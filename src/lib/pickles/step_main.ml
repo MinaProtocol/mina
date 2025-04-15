@@ -4,6 +4,7 @@ open Import
 open Impls.Step
 module B = Inductive_rule.B
 
+
 (* Converts from the one hot vector representation of a number
    0 <= i < n
 
@@ -123,7 +124,7 @@ let verify_one ~srs
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main :
     type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
-       (module Requests.Step.S
+       (module Requests.Step(Inductive_rule.Kimchi_proof).S
           with type local_signature = local_signature
            and type local_branches = local_branches
            and type statement = a_value
@@ -149,7 +150,7 @@ let step_main :
          , a_value
          , ret_var
          , ret_value )
-         Inductive_rule.public_input
+         Inductive_rule.Kimchi_proof_statement.public_input
     -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
     -> basic:
          ( var
@@ -170,7 +171,7 @@ let step_main :
        , ret_value
        , auxiliary_var
        , auxiliary_value )
-       Inductive_rule.Promise.t
+       Inductive_rule.Promise(Inductive_rule.Kimchi_proof).t
     -> (   unit
         -> ( (Unfinalized.t, max_proofs_verified) Vector.t
            , Field.t
@@ -276,10 +277,10 @@ let step_main :
     in
     let T = Max_proofs_verified.eq in
     let app_state = exists input_typ ~request:(fun () -> Req.App_state) in
-    let%bind.Promise { Inductive_rule.previous_proof_statements
+    let%bind.Promise ({ previous_proof_statements
                      ; public_output = ret_var
                      ; auxiliary_output = auxiliary_var
-                     } =
+                     } ) =
       (* Run the application logic of the rule on the predecessor statements *)
       with_label "rule_main" (fun () -> rule.main { public_input = app_state })
     in
@@ -305,11 +306,11 @@ let step_main :
                     type prev_vars prev_values ns1 ns2.
                        ( prev_vars
                        , ns1 )
-                       H2.T(Inductive_rule.Previous_proof_statement).t
+                       H2.T(Inductive_rule.Kimchi_proof_statement.Previous_proof_statement).t
                     -> (prev_vars, prev_values, ns1, ns2) H4.T(Tag).t
                     -> ( prev_values
                        , ns1 )
-                       H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+                       H2.T(Inductive_rule.Kimchi_proof_statement.Previous_proof_statement.Constant).t
                     =
                  fun previous_proof_statement tags ->
                   match (previous_proof_statement, tags) with
@@ -372,7 +373,7 @@ let step_main :
           let rec go :
               type vars ns1 ns2.
                  (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
-              -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
+              -> (vars, ns1) H2.T(Inductive_rule.Kimchi_proof_statement.Previous_proof_statement).t
               -> (vars, ns1, ns2) H3.T(Per_proof_witness).t =
            fun proofs stmts ->
             match (proofs, stmts) with
@@ -393,7 +394,7 @@ let step_main :
                   -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
                   -> vars H1.T(E01(Digest)).t
                   -> vars H1.T(E01(Unfinalized)).t
-                  -> (vars, ns1) H2.T(Inductive_rule.Previous_proof_statement).t
+                  -> (vars, ns1) H2.T(Inductive_rule.Kimchi_proof_statement.Previous_proof_statement).t
                   -> (vars, n) Length.t
                   -> actual_wrap_domains:
                        ( Pickles_base.Proofs_verified.t Typ.prover_value

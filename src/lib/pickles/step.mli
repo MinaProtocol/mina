@@ -4,7 +4,8 @@ module Make
     (A : Pickles_types.Poly_types.T0) (A_value : sig
       type t
     end)
-    (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) : sig
+    (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) 
+    (P: sig type _ proof end): sig
   val f :
        ?handler:
          (   Snarky_backendless.Request.request
@@ -22,7 +23,7 @@ module Make
        , 'prev_values
        , 'local_widths
        , 'local_heights )
-       Step_branch_data.t
+       Step_branch_data.Make(P).t
     -> A_value.t
     -> maxes:
          (module Pickles_types.Hlist.Maxes.S
@@ -43,7 +44,7 @@ module Make
          , A_value.t
          , 'ret_var
          , 'ret_value )
-         Inductive_rule.public_input
+         Inductive_rule.Proof_statement_F(P).public_input
     -> auxiliary_typ:('auxiliary_var, 'auxiliary_value) Impls.Step.Typ.t
     -> Kimchi_pasta.Vesta_based_plonk.Keypair.t
     -> Impls.Wrap.Verification_key.t

@@ -5,21 +5,23 @@ module B = struct
   type t = Impls.Step.Boolean.var
 end
 
-module Previous_proof_statement = struct
-  type ('prev_var, 'width) t =
-    { public_input : 'prev_var
-    ; proof : ('width, 'width) Proof.t Impls.Step.Typ.prover_value
-    ; proof_must_verify : B.t
-    }
 
-  module Constant = struct
-    type ('prev_value, 'width) t =
-      { public_input : 'prev_value
-      ; proof : ('width, 'width) Proof.t
-      ; proof_must_verify : bool
-      }
-  end
-end
+module Proof_statement_F(P: sig type _ proof end) = struct
+    module Previous_proof_statement = struct
+      type ('prev_var, 'width) t =
+        { public_input : 'prev_var
+        ; proof : 'width P.proof Impls.Step.Typ.prover_value
+        ; proof_must_verify : B.t
+        }
+    
+      module Constant = struct
+        type ('prev_value, 'width) t =
+          { public_input : 'prev_value
+          ; proof : 'width P.proof
+          ; proof_must_verify : bool
+          }
+      end
+    end
 
 (** This type relates the types of the input and output types of an inductive
     rule's [main] function to the type of the public input to the resulting
@@ -63,9 +65,11 @@ type ('prev_vars, 'widths, 'public_output, 'auxiliary_output) main_return =
         *)
   }
 
+end
+
 module Make (M : sig
   type _ t
-end) =
+end) (P: sig type _ proof end)  =
 struct
   (** This type models an "inductive rule". It includes
     - the list of previous statements which this one assumes
@@ -103,6 +107,8 @@ struct
       auxiliary data, to be returned to the prover but not exposed in the
       public input.
   *)
+  module Proof_statement = Proof_statement_F(P)
+
   type ( 'prev_vars
        , 'prev_values
        , 'widths
@@ -117,8 +123,8 @@ struct
     { identifier : string
     ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
     ; main :
-           'a_var main_input
-        -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) main_return M.t
+           'a_var Proof_statement.main_input
+        -> ('prev_vars, 'widths, 'ret_var, 'auxiliary_var) Proof_statement.main_return M.t
     ; feature_flags : bool Pickles_types.Plonk_types.Features.t
     }
 
@@ -145,6 +151,20 @@ struct
   end
 end
 
+module Kimchi_proof = struct
+  type 'width proof = ('width, 'width) Proof.t_kimchi
+  type ('a, 'b) t = ('a, 'b) Proof.t_kimchi
+
+  let proof_eq : ('a proof, (unit, 'a, 'a) Mina_wire_types.Pickles.Concrete_.Proof.with_data) Core_kernel.Type_equal.t =
+    Core_kernel.Type_equal.T
+
+end
+
+module Kimchi_proof_statement = struct
+  module M = Proof_statement_F(Kimchi_proof)
+  include M
+end
+
 module Promise = Make (Promise)
 module Deferred = Make (Async_kernel.Deferred)
-include Make (Id)
+include Make (Id) (Kimchi_proof)

@@ -3,6 +3,8 @@ open Pickles_types
 open Hlist
 open Import
 
+module Make(P: sig type _ proof end) = struct
+
 (* The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
      , 'a_value
@@ -34,7 +36,7 @@ type ( 'a_var
           , 'ret_value
           , 'auxiliary_var
           , 'auxiliary_value )
-          Inductive_rule.Promise.t
+          Inductive_rule.Promise(P).t
       ; main :
              step_domains:(Domains.t, 'branches) Vector.t Promise.t
           -> (   unit
@@ -45,7 +47,7 @@ type ( 'a_var
                  Promise.t )
              Promise.t
       ; requests :
-          (module Requests.Step.S
+          (module Requests.Step(P).S
              with type statement = 'a_value
               and type max_proofs_verified = 'max_proofs_verified
               and type proofs_verified = 'proofs_verified
@@ -85,9 +87,9 @@ let create
        , a_value
        , ret_var
        , ret_value )
-       Inductive_rule.public_input ) ~auxiliary_typ _var_to_field_elements
+       Inductive_rule.Proof_statement_F(P).public_input ) ~auxiliary_typ _var_to_field_elements
     _value_to_field_elements ~(chain_to : unit Promise.t)
-    (rule : _ Inductive_rule.Promise.t) =
+    (rule : _ Inductive_rule.Promise(P).t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, proofs_verified)) = HT.length rule.prevs in
@@ -123,7 +125,7 @@ let create
     extract_lengths rule.prevs proofs_verified
   in
   let lte = Nat.lte_exn self_width max_proofs_verified in
-  let requests = Requests.Step.create () in
+  let requests = Requests.Step(P).create () in
   let (typ : (var, value) Impls.Step.Typ.t) =
     match public_input with
     | Input typ ->
@@ -237,3 +239,4 @@ let create
     ; requests
     ; feature_flags = actual_feature_flags
     }
+end

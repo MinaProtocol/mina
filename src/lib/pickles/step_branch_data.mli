@@ -1,5 +1,7 @@
 open Pickles_types
 
+module Make(P: sig type _ proof end) : sig
+
 (** The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
      , 'a_value
@@ -35,7 +37,7 @@ type ( 'a_var
           , 'ret_value
           , 'auxiliary_var
           , 'auxiliary_value )
-          Inductive_rule.Promise.t
+          Inductive_rule.Promise(P).t
             (* Main functions to compute *)
       ; main :
              step_domains:
@@ -50,7 +52,7 @@ type ( 'a_var
                  Promise.t )
              Promise.t
       ; requests :
-          (module Requests.Step.S
+          (module Requests.Step(P).S
              with type auxiliary_value = 'auxiliary_value
               and type local_branches = 'local_heights
               and type local_signature = 'local_widths
@@ -99,7 +101,7 @@ val create :
        , 'a_value
        , 'ret_var
        , 'ret_value )
-       Inductive_rule.public_input
+       Inductive_rule.Proof_statement_F(P).public_input
   -> auxiliary_typ:('a, 'b) Impls.Step.Typ.t
   -> 'c
   -> 'd
@@ -114,7 +116,7 @@ val create :
      , 'ret_value
      , 'a
      , 'b )
-     Inductive_rule.Promise.t
+     Inductive_rule.Promise(P).t
   -> ( 'a_var
      , 'a_value
      , 'ret_var
@@ -128,3 +130,4 @@ val create :
      , 'g
      , 'h )
      t
+            end

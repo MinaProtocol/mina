@@ -53,7 +53,7 @@ struct
         , prev_values
         , local_widths
         , local_heights )
-        Step_branch_data.t ) (next_state : A_value.t)
+        Step_branch_data.Make(Inductive_rule.Kimchi_proof).t ) (next_state : A_value.t)
       ~maxes:
         (module Maxes : Pickles_types.Hlist.Maxes.S
           with type length = Max_proofs_verified.n
@@ -67,7 +67,7 @@ struct
          , A_value.t
          , ret_var
          , ret_value )
-         Inductive_rule.public_input )
+         Inductive_rule.Kimchi_proof_statement.public_input )
       ~(auxiliary_typ : (auxiliary_var, auxiliary_value) Impls.Step.Typ.t) pk
       self_dlog_vk :
       ( ( value
@@ -123,7 +123,7 @@ struct
            Impls.Wrap.Verification_key.t
         -> _ array Plonk_verification_key_evals.t
         -> value
-        -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
+        -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t_kimchi
         -> (var, value, local_max_proofs_verified) Types_map.Basic.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
@@ -572,7 +572,7 @@ struct
             -> (vars, values, ns) H3.T(Types_map.Basic).t
             -> ( values
                , ns )
-               H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+               H2.T(Inductive_rule.Kimchi_proof_statement.Previous_proof_statement.Constant).t
             -> (vars, k) Length.t
             -> (Tock.Curve.Affine.t, k) Vector.t
                * (Unfinalized.Constant.t, k) Vector.t
@@ -582,7 +582,7 @@ struct
                  , ns
                  , ms )
                  H3.T(Per_proof_witness.Constant.No_app_state).t
-               * (ns, ns) H2.T(Proof).t
+               * (ns, ns) H2.T(Inductive_rule.Kimchi_proof).t
                * (int, k) Vector.t =
          fun ts datas prev_proof_stmts l ->
           match (ts, datas, prev_proof_stmts, l) with
@@ -602,6 +602,7 @@ struct
                 else (data.wrap_vk, data.wrap_key)
               in
               let `Sg sg, u, s, x, w, `Actual_wrap_domain domain =
+                let _ = Inductive_rule.Kimchi_proof.proof_eq in
                 expand_proof dlog_vk dlog_index app_state p data ~must_verify
               and sgs, us, ss, xs, ws, ps, domains =
                 go ts datas prev_proof_stmts l
@@ -641,14 +642,14 @@ struct
       module type S = sig
         type res
 
-        val f : _ Proof.t -> res
+        val f : _ Proof.t_kimchi -> res
       end
     end in
     let extract_from_proofs (type res)
         (module Extract : Extract.S with type res = res) =
       let rec go :
           type vars values ns ms len.
-             (ns, ns) H2.T(Proof).t
+             (ns, ns) H2.T(Inductive_rule.Kimchi_proof).t
           -> (values, vars, ns, ms) H4.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
@@ -673,7 +674,7 @@ struct
                  Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
                  Step_bp_vec.t
 
-               let f (T t : _ Proof.t) =
+               let f (T t : _ Proof.t_kimchi) =
                  t.statement.proof_state.deferred_values.bulletproof_challenges
              end )
          in
@@ -781,7 +782,7 @@ struct
              ( module struct
                type res = Tick.Curve.Affine.t
 
-               let f (T t : _ Proof.t) =
+               let f (T t : _ Proof.t_kimchi) =
                  t.statement.proof_state.messages_for_next_wrap_proof
                    .challenge_polynomial_commitment
              end )
@@ -855,7 +856,7 @@ struct
         ( module struct
           type res = E.t
 
-          let f (T t : _ Proof.t) =
+          let f (T t : _ Proof.t_kimchi) =
             let proof = Wrap_wire_proof.to_kimchi_proof t.proof in
             (proof.openings.evals, proof.openings.ft_eval1)
         end )
@@ -863,7 +864,7 @@ struct
     let messages_for_next_wrap_proof =
       let rec go :
           type a.
-             (a, a) H2.T(Proof).t
+             (a, a) H2.T(Kimchi_proof).t
           -> a H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function
         | [] ->

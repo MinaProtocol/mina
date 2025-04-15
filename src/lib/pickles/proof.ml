@@ -109,10 +109,10 @@ module With_data = struct
   type ('s, 'mlmb, 'w) t = ('s, 'mlmb, 'w) with_data
 end
 
-type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
+type ('max_width, 'mlmb) t_kimchi = (unit, 'mlmb, 'max_width) With_data.t
 
 let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
-    (most_recent_width : r Nat.t) ~domain_log2 : (w, h) t =
+    (most_recent_width : r Nat.t) ~domain_log2 : (w, h) t_kimchi =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -227,7 +227,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
-  type nonrec t = (W.n, MLMB.n) t
+  type nonrec t = (W.n, MLMB.n) t_kimchi
 
   let to_repr (T { statement; prev_evals; proof }) : Repr.t =
     let lte =

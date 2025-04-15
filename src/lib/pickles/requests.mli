@@ -4,7 +4,7 @@
 
 open Pickles_types
 
-module Step : sig
+module Step(P: sig type _ proof end) : sig
   module type S = sig
     type statement
 
@@ -26,7 +26,7 @@ module Step : sig
       | Compute_prev_proof_parts :
           ( prev_values
           , local_signature )
-          Hlist.H2.T(Inductive_rule.Previous_proof_statement.Constant).t
+          Hlist.H2.T(Inductive_rule.Kimchi_proof_statement.Previous_proof_statement.Constant).t
           -> unit Promise.t Snarky_backendless.Request.t
       | Proof_with_datas :
           ( prev_values
