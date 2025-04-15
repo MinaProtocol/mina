@@ -19,17 +19,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
   let perform_single () ~message spec :
       (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t =
     (* Use a dummy proof. *)
-    let stmt =
-      match spec with
-      | Rpcs_types.Wire_work.Single.Spec.Stable.V1.Regular regular -> (
-          match regular with
-          | Snark_work_lib.Work.Single.Spec.Transition (stmt, _) ->
-              stmt
-          | Merge (stmt, _, _) ->
-              stmt )
-      | _ ->
-          failwith "TODO"
-    in
+    let stmt = Rpcs_types.Wire_work.Single.Spec.statement spec in
     let sok_digest = Sok_message.digest message in
     Deferred.Or_error.return
     @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
