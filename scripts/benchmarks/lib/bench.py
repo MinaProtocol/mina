@@ -116,6 +116,9 @@ class Benchmark(abc.ABC):
                     result = self.influx_client.query_moving_average(
                         name, branch, str(field), self.branch_header())
 
+                    print(f"result: {result}")
+                    print(f"last result: {result[-1]}")
+
                     records = result[-1].records if (result is not None) and (result[-1] is not None) else []
 
                     if len(records) < self.influx_client.moving_average_size :
