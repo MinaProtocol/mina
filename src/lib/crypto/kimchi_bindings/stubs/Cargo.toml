@@ -9,7 +9,7 @@ edition = "2021"
 
 [dependencies]
 ocaml = { version = "0.22.2", features = ["no-caml-startup"] }
-ocaml-gen = "0.1.5"
+ocaml-gen = "1.0.0"
 
 # proof-systems
 kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
