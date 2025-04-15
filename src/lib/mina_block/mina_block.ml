@@ -7,6 +7,7 @@ module Validation = Validation
 module Validated = Validated_block
 module Precomputed = Precomputed_block
 module Internal_transition = Internal_transition
+module Legacy_format = Legacy_format
 
 type fully_invalid_block = Validation.fully_invalid_with_block
 

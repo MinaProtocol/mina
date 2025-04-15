@@ -57,7 +57,7 @@ let zkapp_proof ~zkapp_command =
 
 let dummy_proof =
   Pickles.Proof.dummy Pickles_types.Nat.N2.n Pickles_types.Nat.N2.n
-    Pickles_types.Nat.N2.n ~domain_log2:16
+    ~domain_log2:16
 
 let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
 

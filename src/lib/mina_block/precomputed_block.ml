@@ -53,7 +53,7 @@ module T = struct
     { scheduled_time : Block_time.t
     ; protocol_state : Protocol_state.value
     ; protocol_state_proof : Proof.t
-    ; staged_ledger_diff : Legacy_staged_ledger_diff.Stable.Latest.t
+    ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.Latest.t
     ; delta_transition_chain_proof :
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list
     ; protocol_version : Protocol_version.t
@@ -78,7 +78,7 @@ module Stable = struct
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
-      ; staged_ledger_diff : Legacy_staged_ledger_diff.Stable.V1.t
+      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V1.t
             (* TODO: Delete this or find out why it is here. *)
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list

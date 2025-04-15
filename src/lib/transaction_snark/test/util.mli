@@ -74,10 +74,8 @@ val trivial_zkapp :
        , unit
        , unit
        , Zkapp_statement.t
-       , ( unit
-         * unit
-         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
-         Async.Deferred.t )
+       , (unit * unit * Pickles_types.Nat.N2.n Pickles.Proof.t) Async.Deferred.t
+       )
        Pickles.Prover.t ] )
   Lazy.t
 
@@ -97,10 +95,8 @@ val test_snapp_update :
        , unit
        , unit
        , Zkapp_statement.t
-       , ( unit
-         * unit
-         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
-         Async.Deferred.t )
+       , (unit * unit * Pickles_types.Nat.N2.n Pickles.Proof.t) Async.Deferred.t
+       )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Update_states_spec.t
   -> init_ledger:Mina_transaction_logic.For_tests.Init_ledger.t
