@@ -365,8 +365,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
-        ~max_proofs_verified ~name ~choices ()
+        ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
+        ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -431,8 +431,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
-        ~max_proofs_verified ~name ~choices ()
+        ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
+        ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -1294,7 +1294,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
             in
             let r =
               Common.time "wrap read or generate " (fun () ->
-                  Cache.Wrap.read_or_generate ~prev_challenges:2 [] ~lazy_mode:false
+                  Cache.Wrap.read_or_generate ~prev_challenges:2 []
+                    ~lazy_mode:false
                     (Lazy.map ~f:Promise.return disk_key_prover)
                     (Lazy.map ~f:Promise.return disk_key_verifier) )
             in

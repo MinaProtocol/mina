@@ -92,7 +92,7 @@ module Step = struct
               header path ) )
 
   let read_or_generate ~prev_challenges cache ?(s_p = storable)
-      ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v  =
+      ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
     let open Impls.Step in
     let pk =
       lazy
@@ -107,7 +107,7 @@ module Step = struct
              let _, _, _, sys = k_p in
              let r =
                Common.time "stepkeygen" (fun () ->
-                   Keypair.generate ~prev_challenges sys ~lazy_mode)
+                   Keypair.generate ~prev_challenges sys ~lazy_mode )
              in
              Timer.clock __LOC__ ;
              ignore
@@ -227,7 +227,7 @@ module Wrap = struct
                          t ) ) )
               header path ) )
 
-  let read_or_generate ~prev_challenges cache ?(s_p = storable) 
+  let read_or_generate ~prev_challenges cache ?(s_p = storable)
       ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
     let module Vk = Verification_key in
     let open Impls.Wrap in

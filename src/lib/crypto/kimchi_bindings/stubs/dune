@@ -82,8 +82,9 @@
   (env_var KIMCHI_STUBS_STATIC_LIB))
  (action
   (progn
-   (copy %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a libkimchi_stubs.a)
-   )))
+   (copy
+    %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a
+    libkimchi_stubs.a))))
 
 ;;
 ;; declare the libraries we're going to generate to match the bindings

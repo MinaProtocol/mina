@@ -378,8 +378,8 @@ struct
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
-       ?(num_chunks = Plonk_checks.num_chunks_by_default) ?(lazy_mode = false) 
-       ~branches ~prev_varss_length ~max_proofs_verified ~name 
+       ?(num_chunks = Plonk_checks.num_chunks_by_default) ?(lazy_mode = false)
+       ~branches ~prev_varss_length ~max_proofs_verified ~name
        ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
@@ -614,7 +614,8 @@ struct
                 Common.time "step read or generate" (fun () ->
                     Cache.Step.read_or_generate
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
-                      cache ~s_p:step_storable ~s_v:step_vk_storable ~lazy_mode k_p k_v)
+                      cache ~s_p:step_storable ~s_v:step_vk_storable ~lazy_mode
+                      k_p k_v )
               in
               accum_dirty (Lazy.map pk ~f:(Promise.map ~f:snd)) ;
               accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;
@@ -696,8 +697,8 @@ struct
       let r =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 cache ~s_p:wrap_storable
-              ~s_v:wrap_vk_storable ~lazy_mode disk_key_prover disk_key_verifier )
+              ~prev_challenges:2 cache ~s_p:wrap_storable ~s_v:wrap_vk_storable
+              ~lazy_mode disk_key_prover disk_key_verifier )
       in
       (r, disk_key_verifier)
     in
