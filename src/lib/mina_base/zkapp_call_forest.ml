@@ -41,7 +41,8 @@ module Checked = struct
 
   let account_update_typ () :
       ( account_update
-      , (_, Zkapp_command.Digest.Account_update.t) With_hash.t )
+      , (Account_update.t, Zkapp_command.Digest.Account_update.t) With_hash.t
+      )
       Typ.t =
     let (Typ typ) =
       Typ.(
