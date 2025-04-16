@@ -4969,6 +4969,86 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       zkapp_command
 
+    module Signature_transfers_spec = struct
+      type t =
+        { fee : Currency.Fee.t
+        ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
+        ; fee_payer :
+            (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
+        ; receivers :
+            ( ( Signature_lib.Keypair.t
+              , Signature_lib.Public_key.Compressed.t )
+              Either.t
+            * Currency.Amount.t )
+            list
+        ; amount : Currency.Amount.t
+        ; zkapp_account_keypairs : Signature_lib.Keypair.t list
+        ; memo : Signed_command_memo.t
+        ; new_zkapp_account : bool
+        ; snapp_update : Account_update.Update.t
+              (* Authorization for the update being performed *)
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; transfer_parties_get_actions_events : bool
+        ; call_data : Tick.Field.t
+        ; preconditions : Account_update.Preconditions.t option
+        }
+      [@@deriving sexp]
+
+      let spec_of_t
+          { fee
+          ; sender
+          ; fee_payer
+          ; receivers
+          ; amount
+          ; zkapp_account_keypairs
+          ; memo
+          ; new_zkapp_account
+          ; snapp_update = _
+          ; actions
+          ; events
+          ; transfer_parties_get_actions_events
+          ; call_data
+          ; preconditions
+          } : Spec.t =
+        { fee
+        ; sender
+        ; fee_payer
+        ; receivers
+        ; amount
+        ; zkapp_account_keypairs
+        ; memo
+        ; new_zkapp_account
+        ; actions
+        ; events
+        ; transfer_parties_get_actions_events
+        ; call_data
+        ; preconditions
+        ; authorization_kind = Signature
+        }
+    end
+
+    let signature_transfers ?receiver_auth ~constraint_constants
+        (spec : Signature_transfers_spec.t) =
+      let ( `Zkapp_command zkapp_command
+          , `Sender_account_update sender_account_update
+          , `Proof_zkapp_command snapp_zkapp_command
+          , `Txn_commitment _commitment
+          , `Full_txn_commitment _full_commitment ) =
+        create_zkapp_command ?receiver_auth ~constraint_constants
+          (Signature_transfers_spec.spec_of_t spec)
+          ~update:spec.snapp_update ~receiver_update:spec.snapp_update
+      in
+      assert (Option.is_some sender_account_update) ;
+      assert (List.is_empty snapp_zkapp_command) ;
+      let account_updates =
+        let sender_account_update = Option.value_exn sender_account_update in
+        Zkapp_command.Call_forest.cons
+          (Account_update.of_simple sender_account_update)
+          zkapp_command.account_updates
+      in
+      { zkapp_command with account_updates }
+
     module Multiple_transfers_spec = struct
       type t =
         { fee : Currency.Fee.t
@@ -4990,7 +5070,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
       [@@deriving sexp]
 
-      let spec_of_t
+      let signature_transfers_spec_of_t
           { fee
           ; sender
           ; fee_payer
@@ -4999,12 +5079,12 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; zkapp_account_keypairs
           ; memo
           ; new_zkapp_account
-          ; snapp_update = _
+          ; snapp_update
           ; actions
           ; events
           ; call_data
           ; preconditions
-          } : Spec.t =
+          } : Signature_transfers_spec.t =
         { fee
         ; sender
         ; fee_payer
@@ -5013,35 +5093,19 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; zkapp_account_keypairs
         ; memo
         ; new_zkapp_account
+        ; snapp_update
         ; actions
         ; events
         ; transfer_parties_get_actions_events = false
         ; call_data
         ; preconditions
-        ; authorization_kind = Signature
         }
     end
 
     let multiple_transfers ~constraint_constants
         (spec : Multiple_transfers_spec.t) =
-      let ( `Zkapp_command zkapp_command
-          , `Sender_account_update sender_account_update
-          , `Proof_zkapp_command snapp_zkapp_command
-          , `Txn_commitment _commitment
-          , `Full_txn_commitment _full_commitment ) =
-        create_zkapp_command ~constraint_constants
-          (Multiple_transfers_spec.spec_of_t spec)
-          ~update:spec.snapp_update ~receiver_update:spec.snapp_update
-      in
-      assert (Option.is_some sender_account_update) ;
-      assert (List.is_empty snapp_zkapp_command) ;
-      let account_updates =
-        let sender_account_update = Option.value_exn sender_account_update in
-        Zkapp_command.Call_forest.cons
-          (Account_update.of_simple sender_account_update)
-          zkapp_command.account_updates
-      in
-      { zkapp_command with account_updates }
+      signature_transfers ~constraint_constants
+        (Multiple_transfers_spec.signature_transfers_spec_of_t spec)
 
     let trivial_zkapp_account ?(permissions = Permissions.user_default) ~vk pk =
       let id = Account_id.create pk Token_id.default in
