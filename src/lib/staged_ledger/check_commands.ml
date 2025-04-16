@@ -25,7 +25,7 @@ let verify_command_with_transaction_pool_proxy
     (* PERF: `hash_command` is slow, so we may need to investigate if we could
        reuse hashes from transition verification. *)
     User_command.of_verifiable verifiable_cmd
-    |> User_command.read_all_proofs_from_disk |> Transaction_hash.hash_command
+    |> Transaction_hash.hash_command_with_hashes
   in
   match transaction_pool_proxy.find_by_hash cmd_hash with
   | None ->

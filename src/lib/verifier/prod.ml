@@ -256,7 +256,9 @@ module Worker = struct
         ; verify_commands =
             f
               ( [%bin_type_class:
-                  User_command.Verifiable.t With_status.Stable.Latest.t list]
+                  User_command.Verifiable.Serializable.t
+                  With_status.Stable.Latest.t
+                  list]
               , [%bin_type_class:
                   [ `Valid
                   | `Valid_assuming of

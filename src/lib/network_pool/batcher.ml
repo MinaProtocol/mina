@@ -253,7 +253,7 @@ module Transaction_pool = struct
   open Mina_base
 
   type diff = User_command.Verifiable.t list Envelope.Incoming.t
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 
   (* A partially verified transaction is either valid, or valid assuming that some list of
      (verification key, statement, proof) triples will verify. That is, the transaction has
@@ -268,11 +268,12 @@ module Transaction_pool = struct
         * Zkapp_statement.t
         * Pickles.Side_loaded.Proof.t )
         list ]
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 
-  type partial = partial_item list [@@deriving sexp]
+  type partial = partial_item list [@@deriving sexp_of]
 
-  type t = (diff, partial, User_command.Valid.t list) batcher [@@deriving sexp]
+  type t = (diff, partial, User_command.Valid.t list) batcher
+  [@@deriving sexp_of]
 
   type input = [ `Init of diff | `Partially_validated of partial ]
 

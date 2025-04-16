@@ -102,8 +102,8 @@ let read_all_proofs_from_disk : t -> Stable.Latest.t = function
   | Zkapp_command zc ->
       Zkapp_command (Zkapp_command.read_all_proofs_from_disk zc)
 
-type ('a, 'b) with_forest =
-  (Signed_command.t, ('a, 'b) Zkapp_command.with_forest) Poly.t
+type ('p, 'a, 'b) with_forest =
+  (Signed_command.t, ('p, 'a, 'b) Zkapp_command.with_forest) Poly.t
 
 let to_base64 : Stable.Latest.t -> string = function
   | Signed_command sc ->
@@ -142,7 +142,7 @@ module Verifiable = struct
     ( Signed_command.Stable.Latest.t
     , Zkapp_command.Verifiable.t )
     Poly.Stable.Latest.t
-  [@@deriving sexp, bin_io_unversioned]
+  [@@deriving sexp_of]
 
   let fee_payer (t : t) =
     match t with
@@ -150,6 +150,28 @@ module Verifiable = struct
         Signed_command.fee_payer x
     | Zkapp_command p ->
         Account_update.Fee_payer.account_id p.fee_payer
+
+  module Serializable = struct
+    type t =
+      ( Signed_command.Stable.Latest.t
+      , Zkapp_command.Verifiable.Serializable.t )
+      Poly.Stable.Latest.t
+    [@@deriving bin_io_unversioned]
+  end
+
+  let to_serializable (t : t) : Serializable.t =
+    match t with
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command cmd ->
+        Zkapp_command (Zkapp_command.Verifiable.to_serializable cmd)
+
+  let of_serializable (t : Serializable.t) : t =
+    match t with
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command cmd ->
+        Zkapp_command (Zkapp_command.Verifiable.of_serializable cmd)
 end
 
 let to_verifiable (t : t) ~failed ~find_vk : Verifiable.t Or_error.t =
@@ -215,7 +237,7 @@ let of_verifiable (t : Verifiable.t) : t =
   | Zkapp_command p ->
       Zkapp_command (Zkapp_command.of_verifiable p)
 
-let fee : (_, _) with_forest -> Currency.Fee.t = function
+let fee : (_, _, _) with_forest -> Currency.Fee.t = function
   | Signed_command x ->
       Signed_command.fee x
   | Zkapp_command p ->
@@ -230,18 +252,18 @@ let is_disabled = function
       false
 
 (* always `Accessed` for fee payer *)
-let accounts_accessed (t : (_, _) with_forest) (status : Transaction_status.t) :
-    (Account_id.t * [ `Accessed | `Not_accessed ]) list =
+let accounts_accessed (t : (_, _, _) with_forest) (status : Transaction_status.t)
+    : (Account_id.t * [ `Accessed | `Not_accessed ]) list =
   match t with
   | Signed_command x ->
       Signed_command.account_access_statuses x status
   | Zkapp_command ps ->
       Zkapp_command.account_access_statuses ps status
 
-let accounts_referenced (t : (_, _) with_forest) =
+let accounts_referenced (t : (_, _, _) with_forest) =
   List.map (accounts_accessed t Applied) ~f:(fun (acct_id, _status) -> acct_id)
 
-let fee_payer (t : (_, _) with_forest) =
+let fee_payer (t : (_, _, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.fee_payer x
@@ -249,7 +271,7 @@ let fee_payer (t : (_, _) with_forest) =
       Zkapp_command.fee_payer p
 
 (** The application nonce is the nonce of the fee payer at which a user command can be applied. *)
-let applicable_at_nonce (t : (_, _) with_forest) =
+let applicable_at_nonce (t : (_, _, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.nonce x
@@ -266,21 +288,21 @@ let extract_vks : t -> (Account_id.t * Verification_key_wire.t) List.t =
       Zkapp_command.extract_vks cmd
 
 (** The target nonce is what the nonce of the fee payer will be after a user command is successfully applied. *)
-let target_nonce_on_success (t : (_, _) with_forest) =
+let target_nonce_on_success (t : (_, _, _) with_forest) =
   match t with
   | Signed_command x ->
       Account.Nonce.succ (Signed_command.nonce x)
   | Zkapp_command p ->
       Zkapp_command.target_nonce_on_success p
 
-let fee_token (t : (_, _) with_forest) =
+let fee_token (t : (_, _, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.fee_token x
   | Zkapp_command x ->
       Zkapp_command.fee_token x
 
-let valid_until (t : (_, _) with_forest) =
+let valid_until (t : (_, _, _) with_forest) =
   match t with
   | Signed_command x ->
       Signed_command.valid_until x
@@ -295,7 +317,7 @@ module Valid = struct
   type t_ = t
 
   type t = (Signed_command.With_valid_signature.t, Zkapp_command.Valid.t) Poly.t
-  [@@deriving sexp, compare, equal, hash, yojson]
+  [@@deriving sexp_of, to_yojson]
 
   module Gen = Gen_make (Signed_command.With_valid_signature)
 end
@@ -346,14 +368,14 @@ let filter_by_participant (commands : t list) public_key =
 
 (* A metric on user commands that should correspond roughly to resource costs
    for validation/application *)
-let weight : (_, _) with_forest -> int = function
+let weight : (_, _, _) with_forest -> int = function
   | Signed_command signed_command ->
       Signed_command.payload signed_command |> Signed_command_payload.weight
   | Zkapp_command zkapp_command ->
       Zkapp_command.weight zkapp_command
 
 (* Fee per weight unit *)
-let fee_per_wu (user_command : (_, _) with_forest) : Currency.Fee_rate.t =
+let fee_per_wu (user_command : (_, _, _) with_forest) : Currency.Fee_rate.t =
   (*TODO: return Or_error*)
   Currency.Fee_rate.make_exn (fee user_command) (weight user_command)
 
@@ -375,7 +397,7 @@ let is_incompatible_version = function
   | Zkapp_command p ->
       Zkapp_command.is_incompatible_version p
 
-let has_invalid_call_forest : (_, _) with_forest -> bool = function
+let has_invalid_call_forest : (_, _, _) with_forest -> bool = function
   | Signed_command _ ->
       false
   | Zkapp_command cmd ->
@@ -413,7 +435,7 @@ module Well_formedness_error = struct
 end
 
 let check_well_formedness ~(genesis_constants : Genesis_constants.t)
-    (t : (_, _) with_forest) : (unit, Well_formedness_error.t list) result =
+    (t : (_, _, _) with_forest) : (unit, Well_formedness_error.t list) result =
   let preds =
     let open Well_formedness_error in
     [ ( has_insufficient_fee
@@ -441,7 +463,7 @@ let check_well_formedness ~(genesis_constants : Genesis_constants.t)
 type fee_payer_summary_t = Signature.t * Account.key * int
 [@@deriving yojson, hash]
 
-let fee_payer_summary : (_, _) with_forest -> fee_payer_summary_t = function
+let fee_payer_summary : (_, _, _) with_forest -> fee_payer_summary_t = function
   | Zkapp_command cmd ->
       let fp = Zkapp_command.fee_payer_account_update cmd in
       let open Account_update in
