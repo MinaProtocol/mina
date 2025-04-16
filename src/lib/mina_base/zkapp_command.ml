@@ -868,7 +868,8 @@ end
 (* so transaction ids have a version tag *)
 include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
-type account_updates = (Account_update.t, unit, unit) Call_forest.t
+type account_updates =
+  (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Call_forest.t
 
 let account_updates_deriver obj =
   let of_zkapp_command_with_depth (ps : Account_update.Graphql_repr.t list) =
@@ -876,6 +877,7 @@ let account_updates_deriver obj =
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
     |> Call_forest.map ~f:Account_update.of_graphql_repr
+    |> Call_forest.accumulate_hashes'
   and to_zkapp_command_with_depth ps : Account_update.Graphql_repr.t list =
     ps
     |> Call_forest.to_account_updates_map ~f:(fun ~depth p ->
