@@ -34,6 +34,7 @@ in  Pipeline.build
                 , service = Artifacts.Type.Toolchain
                 , deb_codename = DebianVersions.DebVersion.Focal
                 , no_cache = True
+                , no_debian = True
                 }
 
           in  DockerImage.generateStep toolchainBullseyeSpec
