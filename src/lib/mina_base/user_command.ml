@@ -114,8 +114,11 @@ let forget_digests_and_proofs (t : (_, _, _) with_forest) :
   | Zkapp_command zc ->
       Zkapp_command (Zkapp_command.forget_digests_and_proofs zc)
 
-let equal_ignoring_proofs_and_hashes (type a b c a' b' c')
-    (t1 : (a, b, c) with_forest) (t2 : (a', b', c') with_forest) =
+let equal_ignoring_proofs_and_hashes
+    (type proof_l account_update_digest_l forest_digest_l proof_r
+    account_update_digest_r forest_digest_r )
+    (t1 : (proof_l, account_update_digest_l, forest_digest_l) with_forest)
+    (t2 : (proof_r, account_update_digest_r, forest_digest_r) with_forest) =
   let ignore2 _ _ = true in
   let t1' = forget_digests_and_proofs t1 in
   let t2' = forget_digests_and_proofs t2 in
