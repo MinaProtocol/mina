@@ -21,12 +21,15 @@ TEMP_ACCOUNTS_FILE=$TEMP_FOLDER/accounts_tmp.json
 GENESIS_LEDGER=$TEMP_FOLDER/genesis_ledger.config
 SENDER=$TEMP_FOLDER/sender
 
-while [[ "$#" -gt 0 ]]; do case $1 in
-  -m|--mina-app) MINA_APP="$2"; shift;;
-  -r|--runtime-ledger-app) RUNTIME_LEDGER_APP="$2"; shift;;
-  *) echo "Unknown parameter passed: $1"; exit 1;;
-esac; shift; done
+ACTIONS_EVENTS_OPT="--transfer-parties-get-actions-events"
+FULL_ACTIONS_EVENTS=""
 
+while [[ "$#" -gt 0 ]]; do case $1 in
+  -m|--mina-app) MINA_APP="$2"; shift; shift;;
+  -r|--runtime-ledger-app) RUNTIME_LEDGER_APP="$2"; shift; shift;;
+  $ACTIONS_EVENTS_OPT) FULL_ACTIONS_EVENTS="$ACTIONS_EVENTS_OPT"; shift;;
+  *) echo "Unknown parameter passed: $1"; exit 1;;
+esac; done
 
 echo "Exporting ledger to $TEMP_FOLDER"
 echo "20k accounts is way less than the size of a mainnet ledger (200k), but good enough for testing"
@@ -55,5 +58,4 @@ mkdir $TEMP_FOLDER/genesis/ledger
 tar -zxf  $TEMP_FOLDER/genesis/genesis_ledger_*.tar.gz -C $TEMP_FOLDER/genesis/ledger
 
 echo "running test:"
-time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200 --dump-benchmark $BENCHMARK_FILE
-
+time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200 --dump-benchmark $BENCHMARK_FILE $ACTIONS_EVENTS_OPT
