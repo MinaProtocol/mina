@@ -207,6 +207,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; transaction_capacity =
             Some Runtime_config.Proof_keys.Transaction_capacity.small
         ; fork = Some fork_config
+        ; block_window_duration_ms = Some 30000
         }
     }
 
