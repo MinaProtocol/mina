@@ -244,7 +244,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect V3
+      dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect `V3
         daemon_address
     with
     | Error e ->

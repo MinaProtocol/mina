@@ -14,7 +14,7 @@ module Get_work = struct
          logic dealing with whole zkapp command in the client.
          We could imagine this query being telling the server what capability the client snark worker have
       *)
-      type query = V2 | V3
+      type query = [ `V2 | `V3 ]
 
       type response = (Wire_work.Spec.t * Public_key.Compressed.t) option
     end

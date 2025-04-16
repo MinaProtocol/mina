@@ -49,3 +49,8 @@ module Snark_job_state : sig
   type t =
     { work_selector : State.t; work_partitioner : Work_partitioner.State.t }
 end
+
+val request_partitioned_work :
+     Snark_job_state.t
+  -> (Work_partitioner.partitioned_work * Snark_work_lib.Work.Partition_id.t)
+     option

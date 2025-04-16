@@ -9,6 +9,16 @@
 open Core_kernel
 open Transaction_snark
 
+type partitioned_work =
+  | Regular of
+      (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+  | Zkapp_command_segment of
+      { segment_id : int
+      ; statement : Transaction_snark.Statement.With_sok.t
+      ; witness : Zkapp_command_segment.Witness.t
+      ; spec : Zkapp_command_segment.Basic.t
+      }
+
 module Single_work_with_data = struct
   type t =
     { which_half : [ `First | `Second ]
@@ -72,5 +82,3 @@ module State = struct
     ; sent_jobs_partitioner = Queue.create ()
     }
 end
-
-let request_work (_s : State.t) = failwith "TODO: implement work issuement"

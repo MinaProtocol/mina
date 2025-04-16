@@ -865,17 +865,43 @@ let best_chain ?max_length t =
       Transition_frontier.root frontier :: best_tip_path
 
 (* A Snark worker is requesting work from coordinator *)
-let request_work ~capability:_ (t : t) :
+let request_work ~capability (t : t) :
     Snark_worker_lib.Rpcs_types.Wire_work.Spec.t option =
   let (module Work_selection_method) = t.config.work_selection_method in
+  let open Option.Let_syntax in
   let fee = snark_work_fee t in
-  let _instances_opt =
-    Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) (snark_job_state t).work_selector
-  in
-  (* Option.map instances_opt ~f:(fun instances -> *)
-  (*     { Snark_work_lib.Work.Spec.instances; fee } ) *)
-  failwith "TODO: request work"
+  match capability with
+  | `V2 ->
+      let%map instances =
+        Work_selection_method.work ~logger:t.config.logger ~fee
+          ~snark_pool:(snark_pool t) (snark_job_state t).work_selector
+      in
+      Snark_worker_lib.Rpcs_types.Wire_work.Spec.Stable.V1.to_latest
+        { instances; fee }
+  | `V3 -> (
+      let%map spec, work_id =
+        Work_selector.request_partitioned_work t.snark_job_state
+      in
+      match spec with
+      | Regular instance ->
+          { Snark_work_lib.Work.Spec.Stable.V2.instances =
+              `One
+                (Snark_worker_lib.Rpcs_types.Wire_work.Single.Spec.Stable.V2
+                 .Regular
+                   instance )
+          ; fee
+          ; work_id
+          }
+      | Zkapp_command_segment { segment_id; statement; witness; spec } ->
+          { Snark_work_lib.Work.Spec.Stable.V2.instances =
+              `One
+                (* TODO: move this type to work definition so we have clearer code*)
+                (Snark_worker_lib.Rpcs_types.Wire_work.Single.Spec.Stable.V2
+                 .Zkapp_command_segment
+                   { segment_id; statement; witness; spec } )
+          ; fee
+          ; work_id
+          } )
 
 let work_selection_method t = t.config.work_selection_method
 

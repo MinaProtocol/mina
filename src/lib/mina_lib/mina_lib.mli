@@ -108,7 +108,7 @@ val snark_work_fee : t -> Currency.Fee.t
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
 val request_work :
-     capability:Snark_worker.Rpcs_versioned.Get_work.Latest.query
+     capability:[ `V2 | `V3 ]
   -> t
   -> Snark_worker.Rpcs_types.Wire_work.Spec.t option
 

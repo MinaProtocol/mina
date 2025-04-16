@@ -18,22 +18,14 @@ let regular_opt (work : Wire_work.Single.Spec.Stable.V2.t) :
 module Get_work = struct
   module V3 = struct
     module T = struct
-      type query = V2 | V3
+      type query = [ `V2 | `V3 ]
 
       type response =
         (Wire_work.Spec.Stable.V2.t * Public_key.Compressed.Stable.V1.t) option
 
-      let query_of_caller_model = function
-        | Rpcs_master.Get_work.V2 ->
-            V2
-        | V3 ->
-            V3
+      let query_of_caller_model = Fn.id
 
-      let callee_model_of_query = function
-        | V2 ->
-            Rpcs_master.Get_work.V2
-        | V3 ->
-            V3
+      let callee_model_of_query = Fn.id
 
       let response_of_callee_model : Rpcs_master.Get_work.response -> response =
         Fn.id
@@ -55,7 +47,7 @@ module Get_work = struct
 
       let query_of_caller_model = const ()
 
-      let callee_model_of_query = const Rpcs_master.Get_work.V2
+      let callee_model_of_query = const `V2
 
       let response_of_callee_model (resp : Rpcs_master.Get_work.response) :
           response =
