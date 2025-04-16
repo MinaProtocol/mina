@@ -2342,7 +2342,7 @@ module Queries = struct
             Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
         in
         Work_selector.pending_work_statements ~snark_pool ~fee_opt
-          snark_job_state )
+          snark_job_state.work_selector )
 
   let snark_work_range =
     field "snarkWorkRange"
@@ -2367,7 +2367,9 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
         let snark_job_state = Mina_lib.snark_job_state mina in
         let snark_pool = Mina_lib.snark_pool mina in
-        let all_work = Work_selector.all_work ~snark_pool snark_job_state in
+        let all_work =
+          Work_selector.all_work ~snark_pool snark_job_state.work_selector
+        in
         let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
         let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
         let to_bundle_specs =

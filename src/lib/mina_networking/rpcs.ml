@@ -34,7 +34,7 @@ module type CONTEXT = sig
 
   val get_snark_pool : unit -> Network_pool.Snark_pool.t option
 
-  val snark_job_state : unit -> Work_selector.State.t option
+  val snark_job_state : unit -> Work_selector.Snark_job_state.t option
 
   val ledger_sync_config : Syncable_ledger.daemon_config
 
@@ -864,7 +864,8 @@ module Get_completed_snarks = struct
     let limit = 32 in
     match (get_snark_pool (), snark_job_state ()) with
     | Some snark_pool, Some snark_state ->
-        Work_selector.completed_work_statements ~snark_pool snark_state
+        Work_selector.completed_work_statements ~snark_pool
+          snark_state.work_selector
         |> Fn.flip List.take limit
         |> List.map
              ~f:

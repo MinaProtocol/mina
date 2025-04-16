@@ -107,7 +107,7 @@ type t =
   ; pipes : pipes
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
-  ; snark_job_state : Work_selector.State.t
+  ; snark_job_state : Work_selector.Snark_job_state.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
@@ -871,7 +871,7 @@ let request_work ~capability:_ (t : t) :
   let fee = snark_work_fee t in
   let _instances_opt =
     Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) (snark_job_state t)
+      ~snark_pool:(snark_pool t) (snark_job_state t).work_selector
   in
   (* Option.map instances_opt ~f:(fun instances -> *)
   (*     { Snark_work_lib.Work.Spec.instances; fee } ) *)
@@ -888,7 +888,7 @@ let add_work t (work : Snark_worker_lib.Rpcs_types.Wire_work.Result.t) =
     in
     let pending_work =
       Work_selector.pending_work_statements ~snark_pool ~fee_opt
-        t.snark_job_state
+        t.snark_job_state.work_selector
       |> List.length
     in
     Mina_metrics.(
@@ -902,7 +902,7 @@ let add_work t (work : Snark_worker_lib.Rpcs_types.Wire_work.Result.t) =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selector.remove t.snark_job_state spec
+    Work_selector.remove t.snark_job_state.work_selector spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Network_pool.Snark_pool.(
@@ -2083,10 +2083,14 @@ let create ~commit_id ?wallets (config : Config.t) =
               }
           in
           let snark_jobs_state =
-            Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~logger:config.logger
+            Work_selector.Snark_job_state.
+              { work_partitioner = ()
+              ; work_selector =
+                  Work_selector.State.init
+                    ~reassignment_wait:config.work_reassignment_wait
+                    ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+                    ~logger:config.logger
+              }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =

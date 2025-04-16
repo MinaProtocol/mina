@@ -124,7 +124,7 @@ val add_work_graphql :
      * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
      Deferred.Or_error.t
 
-val snark_job_state : t -> Work_selector.State.t
+val snark_job_state : t -> Work_selector.Snark_job_state.t
 
 val get_current_nonce :
      t

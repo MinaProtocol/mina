@@ -42,3 +42,10 @@ val all_work :
 
 val completed_work_statements :
   snark_pool:snark_pool -> State.t -> Transaction_snark_work.Checked.t list
+
+module Work_partitioner = Work_partitioner
+
+module Snark_job_state : sig
+  type t =
+    { work_selector : State.t; work_partitioner : Work_partitioner.State.t }
+end

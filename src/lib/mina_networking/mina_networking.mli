@@ -290,5 +290,5 @@ val create :
   -> get_transition_frontier:(unit -> Transition_frontier.t option)
   -> get_snark_pool:(unit -> Snark_pool.t option)
   -> get_node_status:(unit -> Node_status.t Deferred.Or_error.t)
-  -> snark_job_state:(unit -> Work_selector.State.t option)
+  -> snark_job_state:(unit -> Work_selector.Snark_job_state.t option)
   -> t Deferred.t
