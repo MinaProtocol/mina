@@ -1,3 +1,6 @@
+(* module contains logic that may be shared across coordinator and worker. This
+   is needed for backward compatibility reason. *)
+
 open Core
 open Async
 open Mina_base
@@ -6,6 +9,7 @@ open Transaction_snark
 (* NOTE:
    For compatibility reasons, this is used in:
      - Snark_worker.Worker_impl_prod.perform_single
+     - Work_selector.produce_partitioned_work_from_single
 *)
 
 let extract_zkapp_segment_works (module M : S)

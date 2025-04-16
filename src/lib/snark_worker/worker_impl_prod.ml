@@ -136,6 +136,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
       ~sok_digest =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
+    (* WARN: a smilar copy of this exists in `Work_selector.Work_selector` *)
     match regular with
     | Work.Single.Spec.Transition (input, (w : Transaction_witness.t)) -> (
         match Transaction.read_all_proofs_from_disk w.transaction with
@@ -143,7 +144,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
             (* NOTE: we only go down this path if coordinator is
                V2, still this is preserved for compatibility. *)
             let%bind witnesses_specs_stmts =
-              Shared.extract_zkapp_segment_works
+              Work_selector.Shared.extract_zkapp_segment_works
                 (module M)
                 input w zkapp_command
             in

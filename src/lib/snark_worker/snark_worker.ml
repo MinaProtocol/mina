@@ -17,10 +17,6 @@ module Impl = struct
   module Debug = Worker_impl_debug.Impl
 end
 
-(* module contains logic that may be shared across coordinator and worker. This
-   is needed for backward compatibility reason. *)
-module Shared = Shared
-
 type Structured_log_events.t +=
   | Generating_snark_work_failed of { error : Yojson.Safe.t }
   [@@deriving register_event { msg = "Failed to generate SNARK work: $error" }]

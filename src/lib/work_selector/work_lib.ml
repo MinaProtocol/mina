@@ -2,6 +2,10 @@ open Core_kernel
 open Currency
 open Async
 
+type work =
+  (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+[@@deriving yojson]
+
 module Job_status = struct
   type t = Assigned of Time.t
 

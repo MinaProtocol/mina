@@ -46,7 +46,10 @@
   mina_node_config.unconfigurable_constants
   mina_state
   transaction_protocol_state
-  ppx_version.runtime)
+  ppx_version.runtime
+  ; The reason we need this is Work_selector.Shared module is used in snark worker
+  work_selector)
+  
  (preprocess
   (pps
    ppx_bin_prot

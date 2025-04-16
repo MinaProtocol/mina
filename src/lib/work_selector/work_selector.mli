@@ -44,6 +44,7 @@ val completed_work_statements :
   snark_pool:snark_pool -> State.t -> Transaction_snark_work.Checked.t list
 
 module Work_partitioner = Work_partitioner
+module Shared = Shared
 
 module Snark_job_state : sig
   type t =
@@ -57,4 +58,4 @@ val request_partitioned_work :
   -> snark_pool:snark_pool
   -> selector:State.t
   -> partitioner:Work_partitioner.State.t
-  -> Work_partitioner.partitioned_work option
+  -> Work_partitioner.Partitioned_work.t option
