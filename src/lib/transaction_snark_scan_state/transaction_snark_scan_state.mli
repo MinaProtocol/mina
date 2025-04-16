@@ -257,7 +257,7 @@ val check_required_protocol_states :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> ( Transaction_witness.Stable.Latest.t
+  -> ( Transaction_witness.t
      , Ledger_proof.Cached.t )
      Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
