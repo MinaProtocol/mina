@@ -17,7 +17,7 @@ val hash_messages_for_next_wrap_proof :
      Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
   -> Import.Types.Digest.Constant.t
 
-val pad_proof : ('mlmb, 'a) Proof.t -> Proof.Proofs_verified_max.t
+val pad_proof : 'mlmb Proof.t -> Proof.Proofs_verified_max.t
 
 val pad_challenges :
      ( ( Backend.Tock.Field.t

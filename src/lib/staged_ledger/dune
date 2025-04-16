@@ -6,25 +6,17 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
   ppx_hash.runtime-lib
-  async_kernel
-  base.caml
-  base
-  sexplib0
-  core_kernel
   core
   lens
   async
   async_unix
-  base.base_internalhash_types
   integers
   ;; local libraries
   kimchi_pasta
   kimchi_pasta.basic
   random_oracle_input
   bounded_types
-  mina_base.import
   mina_ledger
   quickcheck_lib
   mina_metrics

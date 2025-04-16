@@ -8,14 +8,14 @@ end
 module Previous_proof_statement = struct
   type ('prev_var, 'width) t =
     { public_input : 'prev_var
-    ; proof : ('width, 'width) Proof.t Impls.Step.Typ.prover_value
+    ; proof : 'width Proof.t Impls.Step.Typ.prover_value
     ; proof_must_verify : B.t
     }
 
   module Constant = struct
     type ('prev_value, 'width) t =
       { public_input : 'prev_value
-      ; proof : ('width, 'width) Proof.t
+      ; proof : 'width Proof.t
       ; proof_must_verify : bool
       }
   end

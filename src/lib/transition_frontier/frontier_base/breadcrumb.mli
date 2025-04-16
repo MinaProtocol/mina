@@ -30,7 +30,6 @@ val create :
 val build :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
   -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
-  -> proof_cache_db:Proof_cache_tag.cache_db
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t

@@ -24,7 +24,7 @@ module Sender_local_state : sig
 end
 
 (** Transaction pool. This is a purely functional data structure. *)
-type t [@@deriving equal, compare, sexp_of]
+type t [@@deriving equal, sexp_of]
 
 val config : t -> Config.t
 
@@ -35,7 +35,7 @@ val set_sender_local_state : t -> Sender_local_state.t -> t
 module rec Update : sig
   val apply : Update.t -> t -> t
 
-  type t [@@deriving to_yojson, sexp]
+  type t [@@deriving to_yojson]
 
   val merge : t -> t -> t
 
@@ -139,10 +139,13 @@ module For_tests : sig
       there is a bug. *)
   val assert_pool_consistency : t -> unit
 
-  val applicable_by_fee :
-       t
-    -> Transaction_hash.User_command_with_valid_signature.Set.t
-       Currency.Fee_rate.Map.t
+  module Applicable_by_fee :
+      module type of
+        Mina_stdlib.Map_set.Make
+          (Currency.Fee_rate)
+          (Transaction_hash.User_command_with_valid_signature.Set)
+
+  val applicable_by_fee : t -> Applicable_by_fee.t
 
   val all_by_sender :
        t

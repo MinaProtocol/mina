@@ -107,7 +107,7 @@ in {
         fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
     };
     buildPhase = ''
-      cargo build -p kimchi-stubs --release --lib --all-features
+      cargo build -p kimchi-stubs --release --lib
     '';
     installPhase = ''
         mkdir -p $out/lib
@@ -205,9 +205,9 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./plonk-wasm -- --features nodejs
-      wasm-pack build --mode no-install --target web --out-dir $out/web ./plonk-wasm
+      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';

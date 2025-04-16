@@ -153,6 +153,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
     breadcrumb |> Transition_frontier.Breadcrumb.block
+    |> Mina_block.read_all_proofs_from_disk
   in
   let block_string =
     Binable.to_string (module Mina_block.Stable.Latest) external_transition

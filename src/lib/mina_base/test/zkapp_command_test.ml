@@ -98,14 +98,14 @@ let account_update_or_stack_of_zkapp_command_list () =
     zkapp_command_list_4
 
 let wire_embedded_in_t () =
-  let module Wire = Stable.Latest.Wire in
-  Quickcheck.test ~trials:10 ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
-      [%test_eq: Wire.t] (to_wire (of_wire w)) w )
+  let open Stable.Latest in
+  Quickcheck.test ~trials:10 ~shrinker gen ~f:(fun w ->
+      [%test_eq: t] (read_all_proofs_from_disk (write_all_proofs_to_disk w)) w )
 
 let wire_embedded_in_graphql () =
-  let module Wire = Stable.Latest.Wire in
-  Quickcheck.test ~shrinker:Wire.shrinker Wire.gen ~f:(fun w ->
-      [%test_eq: Wire.t] (Wire.of_graphql_repr (Wire.to_graphql_repr w)) w )
+  let open Stable.Latest in
+  Quickcheck.test ~shrinker gen ~f:(fun w ->
+      [%test_eq: t] (of_graphql_repr (to_graphql_repr w)) w )
 
 (* These tests are wrapped so that the type of [full] does not have to be
    exposed (and can remain polymorphic). *)
@@ -119,10 +119,13 @@ end = struct
   let full = deriver @@ Fd.o ()
 
   let json_roundtrip_dummy () =
-    let dummy = Lazy.force dummy in
-    [%test_eq: t] dummy (dummy |> Fd.to_json full |> Fd.of_json full)
+    let dummy = Lazy.force dummy |> Zkapp_command.read_all_proofs_from_disk in
+    [%test_eq: Stable.Latest.t] dummy
+      (dummy |> Fd.to_json full |> Fd.of_json full)
 
   let full_circuit () =
     Run_in_thread.block_on_async_exn
-    @@ fun () -> Fields_derivers_zkapps.Test.Loop.run full (Lazy.force dummy)
+    @@ fun () ->
+    Fields_derivers_zkapps.Test.Loop.run full
+      (Zkapp_command.read_all_proofs_from_disk @@ Lazy.force dummy)
 end
