@@ -497,12 +497,31 @@ let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
 let accumulate_hashes_predicated xs =
   accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
+let forget_hashes =
+  let rec impl = List.map ~f:forget_digest
+  and forget_digest = function
+    | { With_stack_hash.stack_hash = _
+      ; elt = { Tree.account_update; account_update_digest = _; calls }
+      } ->
+        { With_stack_hash.stack_hash = ()
+        ; elt =
+            { Tree.account_update
+            ; account_update_digest = ()
+            ; calls = impl calls
+            }
+        }
+  in
+  impl
+
 module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'data t =
-        ( Account_update.Stable.V1.t * 'data
+      type ('proof, 'data) t =
+        ( ( Account_update.Body.Stable.V1.t
+          , ('proof, Signature.Stable.V1.t) Control.Poly.Stable.V1.t )
+          Account_update.Poly.Stable.V1.t
+          * 'data
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t

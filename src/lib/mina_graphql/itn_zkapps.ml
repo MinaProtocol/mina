@@ -72,7 +72,11 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
         @@ fun () ->
         if finished () then Deferred.return (`Finished ())
         else
-          match%bind Zkapps.send_zkapp_command mina zkapp_command with
+          (* TODO create without hash accumulation and remove read_all_proofs_from_disk call *)
+          match%bind
+            Zkapps.send_zkapp_command mina
+              (Zkapp_command.read_all_proofs_from_disk zkapp_command)
+          with
           | Ok _ ->
               fee_payer_nonces.(ndx) :=
                 Account.Nonce.succ !(fee_payer_nonces.(ndx)) ;
@@ -283,7 +287,11 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
         let%bind () =
           O1trace.thread "itn_send_zkapp"
           @@ fun () ->
-          match%map Zkapps.send_zkapp_command mina zkapp_command with
+          (* TODO create without hash accumulation and remove read_all_proofs_from_disk call *)
+          match%map
+            Zkapps.send_zkapp_command mina
+              (Zkapp_command.read_all_proofs_from_disk zkapp_command)
+          with
           | Ok _ ->
               [%log info] "Sent out zkApp with fee payer's summary $summary"
                 ~metadata:

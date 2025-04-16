@@ -3,14 +3,10 @@
  (public_name downloader)
  (libraries
   ;; opam libraries
-  async_kernel
   async
   core
-  core_kernel
-  sexplib0
   core_kernel.pairing_heap
   async_unix
-  base.caml
   ;; local libraries
   network_peer
   pipe_lib
