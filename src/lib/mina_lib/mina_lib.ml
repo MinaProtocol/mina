@@ -865,15 +865,17 @@ let best_chain ?max_length t =
       Transition_frontier.root frontier :: best_tip_path
 
 (* A Snark worker is requesting work from coordinator *)
-let request_work (t : t) =
+let request_work ~capability:_ (t : t) :
+    Snark_worker_lib.Rpcs_types.Wire_work.Spec.t option =
   let (module Work_selection_method) = t.config.work_selection_method in
   let fee = snark_work_fee t in
-  let instances_opt =
+  let _instances_opt =
     Work_selection_method.work ~logger:t.config.logger ~fee
       ~snark_pool:(snark_pool t) (snark_job_state t)
   in
-  Option.map instances_opt ~f:(fun instances ->
-      { Snark_work_lib.Work.Spec.instances; fee } )
+  (* Option.map instances_opt ~f:(fun instances -> *)
+  (*     { Snark_work_lib.Work.Spec.instances; fee } ) *)
+  failwith "TODO: request work"
 
 let work_selection_method t = t.config.work_selection_method
 

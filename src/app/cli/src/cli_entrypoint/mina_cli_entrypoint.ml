@@ -1719,7 +1719,7 @@ let internal_commands logger ~itn_features =
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
         (let open Command.Let_syntax in
         let%map_open filename =
-          flag "--file" (required string)
+          flag "--file-wire-work-single-v2" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
         in
         fun () ->
@@ -1746,10 +1746,7 @@ let internal_commands logger ~itn_features =
                 }
               in
               let spec =
-                [%of_sexp:
-                  ( Transaction_witness.Stable.Latest.t
-                  , Ledger_proof.t )
-                  Snark_work_lib.Work.Single.Spec.t] sexp
+                [%of_sexp: Snark_worker.Rpcs_types.Wire_work.Single.Spec.t] sexp
               in
               match%map
                 Impl.perform_single worker_state ~message:sok_message spec

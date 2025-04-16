@@ -58,6 +58,14 @@ module Wire_work = struct
 
       type t = Stable.Latest.t [@@deriving sexp, yojson]
 
+      let map_regular_witness ~f = function
+        | Regular work ->
+            Regular
+              (Snark_work_lib.Work.Single.Spec.map ~f_witness:f ~f_proof:Fn.id
+                 work )
+        | Zkapp_command_segment seg ->
+            Zkapp_command_segment seg
+
       let statement : t -> Transaction_snark.Statement.Stable.V2.t = function
         | Regular regular ->
             Work.Single.Spec.statement regular

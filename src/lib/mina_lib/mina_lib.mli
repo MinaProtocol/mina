@@ -107,7 +107,10 @@ val snark_work_fee : t -> Currency.Fee.t
 
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
-val request_work : t -> Work_selector.work Snark_work_lib.Work.Spec.t option
+val request_work :
+     capability:Snark_worker.Rpcs_versioned.Get_work.Latest.query
+  -> t
+  -> Snark_worker.Rpcs_types.Wire_work.Spec.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
