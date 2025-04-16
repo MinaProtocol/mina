@@ -133,6 +133,8 @@ let emit_proof_metrics metrics instances logger =
   One_or_two.iter (One_or_two.zip_exn metrics instances)
     ~f:(fun ((time, tag), single) ->
       match tag with
+      | `Zkapp_command_segment ->
+          failwith "TODO: emit proof metrics for zkapp command"
       | `Merge ->
           Mina_metrics.(
             Cryptography.Snark_work_histogram.observe
@@ -289,33 +291,31 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
                   ()
             in
             log_and_retry "performing work" error (retry_pause 10.) go
-        | Ok _result ->
-            (* emit_proof_metrics *)
-            (*   (result.metrics |> One_or_two.map ~f:Work.update_metric) *)
-            (*   (Rpcs_types.Wire_work.Result.transactions result) *)
-            (*   logger ; *)
-            (* [%log info] "Submitted completed SNARK work $work_ids to $address" *)
-            (*   ~metadata: *)
-            (*     [ ("address", `String (Host_and_port.to_string daemon_address)) *)
-            (*     ; ( "work_ids" *)
-            (*       , Transaction_snark_work.Statement.compact_json *)
-            (*           (One_or_two.map *)
-            (*              (Work.Spec.instances work_spec) *)
-            (*              ~f:Rpcs_types.Wire_work.Single.Spec.statement ) ) *)
-            (*     ] ; *)
-            (* let rec submit_work () = *)
-            (*   match%bind *)
-            (*     dispatch Rpcs_versioned.Submit_work.Latest.rpc *)
-            (*       shutdown_on_disconnect (Regular result) daemon_address *)
-            (*   with *)
-            (*   | Error e -> *)
-            (*       log_and_retry "submitting work" e (retry_pause 10.) *)
-            (*         submit_work *)
-            (*   | Ok () -> *)
-            (*       go () *)
-            (* in *)
-            (* submit_work ()  *)
-            failwith "FIXME" )
+        | Ok result ->
+            emit_proof_metrics result.metrics
+              (Rpcs_types.Wire_work.Result.transactions result)
+              logger ;
+            [%log info] "Submitted completed SNARK work $work_ids to $address"
+              ~metadata:
+                [ ("address", `String (Host_and_port.to_string daemon_address))
+                ; ( "work_ids"
+                  , Transaction_snark_work.Statement.compact_json
+                      (One_or_two.map
+                         (Work.Spec.instances work_spec)
+                         ~f:Rpcs_types.Wire_work.Single.Spec.statement ) )
+                ] ;
+            let rec submit_work () =
+              match%bind
+                dispatch Rpcs_versioned.Submit_work.Latest.rpc
+                  shutdown_on_disconnect result daemon_address
+              with
+              | Error e ->
+                  log_and_retry "submitting work" e (retry_pause 10.)
+                    submit_work
+              | Ok () ->
+                  go ()
+            in
+            submit_work () )
   in
   go ()
 

@@ -71,7 +71,7 @@ module Wire_work = struct
             |> Option.map ~f:(fun w ->
                    w.Transaction_witness.Stable.V2.transaction )
         | Zkapp_command_segment _ ->
-            failwith "NO txn for zkapp command segment"
+            None
     end
   end
 
