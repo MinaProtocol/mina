@@ -22,8 +22,11 @@ module Zkapp_command_segment_work = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      (* NOTE: the Work_partitioner is responsible to ensure the integrity of
+         `which_half`, `work_id` & `segment_id`.
+         `which_half is needed so work selector wouldn't change. as we would split the work and send them over the network *)
       type t =
-        { id : int
+        { segment_id : int
         ; statement : Transaction_snark.Statement.With_sok.Stable.V2.t
         ; witness : Zkapp_command_segment.Witness.Stable.V1.t
         ; spec : Zkapp_command_segment.Basic.Stable.V1.t

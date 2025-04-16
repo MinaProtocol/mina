@@ -93,6 +93,21 @@ let update_metric :
   | span, `Merge ->
       (span, `Merge)
 
+(* NOTE: to maintain compatibility with underlying Work_selector, we will need a `partition_id` to merge single works together
+ *)
+
+module Partition_id = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      (* `One_or_two` means we're receving a work not partitioned by the work partitioner *)
+      type t = First of int | Second of int | One_or_two
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module Result = struct
   [%%versioned
   module Stable = struct
@@ -105,6 +120,7 @@ module Result = struct
             One_or_two.Stable.V1.t
         ; spec : 'spec
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
+        ; work_id : Partition_id.Stable.V1.t
         }
       [@@deriving fields]
     end
@@ -126,22 +142,24 @@ module Result = struct
         ; metrics = One_or_two.map ~f:update_metric metrics
         ; spec
         ; prover
+        ; work_id = One_or_two
         }
     end
   end]
 
-  let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
+  let map ~f_spec ~f_single { proofs; metrics; spec; prover; work_id } =
     { proofs = One_or_two.map ~f:f_single proofs
     ; metrics
     ; spec = f_spec spec
     ; prover
+    ; work_id
     }
 
-  let map_opt ~f_spec ~f_single { proofs; metrics; spec; prover } =
+  let map_opt ~f_spec ~f_single { proofs; metrics; spec; prover; work_id } =
     let open Option.Let_syntax in
     let%bind proofs = One_or_two.Option.map ~f:f_single proofs in
     let%map spec = f_spec spec in
-    { proofs; metrics; spec; prover }
+    { proofs; metrics; spec; prover; work_id }
 end
 
 module Result_zkapp_command_segment = struct
