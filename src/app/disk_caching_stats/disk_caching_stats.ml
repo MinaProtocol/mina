@@ -721,7 +721,7 @@ let () =
     let num_updates = 1 in
     Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
       ~constraint_constants ~min_num_updates:num_updates
-      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+      ~min_num_proof_updates:num_updates ~max_num_updates:num_updates ()
   in
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =
