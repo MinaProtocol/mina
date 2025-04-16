@@ -78,7 +78,7 @@ let promoteDockerStep =
 
                         in  Cmd.run
                               ". ./buildkite/scripts/export-git-env-vars.sh && ./scripts/docker/promote.sh --name ${Artifact.dockerName
-                                                                                                                      spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
+                                                                                                                      spec.name} --version ${old_tag} --tag \"\$(echo ${new_tag})\" ${publish}"
                   )
                   spec.new_tags
 
