@@ -51,6 +51,10 @@ module Snark_job_state : sig
 end
 
 val request_partitioned_work :
-     Snark_job_state.t
-  -> (Work_partitioner.partitioned_work * Snark_work_lib.Work.Partition_id.t)
-     option
+     selection_method:(module Selection_method_intf)
+  -> logger:Logger.t
+  -> fee:Currency.Fee.t
+  -> snark_pool:snark_pool
+  -> selector:State.t
+  -> partitioner:Work_partitioner.State.t
+  -> Work_partitioner.partitioned_work option

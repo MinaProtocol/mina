@@ -870,38 +870,23 @@ let request_work ~capability (t : t) :
   let (module Work_selection_method) = t.config.work_selection_method in
   let open Option.Let_syntax in
   let fee = snark_work_fee t in
+  let request_regular_work () =
+    let%map instances =
+      Work_selection_method.work ~logger:t.config.logger ~fee
+        ~snark_pool:(snark_pool t) (snark_job_state t).work_selector
+    in
+    Snark_worker_lib.Rpcs_types.Wire_work.Spec.Stable.V1.to_latest
+      { instances; fee }
+  in
+
   match capability with
   | `V2 ->
-      let%map instances =
-        Work_selection_method.work ~logger:t.config.logger ~fee
-          ~snark_pool:(snark_pool t) (snark_job_state t).work_selector
-      in
-      Snark_worker_lib.Rpcs_types.Wire_work.Spec.Stable.V1.to_latest
-        { instances; fee }
-  | `V3 -> (
-      let%map spec, work_id =
-        Work_selector.request_partitioned_work t.snark_job_state
-      in
-      match spec with
-      | Regular instance ->
-          { Snark_work_lib.Work.Spec.Stable.V2.instances =
-              `One
-                (Snark_worker_lib.Rpcs_types.Wire_work.Single.Spec.Stable.V2
-                 .Regular
-                   instance )
-          ; fee
-          ; work_id
-          }
-      | Zkapp_command_segment { segment_id; statement; witness; spec } ->
-          { Snark_work_lib.Work.Spec.Stable.V2.instances =
-              `One
-                (* TODO: move this type to work definition so we have clearer code*)
-                (Snark_worker_lib.Rpcs_types.Wire_work.Single.Spec.Stable.V2
-                 .Zkapp_command_segment
-                   { segment_id; statement; witness; spec } )
-          ; fee
-          ; work_id
-          } )
+      request_regular_work ()
+  | `V3 ->
+      Work_selector.Work_partitioner.request_partitioned_work
+        ~logger:t.config.logger ~fee ~snark_pool:(snark_pool t)
+        ~selector:t.snark_job_state.work_selector
+        ~partitioner:t.snark_job_state.work_partitioner
 
 let work_selection_method t = t.config.work_selection_method
 

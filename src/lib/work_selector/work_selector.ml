@@ -36,7 +36,18 @@ module Snark_job_state = struct
     { work_selector : State.t; work_partitioner : Work_partitioner.State.t }
 end
 
-let request_partitioned_work (_t : Snark_job_state.t) :
-    (Work_partitioner.partitioned_work * Snark_work_lib.Work.Partition_id.t)
-    option =
-  failwith "TODO"
+(* This returns work of finer grain (i.e. sub zkapp command level) compared to calling selector directly *)
+let request_partitioned_work
+    ~(selection_method : (module Selection_method_intf)) ~(logger : Logger.t)
+    ~(fee : Currency.Fee.t) ~(snark_pool : snark_pool) ~(selector : State.t)
+    ~(partitioner : Work_partitioner.State.t) :
+    Work_partitioner.partitioned_work option =
+  match Work_partitioner.reissue_old_task partitioner with
+  | Some task ->
+      Some task
+  | None ->
+      let (module Work_selection_method) = selection_method in
+      let%map instances =
+        Work_selection_method.work ~logger ~fee ~snark_pool selector
+      in
+      failwith "WIP"
