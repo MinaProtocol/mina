@@ -22,20 +22,34 @@ module Single_work_with_data = struct
     }
 end
 
-module Pending_Zkapp_command = struct
-  type t = { aggregated : Ledger_proof.t }
+module Mergable_partition_id = struct
+  (* `One_or_two` means we're receving a work not partitioned by the work partitioner *)
+  type t = First of int | Second of int [@@deriving compare, hash, sexp]
 end
 
-module Mergable_partition_id = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      (* `One_or_two` means we're receving a work not partitioned by the work partitioner *)
-      type t = First of int | Second of int [@@deriving compare, hash, sexp]
+module Zkapp_command_segment_work_job = struct
+  type t =
+    { id : Mergable_partition_id.t
+    ; spec :
+        [ `Merge_segment of Ledger_proof.t * Ledger_proof.t
+        | `Base_segment of
+          Zkapp_command_segment.Witness.t
+          * Zkapp_command_segment.Basic.t
+          * Statement.With_sok.t ]
+    ; status : Work_lib.Job_status.t
+    }
+end
 
-      let to_latest = Fn.id
-    end
-  end]
+module Pending_Zkapp_command = struct
+  type t =
+    { unseen_segments : (int, unit) Hashtbl.t
+    ; pending_mergable : Ledger_proof.t Queue.t
+    ; pending_base_cases :
+        ( Zkapp_command_segment.Witness.t
+        * Zkapp_command_segment.Basic.t
+        * Statement.With_sok.t )
+        Queue.t
+    }
 end
 
 module State = struct
@@ -44,12 +58,10 @@ module State = struct
     ; logger : Logger.t
     ; pairing_pool : (int, Single_work_with_data.t) Hashtbl.t
     ; zkapp_commend_segment_pool :
-        ( Mergable_partition_id.t
-        , ( Zkapp_command_segment.Witness.t
-          * Zkapp_command_segment.Basic.t
-          * Statement.With_sok.t )
-          Queue.t )
-        Hashtbl.t
+        (Mergable_partition_id.t, Pending_Zkapp_command.t) Hashtbl.t
+    ; sent_jobs_partitioner : Zkapp_command_segment_work_job.t Queue.t
+          (* we only track tasks created by a Work_partitioner here. For reissue of regular jobs,
+             we still turn to the underlying Work_selector *)
     }
 
   let init (reassignment_wait : int) (logger : Logger.t) : t =
@@ -57,5 +69,8 @@ module State = struct
     ; zkapp_commend_segment_pool = Hashtbl.create (module Mergable_partition_id)
     ; reassignment_wait
     ; logger
+    ; sent_jobs_partitioner = Queue.create ()
     }
 end
+
+let request_work (_s : State.t) = failwith "TODO: implement work issuement"

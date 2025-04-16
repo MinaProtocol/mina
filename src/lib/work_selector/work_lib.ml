@@ -2,18 +2,19 @@ open Core_kernel
 open Currency
 open Async
 
+module Job_status = struct
+  type t = Assigned of Time.t
+
+  let is_old (Assigned at_time) ~now ~reassignment_wait =
+    let max_age = Time.Span.of_ms (Float.of_int reassignment_wait) in
+    let delta = Time.diff now at_time in
+    Time.Span.( > ) delta max_age
+end
+
 module Make (Inputs : Intf.Inputs_intf) = struct
   module Inputs = Inputs
   module Work_spec = Snark_work_lib.Work.Single.Spec
-
-  module Job_status = struct
-    type t = Assigned of Time.t
-
-    let is_old (Assigned at_time) ~now ~reassignment_wait =
-      let max_age = Time.Span.of_ms (Float.of_int reassignment_wait) in
-      let delta = Time.diff now at_time in
-      Time.Span.( > ) delta max_age
-  end
+  module Job_status = Job_status
 
   module State = struct
     module Seen_key = struct
