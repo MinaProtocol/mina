@@ -67,12 +67,15 @@ module Make (Inputs : Intf.Inputs_intf) :
 
     module Single = struct
       module Spec = struct
-        type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
+        type t =
+          ( Transaction_witness.Stable.Latest.t
+          , Ledger_proof.t )
+          Work.Single.Spec.t
         [@@deriving sexp, yojson]
 
         let transaction t =
           Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.transaction )
+              w.Transaction_witness.Stable.Latest.transaction )
 
         let statement = Work.Single.Spec.statement
       end
@@ -188,8 +191,9 @@ module Make (Inputs : Intf.Inputs_intf) :
                             Mina_base.Control.(
                               Tag.equal Proof
                                 (tag
-                                   (Mina_base.Account_update.authorization
-                                      account_update ) ))
+                                   account_update
+                                     .Mina_base.Account_update.Poly
+                                      .authorization ))
                           then proof_updates_count + 1
                           else proof_updates_count ) )
                   in

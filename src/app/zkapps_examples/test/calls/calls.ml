@@ -68,7 +68,6 @@ let%test_module "Composability test" =
             ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:(option_typ Zkapps_calls.Call_data.Output.typ)
-        ~branches:(module Nat.N4)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
         ~choices:(fun ~self:_ ->
@@ -267,7 +266,7 @@ let%test_module "Composability test" =
                 in
                 { account_update with
                   authorization =
-                    Signature
+                    Control.Poly.Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }

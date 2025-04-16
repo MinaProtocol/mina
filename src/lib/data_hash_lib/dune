@@ -6,14 +6,9 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  result
-  base.base_internalhash_types
   core_kernel
-  bin_prot.shape
   ppx_inline_test.config
   base
-  sexplib0
-  base.caml
   ;; local libraries
   fields_derivers.graphql
   fields_derivers

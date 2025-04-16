@@ -541,7 +541,6 @@ let compile :
     -> ?disk_keys:(_, branches) Vector.t * _
     -> ?override_wrap_domain:_
     -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
-    -> branches:(module Nat.Intf with type n = branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
@@ -552,7 +551,8 @@ let compile :
                , max_proofs_verified
                , branches )
                Pickles.Tag.t
-          -> ( prev_varss
+          -> ( branches
+             , prev_varss
              , prev_valuess
              , widthss
              , heightss
@@ -562,7 +562,7 @@ let compile :
              , unit (* TODO: Remove? *)
              , auxiliary_var
              , auxiliary_value )
-             H4_6.T(Pickles.Inductive_rule).t )
+             H4_6_with_length.T(Pickles.Inductive_rule).t )
     -> unit
     -> ( Zkapp_statement.Checked.t
        , Zkapp_statement.t
@@ -571,9 +571,7 @@ let compile :
        Pickles.Tag.t
        * _
        * (module Pickles.Proof_intf
-            with type t = ( max_proofs_verified
-                          , max_proofs_verified )
-                          Pickles.Proof.t
+            with type t = max_proofs_verified Pickles.Proof.t
              and type statement = Zkapp_statement.t )
        * ( prev_valuess
          , widthss
@@ -587,12 +585,13 @@ let compile :
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain ~auxiliary_typ
-     ~branches ~max_proofs_verified ~name ~choices () ->
+     ~max_proofs_verified ~name ~choices () ->
   let vk_hash = ref None in
   let choices ~self =
     let rec go :
-        type prev_varss prev_valuess widthss heightss.
-           ( prev_varss
+        type branches prev_varss prev_valuess widthss heightss.
+           ( branches
+           , prev_varss
            , prev_valuess
            , widthss
            , heightss
@@ -602,8 +601,9 @@ let compile :
            , unit
            , auxiliary_var
            , auxiliary_value )
-           H4_6.T(Pickles.Inductive_rule).t
-        -> ( prev_varss
+           H4_6_with_length.T(Pickles.Inductive_rule).t
+        -> ( branches
+           , prev_varss
            , prev_valuess
            , widthss
            , heightss
@@ -613,7 +613,7 @@ let compile :
            , Zkapp_statement.t
            , return_type Prover_value.t * auxiliary_var
            , return_type * auxiliary_value )
-           H4_6.T(Pickles.Inductive_rule.Deferred).t = function
+           H4_6_with_length.T(Pickles.Inductive_rule.Deferred).t = function
       | [] ->
           []
       | { identifier; prevs; main; feature_flags } :: choices ->
@@ -648,7 +648,7 @@ let compile :
     Pickles.compile_async () ?self ?cache ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
-      ~branches ~max_proofs_verified ~name ~choices
+      ~max_proofs_verified ~name ~choices
   in
   let () =
     vk_hash :=
@@ -666,7 +666,7 @@ let compile :
            , unit
            , ( Zkapp_statement.t
              * (return_type * auxiliary_value)
-             * (max_proofs_verified, max_proofs_verified) Pickles.Proof.t )
+             * max_proofs_verified Pickles.Proof.t )
              Deferred.t )
            H3_2.T(Pickles.Prover).t
         -> ( prev_valuess
@@ -825,7 +825,7 @@ let insert_signatures pk_compressed sk
           in
           { account_update with
             authorization =
-              Signature
+              Control.Poly.Signature
                 (Schnorr.Chunked.sign sk
                    (Random_oracle.Input.Chunked.field commitment) )
           }

@@ -47,8 +47,8 @@ let zkapp_proof ~zkapp_command =
     (Mina_base.Zkapp_command.all_account_updates_list zkapp_command)
     ~init:None
     ~f:(fun _acc a ->
-      match a.Mina_base.Account_update.authorization with
-      | Proof proof ->
+      match a.Mina_base.Account_update.Poly.authorization with
+      | Mina_base.Control.Poly.Proof proof ->
           Stop (Some proof)
       | _ ->
           Continue None )
@@ -57,7 +57,7 @@ let zkapp_proof ~zkapp_command =
 
 let dummy_proof =
   Pickles.Proof.dummy Pickles_types.Nat.N2.n Pickles_types.Nat.N2.n
-    Pickles_types.Nat.N2.n ~domain_log2:16
+    ~domain_log2:16
 
 let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
 

@@ -306,8 +306,7 @@ module type Full = sig
            , unit
            , unit
            , Zkapp_statement.t
-           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
-             Async.Deferred.t )
+           , (unit * unit * Nat.N2.n Pickles.Proof.t) Async.Deferred.t )
            Pickles.Prover.t
            * ( Pickles.Side_loaded.Verification_key.t
              , Snark_params.Tick.Field.t )
@@ -347,8 +346,7 @@ module type Full = sig
            , unit
            , unit
            , Zkapp_statement.t
-           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
-             Async.Deferred.t )
+           , (unit * unit * Nat.N2.n Pickles.Proof.t) Async.Deferred.t )
            Pickles.Prover.t
            * ( Pickles.Side_loaded.Verification_key.t
              , Snark_params.Tick.Field.t )
@@ -390,8 +388,7 @@ module type Full = sig
               , unit
               , unit
               , Zkapp_statement.t
-              , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
-                Async.Deferred.t )
+              , (unit * unit * Nat.N2.n Pickles.Proof.t) Async.Deferred.t )
               Pickles.Prover.t ]
 
     module Multiple_transfers_spec : sig

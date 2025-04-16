@@ -71,7 +71,7 @@ type components =
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
   | Signed_command_inputs of User_command_input.t list
-  | Zkapp_command_command_inputs of Zkapp_command.t list
+  | Zkapp_command_command_inputs of Zkapp_command.Stable.Latest.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -890,7 +890,10 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec = work.spec.instances in
+  let spec =
+    One_or_two.map work.spec.instances
+      ~f:Snark_work_lib.Work.Single.Spec.statement
+  in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
@@ -970,7 +973,8 @@ let add_full_transactions t user_commands =
       in
       Deferred.Result.fail error
 
-let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
+let add_zkapp_transactions t
+    (zkapp_commands : Zkapp_command.Stable.Latest.t list) =
   let add_all_txns () =
     let result_ivar = Ivar.create () in
     let cmd_inputs = Zkapp_command_command_inputs zkapp_commands in
@@ -1611,7 +1615,9 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
       let%bind () =
         Deferred.List.iter completed_works ~f:(fun work ->
             (* proofs should be verified in apply and broadcast *)
-            let statement = Transaction_snark_work.statement work in
+            let statement =
+              Transaction_snark_work.Stable.Latest.statement work
+            in
             let snark =
               Network_pool.Priced_proof.
                 { proof = work.proofs
@@ -1694,7 +1700,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
-        if config.compile_config.itn_features then
+        if config.itn_features then
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in

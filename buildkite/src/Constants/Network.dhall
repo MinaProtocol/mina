@@ -22,6 +22,14 @@ let requiresMainnetBuild =
           \(network : Network)
       ->  merge { Devnet = True, Mainnet = True, Berkeley = False } network
 
+let buildMainnetEnv =
+          \(network : Network)
+      ->        if requiresMainnetBuild network
+
+          then  "MINA_BUILD_MAINNET=true"
+
+          else  "MINA_BUILD_MAINNET=false"
+
 let foldMinaBuildMainnetEnv =
           \(networks : List Network)
       ->        if List/any Network requiresMainnetBuild networks
@@ -35,4 +43,5 @@ in  { Type = Network
     , lowerName = lowerName
     , requiresMainnetBuild = requiresMainnetBuild
     , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
+    , buildMainnetEnv = buildMainnetEnv
     }

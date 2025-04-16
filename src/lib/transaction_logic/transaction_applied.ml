@@ -77,11 +77,19 @@ module Zkapp_command_applied = struct
 
   let write_all_proofs_to_disk { Stable.Latest.accounts; command; new_accounts }
       : t =
-    { accounts; command; new_accounts }
+    { accounts
+    ; command =
+        With_status.map ~f:Zkapp_command.write_all_proofs_to_disk command
+    ; new_accounts
+    }
 
   let read_all_proofs_from_disk { accounts; command; new_accounts } :
       Stable.Latest.t =
-    { Stable.Latest.accounts; command; new_accounts }
+    { Stable.Latest.accounts
+    ; command =
+        With_status.map ~f:Zkapp_command.read_all_proofs_from_disk command
+    ; new_accounts
+    }
 end
 
 module Command_applied = struct

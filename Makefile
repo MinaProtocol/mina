@@ -40,6 +40,60 @@ GITLONGHASH := $(shell git rev-parse HEAD)
 LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ########################################
+## Help
+.PHONY: help
+help:
+	@echo "Mina Makefile Targets:"
+	@echo "======================="
+	@echo "all                - Clean and build the project"
+	@echo "archive_blocks     - Build the archive_blocks executable"
+	@echo "benchmarks         - Build benchmarking tools"
+	@echo "build              - Build the main project executables"
+	@echo "build_all_sigs     - Build all signature variants of the daemon"
+	@echo "build_archive      - Build the archive node"
+	@echo "build_archive_utils - Build archive node and related utilities"
+	@echo "build_intgtest     - Build integration test tools"
+	@echo "build_or_download_pv_keys - Build or download proving/verification keys"
+	@echo "build_pv_keys      - Build proving/verification keys"
+	@echo "build_rosetta      - Build Rosetta API components"
+	@echo "build_rosetta_all_sigs - Build all signature variants of Rosetta"
+	@echo "check              - Check that all OCaml packages build without issues"
+	@echo "check-format       - Check formatting of OCaml code"
+	@echo "check_opam_switch  - Verify the opam switch has correct packages"
+	@echo "check-snarky-submodule - Check the snarky submodule"
+	@echo "clean              - Remove build artifacts"
+	@echo "coverage-html      - Generate HTML report from coverage data"
+	@echo "coverage-summary   - Generate coverage summary report"
+	@echo "deb                - Build Debian package"
+	@echo "dev                - Alias for build"
+	@echo "doc_diagrams       - Generate documentation diagrams"
+	@echo "extract_blocks     - Build the extract_blocks executable"
+	@echo "genesiskeys        - Generate and copy genesis keys"
+	@echo "genesis_ledger     - Build runtime genesis ledger"
+	@echo "genesis-ledger-ocaml - Generate OCaml genesis ledger from daemon"
+	@echo "heap_usage         - Build heap usage analysis tool"
+	@echo "help               - Display this help information"
+	@echo "libp2p_helper      - Build libp2p helper"
+	@echo "macos-portable     - Create portable macOS package"
+	@echo "macos-setup        - Set up development environment on macOS"
+	@echo "missing_blocks_auditor - Build missing blocks auditor tool"
+	@echo "ml-docs            - Generate OCaml documentation"
+	@echo "ocaml_checks       - Run OCaml version and config checks"
+	@echo "ocaml_version      - Check OCaml version"
+	@echo "ocaml_word_size    - Check OCaml word size"
+	@echo "patch_archive_test - Build the patch archive test"
+	@echo "publish-macos      - Publish macOS artifacts"
+	@echo "reformat           - Reformat all OCaml code"
+	@echo "reformat-diff      - Reformat only modified OCaml files"
+	@echo "replayer           - Build the replayer tool"
+	@echo "rosetta_lib_encodings - Test Rosetta library encodings"
+	@echo "switch             - Set up the opam switch"
+	@echo "test-coverage      - Run tests with coverage instrumentation"
+	@echo "test-ppx           - Test PPX extensions"
+	@echo "update-graphql     - Update GraphQL schema"
+	@echo "zkapp_limits       - Build ZkApp limits tool"
+
+########################################
 ## Code
 
 all: clean build
@@ -182,7 +236,8 @@ reformat: ocaml_checks
 	dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path .
 
 reformat-diff:
-	@ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
+	@FILES=$$(git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done); \
+	if [ -n "$$FILES" ]; then ocamlformat --doc-comments=before --inplace $$FILES; fi
 
 check-format: ocaml_checks
 	dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
@@ -297,4 +352,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks ocaml_version ocaml_word_size ocaml_checks switch
+.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks ocaml_version ocaml_word_size ocaml_checks switch help

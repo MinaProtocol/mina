@@ -314,10 +314,15 @@ let verify_receipt =
       ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
+  let legacy_json_flag =
+    flag "--legacy" no_arg
+      ~doc:"Use legacy json format (zkapp command with hashes)"
+  in
   Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip4 payment_path_flag proof_path_flag address_flag token_flag)
-       ~f:(fun port (payment_path, proof_path, pk, token_id) ->
+       (Args.zip5 payment_path_flag proof_path_flag address_flag token_flag
+          legacy_json_flag )
+       ~f:(fun port (payment_path, proof_path, pk, token_id, use_legacy_json) ->
          let account_id = Account_id.create pk token_id in
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
@@ -325,22 +330,43 @@ let verify_receipt =
              read_json payment_path ~flag:"payment-path"
            in
            let%bind proof_json = read_json proof_path ~flag:"proof-path" in
+           let of_payment_json =
+             if use_legacy_json then
+               Fn.compose
+                 (Result.map ~f:User_command.read_all_proofs_from_disk)
+                 Mina_block.Legacy_format.User_command.of_yojson
+             else User_command.Stable.Latest.of_yojson
+           in
+           let of_proof_json =
+             let unwrap_proof =
+               Tuple2.map_snd
+                 ~f:(List.map ~f:User_command.read_all_proofs_from_disk)
+             in
+             if use_legacy_json then
+               Fn.compose
+                 (Result.map ~f:unwrap_proof)
+                 [%of_yojson:
+                   Receipt.Chain_hash.t
+                   * Mina_block.Legacy_format.User_command.t list]
+             else
+               [%of_yojson:
+                 Receipt.Chain_hash.t * User_command.Stable.Latest.t list]
+           in
            let to_deferred_or_error result ~error =
              Result.map_error result ~f:(fun s ->
                  Error.of_string (sprintf "%s: %s" error s) )
              |> Deferred.return
            in
            let%bind payment =
-             User_command.of_yojson payment_json
-             |> to_deferred_or_error
-                  ~error:
-                    (sprintf "Payment file %s has invalid json format"
-                       payment_path )
+             to_deferred_or_error
+               ~error:
+                 (sprintf "Payment file %s has invalid json format" payment_path)
+               (of_payment_json payment_json)
            and proof =
-             [%of_yojson: Receipt.Chain_hash.t * User_command.t list] proof_json
-             |> to_deferred_or_error
-                  ~error:
-                    (sprintf "Proof file %s has invalid json format" proof_path)
+             to_deferred_or_error
+               ~error:
+                 (sprintf "Proof file %s has invalid json format" proof_path)
+               (of_proof_json proof_json)
            in
            Daemon_rpcs.Client.dispatch Verify_proof.rpc
              (account_id, payment, proof)
@@ -2135,7 +2161,8 @@ let receipt_chain_hash =
              in
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =
-                 Zkapp_command.get_transaction_commitments zkapp_cmd
+                 Zkapp_command.get_transaction_commitments
+                   (Zkapp_command.write_all_proofs_to_disk zkapp_cmd)
                in
                Receipt.Zkapp_command_elt.Zkapp_command_commitment
                  full_txn_commitment
@@ -2315,7 +2342,11 @@ let test_ledger_application =
        flag "--has-second-partition"
          ~doc:"Assume there is a second partition (scan state)" no_arg
      and tracing = flag "--tracing" ~doc:"Wrap test into tracing" no_arg
-     and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg in
+     and no_masks = flag "--no-masks" ~doc:"Do not create masks" no_arg
+     and benchmark =
+       flag "--dump-benchmark" ~doc:"Dump json file with benchmark data"
+         (optional string)
+     in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
      let first_partition_slots =
@@ -2331,7 +2362,7 @@ let test_ledger_application =
      Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
        ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs
-       ~constraint_constants ~genesis_constants )
+       ~constraint_constants ~genesis_constants ~benchmark )
 
 let itn_create_accounts =
   let compile_config = Mina_compile_config.Compiled.t in
