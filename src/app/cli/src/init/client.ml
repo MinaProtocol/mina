@@ -1248,8 +1248,7 @@ let import_key =
        Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
     (let%map_open.Command access_method =
-       choose_one
-         ~if_nothing_chosen:(Default_to `None)
+       choose_one ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1459,8 +1458,7 @@ let export_key =
 let list_accounts =
   Command.async ~summary:"List all owned accounts"
     (let%map_open.Command access_method =
-       choose_one
-         ~if_nothing_chosen:(Default_to `None)
+       choose_one ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -2346,6 +2344,13 @@ let test_ledger_application =
      and benchmark =
        flag "--dump-benchmark" ~doc:"Dump json file with benchmark data"
          (optional string)
+     and transfer_parties_get_actions_events =
+       flag "--transfer-parties-get-actions-events"
+         ~doc:
+           "If true, all updates in the ledger commands will have full actions \
+            and events. If false, they will have empty actions and events. \
+            Default: false."
+         no_arg
      in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
@@ -2361,8 +2366,9 @@ let test_ledger_application =
      let genesis_constants = Genesis_constants.Compiled.genesis_constants in
      Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
-       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs
-       ~constraint_constants ~genesis_constants ~benchmark )
+       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing
+       ~transfer_parties_get_actions_events num_txs ~constraint_constants
+       ~genesis_constants ~benchmark )
 
 let itn_create_accounts =
   let compile_config = Mina_compile_config.Compiled.t in
