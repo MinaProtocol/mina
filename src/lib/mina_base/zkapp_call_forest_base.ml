@@ -142,7 +142,10 @@ module type Digest_intf = sig
 
     include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-    val create : ?chain:Mina_signature_kind.t -> Account_update.t -> t
+    val create :
+         ?chain:Mina_signature_kind.t
+      -> (Account_update.Body.t, _) Account_update.Poly.t
+      -> t
 
     val create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
   end
@@ -254,7 +257,10 @@ module Make_digest_str
       let create_body = Account_update.Body.Checked.digest
     end
 
-    let create : ?chain:Mina_signature_kind.t -> Account_update.t -> t =
+    let create :
+           ?chain:Mina_signature_kind.t
+        -> (Account_update.Body.t, _) Account_update.Poly.t
+        -> t =
       Account_update.digest
 
     let create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
@@ -533,13 +539,12 @@ module With_hashes_and_data = struct
 
   let empty = Digest.Forest.empty
 
-  let hash_account_update ((p : Account_update.t), _) =
+  let hash_account_update ((p : Account_update.Stable.Latest.t), _) =
     Digest.Account_update.create p
 
   let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
 
-  let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list) :
-      _ t =
+  let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list) =
     of_account_updates xs
       ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
         p.body.call_depth )
@@ -567,8 +572,14 @@ module With_hashes_and_data = struct
 end
 
 module With_hashes = struct
+  type t =
+    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Stable.Latest.t
+  [@@deriving sexp_of, to_yojson]
+
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         ( Account_update.Stable.V1.t
@@ -583,19 +594,19 @@ module With_hashes = struct
 
   let empty = Digest.Forest.empty
 
-  let hash_account_update (p : Account_update.t) =
-    Digest.Account_update.create p
+  let hash_account_update p = Digest.Account_update.create p
 
-  let accumulate_hashes xs : t = accumulate_hashes ~hash_account_update xs
+  let accumulate_hashes xs = accumulate_hashes ~hash_account_update xs
 
-  let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) : t =
+  let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) =
     of_account_updates xs
       ~account_update_depth:(fun (p : Account_update.Simple.t) ->
         p.body.call_depth )
     |> map ~f:Account_update.of_simple
     |> accumulate_hashes
 
-  let of_account_updates (xs : Account_update.Graphql_repr.t list) : t =
+  let of_account_updates (xs : Account_update.Graphql_repr.t list) :
+      Stable.Latest.t =
     of_account_updates_map
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
