@@ -3799,7 +3799,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    , `Pending_coinbase_of_statement
                        pending_coinbase_stack_state2
                    , zkapp_command2 )
-                   :: rest ->
+                :: rest ->
                   let commitment', full_commitment' =
                     mk_next_commitments zkapp_command2.account_updates
                   in
@@ -4142,6 +4142,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; new_zkapp_account : bool
         ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; transfer_parties_get_actions_events : bool
+              (** If true, all parties with the correct authorization get an
+                  update with the spec actions and events. If false, only the
+                  zkapp accounts do, the rest getting the empty list. *)
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         ; authorization_kind : Account_update.Authorization_kind.t
@@ -4251,6 +4255,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; memo
           ; actions
           ; events
+          ; transfer_parties_get_actions_events
           ; call_data
           ; preconditions
           ; authorization_kind
@@ -4307,6 +4312,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ~default:Zkapp_basic.Or_ignore.Ignore
             }
       in
+      let transfer_party_actions, transfer_party_events =
+        if transfer_parties_get_actions_events then (actions, events)
+        else ([], [])
+      in
 
       let sender_account_update : Account_update.Simple.t option =
         let empty_sender = Option.value ~default:false empty_sender in
@@ -4322,8 +4331,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; balance_change
           ; increment_nonce =
               (if sender_is_the_same_as_fee_payer then false else true)
-          ; events = []
-          ; actions = []
+          ; events = transfer_party_events
+          ; actions = transfer_party_actions
           ; call_data = Field.zero
           ; call_depth = 0
           ; preconditions = preconditions'
@@ -4408,19 +4417,27 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let other_receivers =
         List.map receivers ~f:(fun (receiver, amt) : Account_update.Simple.t ->
-            let receiver =
+            let receiver, actions, events =
               match receiver with
               | First receiver_kp ->
-                  Signature_lib.Public_key.compress receiver_kp.public_key
+                  ( Signature_lib.Public_key.compress receiver_kp.public_key
+                  , transfer_party_actions
+                  , transfer_party_events )
               | Second receiver ->
-                  receiver
+                  (receiver, [], [])
             in
-            let receiver_auth, authorization_kind, use_full_commitment =
+            let ( receiver_auth
+                , authorization_kind
+                , use_full_commitment
+                , actions
+                , events ) =
               match receiver_auth with
               | Some Control.Tag.Signature ->
                   ( Control.Poly.Signature Signature.dummy
                   , Account_update.Authorization_kind.Signature
-                  , true )
+                  , true
+                  , actions
+                  , events )
               | Some Proof ->
                   failwith
                     "Not implemented. Pickles_types.Nat.N2.n \
@@ -4428,7 +4445,9 @@ module Make_str (A : Wire_types.Concrete) = struct
               | Some None_given | None ->
                   ( Control.Poly.None_given
                   , Account_update.Authorization_kind.None_given
-                  , false )
+                  , false
+                  , []
+                  , [] )
             in
             { body =
                 { public_key = receiver
@@ -4436,8 +4455,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.of_unsigned amt
                 ; increment_nonce = false
-                ; events = []
-                ; actions = []
+                ; events
+                ; actions
                 ; call_data = Field.zero
                 ; call_depth = 0
                 ; preconditions =
@@ -4570,6 +4589,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; new_zkapp_account
         ; actions = []
         ; events = []
+        ; transfer_parties_get_actions_events = false
         ; call_data = Tick.Field.zero
         ; preconditions
         ; authorization_kind
@@ -4697,6 +4717,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; new_zkapp_account = false
         ; actions
         ; events
+        ; transfer_parties_get_actions_events = false
         ; call_data
         ; preconditions = None
         ; authorization_kind = Proof (With_hash.hash vk)
@@ -4842,6 +4863,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; new_zkapp_account
         ; actions
         ; events
+        ; transfer_parties_get_actions_events = false
         ; call_data
         ; preconditions
         ; authorization_kind =
@@ -4993,6 +5015,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; new_zkapp_account
         ; actions
         ; events
+        ; transfer_parties_get_actions_events = false
         ; call_data
         ; preconditions
         ; authorization_kind = Signature
