@@ -23,7 +23,6 @@ let%test_module "Actions test" =
         , Pickles.Provers.[ initialize_prover; add_actions_prover ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"no actions"
         ~choices:(fun ~self:_ ->
@@ -151,7 +150,7 @@ let%test_module "Actions test" =
                 in
                 { account_update with
                   authorization =
-                    Signature
+                    Control.Poly.Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }

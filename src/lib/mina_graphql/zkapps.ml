@@ -15,7 +15,7 @@ let send_zkapp_command mina zkapp_command =
           let cmd_with_hash =
             Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
                 { With_hash.data = cmd
-                ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
+                ; hash = Transaction_hash.hash_zkapp_command cmd
                 } )
           in
           Ok cmd_with_hash

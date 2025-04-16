@@ -7,6 +7,7 @@ module Validation = Validation
 module Validated = Validated_block
 module Precomputed = Precomputed_block
 module Internal_transition = Internal_transition
+module Legacy_format = Legacy_format
 
 type fully_invalid_block = Validation.fully_invalid_with_block
 
@@ -73,16 +74,23 @@ let consensus_state =
 
 include Block
 
+module Proof_carrying = struct
+  let to_header_data ~to_header
+      { Proof_carrying_data.proof = merkle_list, root_unverified
+      ; data = best_tip_unverified
+      } =
+    { Proof_carrying_data.proof = (merkle_list, to_header root_unverified)
+    ; data = to_header best_tip_unverified
+    }
+end
+
 let verify_on_header ~verify
-    { Proof_carrying_data.proof = merkle_list, root_unverified
-    ; data = best_tip_unverified
-    } =
+    ( { Proof_carrying_data.proof = _, root_unverified
+      ; data = best_tip_unverified
+      } as pcd ) =
   let%map.Async_kernel.Deferred.Or_error ( `Root root_header
                                          , `Best_tip best_tip_header ) =
-    verify
-      { Proof_carrying_data.proof = (merkle_list, header root_unverified)
-      ; data = header best_tip_unverified
-      }
+    verify (Proof_carrying.to_header_data ~to_header:header pcd)
   in
   let root = Validation.with_body root_header (body root_unverified) in
   let best_tip =

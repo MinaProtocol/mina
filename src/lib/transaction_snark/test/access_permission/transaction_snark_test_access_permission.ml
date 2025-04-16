@@ -29,7 +29,6 @@ let%test_module "Access permission tests" =
     let tag, _, p_module, Pickles.Provers.[ prover ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache ~proof_cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Nat.N1)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
         ~choices:(fun ~self:_ -> [ Zkapps_empty_update.rule pk_compressed ])
@@ -160,7 +159,7 @@ let%test_module "Access permission tests" =
                 in
                 { account_update with
                   authorization =
-                    Control.Signature
+                    Control.Poly.Signature
                       (Schnorr.Chunked.sign sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }

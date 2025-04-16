@@ -11,7 +11,7 @@ end
 
 module Deferred_block = struct
   type t =
-    { block : Mina_block.t Deferred.Or_error.t
+    { block : Mina_block.Stable.Latest.t Deferred.Or_error.t
     ; valid : unit Deferred.Or_error.t (* Raises if block is invalid. *)
     }
 
@@ -26,7 +26,7 @@ module Deferred_block = struct
     Deferred.create compute
 
   let verify_block ~verify_blockchain_snarks block =
-    let header = Mina_block.header block in
+    let header = Mina_block.Stable.Latest.header block in
     let open Mina_block.Header in
     verify_blockchain_snarks
       [ (protocol_state header, protocol_state_proof header) ]

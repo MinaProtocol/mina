@@ -1062,7 +1062,7 @@ let gen_account_update_from ?(no_account_precondition = false)
   in
   let account_id = Account_id.create body.public_key body.token_id in
   Hash_set.add account_ids_seen account_id ;
-  return { Account_update.Simple.body; authorization }
+  return { Account_update.Poly.body; authorization }
 
 (* takes an account id, if we want to sign this data *)
 let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
@@ -1336,7 +1336,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         in
         let%bind account_update0 =
           (* Signature authorization to start *)
-          let authorization = Control.Signature Signature.dummy in
+          let authorization = Control.Poly.Signature Signature.dummy in
           gen_account_update_from ~no_account_precondition ?balance_change_range
             ?global_slot ~zkapp_account_ids ~account_ids_seen ~update ?failure
             ~authorization ~new_account ~permissions_auth ~zkapp_account
@@ -1468,7 +1468,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   *)
   let balance_change = Currency.Amount.Signed.negate balance_change_sum in
   let%bind balancing_account_update =
-    let authorization = Control.Signature Signature.dummy in
+    let authorization = Control.Poly.Signature Signature.dummy in
     gen_account_update_from ~no_account_precondition ?balance_change_range
       ?global_slot ?failure ~permissions_auth:Control.Tag.Signature
       ~zkapp_account_ids ~account_ids_seen ~authorization ~new_account:false
@@ -1477,7 +1477,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
       ~ignore_sequence_events_precond ()
   in
   let gen_zkapp_command_with_token_accounts ~num_zkapp_command =
-    let authorization = Control.Signature Signature.dummy in
+    let authorization = Control.Poly.Signature Signature.dummy in
     let permissions_auth = Control.Tag.Signature in
     let rec gen_tree acc n =
       if n <= 0 then return (List.rev acc)
@@ -1567,8 +1567,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
   in
   List.iteri account_updates ~f:(fun ndx account_update ->
       (* update receipt chain hash only for signature, proof authorizations *)
-      match Account_update.authorization account_update with
-      | Control.Proof _ | Control.Signature _ ->
+      match account_update.Account_update.Poly.authorization with
+      | Control.Poly.Proof _ | Control.Poly.Signature _ ->
           let acct_id = Account_update.account_id account_update in
           Account_id.Table.update account_state_tbl acct_id ~f:(function
             | None ->
@@ -1584,7 +1584,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                     account.Account.receipt_chain_hash
                 in
                 ({ account with receipt_chain_hash }, role) )
-      | Control.None_given ->
+      | Control.Poly.None_given ->
           () ) ;
   zkapp_command_dummy_authorizations
 
