@@ -44,7 +44,7 @@ let perform (s : Impl.Worker_state.t) ~fee ~public_key
       let%map proof, time =
         Impl.perform_single s
           ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-          w
+          (Regular w)
       in
       ( proof
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )

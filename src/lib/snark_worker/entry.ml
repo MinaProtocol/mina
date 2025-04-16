@@ -278,7 +278,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
               match%map
                 dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
                   shutdown_on_disconnect
-                  { error; failed_work = work_spec }
+                  (error, work_spec, public_key)
                   daemon_address
               with
               | Error e ->

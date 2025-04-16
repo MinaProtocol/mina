@@ -97,8 +97,8 @@ module Result = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type ('spec, 'single) t =
-        { proofs : 'single One_or_two.Stable.V1.t
+      type ('spec, 'proof) t =
+        { proofs : 'proof One_or_two.Stable.V1.t
         ; metrics :
             ( Core.Time.Stable.Span.V1.t
             * [ `Transition | `Merge | `Zkapp_command_segment ] )
@@ -110,8 +110,8 @@ module Result = struct
     end
 
     module V1 = struct
-      type ('spec, 'single) t =
-        { proofs : 'single One_or_two.Stable.V1.t
+      type ('spec, 'proof) t =
+        { proofs : 'proof One_or_two.Stable.V1.t
         ; metrics :
             (Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ])
             One_or_two.Stable.V1.t

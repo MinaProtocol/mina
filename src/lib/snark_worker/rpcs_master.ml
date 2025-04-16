@@ -55,9 +55,9 @@ module Failed_to_generate_snark = struct
 
     module T = struct
       type query =
-        { error : Bounded_types.Wrapped_error.t
-        ; failed_work : Wire_work.Spec.t
-        }
+        Bounded_types.Wrapped_error.t
+        * Wire_work.Spec.t
+        * Public_key.Compressed.t
 
       type response = unit
     end
