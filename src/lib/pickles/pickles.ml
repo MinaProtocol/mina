@@ -3,11 +3,6 @@
 (** See documentation of the {!Mina_wire_types} library *)
 module Wire_types = Mina_wire_types.Pickles
 
-module Stupid_Kimchi_Promise_Wrapper =
-  Inductive_rule.Stupid_Kimchi_Promise_Wrapper
-module Stupid_Kimchi_Deferred_Wrapper =
-  Inductive_rule.Stupid_Kimchi_Deferred_Wrapper
-
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Pickles_intf.S
@@ -344,7 +339,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              , h
              , i
              , j )
-             H4_6_with_length.T(Stupid_Kimchi_Promise_Wrapper).t
+             H4_6_with_length.T(Inductive_rule).t
           -> ( length
              , a
              , b
@@ -356,14 +351,13 @@ module Make_str (_ : Wire_types.Concrete) = struct
              , h
              , i
              , j )
-             H4_6_with_length.T(Stupid_Kimchi_Promise_Wrapper).t = function
+             H4_6_with_length.T(Inductive_rule.Promise).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
             { identifier
             ; prevs
-              (* TODO: why do we not need the return any more. Why did we ever need it*)
-            ; main = (fun x -> main x)
+            ; main = (fun x -> Promise.return (main x))
             ; feature_flags
             }
             :: go rest
@@ -406,7 +400,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              , h
              , i
              , j )
-             H4_6_with_length.T(Stupid_Kimchi_Deferred_Wrapper).t
+             H4_6_with_length.T(Inductive_rule.Deferred).t
           -> ( length
              , a
              , b
@@ -418,7 +412,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
              , h
              , i
              , j )
-             H4_6_with_length.T(Stupid_Kimchi_Promise_Wrapper).t = function
+             H4_6_with_length.T(Inductive_rule.Promise).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
@@ -1031,7 +1025,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
         let tagname = "" in
         Tag.create ~kind:Compiled tagname
 
-      let rule : _ Inductive_rule.Promise.s =
+      let rule : _ Inductive_rule.Promise.t =
         let open Impls.Step in
         { identifier = "main"
         ; prevs = [ tag; tag ]

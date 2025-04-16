@@ -81,7 +81,7 @@ module type Intf = sig
          , 'ret_value
          , 'auxiliary_var
          , 'auxiliary_value )
-         s =
+         t =
       { identifier : string
       ; prevs :
           ( 'prev_vars
@@ -102,7 +102,7 @@ module type Intf = sig
         (Return_value : Pickles_types.Poly_types.T0)
         (Auxiliary_var : Pickles_types.Poly_types.T0)
         (Auxiliary_value : Pickles_types.Poly_types.T0) : sig
-      type ('prev_vars, 'prev_values, 'widths, 'heights) t =
+      type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
         ( 'prev_vars
         , 'prev_values
         , 'widths
@@ -113,7 +113,7 @@ module type Intf = sig
         , Return_value.t
         , Auxiliary_var.t
         , Auxiliary_value.t )
-        s
+        t
     end
   end
 
@@ -131,13 +131,3 @@ end
 module Make (P : Proof_intf) : Intf
 
 module Kimchi : Intf with type 'width proof = 'width Proof.t
-
-module Stupid_Kimchi_Promise_Wrapper : sig
-  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) t =
-    ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) Kimchi.Promise.s
-end
-
-module Stupid_Kimchi_Deferred_Wrapper : sig
-  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) t =
-    ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) Kimchi.Deferred.s
-end

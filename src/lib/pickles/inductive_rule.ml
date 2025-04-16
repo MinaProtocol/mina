@@ -86,7 +86,7 @@ module type Intf = sig
          , 'ret_value
          , 'auxiliary_var
          , 'auxiliary_value )
-         s =
+         t =
       { identifier : string
       ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
       ; main :
@@ -102,7 +102,7 @@ module type Intf = sig
         (Return_value : T0)
         (Auxiliary_var : T0)
         (Auxiliary_value : T0) : sig
-      type ('prev_vars, 'prev_values, 'widths, 'heights) t =
+      type nonrec ('prev_vars, 'prev_values, 'widths, 'heights) t =
         ( 'prev_vars
         , 'prev_values
         , 'widths
@@ -113,7 +113,7 @@ module type Intf = sig
         , Return_value.t
         , Auxiliary_var.t
         , Auxiliary_value.t )
-        s
+        t
     end
   end
 
@@ -207,7 +207,7 @@ module Make (P : Proof_intf) : Intf with type 'a proof = 'a P.t = struct
          , 'ret_value
          , 'auxiliary_var
          , 'auxiliary_value )
-         s =
+         t =
       { identifier : string
       ; prevs : ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
       ; main :
@@ -235,7 +235,7 @@ module Make (P : Proof_intf) : Intf with type 'a proof = 'a P.t = struct
         , Return_value.t
         , Auxiliary_var.t
         , Auxiliary_value.t )
-        s
+        t
     end
   end
 
@@ -247,13 +247,3 @@ module Make (P : Proof_intf) : Intf with type 'a proof = 'a P.t = struct
 end
 
 module Kimchi = Make (Proof)
-
-module Stupid_Kimchi_Promise_Wrapper = struct
-  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) t =
-    ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) Kimchi.Promise.s
-end
-
-module Stupid_Kimchi_Deferred_Wrapper = struct
-  type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) t =
-    ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) Kimchi.Deferred.s
-end

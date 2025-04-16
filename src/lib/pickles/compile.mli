@@ -321,7 +321,7 @@ val compile_with_wrap_main_override_promise :
            , 'ret_value
            , 'auxiliary_var
            , 'auxiliary_value )
-           H4_6_with_length.T(Inductive_rule.Stupid_Kimchi_Promise_Wrapper).t )
+           H4_6_with_length.T(Inductive_rule.Kimchi.Promise).t )
   -> unit
   -> ('var, 'value, 'max_proofs_verified, 'branches) Tag.t
      * Cache_handle.t

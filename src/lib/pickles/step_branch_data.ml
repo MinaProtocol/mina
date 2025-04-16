@@ -36,7 +36,7 @@ module Make (IR : Inductive_rule.Intf) = struct
             , 'ret_value
             , 'auxiliary_var
             , 'auxiliary_value )
-            IR.Promise.s
+            IR.Promise.t
         ; main :
                step_domains:(Domains.t, 'branches) Vector.t Promise.t
             -> (   unit
@@ -84,7 +84,7 @@ module Make (IR : Inductive_rule.Intf) = struct
       ~(public_input :
          (var, value, a_var, a_value, ret_var, ret_value) IR.public_input )
       ~auxiliary_typ _var_to_field_elements _value_to_field_elements
-      ~(chain_to : unit Promise.t) (rule : _ IR.Promise.s) =
+      ~(chain_to : unit Promise.t) (rule : _ IR.Promise.t) =
     Timer.clock __LOC__ ;
     let module HT = H4.T (Tag) in
     let (T (self_width, proofs_verified)) = HT.length rule.prevs in

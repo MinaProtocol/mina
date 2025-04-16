@@ -47,7 +47,7 @@ module Make (IR : Inductive_rule.Intf) : sig
        , 'ret_value
        , 'auxiliary_var
        , 'auxiliary_value )
-       IR.Promise.s
+       IR.Promise.t
     -> (   unit
         -> ( (Unfinalized.t, 'max_proofs_verified) Pickles_types.Vector.t
            , Impls.Step.Field.t

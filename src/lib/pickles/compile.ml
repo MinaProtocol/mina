@@ -1014,8 +1014,7 @@ let compile_with_wrap_main_override_promise :
              , ret_value
              , auxiliary_var
              , auxiliary_value )
-             H4_6_with_length.T(Inductive_rule.Stupid_Kimchi_Promise_Wrapper).t
-         )
+             H4_6_with_length.T(Inductive_rule.Kimchi.Promise).t )
     -> unit
     -> (var, value, max_proofs_verified, branches) Tag.t
        * Cache_handle.t
@@ -1094,7 +1093,7 @@ let compile_with_wrap_main_override_promise :
          , ret_value
          , auxiliary_var
          , auxiliary_value )
-         H4_6_with_length.T(Inductive_rule.Stupid_Kimchi_Promise_Wrapper).t
+         H4_6_with_length.T(Inductive_rule.Kimchi.Promise).t
       -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
     | [] ->
         []
@@ -1103,8 +1102,7 @@ let compile_with_wrap_main_override_promise :
   in
   let choices = choices ~self in
   let branches, prev_varss_length =
-    let module IR_hlist =
-      H4_6_with_length.T (Inductive_rule.Stupid_Kimchi_Promise_Wrapper) in
+    let module IR_hlist = H4_6_with_length.T (Inductive_rule.Kimchi.Promise) in
     IR_hlist.length choices
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
@@ -1299,7 +1297,7 @@ end) =
 struct
   open Impls.Step
 
-  let rule self : _ Inductive_rule.Stupid_Kimchi_Promise_Wrapper.t =
+  let rule self : _ Inductive_rule.Kimchi.Promise.t =
     { identifier = "main"
     ; prevs = [ self; self ]
     ; main =

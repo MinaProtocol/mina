@@ -36,7 +36,7 @@ module Make (IR : Inductive_rule.Intf) : sig
             , 'ret_value
             , 'auxiliary_var
             , 'auxiliary_value )
-            IR.Promise.s
+            IR.Promise.t
               (* Main functions to compute *)
         ; main :
                step_domains:
@@ -109,7 +109,7 @@ module Make (IR : Inductive_rule.Intf) : sig
        , 'ret_value
        , 'a
        , 'b )
-       IR.Promise.s
+       IR.Promise.t
     -> ( 'a_var
        , 'a_value
        , 'ret_var
