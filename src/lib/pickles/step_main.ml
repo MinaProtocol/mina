@@ -62,8 +62,7 @@ let verify_one ~srs
   let statement =
     let prev_messages_for_next_step_proof =
       with_label __LOC__ (fun () ->
-          hash_messages_for_next_step_proof ~widths:d.proofs_verifieds
-            ~max_width:(Nat.Add.n d.max_proofs_verified)
+          hash_messages_for_next_step_proof
             ~proofs_verified_mask:
               (Vector.trim_front branch_data.proofs_verified_mask
                  (Nat.lte_exn
@@ -481,10 +480,7 @@ let step_main :
                       , max_proofs_verified
                       , self_branches )
                       Types_map.For_step.t =
-                    { proofs_verifieds =
-                        `Known
-                          (Vector.map basic.proofs_verifieds ~f:Field.of_int)
-                    ; max_proofs_verified
+                    { max_proofs_verified
                     ; public_input = basic.public_input
                     ; wrap_domain = `Known basic.wrap_domains.h
                     ; step_domains = `Known basic.step_domains

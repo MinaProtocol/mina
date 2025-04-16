@@ -14,7 +14,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
        and type ('a, 'b) Pre_diff_one.Stable.V2.t = ('a, 'b) A.Pre_diff_one.V2.t
        and type Pre_diff_with_at_most_one_coinbase.Stable.V2.t =
         A.Pre_diff_with_at_most_one_coinbase.V2.t
-       and type t = A.V2.t
+       and type Diff.Stable.V2.t = A.Diff.V2.t
        and type Stable.V2.t = A.V2.t
 end
 
@@ -175,7 +175,17 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
+
+    let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+      Pre_diff_two.map
+        ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
+        ~f2:(With_status.map ~f:User_command.write_all_proofs_to_disk)
+
+    let read_all_proofs_from_disk : t -> Stable.Latest.t =
+      Pre_diff_two.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
+        ~f2:(With_status.map ~f:User_command.read_all_proofs_from_disk)
   end
 
   module Pre_diff_with_at_most_one_coinbase = struct
@@ -194,10 +204,44 @@ module Make_str (A : Wire_types.Concrete) = struct
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
+
+    let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+      Pre_diff_one.map
+        ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
+        ~f2:(With_status.map ~f:User_command.write_all_proofs_to_disk)
+
+    let read_all_proofs_from_disk : t -> Stable.Latest.t =
+      Pre_diff_one.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
+        ~f2:(With_status.map ~f:User_command.read_all_proofs_from_disk)
   end
 
   module Diff = struct
+    let coinbase_amount
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        ~supercharge_coinbase =
+      if supercharge_coinbase then
+        Currency.Amount.scale constraint_constants.coinbase_amount
+          constraint_constants.supercharged_coinbase_factor
+      else Some constraint_constants.coinbase_amount
+
+    let coinbase
+        ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+        ~supercharge_coinbase (first_pre_diff, second_pre_diff_opt) =
+      let coinbase_amount =
+        coinbase_amount ~constraint_constants ~supercharge_coinbase
+      in
+      match
+        ( first_pre_diff.Pre_diff_two.coinbase
+        , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
+            ~f:(fun d -> d.Pre_diff_one.coinbase) )
+      with
+      | At_most_two.Zero, At_most_one.Zero ->
+          Some Currency.Amount.zero
+      | _ ->
+          coinbase_amount
+
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
@@ -209,10 +253,34 @@ module Make_str (A : Wire_types.Concrete) = struct
         [@@deriving equal, sexp, yojson]
 
         let to_latest = Fn.id
+
+        let coinbase = coinbase
       end
     end]
 
-    type t = Stable.Latest.t
+    type t =
+      Pre_diff_with_at_most_two_coinbase.t
+      * Pre_diff_with_at_most_one_coinbase.t option
+
+    let write_all_proofs_to_disk ~proof_cache_db
+        (( pre_diff_with_at_most_two_coinbase
+         , pre_diff_with_at_most_one_coinbase_opt ) :
+          Stable.Latest.t ) : t =
+      ( Pre_diff_with_at_most_two_coinbase.write_all_proofs_to_disk
+          ~proof_cache_db pre_diff_with_at_most_two_coinbase
+      , Option.map pre_diff_with_at_most_one_coinbase_opt
+          ~f:
+            (Pre_diff_with_at_most_one_coinbase.write_all_proofs_to_disk
+               ~proof_cache_db ) )
+
+    let read_all_proofs_from_disk
+        (( pre_diff_with_at_most_two_coinbase
+         , pre_diff_with_at_most_one_coinbase_opt ) :
+          t ) : Stable.Latest.t =
+      ( Pre_diff_with_at_most_two_coinbase.read_all_proofs_from_disk
+          pre_diff_with_at_most_two_coinbase
+      , Option.map pre_diff_with_at_most_one_coinbase_opt
+          ~f:Pre_diff_with_at_most_one_coinbase.read_all_proofs_from_disk )
   end
 
   [%%versioned
@@ -224,10 +292,32 @@ module Make_str (A : Wire_types.Concrete) = struct
       [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
+
+      let empty_diff : t =
+        { diff =
+            ( { completed_works = []
+              ; commands = []
+              ; coinbase = At_most_two.Zero
+              ; internal_command_statuses = []
+              }
+            , None )
+        }
+
+      let completed_works (t : t) =
+        (fst t.diff).completed_works
+        @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
+              d.completed_works )
     end
   end]
 
-  type t = Stable.Latest.t = { diff : Diff.t } [@@deriving fields]
+  type t = { diff : Diff.t } [@@deriving fields]
+
+  let write_all_proofs_to_disk ~proof_cache_db t =
+    { diff = Diff.write_all_proofs_to_disk ~proof_cache_db t.Stable.Latest.diff
+    }
+
+  let read_all_proofs_from_disk t =
+    { Stable.Latest.diff = Diff.read_all_proofs_from_disk t.diff }
 
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =
@@ -263,31 +353,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let forget_cw cw_list = List.map ~f:Transaction_snark_work.forget cw_list
 
-  let coinbase_amount
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~supercharge_coinbase =
-    if supercharge_coinbase then
-      Currency.Amount.scale constraint_constants.coinbase_amount
-        constraint_constants.supercharged_coinbase_factor
-    else Some constraint_constants.coinbase_amount
-
-  let coinbase
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~supercharge_coinbase t =
-    let first_pre_diff, second_pre_diff_opt = t.diff in
-    let coinbase_amount =
-      coinbase_amount ~constraint_constants ~supercharge_coinbase
-    in
-    match
-      ( first_pre_diff.coinbase
-      , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
-          ~f:(fun d -> d.coinbase) )
-    with
-    | At_most_two.Zero, At_most_one.Zero ->
-        Some Currency.Amount.zero
-    | _ ->
-        coinbase_amount
-
   module With_valid_signatures = struct
     type pre_diff_with_at_most_two_coinbase =
       ( Transaction_snark_work.t
@@ -310,7 +375,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~supercharge_coinbase (t : t) =
       let first_pre_diff, second_pre_diff_opt = t.diff in
       let coinbase_amount =
-        coinbase_amount ~constraint_constants ~supercharge_coinbase
+        Diff.coinbase_amount ~constraint_constants ~supercharge_coinbase
       in
       match
         ( first_pre_diff.coinbase
@@ -428,7 +493,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let open Currency in
     let open Option.Let_syntax in
     let%bind coinbase =
-      coinbase ~constraint_constants ~supercharge_coinbase t
+      Diff.coinbase ~constraint_constants ~supercharge_coinbase t.diff
     in
     let%bind total_reward =
       List.fold

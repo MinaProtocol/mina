@@ -77,7 +77,7 @@ let create
     ~wrap_domains ~(feature_flags : Opt.Flag.t Plonk_types.Features.Full.t)
     ~num_chunks ~(actual_feature_flags : bool Plonk_types.Features.t)
     ~(max_proofs_verified : max_proofs_verified Nat.t)
-    ~(proofs_verifieds : (int, branches) Vector.t) ~(branches : branches Nat.t)
+    ~(branches : branches Nat.t)
     ~(public_input :
        ( var
        , value
@@ -186,7 +186,6 @@ let create
       rule
       ~basic:
         { public_input = typ
-        ; proofs_verifieds
         ; wrap_domains
         ; step_domains
         ; feature_flags

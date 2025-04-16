@@ -4,14 +4,9 @@
  (libraries
   ;; opam libraries
   core.uuid
-  core_kernel.uuid
   async_unix
   async
   core
-  core_kernel
-  base.caml
-  async_kernel
-  sexplib0
   ;; local libraries
   snark_params
   pickles

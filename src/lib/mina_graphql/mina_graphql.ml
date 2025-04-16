@@ -380,7 +380,7 @@ module Mutations = struct
                   in
                   Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
                       { With_hash.data = cmd
-                      ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
+                      ; hash = Transaction_hash.hash_zkapp_command cmd
                       } ) )
             in
             Ok cmds_with_hash
@@ -391,8 +391,8 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let mock_zkapp_command mina zkapp_command :
-      ( (Zkapp_command.t, Transaction_hash.t) With_hash.t
+  let mock_zkapp_command mina (zkapp_command : Zkapp_command.Stable.Latest.t) :
+      ( (Zkapp_command.Stable.Latest.t, Transaction_hash.t) With_hash.t
         Types.Zkapp_command.With_status.t
       , string )
       result
@@ -465,19 +465,16 @@ module Mutations = struct
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
                       |> Consensus.Data.Consensus_state
                          .global_slot_since_genesis )
-                    ~state_view ledger zkapp_command
+                    ~state_view ledger
+                    (Zkapp_command.write_all_proofs_to_disk zkapp_command)
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
                 let applied_ok =
                   Result.map applied
                     ~f:(fun (zkapp_command_applied, _local_state_and_amount) ->
-                      let ({ data = zkapp_command; status }
-                            : Zkapp_command.t With_status.t ) =
-                        zkapp_command_applied.command
-                      in
+                      let status = zkapp_command_applied.command.status in
                       let hash =
-                        Transaction_hash.hash_command
-                          (Zkapp_command zkapp_command)
+                        Transaction_hash.hash_zkapp_command zkapp_command
                       in
                       let (with_hash : _ With_hash.t) =
                         { data = zkapp_command; hash }
@@ -1704,7 +1701,9 @@ module Queries = struct
                       match Zkapp_command.of_base64 serialized_txn with
                       | Ok zkapp_command ->
                           let user_cmd =
-                            User_command.Zkapp_command zkapp_command
+                            User_command.Zkapp_command
+                              (Zkapp_command.write_all_proofs_to_disk
+                                 zkapp_command )
                           in
                           (* The command gets piped through [forget_check]
                              below; this is just to make the types work
@@ -1797,6 +1796,7 @@ module Queries = struct
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
                 txn
+              |> With_hash.map ~f:User_command.read_all_proofs_from_disk
             in
             match cmd_with_hash.data with
             | Signed_command _ ->
@@ -2050,8 +2050,10 @@ module Queries = struct
         in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
         let transaction_pool = Mina_lib.transaction_pool mina in
+        (* TODO: do not compute hashes to just get the status *)
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool txn.data )
+          ~transaction_pool
+        @@ User_command.write_all_proofs_to_disk txn.data )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker

@@ -6,8 +6,8 @@ type Structured_log_events.t +=
   [@@deriving register_event]
 
 type block_or_header =
-  [ `Block of Mina_block.t Envelope.Incoming.t
-  | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+  [ `Block of Mina_block.Stable.Latest.t Envelope.Incoming.t
+  | `Header of Mina_block.Header.Stable.Latest.t Envelope.Incoming.t ]
 
 include
   Mina_net2.Sink.S_with_void
