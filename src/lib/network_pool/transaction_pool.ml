@@ -178,7 +178,7 @@ module Diff_versioned = struct
   type rejected = Rejected.t [@@deriving sexp, yojson, compare]
 
   type verified = Transaction_hash.User_command_with_valid_signature.t list
-  [@@deriving sexp, to_yojson]
+  [@@deriving to_yojson]
 
   let summary t =
     Printf.sprintf
@@ -1002,7 +1002,7 @@ struct
 
       type rejected = Rejected.t
 
-      type verified = Diff_versioned.verified [@@deriving sexp, to_yojson]
+      type verified = Diff_versioned.verified [@@deriving to_yojson]
 
       let reject_overloaded_diff (diff : verified) : rejected =
         List.map diff ~f:(fun cmd ->

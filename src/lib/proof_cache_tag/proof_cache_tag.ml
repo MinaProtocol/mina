@@ -8,6 +8,12 @@ type t =
   | Lmdb of { cache_id : Cache.id; cache_db : Cache.t }
   | Identity of Pickles.Proof.Proofs_verified_2.Stable.Latest.t
 
+(* Sexp serialization is opaque for proof_cache_tag *)
+let sexp_of_t _ = Sexp.of_string "proof_cache_tag"
+
+(* JSON serialization is opaque for proof_cache_tag *)
+let to_yojson _ = `String "proof_cache_tag"
+
 let read_proof_from_disk = function
   | Lmdb t ->
       Cache.get t.cache_db t.cache_id

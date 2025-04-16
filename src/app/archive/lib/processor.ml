@@ -2079,7 +2079,7 @@ module User_command = struct
       in
       let memo = ps.memo |> Signed_command_memo.to_base58_check in
       let hash =
-        Transaction_hash.hash_wrapped_zkapp_command ps
+        Transaction_hash.hash_zkapp_command_with_hashes ps
         |> Transaction_hash.to_base58_check
       in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
