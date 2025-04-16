@@ -58,7 +58,7 @@ type ('proof, 'account_update_digest, 'forest_digest) with_forest =
 
 module T = struct
   type t = (Proof.t, Digest.Account_update.t, Digest.Forest.t) with_forest
-  [@@deriving sexp, compare, equal, hash, yojson]
+  [@@deriving sexp_of, to_yojson]
 
   [%%versioned
   module Stable = struct
@@ -165,6 +165,15 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   ; memo = t.memo
   ; account_updates = Call_forest.forget_hashes t.account_updates
   }
+
+let forget_digests_and_proofs
+    ({ fee_payer; memo; account_updates } : (_, _, _) with_forest) :
+    (unit, unit, unit) with_forest =
+  map_proofs ~f:(const ())
+    { Poly.fee_payer
+    ; memo
+    ; account_updates = Call_forest.forget_hashes account_updates
+    }
 
 [%%define_locally Stable.Latest.(gen)]
 
