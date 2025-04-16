@@ -76,7 +76,10 @@ module Get_work = struct
         let%map work =
           Work.Spec.map_opt ~f_single:unwrap_regular_and_warn work
         in
-        (work, key)
+        assert (Work.Partition_id.(equal work.work_id One_or_two)) ;
+        ( ( { instances = work.instances; fee = work.fee }
+            : Wire_work.Spec.Stable.V1.t )
+        , key )
 
       let caller_model_of_response (resp : response) :
           Rpcs_master.Get_work.response =
@@ -135,15 +138,20 @@ module Submit_work = struct
           ({ proofs; metrics; spec; prover } : Rpcs_master.Submit_work.query) :
           query =
         let open Option.Let_syntax in
+        let fatal_message =
+          "FATAL: V2 Worker completed a `Zkapp_command_segment` job where the \
+           coordinator can't aggregate, this shouldn't happen as the work is \
+           issued by the coordinator"
+        in
         (let%bind metrics = One_or_two.Option.map metrics ~f:fix_metric_tag in
          let%map spec = Work.Spec.map_opt ~f_single:regular_opt spec in
+         assert (Work.Partition_id.(equal spec.work_id One_or_two)) ;
+         let spec : Wire_work.Spec.Stable.V1.t =
+           { instances = spec.instances; fee = spec.fee }
+         in
          let result : query = { proofs; metrics; spec; prover } in
          result )
-        |> Option.value_exn
-             ~message:
-               "FATAL: V2 Worker completed a `Zkapp_command_segment` job where \
-                the coordinator can't aggregate, this shouldn't happen as the \
-                work is issued by the coordinator"
+        |> Option.value_exn ~message:fatal_message
 
       let callee_model_of_query : query -> Rpcs_master.Submit_work.query =
         Wire_work.Result.Stable.V1.to_latest
@@ -211,6 +219,10 @@ module Failed_to_generate_snark = struct
         let open Option.Let_syntax in
         (let%map work_spec =
            Work.Spec.map_opt ~f_single:regular_opt work_spec
+         in
+         assert (Work.Partition_id.(equal work_spec.work_id One_or_two)) ;
+         let work_spec : Wire_work.Spec.Stable.V1.t =
+           { instances = work_spec.instances; fee = work_spec.fee }
          in
          (error, work_spec, public_key) )
         |> Option.value_exn

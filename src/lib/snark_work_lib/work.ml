@@ -61,9 +61,34 @@ module Single = struct
   end
 end
 
+(* NOTE: to maintain compatibility with underlying Work_selector, we will need a `partition_id` to merge single works together
+ *)
+
+module Partition_id = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      (* `One_or_two` means we're receving a work not partitioned by the work partitioner *)
+      type t = First of int | Second of int | One_or_two
+      [@@deriving sexp, to_yojson, equal]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module Spec = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type 'single t =
+        { instances : 'single One_or_two.Stable.V1.t
+        ; fee : Currency.Fee.Stable.V1.t
+        ; work_id : Partition_id.Stable.V1.t
+        }
+      [@@deriving fields, sexp, to_yojson]
+    end
+
     module V1 = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
@@ -71,17 +96,18 @@ module Spec = struct
         }
       [@@deriving fields, sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest ({ instances; fee } : 's t) : 's V2.t =
+        { instances; fee; work_id = One_or_two }
     end
   end]
 
-  let map ~f_single { instances; fee } =
-    { instances = One_or_two.map ~f:f_single instances; fee }
+  let map ~f_single { instances; fee; work_id } =
+    { instances = One_or_two.map ~f:f_single instances; fee; work_id }
 
-  let map_opt ~f_single { instances; fee } =
+  let map_opt ~f_single { instances; fee; work_id } =
     let open Option.Let_syntax in
     let%map instances = One_or_two.Option.map ~f:f_single instances in
-    { instances; fee }
+    { instances; fee; work_id }
 end
 
 let update_metric :
@@ -92,21 +118,6 @@ let update_metric :
       (span, `Transition)
   | span, `Merge ->
       (span, `Merge)
-
-(* NOTE: to maintain compatibility with underlying Work_selector, we will need a `partition_id` to merge single works together
- *)
-
-module Partition_id = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      (* `One_or_two` means we're receving a work not partitioned by the work partitioner *)
-      type t = First of int | Second of int | One_or_two
-
-      let to_latest = Fn.id
-    end
-  end]
-end
 
 module Result = struct
   [%%versioned
@@ -120,7 +131,6 @@ module Result = struct
             One_or_two.Stable.V1.t
         ; spec : 'spec
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
-        ; work_id : Partition_id.Stable.V1.t
         }
       [@@deriving fields]
     end
@@ -142,24 +152,22 @@ module Result = struct
         ; metrics = One_or_two.map ~f:update_metric metrics
         ; spec
         ; prover
-        ; work_id = One_or_two
         }
     end
   end]
 
-  let map ~f_spec ~f_single { proofs; metrics; spec; prover; work_id } =
+  let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
     { proofs = One_or_two.map ~f:f_single proofs
     ; metrics
     ; spec = f_spec spec
     ; prover
-    ; work_id
     }
 
-  let map_opt ~f_spec ~f_single { proofs; metrics; spec; prover; work_id } =
+  let map_opt ~f_spec ~f_single { proofs; metrics; spec; prover } =
     let open Option.Let_syntax in
     let%bind proofs = One_or_two.Option.map ~f:f_single proofs in
     let%map spec = f_spec spec in
-    { proofs; metrics; spec; prover; work_id }
+    { proofs; metrics; spec; prover }
 end
 
 module Result_zkapp_command_segment = struct

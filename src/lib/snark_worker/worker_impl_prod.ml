@@ -236,7 +236,8 @@ module Impl : Worker_impl_intf.Worker_impl = struct
               match spec with
               | Regular regular ->
                   perform_regular ~m:(module M) ~logger ~regular ~sok_digest
-              | Zkapp_command_segment { id = _; statement; witness; spec } ->
+              | Zkapp_command_segment
+                  { segment_id = _; statement; witness; spec } ->
                   log_zkapp_cmd_base_snark ~logger ~statement ~spec
                     (M.of_zkapp_command_segment_exn ~witness) )
       | Check | No_check ->

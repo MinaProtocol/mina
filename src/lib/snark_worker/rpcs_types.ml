@@ -90,7 +90,7 @@ module Wire_work = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
-        type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
+        type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V2.t
         [@@deriving to_yojson]
 
         let to_latest = Fn.id
@@ -100,8 +100,9 @@ module Wire_work = struct
         type t = Single.Spec.Stable.V1.t Work.Spec.Stable.V1.t
         [@@deriving to_yojson]
 
-        let to_latest : t -> V2.t =
-          Work.Spec.map ~f_single:Single.Spec.Stable.V1.to_latest
+        let to_latest (spec : t) : V2.t =
+          Work.Spec.Stable.V1.to_latest spec
+          |> Work.Spec.map ~f_single:Single.Spec.Stable.V1.to_latest
       end
     end]
   end

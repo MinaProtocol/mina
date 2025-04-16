@@ -2084,7 +2084,9 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           let snark_jobs_state =
             Work_selector.Snark_job_state.
-              { work_partitioner = ()
+              { work_partitioner =
+                  Work_selector.Work_partitioner.State.init
+                    config.work_reassignment_wait config.logger
               ; work_selector =
                   Work_selector.State.init
                     ~reassignment_wait:config.work_reassignment_wait

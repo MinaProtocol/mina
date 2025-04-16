@@ -64,7 +64,7 @@ type Structured_log_events.t +=
 include Worker_impl_prod.Impl
 
 let perform (s : Worker_state.t) public_key
-    ({ instances; fee } as spec : Rpcs_types.Wire_work.Spec.t) =
+    ({ instances; fee; _ } as spec : Rpcs_types.Wire_work.Spec.t) =
   One_or_two.Deferred_result.map instances ~f:(fun single_work ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
