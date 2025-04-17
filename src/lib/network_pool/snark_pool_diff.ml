@@ -123,7 +123,7 @@ module Make
         ( (_, _) Snark_work_lib.Work.Compact.Single.Spec.t
           Snark_work_lib.Work.Compact.Spec.t
         , Ledger_proof.t )
-        Snark_work_lib.Work.Result.t ) =
+        Snark_work_lib.Work.Compact.Result.t ) =
     Add_solved_work
       ( One_or_two.map res.spec.instances
           ~f:Snark_work_lib.Work.Compact.Single.Spec.statement

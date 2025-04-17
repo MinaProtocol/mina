@@ -35,7 +35,7 @@ module UUID_generator = struct
   let recycle_uuid (t : t) (uuid : int) = Queue.enqueue t.reusable_uuids uuid
 end
 
-module Pairing = Snark_work_lib.Work.Pairing
+module Pairing = Snark_work_lib.Work.Wire.Pairing
 
 module Zkapp_command_job_with_status = struct
   type t = { job : Zkapp_command_job.t; status : Work_lib.Job_status.t }
@@ -93,11 +93,7 @@ module Pending_Zkapp_command = struct
     in
     let open Option.Let_syntax in
     let%map proof1, proof2 = try_take2 t.pending_mergable_proofs in
-    Zkapp_command_job.Spec.Merge
-      { statement = failwith "TODO: add statement to merge "
-      ; proof1 : Ledger_proof.t
-      ; proof2 : Ledger_proof.t
-      }
+    Zkapp_command_job.Spec.Merge { proof1; proof2 }
 
   let generate_segment ~(t : t) () =
     let open Option.Let_syntax in
