@@ -105,6 +105,7 @@ let%test_module "Initialize state test" =
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
@@ -138,7 +139,7 @@ let%test_module "Initialize state test" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -158,7 +159,7 @@ let%test_module "Initialize state test" =
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign sk
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->

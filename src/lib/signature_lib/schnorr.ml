@@ -11,7 +11,7 @@ module type Message_intf = sig
   type curve_scalar
 
   val derive :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> t
     -> private_key:curve_scalar
     -> public_key:curve
@@ -24,7 +24,7 @@ module type Message_intf = sig
     t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
 
   val hash :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> t
     -> public_key:curve
     -> r:field
@@ -121,13 +121,13 @@ module type S = sig
   val compress : curve -> bool list
 
   val sign :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Private_key.t
     -> Message.t
     -> Signature.t
 
   val verify :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature.t
     -> Public_key.t
     -> Message.t
@@ -222,25 +222,25 @@ module Make
 
   let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)
 
-  let sign ?signature_kind (d_prime : Private_key.t) (m : Message.t) =
+  let sign ~signature_kind (d_prime : Private_key.t) (m : Message.t) =
     let public_key =
       (* TODO: Don't recompute this. *) Curve.scale Curve.one d_prime
     in
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
-    let derive = Message.derive ?signature_kind in
+    let derive = Message.derive ~signature_kind in
     let k_prime = derive m ~public_key ~private_key:d in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, ry = Curve.(to_affine_exn (scale Curve.one k_prime)) in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let hash = Message.hash ?signature_kind in
+    let hash = Message.hash ~signature_kind in
     let e = hash m ~public_key ~r in
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
-  let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
+  let verify ~signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
       (m : Message.t) =
-    let hash = Message.hash ?signature_kind in
+    let hash = Message.hash ~signature_kind in
     let e = hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
@@ -304,15 +304,6 @@ module Message = struct
 
   let network_id_other chain_name = chain_name
 
-  let network_id =
-    match Mina_signature_kind.t_DEPRECATED with
-    | Mainnet ->
-        network_id_mainnet
-    | Testnet ->
-        network_id_testnet
-    | Other_network chain_name ->
-        network_id_other chain_name
-
   module Legacy = struct
     open Tick
 
@@ -335,7 +326,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
+    let derive ~(signature_kind : Mina_signature_kind.t) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -361,10 +352,7 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash ?signature_kind =
-      let signature_kind =
-        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
-      in
+    let hash ~signature_kind =
       make_hash ~init:(Hash_prefix_states.signature_legacy ~signature_kind)
 
     let hash_for_mainnet =
@@ -413,7 +401,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
+    let derive ~(signature_kind : Mina_signature_kind.t) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -439,10 +427,7 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash ?signature_kind =
-      let signature_kind =
-        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
-      in
+    let hash ~signature_kind =
       make_hash ~init:(Hash_prefix_states.signature ~signature_kind)
 
     let hash_for_mainnet =
@@ -529,10 +514,11 @@ let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
     ~value_of_hlist:of_hlist
 
 let%test_unit "schnorr checked + unchecked" =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Quickcheck.test ~trials:5 gen_legacy ~f:(fun (pk, msg) ->
-      let s = Legacy.sign pk msg in
+      let s = Legacy.sign ~signature_kind pk msg in
       let pubkey = Tick.Inner_curve.(scale one pk) in
-      assert (Legacy.verify s pubkey msg) ;
+      assert (Legacy.verify ~signature_kind s pubkey msg) ;
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(
            tuple3 Tick.Inner_curve.typ (legacy_message_typ ())
@@ -548,10 +534,11 @@ let%test_unit "schnorr checked + unchecked" =
         (pubkey, msg, s) )
 
 let%test_unit "schnorr checked + unchecked" =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Quickcheck.test ~trials:5 gen_chunked ~f:(fun (pk, msg) ->
-      let s = Chunked.sign pk msg in
+      let s = Chunked.sign ~signature_kind pk msg in
       let pubkey = Tick.Inner_curve.(scale one pk) in
-      assert (Chunked.verify s pubkey msg) ;
+      assert (Chunked.verify ~signature_kind s pubkey msg) ;
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(
            tuple3 Tick.Inner_curve.typ (chunked_message_typ ())

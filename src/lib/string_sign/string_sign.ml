@@ -53,14 +53,14 @@ let string_to_input s =
     ; bitstrings = Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s)))
     }
 
-let verify ?signature_kind signature pk s =
+let verify ~signature_kind signature pk s =
   let m = string_to_input s in
   let inner_curve = Inner_curve.of_affine pk in
-  Schnorr.Legacy.verify ?signature_kind signature inner_curve m
+  Schnorr.Legacy.verify ~signature_kind signature inner_curve m
 
-let sign ?signature_kind sk s =
+let sign ~signature_kind sk s =
   let m = string_to_input s in
-  Schnorr.Legacy.sign ?signature_kind sk m
+  Schnorr.Legacy.sign ~signature_kind sk m
 
 let%test_module "Sign_string tests" =
   ( module struct
@@ -77,11 +77,12 @@ let%test_module "Sign_string tests" =
       { public_key; private_key }
 
     let%test "Sign, verify with default network" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let s =
         "Now is the time for all good men to come to the aid of their party"
       in
-      let signature = sign keypair.private_key s in
-      verify signature keypair.public_key s
+      let signature = sign ~signature_kind keypair.private_key s in
+      verify ~signature_kind signature keypair.public_key s
 
     let%test "Sign, verify with mainnet" =
       let s = "Rain and Spain don't rhyme with cheese" in

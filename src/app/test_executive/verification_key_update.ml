@@ -98,6 +98,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let logger = Logger.create ()
 
   let run network t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Malleable_error.Let_syntax in
     let%bind () =
       section_hard "Wait for nodes to initialize"
@@ -241,7 +242,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             when Public_key.Compressed.equal public_key account_a_pk ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign account_a_kp.private_key
+                  Schnorr.Chunked.sign ~signature_kind account_a_kp.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -261,7 +262,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign account_a_kp.private_key
+                      (Schnorr.Chunked.sign ~signature_kind
+                         account_a_kp.private_key
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->

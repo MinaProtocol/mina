@@ -31,6 +31,7 @@ let sign_command =
         exit 1
 
 let verify_message_command =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Command.Let_syntax in
   let%map_open signature =
     flag "--signature" ~doc:"Rosetta signature" (required string)
@@ -46,7 +47,7 @@ let verify_message_command =
       Option.value_exn (Mina_base.Signature.Raw.decode signature)
     in
     let pk = Rosetta_coding.Coding.to_public_key public_key in
-    match String_sign.verify signature pk message with
+    match String_sign.verify ~signature_kind signature pk message with
     | true ->
         return ()
     | false ->

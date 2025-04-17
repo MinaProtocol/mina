@@ -84,6 +84,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
 *)
 let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     Zkapp_command.t Async_kernel.Deferred.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let txn_commitment, full_txn_commitment =
     Zkapp_command.get_transaction_commitments zkapp_command
   in
@@ -91,7 +92,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     let commitment =
       if use_full_commitment then full_txn_commitment else txn_commitment
     in
-    Signature_lib.Schnorr.Chunked.sign sk
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind sk
       (Random_oracle.Input.Chunked.field commitment)
   in
   let fee_payer_sk =
