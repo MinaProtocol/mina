@@ -12,7 +12,6 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 # global variables
-declare CLI_VERSION='1.0.0';
 declare CLI_NAME='aptly.sh';
 declare PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
@@ -32,26 +31,26 @@ function start_aptly() {
     local __background=$3
     local __clean=$4
     local __component=$5
-    local __repo="$__distribution-$__component"
+    local __repo="${__distribution}"-"${__component}"
     local __port=$6
     local __wait=$7
 
-    if [ $__clean = 1 ]; then
+    if [ "${__clean}" = 1 ]; then
         rm -rf ~/.aptly
     fi
     
-    aptly repo create -component $__component -distribution $__distribution  $__repo
+    aptly repo create -component "${__component}" -distribution "${__distribution}"  "${__repo}"
 
-    aptly repo add $__repo $__debs
+    aptly repo add "${__repo}" "${__debs}"
 
-    aptly snapshot create $__component from repo $__repo
+    aptly snapshot create "${__component}" from repo "${__repo}"
 
-    aptly publish snapshot -distribution=$__distribution -skip-signing $__component
+    aptly publish snapshot -distribution="${__distribution}" -skip-signing "${__component}"
 
-    if [ $__background = 1 ]; then
-        aptly serve -listen localhost:$__port &
-    else 
-        aptly serve -listen localhost:$__port
+    if [ "${__background}" = 1 ]; then
+        aptly serve -listen localhost:"${__port}" &
+    else
+        aptly serve -listen localhost:"${__port}"
     fi
 
     if [ $__wait = 1 ]; then
@@ -112,7 +111,7 @@ function start(){
             -h | --help )
                 start_help;
             ;;
-            -b | --background ) 
+            -b | --background )
                 __background=1
                 shift;
             ;;
@@ -173,9 +172,9 @@ function stop_help(){
 }
 
 function stop(){
-    
+
     local __clean=0
-    
+
     while [ ${#} -gt 0 ]; do
         case $1 in
             -h | --help )
@@ -192,9 +191,9 @@ function stop(){
             ;;
         esac
     done
-    
+
     pkill aptly
-    if [ $__clean = 1 ]; then
+    if [ "${__clean}" = 1 ]; then
         rm -rf ~/.aptly
     fi
 }
