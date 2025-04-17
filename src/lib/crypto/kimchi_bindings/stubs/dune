@@ -38,11 +38,11 @@
 ;; rules to build the static library for kimchi
 ;;
 
-;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
+;; note: to build Mina, nix will set `KIMCHI_STUBS` and ignore this rule
 
 (rule
  (enabled_if
-  (= %{env:MARLIN_PLONK_STUBS=n} n))
+  (= %{env:KIMCHI_STUBS=n} n))
  (targets dllkimchi_stubs.so libkimchi_stubs.a)
  (deps
   Cargo.toml
@@ -51,7 +51,7 @@
   (source_tree kimchi-stubs-vendors)
   (source_tree .cargo)
   (source_tree ../../proof-systems)
-  (env_var MARLIN_PLONK_STUBS))
+  (env_var KIMCHI_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
@@ -92,13 +92,15 @@
 
 (rule
  (enabled_if
-  (<> %{env:MARLIN_PLONK_STUBS_STATIC_LIB=n} n))
+  (<> %{env:KIMCHI_STUBS_STATIC_LIB=n} n))
  (targets libkimchi_stubs.a)
  (deps
-  (env_var MARLIN_PLONK_STUBS_STATIC_LIB))
+  (env_var KIMCHI_STUBS_STATIC_LIB))
  (action
   (progn
-   (copy %{env:MARLIN_PLONK_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a libkimchi_stubs.a))))
+   (copy %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a libkimchi_stubs.a)
+   (copy %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/dllkimchi_stubs.so dllkimchi_stubs.so)
+   )))
 
 ;;
 ;; declare the libraries we're going to generate to match the bindings
@@ -162,12 +164,12 @@
 ;; generate the OCaml bindings
 ;;
 
-;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
+;; note: to build Mina, nix will set `KIMCHI_STUBS` and ignore this rule
 
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
  (enabled_if
-  (= %{env:MARLIN_PLONK_STUBS=n} n))
+  (= %{env:KIMCHI_STUBS=n} n))
  (mode promote)
  (deps
   ../../../../.ocamlformat
@@ -177,7 +179,7 @@
   (source_tree kimchi-stubs-vendors)
   (source_tree .cargo)
   (source_tree ../../proof-systems)
-  (env_var MARLIN_PLONK_STUBS))
+  (env_var KIMCHI_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
@@ -194,12 +196,12 @@
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
  (enabled_if
-  (<> %{env:MARLIN_PLONK_STUBS=n} n))
+  (<> %{env:KIMCHI_STUBS=n} n))
  (mode promote)
  (deps
   ../../../../.ocamlformat
-  (env_var MARLIN_PLONK_STUBS))
+  (env_var KIMCHI_STUBS))
  (action
   (progn
-   (run %{env:MARLIN_PLONK_STUBS=n}/bin/wires_15_stubs %{targets})
+   (run %{env:KIMCHI_STUBS=n}/bin/wires_15_stubs %{targets})
    (run ocamlformat -i %{targets}))))

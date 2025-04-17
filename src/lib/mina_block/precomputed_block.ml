@@ -181,6 +181,7 @@ let of_block ~logger
   ; protocol_state_proof = Header.protocol_state_proof header
   ; staged_ledger_diff =
       Staged_ledger_diff.Body.staged_ledger_diff (Block.body block)
+      |> Staged_ledger_diff.read_all_proofs_from_disk
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; protocol_version
   ; proposed_protocol_version
