@@ -57,7 +57,7 @@ module T = struct
       | Invalid_public_key of Public_key.Compressed.t
       | ZkApps_exceed_limit of int * int
       | Unexpected of Error.t
-    [@@deriving sexp]
+    [@@deriving sexp_of]
 
     let to_string = function
       | Couldn't_reach_verifier e ->
@@ -2871,12 +2871,18 @@ let%test_module "staged ledger tests" =
                 (* There is an edge case where cmds_applied_this_iter = 0, when
                    there is only enough space for coinbase transactions. *)
                 assert (cmds_applied_this_iter <= Sequence.length cmds_this_iter) ;
-                [%test_eq: User_command.t list]
-                  (List.map (Staged_ledger_diff.commands diff)
-                     ~f:(fun { With_status.data; _ } -> data) )
-                  ( Sequence.take cmds_this_iter cmds_applied_this_iter
+                let commands_in_ledger =
+                  List.map (Staged_ledger_diff.commands diff)
+                    ~f:(fun { With_status.data; _ } -> data)
+                in
+                let commands_applied =
+                  Sequence.take cmds_this_iter cmds_applied_this_iter
                   |> Sequence.map ~f:User_command.forget_check
-                  |> Sequence.to_list )
+                  |> Sequence.to_list
+                in
+                assert (
+                  List.equal User_command.equal_ignoring_proofs_and_hashes
+                    commands_in_ledger commands_applied )
             | None ->
                 () ) ;
             let coinbase_cost = coinbase_cost diff in
@@ -4570,7 +4576,8 @@ let%test_module "staged ledger tests" =
                        User_command.forget_check data )
               in
               assert (
-                List.equal User_command.equal valid_commands
+                List.equal User_command.equal_ignoring_proofs_and_hashes
+                  valid_commands
                   ( [ valid_command_1
                     ; valid_command_2
                     ; valid_command_5

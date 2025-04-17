@@ -134,7 +134,7 @@ type t =
   ; status : Mina_base.Transaction_status.t
   ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
   }
-[@@deriving sexp, yojson]
+[@@deriving sexp_of, to_yojson]
 
 let read_all_proofs_from_disk
     { transaction
