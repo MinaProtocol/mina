@@ -38,7 +38,7 @@ function start_aptly() {
     if [ "${__clean}" = 1 ]; then
         rm -rf ~/.aptly
     fi
-    
+
     aptly repo create -component "${__component}" -distribution "${__distribution}"  "${__repo}"
 
     aptly repo add "${__repo}" "${__debs}"
