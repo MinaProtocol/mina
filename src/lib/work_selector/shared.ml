@@ -9,7 +9,7 @@ open Transaction_snark
 (* NOTE:
    For compatibility reasons, this is used in:
      - Snark_worker.Worker_impl_prod.perform_single
-     - Work_selector.produce_partitioned_work_from_single
+     - Work_selector.Work_partitioner.convert_single_work_from_selector
 *)
 
 let extract_zkapp_segment_works (module M : S)

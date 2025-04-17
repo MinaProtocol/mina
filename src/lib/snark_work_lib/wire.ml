@@ -67,7 +67,7 @@ module Zkapp_command_job = struct
       module V1 = struct
         type t =
           | Segment of
-              { statement : Statement.Stable.V2.t
+              { statement : Statement.With_sok.Stable.V2.t
               ; witness : Zkapp_command_segment.Witness.Stable.V1.t
               ; spec : Zkapp_command_segment.Basic.Stable.V1.t
               }
@@ -129,9 +129,7 @@ module Single = struct
     let statement : t -> Statement.Stable.V2.t option = function
       | Regular regular ->
           Some (Compact.Single.Spec.statement regular)
-      | Sub_zkapp_command { spec = Segment { statement; _ }; _ } ->
-          Some statement
-      | Sub_zkapp_command { spec = Merge _; _ } ->
+      | Sub_zkapp_command _ ->
           None
 
     let transaction : t -> Mina_transaction.Transaction.Stable.V2.t option =

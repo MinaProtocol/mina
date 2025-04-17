@@ -74,24 +74,25 @@ let perform (s : Worker_state.t) public_key
       in
       let work_tag =
         match single_work with
-        | Rpcs_types.Wire_work.Single.Spec.Stable.Latest.Regular
-            (Work.Single.Spec.Transition _) ->
+        | Snark_work_lib.Work.Wire.Single.Spec.Stable.Latest.Regular
+            (Transition _) ->
             `Transition
         | Regular (Merge _) ->
             `Merge
-        | Zkapp_command_segment _ ->
+        | Sub_zkapp_command _ ->
+            failwith "use more specific tags" ;
             `Zkapp_command_segment
       in
       (proof, (time, work_tag)) )
   |> Deferred.Or_error.map ~f:(function
        | `One (proof1, metrics1) ->
-           { Snark_work_lib.Work.Result.proofs = `One proof1
+           { Snark_work_lib.Work.Compact.Result.proofs = `One proof1
            ; metrics = `One metrics1
            ; spec
            ; prover = public_key
            }
        | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-           { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
+           { Snark_work_lib.Work.Compact.Result.proofs = `Two (proof1, proof2)
            ; metrics = `Two (metrics1, metrics2)
            ; spec
            ; prover = public_key
@@ -269,8 +270,9 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             ; ( "work_ids"
               , Transaction_snark_work.Statement.compact_json
                   (One_or_two.map
-                     (Work.Spec.instances work_spec)
-                     ~f:Rpcs_types.Wire_work.Single.Spec.statement ) )
+                     (Snark_work_lib.Work.Compact.Spec.instances work_spec)
+                     ~f:Snark_work_lib.Work.Wire.Wire_work.Single.Spec.statement )
+              )
             ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)

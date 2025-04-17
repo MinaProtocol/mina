@@ -124,7 +124,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                     *)
                   , `String
                       (Sexp.to_string
-                         (Rpcs_types.Wire_work.Single.Spec.sexp_of_t spec) ) )
+                         (Snark_work_lib.Wire.Single.Spec.sexp_of_t spec) ) )
                 ] ;
             Error e
         | Ok res ->
@@ -135,10 +135,10 @@ module Impl : Worker_impl_intf.Worker_impl = struct
   let perform_regular ~m:(module M : Transaction_snark.S) ~logger ~regular
       ~sok_digest =
     let open Deferred.Or_error.Let_syntax in
-    let open Snark_work_lib in
     (* WARN: a smilar copy of this exists in `Work_selector.Work_selector` *)
     match regular with
-    | Work.Single.Spec.Transition (input, (w : Transaction_witness.t)) -> (
+    | Snark_work_lib.Work.Compact.Single.Spec.Transition
+        (input, (w : Transaction_witness.t)) -> (
         match Transaction.read_all_proofs_from_disk w.transaction with
         | Command (Zkapp_command zkapp_command) -> (
             (* NOTE: we only go down this path if coordinator is
@@ -229,18 +229,27 @@ module Impl : Worker_impl_intf.Worker_impl = struct
     let sok_digest = Mina_base.Sok_message.digest message in
     let logger = Logger.create () in
     let (module M) = Option.value_exn m in
-    fun (spec : Rpcs_types.Wire_work.Single.Spec.t) ->
-      let statement = Rpcs_types.Wire_work.Single.Spec.statement spec in
+    fun (spec : Snark_work_lib.Work.Wire.Single.Spec.t) ->
+      let statement =
+        Snark_work_lib.Work.Wire.Single.Spec.statement spec
+        |> Option.value_exn
+             ~message:"This case is we're receiving a zkapp merge work spec"
+      in
       match proof_level with
       | Genesis_constants.Proof_level.Full ->
           cache_and_time ~logger ~cache ~statement ~spec (fun () ->
               match spec with
               | Regular regular ->
                   perform_regular ~m:(module M) ~logger ~regular ~sok_digest
-              | Zkapp_command_segment
-                  { segment_id = _; statement; witness; spec } ->
+              | Sub_zkapp_command
+                  { spec = Segment { statement; witness; spec }
+                  ; pairing_id = _
+                  ; job_uuid = _
+                  } ->
                   log_zkapp_cmd_base_snark ~logger ~statement ~spec
-                    (M.of_zkapp_command_segment_exn ~witness) )
+                    (M.of_zkapp_command_segment_exn ~witness)
+              | _ ->
+                  failwith "TODO: zkapp merge case" )
       | Check | No_check ->
           (* Use a dummy proof. *)
           Deferred.Or_error.return

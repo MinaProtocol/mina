@@ -10,8 +10,8 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
    - https://ocaml.org/p/async_rpc_kernel/v0.14.0/doc/Async_rpc_kernel/Versioned_rpc/index.html
 *)
 
-let regular_opt (work : Wire_work.Single.Spec.Stable.V2.t) :
-    Regular_work_single.t option =
+let regular_opt (work : Work.Wire.Single.Spec.Stable.V2.t) :
+    Work.Wire.Regular_work_single.t option =
   match work with Regular w -> Some w | _ -> None
 
 [%%versioned_rpc
@@ -66,12 +66,9 @@ module Get_work = struct
               Some w
         in
         let%map work =
-          Work.Spec.map_opt ~f_single:unwrap_regular_and_warn work
+          Work.Compact.Spec.map_opt ~f_single:unwrap_regular_and_warn work
         in
-        assert (Option.is_none work.partitioner_auxilaries) ;
-        ( ( { instances = work.instances; fee = work.fee }
-            : Wire_work.Spec.Stable.V1.t )
-        , key )
+        (work, key)
 
       let caller_model_of_response (resp : response) :
           Rpcs_master.Get_work.response =
@@ -136,12 +133,8 @@ module Submit_work = struct
            issued by the coordinator"
         in
         (let%bind metrics = One_or_two.Option.map metrics ~f:fix_metric_tag in
-         let%map spec = Work.Spec.map_opt ~f_single:regular_opt spec in
+         let%map spec = Work.Compact.Spec.map_opt ~f_single:regular_opt spec in
 
-         assert (Option.is_none spec.partitioner_auxilaries) ;
-         let spec : Wire_work.Spec.Stable.V1.t =
-           { instances = spec.instances; fee = spec.fee }
-         in
          let result : query = { proofs; metrics; spec; prover } in
          result )
         |> Option.value_exn ~message:fatal_message
@@ -211,13 +204,9 @@ module Failed_to_generate_snark = struct
        fun (error, work_spec, public_key) ->
         let open Option.Let_syntax in
         (let%map work_spec =
-           Work.Spec.map_opt ~f_single:regular_opt work_spec
+           Work.Compact.Spec.map_opt ~f_single:regular_opt work_spec
          in
 
-         assert (Option.is_none work_spec.partitioner_auxilaries) ;
-         let work_spec : Wire_work.Spec.Stable.V1.t =
-           { instances = work_spec.instances; fee = work_spec.fee }
-         in
          (error, work_spec, public_key) )
         |> Option.value_exn
              ~message:

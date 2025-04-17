@@ -17,6 +17,6 @@ module type Worker_impl = sig
   val perform_single :
        Worker_state.t
     -> message:Mina_base.Sok_message.t
-    -> Rpcs_types.Wire_work.Single.Spec.t
+    -> Snark_work_lib.Wire.Single.Spec.t
     -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
 end

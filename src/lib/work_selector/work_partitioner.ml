@@ -284,10 +284,7 @@ and convert_single_work_from_selector ~(partitioner : t) ~sok_digest:_
               in
               let unscheduled_segments =
                 all
-                |> List.map ~f:(fun (witness, spec, stmt) ->
-                       let statement =
-                         Transaction_snark.Statement.With_sok.drop_sok stmt
-                       in
+                |> List.map ~f:(fun (witness, spec, statement) ->
                        Zkapp_command_job.Spec.Segment
                          { statement; witness; spec } )
                 |> Queue.of_list

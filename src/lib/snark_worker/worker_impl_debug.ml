@@ -18,8 +18,13 @@ module Impl : Worker_impl_intf.Worker_impl = struct
 
   let perform_single () ~message spec :
       (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t =
-    (* Use a dummy proof. *)
-    let stmt = Rpcs_types.Wire_work.Single.Spec.statement spec in
+    let stmt =
+      Snark_work_lib.Wire.Single.Spec.statement spec
+      |> Option.value_exn
+           ~message:
+             "zkapp merge doesn't have a statement that make sense, we need to \
+              figure out what statement should we fill in."
+    in
     let sok_digest = Sok_message.digest message in
     Deferred.Or_error.return
     @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
