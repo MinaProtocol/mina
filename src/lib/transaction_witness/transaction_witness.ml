@@ -89,7 +89,10 @@ module Zkapp_command_segment_witness = struct
       } =
     { Stable.Latest.global_first_pass_ledger
     ; global_second_pass_ledger
-    ; local_state_init
+    ; local_state_init =
+        Mina_transaction_logic.Zkapp_command_logic.Local_state.map_with_hashes
+          ~f:Zkapp_command.Call_forest.With_hashes.read_all_proofs_from_disk
+          local_state_init
     ; start_zkapp_command =
         List.map
           ~f:(fun sd ->
@@ -155,7 +158,7 @@ let read_all_proofs_from_disk
   ; block_global_slot
   }
 
-let write_all_proofs_to_disk
+let write_all_proofs_to_disk ~proof_cache_db
     { Stable.Latest.transaction
     ; first_pass_ledger
     ; second_pass_ledger
@@ -165,7 +168,8 @@ let write_all_proofs_to_disk
     ; block_global_slot
     } =
   { transaction =
-      Mina_transaction.Transaction.write_all_proofs_to_disk transaction
+      Mina_transaction.Transaction.write_all_proofs_to_disk ~proof_cache_db
+        transaction
   ; first_pass_ledger
   ; second_pass_ledger
   ; protocol_state_body

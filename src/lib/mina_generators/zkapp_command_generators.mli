@@ -66,7 +66,8 @@ val gen_zkapp_command_from :
   -> ?failure:failure
   -> ?max_account_updates:int
   -> ?max_token_updates:int
-  -> ?map_account_update:(Account_update.t -> Account_update.t)
+  -> ?map_account_update:
+       (Account_update.Stable.Latest.t -> Account_update.Stable.Latest.t)
   -> fee_payer_keypair:Signature_lib.Keypair.t
   -> keymap:
        Signature_lib.Private_key.t Signature_lib.Public_key.Compressed.Map.t

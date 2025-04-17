@@ -2125,6 +2125,7 @@ let archive_blocks =
                  add_to_failure_file path ) ) )
 
 let receipt_chain_hash =
+  let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let open Command.Let_syntax in
   Command.basic
     ~summary:
@@ -2162,7 +2163,8 @@ let receipt_chain_hash =
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =
                  Zkapp_command.get_transaction_commitments
-                   (Zkapp_command.write_all_proofs_to_disk zkapp_cmd)
+                   (Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+                      zkapp_cmd )
                in
                Receipt.Zkapp_command_elt.Zkapp_command_commitment
                  full_txn_commitment

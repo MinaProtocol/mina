@@ -288,18 +288,20 @@ struct
         ; genesis_constants : Genesis_constants.t
         ; slot_tx_end : Mina_numbers.Global_slot_since_hard_fork.t option
         ; vk_cache_db : Zkapp_vk_cache_tag.cache_db
+        ; proof_cache_db : Proof_cache_tag.cache_db
         }
 
       (* remove next line if there's a way to force [@@deriving make] write a
          named parameter instead of an optional parameter *)
       let make ~trust_system ~pool_max_size ~verifier ~genesis_constants
-          ~slot_tx_end ~vk_cache_db =
+          ~slot_tx_end ~vk_cache_db ~proof_cache_db =
         { trust_system
         ; pool_max_size
         ; verifier
         ; genesis_constants
         ; slot_tx_end
         ; vk_cache_db
+        ; proof_cache_db
         }
     end
 
@@ -830,7 +832,9 @@ struct
         ; remaining_in_batch = max_per_15_seconds
         ; config
         ; logger
-        ; batcher = Batcher.create ~logger config.verifier
+        ; batcher =
+            Batcher.create ~proof_cache_db:config.proof_cache_db ~logger
+              config.verifier
         ; best_tip_diff_relay = None
         ; best_tip_ledger = None
         ; verification_key_table =
@@ -1179,7 +1183,11 @@ struct
         in
         let%bind verified_diff =
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
-              List.map ~f:User_command.write_all_proofs_to_disk diff
+              List.map
+                ~f:
+                  (User_command.write_all_proofs_to_disk
+                     ~proof_cache_db:t.config.proof_cache_db )
+                diff
               |> User_command.Unapplied_sequence.to_all_verifiable
                    ~load_vk_cache:(load_vk_cache ~t ~ledger) )
           |> Result.map_error ~f:(fun e -> Invalid e)
@@ -1938,6 +1946,7 @@ let%test_module _ =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
           ~genesis_constants ~slot_tx_end
           ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
+          ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
       in
       let pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
@@ -2128,7 +2137,7 @@ let%test_module _ =
                 ~max_token_updates:1 ~keymap ~account_state_tbl
                 ~fee_payer_keypair ~ledger:best_tip_ledger ~constraint_constants
                 ~genesis_constants
-                ~map_account_update:(fun (p : Account_update.t) ->
+                ~map_account_update:(fun p ->
                   Zkapp_command.For_tests.replace_vk vk
                     { p with
                       body =
