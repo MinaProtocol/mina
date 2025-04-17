@@ -148,18 +148,18 @@ let next_uuid (s : State.t) : int =
    won't query the already issued work and attempt to reissue them.
    Because we'll do that in `reissue_old_task` instead
 *)
-let rec attempt_issue_partitioned_work ~(partitioner : State.t) :
+let rec issue_work_from_partitioner ~(partitioner : State.t) :
     Partitioned_work.t option =
   match partitioner.pair_left with
   | Some work ->
       partitioner.pair_left <- None ;
       Some
-        (produce_partitioned_work_from_single ~partitioner ~sok_digest
-           ~direction:`First ~work )
+        (issue_work_from_selector ~partitioner ~sok_digest ~direction:`First
+           ~work )
 
 (* try to issue a work by consulting the underlying Work_selector
    direction tracks which task is this inside a `One_or_two`*)
-and produce_partitioned_work_from_single ~(partitioner : State.t) ~sok_digest
+and issue_work_from_selector ~(partitioner : State.t) ~sok_digest
     ~(direction : [ `First | `Second | `One ]) ~(work : Work_lib.work) :
     Partitioned_work.t =
   match work with
@@ -207,7 +207,11 @@ and produce_partitioned_work_from_single ~(partitioner : State.t) ~sok_digest
                   (Hashtbl.add ~key:pairing_uuid ~data:pending_zkapp_command
                      partitioner.zkapp_command_work_pool )
                   `Ok ) ;
-              attempt_issue_partitioned_work ~partitioner
+              issue_work_from_partitioner ~partitioner
+              |> Option.value_exn
+                   ~message:
+                     "FATAL: we already inserted work into partitioner so this \
+                      shouldn't happen"
           | Ok (Ok []) ->
               failwith "No witness generated"
           | Ok (Error e) ->
