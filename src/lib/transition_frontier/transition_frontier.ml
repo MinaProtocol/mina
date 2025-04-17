@@ -294,7 +294,7 @@ let rec load_with_max_length :
       ~snarked_ledger_hash:genesis_ledger_hash
   in
   match
-    time ~label:"Persistent_frontier.Instsance.check_database" ~logger
+    time ~label:"Persistent_frontier.Instance.check_database" ~logger
     @@ fun () ->
     Persistent_frontier.Instance.check_database
       ~genesis_state_hash:
