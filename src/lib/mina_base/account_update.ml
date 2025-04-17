@@ -1490,8 +1490,11 @@ module Body = struct
         ]
 
     let digest ?chain (t : t) =
+      let chain =
+        Option.value chain ~default:Mina_signature_kind.t_DEPRECATED
+      in
       Random_oracle.Checked.(
-        hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
+        hash ~init:(Hash_prefix.zkapp_body ~chain) (pack_input (to_input t)))
   end
 
   let typ () : (Checked.t, t) Typ.t =
@@ -1563,8 +1566,9 @@ module Body = struct
       ]
 
   let digest ?chain (t : t) =
+    let chain = Option.value chain ~default:Mina_signature_kind.t_DEPRECATED in
     Random_oracle.(
-      hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
+      hash ~init:(Hash_prefix.zkapp_body ~chain) (pack_input (to_input t)))
 
   module Digested = struct
     type t = Random_oracle.Digest.t
