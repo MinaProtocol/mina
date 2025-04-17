@@ -23,11 +23,7 @@ module type Inputs_intf = sig
   end
 
   module Transaction_witness : sig
-    module Stable : sig
-      module Latest : sig
-        type t
-      end
-    end
+    type t
   end
 
   module Ledger_proof : sig
@@ -76,7 +72,7 @@ module type Inputs_intf = sig
          t
       -> get_state:
            (Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-      -> ( Transaction_witness.Stable.Latest.t
+      -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
@@ -125,8 +121,8 @@ module type Lib_intf = sig
     (**Jobs that have not been assigned yet*)
     val all_unseen_works :
          t
-      -> ( Transaction_witness.Stable.Latest.t
-         , Ledger_proof.t )
+      -> ( Transaction_witness.t
+         , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
          list
@@ -135,8 +131,8 @@ module type Lib_intf = sig
 
     val set :
          t
-      -> ( Transaction_witness.Stable.Latest.t
-         , Ledger_proof.t )
+      -> ( Transaction_witness.t
+         , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
       -> unit
@@ -145,13 +141,13 @@ module type Lib_intf = sig
   val get_expensive_work :
        snark_pool:Snark_pool.t
     -> fee:Fee.t
-    -> ( Transaction_witness.Stable.Latest.t
-       , Ledger_proof.t )
+    -> ( Transaction_witness.t
+       , Ledger_proof.Cached.t )
        Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
-    -> ( Transaction_witness.Stable.Latest.t
-       , Ledger_proof.t )
+    -> ( Transaction_witness.t
+       , Ledger_proof.Cached.t )
        Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
@@ -195,8 +191,8 @@ module type Make_selection_method_intf = functor (Lib : Lib_intf) ->
   Selection_method_intf
     with type staged_ledger := Lib.Inputs.Staged_ledger.t
      and type work :=
-      ( Lib.Inputs.Transaction_witness.Stable.Latest.t
-      , Lib.Inputs.Ledger_proof.t )
+      ( Lib.Inputs.Transaction_witness.t
+      , Lib.Inputs.Ledger_proof.Cached.t )
       Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Lib.Inputs.Snark_pool.t
      and type transition_frontier := Lib.Inputs.Transition_frontier.t

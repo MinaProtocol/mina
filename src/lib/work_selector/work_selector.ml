@@ -2,6 +2,11 @@ module Lib = Work_lib.Make (Inputs.Implementation_inputs)
 module State = Lib.State
 
 type work =
+  ( Transaction_witness.t
+  , Ledger_proof.Cached.t )
+  Snark_work_lib.Work.Single.Spec.t
+
+type in_memory_work =
   ( Transaction_witness.Stable.Latest.t
   , Ledger_proof.t )
   Snark_work_lib.Work.Single.Spec.t

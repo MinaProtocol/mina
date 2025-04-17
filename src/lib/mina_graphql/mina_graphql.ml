@@ -2374,6 +2374,13 @@ module Queries = struct
         let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
         let to_bundle_specs =
           List.map ~f:(fun (spec, fee_prover) ->
+              let spec =
+                One_or_two.map spec
+                  ~f:
+                    (Snark_work_lib.Work.Single.Spec.map
+                       ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                       ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+              in
               { Types.Snark_work_bundle.spec; fee_prover } )
         in
         match end_idx with

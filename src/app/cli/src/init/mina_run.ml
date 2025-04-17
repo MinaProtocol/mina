@@ -437,6 +437,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 ~f:Fn.const
             in
             let%map work = Mina_lib.request_work mina in
+            let work =
+              Snark_work_lib.Work.Spec.map work
+                ~f:
+                  (Snark_work_lib.Work.Single.Spec.map
+                     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                     ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+            in
             [%log trace]
               ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson work) ]
               "responding to a Get_work request with some new work" ;

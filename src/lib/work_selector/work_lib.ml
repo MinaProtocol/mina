@@ -28,8 +28,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
     type t =
       { mutable available_jobs :
-          ( Inputs.Transaction_witness.Stable.Latest.t
-          , Inputs.Ledger_proof.t )
+          ( Inputs.Transaction_witness.t
+          , Inputs.Ledger_proof.Cached.t )
           Work_spec.t
           One_or_two.t
           list
@@ -83,20 +83,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                                 ( Time.diff end_time start_time
                                 |> Time.Span.to_ms ) )
                           ] ;
-                      let new_available_jobs_unwrapped :
-                          ( Inputs.Transaction_witness.Stable.Latest.t
-                          , Inputs.Ledger_proof.t )
-                          Work_spec.t
-                          One_or_two.t
-                          list =
-                        let f =
-                          Snark_work_lib.Work.Single.Spec.map ~f_witness:ident
-                            ~f_proof:
-                              Inputs.Ledger_proof.Cached.read_proof_from_disk
-                        in
-                        List.map new_available_jobs ~f:(One_or_two.map ~f)
-                      in
-                      t.available_jobs <- new_available_jobs_unwrapped ) ;
+                      t.available_jobs <- new_available_jobs ) ;
                   Deferred.unit )
               |> Deferred.don't_wait_for ) ;
           Deferred.unit )
