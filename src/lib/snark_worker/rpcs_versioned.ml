@@ -68,7 +68,7 @@ module Get_work = struct
         let%map work =
           Work.Spec.map_opt ~f_single:unwrap_regular_and_warn work
         in
-        assert (Work.Partition_id.(equal work.work_id One_or_two)) ;
+        assert (Option.is_none work.partitioner_auxilaries) ;
         ( ( { instances = work.instances; fee = work.fee }
             : Wire_work.Spec.Stable.V1.t )
         , key )
@@ -137,7 +137,8 @@ module Submit_work = struct
         in
         (let%bind metrics = One_or_two.Option.map metrics ~f:fix_metric_tag in
          let%map spec = Work.Spec.map_opt ~f_single:regular_opt spec in
-         assert (Work.Partition_id.(equal spec.work_id One_or_two)) ;
+
+         assert (Option.is_none spec.partitioner_auxilaries) ;
          let spec : Wire_work.Spec.Stable.V1.t =
            { instances = spec.instances; fee = spec.fee }
          in
@@ -212,7 +213,8 @@ module Failed_to_generate_snark = struct
         (let%map work_spec =
            Work.Spec.map_opt ~f_single:regular_opt work_spec
          in
-         assert (Work.Partition_id.(equal work_spec.work_id One_or_two)) ;
+
+         assert (Option.is_none work_spec.partitioner_auxilaries) ;
          let work_spec : Wire_work.Spec.Stable.V1.t =
            { instances = work_spec.instances; fee = work_spec.fee }
          in

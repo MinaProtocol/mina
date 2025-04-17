@@ -35,18 +35,7 @@ module UUID_generator = struct
   let recycle_uuid (t : t) (uuid : int) = Queue.enqueue t.reusable_uuids uuid
 end
 
-(* A `Pairing.t` identifies a single work in Work_selector's perspective *)
-module Pairing = struct
-  module UUID = struct
-    (* this identifies a One_or_two work from Work_selector's perspective *)
-    type t = Pairing_UUID of int [@@deriving compare, hash, sexp]
-  end
-
-  (* Case `One` indicate no need to pair. This is needed because zkapp command
-     might be left in pool of half completion. *)
-  type t = { one_or_two : [ `First | `Second | `One ]; pair_uuid : UUID.t }
-  [@@deriving compare, hash, sexp]
-end
+module Pairing = Snark_work_lib.Work.Pairing
 
 module Zkapp_command_job = struct
   (* A Zkapp_command_job.t`this identifies a single `Zkapp_command_job` *)

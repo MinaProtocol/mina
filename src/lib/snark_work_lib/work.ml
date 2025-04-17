@@ -64,12 +64,43 @@ end
 (* NOTE: to maintain compatibility with underlying Work_selector, we will need a `partition_id` to merge single works together
  *)
 
-module Partition_id = struct
+(* A `Pairing.t` identifies a single work in Work_selector's perspective *)
+module Pairing = struct
+  module UUID = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        (* this identifies a One_or_two work from Work_selector's perspective *)
+        type t = Pairing_UUID of int
+        [@@deriving compare, hash, sexp, to_yojson, equal]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      (* Case `One` indicate no need to pair. This is needed because zkapp command
+         might be left in pool of half completion. *)
+      type t =
+        { one_or_two : [ `First | `Second | `One ]
+        ; pair_uuid : UUID.Stable.V1.t
+        }
+      [@@deriving compare, hash, sexp, to_yojson, equal]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
+module Work_partitioner_auxilaries = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       (* `One_or_two` means we're receving a work not partitioned by the work partitioner *)
-      type t = First of int | Second of int | One_or_two
+      type t = { job_uuid : int; pairing : Pairing.Stable.V1.t }
       [@@deriving sexp, to_yojson, equal]
 
       let to_latest = Fn.id
@@ -84,7 +115,8 @@ module Spec = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
-        ; work_id : Partition_id.Stable.V1.t
+        ; partitioner_auxilaries :
+            Work_partitioner_auxilaries.Stable.V1.t option
         }
       [@@deriving fields, sexp, to_yojson]
     end
@@ -97,17 +129,20 @@ module Spec = struct
       [@@deriving fields, sexp, to_yojson]
 
       let to_latest ({ instances; fee } : 's t) : 's V2.t =
-        { instances; fee; work_id = One_or_two }
+        { instances; fee; partitioner_auxilaries = None }
     end
   end]
 
-  let map ~f_single { instances; fee; work_id } =
-    { instances = One_or_two.map ~f:f_single instances; fee; work_id }
+  let map ~f_single { instances; fee; partitioner_auxilaries } =
+    { instances = One_or_two.map ~f:f_single instances
+    ; fee
+    ; partitioner_auxilaries
+    }
 
-  let map_opt ~f_single { instances; fee; work_id } =
+  let map_opt ~f_single { instances; fee; partitioner_auxilaries } =
     let open Option.Let_syntax in
     let%map instances = One_or_two.Option.map ~f:f_single instances in
-    { instances; fee; work_id }
+    { instances; fee; partitioner_auxilaries }
 end
 
 let update_metric :
