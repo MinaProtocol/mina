@@ -2586,3 +2586,5 @@ let best_chain_block_by_state_hash (t : t) hash =
             (State_hash.to_base58_check hash) )
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
+
+let proof_cache_db t = t.proof_cache_db

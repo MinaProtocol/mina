@@ -624,7 +624,7 @@ let pending_work =
 
 module Snark_work_bundle = struct
   type t =
-    { spec : Work_selector.work One_or_two.t
+    { spec : Work_selector.in_memory_work One_or_two.t
     ; fee_prover : (Currency.Fee.t * Public_key.Compressed.t) option
     }
 
@@ -638,7 +638,7 @@ module Snark_work_bundle = struct
             ~doc:"Snark work specification in json format"
             ~args:Arg.[]
             ~resolve:(fun _ { spec; _ } ->
-              One_or_two.to_yojson Work_selector.work_to_yojson spec
+              One_or_two.to_yojson Work_selector.in_memory_work_to_yojson spec
               |> Yojson.Safe.to_string )
         ; field "snarkFee" ~typ:fee
             ~doc:"Fee if proof for the spec exists in snark pool"
