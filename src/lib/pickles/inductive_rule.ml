@@ -120,13 +120,9 @@ module type Proof_intf = sig
   type 'width t
 end
 
-module B = struct
-  type t = Impls.Step.Boolean.var
-end
-
 module Make (P : Proof_intf) : Intf with type 'a proof = 'a P.t = struct
   module B = struct
-    include B
+    type t = Impls.Step.Boolean.var
   end
 
   type 'a proof = 'a P.t

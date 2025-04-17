@@ -124,10 +124,6 @@ module type Proof_intf = sig
   type 'width t
 end
 
-module B : sig
-  type t = Impls.Step.Boolean.var
-end
-
 module Make (P : Proof_intf) : Intf
 
 module Kimchi : Intf with type 'width proof = 'width Proof.t
