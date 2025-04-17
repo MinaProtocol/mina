@@ -47,8 +47,7 @@ module Work_partitioner = Work_partitioner
 module Shared = Shared
 
 module Snark_job_state : sig
-  type t =
-    { work_selector : State.t; work_partitioner : Work_partitioner.State.t }
+  type t = { work_selector : State.t; work_partitioner : Work_partitioner.t }
 end
 
 val request_partitioned_work :
@@ -57,5 +56,6 @@ val request_partitioned_work :
   -> fee:Currency.Fee.t
   -> snark_pool:snark_pool
   -> selector:State.t
-  -> partitioner:Work_partitioner.State.t
+  -> partitioner:Work_partitioner.t
+  -> key:Signature_lib.Public_key.Compressed.t
   -> Work_partitioner.Partitioned_work.t option

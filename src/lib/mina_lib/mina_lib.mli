@@ -108,7 +108,8 @@ val snark_work_fee : t -> Currency.Fee.t
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
 val request_work :
-     capability:[ `V2 | `V3 ]
+     key:Signature_lib.Public_key.Compressed.t
+  -> capability:[ `V2 | `V3 ]
   -> t
   -> Snark_worker.Rpcs_types.Wire_work.Spec.t option
 

@@ -3,47 +3,79 @@
    the response from worker. We have this layer because we don't want to
    touch the Work_selector and break the GraphQL API.
 
-   Ideally, we should refactor so this integrates into Work_selector
+   Ideally, we should refactor so this integrates into `Work_selector`.
 *)
 
 open Core_kernel
 open Transaction_snark
 
-module Job_UUID = struct
-  (* this identifies a single `zkapp_command_work` *)
-  type t = Job_UUID of int [@@deriving compare, hash, sexp]
+(* A generic function that try on each function in the list until we got an
+   `Some _` and return it *)
+let attempt_these =
+  List.fold_until ~init:None ~finish:Fn.id ~f:(fun _ this_attempt ->
+      match this_attempt () with
+      | Some result ->
+          Stop (Some result)
+      | None ->
+          Continue None )
+
+module UUID_generator = struct
+  type t = { reusable_uuids : int Queue.t; mutable last_uuid : int }
+
+  let create () = { reusable_uuids = Queue.create (); last_uuid = 0 }
+
+  let next_uuid (t : t) : int =
+    match Queue.dequeue t.reusable_uuids with
+    | Some uuid ->
+        uuid
+    | None ->
+        t.last_uuid <- t.last_uuid + 1 ;
+        t.last_uuid
+
+  let recycle_uuid (t : t) (uuid : int) = Queue.enqueue t.reusable_uuids uuid
 end
 
-module Pair_UUID = struct
-  (* this identifies a One_or_two work from Work_selector's perspective *)
-  type t = Pair_UUID of int [@@deriving compare, hash, sexp]
-end
+(* A `Pairing.t` identifies a single work in Work_selector's perspective *)
+module Pairing = struct
+  module UUID = struct
+    (* this identifies a One_or_two work from Work_selector's perspective *)
+    type t = Pairing_UUID of int [@@deriving compare, hash, sexp]
+  end
 
-module Zkapp_command_work_spec = struct
-  type t =
-    | Zkapp_command_segment of
-        { statement : Transaction_snark.Statement.With_sok.t
-        ; witness : Zkapp_command_segment.Witness.t
-        ; spec : Zkapp_command_segment.Basic.t
-        }
-    | Zkapp_command_merge of
-        { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }
-end
-
-(* This ID identifies a single work in Work_selector's perspective *)
-module Pairing_id = struct
   (* Case `One` indicate no need to pair. This is needed because zkapp command
      might be left in pool of half completion. *)
-  type t = { direction : [ `First | `Second | `One ]; pair_uuid : Pair_UUID.t }
+  type t = { one_or_two : [ `First | `Second | `One ]; pair_uuid : UUID.t }
   [@@deriving compare, hash, sexp]
 end
 
-module Zkapp_command_work = struct
-  type t =
-    { spec : Zkapp_command_work_spec.t
-    ; pairing_uuid : Pairing_id.t
-    ; job_uuid : Job_UUID.t
-    }
+module Zkapp_command_job = struct
+  (* A Zkapp_command_job.t`this identifies a single `Zkapp_command_job` *)
+  module UUID = struct
+    type t = Job_UUID of int [@@deriving compare, hash, sexp]
+  end
+
+  module Spec = struct
+    type t =
+      | Zkapp_command_segment of
+          { statement : Transaction_snark.Statement.With_sok.t
+          ; witness : Zkapp_command_segment.Witness.t
+          ; spec : Zkapp_command_segment.Basic.t
+          }
+      | Zkapp_command_merge of
+          { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }
+  end
+
+  module T = struct
+    type t = { spec : Spec.t; pairing_id : Pairing.t; job_uuid : UUID.t }
+  end
+
+  include T
+
+  module With_status = struct
+    type t = { job : T.t; status : Work_lib.Job_status.t }
+
+    let issue_now (job : T.t) : t = { job; status = Assigned (Time.now ()) }
+  end
 end
 
 (* result from Work_partitioner *)
@@ -53,7 +85,11 @@ module Partitioned_work = struct
         ( Transaction_witness.t
         , Ledger_proof.t )
         Snark_work_lib.Work.Single.Spec.t
-    | Zkapp_command of Zkapp_command_work.t
+    | Zkapp_command of Zkapp_command_job.t
+
+  let of_job_with_status (job_with_status : Zkapp_command_job.With_status.t) : t
+      =
+    Zkapp_command job_with_status.job
 end
 
 (* A single work in Work_selector's perspective *)
@@ -70,97 +106,192 @@ module Single_work_with_data = struct
     }
 end
 
-module Zkapp_command_work_in_queue = struct
-  type t =
-    { work : Zkapp_command_work.t
-    ; status : Work_lib.Job_status.t
-    ; is_done : bool ref
-    }
-
-  let wrap_as_partitioned_work : t -> Partitioned_work.t =
-   fun _ -> failwith "TODO"
-end
-
 module Pending_Zkapp_command = struct
   type t =
-    { unscheduled : Zkapp_command_work.t Queue.t
-    ; pending_mergable_proofs : Ledger_proof.t Queue.t
+    { unscheduled_segments : Zkapp_command_job.Spec.t Queue.t
+          (* we may need to insert proofs to merge back to the queue, hence a Deque *)
+    ; pending_mergable_proofs : Ledger_proof.t Deque.t
     }
+
+  let generate_merge ~(t : t) () =
+    let try_take2 (q : 'a Deque.t) : ('a * 'a) option =
+      match Deque.dequeue_front q with
+      | None ->
+          None
+      | Some fst -> (
+          match Deque.dequeue_front q with
+          | Some snd ->
+              Some (fst, snd)
+          | None ->
+              Deque.enqueue_front q fst ; None )
+    in
+    let open Option.Let_syntax in
+    let%map proof1, proof2 = try_take2 t.pending_mergable_proofs in
+    Zkapp_command_job.Spec.Zkapp_command_merge
+      { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }
+
+  let generate_segment ~(t : t) () =
+    let open Option.Let_syntax in
+    let%map segment = Queue.dequeue t.unscheduled_segments in
+    segment
+
+  let generate_job_spec (t : t) : Zkapp_command_job.Spec.t option =
+    attempt_these [ generate_merge ~t; generate_segment ~t ]
 end
 
-module State = struct
+(* NOTE: Maybe this is reusable with Work Selector as they also have reissue mechanism *)
+module JobPool (ID : Hashtbl.Key) (Job : T) = struct
+  type job_item = Job.t option ref
+
   type t =
-    { reassignment_wait : int
-    ; logger : Logger.t
-    ; transaction_snark : (module Transaction_snark.S)
-          (* if one single work from underlying Work_selector is completed but
-             not the other. throw it here. *)
-    ; pairing_pool : (Pair_UUID.t, Single_work_with_data.t) Hashtbl.t
-    ; zkapp_command_work_pool :
-        (Pairing_id.t, Pending_Zkapp_command.t) Hashtbl.t
-          (* we only track tasks created by a Work_partitioner here. For reissue
-             of regular jobs, we still turn to the underlying Work_selector *)
-          (* WARN: we're assuming everything in this queue is sorted in time from old to new.
-             So queue head is the oldest task.
-          *)
-    ; sent_jobs_partitioner : Zkapp_command_work_in_queue.t Queue.t
-          (* we mark completed tasks in this hash table instead of crossing off
-             the queue `sent_jobs_partitioner`. Hence no need to iterate through
-             it. *)
-    ; completion_markers : (Job_UUID.t, bool ref) Hashtbl.t
-          (* When receving a `Two works from the underlying Work_selector, store one of them here,
-             so we could issue them to another worker.
-          *)
-    ; mutable pair_left : Work_lib.work option
-          (* WARN: we're mixing UUID for segments and pairs. Should be fine *)
-    ; reusable_uuids : int Queue.t
-    ; mutable uuid_generator : int
+    { queue : (ID.t * job_item) Queue.t (* For iteration  *)
+    ; table : (ID.t, job_item) Hashtbl.t (* For marking task as done *)
     }
 
-  let init (reassignment_wait : int) (logger : Logger.t) : t =
-    let module M = Transaction_snark.Make (struct
-      let constraint_constants = Genesis_constants.Compiled.constraint_constants
+  let create () =
+    { queue = Queue.create (); table = Hashtbl.create (module ID) }
 
-      let proof_level = Genesis_constants.Compiled.proof_level
-    end) in
-    { pairing_pool = Hashtbl.create (module Pair_UUID)
-    ; zkapp_command_work_pool = Hashtbl.create (module Pairing_id)
-    ; reassignment_wait
-    ; logger
-    ; sent_jobs_partitioner = Queue.create ()
-    ; completion_markers = Hashtbl.create (module Job_UUID)
-    ; pair_left = None
-    ; reusable_uuids = Queue.create ()
-    ; uuid_generator = 0
-    ; transaction_snark = (module M)
-    }
+  let rec peek (t : t) =
+    match Queue.peek t.queue with
+    | None ->
+        None
+    | Some (_, { contents = None }) ->
+        (* Task done *)
+        ignore (Queue.dequeue_exn t.queue : ID.t * job_item) ;
+        peek t
+    | Some (id, { contents = Some pending }) ->
+        Some (id, pending)
+
+  let rec spit_one_if ~(pred : Job.t -> bool) (t : t) =
+    match Queue.peek t.queue with
+    | None ->
+        None
+    | Some (_, { contents = None }) ->
+        (* Task done *)
+        ignore (Queue.dequeue_exn t.queue : ID.t * job_item) ;
+        spit_one_if ~pred t
+    | Some (id, { contents = Some pending }) ->
+        if pred pending then (
+          ignore (Queue.dequeue_exn t.queue : ID.t * job_item) ;
+          Some (id, pending) )
+        else None
+
+  (* will leave untouched if duplicated*)
+  let add ~(key : ID.t) ~(job : Job.t) (t : t) =
+    let data = ref (Some job) in
+    Queue.enqueue t.queue (key, data) ;
+    Hashtbl.add ~key ~data t.table
+
+  (* will overwrite*)
+  let set ~(key : ID.t) ~(job : Job.t) (t : t) =
+    let data = ref (Some job) in
+    Queue.enqueue t.queue (key, data) ;
+    Hashtbl.set ~key ~data t.table
+
+  let slash (t : t) (id : ID.t) =
+    match Hashtbl.find_and_remove t.table id with
+    | None ->
+        None
+    | Some job_item ->
+        let result = !job_item in
+        job_item := None ;
+        Some result
 end
 
-let next_uuid (s : State.t) : int =
-  match Queue.dequeue s.reusable_uuids with
-  | Some uuid ->
-      uuid
+module Zkapp_command_job_pool = JobPool (Pairing) (Pending_Zkapp_command)
+module Sent_job_pool =
+  JobPool (Zkapp_command_job.UUID) (Zkapp_command_job.With_status)
+
+type t =
+  { logger : Logger.t
+  ; transaction_snark : (module Transaction_snark.S)
+        (* WARN: we're mixing UUID for `pairing_pool` and `zkapp_command_jobs.
+           Should be fine *)
+  ; uuid_generator : UUID_generator.t ref (* NOTE: Fields for pooling *)
+  ; pairing_pool : (Pairing.UUID.t, Single_work_with_data.t) Hashtbl.t
+        (* if one single work from underlying Work_selector is completed but
+           not the other. throw it here. *)
+  ; zkapp_command_jobs : Zkapp_command_job_pool.t
+        (* NOTE: Fields for reissue pooling*)
+  ; reassignment_wait : int
+  ; jobs_sent_by_partitioner : Sent_job_pool.t
+        (* we only track tasks created by a Work_partitioner here. For reissue
+           of regular jobs, we still turn to the underlying Work_selector *)
+        (* WARN: we're assuming everything in this queue is sorted in time from old to new.
+           So queue head is the oldest task.
+        *)
+  ; mutable first_in_pair :
+      (Work_lib.work * Mina_base.Sok_message.Digest.t) option
+        (* When receving a `Two works from the underlying Work_selector, store one of them here,
+           so we could issue them to another worker.
+        *)
+  }
+
+let create ~(reassignment_wait : int) ~(logger : Logger.t) : t =
+  let module M = Transaction_snark.Make (struct
+    let constraint_constants = Genesis_constants.Compiled.constraint_constants
+
+    let proof_level = Genesis_constants.Compiled.proof_level
+  end) in
+  { logger
+  ; transaction_snark = (module M)
+  ; uuid_generator = ref (UUID_generator.create ())
+  ; pairing_pool = Hashtbl.create (module Pairing.UUID)
+  ; zkapp_command_jobs = Zkapp_command_job_pool.create ()
+  ; reassignment_wait
+  ; jobs_sent_by_partitioner = Sent_job_pool.create ()
+  ; first_in_pair = None
+  }
+
+let reissue_old_task ~(partitioner : t) () : Partitioned_work.t option =
+  let job_is_old (job : Zkapp_command_job.With_status.t) : bool =
+    Work_lib.Job_status.is_old ~now:(Time.now ())
+      ~reassignment_wait:partitioner.reassignment_wait job.status
+  in
+  match
+    Sent_job_pool.spit_one_if ~pred:job_is_old
+      partitioner.jobs_sent_by_partitioner
+  with
   | None ->
-      s.uuid_generator <- s.uuid_generator + 1 ;
-      s.uuid_generator
+      None
+  | Some (key, job_with_status) ->
+      let reissued = { job_with_status with status = Assigned (Time.now ()) } in
+      Sent_job_pool.set ~key ~job:reissued partitioner.jobs_sent_by_partitioner ;
+      Some (Partitioned_work.Zkapp_command job_with_status.job)
 
-(* Try to issue a work from states tracked inside the partitioner, this
-   won't query the already issued work and attempt to reissue them.
-   Because we'll do that in `reissue_old_task` instead
-*)
-let rec issue_work_from_partitioner ~(partitioner : State.t) :
+let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     Partitioned_work.t option =
-  match partitioner.pair_left with
-  | Some work ->
-      partitioner.pair_left <- None ;
-      Some
-        (issue_work_from_selector ~partitioner ~sok_digest ~direction:`First
-           ~work )
+  let open Option.Let_syntax in
+  let%bind pairing_id, pending_zkapp_command =
+    Zkapp_command_job_pool.peek partitioner.zkapp_command_jobs
+  in
+  let%map spec =
+    Pending_Zkapp_command.generate_job_spec pending_zkapp_command
+  in
+  let job_uuid =
+    Zkapp_command_job.UUID.Job_UUID
+      (UUID_generator.next_uuid !(partitioner.uuid_generator))
+  in
+  let job = Zkapp_command_job.{ spec; pairing_id; job_uuid } in
+  let job_with_status = Zkapp_command_job.With_status.issue_now job in
+  Sent_job_pool.set ~key:job_uuid ~job:job_with_status
+    partitioner.jobs_sent_by_partitioner ;
+  Partitioned_work.Zkapp_command job
 
-(* try to issue a work by consulting the underlying Work_selector
-   direction tracks which task is this inside a `One_or_two`*)
-and issue_work_from_selector ~(partitioner : State.t) ~sok_digest
-    ~(direction : [ `First | `Second | `One ]) ~(work : Work_lib.work) :
+let rec issue_from_first_in_pair ~(partitioner : t) () =
+  match partitioner.first_in_pair with
+  | Some (work, sok_digest) ->
+      partitioner.first_in_pair <- None ;
+      Some
+        (convert_single_work_from_selector ~partitioner ~sok_digest
+           ~one_or_two:`First ~work )
+  | None ->
+      None
+
+(* try to issue a single work received from the underlying Work_selector
+   `one_or_two` tracks which task is it inside a `One_or_two`*)
+and convert_single_work_from_selector ~(partitioner : t) ~sok_digest
+    ~(one_or_two : [ `First | `Second | `One ]) ~(work : Work_lib.work) :
     Partitioned_work.t =
   match work with
   | Snark_work_lib.Work.Single.Spec.Transition (input, witness) as work -> (
@@ -169,9 +300,6 @@ and issue_work_from_selector ~(partitioner : State.t) ~sok_digest
         Mina_transaction.Transaction.read_all_proofs_from_disk
           witness.transaction
       with
-      (* let sok_digest = Mina_base.Sok_message.digest message in *)
-
-      (* ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key) *)
       | Command (Zkapp_command zkapp_command) -> (
           match
             Async.Thread_safe.block_on_async (fun () ->
@@ -179,35 +307,31 @@ and issue_work_from_selector ~(partitioner : State.t) ~sok_digest
                   input witness zkapp_command )
           with
           | Ok (Ok (_ :: _ as all)) ->
-              let pairing_uuid =
-                Pairing_id.
-                  { direction; pair_uuid = Pair_UUID (next_uuid partitioner) }
+              let pairing_id =
+                Pairing.
+                  { one_or_two
+                  ; pair_uuid =
+                      Pairing_UUID
+                        (UUID_generator.next_uuid !(partitioner.uuid_generator))
+                  }
               in
-              let unscheduled =
+              let unscheduled_segments =
                 all
                 |> List.map ~f:(fun (witness, spec, stmt) ->
-                       Zkapp_command_work.
-                         { pairing_uuid
-                         ; job_uuid = Job_UUID (next_uuid partitioner)
-                         ; spec =
-                             Zkapp_command_segment
-                               { statement = { stmt with sok_digest }
-                               ; witness
-                               ; spec
-                               }
-                         } )
+                       Zkapp_command_job.Spec.Zkapp_command_segment
+                         { statement = { stmt with sok_digest }; witness; spec } )
                 |> Queue.of_list
               in
-              let pending_mergable_proofs = Queue.create () in
+              let pending_mergable_proofs = Deque.create () in
               let pending_zkapp_command =
-                Pending_Zkapp_command.{ unscheduled; pending_mergable_proofs }
+                Pending_Zkapp_command.
+                  { unscheduled_segments; pending_mergable_proofs }
               in
               assert (
-                phys_equal
-                  (Hashtbl.add ~key:pairing_uuid ~data:pending_zkapp_command
-                     partitioner.zkapp_command_work_pool )
-                  `Ok ) ;
-              issue_work_from_partitioner ~partitioner
+                phys_equal `Ok
+                  (Zkapp_command_job_pool.add ~key:pairing_id
+                     ~job:pending_zkapp_command partitioner.zkapp_command_jobs ) ) ;
+              issue_job_from_partitioner ~partitioner ()
               |> Option.value_exn
                    ~message:
                      "FATAL: we already inserted work into partitioner so this \
@@ -223,32 +347,25 @@ and issue_work_from_selector ~(partitioner : State.t) ~sok_digest
   | Merge _ ->
       Regular work
 
-let reissue_old_task (s : State.t) : Partitioned_work.t option =
-  let slashing_finished_task = ref true in
-  let result = ref None in
-  while !slashing_finished_task do
-    match Queue.peek s.sent_jobs_partitioner with
-    | Some { is_done; work = { job_uuid = Job_UUID uuid; _ }; _ } when !is_done
-      ->
-        Queue.enqueue s.reusable_uuids uuid ;
-        (* clearing jobs done *)
-        ignore
-          ( Queue.dequeue_exn s.sent_jobs_partitioner
-            : Zkapp_command_work_in_queue.t )
-    | Some { is_done; status; _ }
-      when (not !is_done)
-           && Work_lib.Job_status.is_old ~now:(Time.now ())
-                ~reassignment_wait:s.reassignment_wait status ->
-        (* figured out task to reissue *)
-        result := Queue.dequeue s.sent_jobs_partitioner ;
-        slashing_finished_task := false
-    | Some _ | None ->
-        (* nothing has timeout so don't reissue *)
-        slashing_finished_task := false
-  done ;
+and issue_job_from_partitioner ~(partitioner : t) () : Partitioned_work.t option
+    =
+  attempt_these
+    [ reissue_old_task ~partitioner
+    ; issue_from_first_in_pair ~partitioner
+    ; issue_from_zkapp_command_work_pool ~partitioner
+    ]
 
-  let open Option.Let_syntax in
-  let%map ({ work; _ } as job) = !result in
-  let reissued = { job with status = Assigned (Time.now ()) } in
-  Queue.enqueue s.sent_jobs_partitioner reissued ;
-  Partitioned_work.Zkapp_command work
+(* WARN: this should only be called if partitioner.first_in_pair is None *)
+let consume_job_from_selector ~fee ~prover ~(partitioner : t)
+    ~(work : Work_lib.work One_or_two.t) () : Partitioned_work.t =
+  let message = Mina_base.Sok_message.create ~fee ~prover in
+  let sok_digest = Mina_base.Sok_message.digest message in
+  match work with
+  | `One work ->
+      convert_single_work_from_selector ~partitioner ~one_or_two:`One ~work
+        ~sok_digest
+  | `Two (work_fst, work_snd) ->
+      assert (phys_equal None partitioner.first_in_pair) ;
+      partitioner.first_in_pair <- Some (work_fst, sok_digest) ;
+      convert_single_work_from_selector ~partitioner ~one_or_two:`Second
+        ~work:work_snd ~sok_digest

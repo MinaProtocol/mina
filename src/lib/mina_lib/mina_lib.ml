@@ -865,7 +865,7 @@ let best_chain ?max_length t =
       Transition_frontier.root frontier :: best_tip_path
 
 (* A Snark worker is requesting work from coordinator *)
-let request_work ~capability (t : t) :
+let request_work ~key ~capability (t : t) :
     Snark_worker_lib.Rpcs_types.Wire_work.Spec.t option =
   let (module Work_selection_method) = t.config.work_selection_method in
   let open Option.Let_syntax in
@@ -883,10 +883,14 @@ let request_work ~capability (t : t) :
   | `V2 ->
       request_regular_work ()
   | `V3 ->
-      Work_selector.Work_partitioner.request_partitioned_work
-        ~logger:t.config.logger ~fee ~snark_pool:(snark_pool t)
-        ~selector:t.snark_job_state.work_selector
-        ~partitioner:t.snark_job_state.work_partitioner
+      let _work =
+        Work_selector.request_partitioned_work
+          ~selection_method:t.config.work_selection_method
+          ~logger:t.config.logger ~fee ~snark_pool:(snark_pool t)
+          ~selector:t.snark_job_state.work_selector
+          ~partitioner:t.snark_job_state.work_partitioner ~key
+      in
+      failwith "TODO"
 
 let work_selection_method t = t.config.work_selection_method
 
@@ -2096,8 +2100,9 @@ let create ~commit_id ?wallets (config : Config.t) =
           let snark_jobs_state =
             Work_selector.Snark_job_state.
               { work_partitioner =
-                  Work_selector.Work_partitioner.State.init
-                    config.work_reassignment_wait config.logger
+                  Work_selector.Work_partitioner.create
+                    ~reassignment_wait:config.work_reassignment_wait
+                    ~logger:config.logger
               ; work_selector =
                   Work_selector.State.init
                     ~reassignment_wait:config.work_reassignment_wait
