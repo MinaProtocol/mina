@@ -296,6 +296,7 @@ val compile_with_wrap_main_override_promise :
   -> ?override_wrap_main:
        ('max_proofs_verified, 'branches, 'prev_varss) wrap_main_generic
   -> ?num_chunks:int
+  -> ?lazy_mode:bool
   -> public_input:
        ( 'var
        , 'value

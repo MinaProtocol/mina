@@ -41,9 +41,9 @@ module Step = struct
 
     let create = Fields.create
 
-    let generate ~prev_challenges cs =
+    let generate ?(lazy_mode = false) ~prev_challenges cs =
       let open Tick.Keypair in
-      let keypair = create ~prev_challenges cs in
+      let keypair = create ~prev_challenges cs ~lazy_mode in
       { pk = pk keypair; vk = vk keypair }
   end
 
