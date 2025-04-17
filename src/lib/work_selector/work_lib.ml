@@ -3,7 +3,9 @@ open Currency
 open Async
 
 type work =
-  (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+  ( Transaction_witness.t
+  , Ledger_proof.t )
+  Snark_work_lib.Work.Compact.Single.Spec.t
 [@@deriving yojson]
 
 module Job_status = struct
@@ -17,7 +19,7 @@ end
 
 module Make (Inputs : Intf.Inputs_intf) = struct
   module Inputs = Inputs
-  module Work_spec = Snark_work_lib.Work.Single.Spec
+  module Work_spec = Snark_work_lib.Work.Compact.Single.Spec
   module Job_status = Job_status
 
   module State = struct
@@ -93,7 +95,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                           One_or_two.t
                           list =
                         let f =
-                          Snark_work_lib.Work.Single.Spec.map ~f_witness:ident
+                          Snark_work_lib.Work.Compact.Single.Spec.map
+                            ~f_witness:ident
                             ~f_proof:
                               Inputs.Ledger_proof.Cached.read_proof_from_disk
                         in

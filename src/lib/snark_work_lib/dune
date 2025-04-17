@@ -17,7 +17,9 @@
   signature_lib
   one_or_two
   currency
-  ppx_version.runtime)
+  ppx_version.runtime
+  ledger_proof)
+  
  (preprocess
   (pps ppx_jane ppx_deriving_yojson ppx_version))
  (instrumentation

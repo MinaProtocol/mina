@@ -46,7 +46,7 @@ module Wire_work = struct
         module V2 = struct
           type t =
             | Regular of Regular_work_single.Stable.V1.t
-            | Zkapp_command_segment of Zkapp_command_segment_work.Stable.V1.t
+            | Zkapp_command of Zkapp_command_segment_work.Stable.V1.t
           [@@deriving sexp, yojson]
 
           let to_latest = Fn.id

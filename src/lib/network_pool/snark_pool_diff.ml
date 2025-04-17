@@ -120,12 +120,13 @@ module Make
 
   let of_result
       (res :
-        ( (_, _) Snark_work_lib.Work.Single.Spec.t Snark_work_lib.Work.Spec.t
+        ( (_, _) Snark_work_lib.Work.Compact.Single.Spec.t
+          Snark_work_lib.Work.Compact.Spec.t
         , Ledger_proof.t )
         Snark_work_lib.Work.Result.t ) =
     Add_solved_work
       ( One_or_two.map res.spec.instances
-          ~f:Snark_work_lib.Work.Single.Spec.statement
+          ~f:Snark_work_lib.Work.Compact.Single.Spec.statement
       , { proof = res.proofs
         ; fee = { fee = res.spec.fee; prover = res.prover }
         } )

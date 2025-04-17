@@ -869,28 +869,32 @@ let request_work ~key ~capability (t : t) :
     Snark_worker_lib.Rpcs_types.Wire_work.Spec.t option =
   let (module Work_selection_method) = t.config.work_selection_method in
   let open Option.Let_syntax in
+  let open Snark_worker_lib.Rpcs_types in
   let fee = snark_work_fee t in
   let request_regular_work () =
     let%map instances =
       Work_selection_method.work ~logger:t.config.logger ~fee
         ~snark_pool:(snark_pool t) (snark_job_state t).work_selector
     in
-    Snark_worker_lib.Rpcs_types.Wire_work.Spec.Stable.V1.to_latest
-      { instances; fee }
+    Wire_work.Spec.Stable.V1.to_latest { instances; fee }
   in
 
   match capability with
   | `V2 ->
       request_regular_work ()
-  | `V3 ->
-      let _work =
+  | `V3 -> (
+      let%map work =
         Work_selector.request_partitioned_work
           ~selection_method:t.config.work_selection_method
           ~logger:t.config.logger ~fee ~snark_pool:(snark_pool t)
           ~selector:t.snark_job_state.work_selector
           ~partitioner:t.snark_job_state.work_partitioner ~key
       in
-      failwith "TODO"
+      match work with
+      | Regular (work : Work_selector.work) ->
+          Wire_work.Spec.Stable.V1.to_latest { instances = `One work; fee }
+      | Zkapp_command { spec; pairing_id; job_uuid = Job_UUID jid } ->
+          Snark_work_lib.Work.Spec.Stable.V2.{ instances = `One spec } )
 
 let work_selection_method t = t.config.work_selection_method
 

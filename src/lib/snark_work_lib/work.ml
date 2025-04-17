@@ -1,68 +1,84 @@
 (* TODO: remove type generalizations #2594 *)
 
 open Core_kernel
+open Transaction_snark
+module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
-module Single = struct
+module Compact = struct
+  module Single = struct
+    module Spec = struct
+      [%%versioned
+      module Stable = struct
+        module V2 = struct
+          type ('witness, 'ledger_proof) t =
+            | Transition of Statement.Stable.V2.t * 'witness
+            | Merge of Statement.Stable.V2.t * 'ledger_proof * 'ledger_proof
+          [@@deriving sexp, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type ('witness, 'ledger_proof) t =
+            ('witness, 'ledger_proof) Stable.Latest.t =
+        | Transition of Statement.Stable.Latest.t * 'witness
+        | Merge of Statement.Stable.Latest.t * 'ledger_proof * 'ledger_proof
+      [@@deriving sexp, yojson]
+
+      let map ~f_witness ~f_proof = function
+        | Transition (s, w) ->
+            Transition (s, f_witness w)
+        | Merge (s, p1, p2) ->
+            Merge (s, f_proof p1, f_proof p2)
+
+      let witness (t : (_, _) t) =
+        match t with Transition (_, witness) -> Some witness | Merge _ -> None
+
+      let statement = function Transition (s, _) -> s | Merge (s, _, _) -> s
+
+      let gen :
+             'witness Quickcheck.Generator.t
+          -> 'ledger_proof Quickcheck.Generator.t
+          -> ('witness, 'ledger_proof) t Quickcheck.Generator.t =
+       fun gen_witness gen_proof ->
+        let open Quickcheck.Generator in
+        let gen_transition =
+          let open Let_syntax in
+          let%bind statement = Statement.gen in
+          let%map witness = gen_witness in
+          Transition (statement, witness)
+        in
+        let gen_merge =
+          let open Let_syntax in
+          let%bind statement = Statement.gen in
+          let%map p1, p2 = tuple2 gen_proof gen_proof in
+          Merge (statement, p1, p2)
+        in
+        union [ gen_transition; gen_merge ]
+    end
+  end
+
   module Spec = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type ('witness, 'ledger_proof) t =
-          | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
-          | Merge of
-              Transaction_snark.Statement.Stable.V2.t
-              * 'ledger_proof
-              * 'ledger_proof
-        [@@deriving sexp, yojson]
-
-        let to_latest = Fn.id
+      module V1 = struct
+        type 'single t =
+          { instances : 'single One_or_two.Stable.V1.t
+          ; fee : Currency.Fee.Stable.V1.t
+          }
+        [@@deriving fields, sexp, to_yojson]
       end
     end]
 
-    type ('witness, 'ledger_proof) t =
-          ('witness, 'ledger_proof) Stable.Latest.t =
-      | Transition of Transaction_snark.Statement.Stable.Latest.t * 'witness
-      | Merge of
-          Transaction_snark.Statement.Stable.Latest.t
-          * 'ledger_proof
-          * 'ledger_proof
-    [@@deriving sexp, yojson]
+    let map ~f_single { instances; fee } =
+      { instances = One_or_two.map ~f:f_single instances; fee }
 
-    let map ~f_witness ~f_proof = function
-      | Transition (s, w) ->
-          Transition (s, f_witness w)
-      | Merge (s, p1, p2) ->
-          Merge (s, f_proof p1, f_proof p2)
-
-    let witness (t : (_, _) t) =
-      match t with Transition (_, witness) -> Some witness | Merge _ -> None
-
-    let statement = function Transition (s, _) -> s | Merge (s, _, _) -> s
-
-    let gen :
-           'witness Quickcheck.Generator.t
-        -> 'ledger_proof Quickcheck.Generator.t
-        -> ('witness, 'ledger_proof) t Quickcheck.Generator.t =
-     fun gen_witness gen_proof ->
-      let open Quickcheck.Generator in
-      let gen_transition =
-        let open Let_syntax in
-        let%bind statement = Transaction_snark.Statement.gen in
-        let%map witness = gen_witness in
-        Transition (statement, witness)
-      in
-      let gen_merge =
-        let open Let_syntax in
-        let%bind statement = Transaction_snark.Statement.gen in
-        let%map p1, p2 = tuple2 gen_proof gen_proof in
-        Merge (statement, p1, p2)
-      in
-      union [ gen_transition; gen_merge ]
+    let map_opt ~f_single { instances; fee } =
+      let open Option.Let_syntax in
+      let%map instances = One_or_two.Option.map ~f:f_single instances in
+      { instances; fee }
   end
 end
-
-(* NOTE: to maintain compatibility with underlying Work_selector, we will need a `partition_id` to merge single works together
- *)
 
 (* A `Pairing.t` identifies a single work in Work_selector's perspective *)
 module Pairing = struct
@@ -72,7 +88,7 @@ module Pairing = struct
       module V1 = struct
         (* this identifies a One_or_two work from Work_selector's perspective *)
         type t = Pairing_UUID of int
-        [@@deriving compare, hash, sexp, to_yojson, equal]
+        [@@deriving compare, hash, sexp, yojson, equal]
 
         let to_latest = Fn.id
       end
@@ -88,61 +104,125 @@ module Pairing = struct
         { one_or_two : [ `First | `Second | `One ]
         ; pair_uuid : UUID.Stable.V1.t
         }
-      [@@deriving compare, hash, sexp, to_yojson, equal]
+      [@@deriving compare, hash, sexp, yojson, equal]
 
       let to_latest = Fn.id
     end
   end]
 end
 
-module Work_partitioner_auxilaries = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      (* `One_or_two` means we're receving a work not partitioned by the work partitioner *)
-      type t = { job_uuid : int; pairing : Pairing.Stable.V1.t }
-      [@@deriving sexp, to_yojson, equal]
+(* this is the actual work passed over network between coordinator and worker *)
+module Wire = struct
+  module Regular_work_single = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Transaction_witness.Stable.V2.t
+          , Ledger_proof.Stable.V2.t )
+          Compact.Single.Spec.Stable.V2.t
+        [@@deriving sexp, yojson]
 
-      let to_latest = Fn.id
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  module Zkapp_command_job = struct
+    (* A Zkapp_command_job.t`this identifies a single `Zkapp_command_job` *)
+    module UUID = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Job_UUID of int [@@deriving compare, hash, sexp, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
     end
-  end]
-end
 
-module Spec = struct
-  [%%versioned
-  module Stable = struct
-    module V2 = struct
-      type 'single t =
-        { instances : 'single One_or_two.Stable.V1.t
-        ; fee : Currency.Fee.Stable.V1.t
-        ; partitioner_auxilaries :
-            Work_partitioner_auxilaries.Stable.V1.t option
-        }
-      [@@deriving fields, sexp, to_yojson]
+    module Spec = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t =
+            | Segment of
+                { statement : Statement.Stable.V2.t
+                ; witness : Zkapp_command_segment.Witness.Stable.V1.t
+                ; spec : Zkapp_command_segment.Basic.Stable.V1.t
+                }
+            | Merge of
+                { statement : Statement.Stable.V2.t
+                ; proof1 : Ledger_proof.Stable.V2.t
+                ; proof2 : Ledger_proof.Stable.V2.t
+                }
+          [@@deriving sexp, yojson]
+
+          let to_latest = Fn.id
+        end
+      end]
     end
 
-    module V1 = struct
-      type 'single t =
-        { instances : 'single One_or_two.Stable.V1.t
-        ; fee : Currency.Fee.Stable.V1.t
-        }
-      [@@deriving fields, sexp, to_yojson]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { spec : Spec.Stable.V1.t
+          ; pairing_id : Pairing.Stable.V1.t
+          ; job_uuid : UUID.Stable.V1.t
+          }
+        [@@deriving sexp, yojson]
 
-      let to_latest ({ instances; fee } : 's t) : 's V2.t =
-        { instances; fee; partitioner_auxilaries = None }
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  module Single = struct
+    module Spec = struct
+      [%%versioned
+      module Stable = struct
+        module V2 = struct
+          type t =
+            | Regular of Regular_work_single.Stable.V1.t
+            | Sub_zkapp_command of Zkapp_command_job.Stable.V1.t
+          [@@deriving sexp, yojson]
+
+          let to_latest = Fn.id
+        end
+
+        module V1 = struct
+          type t = Regular_work_single.Stable.V1.t [@@deriving sexp, yojson]
+
+          let to_latest (t : t) : V2.t = Regular t
+        end
+      end]
+
+      type t = Stable.Latest.t [@@deriving sexp, yojson]
+
+      let map_regular_witness ~f = function
+        | Regular work ->
+            Regular (Compact.Single.Spec.map ~f_witness:f ~f_proof:Fn.id work)
+        | Sub_zkapp_command seg ->
+            Sub_zkapp_command seg
+
+      let statement : t -> Statement.Stable.V2.t = function
+        | Regular regular ->
+            Compact.Single.Spec.statement regular
+        | Sub_zkapp_command
+            { spec = Segment { statement; _ } | Merge { statement; _ }; _ } ->
+            statement
+
+      let transaction : t -> Mina_transaction.Transaction.Stable.V2.t option =
+        function
+        | Regular work ->
+            work |> Compact.Single.Spec.witness
+            |> Option.map ~f:(fun w ->
+                   w.Transaction_witness.Stable.V2.transaction )
+        | Sub_zkapp_command _ ->
+            None
     end
-  end]
-
-  let map ~f_single { instances; fee; partitioner_auxilaries } =
-    { instances = One_or_two.map ~f:f_single instances
-    ; fee
-    ; partitioner_auxilaries
-    }
-
-  let map_opt ~f_single { instances; fee; partitioner_auxilaries } =
-    let open Option.Let_syntax in
-    let%map instances = One_or_two.Option.map ~f:f_single instances in
-    { instances; fee; partitioner_auxilaries }
+  end
 end
 
 let update_metric :
@@ -225,7 +305,7 @@ end
 module Result_without_metrics = struct
   type 'proof t =
     { proofs : 'proof One_or_two.t
-    ; statements : Transaction_snark.Statement.t One_or_two.t
+    ; statements : Statement.t One_or_two.t
     ; prover : Signature_lib.Public_key.Compressed.t
     ; fee : Currency.Fee.t
     }

@@ -7,7 +7,7 @@
 *)
 
 open Core_kernel
-open Transaction_snark
+open Snark_work_lib.Work.Wire
 
 (* A generic function that try on each function in the list until we got an
    `Some _` and return it *)
@@ -37,48 +37,25 @@ end
 
 module Pairing = Snark_work_lib.Work.Pairing
 
-module Zkapp_command_job = struct
-  (* A Zkapp_command_job.t`this identifies a single `Zkapp_command_job` *)
-  module UUID = struct
-    type t = Job_UUID of int [@@deriving compare, hash, sexp]
-  end
+module Zkapp_command_job_with_status = struct
+  type t = { job : Zkapp_command_job.t; status : Work_lib.Job_status.t }
 
-  module Spec = struct
-    type t =
-      | Zkapp_command_segment of
-          { statement : Transaction_snark.Statement.With_sok.t
-          ; witness : Zkapp_command_segment.Witness.t
-          ; spec : Zkapp_command_segment.Basic.t
-          }
-      | Zkapp_command_merge of
-          { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }
-  end
-
-  module T = struct
-    type t = { spec : Spec.t; pairing_id : Pairing.t; job_uuid : UUID.t }
-  end
-
-  include T
-
-  module With_status = struct
-    type t = { job : T.t; status : Work_lib.Job_status.t }
-
-    let issue_now (job : T.t) : t = { job; status = Assigned (Time.now ()) }
-  end
+  let issue_now (job : Zkapp_command_job.t) : t =
+    { job; status = Assigned (Time.now ()) }
 end
 
 (* result from Work_partitioner *)
 module Partitioned_work = struct
   type t =
-    | Regular of
-        ( Transaction_witness.t
-        , Ledger_proof.t )
-        Snark_work_lib.Work.Single.Spec.t
-    | Zkapp_command of Zkapp_command_job.t
+    [ `Regular of
+      ( Transaction_witness.t
+      , Ledger_proof.t )
+      Snark_work_lib.Work.Compact.Single.Spec.t
+    | `Zkapp_command of Zkapp_command_job.t ]
 
-  let of_job_with_status (job_with_status : Zkapp_command_job.With_status.t) : t
+  let of_job_with_status (job_with_status : Zkapp_command_job_with_status.t) : t
       =
-    Zkapp_command job_with_status.job
+    `Zkapp_command job_with_status.job
 end
 
 (* A single work in Work_selector's perspective *)
@@ -90,7 +67,7 @@ module Single_work_with_data = struct
     ; spec :
         ( Transaction_witness.t
         , Ledger_proof.t )
-        Snark_work_lib.Work.Single.Spec.t
+        Snark_work_lib.Work.Compact.Single.Spec.t
     ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
     }
 end
@@ -116,8 +93,11 @@ module Pending_Zkapp_command = struct
     in
     let open Option.Let_syntax in
     let%map proof1, proof2 = try_take2 t.pending_mergable_proofs in
-    Zkapp_command_job.Spec.Zkapp_command_merge
-      { proof1 : Ledger_proof.t; proof2 : Ledger_proof.t }
+    Zkapp_command_job.Spec.Merge
+      { statement = failwith "TODO: add statement to merge "
+      ; proof1 : Ledger_proof.t
+      ; proof2 : Ledger_proof.t
+      }
 
   let generate_segment ~(t : t) () =
     let open Option.Let_syntax in
@@ -189,7 +169,7 @@ end
 
 module Zkapp_command_job_pool = JobPool (Pairing) (Pending_Zkapp_command)
 module Sent_job_pool =
-  JobPool (Zkapp_command_job.UUID) (Zkapp_command_job.With_status)
+  JobPool (Zkapp_command_job.UUID) (Zkapp_command_job_with_status)
 
 type t =
   { logger : Logger.t
@@ -233,7 +213,7 @@ let create ~(reassignment_wait : int) ~(logger : Logger.t) : t =
   }
 
 let reissue_old_task ~(partitioner : t) () : Partitioned_work.t option =
-  let job_is_old (job : Zkapp_command_job.With_status.t) : bool =
+  let job_is_old (job : Zkapp_command_job_with_status.t) : bool =
     Work_lib.Job_status.is_old ~now:(Time.now ())
       ~reassignment_wait:partitioner.reassignment_wait job.status
   in
@@ -246,7 +226,7 @@ let reissue_old_task ~(partitioner : t) () : Partitioned_work.t option =
   | Some (key, job_with_status) ->
       let reissued = { job_with_status with status = Assigned (Time.now ()) } in
       Sent_job_pool.set ~key ~job:reissued partitioner.jobs_sent_by_partitioner ;
-      Some (Partitioned_work.Zkapp_command job_with_status.job)
+      Some (`Zkapp_command job_with_status.job)
 
 let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     Partitioned_work.t option =
@@ -262,10 +242,10 @@ let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
       (UUID_generator.next_uuid !(partitioner.uuid_generator))
   in
   let job = Zkapp_command_job.{ spec; pairing_id; job_uuid } in
-  let job_with_status = Zkapp_command_job.With_status.issue_now job in
+  let job_with_status = Zkapp_command_job_with_status.issue_now job in
   Sent_job_pool.set ~key:job_uuid ~job:job_with_status
     partitioner.jobs_sent_by_partitioner ;
-  Partitioned_work.Zkapp_command job
+  `Zkapp_command job
 
 let rec issue_from_first_in_pair ~(partitioner : t) () =
   match partitioner.first_in_pair with
@@ -279,11 +259,13 @@ let rec issue_from_first_in_pair ~(partitioner : t) () =
 
 (* try to issue a single work received from the underlying Work_selector
    `one_or_two` tracks which task is it inside a `One_or_two`*)
-and convert_single_work_from_selector ~(partitioner : t) ~sok_digest
+(* TODO: remove sok_digest *)
+and convert_single_work_from_selector ~(partitioner : t) ~sok_digest:_
     ~(one_or_two : [ `First | `Second | `One ]) ~(work : Work_lib.work) :
     Partitioned_work.t =
   match work with
-  | Snark_work_lib.Work.Single.Spec.Transition (input, witness) as work -> (
+  | Snark_work_lib.Work.Compact.Single.Spec.Transition (input, witness) as work
+    -> (
       (* WARN: a smilar copy of this exists in `Snark_worker.Worker_impl_prod` *)
       match
         Mina_transaction.Transaction.read_all_proofs_from_disk
@@ -307,8 +289,11 @@ and convert_single_work_from_selector ~(partitioner : t) ~sok_digest
               let unscheduled_segments =
                 all
                 |> List.map ~f:(fun (witness, spec, stmt) ->
-                       Zkapp_command_job.Spec.Zkapp_command_segment
-                         { statement = { stmt with sok_digest }; witness; spec } )
+                       let statement =
+                         Transaction_snark.Statement.With_sok.drop_sok stmt
+                       in
+                       Zkapp_command_job.Spec.Segment
+                         { statement; witness; spec } )
                 |> Queue.of_list
               in
               let pending_mergable_proofs = Deque.create () in
@@ -332,9 +317,9 @@ and convert_single_work_from_selector ~(partitioner : t) ~sok_digest
           | Error e ->
               failwith (Exn.to_string e) )
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
-          Regular work )
+          `Regular work )
   | Merge _ ->
-      Regular work
+      `Regular work
 
 and issue_job_from_partitioner ~(partitioner : t) () : Partitioned_work.t option
     =
