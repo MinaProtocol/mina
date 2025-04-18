@@ -1686,6 +1686,7 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
@@ -1736,7 +1737,7 @@ let internal_commands logger ~itn_features =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
+                Snark_worker.Prod.Inputs.Worker_state.create ~chain ~proof_level
                   ~constraint_constants ()
               in
               let sok_message =
