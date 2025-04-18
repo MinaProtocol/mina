@@ -94,9 +94,7 @@ module Result = struct
         { proofs : 'proof One_or_two.Stable.V1.t
         ; metrics :
             ( Core.Time.Stable.Span.V1.t
-            * [ `Transition
-              | `Merge
-              | `Sub_zkapp_command of [ `Segment | `Merge ] ] )
+            * [ `Transition | `Merge | `Sub_zkapp_command ] )
             One_or_two.Stable.V1.t
         ; spec : 'spec
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t

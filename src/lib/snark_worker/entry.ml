@@ -80,9 +80,7 @@ let perform (s : Worker_state.t) public_key
         | Regular (Merge _, _) ->
             `Merge
         | Sub_zkapp_command _ ->
-            let rec hole () = hole () in
-            (* TODO: use more specific tags *)
-            hole ()
+            `Sub_zkapp_command
       in
       (proof, (time, work_tag)) )
   |> Deferred.Or_error.map ~f:(function
@@ -281,7 +279,6 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
                 ]
         in
 
-        (* TODO: this is wrong *)
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
