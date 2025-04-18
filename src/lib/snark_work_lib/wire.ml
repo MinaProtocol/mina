@@ -49,7 +49,7 @@ module Regular_work_single = struct
 end
 
 module Zkapp_command_job = struct
-  (* A Zkapp_command_job.t`this identifies a single `Zkapp_command_job` *)
+  (* This identifies a single `Zkapp_command_job.t` *)
   module UUID = struct
     [%%versioned
     module Stable = struct
