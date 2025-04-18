@@ -74,8 +74,7 @@ let perform (s : Worker_state.t) public_key
       in
       let work_tag =
         match single_work with
-        | Snark_work_lib.Work.Wire.Single.Spec.Stable.Latest.Regular
-            (Transition _) ->
+        | Work.Wire.Single.Spec.Stable.Latest.Regular (Transition _) ->
             `Transition
         | Regular (Merge _) ->
             `Merge
@@ -86,13 +85,13 @@ let perform (s : Worker_state.t) public_key
       (proof, (time, work_tag)) )
   |> Deferred.Or_error.map ~f:(function
        | `One (proof1, metrics1) ->
-           { Snark_work_lib.Work.Compact.Result.proofs = `One proof1
+           { Work.Compact.Result.proofs = `One proof1
            ; metrics = `One metrics1
            ; spec
            ; prover = public_key
            }
        | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-           { Snark_work_lib.Work.Compact.Result.proofs = `Two (proof1, proof2)
+           { Work.Compact.Result.proofs = `Two (proof1, proof2)
            ; metrics = `Two (metrics1, metrics2)
            ; spec
            ; prover = public_key
@@ -268,11 +267,11 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           ~metadata:
             [ ("address", `String (Host_and_port.to_string daemon_address))
             ; ( "work_ids"
-              , Transaction_snark_work.Statement.compact_json
-                  (One_or_two.map
-                     (Snark_work_lib.Work.Compact.Spec.instances work_spec)
-                     ~f:Snark_work_lib.Work.Wire.Wire_work.Single.Spec.statement )
-              )
+              , failwith "TODO"
+                (*, Transaction_snark_work.Statement.compact_json
+                    (One_or_two.map
+                       (Snark_work_lib.Work.Compact.Spec.instances work_spec)
+                       ~f:Snark_work_lib.Work.Wire.Single.Spec.statement *) )
             ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
@@ -301,10 +300,11 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
               ~metadata:
                 [ ("address", `String (Host_and_port.to_string daemon_address))
                 ; ( "work_ids"
-                  , Transaction_snark_work.Statement.compact_json
-                      (One_or_two.map
-                         (Work.Spec.instances work_spec)
-                         ~f:Rpcs_types.Wire_work.Single.Spec.statement ) )
+                  , failwith "TODO"
+                    (* Transaction_snark_work.Statement.compact_json
+                        (One_or_two.map
+                           (Work.Spec.instances work_spec)
+                           ~f:Rpcs_types.Wire_work.Single.Spec.statement*) )
                 ] ;
             let rec submit_work () =
               match%bind
