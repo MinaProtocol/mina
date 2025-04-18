@@ -882,7 +882,7 @@ let request_work ~key ~capability (t : t) :
   match capability with
   | `V2 ->
       request_regular_work ()
-  | `V3 -> (
+  | `V3 ->
       let%map work =
         Work_selector.request_partitioned_work
           ~selection_method:t.config.work_selection_method
@@ -890,11 +890,10 @@ let request_work ~key ~capability (t : t) :
           ~selector:t.snark_job_state.work_selector
           ~partitioner:t.snark_job_state.work_partitioner ~key
       in
-      match work with
-      | Regular (work : Work_selector.work) ->
-          Wire_work.Spec.Stable.V1.to_latest { instances = `One work; fee }
-      | Zkapp_command { spec; pairing_id; job_uuid = Job_UUID jid } ->
-          Snark_work_lib.Work.Spec.Stable.V2.{ instances = `One spec } )
+
+      { Snark_work_lib.Work.Compact.Spec.Stable.Latest.instances = `One work
+      ; fee
+      }
 
 let work_selection_method t = t.config.work_selection_method
 
@@ -914,8 +913,9 @@ let add_work t (work : Snark_worker_lib.Rpcs_types.Wire_work.Result.t) =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec =
-    One_or_two.map work.spec.instances
-      ~f:Snark_worker_lib.Rpcs_types.Wire_work.Single.Spec.statement
+    One_or_two.map work.spec.instances ~f:(fun instance ->
+        Snark_work_lib.Work.Wire.Single.Spec.statement instance
+        |> Option.value_exn ~message:"TODO" )
   in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned

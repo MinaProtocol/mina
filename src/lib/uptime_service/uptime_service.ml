@@ -196,7 +196,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         ~produced:true block_data
 
 let read_all_proofs_for_work_single_spec =
-  Snark_work_lib.Work.Single.Spec.map
+  Snark_work_lib.Work.Compact.Single.Spec.map
     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
     ~f_witness:Transaction_witness.read_all_proofs_from_disk
 
@@ -285,7 +285,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
             let transitions =
               List.concat_map job_one_or_twos ~f:One_or_two.to_list
               |> List.filter ~f:(function
-                   | Snark_work_lib.Work.Single.Spec.Transition _ ->
+                   | Snark_work_lib.Work.Compact.Single.Spec.Transition _ ->
                        true
                    | Merge _ ->
                        false )
@@ -299,8 +299,8 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
             match
               List.find transitions ~f:(fun transition ->
                   match transition with
-                  | Snark_work_lib.Work.Single.Spec.Transition ({ target; _ }, _)
-                    ->
+                  | Snark_work_lib.Work.Compact.Single.Spec.Transition
+                      ({ target; _ }, _) ->
                       Pasta_bindings.Fp.equal target.second_pass_ledger
                         (Staged_ledger_hash.ledger_hash staged_ledger_hash)
                   | Merge _ ->
@@ -330,8 +330,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                   make_interruptible
                     (Uptime_snark_worker.perform_single snark_worker
                        ( message
-                       , Snark_worker.Rpcs_types.Wire_work.Single.Spec.Stable
-                         .Latest
+                       , Snark_work_lib.Work.Wire.Single.Spec.Stable.Latest
                          .Regular
                            (read_all_proofs_for_work_single_spec single_spec) ) )
                 with

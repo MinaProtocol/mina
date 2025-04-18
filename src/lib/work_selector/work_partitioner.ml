@@ -35,8 +35,6 @@ module UUID_generator = struct
   let recycle_uuid (t : t) (uuid : int) = Queue.enqueue t.reusable_uuids uuid
 end
 
-module Pairing = Snark_work_lib.Work.Wire.Pairing
-
 module Zkapp_command_job_with_status = struct
   type t = { job : Zkapp_command_job.t; status : Work_lib.Job_status.t }
 
@@ -46,16 +44,11 @@ end
 
 (* result from Work_partitioner *)
 module Partitioned_work = struct
-  type t =
-    [ `Regular of
-      ( Transaction_witness.t
-      , Ledger_proof.t )
-      Snark_work_lib.Work.Compact.Single.Spec.t
-    | `Zkapp_command of Zkapp_command_job.t ]
+  type t = Single.Spec.t
 
   let of_job_with_status (job_with_status : Zkapp_command_job_with_status.t) : t
       =
-    `Zkapp_command job_with_status.job
+    Single.Spec.Stable.Latest.Sub_zkapp_command job_with_status.job
 end
 
 (* A single work in Work_selector's perspective *)
@@ -222,7 +215,7 @@ let reissue_old_task ~(partitioner : t) () : Partitioned_work.t option =
   | Some (key, job_with_status) ->
       let reissued = { job_with_status with status = Assigned (Time.now ()) } in
       Sent_job_pool.set ~key ~job:reissued partitioner.jobs_sent_by_partitioner ;
-      Some (`Zkapp_command job_with_status.job)
+      Some (Partitioned_work.of_job_with_status job_with_status)
 
 let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     Partitioned_work.t option =
@@ -237,11 +230,13 @@ let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     Zkapp_command_job.UUID.Job_UUID
       (UUID_generator.next_uuid !(partitioner.uuid_generator))
   in
-  let job = Zkapp_command_job.{ spec; pairing_id; job_uuid } in
-  let job_with_status = Zkapp_command_job_with_status.issue_now job in
+  let job_with_status =
+    Zkapp_command_job.{ spec; pairing_id; job_uuid }
+    |> Zkapp_command_job_with_status.issue_now
+  in
   Sent_job_pool.set ~key:job_uuid ~job:job_with_status
     partitioner.jobs_sent_by_partitioner ;
-  `Zkapp_command job
+  Partitioned_work.of_job_with_status job_with_status
 
 let rec issue_from_first_in_pair ~(partitioner : t) () =
   match partitioner.first_in_pair with
@@ -310,9 +305,9 @@ and convert_single_work_from_selector ~(partitioner : t) ~sok_digest:_
           | Error e ->
               failwith (Exn.to_string e) )
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
-          `Regular work )
+          Single.Spec.Stable.Latest.Regular work )
   | Merge _ ->
-      `Regular work
+      Single.Spec.Stable.Latest.Regular work
 
 and issue_job_from_partitioner ~(partitioner : t) () : Partitioned_work.t option
     =

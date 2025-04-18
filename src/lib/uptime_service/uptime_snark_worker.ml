@@ -8,7 +8,7 @@ module Impl = Snark_worker.Impl.Prod
 module Worker_state = struct
   module type S = sig
     val perform_single :
-         Sok_message.t * Snark_worker.Rpcs_types.Wire_work.Single.Spec.t
+         Sok_message.t * Snark_work_lib.Wire.Single.Spec.t
       -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
   end
 
@@ -39,7 +39,7 @@ module Worker = struct
     type 'w functions =
       { perform_single :
           ( 'w
-          , Sok_message.t * Snark_worker.Rpcs_types.Wire_work.Single.Spec.t
+          , Sok_message.t * Snark_work_lib.Work.Wire.Single.Spec.t
           , (Ledger_proof.t * Time.Span.t) Or_error.t )
           F.t
       }
@@ -72,8 +72,7 @@ module Worker = struct
             f
               ( [%bin_type_class:
                   Sok_message.Stable.Latest.t
-                  * Snark_worker.Rpcs_types.Wire_work.Single.Spec.Stable.Latest
-                    .t]
+                  * Snark_work_lib.Work.Wire.Single.Spec.Stable.Latest.t]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_single )
