@@ -23,7 +23,7 @@ module Statement : sig
 
   val gen : t Quickcheck.Generator.t
 
-  val compact_json : t -> Yojson.Safe.t
+  val compact_json : Transaction_snark.Statement.t -> Yojson.Safe.t
 
   val work_ids : t -> int One_or_two.t
 end

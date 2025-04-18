@@ -270,7 +270,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           match work with
           | Regular (regular, _) ->
               let inner =
-                Transaction_snark_work.Statement.compact_json
+                Transaction_snark_work.Statement.compact_json_one
                   (Snark_work_lib.Compact.Single.Spec.statement regular)
               in
               `Assoc [ ("regular", inner) ]
@@ -318,11 +318,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
               ~metadata:
                 [ ("address", `String (Host_and_port.to_string daemon_address))
                 ; ( "work_ids"
-                  , failwith "TODO"
-                    (* Transaction_snark_work.Statement.compact_json
-                        (One_or_two.map
-                           (Work.Spec.instances work_spec)
-                           ~f:Rpcs_types.Wire_work.Single.Spec.statement*) )
+                  , One_or_two.to_yojson serialize_wire_work_spec
+                      work_spec.instances )
                 ] ;
             let rec submit_work () =
               match%bind
