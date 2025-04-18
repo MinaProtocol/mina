@@ -208,6 +208,8 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
     None )
   else Some (report_file, temp_config)
 
+module Wire_work = Snark_work_lib.Wire
+
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
@@ -368,15 +370,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_worker.Rpcs_types.Wire_work.Result.t)
-      =
+  let log_snark_work_metrics (work : Wire_work.Result.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
-      (One_or_two.zip_exn work.metrics
-         (Snark_worker.Rpcs_types.Wire_work.Result.transactions work) )
+      (One_or_two.zip_exn work.metrics (Wire_work.Result.transactions work))
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with
-        | `Zkapp_command_segment ->
+        | `Sub_zkapp_command _ ->
             failwith "TODO: log snark metrics for Zkapp command"
         | `Merge ->
             Perf_histograms.add_span ~name:"snark_worker_merge_time" total ;
@@ -439,22 +439,18 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               ~f:Fn.const
           in
           let%map work = Mina_lib.request_work ~key ~capability mina in
-          let work_wire : Snark_worker.Rpcs_types.Wire_work.Spec.Stable.Latest.t
-              =
+          let work_wire : Wire_work.Spec.Stable.Latest.t =
             { work with
               instances =
                 One_or_two.map work.instances
                   ~f:
-                    (Snark_worker.Rpcs_types.Wire_work.Single.Spec
-                     .map_regular_witness
+                    (Wire_work.Single.Spec.map_regular_witness
                        ~f:Transaction_witness.read_all_proofs_from_disk )
             }
           in
           [%log trace]
             ~metadata:
-              [ ( "work_spec"
-                , Snark_worker.Rpcs_types.Wire_work.Spec.Stable.Latest.to_yojson
-                    work_wire )
+              [ ("work_spec", Wire_work.Spec.Stable.Latest.to_yojson work_wire)
               ]
             "responding to a Get_work request with some new work" ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
@@ -463,10 +459,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Rpcs_versioned.Submit_work.V3.query) ->
           [%log trace] "received completed work from a snark worker"
-            ~metadata:
-              [ ( "work_spec"
-                , Snark_worker.Rpcs_types.Wire_work.Spec.to_yojson work.spec )
-              ] ;
+            ~metadata:[ ("work_spec", Wire_work.Spec.to_yojson work.spec) ] ;
           log_snark_work_metrics work ;
           Deferred.return @@ Mina_lib.add_work mina work )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc

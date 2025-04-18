@@ -1745,9 +1745,7 @@ let internal_commands logger ~itn_features =
                 ; prover = Quickcheck.random_value Public_key.Compressed.gen
                 }
               in
-              let spec =
-                [%of_sexp: Snark_worker.Rpcs_types.Wire_work.Single.Spec.t] sexp
-              in
+              let spec = [%of_sexp: Snark_work_lib.Wire.Single.Spec.t] sexp in
               match%map
                 Impl.perform_single worker_state ~message:sok_message spec
               with

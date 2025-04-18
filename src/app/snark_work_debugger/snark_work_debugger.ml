@@ -4,7 +4,7 @@ open Async
 type single_spec =
   ( Transaction_witness.Stable.Latest.t
   , Transaction_snark.Stable.Latest.t )
-  Snark_work_lib.Work.Single.Spec.Stable.Latest.t
+  Snark_work_lib.Work.Compact.Single.Spec.Stable.Latest.t
 [@@deriving sexp]
 
 let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
@@ -18,8 +18,7 @@ let () = ignore sexp_to_sexp
 let main (spec_path : string) ~constraint_constants ~proof_level =
   let module Impl = Snark_worker.Impl.Prod in
   let%bind spec =
-    Reader.load_sexp_exn spec_path
-      Snark_worker.Rpcs_types.Wire_work.Single.Spec.t_of_sexp
+    Reader.load_sexp_exn spec_path Snark_work_lib.Wire.Single.Spec.t_of_sexp
   in
   let%bind worker =
     Impl.Worker_state.create ~constraint_constants ~proof_level ()

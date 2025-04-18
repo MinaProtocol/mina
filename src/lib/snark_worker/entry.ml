@@ -79,8 +79,10 @@ let perform (s : Worker_state.t) public_key
             `Transition
         | Regular (Merge _, _) ->
             `Merge
-        | Sub_zkapp_command _ ->
-            `Sub_zkapp_command
+        | Sub_zkapp_command { spec = Segment _; _ } ->
+            `Sub_zkapp_command `Segment
+        | Sub_zkapp_command { spec = Merge _; _ } ->
+            `Sub_zkapp_command `Merge
       in
       (proof, (time, work_tag)) )
   |> Deferred.Or_error.map ~f:(function
