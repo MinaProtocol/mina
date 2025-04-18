@@ -85,14 +85,12 @@ module Impl : Worker_impl_intf.Worker_impl = struct
         Error e
 
   let log_zkapp_cmd_merge_snark (module M : Transaction_snark.S) ~logger
-      ~sok_digest prev curr ~all_inputs =
+      ~sok_digest prev curr =
     match%map.Deferred M.merge ~sok_digest prev curr with
     | Ok p ->
         Ok p
     | Error e ->
-        [%log fatal]
-          "Merge snark failed for $stmt1 $stmt2. All inputs: $inputs. Error:  \
-           $error"
+        [%log fatal] "Merge snark failed for $stmt1 $stmt2. Error:  $error"
           ~metadata:
             [ ( "stmt1"
               , Transaction_snark.Statement.to_yojson
@@ -101,7 +99,6 @@ module Impl : Worker_impl_intf.Worker_impl = struct
               , Transaction_snark.Statement.to_yojson
                   (Ledger_proof.statement curr) )
             ; ("error", `String (Error.to_string_hum e))
-            ; ("inputs", zkapp_command_inputs_to_yojson all_inputs)
             ] ;
         Error e
 
@@ -168,9 +165,9 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                           ~all_inputs:inputs
                           (M.of_zkapp_command_segment_exn ~witness)
                       in
-                      log_zkapp_cmd_merge_snark
+                      log_zkapp_cmd_merge_snark ~logger ~sok_digest
                         (module M)
-                        ~logger ~sok_digest prev curr ~all_inputs:inputs )
+                        prev curr )
                 in
                 if
                   Transaction_snark.Statement.equal (Ledger_proof.statement p)
@@ -248,8 +245,14 @@ module Impl : Worker_impl_intf.Worker_impl = struct
                   } ->
                   log_zkapp_cmd_base_snark ~logger ~statement ~spec
                     (M.of_zkapp_command_segment_exn ~witness)
-              | _ ->
-                  failwith "TODO: zkapp merge case" )
+              | Sub_zkapp_command
+                  { spec = Merge { proof1; proof2 }
+                  ; pairing_id = _
+                  ; job_uuid = _
+                  } ->
+                  log_zkapp_cmd_merge_snark ~logger ~sok_digest
+                    (module M)
+                    proof1 proof2 )
       | Check | No_check ->
           (* Use a dummy proof. *)
           Deferred.Or_error.return
