@@ -47,6 +47,8 @@ let print_witnesses ~constraint_constants ~proof_level witnesses =
     let constraint_constants = constraint_constants
 
     let proof_level = proof_level
+
+    let chain = Mina_signature_kind.t_DEPRECATED
   end) in
   Async.Deferred.List.iter (List.rev witnesses)
     ~f:(fun (witness, spec, statement) ->

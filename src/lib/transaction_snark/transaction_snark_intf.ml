@@ -207,6 +207,8 @@ module type Full = sig
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val proof_level : Genesis_constants.Proof_level.t
+
+    val chain : Mina_signature_kind.t
   end) : S
 
   val constraint_system_digests :

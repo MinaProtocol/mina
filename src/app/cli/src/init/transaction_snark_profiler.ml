@@ -89,6 +89,8 @@ let main ~(genesis_constants : Genesis_constants.t)
         let constraint_constants = constraint_constants
 
         let proof_level = proof_level
+
+        let chain = Mina_signature_kind.t_DEPRECATED
       end) in
       run ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:

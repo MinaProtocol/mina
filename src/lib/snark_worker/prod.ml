@@ -40,6 +40,8 @@ module Inputs = struct
                 let constraint_constants = constraint_constants
 
                 let proof_level = proof_level
+
+                let chain = Mina_signature_kind.t_DEPRECATED
               end) : S )
         | Check | No_check ->
             None

@@ -3326,8 +3326,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     , Nat.N5.n )
     Pickles.Tag.t
 
-  let system ~proof_level ~constraint_constants =
-    let chain = Mina_signature_kind.t_DEPRECATED in
+  let system ~proof_level ~chain ~constraint_constants =
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
@@ -3957,6 +3956,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val proof_level : Genesis_constants.Proof_level.t
+
+    val chain : Mina_signature_kind.t
   end) =
   struct
     open Inputs
@@ -3968,7 +3969,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , p
         , Pickles.Provers.
             [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
-      system ~proof_level ~constraint_constants
+      system ~chain ~proof_level ~constraint_constants
 
     module Proof = (val p)
 
