@@ -69,6 +69,7 @@ module Worker_state = struct
     ; internal_trace_filename : string option
     ; logger : Logger.t
     ; proof_level : Genesis_constants.Proof_level.t
+    ; signature_kind : Mina_signature_kind.t
     ; commit_id : string
     ; blockchain_verification_key : Pickles.Verification_key.Stable.Latest.t
     ; transaction_verification_key : Pickles.Verification_key.Stable.Latest.t
@@ -291,6 +292,7 @@ module Worker = struct
             ; internal_trace_filename
             ; logger
             ; proof_level
+            ; signature_kind
             ; commit_id
             ; blockchain_verification_key
             ; transaction_verification_key
@@ -326,6 +328,7 @@ module Worker = struct
           ; internal_trace_filename
           ; logger
           ; proof_level
+          ; signature_kind
           ; commit_id
           ; blockchain_verification_key
           ; transaction_verification_key
@@ -348,8 +351,9 @@ type t = { worker : worker Ivar.t ref; logger : Logger.t }
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~proof_level ~pids ~conf_dir ~commit_id ~blockchain_verification_key
-    ~transaction_verification_key () : t Deferred.t =
+    ~proof_level ~signature_kind ~pids ~conf_dir ~commit_id
+    ~blockchain_verification_key ~transaction_verification_key () : t Deferred.t
+    =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -386,6 +390,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
             ; internal_trace_filename
             ; logger
             ; proof_level
+            ; signature_kind
             ; commit_id
             ; blockchain_verification_key
             ; transaction_verification_key

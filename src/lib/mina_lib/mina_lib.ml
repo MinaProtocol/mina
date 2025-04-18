@@ -1779,7 +1779,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"verifier-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
-                        ~pids:config.pids ~conf_dir:(Some config.conf_dir)
+                        ~signature_kind:chain ~pids:config.pids
+                        ~conf_dir:(Some config.conf_dir)
                         ~blockchain_verification_key
                         ~transaction_verification_key ()
                     in

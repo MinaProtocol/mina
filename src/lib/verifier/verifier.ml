@@ -44,12 +44,13 @@ module For_tests = struct
       ?internal_trace_filename ~proof_level
       ?(pids = Child_processes.Termination.create_pid_table ())
       ?(conf_dir = None) ?(commit_id = "not specified for unit tests") () =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Async.Deferred.Let_syntax in
     let%bind ( `Blockchain blockchain_verification_key
              , `Transaction transaction_verification_key ) =
       get_verification_keys_eagerly ~constraint_constants ~proof_level
     in
     create ~logger ?enable_internal_tracing ?internal_trace_filename
-      ~proof_level ~pids ~conf_dir ~commit_id ~blockchain_verification_key
-      ~transaction_verification_key ()
+      ~proof_level ~signature_kind ~pids ~conf_dir ~commit_id
+      ~blockchain_verification_key ~transaction_verification_key ()
 end

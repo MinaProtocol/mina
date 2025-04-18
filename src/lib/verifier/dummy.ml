@@ -22,9 +22,8 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
-    ~proof_level ~pids:_ ~conf_dir:_ ~commit_id:_ ~blockchain_verification_key
-    ~transaction_verification_key () =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~proof_level ~signature_kind ~pids:_ ~conf_dir:_ ~commit_id:_
+    ~blockchain_verification_key ~transaction_verification_key () =
   let verify_blockchain_snarks chains =
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
