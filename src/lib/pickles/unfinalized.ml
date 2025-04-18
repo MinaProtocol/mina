@@ -95,7 +95,7 @@ module Constant = struct
        { deferred_values =
            { plonk = { plonk with alpha; beta; gamma; zeta }
            ; combined_inner_product = Shifted_value (tock ())
-           ; xi = Scalar_challenge.create one_chal
+           ; polyscale = Scalar_challenge.create one_chal
            ; bulletproof_challenges = Dummy.Ipa.Wrap.challenges
            ; b = Shifted_value (tock ())
            }
