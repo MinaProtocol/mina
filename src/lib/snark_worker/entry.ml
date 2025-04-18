@@ -264,6 +264,23 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         let%bind () = wait ~sec:random_delay () in
         go ()
     | Ok (Some ((work_spec : Wire_work.Spec.t), public_key)) -> (
+        let (_ : Wire_work.Single.Spec.t One_or_two.t) = work_spec.instances in
+
+        let serialize_wire_work_spec (work : Wire_work.Single.Spec.t) =
+          match work with
+          | Regular (regular, _) ->
+              let inner =
+                Transaction_snark_work.Statement.compact_json
+                  (Snark_work_lib.Compact.Single.Spec.statement regular)
+              in
+              `Assoc [ ("regular", inner) ]
+          | Sub_zkapp_command zkapp_command ->
+              `Assoc
+                [ ( "sub_zkapp_command"
+                  , Wire.Zkapp_command_job.to_yojson zkapp_command )
+                ]
+        in
+
         (* TODO: this is wrong *)
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
@@ -271,11 +288,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           ~metadata:
             [ ("address", `String (Host_and_port.to_string daemon_address))
             ; ( "work_ids"
-              , failwith "TODO"
-                (*, Transaction_snark_work.Statement.compact_json
-                    (One_or_two.map
-                       (Snark_work_lib.Work.Compact.Spec.instances work_spec)
-                       ~f:Snark_work_lib.Work.Wire.Single.Spec.statement *) )
+              , One_or_two.to_yojson serialize_wire_work_spec
+                  work_spec.instances )
             ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)

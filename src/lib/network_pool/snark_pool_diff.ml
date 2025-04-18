@@ -127,7 +127,7 @@ module Make
     Add_solved_work
       ( One_or_two.map res.spec.instances
           ~f:Snark_work_lib.Work.Compact.Single.Spec.statement
-      , { proof = (*res.proofs*) failwith "FIXME"
+      , { proof = res.proofs
         ; fee = { fee = res.spec.fee; prover = res.prover }
         } )
 

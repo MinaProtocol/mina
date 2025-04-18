@@ -39,9 +39,7 @@ module Statement = struct
 
   let gen = One_or_two.gen Transaction_snark.Statement.gen
 
-  let compact_json t =
-    let f s = `Int (Transaction_snark.Statement.hash s) in
-    `List (One_or_two.map ~f t |> One_or_two.to_list)
+  let compact_json t : Yojson.Safe.t = `Int (Transaction_snark.Statement.hash t)
 
   let work_ids t : int One_or_two.t =
     One_or_two.map t ~f:Transaction_snark.Statement.hash
