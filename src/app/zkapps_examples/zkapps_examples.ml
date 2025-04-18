@@ -40,6 +40,30 @@ module Account_update_under_construction = struct
                 ; Ignore
                 ; Ignore
                 ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
                 ]
             ; action_state = Ignore
             ; proved_state = Ignore
@@ -78,7 +102,7 @@ module Account_update_under_construction = struct
       type t = { app_state : Field.t option Zkapp_state.V.t }
 
       let create () =
-        { app_state = [ None; None; None; None; None; None; None; None ] }
+        { app_state = [None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None;None] }
 
       let to_zkapp_command_update ({ app_state } : t) :
           Account_update.Update.Checked.t =
@@ -94,7 +118,7 @@ module Account_update_under_construction = struct
         let default =
           var_of_t
             (Account_update.Update.typ ())
-            { app_state = [ Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
+            { app_state = [ Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ;Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ;Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
             ; delegate = Keep
             ; verification_key = Keep
             ; permissions = Keep
@@ -118,7 +142,10 @@ module Account_update_under_construction = struct
 
       let set_full_state app_state (_t : t) =
         match app_state with
-        | [ a0; a1; a2; a3; a4; a5; a6; a7 ] ->
+        | [ a0; a1; a2; a3; a4; a5; a6 ;a7 ;a8
+          ; a9 ;a10 ;a11 ;a12 ;a13 ;a14 ;a15
+          ; a16 ;a17 ;a18 ;a19 ;a20 ;a21 ;a22 ;a23
+          ; a24 ;a25 ;a26 ;a27 ;a28 ;a29 ;a30 ;a31 ] ->
             { app_state =
                 [ Some a0
                 ; Some a1
@@ -128,13 +155,37 @@ module Account_update_under_construction = struct
                 ; Some a5
                 ; Some a6
                 ; Some a7
+                ; Some a8
+                ; Some a9
+                ; Some a10
+                ; Some a11
+                ; Some a12
+                ; Some a13
+                ; Some a14
+                ; Some a15
+                ; Some a16
+                ; Some a17
+                ; Some a18
+                ; Some a19
+                ; Some a20
+                ; Some a21
+                ; Some a22
+                ; Some a23
+                ; Some a24
+                ; Some a25
+                ; Some a26
+                ; Some a27
+                ; Some a28
+                ; Some a29
+                ; Some a30
+                ; Some a31
                 ]
             }
         | _ ->
-            failwith "Incorrect length of app_state"
+            failwith @@ sprintf "Incorrect length of app_state %d" (List.length app_state)
 
       let set_state i value (t : t) =
-        if i < 0 || i >= 8 then failwith "Incorrect index" ;
+        if i < 0 || i >= 32 then failwith "Incorrect index" ;
         { app_state =
             Pickles_types.Vector.mapi t.app_state ~f:(fun j old_value ->
                 if i = j then Some value else old_value )

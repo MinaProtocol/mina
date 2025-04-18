@@ -125,7 +125,7 @@ module Failure = struct
       ~account_delegate_precondition_unsatisfied:add
       ~account_action_state_precondition_unsatisfied:add
       ~account_app_state_precondition_unsatisfied:(fun acc var ->
-        List.init 8 ~f:var.constructor @ acc )
+        List.init 32 ~f:var.constructor @ acc )
       ~account_proved_state_precondition_unsatisfied:add
       ~account_is_new_precondition_unsatisfied:add
       ~protocol_state_precondition_unsatisfied:add

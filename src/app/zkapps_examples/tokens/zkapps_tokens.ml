@@ -22,7 +22,7 @@ module Rules = struct
       The app state is set to the initial state.
   *)
   module Initialize_state = struct
-    let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
+    let initial_state = lazy (List.init 32 ~f:(fun _ -> Field.Constant.zero))
 
     let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)
         (may_use_token : Account_update.May_use_token.t)

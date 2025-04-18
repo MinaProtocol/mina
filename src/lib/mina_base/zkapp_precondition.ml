@@ -479,7 +479,7 @@ module Account = struct
     let%bind state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
-        Quickcheck.Generator.list_with_length 8 (Or_ignore.gen field_gen)
+        Quickcheck.Generator.list_with_length 32 (Or_ignore.gen field_gen)
       in
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
