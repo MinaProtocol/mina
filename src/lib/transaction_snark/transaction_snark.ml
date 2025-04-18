@@ -1863,9 +1863,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Boolean.Assert.all
                   [ correct_coinbase_target_stack; valid_init_state ] ) )
 
-      let main ?(witness : Witness.t option) (spec : Spec.t)
+      let main ?(witness : Witness.t option) (spec : Spec.t) ~chain
           ~constraint_constants (statement : Statement.With_sok.var) =
-        let chain = Mina_signature_kind.t_DEPRECATED in
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
@@ -2114,6 +2113,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , unit
           , unit )
           Pickles.Inductive_rule.t =
+        let chain = Mina_signature_kind.t_DEPRECATED in
         let open Hlist in
         let open Basic in
         let module M = H4.T (Pickles.Tag) in
@@ -2133,7 +2133,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input, `Must_verify must_verify =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ?witness:!witness s ~chain ~constraint_constants stmt
                   in
                   let proof =
                     Run.exists (Typ.prover_value ()) ~request:(fun () ->
@@ -2156,7 +2156,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input_opt, _ =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ?witness:!witness s ~chain ~constraint_constants stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
                   { previous_proof_statements = []
@@ -2171,7 +2171,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; main =
                 (fun { public_input = stmt } ->
                   let zkapp_input_opt, _ =
-                    main ?witness:!witness s ~constraint_constants stmt
+                    main ?witness:!witness s ~chain ~constraint_constants stmt
                   in
                   assert (Option.is_none zkapp_input_opt) ;
                   { previous_proof_statements = []
@@ -3592,8 +3592,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         { stack_hash = Call_stack_digest.cons h_f h_tl; elt = f } :: tl
 
-  let zkapp_command_witnesses_exn ~constraint_constants ~global_slot ~state_body
-      ~fee_excess
+  let zkapp_command_witnesses_exn ~chain ~constraint_constants ~global_slot
+      ~state_body ~fee_excess
       (zkapp_commands_with_context :
         ( [ `Pending_coinbase_init_stack of Pending_coinbase.Stack.t ]
         * [ `Pending_coinbase_of_statement of Pending_coinbase_stack_state.t ]
@@ -3604,7 +3604,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         * [ `Connecting_ledger_hash of Ledger_hash.t ]
         * Zkapp_command.t )
         list ) =
-    let chain = Mina_signature_kind.t_DEPRECATED in
     let sparse_first_pass_ledger zkapp_command = function
       | `Ledger ledger ->
           Sparse_ledger.of_ledger_subset_exn ledger
@@ -4240,10 +4239,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           test_distinct_verification ~prover:prover_b ~valid_vk:vk_b.data
             ~invalid_vk:vk_a.data )
 
-    let create_zkapp_command ?receiver_auth ?empty_sender
+    let create_zkapp_command ?receiver_auth ?empty_sender ~signature_kind
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
         ~update ~receiver_update =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let { Spec.fee
           ; sender = sender, sender_nonce
           ; fee_payer = fee_payer_opt
@@ -4617,7 +4615,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
           , `Full_txn_commitment full_commitment ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ~signature_kind ~constraint_constants
           (Deploy_snapp_spec.spec_of_t spec)
           ~update:update_vk
           ~receiver_update:Mina_base.Account_update.Update.noop
@@ -4729,7 +4727,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Proof_zkapp_command _
           , `Txn_commitment _
           , `Full_txn_commitment _ ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ~signature_kind:chain ~constraint_constants
           (Single_account_update_spec.spec_of_t ~vk spec)
           ~update:spec.update ~receiver_update:Account_update.Update.noop
       in
@@ -4885,7 +4883,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
           , `Full_txn_commitment full_commitment ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ~signature_kind ~constraint_constants
           (Update_states_spec.spec_of_t ~vk spec)
           ~update:spec.snapp_update
           ~receiver_update:Mina_base.Account_update.Update.noop ?receiver_auth
@@ -5019,7 +5017,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment _commitment
           , `Full_txn_commitment _full_commitment ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ~signature_kind:chain ~constraint_constants
           (Multiple_transfers_spec.spec_of_t spec)
           ~update:spec.snapp_update ~receiver_update:spec.snapp_update
       in

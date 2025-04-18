@@ -184,7 +184,8 @@ module type Full = sig
       logic without an exception.
    *)
   val zkapp_command_witnesses_exn :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       chain:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
@@ -254,6 +255,7 @@ module type Full = sig
       val main :
            ?witness:Zkapp_command_segment.Witness.t
         -> Zkapp_command_segment.Spec.t
+        -> chain:Mina_signature_kind.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Statement.With_sok.var
         -> Zkapp_statement.Checked.t option
