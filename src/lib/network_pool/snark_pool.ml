@@ -593,9 +593,10 @@ let%test_module "random set test" =
     let time_controller = Block_time.Controller.basic ~logger
 
     let verifier =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+            ~signature_kind () )
 
     let mk_dummy_proof = Ledger_proof.For_tests.mk_dummy_proof
 

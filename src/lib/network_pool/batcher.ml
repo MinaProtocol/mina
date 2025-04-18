@@ -493,9 +493,10 @@ module Snark_pool = struct
       let logger = Logger.null ()
 
       let verifier =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         Async.Thread_safe.block_on_async_exn (fun () ->
             Verifier.For_tests.default ~constraint_constants ~logger
-              ~proof_level () )
+              ~proof_level ~signature_kind () )
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in
@@ -566,8 +567,7 @@ module Snark_pool = struct
                 run_test proof_lists ) )
 
       let%test_unit "some invalid proofs" =
-        Quickcheck.test ~trials:10
-          (gen ~valid_count:`Any ~invalid_count:`Any)
+        Quickcheck.test ~trials:10 (gen ~valid_count:`Any ~invalid_count:`Any)
           ~f:(fun proof_lists ->
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_test proof_lists ) )

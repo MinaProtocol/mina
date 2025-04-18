@@ -1682,9 +1682,10 @@ let%test_module _ =
     let time_controller = Block_time.Controller.basic ~logger
 
     let verifier =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+            ~signature_kind () )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ()
@@ -3103,10 +3104,11 @@ let%test_module _ =
 
     let%test "account update with a different network id that uses proof \
               authorization would be rejected" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier_full =
             Verifier.For_tests.default ~constraint_constants ~logger
-              ~proof_level:Full ()
+              ~proof_level:Full ~signature_kind ()
           in
           let%bind test =
             setup_test ~verifier:verifier_full

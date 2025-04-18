@@ -1777,6 +1777,7 @@ let internal_commands logger ~itn_features =
             ~doc:"limit the number of proofs taken from the file"
         in
         fun () ->
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           let open Async in
           let logger = Logger.create () in
           let constraint_constants =
@@ -1860,7 +1861,7 @@ let internal_commands logger ~itn_features =
 
           let%bind verifier =
             Verifier.For_tests.default ~constraint_constants ~proof_level
-              ~commit_id:Mina_version.commit_id ~logger
+              ~signature_kind ~commit_id:Mina_version.commit_id ~logger
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =

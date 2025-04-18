@@ -780,9 +780,10 @@ let%test_module "Bootstrap_controller tests" =
     end
 
     let verifier =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+            ~signature_kind () )
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
