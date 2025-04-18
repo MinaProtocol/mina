@@ -798,7 +798,7 @@ module Mutations = struct
       ~resolve:(fun { ctx = mina; _ } ()
                     (proof_bundle :
                       Ledger_proof.t
-                      Snark_work_lib.Work.Result_without_metrics.t ) ->
+                      Snark_work_lib.Work.Compact.Result_without_metrics.t ) ->
         let solved_work =
           Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work
             ( proof_bundle.statements

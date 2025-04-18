@@ -305,9 +305,11 @@ and convert_single_work_from_selector ~(partitioner : t) ~sok_digest:_
           | Error e ->
               failwith (Exn.to_string e) )
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
-          Single.Spec.Stable.Latest.Regular work )
+          Single.Spec.Stable.Latest.Regular
+            (work, { one_or_two; pair_uuid = Pairing.UUID.ignored }) )
   | Merge _ ->
-      Single.Spec.Stable.Latest.Regular work
+      Single.Spec.Stable.Latest.Regular
+        (work, { one_or_two; pair_uuid = Pairing.UUID.ignored })
 
 and issue_job_from_partitioner ~(partitioner : t) () : Partitioned_work.t option
     =

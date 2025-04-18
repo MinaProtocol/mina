@@ -36,7 +36,8 @@ end
 
 (* This returns work in finer grain (i.e. sub zkapp command level) compared to calling selector directly *)
 
-let request_from_selector ~(partitioner : Work_partitioner.t)
+let request_from_selector_and_consume_by_partitioner
+    ~(partitioner : Work_partitioner.t)
     ~(selection_method : (module Selection_method_intf)) ~(selector : State.t)
     ~(logger : Logger.t) ~(fee : Currency.Fee.t) ~snark_pool ~key () =
   let (module Work_selection_method) = selection_method in
@@ -53,13 +54,12 @@ let request_partitioned_work
     ~(partitioner : Work_partitioner.t)
     ~(key : Signature_lib.Public_key.Compressed.t) :
     Work_partitioner.Partitioned_work.t option =
-  ignore selection_method ;
-  ignore logger ;
-  ignore fee ;
-  ignore snark_pool ;
-  ignore selector ;
   Work_partitioner.attempt_these
     [ Work_partitioner.issue_job_from_partitioner ~partitioner
-    ; request_from_selector ~partitioner ~selection_method ~selector ~logger
-        ~fee ~snark_pool ~key
+    ; request_from_selector_and_consume_by_partitioner ~partitioner
+        ~selection_method ~selector ~logger ~fee ~snark_pool ~key
     ]
+
+let submit_partitioned_work ~(result : Snark_work_lib.Wire.Result.t) =
+  (* match  *)
+  failwith "TODO"

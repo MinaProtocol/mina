@@ -239,7 +239,7 @@ module Impl : Worker_impl_intf.Worker_impl = struct
       | Genesis_constants.Proof_level.Full ->
           cache_and_time ~logger ~cache ~statement ~spec (fun () ->
               match spec with
-              | Regular regular ->
+              | Regular (regular, _) ->
                   perform_regular ~m:(module M) ~logger ~regular ~sok_digest
               | Sub_zkapp_command
                   { spec = Segment { statement; witness; spec }

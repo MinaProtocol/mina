@@ -865,18 +865,17 @@ let best_chain ?max_length t =
       Transition_frontier.root frontier :: best_tip_path
 
 (* A Snark worker is requesting work from coordinator *)
-let request_work ~key ~capability (t : t) :
-    Snark_worker_lib.Rpcs_types.Wire_work.Spec.t option =
+let request_work ~key ~capability (t : t) : Snark_work_lib.Wire.Spec.t option =
   let (module Work_selection_method) = t.config.work_selection_method in
   let open Option.Let_syntax in
-  let open Snark_worker_lib.Rpcs_types in
+  let open Snark_work_lib.Wire in
   let fee = snark_work_fee t in
   let request_regular_work () =
     let%map instances =
       Work_selection_method.work ~logger:t.config.logger ~fee
         ~snark_pool:(snark_pool t) (snark_job_state t).work_selector
     in
-    Wire_work.Spec.Stable.V1.to_latest { instances; fee }
+    Spec.Stable.V1.to_latest { instances; fee }
   in
 
   match capability with
@@ -898,7 +897,7 @@ let request_work ~key ~capability (t : t) :
 let work_selection_method t = t.config.work_selection_method
 
 (* A Snark worker is submitting completed work back to the coordinator *)
-let add_work t (work : Snark_worker_lib.Rpcs_types.Wire_work.Result.t) =
+let add_work t (work : Snark_work_lib.Wire.Result.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -917,6 +916,7 @@ let add_work t (work : Snark_worker_lib.Rpcs_types.Wire_work.Result.t) =
         Snark_work_lib.Work.Wire.Single.Spec.statement instance
         |> Option.value_exn ~message:"TODO" )
   in
+  (* TODO: move this call back to somewhere else *)
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.

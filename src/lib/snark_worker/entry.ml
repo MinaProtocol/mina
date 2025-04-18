@@ -1,6 +1,7 @@
 open Core
 open Async
 open Snark_work_lib
+module Wire_work = Snark_work_lib.Wire
 
 let command_name = "snark-worker"
 
@@ -64,7 +65,7 @@ type Structured_log_events.t +=
 include Worker_impl_prod.Impl
 
 let perform (s : Worker_state.t) public_key
-    ({ instances; fee; _ } as spec : Rpcs_types.Wire_work.Spec.t) =
+    ({ instances; fee; _ } as spec : Wire_work.Spec.t) =
   One_or_two.Deferred_result.map instances ~f:(fun single_work ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
@@ -74,9 +75,9 @@ let perform (s : Worker_state.t) public_key
       in
       let work_tag =
         match single_work with
-        | Work.Wire.Single.Spec.Stable.Latest.Regular (Transition _) ->
+        | Work.Wire.Single.Spec.Stable.Latest.Regular (Transition _, _) ->
             `Transition
-        | Regular (Merge _) ->
+        | Regular (Merge _, _) ->
             `Merge
         | Sub_zkapp_command _ ->
             let rec hole () = hole () in
@@ -262,7 +263,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           ~metadata:[ ("time", `Float random_delay) ] ;
         let%bind () = wait ~sec:random_delay () in
         go ()
-    | Ok (Some ((work_spec : Rpcs_types.Wire_work.Spec.t), public_key)) -> (
+    | Ok (Some ((work_spec : Wire_work.Spec.t), public_key)) -> (
         (* TODO: this is wrong *)
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
@@ -297,7 +298,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             log_and_retry "performing work" error (retry_pause 10.) go
         | Ok result ->
             emit_proof_metrics result.metrics
-              (Rpcs_types.Wire_work.Result.transactions result)
+              (Wire_work.Result.transactions result)
               logger ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:

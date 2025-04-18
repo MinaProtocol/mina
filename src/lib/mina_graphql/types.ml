@@ -654,7 +654,7 @@ module Snark_work_bundle = struct
             ~resolve:(fun _ { spec; _ } ->
               One_or_two.map spec ~f:(fun w ->
                   Transaction_snark.Statement.hash
-                    (Snark_work_lib.Work.Single.Spec.statement w) )
+                    (Snark_work_lib.Work.Compact.Single.Spec.statement w) )
               |> One_or_two.to_list )
         ] )
 end
@@ -2670,17 +2670,18 @@ module Input = struct
   end
 
   module ProofBundleInput = struct
-    type input = Ledger_proof.t Snark_work_lib.Work.Result_without_metrics.t
+    type input =
+      Ledger_proof.t Snark_work_lib.Work.Compact.Result_without_metrics.t
 
     let arg_typ =
       scalar "ProofBundleInput"
         ~doc:"Proof bundle for a given spec in json format"
         ~coerce:(fun json ->
           let json = Utils.to_yojson json in
-          Snark_work_lib.Work.Result_without_metrics.of_yojson
+          Snark_work_lib.Work.Compact.Result_without_metrics.of_yojson
             Ledger_proof.of_yojson json )
         ~to_json:(fun (res : input) ->
-          Snark_work_lib.Work.Result_without_metrics.to_yojson
+          Snark_work_lib.Work.Compact.Result_without_metrics.to_yojson
             Ledger_proof.to_yojson res
           |> Yojson.Safe.to_basic )
   end

@@ -8,9 +8,6 @@ module Entry = Entry
 (* module providing versioned RPCs *)
 module Rpcs_versioned = Rpcs_versioned
 
-(* module containing all types passed around with the RPC *)
-module Rpcs_types = Rpcs_types
-
 (* module providing swappable implementation for worker *)
 module Impl = struct
   module Prod = Worker_impl_prod.Impl

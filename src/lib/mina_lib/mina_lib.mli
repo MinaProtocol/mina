@@ -111,11 +111,11 @@ val request_work :
      key:Signature_lib.Public_key.Compressed.t
   -> capability:[ `V2 | `V3 ]
   -> t
-  -> Snark_worker.Rpcs_types.Wire_work.Spec.t option
+  -> Snark_work_lib.Wire.Spec.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_worker.Rpcs_types.Wire_work.Result.t -> unit
+val add_work : t -> Snark_work_lib.Wire.Result.t -> unit
 
 val add_work_graphql :
      t

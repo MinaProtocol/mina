@@ -1,5 +1,5 @@
 open Core_kernel
-open Rpcs_types
+module Wire_work = Snark_work_lib.Wire
 open Signature_lib
 module Work = Snark_work_lib.Work
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
@@ -9,10 +9,6 @@ module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
    - RFC 0013: https://github.com/MinaProtocol/mina/blob/develop/rfcs/0013-rpc-versioning.md
    - https://ocaml.org/p/async_rpc_kernel/v0.14.0/doc/Async_rpc_kernel/Versioned_rpc/index.html
 *)
-
-let regular_opt (work : Work.Wire.Single.Spec.Stable.V2.t) :
-    Work.Wire.Regular_work_single.t option =
-  match work with Regular w -> Some w | _ -> None
 
 [%%versioned_rpc
 module Get_work = struct
@@ -54,7 +50,7 @@ module Get_work = struct
         let open Option.Let_syntax in
         let%bind work, key = resp in
         let unwrap_regular_and_warn work =
-          match regular_opt work with
+          match Wire_work.Single.Spec.regular_opt work with
           | None ->
               (* WARN: we'd better report to the coordinator we failed rather *)
               (*          than ignoring the work*)
@@ -133,8 +129,11 @@ module Submit_work = struct
            issued by the coordinator"
         in
         (let%bind metrics = One_or_two.Option.map metrics ~f:fix_metric_tag in
-         let%map spec = Work.Compact.Spec.map_opt ~f_single:regular_opt spec in
-
+         let%bind spec =
+           Work.Compact.Spec.map_opt ~f_single:Wire_work.Single.Spec.regular_opt
+             spec
+         in
+         let%map proofs = Work.Compact.Partitoned.to_one_or_two proofs in
          let result : query = { proofs; metrics; spec; prover } in
          result )
         |> Option.value_exn ~message:fatal_message
@@ -204,7 +203,8 @@ module Failed_to_generate_snark = struct
        fun (error, work_spec, public_key) ->
         let open Option.Let_syntax in
         (let%map work_spec =
-           Work.Compact.Spec.map_opt ~f_single:regular_opt work_spec
+           Work.Compact.Spec.map_opt ~f_single:Wire_work.Single.Spec.regular_opt
+             work_spec
          in
 
          (error, work_spec, public_key) )

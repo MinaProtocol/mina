@@ -1,6 +1,6 @@
 open Async
-open Rpcs_types
 open Signature_lib
+module Wire_work = Snark_work_lib.Wire
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
 module Get_work = struct
