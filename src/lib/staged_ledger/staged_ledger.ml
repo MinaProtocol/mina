@@ -4769,9 +4769,10 @@ let%test_module "staged ledger tests" =
 
     let mk_basic_zkapp_command ?prover ~keymap ~fee ~fee_payer_pk
         ~fee_payer_nonce nodes =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let open Zkapp_command_builder in
       mk_forest nodes
-      |> mk_zkapp_command ~fee ~fee_payer_pk ~fee_payer_nonce
+      |> mk_zkapp_command ~chain ~fee ~fee_payer_pk ~fee_payer_nonce
       |> replace_authorizations ?prover ~keymap
 
     let%test_unit "Setting verification keys across differing accounts" =

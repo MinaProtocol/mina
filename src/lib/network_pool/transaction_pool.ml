@@ -2915,6 +2915,7 @@ let%test_module _ =
 
     let mk_basic_zkapp ?(fee = 10_000_000_000) ?(empty_update = false)
         ?preconditions ?permissions nonce fee_payer_kp =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let open Zkapp_command_builder in
       let preconditions =
         Option.value preconditions
@@ -2946,7 +2947,7 @@ let%test_module _ =
             ]
       in
       account_updates
-      |> mk_zkapp_command ~memo:"" ~fee
+      |> mk_zkapp_command ~chain ~memo:"" ~fee
            ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
            ~fee_payer_nonce:(Account.Nonce.of_int nonce)
 

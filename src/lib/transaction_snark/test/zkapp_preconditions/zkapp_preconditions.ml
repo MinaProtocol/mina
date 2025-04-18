@@ -771,8 +771,8 @@ let%test_module "Account precondition tests" =
                                 []
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_owner_pk
-                           ~fee_payer_nonce:nonce
+                      |> mk_zkapp_command ~chain ~fee:7
+                           ~fee_payer_pk:token_owner_pk ~fee_payer_nonce:nonce
                     in
                     let zkapp_dummy_signatures =
                       let delegate_precondition =

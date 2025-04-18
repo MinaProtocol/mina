@@ -57,6 +57,7 @@ let%test_module "Zkapp tokens tests" =
           acct
 
     let%test_unit "token operations" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       Test_util.with_randomness 987654321 (fun () ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let check_token_balance (keypair : Keypair.t) token_id balance =
@@ -109,7 +110,7 @@ let%test_module "Zkapp tokens tests" =
                                (10 * account_creation_fee) )
                             []
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
@@ -138,7 +139,7 @@ let%test_module "Zkapp tokens tests" =
                                 []
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
@@ -169,7 +170,7 @@ let%test_module "Zkapp tokens tests" =
                                 ]
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures
@@ -245,7 +246,7 @@ let%test_module "Zkapp tokens tests" =
                                 ]
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
+                      |> mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
                     replace_authorizations ~keymap with_dummy_signatures

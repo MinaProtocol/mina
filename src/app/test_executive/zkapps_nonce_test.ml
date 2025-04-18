@@ -88,6 +88,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         >>| ignore )
 
   let run network t =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     let open Malleable_error.Let_syntax in
     let constants : Test_config.constants =
       { genesis_constants = Network.genesis_constants network
@@ -167,8 +168,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"invalid zkapp from fish1" ~fee:12_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 0)
+        |> mk_zkapp_command ~chain ~memo:"invalid zkapp from fish1"
+             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 0)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
@@ -194,8 +196,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
+        |> mk_zkapp_command ~chain ~memo:"valid zkapp from fish1"
+             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 1)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
@@ -220,7 +223,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"precondition zkapp from fish1"
+        |> mk_zkapp_command ~chain ~memo:"precondition zkapp from fish1"
              ~fee:12_000_000 ~fee_payer_pk:fish1_pk
              ~fee_payer_nonce:(Account.Nonce.of_int 2)
       in
@@ -244,8 +247,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+        |> mk_zkapp_command ~chain ~memo:"valid zkapp from fish1"
+             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 3)
       in
       replace_authorizations ~keymap with_dummy_signatures
     in
@@ -264,7 +268,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:2_000_000
+        |> mk_zkapp_command ~chain ~memo:"valid zkapp from fish1" ~fee:2_000_000
              ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 4)
       in
       replace_authorizations ~keymap with_dummy_signatures
