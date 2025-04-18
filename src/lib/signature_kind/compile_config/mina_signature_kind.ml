@@ -8,3 +8,5 @@ let t_DEPRECATED =
       Mainnet
   | _ ->
       Other_network Node_config.network
+
+let t_TEST_DEPRECATED = t_DEPRECATED
