@@ -240,7 +240,7 @@ module type S = sig
 
       val is_empty : t -> bool
 
-      val pop_exn : t -> Elt.t * t
+      val pop_exn : chain:Mina_signature_kind.t -> t -> Elt.t * t
 
       val pop : t -> (Elt.t * t) option
 
@@ -1470,7 +1470,7 @@ module Make (L : Ledger_intf.S) :
 
       let is_empty = List.is_empty
 
-      let pop_exn : t -> Elt.t * t = function
+      let pop_exn ~chain:_ : t -> Elt.t * t = function
         | [] ->
             failwith "pop_exn"
         | x :: xs ->

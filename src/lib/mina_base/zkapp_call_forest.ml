@@ -16,7 +16,7 @@ let if_ = Zkapp_command.value_if
 
 let is_empty = List.is_empty
 
-let pop_exn : t -> (Account_update.t * t) * t = function
+let pop_exn ~chain:_ : t -> (Account_update.t * t) * t = function
   | { stack_hash = _
     ; elt = { account_update; calls; account_update_digest = _ }
     }
@@ -39,12 +39,11 @@ module Checked = struct
     ; control : Control.t Prover_value.t
     }
 
-  let account_update_typ () :
+  let account_update_typ ~chain () :
       ( account_update
       , (Account_update.t, Zkapp_command.Digest.Account_update.t) With_hash.t
       )
       Typ.t =
-    let chain = Mina_signature_kind.t_DEPRECATED in
     let (Typ typ) =
       Typ.(
         Account_update.Body.typ () * Prover_value.typ ()
@@ -102,8 +101,7 @@ module Checked = struct
 
   let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
-  let pop_exn ({ hash = h; data = r } : t) : (account_update * t) * t =
-    let chain = Mina_signature_kind.t_DEPRECATED in
+  let pop_exn ~chain ({ hash = h; data = r } : t) : (account_update * t) * t =
     with_label "Zkapp_call_forest.pop_exn" (fun () ->
         let hd_r =
           V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
@@ -147,9 +145,8 @@ module Checked = struct
             } )
           : (account_update * t) * t ) )
 
-  let pop ~dummy ~dummy_tree_hash ({ hash = h; data = r } : t) :
+  let pop ~chain ~dummy ~dummy_tree_hash ({ hash = h; data = r } : t) :
       (account_update * t) * t =
-    let chain = Mina_signature_kind.t_DEPRECATED in
     with_label "Zkapp_call_forest.pop" (fun () ->
         let hd_r =
           V.create (fun () ->

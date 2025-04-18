@@ -1235,7 +1235,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             in
             Stack_frame.of_frame elt
 
-          let pop_exn ({ hash = h; data = r } : t) : elt * t =
+          let pop_exn ~chain:_ ({ hash = h; data = r } : t) : elt * t =
             let hd_r = V.create (fun () -> (V.get r |> List.hd_exn).elt) in
             let tl_r = V.create (fun () -> V.get r |> List.tl_exn) in
             let elt : Stack_frame.t = exists_elt hd_r in
