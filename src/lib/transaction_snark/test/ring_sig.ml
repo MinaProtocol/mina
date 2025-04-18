@@ -14,8 +14,9 @@ open Snark_params.Tick.Let_syntax
 
 (* check a signature on msg against a public key *)
 let check_sig pk msg sigma : Boolean.var Checked.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-  Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
+  Schnorr.Chunked.Checked.verifies ~signature_kind (module S) sigma pk msg
 
 (* verify witness signature against public keys *)
 let%snarkydef_ verify_sig pubkeys msg sigma =

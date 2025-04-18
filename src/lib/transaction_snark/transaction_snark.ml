@@ -547,11 +547,13 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let%snarkydef_ check_signature shifted ~payload ~is_user_command ~signer
         ~signature =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let%bind input =
         Transaction_union_payload.Checked.to_input_legacy payload
       in
       let%bind verifies =
-        Schnorr.Legacy.Checked.verifies shifted signature signer input
+        Schnorr.Legacy.Checked.verifies ~signature_kind shifted signature signer
+          input
       in
       [%with_label_ "check signature"] (fun () ->
           Boolean.Assert.any [ Boolean.not is_user_command; verifies ] )
@@ -633,11 +635,12 @@ module Make_str (A : Wire_types.Concrete) = struct
               (module Pickles.Side_loaded.Verification_key.Max_width) )
 
     let signature_verifies ~shifted ~payload_digest signature pk =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let%bind pk =
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Chunked.Checked.verifies shifted signature pk
+      Schnorr.Chunked.Checked.verifies ~signature_kind shifted signature pk
         (Random_oracle.Input.Chunked.field payload_digest)
 
     module Zkapp_command_snark = struct

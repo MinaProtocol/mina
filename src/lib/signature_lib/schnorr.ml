@@ -47,7 +47,11 @@ module type Message_intf = sig
   type _ checked
 
   val hash_checked :
-    var -> public_key:curve_var -> r:field_var -> curve_scalar_var checked
+       signature_kind:Mina_signature_kind.t
+    -> var
+    -> public_key:curve_var
+    -> r:field_var
+    -> curve_scalar_var checked
 end
 
 module type S = sig
@@ -104,14 +108,16 @@ module type S = sig
     val compress : curve_var -> Boolean.var list Checked.t
 
     val verifies :
-         (module Shifted.S with type t = 't)
+         signature_kind:Mina_signature_kind.t
+      -> (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
       -> Boolean.var Checked.t
 
     val assert_verifies :
-         (module Shifted.S with type t = 't)
+         signature_kind:Mina_signature_kind.t
+      -> (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
@@ -262,12 +268,12 @@ module Make
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef_ verifier (type s) ~equal ~final_check
+    let%snarkydef_ verifier (type s) ~signature_kind ~equal ~final_check
         ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s) )
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
         =
-      let%bind e = Message.hash_checked m ~public_key ~r in
+      let%bind e = Message.hash_checked ~signature_kind m ~public_key ~r in
       (* s * g - e * public_key *)
       let%bind e_pk =
         Curve.Checked.scale shifted
@@ -285,11 +291,12 @@ module Make
       let%bind r_correct = equal r rx in
       final_check r_correct y_even
 
-    let verifies s =
-      verifier ~equal:Field.Checked.equal ~final_check:Boolean.( && ) s
+    let verifies ~signature_kind s =
+      verifier ~signature_kind ~equal:Field.Checked.equal
+        ~final_check:Boolean.( && ) s
 
-    let assert_verifies s =
-      verifier ~equal:Field.Checked.Assert.equal
+    let assert_verifies ~signature_kind s =
+      verifier ~signature_kind ~equal:Field.Checked.Assert.equal
         ~final_check:(fun () ry_even -> Boolean.Assert.is_true ry_even)
         s
   end
@@ -363,13 +370,12 @@ module Message = struct
 
     type var = (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 
-    let%snarkydef_ hash_checked t ~public_key ~r =
+    let%snarkydef_ hash_checked ~signature_kind t ~public_key ~r =
       let input =
         let px, py = public_key in
         Random_oracle.Input.Legacy.append t
           { field_elements = [| px; py; r |]; bitstrings = [||] }
       in
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       make_checked (fun () ->
           let open Random_oracle.Legacy.Checked in
           hash
@@ -438,13 +444,12 @@ module Message = struct
 
     type var = Field.Var.t Random_oracle.Input.Chunked.t
 
-    let%snarkydef_ hash_checked t ~public_key ~r =
+    let%snarkydef_ hash_checked ~signature_kind t ~public_key ~r =
       let input =
         let px, py = public_key in
         Random_oracle.Input.Chunked.append t
           { field_elements = [| px; py; r |]; packeds = [||] }
       in
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       make_checked (fun () ->
           let open Random_oracle.Checked in
           hash
@@ -529,7 +534,9 @@ let%test_unit "schnorr checked + unchecked" =
            let%bind (module Shifted) =
              Tick.Inner_curve.Checked.Shifted.create ()
            in
-           Legacy.Checked.verifies (module Shifted) s public_key msg )
+           Legacy.Checked.verifies ~signature_kind
+             (module Shifted)
+             s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
 
@@ -549,6 +556,8 @@ let%test_unit "schnorr checked + unchecked" =
            let%bind (module Shifted) =
              Tick.Inner_curve.Checked.Shifted.create ()
            in
-           Chunked.Checked.verifies (module Shifted) s public_key msg )
+           Chunked.Checked.verifies ~signature_kind
+             (module Shifted)
+             s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
