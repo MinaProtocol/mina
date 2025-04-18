@@ -13,8 +13,8 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.Prod.t
 
 module Processor = struct
-  let verify_commands (cs : User_command.Verifiable.t With_status.t list) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let verify_commands ~signature_kind
+      (cs : User_command.Verifiable.t With_status.t list) =
     let results = List.map cs ~f:(Common.check ~signature_kind) in
     let to_verify =
       List.concat_map
@@ -85,6 +85,7 @@ module Worker_state = struct
       ; transaction_verification_key
       ; _
       } : t Deferred.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match proof_level with
     | Full ->
         Pickles.Side_loaded.srs_precomputation () ;
@@ -96,7 +97,7 @@ module Worker_state = struct
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_commands" ;
-               let%map result = Processor.verify_commands cs in
+               let%map result = Processor.verify_commands ~signature_kind cs in
                [%log internal] "Verifier_verify_commands_done" ;
                result
 
@@ -157,7 +158,6 @@ module Worker_state = struct
         Deferred.return
         @@ ( module struct
              let verify_commands tagged_commands =
-               let signature_kind = Mina_signature_kind.t_DEPRECATED in
                List.map tagged_commands
                  ~f:(Fn.compose f (Common.check ~signature_kind))
                |> Deferred.return
