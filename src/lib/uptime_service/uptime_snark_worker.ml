@@ -92,8 +92,7 @@ end
 type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
-let create ~logger ~constraint_constants ~pids : t Deferred.t =
-  let chain = Mina_signature_kind.t_DEPRECATED in
+let create ~chain ~logger ~constraint_constants ~pids : t Deferred.t =
   let on_failure err =
     [%log error] "Uptime service SNARK worker process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;

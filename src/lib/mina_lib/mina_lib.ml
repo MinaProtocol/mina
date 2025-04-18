@@ -1363,8 +1363,8 @@ let start t =
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
     let module Context =
-    ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
-            t.config )
+      ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+              t.config )
     in
     Block_producer.run
       ~context:(module Context)
@@ -1441,7 +1441,8 @@ let start t =
 
 let start_with_precomputed_blocks t blocks =
   let module Context =
-  (val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id t.config)
+    ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+            t.config )
   in
   let%bind () =
     Block_producer.run_precomputed
@@ -1691,6 +1692,7 @@ let initialize_zkapp_vk_cache_db (config : Config.t) =
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let create ~commit_id ?wallets (config : Config.t) =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1725,8 +1727,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                  config.start_filtered_logs ;
           let%bind proof_cache_db = initialize_proof_cache_db config in
           let%bind zkapp_vk_cache_db = initialize_zkapp_vk_cache_db config in
-          let module Context =
-          (val context ~proof_cache_db ~commit_id config)
+          let module Context = (val context ~proof_cache_db ~commit_id config)
           in
           let%bind prover =
             Monitor.try_with ~here:[%here]
@@ -1848,7 +1849,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   (fun () ->
                     O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
-                        Uptime_service.Uptime_snark_worker.create
+                        Uptime_service.Uptime_snark_worker.create ~chain
                           ~constraint_constants:
                             config.precomputed_values.constraint_constants
                           ~logger:config.logger ~pids:config.pids ) )
