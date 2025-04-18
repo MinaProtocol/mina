@@ -1708,7 +1708,7 @@ let internal_commands logger ~itn_features =
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level ~constraint_constants
+                     ~proof_level ~chain ~constraint_constants
                      ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
@@ -1966,7 +1966,7 @@ let internal_commands logger ~itn_features =
                realistic test.
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
-              ~conf_dir ~proof_level
+              ~conf_dir ~proof_level ~chain
               ~constraint_constants:precomputed_values.constraint_constants ()
           in
           match%bind

@@ -4,6 +4,7 @@ open Async_kernel
 let diff_s a b = Time_ns.(Span.to_string_hum (diff a b))
 
 let time_genesis_creation () =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let commit_id = "<skipped for unit test>" in
   let logger = Logger.create () in
   Logger.Consumer_registry.register ~id:Logger.Logger_id.mina ~commit_id
@@ -23,6 +24,7 @@ let time_genesis_creation () =
       ; internal_trace_filename = None
       ; logger
       ; proof_level = Full
+      ; chain
       ; constraint_constants =
           Genesis_constants.For_unit_tests.Constraint_constants.t
       ; commit_id

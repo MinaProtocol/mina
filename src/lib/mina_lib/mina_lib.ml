@@ -1746,7 +1746,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
-                        ~constraint_constants ~pids:config.pids
+                        ~chain ~constraint_constants ~pids:config.pids
                         ~conf_dir:config.conf_dir ()
                     in
                     let%map () = set_itn_data (module Prover) prover in
