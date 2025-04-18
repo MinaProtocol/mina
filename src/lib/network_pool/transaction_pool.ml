@@ -1835,6 +1835,7 @@ let%test_module _ =
 
     let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
         User_command.Valid.t list Deferred.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Deferred.Let_syntax in
       let%map zkapp_commands_fixed =
         Deferred.List.map
@@ -1842,7 +1843,8 @@ let%test_module _ =
           ~f:(function
             | Zkapp_command zkapp_command_dummy_auths ->
                 let%map cmd =
-                  Zkapp_command_builder.replace_authorizations ~keymap ~prover
+                  Zkapp_command_builder.replace_authorizations ~signature_kind
+                    ~keymap ~prover
                     (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
                 in
                 User_command.Zkapp_command cmd

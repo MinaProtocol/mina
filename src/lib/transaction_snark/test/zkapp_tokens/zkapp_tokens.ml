@@ -113,7 +113,8 @@ let%test_module "Zkapp tokens tests" =
                       |> mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
-                    replace_authorizations ~keymap with_dummy_signatures
+                    replace_authorizations ~signature_kind:chain ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_zkapp_command_with_merges_exn ledger
@@ -142,7 +143,8 @@ let%test_module "Zkapp tokens tests" =
                       |> mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
-                    replace_authorizations ~keymap with_dummy_signatures
+                    replace_authorizations ~signature_kind:chain ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_zkapp_command_with_merges_exn ledger
@@ -173,7 +175,8 @@ let%test_module "Zkapp tokens tests" =
                       |> mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
-                    replace_authorizations ~keymap with_dummy_signatures
+                    replace_authorizations ~signature_kind:chain ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_zkapp_command_with_merges_exn ledger
@@ -249,7 +252,8 @@ let%test_module "Zkapp tokens tests" =
                       |> mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk
                            ~fee_payer_nonce:nonce
                     in
-                    replace_authorizations ~keymap with_dummy_signatures
+                    replace_authorizations ~signature_kind:chain ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_zkapp_command_with_merges_exn ledger
