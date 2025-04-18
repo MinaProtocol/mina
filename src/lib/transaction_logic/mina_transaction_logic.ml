@@ -1618,6 +1618,7 @@ module Make (L : Ledger_intf.S) :
       ( Transaction_partially_applied.Zkapp_command_partially_applied.t
       * user_acc )
       Or_error.t =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     let open Or_error.Let_syntax in
     let previous_hash = merkle_root ledger in
     let original_first_pass_account_states =
@@ -1664,7 +1665,7 @@ module Make (L : Ledger_intf.S) :
     let account_updates = Zkapp_command.all_account_updates command in
     let%map global_state, local_state =
       Or_error.try_with (fun () ->
-          M.start ~constraint_constants
+          M.start ~chain ~constraint_constants
             { account_updates
             ; memo_hash = Signed_command_memo.hash command.memo
             ; will_succeed =
@@ -1706,6 +1707,7 @@ module Make (L : Ledger_intf.S) :
       ledger
       (c : Transaction_partially_applied.Zkapp_command_partially_applied.t) :
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     let open Or_error.Let_syntax in
     let perform eff =
       Env.perform ~constraint_constants:c.constraint_constants eff
@@ -1740,8 +1742,8 @@ module Make (L : Ledger_intf.S) :
       else
         let%bind states =
           Or_error.try_with (fun () ->
-              M.step ~constraint_constants:c.constraint_constants { perform }
-                (g_state, l_state) )
+              M.step ~chain ~constraint_constants:c.constraint_constants
+                { perform } (g_state, l_state) )
         in
         step_all (f user_acc states) states
     in

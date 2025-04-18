@@ -1865,6 +1865,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let main ?(witness : Witness.t option) (spec : Spec.t)
           ~constraint_constants (statement : Statement.With_sok.var) =
+        let chain = Mina_signature_kind.t_DEPRECATED in
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
@@ -1985,7 +1986,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 let global_state, local_state =
                   with_label "apply" (fun () ->
-                      S.apply ~constraint_constants
+                      S.apply ~chain ~constraint_constants
                         ~is_start:
                           ( match account_update_spec.is_start with
                           | `No ->
@@ -2003,7 +2004,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 match account_update_spec.is_start with
                 | `No ->
                     let global_state, local_state =
-                      S.apply ~constraint_constants ~is_start:`No
+                      S.apply ~chain ~constraint_constants ~is_start:`No
                         S.{ perform }
                         acc
                     in
