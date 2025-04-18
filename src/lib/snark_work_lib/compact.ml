@@ -86,78 +86,17 @@ module Spec = struct
     { instances; fee }
 end
 
-(* TODO: we don't want `Zkapp_command_segment *)
-
-let update_metric :
-       Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ]
-    -> Core.Time.Stable.Span.V1.t
-       * [ `Transition | `Merge | `Zkapp_command_segment ] = function
-  | span, `Transition ->
-      (span, `Transition)
-  | span, `Merge ->
-      (span, `Merge)
-
-(* Since we may return parts of One_or_two, we need a new type to track it  *)
-module Partitoned = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'a t = [ `One of 'a | `Two of 'a * 'a | `First of 'a | `Second of 'a ]
-    end
-  end]
-
-  let of_one_or_two : 'a One_or_two.t -> 'a t = function
-    | `One a ->
-        `One a
-    | `Two (a, b) ->
-        `Two (a, b)
-
-  let to_one_or_two : 'a t -> 'a One_or_two.t option = function
-    | `One a ->
-        Some (`One a)
-    | `Two (a, b) ->
-        Some (`Two (a, b))
-    | `First _ | `Second _ ->
-        None
-
-  let map (t : 'a t) ~f =
-    match t with
-    | `One a ->
-        `One (f a)
-    | `Two (a, b) ->
-        `Two (f a, f b)
-    | `First a ->
-        `First (f a)
-    | `Second a ->
-        `Second (f a)
-
-  let map_opt (t : 'a t) ~f =
-    let open Option.Let_syntax in
-    match t with
-    | `One a ->
-        let%map f_a = f a in
-        `One f_a
-    | `Two (a, b) ->
-        let%bind f_a = f a in
-        let%map f_b = f b in
-        `Two (f_a, f_b)
-    | `First a ->
-        let%map f_a = f a in
-        `First f_a
-    | `Second a ->
-        let%map f_a = f a in
-        `Second f_a
-end
-
 module Result = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
       type ('spec, 'proof) t =
-        { proofs : 'proof Partitoned.Stable.V1.t
+        { proofs : 'proof One_or_two.Stable.V1.t
         ; metrics :
             ( Core.Time.Stable.Span.V1.t
-            * [ `Transition | `Merge | `Zkapp_command_segment ] )
+            * [ `Transition
+              | `Merge
+              | `Sub_zkapp_command of [ `Segment | `Merge ] ] )
             One_or_two.Stable.V1.t
         ; spec : 'spec
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
@@ -178,7 +117,13 @@ module Result = struct
 
       let to_latest ({ proofs; metrics; spec; prover } : ('spec, 'single) t) :
           ('spec, 'single) V2.t =
-        { proofs = Partitoned.of_one_or_two proofs
+        let update_metric = function
+          | span, `Transition ->
+              (span, `Transition)
+          | span, `Merge ->
+              (span, `Merge)
+        in
+        { proofs
         ; metrics = One_or_two.map ~f:update_metric metrics
         ; spec
         ; prover
@@ -187,7 +132,7 @@ module Result = struct
   end]
 
   let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
-    { proofs = Partitoned.map ~f:f_single proofs
+    { proofs = One_or_two.map ~f:f_single proofs
     ; metrics
     ; spec = f_spec spec
     ; prover
@@ -195,7 +140,7 @@ module Result = struct
 
   let map_opt ~f_spec ~f_single { proofs; metrics; spec; prover } =
     let open Option.Let_syntax in
-    let%bind proofs = Partitoned.map_opt ~f:f_single proofs in
+    let%bind proofs = One_or_two.Option.map ~f:f_single proofs in
     let%map spec = f_spec spec in
     { proofs; metrics; spec; prover }
 end

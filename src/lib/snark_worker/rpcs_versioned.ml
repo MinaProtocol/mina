@@ -112,31 +112,13 @@ module Submit_work = struct
 
       type response = unit
 
-      let fix_metric_tag (span, tag) =
-        match tag with
-        | (`Transition | `Merge) as tag ->
-            Some (span, tag)
-        | `Zkapp_command_segment ->
-            None
-
-      let query_of_caller_model
-          ({ proofs; metrics; spec; prover } : Rpcs_master.Submit_work.query) :
-          query =
-        let open Option.Let_syntax in
-        let fatal_message =
-          "FATAL: V2 Worker completed a `Zkapp_command_segment` job where the \
-           coordinator can't aggregate, this shouldn't happen as the work is \
-           issued by the coordinator"
-        in
-        (let%bind metrics = One_or_two.Option.map metrics ~f:fix_metric_tag in
-         let%bind spec =
-           Work.Compact.Spec.map_opt ~f_single:Wire_work.Single.Spec.regular_opt
-             spec
-         in
-         let%map proofs = Work.Compact.Partitoned.to_one_or_two proofs in
-         let result : query = { proofs; metrics; spec; prover } in
-         result )
-        |> Option.value_exn ~message:fatal_message
+      let query_of_caller_model (q : Rpcs_master.Submit_work.query) : query =
+        Wire_work.Result.Stable.V1.of_latest q
+        |> Option.value_exn
+             ~message:
+               "FATAL: V2 Worker completed a `Zkapp_command_segment` job where \
+                the coordinator can't aggregate, this shouldn't happen as the \
+                work is issued by the coordinator"
 
       let callee_model_of_query : query -> Rpcs_master.Submit_work.query =
         Wire_work.Result.Stable.V1.to_latest

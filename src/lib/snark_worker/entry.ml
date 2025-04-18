@@ -135,7 +135,7 @@ let emit_proof_metrics metrics instances logger =
   One_or_two.iter (One_or_two.zip_exn metrics instances)
     ~f:(fun ((time, tag), single) ->
       match tag with
-      | `Zkapp_command_segment ->
+      | `Sub_zkapp_command _ ->
           let rec hole () = hole () in
           (* TODO: emit proof metrics for zkapp command *)
           hole ()

@@ -34,6 +34,8 @@ module Snark_job_state = struct
   type t = { work_selector : State.t; work_partitioner : Work_partitioner.t }
 end
 
+module Wire_work = Snark_work_lib.Wire
+
 (* This returns work in finer grain (i.e. sub zkapp command level) compared to calling selector directly *)
 
 let request_from_selector_and_consume_by_partitioner
@@ -53,13 +55,9 @@ let request_partitioned_work
     ~(fee : Currency.Fee.t) ~(snark_pool : snark_pool) ~(selector : State.t)
     ~(partitioner : Work_partitioner.t)
     ~(key : Signature_lib.Public_key.Compressed.t) :
-    Work_partitioner.Partitioned_work.t option =
+    Wire_work.Single.Spec.t option =
   Work_partitioner.attempt_these
     [ Work_partitioner.issue_job_from_partitioner ~partitioner
     ; request_from_selector_and_consume_by_partitioner ~partitioner
         ~selection_method ~selector ~logger ~fee ~snark_pool ~key
     ]
-
-let submit_partitioned_work ~(result : Snark_work_lib.Wire.Result.t) =
-  (* match  *)
-  failwith "TODO"

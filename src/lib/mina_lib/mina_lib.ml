@@ -897,7 +897,7 @@ let request_work ~key ~capability (t : t) : Snark_work_lib.Wire.Spec.t option =
 let work_selection_method t = t.config.work_selection_method
 
 (* A Snark worker is submitting completed work back to the coordinator *)
-let add_work t (work : Snark_work_lib.Wire.Result.t) =
+let add_work t (result : Snark_work_lib.Wire.Result.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -911,23 +911,28 @@ let add_work t (work : Snark_work_lib.Wire.Result.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec =
-    One_or_two.map work.spec.instances ~f:(fun instance ->
-        Snark_work_lib.Work.Wire.Single.Spec.statement instance
-        |> Option.value_exn ~message:"TODO" )
+  (* WARN: Callback hell *)
+  let after_partitioner_recombine_work
+      ~(work : Snark_work_lib.Work.Wire.Result.Stable.V1.t) =
+    let spec =
+      One_or_two.map work.spec.instances ~f:(fun instance ->
+          Snark_work_lib.Work.Compact.Single.Spec.statement instance )
+    in
+    let after_work_enter_pool _ =
+      (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
+       * If the diff is accepted then remove it from the seen jobs.
+       * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
+      Work_selector.remove t.snark_job_state.work_selector spec
+    in
+    ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
+    Network_pool.Snark_pool.(
+      Local_sink.push t.pipes.snark_local_sink
+        (Resource_pool.Diff.of_result work, after_work_enter_pool))
+    |> Deferred.don't_wait_for
   in
-  (* TODO: move this call back to somewhere else *)
-  let cb _ =
-    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
-     * If the diff is accepted then remove it from the seen jobs.
-     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selector.remove t.snark_job_state.work_selector spec
-  in
-  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
-  Network_pool.Snark_pool.(
-    Local_sink.push t.pipes.snark_local_sink
-      (Resource_pool.Diff.of_result (failwith "TODO `work`"), cb))
-  |> Deferred.don't_wait_for
+  Work_selector.Work_partitioner.submit_partitioned_work ~result
+    ~after_partitioner_recombine_work
+    ~partitioner:t.snark_job_state.work_partitioner
 
 let add_work_graphql t diff =
   let results_ivar = Ivar.create () in

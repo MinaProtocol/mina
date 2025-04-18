@@ -44,7 +44,10 @@ let perform (s : Impl.Worker_state.t) ~fee ~public_key
       let%map proof, time =
         Impl.perform_single s
           ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-          (Regular w)
+          (Regular
+             ( w
+             , Snark_work_lib.Wire.Pairing.
+                 { one_or_two = `One; pair_uuid = None } ) )
       in
       ( proof
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )

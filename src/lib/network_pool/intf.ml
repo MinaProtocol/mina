@@ -349,7 +349,7 @@ module type Snark_pool_diff_intf = sig
        ( (_, _) Snark_work_lib.Work.Compact.Single.Spec.t
          Snark_work_lib.Work.Compact.Spec.t
        , Ledger_proof.t )
-       Snark_work_lib.Work.Compact.Result.t
+       Snark_work_lib.Work.Compact.Result.Stable.V1.t
     -> t
 end
 
