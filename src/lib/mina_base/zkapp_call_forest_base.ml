@@ -134,20 +134,20 @@ module type Digest_intf = sig
     module Checked : sig
       include Digest_intf.S_checked
 
-      val create : ?chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
+      val create : chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
 
       val create_body :
-        ?chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
+        chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
     end
 
     include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
     val create :
-         ?chain:Mina_signature_kind.t
+         chain:Mina_signature_kind.t
       -> (Account_update.Body.t, _) Account_update.Poly.t
       -> t
 
-    val create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
+    val create_body : chain:Mina_signature_kind.t -> Account_update.Body.t -> t
   end
 
   module rec Forest : sig
@@ -252,30 +252,20 @@ module Make_digest_str
     module Checked = struct
       include Checked
 
-      let create ?chain =
-        let chain =
-          Option.value chain ~default:Mina_signature_kind.t_DEPRECATED
-        in
-        Account_update.Checked.digest ~chain
+      let create = Account_update.Checked.digest
 
-      let create_body ?chain =
-        let chain =
-          Option.value chain ~default:Mina_signature_kind.t_DEPRECATED
-        in
-        Account_update.Body.Checked.digest ~chain
+      let create_body = Account_update.Body.Checked.digest
     end
 
-    let create ?chain : (Account_update.Body.t, _) Account_update.Poly.t -> t =
-      let chain =
-        Option.value chain ~default:Mina_signature_kind.t_DEPRECATED
-      in
-      Account_update.digest ~chain
+    let create :
+           chain:Mina_signature_kind.t
+        -> (Account_update.Body.t, _) Account_update.Poly.t
+        -> t =
+      Account_update.digest
 
-    let create_body ?chain : Account_update.Body.t -> t =
-      let chain =
-        Option.value chain ~default:Mina_signature_kind.t_DEPRECATED
-      in
-      Account_update.Body.digest ~chain
+    let create_body : chain:Mina_signature_kind.t -> Account_update.Body.t -> t
+        =
+      Account_update.Body.digest
   end
 
   module Forest = struct
@@ -480,8 +470,10 @@ let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
   cons_tree tree xs
 
 let cons ?calls (account_update : Account_update.t) xs =
-  cons_aux ~digest_account_update:Digest.Account_update.create ?calls
-    account_update xs
+  let chain = Mina_signature_kind.t_DEPRECATED in
+  cons_aux
+    ~digest_account_update:(Digest.Account_update.create ~chain)
+    ?calls account_update xs
 
 let rec accumulate_hashes ~hash_account_update (xs : _ t) =
   let go = accumulate_hashes ~hash_account_update in
@@ -505,13 +497,17 @@ let rec accumulate_hashes ~hash_account_update (xs : _ t) =
 
 let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
     (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let hash_account_update (p : Account_update.t) =
-    Digest.Account_update.create p
+    Digest.Account_update.create ~chain p
   in
   accumulate_hashes ~hash_account_update xs
 
 let accumulate_hashes_predicated xs =
-  accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
+  let chain = Mina_signature_kind.t_DEPRECATED in
+  accumulate_hashes
+    ~hash_account_update:(Digest.Account_update.create ~chain)
+    xs
 
 let forget_hashes =
   let rec impl = List.map ~f:forget_digest
@@ -550,7 +546,8 @@ module With_hashes_and_data = struct
   let empty = Digest.Forest.empty
 
   let hash_account_update ((p : Account_update.Stable.Latest.t), _) =
-    Digest.Account_update.create p
+    let chain = Mina_signature_kind.t_DEPRECATED in
+    Digest.Account_update.create ~chain p
 
   let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
 
@@ -604,7 +601,9 @@ module With_hashes = struct
 
   let empty = Digest.Forest.empty
 
-  let hash_account_update p = Digest.Account_update.create p
+  let hash_account_update p =
+    let chain = Mina_signature_kind.t_DEPRECATED in
+    Digest.Account_update.create ~chain p
 
   let accumulate_hashes xs = accumulate_hashes ~hash_account_update xs
 

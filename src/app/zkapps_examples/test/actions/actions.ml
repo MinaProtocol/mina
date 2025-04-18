@@ -122,6 +122,7 @@ let%test_module "Actions test" =
           transaction_commitment ~memo_hash
           ~fee_payer_hash:
             (Zkapp_command.Call_forest.Digest.Account_update.create
+               ~chain:signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :

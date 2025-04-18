@@ -151,13 +151,14 @@ let map_proofs ~(f : 'p -> 'q)
   }
 
 let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
       w.account_updates
       |> Call_forest.accumulate_hashes
            ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
+             Digest.Account_update.create ~chain p )
   }
 
 let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
@@ -178,6 +179,7 @@ let forget_digests_and_proofs
 [%%define_locally Stable.Latest.(gen)]
 
 let of_simple (w : Simple.t) : t =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
@@ -187,7 +189,7 @@ let of_simple (w : Simple.t) : t =
       |> Call_forest.map ~f:Account_update.of_simple
       |> Call_forest.accumulate_hashes
            ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
+             Digest.Account_update.create ~chain p )
   }
 
 let to_simple (t : t) : Simple.t =
@@ -220,6 +222,7 @@ let to_simple (t : t) : Simple.t =
   }
 
 let all_account_updates t : _ Call_forest.t =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let p = t.Poly.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
   let account_update =
@@ -228,7 +231,7 @@ let all_account_updates t : _ Call_forest.t =
     }
   in
   let fee_payer_digest : Digest.Account_update.t =
-    Digest.Account_update.create account_update
+    Digest.Account_update.create ~chain account_update
   in
   let tree : _ Call_forest.Tree.t =
     { account_update; account_update_digest = fee_payer_digest; calls = [] }
@@ -1039,7 +1042,7 @@ end = struct
             ~spec:(zkapp_segment_of_controls [ a1 ])
             ~before ~after
           :: acc
-      | ( ({ Account_update.Poly.authorization = Control.Poly.Proof _ as a1; _ }
+      | ( ( { Account_update.Poly.authorization = Control.Poly.Proof _ as a1; _ }
           :: zkapp_command )
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -1053,7 +1056,7 @@ end = struct
             :: acc )
       | ( []
           :: ({ authorization = Proof _ as a1; _ } :: zkapp_command)
-             :: zkapp_commands
+          :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is part of a new transaction, and contains a proof, don't
              pair it with other account updates.
@@ -1065,7 +1068,7 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1 ])
                 ~before ~after
             :: acc )
-      | ( ({ authorization = a1; _ }
+      | ( ( { authorization = a1; _ }
           :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
           :: zkapp_commands
         , (before :: (after :: _ as stmts)) :: stmtss ) ->
@@ -1090,9 +1093,9 @@ end = struct
                 ~spec:(zkapp_segment_of_controls [ a1 ])
                 ~before ~after
             :: acc )
-      | ( ({ authorization = (Signature _ | None_given) as a1; _ }
+      | ( ( { authorization = (Signature _ | None_given) as a1; _ }
           :: { authorization = (Signature _ | None_given) as a2; _ }
-             :: zkapp_command )
+          :: zkapp_command )
           :: zkapp_commands
         , (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
           (* The next two zkapp_command do not contain proofs, and are within the same
@@ -1108,9 +1111,9 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: ({ authorization = a1; _ }
+          :: ( { authorization = a1; _ }
              :: ({ authorization = Proof _; _ } :: _ as zkapp_command) )
-             :: zkapp_commands
+          :: zkapp_commands
         , [ _ ] :: (before :: (after :: _ as stmts)) :: stmtss ) ->
           (* This account_update is in the next transaction, and the next account_update contains a
              proof, don't pair it with this account_update.
@@ -1123,10 +1126,10 @@ end = struct
                 ~before ~after
             :: acc )
       | ( []
-          :: ({ authorization = (Signature _ | None_given) as a1; _ }
+          :: ( { authorization = (Signature _ | None_given) as a1; _ }
              :: { authorization = (Signature _ | None_given) as a2; _ }
-                :: zkapp_command )
-             :: zkapp_commands
+             :: zkapp_command )
+          :: zkapp_commands
         , [ _ ] :: (before :: _ :: (after :: _ as stmts)) :: stmtss ) ->
           (* The next two zkapp_command do not contain proofs, and are within the same
              new transaction. Pair them.
@@ -1141,9 +1144,9 @@ end = struct
                 ~before ~after
             :: acc )
       | ( [ { authorization = (Signature _ | None_given) as a1; _ } ]
-          :: ({ authorization = (Signature _ | None_given) as a2; _ }
+          :: ( { authorization = (Signature _ | None_given) as a2; _ }
              :: zkapp_command )
-             :: zkapp_commands
+          :: zkapp_commands
         , (before :: _after1) :: (_before2 :: (after :: _ as stmts)) :: stmtss )
         ->
           (* The next two zkapp_command do not contain proofs, and the second is within
@@ -1160,7 +1163,7 @@ end = struct
             :: acc )
       | ( []
           :: ({ authorization = a1; _ } :: zkapp_command)
-             :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
+          :: (({ authorization = Proof _; _ } :: _) :: _ as zkapp_commands)
         , [ _ ] :: (before :: ([ after ] as stmts)) :: (_ :: _ as stmtss) ) ->
           (* The next transaction contains a proof, and this account_update is in a new
              transaction, don't pair it with the next account_update.
@@ -1174,12 +1177,13 @@ end = struct
             :: acc )
       | ( []
           :: [ { authorization = (Signature _ | None_given) as a1; _ } ]
-             :: ({ authorization = (Signature _ | None_given) as a2; _ }
-                :: zkapp_command )
-                :: zkapp_commands
+          :: ( { authorization = (Signature _ | None_given) as a2; _ }
+             :: zkapp_command )
+          :: zkapp_commands
         , [ _ ]
           :: [ before; _after1 ]
-             :: (_before2 :: (after :: _ as stmts)) :: stmtss ) ->
+          :: (_before2 :: (after :: _ as stmts))
+          :: stmtss ) ->
           (* The next two zkapp_command do not contain proofs, the first is within a
              new transaction, and the second is within another new transaction.
              Pair them.
@@ -1400,10 +1404,11 @@ let is_incompatible_version
           not Mina_numbers.Txn_version.(equal_to_current txn_version) )
 
 let get_transaction_commitments (zkapp_command : _ Poly.t) =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =
     Account_update.of_fee_payer zkapp_command.fee_payer
-    |> Digest.Account_update.create
+    |> Digest.Account_update.create ~chain
   in
   let account_updates_hash = account_updates_hash zkapp_command in
   let txn_commitment = Transaction_commitment.create ~account_updates_hash in

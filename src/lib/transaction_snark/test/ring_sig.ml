@@ -284,6 +284,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ~memo_hash
                 ~fee_payer_hash:
                   (Zkapp_command.Digest.Account_update.create
+                     ~chain:signature_kind
                      (Account_update.of_fee_payer fee_payer) )
             in
             { fee_payer with

@@ -85,6 +85,7 @@ module Rules = struct
           respond Unhandled
 
     let main input =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
@@ -125,7 +126,8 @@ module Rules = struct
                  .to_account_update_and_calls
             in
             let digest =
-              Zkapp_command.Digest.Account_update.Checked.create final_update
+              Zkapp_command.Digest.Account_update.Checked.create ~chain
+                final_update
             in
             ( { Zkapp_call_forest.Checked.account_update =
                   { data = final_update; hash = digest }
@@ -157,10 +159,12 @@ module Rules = struct
   (** Rule to transfer tokens. *)
   module Transfer = struct
     let dummy_account_update_body =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       lazy
         (let dummy_body = Account_update.Body.dummy in
          { With_hash.data = dummy_body
-         ; hash = Zkapp_command.Digest.Account_update.create_body dummy_body
+         ; hash =
+             Zkapp_command.Digest.Account_update.create_body ~chain dummy_body
          } )
 
     let dummy_tree_hash =

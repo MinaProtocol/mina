@@ -3603,6 +3603,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         * [ `Connecting_ledger_hash of Ledger_hash.t ]
         * Zkapp_command.t )
         list ) =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     let sparse_first_pass_ledger zkapp_command = function
       | `Ledger ledger ->
           Sparse_ledger.of_ledger_subset_exn ledger
@@ -3749,7 +3750,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let next_commitment = Zkapp_command.commitment zkapp_command in
                 let memo_hash = Signed_command_memo.hash zkapp_command.memo in
                 let fee_payer_hash =
-                  Zkapp_command.Digest.Account_update.create
+                  Zkapp_command.Digest.Account_update.create ~chain
                     (Account_update.of_fee_payer zkapp_command.fee_payer)
                 in
                 let next_full_commitment =
@@ -4469,7 +4470,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         Zkapp_command.Transaction_commitment.create_complete commitment
           ~memo_hash:(Signed_command_memo.hash memo)
           ~fee_payer_hash:
-            (Zkapp_command.Digest.Account_update.create
+            (Zkapp_command.Digest.Account_update.create ~chain:signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let fee_payer =
@@ -4662,7 +4663,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
             |> Zkapp_command.Call_forest.accumulate_hashes
                  ~hash_account_update:(fun (p : Account_update.t) ->
-                   Zkapp_command.Digest.Account_update.create p )
+                   Zkapp_command.Digest.Account_update.create
+                     ~chain:signature_kind p )
         }
       in
       zkapp_command
@@ -4759,7 +4761,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           account_update_with_dummy_auth
       in
       let account_update_digest_with_current_chain =
-        Zkapp_command.Digest.Account_update.create
+        Zkapp_command.Digest.Account_update.create ~chain
           account_update_with_dummy_auth
       in
       let tree_with_dummy_auth =
@@ -5186,7 +5188,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Zkapp_command.Transaction_commitment.create_complete transaction
             ~memo_hash:(Signed_command_memo.hash memo)
             ~fee_payer_hash:
-              (Zkapp_command.Digest.Account_update.create
+              (Zkapp_command.Digest.Account_update.create ~chain:signature_kind
                  (Account_update.of_fee_payer fee_payer) )
         in
         Signature_lib.Schnorr.Chunked.sign ~signature_kind sender.private_key

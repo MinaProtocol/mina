@@ -44,6 +44,7 @@ module Checked = struct
       , (Account_update.t, Zkapp_command.Digest.Account_update.t) With_hash.t
       )
       Typ.t =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     let (Typ typ) =
       Typ.(
         Account_update.Body.typ () * Prover_value.typ ()
@@ -75,7 +76,7 @@ module Checked = struct
                 Field.Assert.equal
                   (hash :> Field.t)
                   ( Zkapp_command.Call_forest.Digest.Account_update.Checked
-                    .create account_update
+                    .create ~chain account_update
                     :> Field.t ) ) )
       }
 
@@ -102,6 +103,7 @@ module Checked = struct
   let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
   let pop_exn ({ hash = h; data = r } : t) : (account_update * t) * t =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     with_label "Zkapp_call_forest.pop_exn" (fun () ->
         let hd_r =
           V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
@@ -116,7 +118,8 @@ module Checked = struct
         in
         let account_update =
           With_hash.of_data account_update
-            ~hash_data:Zkapp_command.Digest.Account_update.Checked.create
+            ~hash_data:
+              (Zkapp_command.Digest.Account_update.Checked.create ~chain)
         in
         let subforest : t =
           let subforest = V.create (fun () -> (V.get hd_r).calls) in
@@ -146,6 +149,7 @@ module Checked = struct
 
   let pop ~dummy ~dummy_tree_hash ({ hash = h; data = r } : t) :
       (account_update * t) * t =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     with_label "Zkapp_call_forest.pop" (fun () ->
         let hd_r =
           V.create (fun () ->
@@ -165,7 +169,8 @@ module Checked = struct
         in
         let account_update =
           With_hash.of_data account_update
-            ~hash_data:Zkapp_command.Digest.Account_update.Checked.create
+            ~hash_data:
+              (Zkapp_command.Digest.Account_update.Checked.create ~chain)
         in
         let subforest : t =
           let subforest = V.create (fun () -> (V.get hd_r).calls) in
