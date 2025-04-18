@@ -655,6 +655,7 @@ let%test_module "Account precondition tests" =
           else update )
 
     let%test_unit "delegate precondition on new account" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen = U.gen_snapp_ledger in
       Quickcheck.test ~trials:5 gen ~f:(fun ({ specs; _ }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -702,7 +703,7 @@ let%test_module "Account precondition tests" =
                           add_account_precondition ~at:1 delegate_precondition
                             zkapp_command0.account_updates
                           |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated
+                             .accumulate_hashes_predicated ~chain
                       }
                     in
                     let keymap =
@@ -717,6 +718,7 @@ let%test_module "Account precondition tests" =
                     [ zkapp_command ] ) ) )
 
     let%test_unit "unsatisfied delegate precondition, custom token" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       (* when new account has a custom token, it doesn't get a self-delegation *)
       let constraint_constants = U.constraint_constants in
       let account_creation_fee =
@@ -781,7 +783,7 @@ let%test_module "Account precondition tests" =
                           add_account_precondition ~at:1 delegate_precondition
                             zkapp0.account_updates
                           |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated
+                             .accumulate_hashes_predicated ~chain
                       }
                     in
                     replace_authorizations ~keymap zkapp_dummy_signatures

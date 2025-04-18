@@ -213,7 +213,7 @@ module Checked = struct
           : (account_update * t) * t ) )
 
   (* TODO Consider moving out of mina_base *)
-  let push
+  let push ~chain
       ~account_update:
         { account_update = { hash = account_update_hash; data = account_update }
         ; control = auth
@@ -237,7 +237,7 @@ module Checked = struct
               let account_update : Account_update.t = { body; authorization } in
               let calls = V.get calls in
               let res =
-                Zkapp_command.Call_forest.cons ~calls account_update tl
+                Zkapp_command.Call_forest.cons ~chain ~calls account_update tl
               in
               (* Sanity check; we're re-hashing anyway, might as well make sure it's
                  consistent.

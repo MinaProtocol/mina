@@ -469,8 +469,7 @@ let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
   let tree : _ Tree.t = { account_update; account_update_digest; calls } in
   cons_tree tree xs
 
-let cons ?calls (account_update : Account_update.t) xs =
-  let chain = Mina_signature_kind.t_DEPRECATED in
+let cons ~chain ?calls (account_update : Account_update.t) xs =
   cons_aux
     ~digest_account_update:(Digest.Account_update.create ~chain)
     ?calls account_update xs
@@ -495,16 +494,14 @@ let rec accumulate_hashes ~hash_account_update (xs : _ t) =
       let node_hash = Digest.Tree.create node in
       { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) } :: xs
 
-let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
+let accumulate_hashes' (type a b) ~chain (xs : (Account_update.t, a, b) t) :
     (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
-  let chain = Mina_signature_kind.t_DEPRECATED in
   let hash_account_update (p : Account_update.t) =
     Digest.Account_update.create ~chain p
   in
   accumulate_hashes ~hash_account_update xs
 
-let accumulate_hashes_predicated xs =
-  let chain = Mina_signature_kind.t_DEPRECATED in
+let accumulate_hashes_predicated ~chain xs =
   accumulate_hashes
     ~hash_account_update:(Digest.Account_update.create ~chain)
     xs
@@ -545,11 +542,11 @@ module With_hashes_and_data = struct
 
   let empty = Digest.Forest.empty
 
-  let hash_account_update ((p : Account_update.Stable.Latest.t), _) =
-    let chain = Mina_signature_kind.t_DEPRECATED in
+  let hash_account_update ~chain ((p : Account_update.Stable.Latest.t), _) =
     Digest.Account_update.create ~chain p
 
-  let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
+  let accumulate_hashes ~chain xs : _ t =
+    accumulate_hashes ~hash_account_update:(hash_account_update ~chain) xs
 
   let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list) =
     of_account_updates xs
@@ -558,21 +555,21 @@ module With_hashes_and_data = struct
     |> map ~f:(fun (p, x) -> (Account_update.of_simple p, x))
     |> accumulate_hashes
 
-  let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) : _ t
-      =
+  let of_account_updates ~chain (xs : (Account_update.Graphql_repr.t * 'a) list)
+      : _ t =
     of_account_updates_map
       ~account_update_depth:(fun ((p : Account_update.Graphql_repr.t), _) ->
         p.body.call_depth )
       ~f:(fun (p, x) -> (Account_update.of_graphql_repr p, x))
       xs
-    |> accumulate_hashes
+    |> accumulate_hashes ~chain
 
   let to_account_updates (x : _ t) = to_account_updates x
 
   let to_zkapp_command_with_hashes_list (x : _ t) =
     to_zkapp_command_with_hashes_list x
 
-  let account_updates_hash' xs = of_account_updates xs |> hash
+  let account_updates_hash' ~chain xs = of_account_updates ~chain xs |> hash
 
   let account_updates_hash xs =
     List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash'

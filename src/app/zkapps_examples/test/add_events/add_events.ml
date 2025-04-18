@@ -186,11 +186,13 @@ let%test_module "Add events test" =
     end)
 
     let%test_unit "Initialize" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~chain
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       assert (Option.is_some account) ;
@@ -202,12 +204,14 @@ let%test_module "Add events test" =
           assert (List.is_empty account_update.body.events) )
 
     let%test_unit "Initialize and add events" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~chain
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       assert (Option.is_some account) ;
@@ -219,6 +223,7 @@ let%test_module "Add events test" =
           else assert (List.is_empty account_update.body.events) )
 
     let%test_unit "Initialize and add several events" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
@@ -226,7 +231,8 @@ let%test_module "Add events test" =
         |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~chain
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       assert (Option.is_some account) ;

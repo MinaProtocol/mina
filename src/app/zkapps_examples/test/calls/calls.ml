@@ -297,6 +297,7 @@ let%test_module "Composability test" =
           Ledger.get ledger loc )
 
     let test_recursive num_calls call_kind =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let increments =
         Array.init num_calls ~f:(fun _ -> Snark_params.Tick.Field.random ())
       in
@@ -317,7 +318,8 @@ let%test_module "Composability test" =
              (Update_state_account_update.account_update calls_kind call_kind)
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~chain
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       let (first_state :: zkapp_state) =
