@@ -6,7 +6,7 @@ export MINA_REPO="https://github.com/MinaProtocol/mina.git"
 
 if [ -z "${BUILDKITE_PULL_REQUEST_REPO}" ]; then
     echo "Unable to detect fork without BUILDKITE_PULL_REQUEST_REPO"
-    echo "Looks like CI was ran without ci-build-me! skipping..."
+    echo "Looks like CI was ran without !ci-build-me skipping..."
     export FORK=0
     exit 0
 fi
