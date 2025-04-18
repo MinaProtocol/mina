@@ -1376,6 +1376,7 @@ let%test_module "account timing check" =
           failwithf "Unexpected transaction error: %s" err_str ()
 
     let%test_unit "zkApp command, before cliff time, sufficient balance" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1428,8 +1429,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1446,6 +1447,7 @@ let%test_module "account timing check" =
                 [ txn ] ) )
 
     let%test_unit "zkApp command, before cliff time, min balance violation" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1499,8 +1501,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1525,6 +1527,7 @@ let%test_module "account timing check" =
                 result ) )
 
     let%test_unit "zkApp command, before cliff time, fee payer fails" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1581,8 +1584,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1616,6 +1619,7 @@ let%test_module "account timing check" =
                   then failwithf "Unexpected transaction error: %s" err_str () ) )
 
     let gen_untimed_account_and_create_timed_account ~balance ~min_balance =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Quickcheck.Generator.Let_syntax in
       let untimed =
         let keypair = List.nth_exn keypairs 0 in
@@ -1670,8 +1674,8 @@ let%test_module "account timing check" =
           Token_id.default
       in
       let zkapp_command, _, _, _ =
-        ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-            create_timed_account_spec
+        ( Transaction_snark.For_tests.deploy_snapp ~signature_kind
+            ~constraint_constants create_timed_account_spec
         , timed_account_id
         , create_timed_account_spec.snapp_update
         , zkapp_keypair )
@@ -1746,6 +1750,7 @@ let%test_module "account timing check" =
 
     let%test_unit "zkApp command, just before cliff time, insufficient balance"
         =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1799,8 +1804,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1834,6 +1839,7 @@ let%test_module "account timing check" =
        because the cliff amount makes the whole balance liquid
     *)
     let%test_unit "zkApp command, at cliff time, sufficient balance" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let ledger_init_state =
@@ -1886,8 +1892,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1903,6 +1909,7 @@ let%test_module "account timing check" =
                 [ zkapp_command ] ) )
 
     let%test_unit "zkApp command, while vesting, sufficient balance" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let balance_int = 100_000_000_000_000 in
@@ -1963,8 +1970,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1980,6 +1987,7 @@ let%test_module "account timing check" =
                 [ zkapp_command ] ) )
 
     let%test_unit "zkApp command, while vesting, insufficient balance" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let balance_int = 100_000_000_000_000 in
@@ -2041,8 +2049,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2066,6 +2074,7 @@ let%test_module "account timing check" =
                 result ) )
 
     let%test_unit "zkApp command, after vesting, sufficient balance" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let balance_int = 100_000_000_000_000 in
@@ -2122,8 +2131,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2141,6 +2150,7 @@ let%test_module "account timing check" =
 
     (* same as previous test, amount is incremented by 1 *)
     let%test_unit "zkApp command, after vesting, insufficient balance" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let balance_int = 100_000_000_000_000 in
@@ -2198,8 +2208,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~chain
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2222,6 +2232,7 @@ let%test_module "account timing check" =
 
     let%test_unit "zkApp command, create timed account with wrong authorization"
         =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let ledger_init_state =
         List.map keypairs ~f:(fun keypair ->
             let balance = Currency.Amount.of_mina_int_exn 100_000 in
@@ -2265,7 +2276,7 @@ let%test_module "account timing check" =
           Token_id.default
       in
       let create_timed_account_zkapp_command, _, _, _ =
-        ( Transaction_snark.For_tests.deploy_snapp ~no_auth:true
+        ( Transaction_snark.For_tests.deploy_snapp ~signature_kind ~no_auth:true
             ~constraint_constants create_timed_account_spec
         , timing_account_id
         , create_timed_account_spec.snapp_update
@@ -2300,6 +2311,7 @@ let%test_module "account timing check" =
                 [ create_timed_account_zkapp_command ] ) )
 
     let%test_unit "zkApp command, change untimed account to timed" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Backtrace.elide := false ;
           let ledger_init_state =
@@ -2346,8 +2358,8 @@ let%test_module "account timing check" =
           in
           let open Async.Deferred.Let_syntax in
           let%bind update_timing_zkapp_command =
-            Transaction_snark.For_tests.update_states ~constraint_constants
-              update_timing_spec
+            Transaction_snark.For_tests.update_states ~signature_kind
+              ~constraint_constants update_timing_spec
           in
           let gen =
             Quickcheck.Generator.return
@@ -2371,6 +2383,7 @@ let%test_module "account timing check" =
                 [ update_timing_zkapp_command ] ) )
 
     let%test_unit "zkApp command, invalid update for timed account" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let ledger_init_state =
             List.mapi keypairs ~f:(fun i keypair ->
@@ -2430,8 +2443,8 @@ let%test_module "account timing check" =
           in
           let open Async.Deferred.Let_syntax in
           let%map update_timing_zkapp_command =
-            Transaction_snark.For_tests.update_states ~constraint_constants
-              update_timing_spec
+            Transaction_snark.For_tests.update_states ~signature_kind
+              ~constraint_constants update_timing_spec
           in
           let gen =
             Quickcheck.Generator.return

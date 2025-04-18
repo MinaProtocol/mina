@@ -285,6 +285,7 @@ module type Full = sig
     val deploy_snapp :
          ?no_auth:bool
       -> ?permissions:Permissions.t
+      -> signature_kind:Mina_signature_kind.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
       -> Zkapp_command.t Async.Deferred.t
@@ -355,12 +356,14 @@ module type Full = sig
              With_hash.t
              Async.Deferred.t
       -> ?empty_sender:bool
+      -> signature_kind:Mina_signature_kind.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Update_states_spec.t
       -> Zkapp_command.t Async.Deferred.t
 
     val create_trivial_predicate_snapp :
          ?protocol_state_predicate:Zkapp_precondition.Protocol_state.t
+      -> signature_kind:Mina_signature_kind.t
       -> snapp_kp:Signature_lib.Keypair.t
       -> Mina_transaction_logic.For_tests.Transaction_spec.t
       -> Mina_ledger.Ledger.t
@@ -416,7 +419,8 @@ module type Full = sig
     end
 
     val multiple_transfers :
-         constraint_constants:Genesis_constants.Constraint_constants.t
+         chain:Mina_signature_kind.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Multiple_transfers_spec.t
       -> Zkapp_command.t
 

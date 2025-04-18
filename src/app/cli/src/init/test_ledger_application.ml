@@ -26,6 +26,7 @@ let generate_event =
 let mk_tx ~event_elements ~action_elements
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) keypair
     nonce =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let num_acc_updates = 8 in
   let multispec : Transaction_snark.For_tests.Multiple_transfers_spec.t =
     let fee_payer = None in
@@ -75,7 +76,8 @@ let mk_tx ~event_elements ~action_elements
     ; preconditions
     }
   in
-  Transaction_snark.For_tests.multiple_transfers ~constraint_constants multispec
+  Transaction_snark.For_tests.multiple_transfers ~chain ~constraint_constants
+    multispec
 
 let generate_protocol_state_stub ~consensus_constants ~constraint_constants
     ledger =

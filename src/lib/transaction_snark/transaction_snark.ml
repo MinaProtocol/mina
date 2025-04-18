@@ -2100,7 +2100,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* Horrible hack :( *)
       let witness : Witness.t option ref = ref None
 
-      let rule (type a b c d) ~constraint_constants ~proof_level
+      let rule (type a b c d) ~chain ~constraint_constants ~proof_level
           (t : (a, b, c, d) Basic.t_typed) :
           ( a
           , b
@@ -2113,7 +2113,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           , unit
           , unit )
           Pickles.Inductive_rule.t =
-        let chain = Mina_signature_kind.t_DEPRECATED in
         let open Hlist in
         let open Basic in
         let module M = H4.T (Pickles.Tag) in
@@ -3328,6 +3327,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     Pickles.Tag.t
 
   let system ~proof_level ~constraint_constants =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
@@ -3335,7 +3335,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~name:"transaction-snark"
       ~choices:(fun ~self ->
         let zkapp_command x =
-          Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
+          Base.Zkapp_command_snark.rule ~chain ~constraint_constants
+            ~proof_level x
         in
         [ Base.rule ~constraint_constants
         ; Merge.rule ~proof_level self
@@ -4581,9 +4582,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
-        (spec : Deploy_snapp_spec.t) =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let deploy_snapp ?(no_auth = false) ?permissions ~signature_kind
+        ~constraint_constants (spec : Deploy_snapp_spec.t) =
       let `VK vk, `Prover _trivial_prover = create_trivial_snapp () in
       let%map.Async.Deferred vk = vk in
       (* only allow timing on a single new snapp account
@@ -4866,8 +4866,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
-        ~constraint_constants (spec : Update_states_spec.t) =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+        ~signature_kind ~constraint_constants (spec : Update_states_spec.t) =
       let prover, vk =
         match zkapp_prover_and_vk with
         | Some (prover, vk) ->
@@ -5009,9 +5008,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let multiple_transfers ~constraint_constants
+    let multiple_transfers ~chain ~constraint_constants
         (spec : Multiple_transfers_spec.t) =
-      let chain = Mina_signature_kind.t_DEPRECATED in
       let ( `Zkapp_command zkapp_command
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
@@ -5056,8 +5054,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let create_trivial_predicate_snapp
         ?(protocol_state_predicate = Zkapp_precondition.Protocol_state.accept)
-        ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+        ~signature_kind ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
       let { Mina_transaction_logic.For_tests.Transaction_spec.fee
           ; sender = sender, sender_nonce
           ; receiver = _

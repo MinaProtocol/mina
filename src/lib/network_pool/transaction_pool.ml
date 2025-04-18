@@ -2015,6 +2015,7 @@ let%test_module _ =
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
@@ -2069,8 +2070,8 @@ let%test_module _ =
         }
       in
       let zkapp_command =
-        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-          test_spec
+        Transaction_snark.For_tests.multiple_transfers ~chain
+          ~constraint_constants test_spec
       in
       let zkapp_command =
         Or_error.ok_exn

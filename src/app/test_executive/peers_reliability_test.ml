@@ -34,6 +34,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     }
 
   let run network t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -139,7 +140,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              }
            in
            Malleable_error.lift
-           @@ Transaction_snark.For_tests.deploy_snapp
+           @@ Transaction_snark.For_tests.deploy_snapp ~signature_kind
                 ~constraint_constants:(Network.constraint_constants network)
                 parties_spec
          in

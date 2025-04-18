@@ -178,6 +178,7 @@ let%test_module "Zkapp payments tests" =
                   U.check_zkapp_command_with_merges_exn ledger zkapp_commands ) ) )
 
     let%test_unit "multiple transfers from one account" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -223,7 +224,7 @@ let%test_module "Zkapp payments tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.multiple_transfers
+                    Transaction_snark.For_tests.multiple_transfers ~chain
                       ~constraint_constants test_spec
                   in
                   Init_ledger.init
@@ -232,6 +233,7 @@ let%test_module "Zkapp payments tests" =
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
     let%test_unit "zkapps payments failed due to insufficient funds" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:5 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -290,7 +292,7 @@ let%test_module "Zkapp payments tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.multiple_transfers
+                    Transaction_snark.For_tests.multiple_transfers ~chain
                       ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn

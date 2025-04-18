@@ -6,6 +6,7 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
     ~init_balance ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
     ~constraint_constants ~logger ~memo_prefix ~wait_span ~stop_signal
     ~stop_time ~uuid keypairs =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   O1trace.thread "itn_deploy_zkapps"
   @@ fun () ->
   let fee_payer_accounts =
@@ -53,7 +54,8 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
           }
         in
         let zkapp_command =
-          Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+          Transaction_snark.For_tests.deploy_snapp ~signature_kind
+            ~constraint_constants
             ~permissions:
               ( if max_cost then
                 { Permissions.user_default with

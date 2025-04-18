@@ -4410,6 +4410,7 @@ let%test_module "staged ledger tests" =
       (test_spec, kp, global_slot)
 
     let%test_unit "When creating diff, invalid commands would be skipped" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind spec_keypair_and_slot = gen_spec_keypair_and_global_slot in
@@ -4484,7 +4485,7 @@ let%test_module "staged ledger tests" =
               }
             in
             let%map zkapp_command =
-              Transaction_snark.For_tests.update_states
+              Transaction_snark.For_tests.update_states ~signature_kind
                 ~zkapp_prover_and_vk:(zkapp_prover, Async.Deferred.return vk)
                 ~constraint_constants spec
             in
@@ -4924,6 +4925,7 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Transaction_snark.For_tests in
       Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs = _ }, new_kp, global_slot) ->
@@ -4987,7 +4989,7 @@ let%test_module "staged ledger tests" =
                     let zkapp_prover_and_vk =
                       (zkapp_prover, Async.Deferred.return vk)
                     in
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =

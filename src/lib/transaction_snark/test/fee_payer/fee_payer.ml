@@ -141,6 +141,7 @@ let%test_module "Fee payer tests" =
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "snapp transaction with non-existent fee payer account" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1
         Quickcheck.Generator.(tuple2 U.gen_snapp_ledger small_positive_int)
@@ -165,8 +166,8 @@ let%test_module "Fee payer tests" =
               in
               let zkapp_command =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants )
+                    Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                      test_spec ~constraint_constants )
               in
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view U.genesis_state_body
@@ -208,6 +209,7 @@ let%test_module "Fee payer tests" =
 
     let test_empty_update ?(new_account = true) test_spec init_ledger
         (zkapp_kp : Keypair.t) =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       let get_account ledger id =
         let location =
@@ -229,8 +231,8 @@ let%test_module "Fee payer tests" =
               in
               let%bind zkapp_command =
                 let zkapp_prover_and_vk = (zkapp_prover, vk) in
-                Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
-                  ~constraint_constants test_spec
+                Transaction_snark.For_tests.update_states ~signature_kind
+                  ~zkapp_prover_and_vk ~constraint_constants test_spec
               in
               ( if new_account then
                 ignore
@@ -287,6 +289,7 @@ let%test_module "Fee payer tests" =
             (fst spec.sender) )
 
     let%test_unit "No account updates, only fee payer in a zkapp transaction" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
           let fee = Fee.of_nanomina_int_exn 1_000_000 in
@@ -316,7 +319,7 @@ let%test_module "Fee payer tests" =
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
                     let zkapp_prover_and_vk = (zkapp_prover, vk) in
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   assert (

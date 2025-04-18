@@ -59,6 +59,7 @@ let%test_module "Valid_while precondition tests" =
       }
 
     let%test_unit "exact valid_while precondition" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -74,7 +75,7 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -82,6 +83,7 @@ let%test_module "Valid_while precondition tests" =
                     [ zkapp_command ] ) ) )
 
     let%test_unit "invalid valid_while precondition" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -97,7 +99,7 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -512,6 +514,7 @@ let%test_module "Account precondition tests" =
       predicate_account
 
     let%test_unit "exact account predicate" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -557,13 +560,14 @@ let%test_module "Account precondition tests" =
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
     let%test_unit "generated account precondition" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ((_, new_kp) as l) = U.gen_snapp_ledger in
@@ -619,7 +623,7 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
@@ -689,7 +693,8 @@ let%test_module "Account precondition tests" =
                   in
                   let%bind zkapp_command0 =
                     Transaction_snark.For_tests.update_states
-                      ~zkapp_prover_and_vk ~constraint_constants test_spec
+                      ~signature_kind:chain ~zkapp_prover_and_vk
+                      ~constraint_constants test_spec
                   in
                   (* add delegate precondition for new account *)
                   let%bind zkapp_command =
@@ -797,6 +802,7 @@ let%test_module "Account precondition tests" =
                     [ mint_token_zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in other zkapp_command" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let state_body = U.genesis_state_body in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -845,7 +851,7 @@ let%test_module "Account precondition tests" =
                   in
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
