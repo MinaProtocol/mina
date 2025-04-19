@@ -213,7 +213,7 @@ main() {
       fi
       echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
       [[ "$PARENT" != "null" ]] && echo "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap $SINGLE_RUN
-      echo "[RESOLUTION] The bootstrap process finished successfuly, the Archive node is synced with no missing blocks to genesis!"
+      echo "[RESOLUTION] The bootstrap process finished successfully, the Archive node is synced with no missing blocks to genesis!"
       exit 0
       ;; 
 
