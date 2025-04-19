@@ -587,6 +587,7 @@ module Account_update_body_components = struct
        , 'token_id
        , 'amount
        , 'events
+       , 'actions
        , 'call_data
        , 'int
        , 'bool
@@ -602,7 +603,7 @@ module Account_update_body_components = struct
     ; balance_change : 'amount
     ; increment_nonce : 'bool
     ; events : 'events
-    ; actions : 'events
+    ; actions : 'actions
     ; call_data : 'call_data
     ; call_depth : 'int
     ; protocol_state_precondition : 'protocol_state_precondition
@@ -676,7 +677,7 @@ let gen_account_update_body_components (type a b c d) ?global_slot
        first_use_of_account:bool -> Account.t -> d Quickcheck.Generator.t )
     ~(f_account_update_account_precondition :
        d -> Account_update.Account_precondition.t ) ~authorization_tag () :
-    (_, _, _, a, _, _, _, b, _, d, _, _, _) Account_update_body_components.t
+    (_, _, _, a, _, _, _, _, b, _, d, _, _, _) Account_update_body_components.t
     Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   (* fee payers have to be in the ledger *)
