@@ -35,6 +35,7 @@
   transaction_witness
   perf_histograms
   snark_work_lib
+  work_partitioner
   currency
   mina_base
   mina_transaction
