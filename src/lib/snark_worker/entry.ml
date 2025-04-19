@@ -131,15 +131,25 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
+(* WARN: This is largely identical to Init.Mina_run.log_snark_work_metrics, we should refactor this out *)
 let emit_proof_metrics metrics instances logger =
   One_or_two.iter (One_or_two.zip_exn metrics instances)
     ~f:(fun ((time, tag), single) ->
       match tag with
-      | `Sub_zkapp_command _ ->
-          let rec hole () = hole () in
-          (* TODO: emit proof metrics for zkapp command *)
-          hole ()
+      | `Sub_zkapp_command `Segment ->
+          (* WARN:
+             I don't know if this is the desired behavior, we need CI engineers to decide
+          *)
+          Perf_histograms.add_span
+            ~name:"snark_worker_sub_zkapp_command_segment_time" total
+      | `Sub_zkapp_command `Merge ->
+          (* WARN:
+             I don't know if this is the desired behavior, we need CI engineers to decide
+          *)
+          Perf_histograms.add_span
+            ~name:"snark_worker_sub_zkapp_command_merge_time" total
       | `Merge ->
+          (* WARN: below is just noop, not sure why it's here *)
           Mina_metrics.(
             Cryptography.Snark_work_histogram.observe
               Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
@@ -150,6 +160,8 @@ let emit_proof_metrics metrics instances logger =
             match Option.value_exn single with
             | Mina_transaction.Transaction.Command
                 (Mina_base.User_command.Zkapp_command zkapp_command) ->
+                (* WARN: now this is dead code, if we're using new
+                   protocol between snark coordinator and workers *)
                 let init =
                   match
                     (Mina_base.Account_update.of_fee_payer

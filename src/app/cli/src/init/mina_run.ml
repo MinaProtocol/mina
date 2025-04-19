@@ -370,16 +370,28 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
+  (* WARN: This is largely identical to Snark_worker.emit_proof_metrics, we should refactor this out *)
   let log_snark_work_metrics (work : Wire_work.Result.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
       (One_or_two.zip_exn work.metrics (Wire_work.Result.transactions work))
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with
-        | `Sub_zkapp_command _ ->
-            failwith "TODO: log snark metrics for Zkapp command"
+        | `Sub_zkapp_command `Segment ->
+            (* WARN:
+               I don't know if this is the desired behavior, we need CI engineers to decide
+            *)
+            Perf_histograms.add_span
+              ~name:"snark_worker_sub_zkapp_command_segment_time" total
+        | `Sub_zkapp_command `Merge ->
+            (* WARN:
+               I don't know if this is the desired behavior, we need CI engineers to decide
+            *)
+            Perf_histograms.add_span
+              ~name:"snark_worker_sub_zkapp_command_merge_time" total
         | `Merge ->
             Perf_histograms.add_span ~name:"snark_worker_merge_time" total ;
+            (* WARN: below is just noop, not sure why it's here *)
             Mina_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total))
@@ -388,6 +400,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             match Option.value_exn transaction_opt with
             | Mina_transaction.Transaction.Command
                 (Mina_base.User_command.Zkapp_command parties) ->
+                (* WARN: now this is dead code, if we're using new
+                   protocol between snark coordinator and workers *)
                 let init =
                   match
                     (Mina_base.Account_update.of_fee_payer parties.fee_payer)
