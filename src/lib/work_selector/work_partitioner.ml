@@ -222,8 +222,7 @@ type t =
         (* WARN: we're assuming everything in this queue is sorted in time from old to new.
            So queue head is the oldest task.
         *)
-  ; mutable first_in_pair :
-      (Work_lib.work * Mina_base.Sok_message.Digest.t) option
+  ; mutable first_in_pair : Work_lib.work option
         (* When receving a `Two works from the underlying Work_selector, store one of them here,
            so we could issue them to another worker.
         *)
@@ -287,18 +286,16 @@ let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
 
 let rec issue_from_first_in_pair ~(partitioner : t) () =
   match partitioner.first_in_pair with
-  | Some (work, sok_digest) ->
+  | Some work ->
       partitioner.first_in_pair <- None ;
       Some
-        (convert_single_work_from_selector ~partitioner ~sok_digest
-           ~one_or_two:`First ~work )
+        (convert_single_work_from_selector ~partitioner ~one_or_two:`First ~work)
   | None ->
       None
 
 (* try to issue a single work received from the underlying Work_selector
    `one_or_two` tracks which task is it inside a `One_or_two`*)
-(* TODO: remove sok_digest *)
-and convert_single_work_from_selector ~(partitioner : t) ~sok_digest:_
+and convert_single_work_from_selector ~(partitioner : t)
     ~(one_or_two : [ `First | `Second | `One ]) ~(work : Work_lib.work) :
     Single.Spec.t =
   match work with
@@ -373,19 +370,16 @@ and issue_job_from_partitioner ~(partitioner : t) () : Single.Spec.t option =
     ]
 
 (* WARN: this should only be called if partitioner.first_in_pair is None *)
-let consume_job_from_selector ~fee ~prover ~(partitioner : t)
+let consume_job_from_selector ~(partitioner : t)
     ~(work : Work_lib.work One_or_two.t) () : Single.Spec.t =
-  let message = Mina_base.Sok_message.create ~fee ~prover in
-  let sok_digest = Mina_base.Sok_message.digest message in
   match work with
   | `One work ->
       convert_single_work_from_selector ~partitioner ~one_or_two:`One ~work
-        ~sok_digest
   | `Two (work_fst, work_snd) ->
       assert (phys_equal None partitioner.first_in_pair) ;
-      partitioner.first_in_pair <- Some (work_fst, sok_digest) ;
+      partitioner.first_in_pair <- Some work_fst ;
       convert_single_work_from_selector ~partitioner ~one_or_two:`Second
-        ~work:work_snd ~sok_digest
+        ~work:work_snd
 
 (* Logics for work submitting *)
 
@@ -424,7 +418,8 @@ let submit_single ~partitioner ~this_single ~uuid
         after_partitioner_recombine_work ~work ;
         None
     | None ->
-        Some this_single )
+        Some this_single ) ;
+  Some ()
 
 let submit_one_in_pair_to_work_partitioner ~partitioner ~(result : Result.t)
     ~after_partitioner_recombine_work () =

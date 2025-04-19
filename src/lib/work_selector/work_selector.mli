@@ -59,5 +59,4 @@ val request_partitioned_work :
   -> snark_pool:snark_pool
   -> selector:State.t
   -> partitioner:Work_partitioner.t
-  -> key:Signature_lib.Public_key.Compressed.t
   -> Snark_work_lib.Work.Wire.Single.Spec.t option

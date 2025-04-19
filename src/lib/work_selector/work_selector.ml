@@ -41,23 +41,20 @@ module Wire_work = Snark_work_lib.Wire
 let request_from_selector_and_consume_by_partitioner
     ~(partitioner : Work_partitioner.t)
     ~(selection_method : (module Selection_method_intf)) ~(selector : State.t)
-    ~(logger : Logger.t) ~(fee : Currency.Fee.t) ~snark_pool ~key () =
+    ~(logger : Logger.t) ~(fee : Currency.Fee.t) ~snark_pool () =
   let (module Work_selection_method) = selection_method in
   let open Core_kernel in
   let open Option.Let_syntax in
   let%map work = Work_selection_method.work ~logger ~fee ~snark_pool selector in
 
-  Work_partitioner.consume_job_from_selector ~fee ~prover:key ~partitioner ~work
-    ()
+  Work_partitioner.consume_job_from_selector ~partitioner ~work ()
 
 let request_partitioned_work
     ~(selection_method : (module Selection_method_intf)) ~(logger : Logger.t)
     ~(fee : Currency.Fee.t) ~(snark_pool : snark_pool) ~(selector : State.t)
-    ~(partitioner : Work_partitioner.t)
-    ~(key : Signature_lib.Public_key.Compressed.t) :
-    Wire_work.Single.Spec.t option =
+    ~(partitioner : Work_partitioner.t) : Wire_work.Single.Spec.t option =
   Work_partitioner.attempt_these
     [ Work_partitioner.issue_job_from_partitioner ~partitioner
     ; request_from_selector_and_consume_by_partitioner ~partitioner
-        ~selection_method ~selector ~logger ~fee ~snark_pool ~key
+        ~selection_method ~selector ~logger ~fee ~snark_pool
     ]

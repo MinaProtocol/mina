@@ -452,7 +452,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               (Mina_lib.snark_coordinator_key mina)
               ~f:Fn.const
           in
-          let%map work = Mina_lib.request_work ~key ~capability mina in
+          let%map work = Mina_lib.request_work ~capability mina in
           let work_wire : Wire_work.Spec.Stable.Latest.t =
             { work with
               instances =

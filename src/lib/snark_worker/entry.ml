@@ -141,13 +141,13 @@ let emit_proof_metrics metrics instances logger =
              I don't know if this is the desired behavior, we need CI engineers to decide
           *)
           Perf_histograms.add_span
-            ~name:"snark_worker_sub_zkapp_command_segment_time" total
+            ~name:"snark_worker_sub_zkapp_command_segment_time" time
       | `Sub_zkapp_command `Merge ->
           (* WARN:
              I don't know if this is the desired behavior, we need CI engineers to decide
           *)
           Perf_histograms.add_span
-            ~name:"snark_worker_sub_zkapp_command_merge_time" total
+            ~name:"snark_worker_sub_zkapp_command_merge_time" time
       | `Merge ->
           (* WARN: below is just noop, not sure why it's here *)
           Mina_metrics.(
