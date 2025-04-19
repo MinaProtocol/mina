@@ -231,6 +231,7 @@
 (package (name webkit_trace_event))
 (package (name with_hash))
 (package (name work_selector))
+(package (name work_partitioner))
 (package (name zkapp_command_builder))
 (package (name zkapps_examples))
 (package (name zkapp_limits))
