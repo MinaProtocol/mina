@@ -1,13 +1,9 @@
-(* TODO: remove type generalizations #2594 *)
-
 open Core_kernel
 
 module Single = struct
   module Spec = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('witness, 'ledger_proof) t =
           | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -61,8 +57,6 @@ end
 module Spec = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
