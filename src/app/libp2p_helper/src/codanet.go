@@ -643,9 +643,21 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 		logger.Error("failed to write to stream", err)
 		return
 	} else if n != len(h.NodeStatus) {
-		// TODO repeat writing, not log error
-		logger.Error("failed to write all data to stream")
-		return
+		// Keep writing the remaining data
+		remaining := h.NodeStatus[n:]
+		for len(remaining) > 0 {
+			written, err := s.Write(remaining)
+			if err != nil {
+				logger.Error("failed to write remaining data to stream", err)
+				return
+			}
+			if written == 0 {
+				// No progress made
+				logger.Error("unable to make progress writing to stream")
+				return
+			}
+			remaining = remaining[written:]
+		}
 	}
 
 	logger.Debugf("wrote node status to stream %s", s.Protocol())
