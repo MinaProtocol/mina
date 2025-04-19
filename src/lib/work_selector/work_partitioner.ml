@@ -88,6 +88,11 @@ module Single_work_with_data = struct
     }
 end
 
+(* NOTE: this module is where the real optimization happen. One assumption we
+   have is the order of merging is irrelvant to the correctness of the final
+   proof. Hence we're only using a counter `merge_remaining` to track have we
+   reach the final proof
+*)
 module Pending_Zkapp_command = struct
   type t =
     { spec : Work_lib.work (* the original work being splitted *)
@@ -399,28 +404,27 @@ let submit_directly_to_work_selector ~(result : Result.t)
 let submit_single ~partitioner ~this_single ~uuid
     ~after_partitioner_recombine_work =
   let Single_work_with_data.{ which_half; _ } = this_single in
-  match Hashtbl.find_and_remove partitioner.pairing_pool uuid with
-  | Some other_single ->
-      let work =
-        match which_half with
-        | `First ->
-            Single_work_with_data.merge_to_one_result_exn this_single
-              other_single
-        | `Second ->
-            Single_work_with_data.merge_to_one_result_exn other_single
-              this_single
-      in
+  Hashtbl.change partitioner.pairing_pool uuid ~f:(function
+    | Some other_single ->
+        let work =
+          match which_half with
+          | `First ->
+              Single_work_with_data.merge_to_one_result_exn this_single
+                other_single
+          | `Second ->
+              Single_work_with_data.merge_to_one_result_exn other_single
+                this_single
+        in
 
-      let (Pairing_UUID uuid) = uuid in
-      UUID_generator.recycle_uuid partitioner.uuid_generator uuid ;
+        (* For the same reason with another commented recycling, we can't.
 
-      after_partitioner_recombine_work ~work ;
-      Some ()
-  | None ->
-      assert (
-        phys_equal `Ok
-          (Hashtbl.add ~key:uuid ~data:this_single partitioner.pairing_pool) ) ;
-      Some ()
+           let (Pairing_UUID uuid) = uuid in
+           UUID_generator.recycle_uuid partitioner.uuid_generator uuid ;
+        *)
+        after_partitioner_recombine_work ~work ;
+        None
+    | None ->
+        Some this_single )
 
 let submit_one_in_pair_to_work_partitioner ~partitioner ~(result : Result.t)
     ~after_partitioner_recombine_work () =
@@ -465,62 +469,74 @@ let submit_into_pending_zkapp_command ~partitioner ~(result : Result.t)
     ; metrics = `One (elapsed, `Sub_zkapp_command _)
     ; prover
     } -> (
-      (* remove UUID from jobs_sent_by_partitioner pool *)
-      assert (
-        Sent_job_pool.slash partitioner.jobs_sent_by_partitioner job_uuid
-        |> Option.is_some ) ;
-      let (Job_UUID to_recycle) = job_uuid in
-      UUID_generator.recycle_uuid partitioner.uuid_generator to_recycle ;
       match
-        Zkapp_command_job_pool.find partitioner.zkapp_command_jobs pairing_id
+        Sent_job_pool.slash partitioner.jobs_sent_by_partitioner job_uuid
       with
-      | None ->
-          Printf.printf
-            "Worker submit a work that's already slashed from pending zkapp \
-             command pool, ignoring " ;
-          Some ()
-      | Some pending ->
-          Pending_Zkapp_command.submit_proof pending proof elapsed ;
-          if 0 = pending.merge_remaining then
-            let final_proof =
-              Deque.dequeue_front_exn pending.pending_mergable_proofs
-            in
-            let Pairing.{ one_or_two; pair_uuid } = pairing_id in
-            let uuid =
-              Option.value_exn pair_uuid
-                ~message:
-                  "When putting pending zkapp command into pool, we didn't \
-                   assign an uuid"
-            in
-            let metric = (pending.elapsed, `Transition) in
+      | Some _ -> (
+          (* NOTE: Only submit the proof is never seen before. *)
+          (* NOTE:
+             We can't recycle the UUID, however, imagine a really old job that's
+             already completed by some worker A, and acknowledged by the
+             coordinator. Now a really slow worker B try to that with an already
+             recycled UUID, which happens to be issued for another pending work
+             job the same UUID. Now our logic will misuse the proof.
 
-            match one_or_two with
-            | `One ->
-                let result : Result.t =
-                  { proofs = `One final_proof
-                  ; metrics = `One metric
-                  ; spec =
-                      { instances = `One pending.spec; fee }
-                      |> Spec.Stable.V1.to_latest
-                  ; prover
-                  }
+             let (Job_UUID to_recycle) = job_uuid in
+             UUID_generator.recycle_uuid partitioner.uuid_generator to_recycle ;
+          *)
+          match
+            Zkapp_command_job_pool.find partitioner.zkapp_command_jobs
+              pairing_id
+          with
+          | None ->
+              Printf.printf
+                "Worker submit a work that's already slashed from pending \
+                 zkapp command pool, ignoring " ;
+              Some ()
+          | Some pending ->
+              Pending_Zkapp_command.submit_proof pending proof elapsed ;
+              if 0 = pending.merge_remaining then
+                let final_proof =
+                  Deque.dequeue_front_exn pending.pending_mergable_proofs
                 in
-                submit_directly_to_work_selector ~result
-                  ~after_partitioner_recombine_work ()
-            | (`First | `Second) as which_half ->
-                let this_single =
-                  Single_work_with_data.
-                    { which_half
-                    ; proof
-                    ; metric
-                    ; spec = pending.spec
-                    ; prover
-                    ; fee
-                    }
+                let Pairing.{ one_or_two; pair_uuid } = pairing_id in
+                let uuid =
+                  Option.value_exn pair_uuid
+                    ~message:
+                      "When putting pending zkapp command into pool, we didn't \
+                       assign an uuid"
                 in
-                submit_single ~partitioner ~this_single ~uuid
-                  ~after_partitioner_recombine_work
-          else Some () )
+                let metric = (pending.elapsed, `Transition) in
+
+                match one_or_two with
+                | `One ->
+                    let result : Result.t =
+                      { proofs = `One final_proof
+                      ; metrics = `One metric
+                      ; spec =
+                          { instances = `One pending.spec; fee }
+                          |> Spec.Stable.V1.to_latest
+                      ; prover
+                      }
+                    in
+                    submit_directly_to_work_selector ~result
+                      ~after_partitioner_recombine_work ()
+                | (`First | `Second) as which_half ->
+                    let this_single =
+                      Single_work_with_data.
+                        { which_half
+                        ; proof
+                        ; metric
+                        ; spec = pending.spec
+                        ; prover
+                        ; fee
+                        }
+                    in
+                    submit_single ~partitioner ~this_single ~uuid
+                      ~after_partitioner_recombine_work
+              else Some () )
+      | None ->
+          None )
   | _ ->
       None
 
