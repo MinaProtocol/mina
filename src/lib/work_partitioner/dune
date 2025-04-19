@@ -12,7 +12,8 @@
    currency)
  (preprocess
   (pps
-   ppx_let))
+   ppx_let
+   ppx_custom_printf))
    
  (instrumentation
   (backend bisect_ppx))

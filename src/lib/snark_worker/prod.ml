@@ -119,40 +119,18 @@ module Inputs = struct
                   process (fun () ->
                       match w.transaction with
                       | Command (Zkapp_command zkapp_command) -> (
+                          (* WARN: we're forced to write proofs to disk to do the conversion here *)
                           let%bind witnesses_specs_stmts =
-                            Or_error.try_with (fun () ->
-                                Transaction_snark.zkapp_command_witnesses_exn
-                                  ~constraint_constants:M.constraint_constants
-                                  ~global_slot:w.block_global_slot
-                                  ~state_body:w.protocol_state_body
-                                  ~fee_excess:Currency.Amount.Signed.zero
-                                  [ ( `Pending_coinbase_init_stack w.init_stack
-                                    , `Pending_coinbase_of_statement
-                                        { Transaction_snark
-                                          .Pending_coinbase_stack_state
-                                          .source =
-                                            input.source.pending_coinbase_stack
-                                        ; target =
-                                            input.target.pending_coinbase_stack
-                                        }
-                                    , `Sparse_ledger w.first_pass_ledger
-                                    , `Sparse_ledger w.second_pass_ledger
-                                    , `Connecting_ledger_hash
-                                        input.connecting_ledger_left
-                                    , Zkapp_command.write_all_proofs_to_disk
-                                        zkapp_command )
-                                  ]
-                                |> List.rev )
-                            |> Result.map_error ~f:(fun e ->
-                                   Error.createf
-                                     !"Failed to generate inputs for \
-                                       zkapp_command : %s: %s"
-                                     ( Zkapp_command.Stable.Latest.to_yojson
-                                         zkapp_command
-                                     |> Yojson.Safe.to_string )
-                                     (Error.to_string_hum e) )
-                            |> Deferred.return
+                            Work_partitioner.Shared.extract_zkapp_segment_works
+                              ~m:(module M)
+                              ~input
+                              ~witness:
+                                (Transaction_witness.write_all_proofs_to_disk w)
+                              ~zkapp_command:
+                                (Zkapp_command.write_all_proofs_to_disk
+                                   zkapp_command )
                           in
+
                           let log_base_snark f ~statement ~spec ~all_inputs =
                             match%map.Deferred
                               Deferred.Or_error.try_with ~here:[%here]
