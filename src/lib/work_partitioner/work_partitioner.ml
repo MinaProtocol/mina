@@ -51,3 +51,10 @@ module Pending_Zkapp_command = struct
     t.merge_remaining <- t.merge_remaining - 1 ;
     t.elapsed <- Time.Span.(t.elapsed + elapsed)
 end
+
+module Zkapp_command_job_pool =
+  Job_pool.Make (Partitioned_work.Pairing) (Pending_Zkapp_command)
+module Sent_job_pool =
+  Job_pool.Make
+    (Partitioned_work.Zkapp_command_job.UUID)
+    (Zkapp_command_job_with_status)
