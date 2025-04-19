@@ -418,8 +418,7 @@ let submit_single ~partitioner ~this_single ~uuid
         after_partitioner_recombine_work ~work ;
         None
     | None ->
-        Some this_single ) ;
-  Some ()
+        Some this_single )
 
 let submit_one_in_pair_to_work_partitioner ~partitioner ~(result : Result.t)
     ~after_partitioner_recombine_work () =
@@ -446,7 +445,8 @@ let submit_one_in_pair_to_work_partitioner ~partitioner ~(result : Result.t)
       in
 
       submit_single ~partitioner ~this_single ~uuid
-        ~after_partitioner_recombine_work
+        ~after_partitioner_recombine_work ;
+      Some ()
   | _ ->
       None
 
@@ -490,7 +490,7 @@ let submit_into_pending_zkapp_command ~partitioner ~(result : Result.t)
               Some ()
           | Some pending ->
               Pending_Zkapp_command.submit_proof pending proof elapsed ;
-              if 0 = pending.merge_remaining then
+              if 0 = pending.merge_remaining then (
                 let final_proof =
                   Deque.dequeue_front_exn pending.pending_mergable_proofs
                 in
@@ -528,7 +528,8 @@ let submit_into_pending_zkapp_command ~partitioner ~(result : Result.t)
                         }
                     in
                     submit_single ~partitioner ~this_single ~uuid
-                      ~after_partitioner_recombine_work
+                      ~after_partitioner_recombine_work ;
+                    Some () )
               else Some () )
       | None ->
           None )
