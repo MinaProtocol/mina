@@ -103,6 +103,33 @@ module Zkapp_command_segment_witness = struct
     ; init_stack
     ; block_global_slot
     }
+
+  let write_all_proofs_to_disk
+      ({ global_first_pass_ledger
+       ; global_second_pass_ledger
+       ; local_state_init
+       ; start_zkapp_command
+       ; state_body
+       ; init_stack
+       ; block_global_slot
+       } :
+        Stable.V1.t ) : t =
+    { global_first_pass_ledger
+    ; global_second_pass_ledger
+    ; local_state_init
+    ; start_zkapp_command =
+        List.map
+          ~f:(fun sd ->
+            Mina_transaction_logic.Zkapp_command_logic.Start_data.
+              { sd with
+                account_updates =
+                  Zkapp_command.write_all_proofs_to_disk sd.account_updates
+              } )
+          start_zkapp_command
+    ; state_body
+    ; init_stack
+    ; block_global_slot
+    }
 end
 
 [%%versioned
