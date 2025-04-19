@@ -948,7 +948,8 @@ let gen_account_update_body_components (type a b c d) ?global_slot
                       .global_slot_since_genesis )
              in
              let action_state, _last_action_slot =
-               Mina_ledger.Ledger.update_action_state zk.action_state actions
+               Mina_ledger.Ledger.update_action_state zk.action_state
+                 (Zkapp_account.Actions.of_event_list actions)
                  ~txn_global_slot ~last_action_slot
              in
              action_state

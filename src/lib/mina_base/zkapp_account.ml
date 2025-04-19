@@ -113,22 +113,26 @@ end)
 module Actions = struct
   type var = Actions_impl.var
 
-  type t = Actions_impl.t [@@deriving sexp, compare]
+  type t = Actions_impl.t * unit
+
+  let is_empty ((lst, _) : t) = List.is_empty lst
 
   let is_empty_var (e : var) =
     Snark_params.Tick.Field.(
       Checked.equal (Data_as_hash.hash e) (Var.constant Actions_impl.empty_hash))
 
-  let empty_state_element =
+  let empty_state_element : Field.t =
     let salt_phrase = "MinaZkappActionStateEmptyElt" in
     Hash_prefix_create.salt salt_phrase |> Random_oracle.digest
 
-  let push_events (acc : Field.t) (events : t) : Field.t =
+  let push_events (acc : Field.t) ((events, _) : t) : Field.t =
     Actions_impl.push_hash acc (Actions_impl.hash events)
 
   let push_events_checked (x : Field.Var.t) (e : var) : Field.Var.t =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_actions
       [| x; Data_as_hash.hash e |]
+
+  let of_event_list lst = (lst, ())
 
   [%%define_locally
   Actions_impl.
