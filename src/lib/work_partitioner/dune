@@ -1,0 +1,12 @@
+(library
+ (name work_partitioner)
+ (public_name work_partitioner)
+ (library_flags -linkall)
+ (libraries core_kernel)
+ (preprocess
+  (pps
+   ppx_let))
+   
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Partition work returned by Work_selector and issue them to real Snark Worker"))
