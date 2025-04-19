@@ -1686,6 +1686,7 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
@@ -1707,7 +1708,7 @@ let internal_commands logger ~itn_features =
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level ~constraint_constants
+                     ~proof_level ~chain ~constraint_constants
                      ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
@@ -1736,7 +1737,7 @@ let internal_commands logger ~itn_features =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
+                Snark_worker.Prod.Inputs.Worker_state.create ~chain ~proof_level
                   ~constraint_constants ()
               in
               let sok_message =
@@ -1776,6 +1777,7 @@ let internal_commands logger ~itn_features =
             ~doc:"limit the number of proofs taken from the file"
         in
         fun () ->
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           let open Async in
           let logger = Logger.create () in
           let constraint_constants =
@@ -1859,7 +1861,7 @@ let internal_commands logger ~itn_features =
 
           let%bind verifier =
             Verifier.For_tests.default ~constraint_constants ~proof_level
-              ~commit_id:Mina_version.commit_id ~logger
+              ~signature_kind ~commit_id:Mina_version.commit_id ~logger
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
@@ -1965,7 +1967,7 @@ let internal_commands logger ~itn_features =
                realistic test.
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
-              ~conf_dir ~proof_level
+              ~conf_dir ~proof_level ~chain
               ~constraint_constants:precomputed_values.constraint_constants ()
           in
           match%bind

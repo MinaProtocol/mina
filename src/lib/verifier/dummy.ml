@@ -4,6 +4,7 @@ open Mina_base
 
 type t =
   { proof_level : Genesis_constants.Proof_level.t
+  ; signature_kind : Mina_signature_kind.t
   ; verify_blockchain_snarks :
          Blockchain_snark.Blockchain.t list
       -> unit Or_error.t Or_error.t Deferred.t
@@ -21,8 +22,8 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
-    ~proof_level ~pids:_ ~conf_dir:_ ~commit_id:_ ~blockchain_verification_key
-    ~transaction_verification_key () =
+    ~proof_level ~signature_kind ~pids:_ ~conf_dir:_ ~commit_id:_
+    ~blockchain_verification_key ~transaction_verification_key () =
   let verify_blockchain_snarks chains =
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
@@ -68,6 +69,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
 
   Deferred.return
     { proof_level
+    ; signature_kind
     ; verify_blockchain_snarks
     ; blockchain_verification_key
     ; transaction_verification_key
@@ -80,7 +82,7 @@ let verify_blockchain_snarks { verify_blockchain_snarks; _ } chains =
 (* N.B.: Valid_assuming is never returned, in fact; we assert a return type
    containing Valid_assuming to match the expected type
 *)
-let verify_commands { proof_level; _ }
+let verify_commands { proof_level; signature_kind; _ }
     (cs : User_command.Verifiable.t With_status.t list) :
     [ `Valid of Mina_base.User_command.Valid.t
     | `Valid_assuming of
@@ -108,10 +110,10 @@ let verify_commands { proof_level; _ }
         | Ok (`Assuming _) ->
             valid cmd
       in
-      let f cmd = convert_check_res cmd (Common.check cmd) in
+      let f cmd = convert_check_res cmd (Common.check ~signature_kind cmd) in
       List.map cs ~f |> Deferred.Or_error.return
   | Full ->
-      let results = List.map cs ~f:Common.check in
+      let results = List.map cs ~f:(Common.check ~signature_kind) in
       let to_verify =
         List.concat_map
           ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])

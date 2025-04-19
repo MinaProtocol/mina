@@ -85,6 +85,7 @@ module Rules = struct
           respond Unhandled
 
     let main input =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
@@ -125,7 +126,8 @@ module Rules = struct
                  .to_account_update_and_calls
             in
             let digest =
-              Zkapp_command.Digest.Account_update.Checked.create final_update
+              Zkapp_command.Digest.Account_update.Checked.create ~chain
+                final_update
             in
             ( { Zkapp_call_forest.Checked.account_update =
                   { data = final_update; hash = digest }
@@ -157,10 +159,12 @@ module Rules = struct
   (** Rule to transfer tokens. *)
   module Transfer = struct
     let dummy_account_update_body =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       lazy
         (let dummy_body = Account_update.Body.dummy in
          { With_hash.data = dummy_body
-         ; hash = Zkapp_command.Digest.Account_update.create_body dummy_body
+         ; hash =
+             Zkapp_command.Digest.Account_update.create_body ~chain dummy_body
          } )
 
     let dummy_tree_hash =
@@ -324,6 +328,7 @@ module Rules = struct
         State.Circuit.t
         * Zkapp_call_forest.Checked.account_update
         * Account_update.May_use_token.Checked.t =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let dummy_account_update_body = Lazy.force dummy_account_update_body in
       let dummy : _ Zkapp_command.Call_forest.Tree.t =
         { account_update =
@@ -338,7 +343,7 @@ module Rules = struct
         Zkapp_command.Digest.Tree.constant (Lazy.force dummy_tree_hash)
       in
       let (account_update, forest), rest_of_forest =
-        Zkapp_call_forest.Checked.pop ~dummy ~dummy_tree_hash forest
+        Zkapp_call_forest.Checked.pop ~chain ~dummy ~dummy_tree_hash forest
       in
       let rest_of_forest_is_empty =
         Zkapp_call_forest.Checked.is_empty rest_of_forest

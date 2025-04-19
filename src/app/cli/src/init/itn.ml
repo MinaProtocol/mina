@@ -9,6 +9,7 @@ open Mina_transaction
 let create_accounts ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) port
     (privkey_path, key_prefix, num_accounts, fee, amount) =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let keys_per_zkapp = 8 in
   let zkapps_per_block = 10 in
   let pk_check_wait = Time.Span.of_sec 10. in
@@ -177,8 +178,8 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
           }
         in
         fee_payer_current_nonce := Account.Nonce.succ !fee_payer_current_nonce ;
-        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-          multispec )
+        Transaction_snark.For_tests.multiple_transfers ~chain
+          ~constraint_constants multispec )
   in
   (* TODO do not compute hashes and remove Zkapp_command.read_all_proofs_from_disk *)
   let zkapps_batches = List.chunks_of zkapps ~length:zkapps_per_block in

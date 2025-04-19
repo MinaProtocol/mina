@@ -121,6 +121,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         |> Malleable_error.ignore_m
 
   let run network t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let chain = Mina_signature_kind.t_DEPRECATED in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let constants : Test_config.constants =
@@ -177,8 +179,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Malleable_error.lift
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+      @@ Transaction_snark.For_tests.deploy_snapp ~signature_kind
+           ~constraint_constants zkapp_command_spec
     in
     let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
       (* construct a Zkapp_command.t, similar to zkapp_test_transaction update-permissions *)
@@ -226,8 +228,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let%map.Deferred zkapp_command =
-        Transaction_snark.For_tests.update_states ~constraint_constants
-          zkapp_command_spec
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants zkapp_command_spec
       in
       (zkapp_command, new_permissions)
     in
@@ -299,17 +301,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let%bind.Deferred zkapp_command_update_all =
-        Transaction_snark.For_tests.update_states ~constraint_constants
-          zkapp_command_spec
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants zkapp_command_spec
       in
       let%bind.Deferred zkapp_command_invalid_nonce =
-        Transaction_snark.For_tests.update_states ~constraint_constants
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants
           { zkapp_command_spec with
             sender = (fish2_kp, Account.Nonce.max_value)
           }
       in
       let%bind.Deferred zkapp_command_insufficient_funds =
-        Transaction_snark.For_tests.update_states ~constraint_constants
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants
           { zkapp_command_spec with fee = Currency.Fee.max_int }
       in
       let%bind.Deferred zkapp_command_insufficient_replace_fee =
@@ -319,8 +323,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             fee = Currency.Fee.of_nanomina_int_exn 5_000_000
           }
         in
-        Transaction_snark.For_tests.update_states ~constraint_constants
-          spec_insufficient_replace_fee
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants spec_insufficient_replace_fee
       in
       let%bind.Deferred zkapp_command_insufficient_fee =
         let spec_insufficient_fee :
@@ -329,8 +333,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             fee = Currency.Fee.of_nanomina_int_exn 1000
           }
         in
-        Transaction_snark.For_tests.update_states ~constraint_constants
-          spec_insufficient_fee
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants spec_insufficient_fee
       in
 
       let%map.Deferred zkapp_command_cross_network_replay =
@@ -406,7 +410,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions = None
         }
       in
-      Transaction_snark.For_tests.update_states ~constraint_constants spec
+      Transaction_snark.For_tests.update_states ~signature_kind
+        ~constraint_constants spec
     in
     let%bind.Deferred ( zkapp_command_mint_token
                       , zkapp_command_mint_token2
@@ -466,10 +471,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     []
                 ]
             ]
-          |> mk_zkapp_command ~memo:"mint token" ~fee:12_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 1)
+          |> mk_zkapp_command ~chain ~memo:"mint token" ~fee:12_000_000
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
         in
-        replace_authorizations ~keymap with_dummy_signatures
+        replace_authorizations ~signature_kind:chain ~keymap
+          with_dummy_signatures
       in
       let%bind.Deferred zkapp_command_mint_token2 =
         let open Zkapp_command_builder in
@@ -489,10 +495,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     ]
                 ]
             ]
-          |> mk_zkapp_command ~memo:"zkapp to mint token2" ~fee:11_500_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 2)
+          |> mk_zkapp_command ~chain ~memo:"zkapp to mint token2"
+               ~fee:11_500_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 2)
         in
-        replace_authorizations ~keymap with_dummy_signatures
+        replace_authorizations ~signature_kind:chain ~keymap
+          with_dummy_signatures
       in
       let%bind.Deferred zkapp_command_token_transfer =
         let open Zkapp_command_builder in
@@ -521,10 +529,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     []
                 ]
             ]
-          |> mk_zkapp_command ~memo:"zkapp for tokens transfer" ~fee:11_000_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+          |> mk_zkapp_command ~chain ~memo:"zkapp for tokens transfer"
+               ~fee:11_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 3)
         in
-        replace_authorizations ~keymap with_dummy_signatures
+        replace_authorizations ~signature_kind:chain ~keymap
+          with_dummy_signatures
       in
       let%map.Deferred zkapp_command_token_transfer2 =
         let open Zkapp_command_builder in
@@ -557,11 +567,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     ]
                 ]
             ]
-          |> mk_zkapp_command ~memo:"zkapp for tokens transfer 2"
+          |> mk_zkapp_command ~chain ~memo:"zkapp for tokens transfer 2"
                ~fee:10_000_000 ~fee_payer_pk
                ~fee_payer_nonce:(Account.Nonce.of_int 4)
         in
-        replace_authorizations ~keymap with_dummy_signatures
+        replace_authorizations ~signature_kind:chain ~keymap
+          with_dummy_signatures
       in
       ( zkapp_command_mint_token
       , zkapp_command_mint_token2

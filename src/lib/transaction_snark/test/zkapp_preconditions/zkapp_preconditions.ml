@@ -59,6 +59,7 @@ let%test_module "Valid_while precondition tests" =
       }
 
     let%test_unit "exact valid_while precondition" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -74,7 +75,7 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -82,6 +83,7 @@ let%test_module "Valid_while precondition tests" =
                     [ zkapp_command ] ) ) )
 
     let%test_unit "invalid valid_while precondition" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -97,7 +99,7 @@ let%test_module "Valid_while precondition tests" =
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -237,6 +239,7 @@ let%test_module "Protocol state precondition tests" =
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "invalid protocol state predicate in other zkapp_command" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
       let gen =
@@ -364,6 +367,7 @@ let%test_module "Protocol state precondition tests" =
                   let memo_hash = Signed_command_memo.hash memo in
                   let fee_payer_hash =
                     Zkapp_command.Digest.Account_update.create
+                      ~chain:signature_kind
                       (Account_update.of_fee_payer fee_payer)
                   in
                   let full_commitment =
@@ -372,14 +376,16 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let fee_payer =
                     let fee_payer_signature_auth =
-                      Signature_lib.Schnorr.Chunked.sign sender.private_key
+                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                        sender.private_key
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
                     { fee_payer with authorization = fee_payer_signature_auth }
                   in
                   let sender_account_update : Account_update.Simple.t =
                     let signature_auth : Signature.t =
-                      Signature_lib.Schnorr.Chunked.sign sender.private_key
+                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                        sender.private_key
                         (Random_oracle.Input.Chunked.field commitment)
                     in
                     { sender_account_update with
@@ -388,7 +394,8 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let snapp_account_update =
                     let signature_auth =
-                      Signature_lib.Schnorr.Chunked.sign new_kp.private_key
+                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                        new_kp.private_key
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
                     { snapp_account_update with
@@ -507,6 +514,7 @@ let%test_module "Account precondition tests" =
       predicate_account
 
     let%test_unit "exact account predicate" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -552,13 +560,14 @@ let%test_module "Account precondition tests" =
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
     let%test_unit "generated account precondition" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ((_, new_kp) as l) = U.gen_snapp_ledger in
@@ -614,7 +623,7 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
@@ -650,6 +659,7 @@ let%test_module "Account precondition tests" =
           else update )
 
     let%test_unit "delegate precondition on new account" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let gen = U.gen_snapp_ledger in
       Quickcheck.test ~trials:5 gen ~f:(fun ({ specs; _ }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -683,7 +693,8 @@ let%test_module "Account precondition tests" =
                   in
                   let%bind zkapp_command0 =
                     Transaction_snark.For_tests.update_states
-                      ~zkapp_prover_and_vk ~constraint_constants test_spec
+                      ~signature_kind:chain ~zkapp_prover_and_vk
+                      ~constraint_constants test_spec
                   in
                   (* add delegate precondition for new account *)
                   let%bind zkapp_command =
@@ -697,7 +708,7 @@ let%test_module "Account precondition tests" =
                           add_account_precondition ~at:1 delegate_precondition
                             zkapp_command0.account_updates
                           |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated
+                             .accumulate_hashes_predicated ~chain
                       }
                     in
                     let keymap =
@@ -706,12 +717,14 @@ let%test_module "Account precondition tests" =
                         ; (zkapp_pk, new_kp.private_key)
                         ]
                     in
-                    Zkapp_command_builder.replace_authorizations ~keymap zkapp
+                    Zkapp_command_builder.replace_authorizations
+                      ~signature_kind:chain ~keymap zkapp
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
 
     let%test_unit "unsatisfied delegate precondition, custom token" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       (* when new account has a custom token, it doesn't get a self-delegation *)
       let constraint_constants = U.constraint_constants in
       let account_creation_fee =
@@ -764,8 +777,8 @@ let%test_module "Account precondition tests" =
                                 []
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_owner_pk
-                           ~fee_payer_nonce:nonce
+                      |> mk_zkapp_command ~chain ~fee:7
+                           ~fee_payer_pk:token_owner_pk ~fee_payer_nonce:nonce
                     in
                     let zkapp_dummy_signatures =
                       let delegate_precondition =
@@ -776,10 +789,11 @@ let%test_module "Account precondition tests" =
                           add_account_precondition ~at:1 delegate_precondition
                             zkapp0.account_updates
                           |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated
+                             .accumulate_hashes_predicated ~chain
                       }
                     in
-                    replace_authorizations ~keymap zkapp_dummy_signatures
+                    replace_authorizations ~signature_kind:chain ~keymap
+                      zkapp_dummy_signatures
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:
@@ -788,6 +802,7 @@ let%test_module "Account precondition tests" =
                     [ mint_token_zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in other zkapp_command" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let state_body = U.genesis_state_body in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -836,7 +851,7 @@ let%test_module "Account precondition tests" =
                   in
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
@@ -856,6 +871,7 @@ let%test_module "Account precondition tests" =
                     ~state_body ledger [ zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in fee payer" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -955,7 +971,7 @@ let%test_module "Account precondition tests" =
               in
               let memo_hash = Signed_command_memo.hash memo in
               let fee_payer_hash =
-                Zkapp_command.Digest.Account_update.create
+                Zkapp_command.Digest.Account_update.create ~chain:signature_kind
                   (Account_update.of_fee_payer fee_payer)
               in
               let full_commitment =
@@ -964,14 +980,16 @@ let%test_module "Account precondition tests" =
               in
               let fee_payer =
                 let fee_payer_signature_auth =
-                  Signature_lib.Schnorr.Chunked.sign sender.private_key
+                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                    sender.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
                 { fee_payer with authorization = fee_payer_signature_auth }
               in
               let sender_account_update =
                 let signature_auth : Signature.t =
-                  Signature_lib.Schnorr.Chunked.sign sender.private_key
+                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                    sender.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
                 { sender_account_update with
@@ -980,7 +998,8 @@ let%test_module "Account precondition tests" =
               in
               let snapp_account_update =
                 let signature_auth =
-                  Signature_lib.Schnorr.Chunked.sign new_kp.private_key
+                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                    new_kp.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
                 { snapp_account_update with

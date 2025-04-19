@@ -2379,9 +2379,10 @@ let%test_module "staged ledger tests" =
     let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let verifier =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+            ~signature_kind () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -2933,6 +2934,7 @@ let%test_module "staged ledger tests" =
     let gen_zkapps ?ledger_init_state ?failure ~num_zkapps zkapps_per_iter :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Quickcheck.Generator.Let_syntax in
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
@@ -2945,7 +2947,8 @@ let%test_module "staged ledger tests" =
           | Zkapp_command zkapp_command_valid, _fee_payer_keypair, keymap ->
               let zkapp_command_with_auths =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    Zkapp_command_builder.replace_authorizations ~keymap
+                    Zkapp_command_builder.replace_authorizations ~signature_kind
+                      ~keymap
                       (Zkapp_command.Valid.forget zkapp_command_valid) )
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
@@ -4408,6 +4411,7 @@ let%test_module "staged ledger tests" =
       (test_spec, kp, global_slot)
 
     let%test_unit "When creating diff, invalid commands would be skipped" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind spec_keypair_and_slot = gen_spec_keypair_and_global_slot in
@@ -4482,7 +4486,7 @@ let%test_module "staged ledger tests" =
               }
             in
             let%map zkapp_command =
-              Transaction_snark.For_tests.update_states
+              Transaction_snark.For_tests.update_states ~signature_kind
                 ~zkapp_prover_and_vk:(zkapp_prover, Async.Deferred.return vk)
                 ~constraint_constants spec
             in
@@ -4769,10 +4773,11 @@ let%test_module "staged ledger tests" =
 
     let mk_basic_zkapp_command ?prover ~keymap ~fee ~fee_payer_pk
         ~fee_payer_nonce nodes =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let open Zkapp_command_builder in
       mk_forest nodes
-      |> mk_zkapp_command ~fee ~fee_payer_pk ~fee_payer_nonce
-      |> replace_authorizations ?prover ~keymap
+      |> mk_zkapp_command ~chain ~fee ~fee_payer_pk ~fee_payer_nonce
+      |> replace_authorizations ~signature_kind:chain ?prover ~keymap
 
     let%test_unit "Setting verification keys across differing accounts" =
       test_staged_ledger_diff_validity ~expectation:`Accept
@@ -4921,6 +4926,7 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Mismatched verification keys in zkApp accounts and \
                    transactions" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Transaction_snark.For_tests in
       Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs = _ }, new_kp, global_slot) ->
@@ -4984,7 +4990,7 @@ let%test_module "staged ledger tests" =
                     let zkapp_prover_and_vk =
                       (zkapp_prover, Async.Deferred.return vk)
                     in
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =
@@ -5083,6 +5089,7 @@ let%test_module "staged ledger tests" =
                       failwith "expecting zkapp_command transaction" ) ) )
 
     let%test_unit "Invalid account_update_hash would be rejected" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Transaction_snark.For_tests in
       Quickcheck.test ~trials:1 gen_spec_keypair_and_global_slot
         ~f:(fun ({ init_ledger; specs }, zkapp_account_keypair, global_slot) ->
@@ -5164,7 +5171,7 @@ let%test_module "staged ledger tests" =
 
                       let%bind verifier_full =
                         Verifier.For_tests.default ~constraint_constants ~logger
-                          ~proof_level:Full ()
+                          ~proof_level:Full ~signature_kind ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

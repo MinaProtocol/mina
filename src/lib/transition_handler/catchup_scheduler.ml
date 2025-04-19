@@ -379,9 +379,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let create = create ~logger ~trust_system ~time_controller
 
     let verifier =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            ~pids () )
+            ~signature_kind ~pids () )
 
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =

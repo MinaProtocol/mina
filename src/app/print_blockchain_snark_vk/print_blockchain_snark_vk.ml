@@ -8,6 +8,8 @@ let () =
           Genesis_constants.Compiled.constraint_constants
 
         let proof_level = Genesis_constants.Proof_level.Full
+
+        let chain = Mina_signature_kind.t_DEPRECATED
       end) in
       let () = Format.eprintf "Generating blockchain snark circuit..@." in
       let before = Time.now () in

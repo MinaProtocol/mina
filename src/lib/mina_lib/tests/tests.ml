@@ -158,9 +158,10 @@ let%test_module "Epoch ledger sync tests" =
     let pids = Child_processes.Termination.create_pid_table ()
 
     let make_verifier (module Context : CONTEXT) =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Context in
       Verifier.For_tests.default ~constraint_constants ~logger
-        ~proof_level:precomputed_values.proof_level ~pids
+        ~proof_level:precomputed_values.proof_level ~signature_kind ~pids
         ~conf_dir:(Some (make_dirname "verifier"))
         ()
 

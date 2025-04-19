@@ -6,19 +6,20 @@ let name = "transaction-snark-profiler"
 let run ~genesis_constants ~constraint_constants ~proof_level
     ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     ?min_num_updates repeats preeval use_zkapps : unit =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let logger = Logger.null () in
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          create_ledger_and_zkapps ~genesis_constants ~constraint_constants
-            ?min_num_updates ~max_num_updates () )
+          create_ledger_and_zkapps ~signature_kind ~genesis_constants
+            ~constraint_constants ?min_num_updates ~max_num_updates () )
     in
     Parallel.init_master () ;
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~commit_id:Mina_version.commit_id ~logger
-            ~proof_level ~constraint_constants () )
+            ~proof_level ~constraint_constants ~signature_kind () )
     in
     let rec go n =
       if n <= 0 then ()
@@ -84,17 +85,20 @@ let main ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
     preeval use_zkapps () =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
         let constraint_constants = constraint_constants
 
         let proof_level = proof_level
+
+        let chain = chain
       end) in
       run ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
           (profile_user_command ~genesis_constants ~constraint_constants
              (module T) )
-        ~zkapp_profiler:(profile_zkapps ~constraint_constants)
+        ~zkapp_profiler:(profile_zkapps ~chain ~constraint_constants)
         num_transactions ~max_num_updates ?min_num_updates repeats preeval
         use_zkapps )
 

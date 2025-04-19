@@ -17,6 +17,7 @@ let%test_module "zkApp deploy tests" =
     let constraint_constants = U.constraint_constants
 
     let%test_unit "create a new zkAapp account/deploy a smart contract" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -40,8 +41,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -49,6 +50,7 @@ let%test_module "zkApp deploy tests" =
                   U.check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) ) )
 
     let%test_unit "deploy multiple ZkApps" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -79,8 +81,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -89,6 +91,7 @@ let%test_module "zkApp deploy tests" =
 
     let%test_unit "change a non-snapp account to zkApp account/deploy a smart \
                    contract" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
@@ -112,8 +115,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -122,6 +125,7 @@ let%test_module "zkApp deploy tests" =
 
     let%test_unit "change a non-zkApp account to zkApp account/deploy a smart \
                    contract- different fee payer" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, _new_kp) ->
@@ -146,8 +150,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -156,6 +160,7 @@ let%test_module "zkApp deploy tests" =
 
     let%test_unit "Fails to deploy if the account is not present and amount is \
                    insufficient" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
         ~f:(fun ({ init_ledger; specs }, new_kp) ->
@@ -180,8 +185,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)

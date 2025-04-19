@@ -6,6 +6,7 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
     ~init_balance ~(fee_payer_array : Signature_lib.Keypair.t Array.t)
     ~constraint_constants ~logger ~memo_prefix ~wait_span ~stop_signal
     ~stop_time ~uuid keypairs =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   O1trace.thread "itn_deploy_zkapps"
   @@ fun () ->
   let fee_payer_accounts =
@@ -53,7 +54,8 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
           }
         in
         let zkapp_command =
-          Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+          Transaction_snark.For_tests.deploy_snapp ~signature_kind
+            ~constraint_constants
             ~permissions:
               ( if max_cost then
                 { Permissions.user_default with
@@ -162,6 +164,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
     ~fee_payer_array ~tm_end ~scheduler_tbl ~uuid ~keymap ~unused_pks
     ~stop_signal ~mina ~zkapp_command_details ~wait_span ~logger
     ~account_state_tbl init_tm_next init_counter =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
   let repeat tm_next counter =
     let%map () = Async_unix.at tm_next in
@@ -281,8 +284,8 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
         let%bind zkapp_command =
           O1trace.thread "itn_replace_zkapp_auth"
           @@ fun () ->
-          Zkapp_command_builder.replace_authorizations ~prover ~keymap
-            zkapp_dummy
+          Zkapp_command_builder.replace_authorizations ~signature_kind ~prover
+            ~keymap zkapp_dummy
         in
         let%bind () =
           O1trace.thread "itn_send_zkapp"

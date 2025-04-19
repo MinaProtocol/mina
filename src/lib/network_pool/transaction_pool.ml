@@ -1682,9 +1682,10 @@ let%test_module _ =
     let time_controller = Block_time.Controller.basic ~logger
 
     let verifier =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+            ~signature_kind () )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ()
@@ -1835,6 +1836,7 @@ let%test_module _ =
 
     let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
         User_command.Valid.t list Deferred.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Deferred.Let_syntax in
       let%map zkapp_commands_fixed =
         Deferred.List.map
@@ -1842,7 +1844,8 @@ let%test_module _ =
           ~f:(function
             | Zkapp_command zkapp_command_dummy_auths ->
                 let%map cmd =
-                  Zkapp_command_builder.replace_authorizations ~keymap ~prover
+                  Zkapp_command_builder.replace_authorizations ~signature_kind
+                    ~keymap ~prover
                     (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
                 in
                 User_command.Zkapp_command cmd
@@ -2013,6 +2016,7 @@ let%test_module _ =
 
     let mk_transfer_zkapp_command ?valid_period ?fee_payer_idx ~sender_idx
         ~receiver_idx ~fee ~nonce ~amount () =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let sender_kp = test_keys.(sender_idx) in
       let sender_nonce = Account.Nonce.of_int nonce in
       let sender = (sender_kp, sender_nonce) in
@@ -2067,8 +2071,8 @@ let%test_module _ =
         }
       in
       let zkapp_command =
-        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-          test_spec
+        Transaction_snark.For_tests.multiple_transfers ~chain
+          ~constraint_constants test_spec
       in
       let zkapp_command =
         Or_error.ok_exn
@@ -2915,6 +2919,7 @@ let%test_module _ =
 
     let mk_basic_zkapp ?(fee = 10_000_000_000) ?(empty_update = false)
         ?preconditions ?permissions nonce fee_payer_kp =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let open Zkapp_command_builder in
       let preconditions =
         Option.value preconditions
@@ -2946,7 +2951,7 @@ let%test_module _ =
             ]
       in
       account_updates
-      |> mk_zkapp_command ~memo:"" ~fee
+      |> mk_zkapp_command ~chain ~memo:"" ~fee
            ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
            ~fee_payer_nonce:(Account.Nonce.of_int nonce)
 
@@ -3099,10 +3104,11 @@ let%test_module _ =
 
     let%test "account update with a different network id that uses proof \
               authorization would be rejected" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier_full =
             Verifier.For_tests.default ~constraint_constants ~logger
-              ~proof_level:Full ()
+              ~proof_level:Full ~signature_kind ()
           in
           let%bind test =
             setup_test ~verifier:verifier_full

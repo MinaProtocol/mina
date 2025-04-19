@@ -429,6 +429,7 @@ let apply_initial_ledger_state : t -> init_state -> unit =
       create_new_account_exn t account_id account' )
 
 let%test_unit "tokens test" =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let open Mina_transaction_logic.For_tests in
   let open Zkapp_command_builder in
   let constraint_constants =
@@ -460,7 +461,7 @@ let%test_unit "tokens test" =
         |> Or_error.ok_exn
       in
       let zkapp_command =
-        mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
+        mk_zkapp_command ~chain ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
           account_updates
       in
       match

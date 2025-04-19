@@ -114,7 +114,7 @@ module Transaction_key = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let of_zkapp_command
+  let of_zkapp_command ~chain
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~ledger
       (p : Zkapp_command.t) =
     let second_pass_ledger =
@@ -134,7 +134,7 @@ module Transaction_key = struct
       |> Or_error.ok_exn
     in
     let segments =
-      Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
+      Transaction_snark.zkapp_command_witnesses_exn ~chain ~constraint_constants
         ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero
@@ -185,7 +185,7 @@ end
 let transaction_combinations = Transaction_key.Table.create ()
 
 let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
-    ~(genesis_constants : Genesis_constants.t)
+    ~signature_kind ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~max_num_updates () :
     (Mina_ledger.Ledger.t * Zkapp_command.t list) Async.Deferred.t =
@@ -355,8 +355,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
         test_spec nonce ~num_proof_updates ~num_updates
       in
       let%bind.Async.Deferred parties =
-        Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
-          ~constraint_constants ~empty_sender spec
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~zkapp_prover_and_vk ~constraint_constants ~empty_sender spec
           ~receiver_auth:Control.Tag.Signature
       in
       let simple_parties = Zkapp_command.to_simple parties in
@@ -395,8 +395,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
                  Zkapp_command.of_simple { simple_parties with account_updates }
                in
                let combination =
-                 Transaction_key.of_zkapp_command ~constraint_constants ~ledger
-                   p
+                 Transaction_key.of_zkapp_command ~chain:signature_kind
+                   ~constraint_constants ~ledger p
                in
                let perm_string =
                  List.fold ~init:"S" account_updates
@@ -421,8 +421,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
                    i perm_string ;
                  (*Update the authorizations*)
                  let%map.Async.Deferred p =
-                   Zkapp_command_builder.replace_authorizations ~prover ~keymap
-                     p
+                   Zkapp_command_builder.replace_authorizations ~signature_kind
+                     ~prover ~keymap p
                  in
                  Transaction_key.Table.add_exn transaction_combinations
                    ~key:combination
@@ -650,7 +650,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
   let%map total_time = merge_all base_proof_time (List.rev base_proofs_rev) in
   format_time_span total_time
 
-let profile_zkapps
+let profile_zkapps ~chain
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~verifier
     ledger zkapp_commands =
   let open Async.Deferred.Let_syntax in
@@ -720,7 +720,7 @@ let profile_zkapps
           { Time_values.verification_time; proving_time = zkapp_span }
         in
         let combination =
-          Transaction_key.of_zkapp_command ~ledger zkapp_command
+          Transaction_key.of_zkapp_command ~chain ~ledger zkapp_command
         in
         Transaction_key.Table.change transaction_combinations
           (combination ~constraint_constants) ~f:(fun data_opt ->

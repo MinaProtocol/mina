@@ -240,7 +240,7 @@ module type S = sig
 
       val is_empty : t -> bool
 
-      val pop_exn : t -> Elt.t * t
+      val pop_exn : chain:Mina_signature_kind.t -> t -> Elt.t * t
 
       val pop : t -> (Elt.t * t) option
 
@@ -955,9 +955,10 @@ module Make (L : Ledger_intf.S) :
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
       let full_commitment ~account_update ~memo_hash ~commitment =
+        let chain = Mina_signature_kind.t_DEPRECATED in
         (* when called from Zkapp_command_logic.apply, the account_update is the fee payer *)
         let fee_payer_hash =
-          Zkapp_command.Digest.Account_update.create account_update
+          Zkapp_command.Digest.Account_update.create ~chain account_update
         in
         Zkapp_command.Transaction_commitment.create_complete commitment
           ~memo_hash ~fee_payer_hash
@@ -1469,7 +1470,7 @@ module Make (L : Ledger_intf.S) :
 
       let is_empty = List.is_empty
 
-      let pop_exn : t -> Elt.t * t = function
+      let pop_exn ~chain:_ : t -> Elt.t * t = function
         | [] ->
             failwith "pop_exn"
         | x :: xs ->
@@ -1617,6 +1618,7 @@ module Make (L : Ledger_intf.S) :
       ( Transaction_partially_applied.Zkapp_command_partially_applied.t
       * user_acc )
       Or_error.t =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     let open Or_error.Let_syntax in
     let previous_hash = merkle_root ledger in
     let original_first_pass_account_states =
@@ -1663,7 +1665,7 @@ module Make (L : Ledger_intf.S) :
     let account_updates = Zkapp_command.all_account_updates command in
     let%map global_state, local_state =
       Or_error.try_with (fun () ->
-          M.start ~constraint_constants
+          M.start ~chain ~constraint_constants
             { account_updates
             ; memo_hash = Signed_command_memo.hash command.memo
             ; will_succeed =
@@ -1705,6 +1707,7 @@ module Make (L : Ledger_intf.S) :
       ledger
       (c : Transaction_partially_applied.Zkapp_command_partially_applied.t) :
       (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
+    let chain = Mina_signature_kind.t_DEPRECATED in
     let open Or_error.Let_syntax in
     let perform eff =
       Env.perform ~constraint_constants:c.constraint_constants eff
@@ -1739,8 +1742,8 @@ module Make (L : Ledger_intf.S) :
       else
         let%bind states =
           Or_error.try_with (fun () ->
-              M.step ~constraint_constants:c.constraint_constants { perform }
-                (g_state, l_state) )
+              M.step ~chain ~constraint_constants:c.constraint_constants
+                { perform } (g_state, l_state) )
         in
         step_all (f user_acc states) states
     in
@@ -2424,6 +2427,7 @@ module For_tests = struct
       ?(double_sender_nonce = true)
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let sender_pk = Public_key.compress sender.public_key in
     let actual_nonce =
       (* Here, we double the spec'd nonce, because we bump the nonce a second
@@ -2513,12 +2517,12 @@ module For_tests = struct
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
         ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create
+          (Zkapp_command.Digest.Account_update.create ~chain:signature_kind
              (Account_update.of_fee_payer zkapp_command.fee_payer) )
     in
     let account_updates_signature =
       let c = if use_full_commitment then full_commitment else commitment in
-      Schnorr.Chunked.sign sender.private_key
+      Schnorr.Chunked.sign ~signature_kind sender.private_key
         (Random_oracle.Input.Chunked.field c)
     in
     let account_updates =
@@ -2533,7 +2537,7 @@ module For_tests = struct
               account_update )
     in
     let signature =
-      Schnorr.Chunked.sign sender.private_key
+      Schnorr.Chunked.sign ~signature_kind sender.private_key
         (Random_oracle.Input.Chunked.field full_commitment)
     in
     { zkapp_command with

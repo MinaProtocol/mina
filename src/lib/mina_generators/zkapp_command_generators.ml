@@ -1134,6 +1134,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ?account_state_tbl ~ledger ?protocol_state_view ?vk ?available_public_keys
     ~genesis_constants
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) () =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -1538,7 +1539,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         Zkapp_command.Call_forest.map
           ~f:(Fn.compose map_account_update Account_update.of_simple)
           account_updates
-        |> Zkapp_command.Call_forest.accumulate_hashes_predicated
+        |> Zkapp_command.Call_forest.accumulate_hashes_predicated ~chain
     ; memo
     }
   in

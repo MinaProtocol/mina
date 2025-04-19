@@ -58,6 +58,7 @@ let perform (s : Prod.Worker_state.t) ~fee ~public_key
          } )
 
 let command =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let open Command.Let_syntax in
   Command.async ~summary:"Run snark worker directly"
     (let%map_open spec_json =
@@ -110,7 +111,7 @@ let command =
          Genesis_constants.Compiled.constraint_constants
        in
        let%bind worker_state =
-         Prod.Worker_state.create ~constraint_constants ~proof_level ()
+         Prod.Worker_state.create ~chain ~constraint_constants ~proof_level ()
        in
        let%bind spec =
          let spec_of_json json =

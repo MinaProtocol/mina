@@ -97,6 +97,7 @@ let%test_module "Add events test" =
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash =
@@ -119,6 +120,7 @@ let%test_module "Add events test" =
           transaction_commitment ~memo_hash
           ~fee_payer_hash:
             (Zkapp_command.Call_forest.Digest.Account_update.create
+               ~chain:signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
@@ -129,7 +131,7 @@ let%test_module "Add events test" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -149,7 +151,7 @@ let%test_module "Add events test" =
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign sk
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->
@@ -184,11 +186,13 @@ let%test_module "Add events test" =
     end)
 
     let%test_unit "Initialize" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~chain
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       assert (Option.is_some account) ;
@@ -200,12 +204,14 @@ let%test_module "Add events test" =
           assert (List.is_empty account_update.body.events) )
 
     let%test_unit "Initialize and add events" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~chain
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       assert (Option.is_some account) ;
@@ -217,6 +223,7 @@ let%test_module "Add events test" =
           else assert (List.is_empty account_update.body.events) )
 
     let%test_unit "Initialize and add several events" =
+      let chain = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
@@ -224,7 +231,8 @@ let%test_module "Add events test" =
         |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~chain
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       assert (Option.is_some account) ;

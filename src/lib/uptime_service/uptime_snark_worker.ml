@@ -13,17 +13,19 @@ module Worker_state = struct
   end
 
   (* bin_io required by rpc_parallel *)
-  type init_arg = Logger.t * Genesis_constants.Constraint_constants.t
+  type init_arg =
+    Logger.t * Mina_signature_kind.t * Genesis_constants.Constraint_constants.t
   [@@deriving bin_io_unversioned]
 
   type t = (module S)
 
-  let create ~constraint_constants () : t Deferred.t =
+  let create ~chain ~constraint_constants () : t Deferred.t =
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
            let%bind (worker_state : Prod.Worker_state.t) =
-             Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
+             Prod.Worker_state.create ~chain ~constraint_constants
+               ~proof_level:Full ()
            in
            Prod.perform_single worker_state ~message single_spec
        end in
@@ -76,9 +78,9 @@ module Worker = struct
               , perform_single )
         }
 
-      let init_worker_state (logger, constraint_constants) =
+      let init_worker_state (logger, chain, constraint_constants) =
         [%log info] "Uptime SNARK worker started" ;
-        Worker_state.create ~constraint_constants ()
+        Worker_state.create ~chain ~constraint_constants ()
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
@@ -90,7 +92,7 @@ end
 type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
-let create ~logger ~constraint_constants ~pids : t Deferred.t =
+let create ~chain ~logger ~constraint_constants ~pids : t Deferred.t =
   let on_failure err =
     [%log error] "Uptime service SNARK worker process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -100,7 +102,7 @@ let create ~logger ~constraint_constants ~pids : t Deferred.t =
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Connection_closed ~connection_state_init_arg:()
-      (logger, constraint_constants)
+      (logger, chain, constraint_constants)
   in
   [%log info]
     "Daemon started process of kind $process_kind with pid \

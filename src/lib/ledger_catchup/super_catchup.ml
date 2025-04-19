@@ -1467,9 +1467,10 @@ let%test_module "Ledger_catchup tests" =
     let use_super_catchup = true
 
     let verifier =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+            ~signature_kind () )
 
     let ledger_sync_config =
       Syncable_ledger.create_config

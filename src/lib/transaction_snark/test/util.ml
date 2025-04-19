@@ -38,6 +38,8 @@ let snark_module =
       let constraint_constants = constraint_constants
 
       let proof_level = proof_level
+
+      let chain = Mina_signature_kind.t_DEPRECATED
     end) : Transaction_snark.S )
 
 let genesis_state_body =
@@ -75,6 +77,7 @@ let logger_null = Logger.null ()
 let check_zkapp_command_with_merges_exn ?(logger = logger_null)
     ?expected_failure ?ignore_outside_snark ?global_slot
     ?(state_body = genesis_state_body) ledger zkapp_commands =
+  let chain = Mina_signature_kind.t_DEPRECATED in
   let module T = (val Lazy.force snark_module) in
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
@@ -140,7 +143,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
            ->
           match
             Or_error.try_with (fun () ->
-                Transaction_snark.zkapp_command_witnesses_exn
+                Transaction_snark.zkapp_command_witnesses_exn ~chain
                   ~constraint_constants ~global_slot ~state_body
                   ~fee_excess:Amount.Signed.zero
                   [ ( `Pending_coinbase_init_stack init_stack
@@ -379,6 +382,7 @@ let gen_snapp_ledger =
 
 let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
     ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -390,8 +394,8 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
             ?permissions:snapp_permissions ~vk:vk' ~ledger snapp_pk ;
           let%bind zkapp_command =
             let zkapp_prover_and_vk = (zkapp_prover, vk) in
-            Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
-              ~constraint_constants test_spec
+            Transaction_snark.For_tests.update_states ~signature_kind
+              ~zkapp_prover_and_vk ~constraint_constants test_spec
           in
           check_zkapp_command_with_merges_exn ?expected_failure ?state_body
             ledger [ zkapp_command ] ) )
