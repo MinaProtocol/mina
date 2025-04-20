@@ -1,9 +1,9 @@
 module Lib = Work_lib.Make (Inputs.Implementation_inputs)
 module State = Lib.State
 
-type work = Snark_work_lib.Partitioned.Selector_work.t
+type work = Snark_work_lib.Selector.Single_spec.t
 
-type in_memory_work = Snark_work_lib.Partitioned.Selector_work.Stable.Latest.t
+type in_memory_work = Snark_work_lib.Selector.Single_spec.Stable.Latest.t
 [@@deriving yojson]
 
 type snark_pool = Network_pool.Snark_pool.t

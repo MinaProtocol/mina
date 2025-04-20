@@ -1,5 +1,6 @@
 open Core_kernel
 module Partitioned_work = Snark_work_lib.Partitioned
+module Selector_work = Snark_work_lib.Selector
 
 type t =
   { which_half : [ `First | `Second ]
@@ -7,7 +8,7 @@ type t =
   ; metric :
       Core.Time.Span.t
       * [ `Merge | `Transition | `Sub_zkapp_command of [ `Segment | `Merge ] ]
-  ; spec : Partitioned_work.Selector_work.t
+  ; spec : Selector_work.Single_spec.t
   ; prover : Signature_lib.Public_key.Compressed.t
   ; fee : Currency.Fee.t
   }

@@ -1,9 +1,8 @@
 module Poly = Snark_work_lib.Work
-module Partitioned_work = Snark_work_lib.Partitioned
 
 module Compact = struct
   module Spec = struct
-    type t = Partitioned_work.Selector_work.t Poly.Spec.t
+    type t = Snark_work_lib.Selector.Work.t Poly.Spec.t
   end
 
   module Result = struct
