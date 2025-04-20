@@ -14,7 +14,7 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
                   { Permissions.user_default with set_verification_key = auth }
             }
         }
-    ; authorization = Control.dummy_of_tag Signature
+    ; authorization = Control.Poly.Signature Signature.dummy
     }
   in
   let fee_payer : Account_update.Fee_payer.t =

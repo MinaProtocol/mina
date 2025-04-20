@@ -2258,6 +2258,8 @@ module For_tests = struct
 
   let depth = Int.ceil_log2 (num_accounts + num_transactions)
 
+  let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
   module Init_ledger = struct
     type t = (Keypair.t * int64) array [@@deriving sexp]
 
@@ -2507,7 +2509,7 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let zkapp_command = Zkapp_command.of_simple zkapp_command in
+    let zkapp_command = Zkapp_command.of_simple ~proof_cache_db zkapp_command in
     let commitment = Zkapp_command.commitment zkapp_command in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment
@@ -2523,7 +2525,9 @@ module For_tests = struct
     in
     let account_updates =
       Zkapp_command.Call_forest.map zkapp_command.account_updates
-        ~f:(fun (account_update : Account_update.t) ->
+        ~f:(fun
+             (account_update : (Account_update.Body.t, _) Account_update.Poly.t)
+           ->
           match account_update.body.authorization_kind with
           | Signature ->
               { account_update with

@@ -493,13 +493,6 @@ let rec accumulate_hashes ~hash_account_update (xs : _ t) =
       let node_hash = Digest.Tree.create node in
       { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) } :: xs
 
-let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
-    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
-  let hash_account_update (p : Account_update.t) =
-    Digest.Account_update.create p
-  in
-  accumulate_hashes ~hash_account_update xs
-
 let accumulate_hashes_predicated xs =
   accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
@@ -518,6 +511,9 @@ let forget_hashes =
         }
   in
   impl
+
+let forget_hashes_and_proofs p =
+  forget_hashes @@ map ~f:Account_update.forget_proofs p
 
 module With_hashes_and_data = struct
   [%%versioned
@@ -591,6 +587,12 @@ module With_hashes = struct
       let to_latest = Fn.id
     end
   end]
+
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
+    map ~f:Account_update.read_all_proofs_from_disk
+
+  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+    map ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
 
   let empty = Digest.Forest.empty
 
