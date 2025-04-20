@@ -244,3 +244,23 @@ let submit_directly_to_work_selector ~(result : Partitioned_work.Result.t)
   let open Option.Let_syntax in
   let%map result = Partitioned_work.Result.to_selector_result result in
   callback result
+
+let submit_single ~partitioner ~this_single ~uuid ~callback =
+  let Single_work.{ which_half; _ } = this_single in
+  Hashtbl.change partitioner.pairing_pool uuid ~f:(function
+    | Some other_single ->
+        let work =
+          match which_half with
+          | `First ->
+              Single_work.merge_to_one_result_exn this_single other_single
+          | `Second ->
+              Single_work.merge_to_one_result_exn other_single this_single
+        in
+
+        (* For the same reason with another commented recycling, we can't.
+           let (Pairing_UUID uuid) = uuid in
+           UUID_generator.recycle_uuid partitioner.uuid_generator uuid ;
+        *)
+        callback ~work ; None
+    | None ->
+        Some this_single )
