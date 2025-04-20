@@ -62,7 +62,7 @@ module Spec = struct
         { instances : 'single One_or_two.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         }
-      [@@deriving fields, sexp, to_yojson]
+      [@@deriving fields, sexp, yojson]
 
       let to_latest single_latest { instances; fee } =
         { instances = One_or_two.Stable.V1.to_latest single_latest instances
@@ -101,6 +101,13 @@ module Result = struct
       [@@deriving fields]
     end
   end]
+
+  let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
+    { proofs = One_or_two.map ~f:f_single proofs
+    ; metrics
+    ; spec = f_spec spec
+    ; prover
+    }
 end
 
 module Result_without_metrics = struct
