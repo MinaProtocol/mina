@@ -84,6 +84,11 @@ module Spec = struct
 
   let map ~f { instances; fee } =
     { instances = One_or_two.map ~f instances; fee }
+
+  let map_opt ~f_single { instances; fee } =
+    let open Option.Let_syntax in
+    let%map instances = One_or_two.Option.map ~f:f_single instances in
+    { instances; fee }
 end
 
 module Result = struct
