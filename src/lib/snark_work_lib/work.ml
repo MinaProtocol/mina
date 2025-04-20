@@ -89,6 +89,16 @@ module Spec = struct
     let open Option.Let_syntax in
     let%map instances = One_or_two.Option.map ~f:f_single instances in
     { instances; fee }
+
+  let map_biased ~f_single { instances; fee } =
+    let instances =
+      match instances with
+      | `One i ->
+          `One (f_single ~one_or_two:`One i)
+      | `Two (l, r) ->
+          `Two (f_single ~one_or_two:`First l, f_single ~one_or_two:`Second r)
+    in
+    { instances; fee }
 end
 
 module Result = struct
