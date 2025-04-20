@@ -237,6 +237,10 @@ module Spec = struct
 
   let cache ~(proof_cache_db : Proof_cache_tag.cache_db) =
     Work.Spec.map ~f:(Single.Spec.cache ~proof_cache_db)
+
+  let of_selector_spec : Selector.Spec.t -> t =
+    Work.Spec.map_biased ~f_single:(fun ~one_or_two instance ->
+        Single.Spec.Regular (instance, { one_or_two; pair_uuid = None }) )
 end
 
 module Result = struct

@@ -46,9 +46,9 @@ module Pending_Zkapp_command = struct
       Partitioned_work.Zkapp_command_job.Spec.t option =
     List.find_map ~f:(fun f -> f ()) [ generate_merge ~t; generate_segment ~t ]
 
-  let submit_proof (t : t) ~(p : Ledger_proof.Cached.t)
+  let submit_proof (t : t) ~(proof : Ledger_proof.Cached.t)
       ~(elapsed : Time.Stable.Span.V1.t) =
-    Deque.enqueue_back t.pending_mergable_proofs p ;
+    Deque.enqueue_back t.pending_mergable_proofs proof ;
     t.merge_remaining <- t.merge_remaining - 1 ;
     t.elapsed <- Time.Span.(t.elapsed + elapsed)
 end
@@ -261,7 +261,7 @@ let submit_single ~partitioner ~this_single ~uuid ~callback =
            let (Pairing_UUID uuid) = uuid in
            UUID_generator.recycle_uuid partitioner.uuid_generator uuid ;
         *)
-        callback ~work ; None
+        callback work ; None
     | None ->
         Some this_single )
 
@@ -291,5 +291,90 @@ let submit_one_in_pair_to_work_partitioner ~partitioner
 
       submit_single ~partitioner ~this_single ~uuid ~callback ;
       Some ()
+  | _ ->
+      None
+
+let submit_into_pending_zkapp_command ~partitioner
+    ~(result : Partitioned_work.Result.t) ~callback () =
+  match result with
+  (* NOTE: This is terrible, why are we designing the RPC like this?
+     `proofs`, `spec.instances` and `metrics` should be merged together.
+  *)
+  | { proofs = `One proof
+    ; spec =
+        { instances = `One (Sub_zkapp_command { pairing_id; job_uuid; _ })
+        ; fee
+        }
+    ; metrics = `One (elapsed, `Sub_zkapp_command _)
+    ; prover
+    } -> (
+      match
+        Sent_job_pool.slash partitioner.jobs_sent_by_partitioner job_uuid
+      with
+      | Some _ -> (
+          (* NOTE: Only submit the proof is never seen before. *)
+          (* NOTE:
+             We can't recycle the UUID, however, imagine a really old job that's
+             already completed by some worker A, and acknowledged by the
+             coordinator. Now a really slow worker B try to that with an already
+             recycled UUID, which happens to be issued for another pending work
+             job the same UUID. Now our logic will misuse the proof.
+             let (Job_UUID to_recycle) = job_uuid in
+             UUID_generator.recycle_uuid partitioner.uuid_generator to_recycle ;
+          *)
+          match
+            Zkapp_command_job_pool.find partitioner.zkapp_command_jobs
+              pairing_id
+          with
+          | None ->
+              Printf.printf
+                "Worker submit a work that's already slashed from pending \
+                 zkapp command pool, ignoring " ;
+              Some ()
+          | Some pending ->
+              Pending_Zkapp_command.submit_proof ~proof ~elapsed pending ;
+              if 0 = pending.merge_remaining then (
+                let final_proof =
+                  Deque.dequeue_front_exn pending.pending_mergable_proofs
+                in
+                let Partitioned_work.Pairing.{ one_or_two; pair_uuid } =
+                  pairing_id
+                in
+                let uuid =
+                  Option.value_exn pair_uuid
+                    ~message:
+                      "When putting pending zkapp command into pool, we didn't \
+                       assign an uuid"
+                in
+                let metric = (pending.elapsed, `Transition) in
+
+                match one_or_two with
+                | `One ->
+                    let result : Partitioned_work.Result.t =
+                      { proofs = `One final_proof
+                      ; metrics = `One metric
+                      ; spec =
+                          { instances = `One pending.spec; fee }
+                          |> Partitioned_work.Spec.of_selector_spec
+                      ; prover
+                      }
+                    in
+                    submit_directly_to_work_selector ~result ~callback ()
+                | (`First | `Second) as which_half ->
+                    let this_single =
+                      Single_work.
+                        { which_half
+                        ; proof
+                        ; metric
+                        ; spec = pending.spec
+                        ; prover
+                        ; fee
+                        }
+                    in
+                    submit_single ~partitioner ~this_single ~uuid ~callback ;
+                    Some () )
+              else Some () )
+      | None ->
+          None )
   | _ ->
       None
