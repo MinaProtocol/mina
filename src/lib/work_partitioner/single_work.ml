@@ -5,7 +5,6 @@ module Selector_work = Snark_work_lib.Selector
 type t =
   { which_half : [ `First | `Second ]
   ; proof : Ledger_proof.Cached.t
-        (* We have to use a stable type here o.w. there's type mismatch, somehow *)
   ; metric :
       Core.Time.Span.t
       * [ `Merge | `Transition | `Sub_zkapp_command of [ `Segment | `Merge ] ]
