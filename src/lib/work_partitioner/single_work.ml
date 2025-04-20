@@ -1,4 +1,5 @@
 open Core_kernel
+module Partitioned_work = Snark_work_lib.Partitioned
 
 type t =
   { which_half : [ `First | `Second ]
@@ -6,7 +7,7 @@ type t =
   ; metric :
       Core.Time.Span.t
       * [ `Merge | `Transition | `Sub_zkapp_command of [ `Segment | `Merge ] ]
-  ; spec : Work_types.Compact.Single.Spec.t
+  ; spec : Partitioned_work.Selector_work.t
   ; prover : Signature_lib.Public_key.Compressed.t
   ; fee : Currency.Fee.t
   }
