@@ -1420,7 +1420,10 @@ module Make (L : Ledger_intf.S) :
           Zkapp_basic.Set_or_keep.map ~f:Option.some
             account_update.body.update.verification_key
 
-        let actions (account_update : t) = account_update.body.actions
+        (* TODO hash computation (wrapped into of_event_list) should happen during conversion
+           Zkapp_command.Stable.t -> Zkapp_command.t, not here *)
+        let actions (account_update : t) =
+          Zkapp_account.Actions.of_event_list account_update.body.actions
 
         let zkapp_uri (account_update : t) =
           account_update.body.update.zkapp_uri
