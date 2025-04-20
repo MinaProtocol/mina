@@ -1754,6 +1754,8 @@ let map_proofs ~f p =
   in
   { Poly.authorization = map_auth p.Poly.authorization; body = p.Poly.body }
 
+let forget_proofs p = map_proofs ~f:(const ()) p
+
 module Fee_payer = struct
   [%%versioned
   module Stable = struct
@@ -1799,6 +1801,12 @@ module Fee_payer = struct
 end
 
 include T
+
+let read_all_proofs_from_disk (p : t) : Stable.Latest.t =
+  map_proofs ~f:Proof_cache_tag.read_proof_from_disk p
+
+let write_all_proofs_to_disk ~proof_cache_db (p : Stable.Latest.t) : t =
+  map_proofs ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) p
 
 let account_id (t : (Body.t, _) Poly.t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id

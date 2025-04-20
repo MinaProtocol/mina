@@ -4817,9 +4817,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
         ]
       in
-      Zkapp_command.map_proofs
-        ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
-        { fee_payer; memo; account_updates = forest }
+      { Zkapp_command.Poly.fee_payer
+      ; memo
+      ; account_updates =
+          Zkapp_command.Call_forest.map
+            ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
+            forest
+      }
 
     module Update_states_spec = struct
       type t =
@@ -5053,8 +5057,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let sender_account_update = Option.value_exn sender_account_update in
         Zkapp_command.Call_forest.cons
           ( Account_update.of_simple sender_account_update
-          |> Account_update.map_proofs
-               ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+          |> Account_update.write_all_proofs_to_disk ~proof_cache_db )
           zkapp_command.account_updates
       in
       { zkapp_command with account_updates }
