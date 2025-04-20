@@ -18,7 +18,8 @@
   one_or_two
   currency
   ppx_version.runtime
-  ledger_proof)
+  ledger_proof
+  proof_carrying_data)
  (preprocess
   (pps ppx_jane ppx_deriving_yojson ppx_version))
  (instrumentation
