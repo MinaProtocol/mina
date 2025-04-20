@@ -117,3 +117,25 @@ let reissue_old_task ~(partitioner : t) () :
       Sent_job_pool.replace ~id ~job:reissued
         partitioner.jobs_sent_by_partitioner ;
       Some (Sub_zkapp_command job_with_status.job)
+
+let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
+    Partitioned_work.Single.Spec.t option =
+  let open Option.Let_syntax in
+  let%bind pairing_id, pending_zkapp_command =
+    Zkapp_command_job_pool.peek partitioner.zkapp_command_jobs
+  in
+  let%map spec =
+    Pending_Zkapp_command.generate_job_spec pending_zkapp_command
+  in
+  let job_uuid =
+    Partitioned_work.Zkapp_command_job.UUID.Job_UUID
+      (Uuid_generator.next_uuid partitioner.uuid_generator)
+  in
+  let job_with_status =
+    Partitioned_work.Zkapp_command_job.{ spec; pairing_id; job_uuid }
+    |> Zkapp_command_job_with_status.issue_now
+  in
+  Sent_job_pool.replace ~id:job_uuid ~job:job_with_status
+    partitioner.jobs_sent_by_partitioner ;
+
+  Partitioned_work.Single.Spec.Sub_zkapp_command job_with_status.job
