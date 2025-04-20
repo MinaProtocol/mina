@@ -508,13 +508,6 @@ let rec accumulate_hashes ~hash_account_update (xs : _ t) =
       let node_hash = Digest.Tree.create node in
       { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) } :: xs
 
-let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
-    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
-  let hash_account_update (p : Account_update.t) =
-    Digest.Account_update.create p
-  in
-  accumulate_hashes ~hash_account_update xs
-
 let accumulate_hashes_predicated xs =
   accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
