@@ -236,3 +236,11 @@ let consume_job_from_selector ~(partitioner : t)
       partitioner.first_in_pair <- Some work_fst ;
       convert_single_work_from_selector ~partitioner ~one_or_two:`Second
         ~work:work_snd
+
+(* Logics for work submitting *)
+
+let submit_directly_to_work_selector ~(result : Partitioned_work.Result.t)
+    ~(callback : Selector_work.Result.t -> unit) () =
+  let open Option.Let_syntax in
+  let%map result = Partitioned_work.Result.to_selector_result result in
+  callback result

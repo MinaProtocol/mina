@@ -272,4 +272,29 @@ module Result = struct
     ; spec = Spec.cache ~proof_cache_db spec
     ; prover
     }
+
+  let to_selector_result ({ proofs; metrics; spec; prover } : t) :
+      Selector.Result.t option =
+    let fix_metric_tag (span, tag) =
+      match tag with
+      | (`Transition | `Merge) as tag ->
+          Some (span, tag)
+      | `Sub_zkapp_command _ ->
+          None
+    in
+    let open Option.Let_syntax in
+    let%bind () =
+      match spec.instances with
+      | `One (Regular (_, { one_or_two = `One; pair_uuid = None }))
+      | `Two
+          ( Regular (_, { one_or_two = `First; pair_uuid = None })
+          , Regular (_, { one_or_two = `Second; pair_uuid = None }) ) ->
+          (* We indeed have an old spec *)
+          Some ()
+      | _ ->
+          None
+    in
+    let%bind metrics = One_or_two.Option.map ~f:fix_metric_tag metrics in
+    let%map spec = Work.Spec.map_opt ~f_single:Single.Spec.regular_opt spec in
+    ({ proofs; metrics; spec; prover } : Selector.Result.t)
 end
