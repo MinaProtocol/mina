@@ -1,6 +1,7 @@
 open Core_kernel
 module Shared = Shared
 module Partitioned_work = Snark_work_lib.Partitioned
+module Selector_work = Snark_work_lib.Selector
 module Zkapp_command_job_with_status =
   With_job_status.Make (Partitioned_work.Zkapp_command_job)
 
@@ -11,7 +12,7 @@ module Zkapp_command_job_with_status =
 *)
 module Pending_Zkapp_command = struct
   type t =
-    { spec : Partitioned_work.Selector_work.t
+    { spec : Selector_work.Single_spec.t
           (* the original work being splitted, should be identical to Work_selector.work *)
     ; unscheduled_segments : Partitioned_work.Zkapp_command_job.Spec.t Queue.t
           (* we may need to insert proofs to merge back to the queue, hence a Deque *)
@@ -77,7 +78,7 @@ type t =
         (* WARN: we're assuming everything in this queue is sorted in time from old to new.
            So queue head is the oldest task.
         *)
-  ; mutable first_in_pair : Partitioned_work.Selector_work.t option
+  ; mutable first_in_pair : Selector_work.Single_spec.t option
         (* When receving a `Two works from the underlying Work_selector, store one of them here,
            so we could issue them to another worker.
         *)
@@ -153,8 +154,7 @@ let rec issue_from_first_in_pair ~(partitioner : t) () =
    `one_or_two` tracks which task is it inside a `One_or_two`*)
 and convert_single_work_from_selector ~(partitioner : t)
     ~(one_or_two : [ `First | `Second | `One ])
-    ~(work : Partitioned_work.Selector_work.t) : Partitioned_work.Single.Spec.t
-    =
+    ~(work : Selector_work.Single_spec.t) : Partitioned_work.Single.Spec.t =
   match work with
   | Transition (input, witness) as work -> (
       (* WARN: a smilar copy of this exists in `Snark_worker.Worker_impl_prod` *)
@@ -226,7 +226,7 @@ and issue_job_from_partitioner ~(partitioner : t) () :
 
 (* WARN: this should only be called if partitioner.first_in_pair is None *)
 let consume_job_from_selector ~(partitioner : t)
-    ~(work : Partitioned_work.Selector_work.t One_or_two.t) () :
+    ~(work : Selector_work.Single_spec.t One_or_two.t) () :
     Partitioned_work.Single.Spec.t =
   match work with
   | `One work ->

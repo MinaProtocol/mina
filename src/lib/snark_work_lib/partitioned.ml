@@ -134,35 +134,6 @@ module Zkapp_command_job = struct
     { spec = Spec.cache ~proof_cache_db spec; pairing_id; job_uuid }
 end
 
-module Selector_work = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type t =
-        ( Transaction_witness.Stable.V2.t
-        , Ledger_proof.Stable.V2.t )
-        Work.Single.Spec.Stable.V2.t
-      [@@deriving sexp, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  type t = (Transaction_witness.t, Ledger_proof.Cached.t) Work.Single.Spec.t
-
-  let materialize : t -> Stable.Latest.t =
-    Work.Single.Spec.map
-      ~f_witness:Transaction_witness.read_all_proofs_from_disk
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-
-  let cache ~(proof_cache_db : Proof_cache_tag.cache_db) : Stable.Latest.t -> t
-      =
-    Work.Single.Spec.map ~f_witness:Transaction_witness.write_all_proofs_to_disk
-      ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
-end
-
 (* this is the actual work passed over network between coordinator and worker *)
 module Single = struct
   module Spec = struct
@@ -172,7 +143,7 @@ module Single = struct
 
       module V2 = struct
         type t =
-          | Regular of (Selector_work.Stable.V1.t * Pairing.Stable.V1.t)
+          | Regular of (Selector.Single_spec.Stable.V1.t * Pairing.Stable.V1.t)
           | Sub_zkapp_command of Zkapp_command_job.Stable.V1.t
         [@@deriving sexp, yojson]
 
@@ -180,7 +151,7 @@ module Single = struct
       end
 
       module V1 = struct
-        type t = Selector_work.Stable.V1.t [@@deriving sexp, yojson]
+        type t = Selector.Single_spec.Stable.V1.t [@@deriving sexp, yojson]
 
         let to_latest ~one_or_two (t : t) : V2.t =
           Regular (t, { Pairing.Stable.V1.pair_uuid = None; one_or_two })
@@ -188,23 +159,23 @@ module Single = struct
     end]
 
     type t =
-      | Regular of (Selector_work.t * Pairing.t)
+      | Regular of (Selector.Single_spec.t * Pairing.t)
       | Sub_zkapp_command of Zkapp_command_job.t
 
     let materialize : t -> Stable.Latest.t = function
       | Regular (work, pairing) ->
-          Regular (Selector_work.materialize work, pairing)
+          Regular (Selector.Single_spec.materialize work, pairing)
       | Sub_zkapp_command job ->
           Sub_zkapp_command (Zkapp_command_job.materialize job)
 
     let cache ~(proof_cache_db : Proof_cache_tag.cache_db) :
         Stable.Latest.t -> t = function
       | Regular (work, pairing) ->
-          Regular (Selector_work.cache ~proof_cache_db work, pairing)
+          Regular (Selector.Single_spec.cache ~proof_cache_db work, pairing)
       | Sub_zkapp_command job ->
           Sub_zkapp_command (Zkapp_command_job.cache ~proof_cache_db job)
 
-    let regular_opt (work : t) : Selector_work.t option =
+    let regular_opt (work : t) : Selector.Single_spec.t option =
       match work with Regular (w, _) -> Some w | _ -> None
 
     let map_regular_witness ~f = function
