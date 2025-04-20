@@ -1527,7 +1527,10 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     @ [ mk_node balancing_account_update [] ]
     @ new_token_zkapp_command
     |> mk_forest
+    |> Zkapp_command.Call_forest.map
+         ~f:(Fn.compose map_account_update Account_update.of_simple)
   in
+
   let%map memo =
     match memo with
     | Some memo ->
@@ -1535,22 +1538,15 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     | None ->
         Signed_command_memo.gen
   in
-  let zkapp_command_dummy_authorizations =
-    { Zkapp_command.Poly.fee_payer
-    ; account_updates =
-        Zkapp_command.Call_forest.map
-          ~f:(Fn.compose map_account_update Account_update.of_simple)
-          account_updates
-        |> Zkapp_command.Call_forest.accumulate_hashes_predicated
-    ; memo
-    }
+  let zkapp_command =
+    Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+      { Zkapp_command.Poly.fee_payer; account_updates; memo }
   in
   (* update receipt chain hashes in accounts table *)
   let receipt_elt =
     let _txn_commitment, full_txn_commitment =
       (* also computed in replace_authorizations, but easier just to re-compute here *)
-      Zkapp_command.get_transaction_commitments
-        zkapp_command_dummy_authorizations
+      Zkapp_command.get_transaction_commitments zkapp_command
     in
     Receipt.Zkapp_command_elt.Zkapp_command_commitment full_txn_commitment
   in
@@ -1564,11 +1560,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
             account.Account.receipt_chain_hash
         in
         ({ account with receipt_chain_hash }, `Fee_payer) ) ;
-  let account_updates =
-    Zkapp_command.Call_forest.to_account_updates
-      zkapp_command_dummy_authorizations.account_updates
-  in
-  List.iteri account_updates ~f:(fun ndx account_update ->
+  Zkapp_command.Call_forest.iteri zkapp_command.account_updates
+    ~f:(fun ndx account_update ->
       (* update receipt chain hash only for signature, proof authorizations *)
       match account_update.Account_update.Poly.authorization with
       | Control.Poly.Proof _ | Control.Poly.Signature _ ->
@@ -1589,9 +1582,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                 ({ account with receipt_chain_hash }, role) )
       | Control.Poly.None_given ->
           () ) ;
-  Zkapp_command.map_proofs
-    ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
-    zkapp_command_dummy_authorizations
+  zkapp_command
 
 let gen_list_of_zkapp_command_from ?global_slot ?failure ?max_account_updates
     ?max_token_updates ~(fee_payer_keypairs : Signature_lib.Keypair.t list)
