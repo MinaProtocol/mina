@@ -139,3 +139,87 @@ let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     partitioner.jobs_sent_by_partitioner ;
 
   Partitioned_work.Single.Spec.Sub_zkapp_command job_with_status.job
+
+let rec issue_from_first_in_pair ~(partitioner : t) () =
+  match partitioner.first_in_pair with
+  | Some work ->
+      partitioner.first_in_pair <- None ;
+      Some
+        (convert_single_work_from_selector ~partitioner ~one_or_two:`First ~work)
+  | None ->
+      None
+
+(* try to issue a single work received from the underlying Work_selector
+   `one_or_two` tracks which task is it inside a `One_or_two`*)
+and convert_single_work_from_selector ~(partitioner : t)
+    ~(one_or_two : [ `First | `Second | `One ])
+    ~(work : Partitioned_work.Selector_work.t) : Partitioned_work.Single.Spec.t
+    =
+  match work with
+  | Transition (input, witness) as work -> (
+      (* WARN: a smilar copy of this exists in `Snark_worker.Worker_impl_prod` *)
+      match witness.transaction with
+      | Command (Zkapp_command zkapp_command) -> (
+          match
+            Async.Thread_safe.block_on_async (fun () ->
+                Shared.extract_zkapp_segment_works
+                  ~m:partitioner.transaction_snark ~input ~witness
+                  ~zkapp_command )
+          with
+          | Ok (Ok (_ :: _ as all)) ->
+              let pairing_id =
+                Partitioned_work.Pairing.
+                  { one_or_two
+                  ; pair_uuid =
+                      Some
+                        (Pairing_UUID
+                           (Uuid_generator.next_uuid partitioner.uuid_generator)
+                        )
+                  }
+              in
+              let unscheduled_segments =
+                all
+                |> List.map ~f:(fun (witness, spec, statement) ->
+                       Partitioned_work.Zkapp_command_job.Spec.Segment
+                         { statement; witness; spec } )
+                |> Queue.of_list
+              in
+              let pending_mergable_proofs = Deque.create () in
+              let merge_remaining = Queue.length unscheduled_segments - 1 in
+              let pending_zkapp_command =
+                Pending_Zkapp_command.
+                  { unscheduled_segments
+                  ; pending_mergable_proofs
+                  ; merge_remaining
+                  ; spec = work
+                  ; elapsed = Time.Span.zero
+                  }
+              in
+              assert (
+                phys_equal `Ok
+                  (Zkapp_command_job_pool.attempt_add ~key:pairing_id
+                     ~job:pending_zkapp_command partitioner.zkapp_command_jobs ) ) ;
+              issue_job_from_partitioner ~partitioner ()
+              |> Option.value_exn
+                   ~message:
+                     "FATAL: we already inserted work into partitioner so this \
+                      shouldn't happen"
+          | Ok (Ok []) ->
+              failwith "No witness generated"
+          | Ok (Error e) ->
+              failwith (Error.to_string_hum e)
+          | Error e ->
+              failwith (Exn.to_string e) )
+      | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
+          Regular (work, { one_or_two; pair_uuid = None }) )
+  | Merge _ ->
+      Regular (work, { one_or_two; pair_uuid = None })
+
+and issue_job_from_partitioner ~(partitioner : t) () :
+    Partitioned_work.Single.Spec.t option =
+  List.find_map
+    ~f:(fun f -> f ())
+    [ reissue_old_task ~partitioner
+    ; issue_from_first_in_pair ~partitioner
+    ; issue_from_zkapp_command_work_pool ~partitioner
+    ]
