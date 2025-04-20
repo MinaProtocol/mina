@@ -237,6 +237,29 @@ let consume_job_from_selector ~(partitioner : t)
       convert_single_work_from_selector ~partitioner ~one_or_two:`Second
         ~work:work_snd
 
+let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
+    ~(selection_method : (module Work_selector.Selection_method_intf))
+    ~(selector : Work_selector.State.t) ~(logger : Logger.t)
+    ~(fee : Currency.Fee.t) ~snark_pool () =
+  let (module Work_selection_method) = selection_method in
+  let open Core_kernel in
+  let open Option.Let_syntax in
+  let%map work = Work_selection_method.work ~logger ~fee ~snark_pool selector in
+
+  consume_job_from_selector ~partitioner ~work ()
+
+let request_partitioned_work
+    ~(selection_method : (module Work_selector.Selection_method_intf))
+    ~(logger : Logger.t) ~(fee : Currency.Fee.t)
+    ~(snark_pool : Work_selector.snark_pool) ~(selector : Work_selector.State.t)
+    ~(partitioner : t) : Partitioned_work.Single.Spec.t option =
+  List.find_map
+    ~f:(fun f -> f ())
+    [ issue_job_from_partitioner ~partitioner
+    ; request_from_selector_and_consume_by_partitioner ~partitioner
+        ~selection_method ~selector ~logger ~fee ~snark_pool
+    ]
+
 (* Logics for work submitting *)
 
 let submit_directly_to_work_selector ~(result : Partitioned_work.Result.t)
