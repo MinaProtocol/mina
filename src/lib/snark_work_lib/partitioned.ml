@@ -216,3 +216,77 @@ module Single = struct
           None
   end
 end
+
+module Spec = struct
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
+      [@@deriving sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Single.Spec.t Work.Spec.t
+
+  let materialize : t -> Stable.Latest.t =
+    Work.Spec.map ~f:Single.Spec.materialize
+
+  let cache ~(proof_cache_db : Proof_cache_tag.cache_db) =
+    Work.Spec.map ~f:(Single.Spec.cache ~proof_cache_db)
+end
+
+module Result = struct
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t =
+        { proofs : Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+        ; metrics :
+            ( Core.Time.Stable.Span.V1.t
+            * [ `Transition
+              | `Merge
+              | `Sub_zkapp_command of [ `Segment | `Merge ] ] )
+            One_or_two.Stable.V1.t
+        ; spec : Spec.Stable.V1.t
+        ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
+        }
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t =
+    { proofs : Ledger_proof.Cached.t One_or_two.t
+    ; metrics :
+        ( Core.Time.Span.t
+        * [ `Transition | `Merge | `Sub_zkapp_command of [ `Segment | `Merge ] ]
+        )
+        One_or_two.t
+    ; spec : Spec.t
+    ; prover : Signature_lib.Public_key.Compressed.t
+    }
+
+  let materialize ({ proofs; metrics; spec; prover } : t) : Stable.Latest.t =
+    { proofs = One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk proofs
+    ; metrics
+    ; spec = Spec.materialize spec
+    ; prover
+    }
+
+  let cache ~proof_cache_db ({ proofs; metrics; spec; prover } : Stable.Latest.t)
+      : t =
+    { proofs =
+        One_or_two.map
+          ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
+          proofs
+    ; metrics
+    ; spec = Spec.cache ~proof_cache_db spec
+    ; prover
+    }
+end
