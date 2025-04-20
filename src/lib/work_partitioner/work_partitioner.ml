@@ -223,3 +223,16 @@ and issue_job_from_partitioner ~(partitioner : t) () :
     ; issue_from_first_in_pair ~partitioner
     ; issue_from_zkapp_command_work_pool ~partitioner
     ]
+
+(* WARN: this should only be called if partitioner.first_in_pair is None *)
+let consume_job_from_selector ~(partitioner : t)
+    ~(work : Partitioned_work.Selector_work.t One_or_two.t) () :
+    Partitioned_work.Single.Spec.t =
+  match work with
+  | `One work ->
+      convert_single_work_from_selector ~partitioner ~one_or_two:`One ~work
+  | `Two (work_fst, work_snd) ->
+      assert (phys_equal None partitioner.first_in_pair) ;
+      partitioner.first_in_pair <- Some work_fst ;
+      convert_single_work_from_selector ~partitioner ~one_or_two:`Second
+        ~work:work_snd
