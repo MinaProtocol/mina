@@ -11,7 +11,7 @@ module Zkapp_command_job_with_status =
 *)
 module Pending_Zkapp_command = struct
   type t =
-    { spec : Work_types.Compact.Single.Spec.t
+    { spec : Partitioned_work.Selector_work.t
           (* the original work being splitted, should be identical to Work_selector.work *)
     ; unscheduled_segments : Partitioned_work.Zkapp_command_job.Spec.t Queue.t
           (* we may need to insert proofs to merge back to the queue, hence a Deque *)
@@ -77,7 +77,7 @@ type t =
         (* WARN: we're assuming everything in this queue is sorted in time from old to new.
            So queue head is the oldest task.
         *)
-  ; mutable first_in_pair : Work_types.Compact.Single.Spec.t option
+  ; mutable first_in_pair : Partitioned_work.Selector_work.t option
         (* When receving a `Two works from the underlying Work_selector, store one of them here,
            so we could issue them to another worker.
         *)
