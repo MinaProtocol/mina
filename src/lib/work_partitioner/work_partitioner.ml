@@ -264,3 +264,32 @@ let submit_single ~partitioner ~this_single ~uuid ~callback =
         callback ~work ; None
     | None ->
         Some this_single )
+
+let submit_one_in_pair_to_work_partitioner ~partitioner
+    ~(result : Partitioned_work.Result.t) ~callback () =
+  match result with
+  (* NOTE: This is terrible, why are we designing the RPC like this?
+     `proofs`, `spec.instances` and `metrics` should be merged together.
+  *)
+  | { proofs = `One proof
+    ; spec =
+        { instances =
+            `One
+              (Regular
+                ( spec
+                , { one_or_two = (`First | `Second) as which_half
+                  ; pair_uuid = Some uuid
+                  } ) )
+        ; fee
+        }
+    ; metrics = `One ((_, (`Merge | `Transition)) as metric)
+    ; prover
+    } ->
+      let this_single =
+        Single_work.{ which_half; proof; metric; spec; prover; fee }
+      in
+
+      submit_single ~partitioner ~this_single ~uuid ~callback ;
+      Some ()
+  | _ ->
+      None
