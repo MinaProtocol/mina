@@ -162,3 +162,69 @@ module Selector_work = struct
     Work.Single.Spec.map ~f_witness:Transaction_witness.write_all_proofs_to_disk
       ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
 end
+
+(* this is the actual work passed over network between coordinator and worker *)
+module Single = struct
+  module Spec = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V2 = struct
+        type t =
+          | Regular of (Selector_work.Stable.V1.t * Pairing.Stable.V1.t)
+          | Sub_zkapp_command of Zkapp_command_job.Stable.V1.t
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+
+      module V1 = struct
+        type t = Selector_work.Stable.V1.t [@@deriving sexp, yojson]
+
+        let to_latest ~one_or_two (t : t) : V2.t =
+          Regular (t, { Pairing.Stable.V1.pair_uuid = None; one_or_two })
+      end
+    end]
+
+    type t =
+      | Regular of (Selector_work.t * Pairing.t)
+      | Sub_zkapp_command of Zkapp_command_job.t
+
+    let materialize : t -> Stable.Latest.t = function
+      | Regular (work, pairing) ->
+          Regular (Selector_work.materialize work, pairing)
+      | Sub_zkapp_command job ->
+          Sub_zkapp_command (Zkapp_command_job.materialize job)
+
+    let cache ~(proof_cache_db : Proof_cache_tag.cache_db) :
+        Stable.Latest.t -> t = function
+      | Regular (work, pairing) ->
+          Regular (Selector_work.cache ~proof_cache_db work, pairing)
+      | Sub_zkapp_command job ->
+          Sub_zkapp_command (Zkapp_command_job.cache ~proof_cache_db job)
+
+    let regular_opt (work : t) : Selector_work.t option =
+      match work with Regular (w, _) -> Some w | _ -> None
+
+    let map_regular_witness ~f = function
+      | Regular (work, pairing) ->
+          Regular
+            (Work.Single.Spec.map ~f_witness:f ~f_proof:Fn.id work, pairing)
+      | Sub_zkapp_command seg ->
+          Sub_zkapp_command seg
+
+    let statement : t -> Transaction_snark.Statement.t option = function
+      | Regular (regular, _) ->
+          Some (Work.Single.Spec.statement regular)
+      | Sub_zkapp_command _ ->
+          None
+
+    let transaction : t -> Mina_transaction.Transaction.t option = function
+      | Regular (work, _) ->
+          work |> Work.Single.Spec.witness
+          |> Option.map ~f:(fun w -> w.Transaction_witness.transaction)
+      | Sub_zkapp_command _ ->
+          None
+  end
+end
