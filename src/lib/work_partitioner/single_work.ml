@@ -13,8 +13,7 @@ type t =
   ; fee : Currency.Fee.t
   }
 
-let merge_to_one_result_exn (left : t) (right : t) : Work_types.Compact.Result.t
-    =
+let merge_to_one_result_exn (left : t) (right : t) : Selector_work.Result.t =
   assert (
     List.for_all ~f:Fn.id
       [ phys_equal left.which_half `First
