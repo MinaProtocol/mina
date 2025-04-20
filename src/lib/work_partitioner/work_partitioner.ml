@@ -98,3 +98,22 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   ; jobs_sent_by_partitioner = Sent_job_pool.create ()
   ; first_in_pair = None
   }
+
+(* Logics for work requesting *)
+let reissue_old_task ~(partitioner : t) () :
+    Partitioned_work.Single.Spec.t option =
+  let job_is_old (job : Zkapp_command_job_with_status.t) : bool =
+    Zkapp_command_job_with_status.is_old ~now:(Time.now ())
+      ~limit:partitioner.reassignment_timeout job
+  in
+  match
+    Sent_job_pool.take_first_ready ~pred:job_is_old
+      partitioner.jobs_sent_by_partitioner
+  with
+  | None ->
+      None
+  | Some (id, job_with_status) ->
+      let reissued = { job_with_status with assigned = Time.now () } in
+      Sent_job_pool.replace ~id ~job:reissued
+        partitioner.jobs_sent_by_partitioner ;
+      Some (Sub_zkapp_command job_with_status.job)
