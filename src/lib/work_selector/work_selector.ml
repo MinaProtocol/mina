@@ -1,15 +1,9 @@
 module Lib = Work_lib.Make (Inputs.Implementation_inputs)
 module State = Lib.State
 
-type work =
-  ( Transaction_witness.t
-  , Ledger_proof.Cached.t )
-  Snark_work_lib.Work.Single.Spec.t
+type work = Snark_work_lib.Partitioned.Selector_work.t
 
-type in_memory_work =
-  ( Transaction_witness.Stable.Latest.t
-  , Ledger_proof.t )
-  Snark_work_lib.Work.Single.Spec.t
+type in_memory_work = Snark_work_lib.Partitioned.Selector_work.Stable.Latest.t
 [@@deriving yojson]
 
 type snark_pool = Network_pool.Snark_pool.t

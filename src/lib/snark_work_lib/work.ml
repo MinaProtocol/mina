@@ -11,7 +11,7 @@ module Single = struct
               Transaction_snark.Statement.Stable.V2.t
               * 'ledger_proof
               * 'ledger_proof
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson]
       end
     end]
 
