@@ -378,3 +378,15 @@ let submit_into_pending_zkapp_command ~partitioner
           None )
   | _ ->
       None
+
+let submit_partitioned_work ~(result : Partitioned_work.Result.t) ~callback
+    ~(partitioner : t) =
+  (* NOTE: there's some space for optimization as the pattern matching logic is essentially repeated inside these different branches*)
+  List.find_map
+    ~f:(fun f -> f ())
+    [ submit_directly_to_work_selector ~result ~callback
+    ; submit_one_in_pair_to_work_partitioner ~partitioner ~result ~callback
+    ; submit_into_pending_zkapp_command ~partitioner ~result ~callback
+    ]
+  |> Option.value_exn
+       ~message:"Failed to submit work back to Work_partitioner & Work_selector"
