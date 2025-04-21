@@ -185,14 +185,28 @@ module Single = struct
       | Sub_zkapp_command seg ->
           Sub_zkapp_command seg
 
-    let statement : t -> Transaction_snark.Statement.t option = function
+    let statement : t -> Transaction_snark.Statement.t = function
       | Regular (regular, _) ->
-          Some (Work.Single.Spec.statement regular)
+          Work.Single.Spec.statement regular
       | Sub_zkapp_command
           { spec = Zkapp_command_job.Spec.Segment { statement; _ }; _ } ->
-          Some (Mina_state.Snarked_ledger_state.With_sok.drop_sok statement)
-      | Sub_zkapp_command { spec = Zkapp_command_job.Spec.Merge _; _ } ->
-          None
+          Mina_state.Snarked_ledger_state.With_sok.drop_sok statement
+      | Sub_zkapp_command
+          { spec = Zkapp_command_job.Spec.Merge { proof1; proof2 }; _ } -> (
+          let module Statement = Mina_state.Snarked_ledger_state in
+          let { Proof_carrying_data.data = t1; _ } = proof1 in
+          let { Proof_carrying_data.data = t2; _ } = proof2 in
+          let statement =
+            Statement.merge
+              ({ t1 with sok_digest = () } : Statement.t)
+              { t2 with sok_digest = () }
+          in
+          match statement with
+          | Ok statement ->
+              statement
+          | Error _ ->
+              failwith
+                "Failed to construct a statement from  zkapp merge command" )
 
     let transaction : t -> Mina_transaction.Transaction.t option = function
       | Regular (work, _) ->

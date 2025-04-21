@@ -203,53 +203,35 @@ module Impl : Worker_impl.S = struct
         M.merge ~sok_digest proof1 proof2
 
   let cache_and_time ~logger ~cache ~statement ~spec k =
-    let log_error_and_return e =
-      [%log error] "SNARK worker failed: $error"
-        ~metadata:
-          [ ("error", Error_json.error_to_yojson e)
-          ; ( "spec"
-              (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
-                 so we use the less-desirable sexp here
-              *)
-            , `String
-                (Sexp.to_string
-                   Work.Partitioned.Single.Spec.(
-                     materialize spec |> Stable.Latest.sexp_of_t) ) )
-          ] ;
-      Error e
-    in
-
-    match statement with
-    | Some statement -> (
-        match (Cache.find cache) statement with
-        | Some proof ->
-            Deferred.Or_error.return (proof, Time.Span.zero)
-        | None -> (
-            let start = Time.now () in
-            match%map.Async.Deferred
-              Monitor.try_with_join_or_error ~here:[%here] k
-            with
-            | Error e ->
-                log_error_and_return e
-            | Ok res ->
-                Cache.add cache ~statement ~proof:res ;
-
-                let total = Time.abs_diff (Time.now ()) start in
-                Ok (res, total) ) )
+    match (Cache.find cache) statement with
+    | Some proof ->
+        Deferred.Or_error.return (proof, Time.Span.zero)
     | None -> (
-        (*This is the case for zkapp merge *)
         let start = Time.now () in
         match%map.Async.Deferred
           Monitor.try_with_join_or_error ~here:[%here] k
         with
         | Error e ->
-            log_error_and_return e
+            [%log error] "SNARK worker failed: $error"
+              ~metadata:
+                [ ("error", Error_json.error_to_yojson e)
+                ; ( "spec"
+                    (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
+                       so we use the less-desirable sexp here
+                    *)
+                  , `String
+                      (Sexp.to_string
+                         Work.Partitioned.Single.Spec.(
+                           materialize spec |> Stable.Latest.sexp_of_t) ) )
+                ] ;
+            Error e
         | Ok res ->
+            Cache.add cache ~statement ~proof:res ;
+
             let total = Time.abs_diff (Time.now ()) start in
             Ok (res, total) )
 
   let perform_single ({ m_with_proof_level; cache } : Worker_state.t) ~message =
-    let open Deferred.Or_error.Let_syntax in
     let sok_digest = Mina_base.Sok_message.digest message in
     let logger = Logger.create () in
     fun (spec : Work.Partitioned.Single.Spec.t) ->
@@ -282,15 +264,9 @@ module Impl : Worker_impl.S = struct
                     (module M)
                     proof1 proof2 )
       | Check | No_check ->
-          let stmt =
-            Option.value_exn statement
-              ~message:
-                "For zkapp merges, it's unclear what dummy statement should be \
-                 fill in this place"
-          in
-
           Deferred.Or_error.return
-          @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
+          @@ ( Transaction_snark.create
+                 ~statement:{ statement with sok_digest }
                  ~proof:(Lazy.force Proof.transaction_dummy)
              , Time.Span.zero )
 end
