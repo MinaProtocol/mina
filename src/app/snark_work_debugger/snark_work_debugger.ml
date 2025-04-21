@@ -1,11 +1,6 @@
 open Core
 open Async
-
-type single_spec =
-  ( Transaction_witness.Stable.Latest.t
-  , Transaction_snark.Stable.Latest.t )
-  Snark_work_lib.Work.Single.Spec.Stable.Latest.t
-[@@deriving sexp]
+module Work = Snark_work_lib
 
 let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
   | Atom s ->
@@ -16,10 +11,18 @@ let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
 let () = ignore sexp_to_sexp
 
 let main (spec_path : string) ~constraint_constants ~proof_level =
-  let module Inputs = Snark_worker.Prod.Inputs in
-  let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in
+  let module Impl = Snark_worker.Impl.Prod in
+  let%bind spec =
+    Reader.load_sexp_exn spec_path
+      Work.Partitioned.Single.Spec.Stable.Latest.t_of_sexp
+  in
+  let spec =
+    Work.Partitioned.Single.Spec.cache
+      ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
+      spec
+  in
   let%bind worker =
-    Inputs.Worker_state.create ~constraint_constants ~proof_level ()
+    Impl.Worker_state.create ~constraint_constants ~proof_level ()
   in
   let message =
     Mina_base.Sok_message.create ~fee:Currency.Fee.zero
@@ -28,7 +31,7 @@ let main (spec_path : string) ~constraint_constants ~proof_level =
           Public_key.compress
             (Public_key.of_private_key_exn (Private_key.create ())))
   in
-  Inputs.perform_single worker ~message spec >>| ignore
+  Impl.perform_single worker ~message spec >>| ignore
 
 let cmd =
   Command.async ~summary:"Run a snark worker on a single work spec"
