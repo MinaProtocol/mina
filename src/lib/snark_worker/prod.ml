@@ -2,6 +2,7 @@ open Core
 open Async
 open Mina_base
 open Mina_transaction
+module Zkapp_command_inputs = Work_partitioner.Shared.Zkapp_command_inputs
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
@@ -46,6 +47,57 @@ module Impl : Worker_impl.S = struct
 
     let worker_wait_time = 5.
   end
+
+  let log_zkapp_cmd_base_snark ~logger ~statement ~spec ?all_inputs f =
+    match%map.Deferred
+      Deferred.Or_error.try_with ~here:[%here] (fun () -> f ~statement ~spec)
+    with
+    | Ok p ->
+        Ok p
+    | Error e ->
+        let all_inputs_meta_data =
+          match all_inputs with
+          | None ->
+              (* WARN: we may be missing inputs, as zkapp segment work doesn't pass
+                          this over the network! *)
+              []
+          | Some all_inputs ->
+              [ ( "inputs"
+                , Zkapp_command_inputs.materialize all_inputs
+                  |> Zkapp_command_inputs.Stable.Latest.to_yojson )
+              ]
+        in
+        [%log fatal]
+          "Transaction snark failed for input $spec $statement. All inputs: \
+           $inputs. Error:  $error"
+          ~metadata:
+            ( [ ( "spec"
+                , Transaction_snark.Zkapp_command_segment.Basic.to_yojson spec
+                )
+              ; ( "statement"
+                , Transaction_snark.Statement.With_sok.to_yojson statement )
+              ; ("error", `String (Error.to_string_hum e))
+              ]
+            @ all_inputs_meta_data ) ;
+        Error e
+
+  let log_zkapp_cmd_merge_snark ~logger ~sok_digest
+      (module M : Transaction_snark.S) prev curr =
+    match%map.Deferred M.merge ~sok_digest prev curr with
+    | Ok p ->
+        Ok p
+    | Error e ->
+        [%log fatal] "Merge snark failed for $stmt1 $stmt2. Error:  $error"
+          ~metadata:
+            [ ( "stmt1"
+              , Transaction_snark.Statement.to_yojson
+                  (Ledger_proof.statement prev) )
+            ; ( "stmt2"
+              , Transaction_snark.Statement.to_yojson
+                  (Ledger_proof.statement curr) )
+            ; ("error", `String (Error.to_string_hum e))
+            ] ;
+        Error e
 
   (* bin_io is for uptime service SNARK worker *)
   type single_spec =
@@ -107,65 +159,13 @@ module Impl : Worker_impl.S = struct
                                    zkapp_command )
                           in
 
-                          let log_base_snark f ~statement ~spec ~all_inputs =
-                            match%map.Deferred
-                              Deferred.Or_error.try_with ~here:[%here]
-                                (fun () -> f ~statement ~spec)
-                            with
-                            | Ok p ->
-                                Ok p
-                            | Error e ->
-                                [%log fatal]
-                                  "Transaction snark failed for input $spec \
-                                   $statement. All inputs: $inputs. Error:  \
-                                   $error"
-                                  ~metadata:
-                                    [ ( "spec"
-                                      , Transaction_snark.Zkapp_command_segment
-                                        .Basic
-                                        .to_yojson spec )
-                                    ; ( "statement"
-                                      , Transaction_snark.Statement.With_sok
-                                        .to_yojson statement )
-                                    ; ("error", `String (Error.to_string_hum e))
-                                    ; ( "inputs"
-                                      , zkapp_command_inputs_to_yojson
-                                          all_inputs )
-                                    ] ;
-                                Error e
-                          in
-                          let log_merge_snark ~sok_digest prev curr ~all_inputs
-                              =
-                            match%map.Deferred
-                              M.merge ~sok_digest prev curr
-                            with
-                            | Ok p ->
-                                Ok p
-                            | Error e ->
-                                [%log fatal]
-                                  "Merge snark failed for $stmt1 $stmt2. All \
-                                   inputs: $inputs. Error:  $error"
-                                  ~metadata:
-                                    [ ( "stmt1"
-                                      , Transaction_snark.Statement.to_yojson
-                                          (Ledger_proof.statement prev) )
-                                    ; ( "stmt2"
-                                      , Transaction_snark.Statement.to_yojson
-                                          (Ledger_proof.statement curr) )
-                                    ; ("error", `String (Error.to_string_hum e))
-                                    ; ( "inputs"
-                                      , zkapp_command_inputs_to_yojson
-                                          all_inputs )
-                                    ] ;
-                                Error e
-                          in
                           match witnesses_specs_stmts with
                           | [] ->
                               Deferred.Or_error.error_string
                                 "no witnesses generated"
                           | (witness, spec, stmt) :: rest as inputs ->
                               let%bind (p1 : Ledger_proof.t) =
-                                log_base_snark
+                                log_zkapp_cmd_base_snark ~logger
                                   ~statement:{ stmt with sok_digest } ~spec
                                   ~all_inputs:inputs
                                   (M.of_zkapp_command_segment_exn ~witness)
@@ -177,14 +177,18 @@ module Impl : Worker_impl.S = struct
                                     let%bind (prev : Ledger_proof.t) =
                                       Deferred.return acc
                                     in
+
+                                    (* let log_zkapp_cmd_base_snark ~logger ~statement ~spec ?all_inputs f = *)
                                     let%bind (curr : Ledger_proof.t) =
-                                      log_base_snark
+                                      log_zkapp_cmd_base_snark ~logger
                                         ~statement:{ stmt with sok_digest }
                                         ~spec ~all_inputs:inputs
                                         (M.of_zkapp_command_segment_exn ~witness)
                                     in
-                                    log_merge_snark ~sok_digest prev curr
-                                      ~all_inputs:inputs )
+                                    log_zkapp_cmd_merge_snark ~logger
+                                      ~sok_digest
+                                      (module M)
+                                      prev curr )
                               in
                               if
                                 Transaction_snark.Statement.equal
@@ -203,7 +207,9 @@ module Impl : Worker_impl.S = struct
                                       , Transaction_snark.Statement.to_yojson
                                           input )
                                     ; ( "inputs"
-                                      , zkapp_command_inputs_to_yojson inputs )
+                                      , Zkapp_command_inputs.materialize inputs
+                                        |> Zkapp_command_inputs.Stable.Latest
+                                           .to_yojson )
                                     ] ;
                                 Deferred.return
                                   (Or_error.error_string
