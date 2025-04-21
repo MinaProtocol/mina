@@ -224,10 +224,8 @@ let emit_proof_metrics metrics instances logger =
                ; proof_zkapp_command_count
                } ) )
 
-let main
-    (module Rpcs_versioned : Intf.Rpcs_versioned_S
-      with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger ~proof_level
-    ~constraint_constants daemon_address shutdown_on_disconnect =
+let main ~logger ~proof_level ~constraint_constants daemon_address
+    shutdown_on_disconnect =
   let%bind state = Worker_state.create ~constraint_constants ~proof_level () in
   let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
   (* retry interval with jitter *)
@@ -267,7 +265,7 @@ let main
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
+      dispatch Get_work.Stable.Latest.rpc shutdown_on_disconnect `V3
         daemon_address
     with
     | Error e ->
@@ -282,25 +280,48 @@ let main
           ~metadata:[ ("time", `Float random_delay) ] ;
         let%bind () = wait ~sec:random_delay () in
         go ()
-    | Ok (Some (work, public_key)) -> (
+    | Ok (Some (work_spec, public_key)) -> (
+        let work_spec =
+          Work.Partitioned.Spec.cache ~proof_cache_db:Proof_cache.cache_db
+            work_spec
+        in
+        let serialize_wire_work_spec (work : Work.Partitioned.Single.Spec.t) =
+          match work with
+          | Regular (regular, _) ->
+              let inner =
+                Transaction_snark_work.Statement.compact_json_one
+                  (Work.Work.Single.Spec.statement regular)
+              in
+              `Assoc [ ("regular", inner) ]
+          | Sub_zkapp_command
+              (zkapp_command : Work.Partitioned.Zkapp_command_job.t) ->
+              `Assoc
+                [ ( "sub_zkapp_command"
+                  , Work.Partitioned.Zkapp_command_job.materialize zkapp_command
+                    |> Work.Partitioned.Zkapp_command_job.Stable.Latest
+                       .to_yojson )
+                ]
+        in
+        (* Wire_work.Single.Spec. *)
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
           ~metadata:
             [ ("address", `String (Host_and_port.to_string daemon_address))
             ; ( "work_ids"
-              , Transaction_snark_work.Statement.compact_json
-                  (One_or_two.map (Work.Spec.instances work)
-                     ~f:Work.Single.Spec.statement ) )
+              , One_or_two.to_yojson serialize_wire_work_spec
+                  work_spec.instances )
             ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
-        match%bind perform state public_key work with
+        match%bind perform state public_key work_spec with
         | Error e ->
+            let work_spec = Work.Partitioned.Spec.materialize work_spec in
             let%bind () =
               match%map
-                dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-                  shutdown_on_disconnect (e, work, public_key) daemon_address
+                dispatch Failed_to_generate_snark.Stable.Latest.rpc
+                  shutdown_on_disconnect (e, work_spec, public_key)
+                  daemon_address
               with
               | Error e ->
                   [%log error]
@@ -312,25 +333,36 @@ let main
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
             emit_proof_metrics result.metrics
-              (Work.Result.transactions result)
+              (Work.Partitioned.Result.transactions
+                 (result : Work.Partitioned.Result.t) )
               logger ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", `String (Host_and_port.to_string daemon_address))
                 ; ( "work_ids"
-                  , Transaction_snark_work.Statement.compact_json
-                      (One_or_two.map (Work.Spec.instances work)
-                         ~f:Work.Single.Spec.statement ) )
+                  , One_or_two.to_yojson serialize_wire_work_spec
+                      work_spec.instances )
                 ] ;
             let rec submit_work () =
+              let result = Work.Partitioned.Result.materialize result in
               match%bind
-                dispatch Rpcs_versioned.Submit_work.Latest.rpc
-                  shutdown_on_disconnect result daemon_address
+                dispatch Submit_work.Stable.Latest.rpc shutdown_on_disconnect
+                  result daemon_address
               with
               | Error e ->
                   log_and_retry "submitting work" e (retry_pause 10.)
                     submit_work
-              | Ok () ->
+              | Ok message_from_server ->
+                  ( match message_from_server with
+                  | `Finished_by_others when_done ->
+                      [%log info] "Work is finished by another worker at %s"
+                        (Time.to_string when_done)
+                  | `Timeout ->
+                      [%log info]
+                        "The submission is timeout, this means the worker take \
+                         too long to complete the job, the coordinator rejects"
+                  | `Ok ->
+                      () ) ;
                   go ()
             in
             submit_work () )

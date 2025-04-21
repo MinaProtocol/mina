@@ -332,4 +332,7 @@ module Result = struct
     let%bind metrics = One_or_two.Option.map ~f:fix_metric_tag metrics in
     let%map spec = Work.Spec.map_opt ~f_single:Single.Spec.regular_opt spec in
     ({ proofs; metrics; spec; prover } : Selector.Result.t)
+
+  let transactions (t : t) =
+    One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
 end
