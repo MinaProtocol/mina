@@ -280,6 +280,17 @@ module Result = struct
     ; prover
     }
 
+  let of_selector_result ({ proofs; metrics; spec; prover } : Selector.Result.t)
+      : t =
+    let spec = Spec.of_selector_spec spec in
+    let fix_metric_tag tag =
+      match tag with `Transition -> `Transition | `Merge -> `Merge
+    in
+    let metrics =
+      One_or_two.map ~f:(Tuple2.map_snd ~f:fix_metric_tag) metrics
+    in
+    { proofs; metrics; spec; prover }
+
   let to_selector_result ({ proofs; metrics; spec; prover } : t) :
       Selector.Result.t option =
     let fix_metric_tag (span, tag) =
