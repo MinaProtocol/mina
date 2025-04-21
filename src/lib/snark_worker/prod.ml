@@ -99,13 +99,6 @@ module Impl : Worker_impl.S = struct
             ] ;
         Error e
 
-  (* bin_io is for uptime service SNARK worker *)
-  type single_spec =
-    ( Transaction_witness.Stable.Latest.t
-    , Transaction_snark.Stable.Latest.t )
-    Snark_work_lib.Work.Single.Spec.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp]
-
   let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
