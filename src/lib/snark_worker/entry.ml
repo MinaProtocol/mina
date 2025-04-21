@@ -56,3 +56,8 @@ type Structured_log_events.t +=
            with $zkapp_command_count zkapp_command and \
            $proof_zkapp_command_count proof zkapp_command"
       }]
+
+(* NOTE: could swap with Debug.Impl, untested though *)
+module Impl : Worker_impl.S = Prod.Impl
+
+include Impl
