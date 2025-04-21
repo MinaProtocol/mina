@@ -224,6 +224,9 @@ module Spec = struct
   let of_selector_spec : Selector.Spec.t -> t =
     Work.Spec.map_biased ~f_single:(fun ~one_or_two instance ->
         Single.Spec.Regular (instance, { one_or_two; pair_uuid = None }) )
+
+  let to_selector_spec : t -> Selector.Spec.t option =
+    Work.Spec.map_opt ~f_single:Single.Spec.regular_opt
 end
 
 module Result = struct
