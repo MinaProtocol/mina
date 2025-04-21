@@ -25,26 +25,26 @@ module Impl : Worker_impl.S = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
 
-    type t =
-      { m : (module S) option
-      ; cache : Cache.t
-      ; proof_level : Genesis_constants.Proof_level.t
-      }
+    type module_with_proof_level = Check | No_check | Full of (module S)
+
+    type t = { m_with_proof_level : module_with_proof_level; cache : Cache.t }
 
     let create ~constraint_constants ~proof_level () =
-      let m =
+      let m_with_proof_level =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
-            Some
+            Full
               ( module Transaction_snark.Make (struct
                 let constraint_constants = constraint_constants
 
                 let proof_level = proof_level
               end) : S )
-        | Check | No_check ->
-            None
+        | Check ->
+            Check
+        | No_check ->
+            No_check
       in
-      Deferred.return { m; cache = Cache.create (); proof_level }
+      Deferred.return { m_with_proof_level; cache = Cache.create () }
 
     let worker_wait_time = 5.
   end
@@ -248,19 +248,18 @@ module Impl : Worker_impl.S = struct
             let total = Time.abs_diff (Time.now ()) start in
             Ok (res, total) )
 
-  let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
+  let perform_single ({ m_with_proof_level; cache } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
     let sok_digest = Mina_base.Sok_message.digest message in
     let logger = Logger.create () in
     fun (spec : Work.Partitioned.Single.Spec.t) ->
       let statement = Work.Partitioned.Single.Spec.statement spec in
-      match proof_level with
-      | Genesis_constants.Proof_level.Full ->
-          let (module M) = Option.value_exn m in
+      match m_with_proof_level with
+      | Full ((module M) as m) ->
           cache_and_time ~logger ~cache ~statement ~spec (fun () ->
               match spec with
               | Regular (regular, _) ->
-                  perform_regular ~m:(module M) ~logger ~regular ~sok_digest
+                  perform_regular ~m ~logger ~regular ~sok_digest
               | Sub_zkapp_command
                   { spec = Segment { statement; witness; spec }
                   ; pairing_id = _
