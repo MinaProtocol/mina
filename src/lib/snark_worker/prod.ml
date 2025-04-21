@@ -255,14 +255,33 @@ module Impl : Worker_impl.S = struct
     fun (spec : Work.Partitioned.Single.Spec.t) ->
       let statement = Work.Partitioned.Single.Spec.statement spec in
       match proof_level with
-      | Genesis_constants.Proof_level.Full -> (
+      | Genesis_constants.Proof_level.Full ->
           let (module M) = Option.value_exn m in
-          match spec with
-          | Regular (regular, _) ->
-              cache_and_time ~logger ~cache ~statement ~spec (fun () ->
-                  perform_regular ~m:(module M) ~logger ~regular ~sok_digest )
-          | Sub_zkapp_command _ ->
-              failwith "TODO" )
+          cache_and_time ~logger ~cache ~statement ~spec (fun () ->
+              match spec with
+              | Regular (regular, _) ->
+                  perform_regular ~m:(module M) ~logger ~regular ~sok_digest
+              | Sub_zkapp_command
+                  { spec = Segment { statement; witness; spec }
+                  ; pairing_id = _
+                  ; job_uuid = _
+                  } ->
+                  log_zkapp_cmd_base_snark ~logger ~statement ~spec
+                    (M.of_zkapp_command_segment_exn ~witness)
+              | Sub_zkapp_command
+                  { spec = Merge { proof1; proof2 }
+                  ; pairing_id = _
+                  ; job_uuid = _
+                  } ->
+                  let proof1 =
+                    Ledger_proof.Cached.read_proof_from_disk proof1
+                  in
+                  let proof2 =
+                    Ledger_proof.Cached.read_proof_from_disk proof2
+                  in
+                  log_zkapp_cmd_merge_snark ~logger ~sok_digest
+                    (module M)
+                    proof1 proof2 )
       | Check | No_check ->
           let stmt =
             Option.value_exn statement
