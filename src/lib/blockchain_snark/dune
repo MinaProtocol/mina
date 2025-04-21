@@ -4,43 +4,43 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  base.md5
-  base.caml
-  core_kernel
-  core
-  sexplib0
   async
-  bin_prot.shape
   async_kernel
+  base.caml
+  base.md5
+  bin_prot.shape
+  core
+  core_kernel
+  sexplib0
   ;; local libraries
-  pickles.backend
   allocation_functor
-  crypto_params
-  logger
-  consensus
-  transaction_snark
   cache_dir
-  snarky.backendless
-  snark_params
-  mina_base
-  mina_transaction_logic
-  mina_state
-  pickles_types
-  pickles_base
-  pickles
-  genesis_constants
+  consensus
+  crypto_params
   currency
-  sgn
-  random_oracle
+  data_hash_lib
+  genesis_constants
   kimchi_pasta
   kimchi_pasta.basic
-  data_hash_lib
+  logger
+  mina_base
+  mina_state
+  mina_transaction_logic
+  pickles
+  pickles.backend
+  pickles_base
+  pickles_types
   ppx_version.runtime
-  snark_keys_header)
+  random_oracle
+  sgn
+  snarky.backendless
+  snark_keys_header
+  snark_params
+  transaction_snark)
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
-  (pps ppx_snarky ppx_mina ppx_version ppx_jane ppx_compare))
+  (pps ppx_compare ppx_jane ppx_mina ppx_snarky ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "blockchain state transition snarking library"))

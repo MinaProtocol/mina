@@ -20,6 +20,8 @@ let verify_promise = Verify.verify
 open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
+module Inductive_rule = Inductive_rule.Kimchi
+module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
 type chunking_data = Verify.Instance.chunking_data =
   { num_chunks : int; domain_size : int; zk_rows : int }
@@ -727,7 +729,7 @@ struct
     accum_dirty (Lazy.map wrap_vk ~f:(Promise.map ~f:snd)) ;
     let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
     let module S =
-      Step.Make (Arg_var) (Arg_value)
+      Step.Make (Inductive_rule) (Arg_var) (Arg_value)
         (struct
           include Max_proofs_verified
         end)
