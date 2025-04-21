@@ -202,6 +202,52 @@ module Impl : Worker_impl.S = struct
         let proof2 = Ledger_proof.Cached.read_proof_from_disk proof2 in
         M.merge ~sok_digest proof1 proof2
 
+  let cache_and_time ~logger ~cache ~statement ~spec k =
+    let log_error_and_return e =
+      [%log error] "SNARK worker failed: $error"
+        ~metadata:
+          [ ("error", Error_json.error_to_yojson e)
+          ; ( "spec"
+              (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
+                 so we use the less-desirable sexp here
+              *)
+            , `String
+                (Sexp.to_string
+                   Work.Partitioned.Single.Spec.(
+                     materialize spec |> Stable.Latest.sexp_of_t) ) )
+          ] ;
+      Error e
+    in
+
+    match statement with
+    | Some statement -> (
+        match (Cache.find cache) statement with
+        | Some proof ->
+            Deferred.Or_error.return (proof, Time.Span.zero)
+        | None -> (
+            let start = Time.now () in
+            match%map.Async.Deferred
+              Monitor.try_with_join_or_error ~here:[%here] k
+            with
+            | Error e ->
+                log_error_and_return e
+            | Ok res ->
+                Cache.add cache ~statement ~proof:res ;
+
+                let total = Time.abs_diff (Time.now ()) start in
+                Ok (res, total) ) )
+    | None -> (
+        (*This is the case for zkapp merge *)
+        let start = Time.now () in
+        match%map.Async.Deferred
+          Monitor.try_with_join_or_error ~here:[%here] k
+        with
+        | Error e ->
+            log_error_and_return e
+        | Ok res ->
+            let total = Time.abs_diff (Time.now ()) start in
+            Ok (res, total) )
+
   let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
     let sok_digest = Mina_base.Sok_message.digest message in
@@ -211,41 +257,20 @@ module Impl : Worker_impl.S = struct
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
           let (module M) = Option.value_exn m in
-          let process k =
-            let start = Time.now () in
-            match%map.Async.Deferred
-              Monitor.try_with_join_or_error ~here:[%here] k
-            with
-            | Error e ->
-                [%log error] "SNARK worker failed: $error"
-                  ~metadata:
-                    [ ("error", Error_json.error_to_yojson e)
-                    ; ( "spec"
-                        (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
-                           so we use the less-desirable sexp here
-                        *)
-                      , `String
-                          (Sexp.to_string
-                             Work.Partitioned.Single.Spec.(
-                               materialize spec |> Stable.Latest.sexp_of_t) ) )
-                    ] ;
-                Error e
-            | Ok res ->
-                Cache.add cache ~statement ~proof:res ;
-                let total = Time.abs_diff (Time.now ()) start in
-                Ok (res, total)
-          in
-          match Cache.find cache statement with
-          | Some proof ->
-              Deferred.Or_error.return (proof, Time.Span.zero)
-          | None -> (
-              match spec with
-              | Regular (regular, _) ->
-                  process (fun () ->
-                      perform_regular ~m:(module M) ~logger ~regular ~sok_digest )
-              | Sub_zkapp_command _ ->
-                  failwith "TODO" ) )
+          match spec with
+          | Regular (regular, _) ->
+              cache_and_time ~logger ~cache ~statement ~spec (fun () ->
+                  perform_regular ~m:(module M) ~logger ~regular ~sok_digest )
+          | Sub_zkapp_command _ ->
+              failwith "TODO" )
       | Check | No_check ->
+          let stmt =
+            Option.value_exn statement
+              ~message:
+                "For zkapp merges, it's unclear what dummy statement should be \
+                 fill in this place"
+          in
+
           Deferred.Or_error.return
           @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
                  ~proof:(Lazy.force Proof.transaction_dummy)
