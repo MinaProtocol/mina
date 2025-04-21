@@ -11,11 +11,14 @@ open Common
 (* This contains the "step" prover *)
 
 module Make
+    (Inductive_rule : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
     (A : T0) (A_value : sig
       type t
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule)
+
   let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct

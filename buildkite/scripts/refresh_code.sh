@@ -1,6 +1,5 @@
 #!/bin/bash
 
-source ./buildkite/scripts/handle-fork.sh
-git fetch ${REMOTE} --recurse-submodules
-git fetch ${REMOTE} --tags
-git fetch ${REMOTE} --prune-tags
+git branch -D $BUILDKITE_BRANCH 2>/dev/null || true
+git checkout -b $BUILDKITE_BRANCH
+git reset --hard $BUILDKITE_COMMIT
