@@ -370,9 +370,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
   go ()
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants
-    (module Rpcs_versioned : Intf.Rpcs_versioned_S
-      with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
+    ~constraint_constants =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -409,9 +407,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
           [%log info]
             !"Received signal to terminate. Aborting snark worker process" ;
           Core.exit 0 ) ;
-      main
-        (module Rpcs_versioned)
-        ~logger ~proof_level ~constraint_constants daemon_port
+      main ~logger ~proof_level ~constraint_constants daemon_port
         (Option.value ~default:true shutdown_on_disconnect))
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
