@@ -11,14 +11,46 @@ open Transaction_snark
    reasons
 *)
 
-let extract_zkapp_segment_works ~m:(module M : S)
-    ~(input : Mina_state.Snarked_ledger_state.t)
-    ~(witness : Transaction_witness.t) ~(zkapp_command : Zkapp_command.t) :
+module Zkapp_command_inputs = struct
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t =
+        ( Zkapp_command_segment.Witness.Stable.V1.t
+        * Zkapp_command_segment.Basic.Stable.V1.t
+        * Statement.With_sok.Stable.V2.t )
+        list
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t =
     ( Zkapp_command_segment.Witness.t
     * Zkapp_command_segment.Basic.t
     * Statement.With_sok.t )
     list
-    Deferred.Or_error.t =
+
+  let cache : Stable.V1.t -> t =
+    List.map ~f:(fun (witness, segment, stmt) ->
+        ( Zkapp_command_segment.Witness.write_all_proofs_to_disk witness
+        , segment
+        , stmt ) )
+
+  let materialize : t -> Stable.V1.t =
+    List.map ~f:(fun (witness, segment, stmt) ->
+        ( Zkapp_command_segment.Witness.read_all_proofs_from_disk witness
+        , segment
+        , stmt ) )
+end
+
+let extract_zkapp_segment_works ~m:(module M : S)
+    ~(input : Mina_state.Snarked_ledger_state.t)
+    ~(witness : Transaction_witness.t) ~(zkapp_command : Zkapp_command.t) :
+    Zkapp_command_inputs.t Deferred.Or_error.t =
   Or_error.try_with (fun () ->
       zkapp_command_witnesses_exn ~constraint_constants:M.constraint_constants
         ~global_slot:witness.block_global_slot

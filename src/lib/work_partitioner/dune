@@ -18,7 +18,9 @@
   (pps
    ppx_let
    ppx_custom_printf
-   ppx_version))
+   ppx_version
+   ppx_sexp_conv
+   ppx_deriving_yojson))
    
  (instrumentation
   (backend bisect_ppx))
