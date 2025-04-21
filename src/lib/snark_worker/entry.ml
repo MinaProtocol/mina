@@ -61,30 +61,47 @@ type Structured_log_events.t +=
 module Impl : Worker_impl.S = Prod.Impl
 
 include Impl
+module Work = Snark_work_lib
 
-let perform (s : Worker_state.t) public_key
-    ({ instances; fee } as spec : Work.Spec.t) =
-  One_or_two.Deferred_result.map instances ~f:(fun w ->
+let perform (s : Worker_state.t) prover
+    ({ instances; fee } as spec : Work.Partitioned.Spec.t) =
+  One_or_two.Deferred_result.map instances ~f:(fun single_work ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
         perform_single s
-          ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-          w
+          ~message:(Mina_base.Sok_message.create ~fee ~prover)
+          single_work
       in
-      ( proof
-      , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
+      let work_tag =
+        match single_work with
+        | Regular (Transition _, _) ->
+            `Transition
+        | Regular (Merge _, _) ->
+            `Merge
+        | Sub_zkapp_command { spec = Segment _; _ } ->
+            `Sub_zkapp_command `Segment
+        | Sub_zkapp_command { spec = Merge _; _ } ->
+            `Sub_zkapp_command `Merge
+      in
+
+      let proof_cached =
+        Ledger_proof.Cached.write_proof_to_disk
+          ~proof_cache_db:Proof_cache.cache_db proof
+      in
+
+      (proof_cached, (time, work_tag)) )
   |> Deferred.Or_error.map ~f:(function
        | `One (proof1, metrics1) ->
-           { Snark_work_lib.Work.Result.proofs = `One proof1
+           { Work.Partitioned.Result.proofs = `One proof1
            ; metrics = `One metrics1
            ; spec
-           ; prover = public_key
+           ; prover
            }
        | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-           { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
+           { Work.Partitioned.Result.proofs = `Two (proof1, proof2)
            ; metrics = `Two (metrics1, metrics2)
            ; spec
-           ; prover = public_key
+           ; prover
            } )
 
 let dispatch rpc shutdown_on_disconnect query address =
