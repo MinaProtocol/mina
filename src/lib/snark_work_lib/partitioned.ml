@@ -188,7 +188,10 @@ module Single = struct
     let statement : t -> Transaction_snark.Statement.t option = function
       | Regular (regular, _) ->
           Some (Work.Single.Spec.statement regular)
-      | Sub_zkapp_command _ ->
+      | Sub_zkapp_command
+          { spec = Zkapp_command_job.Spec.Segment { statement; _ }; _ } ->
+          Some (Mina_state.Snarked_ledger_state.With_sok.drop_sok statement)
+      | Sub_zkapp_command { spec = Zkapp_command_job.Spec.Merge _; _ } ->
           None
 
     let transaction : t -> Mina_transaction.Transaction.t option = function
