@@ -13,6 +13,8 @@ let%test_module "Composability test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let sk = Private_key.create ()
 
     let pk = Public_key.of_private_key_exn sk
@@ -214,7 +216,6 @@ let%test_module "Composability test" =
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
         let account_updates_hash =
@@ -243,7 +244,6 @@ let%test_module "Composability test" =
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
           Zkapp_command.t =
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -298,7 +298,6 @@ let%test_module "Composability test" =
           Ledger.get ledger loc )
 
     let test_recursive num_calls call_kind =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let increments =
         Array.init num_calls ~f:(fun _ -> Snark_params.Tick.Field.random ())
       in
