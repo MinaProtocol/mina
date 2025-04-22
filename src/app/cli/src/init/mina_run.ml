@@ -476,7 +476,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 )
               ] ;
           let result =
-            Work.Partitioned.Result.cache ~proof_cache_db:(failwith "TODO")
+            Work.Partitioned.Result.cache
+              ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
               wire_result
           in
           log_snark_work_metrics result ;
