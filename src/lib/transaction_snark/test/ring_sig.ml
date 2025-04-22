@@ -256,7 +256,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           in
           let tx_statement : Zkapp_statement.t =
             { account_update =
-                Account_update.Body.digest
+                Account_update.Body.digest ~signature_kind
                   (Account_update.of_simple snapp_account_update_data).body
             ; calls = (Zkapp_command.Digest.Forest.empty :> field)
             }
