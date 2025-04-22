@@ -2369,6 +2369,8 @@ let%test_module "staged ledger tests" =
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let zkapp_cmd_limit_hardcap = 200
 
     let logger = Logger.null ()
@@ -2380,8 +2382,8 @@ let%test_module "staged ledger tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -5169,8 +5171,8 @@ let%test_module "staged ledger tests" =
                         = 1 ) ;
 
                       let%bind verifier_full =
-                        Verifier.For_tests.default ~constraint_constants ~logger
-                          ~proof_level:Full ()
+                        Verifier.For_tests.default ~signature_kind
+                          ~constraint_constants ~logger ~proof_level:Full ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

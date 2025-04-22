@@ -492,14 +492,16 @@ let%test_module "Transition_handler.Processor tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let time_controller = Block_time.Controller.basic ~logger
 
     let trust_system = Trust_system.null ()
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     module Context = struct
       let logger = logger

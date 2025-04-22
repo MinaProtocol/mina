@@ -490,12 +490,14 @@ module Snark_pool = struct
 
       let constraint_constants = precomputed_values.constraint_constants
 
+      let signature_kind = Mina_signature_kind.t_DEPRECATED
+
       let logger = Logger.null ()
 
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.For_tests.default ~constraint_constants ~logger
-              ~proof_level () )
+            Verifier.For_tests.default ~signature_kind ~constraint_constants
+              ~logger ~proof_level () )
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in

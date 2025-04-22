@@ -1857,10 +1857,10 @@ let internal_commands logger ~itn_features =
                     | Error err ->
                         failwithf "Could not parse JSON: %s" err () ) )
           in
-
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           let%bind verifier =
-            Verifier.For_tests.default ~constraint_constants ~proof_level
-              ~commit_id:Mina_version.commit_id ~logger
+            Verifier.For_tests.default ~signature_kind ~constraint_constants
+              ~proof_level ~commit_id:Mina_version.commit_id ~logger
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =

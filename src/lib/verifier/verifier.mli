@@ -15,6 +15,7 @@ module For_tests : sig
     -> ?enable_internal_tracing:bool
     -> ?internal_trace_filename:string
     -> proof_level:Genesis_constants.Proof_level.t
+    -> signature_kind:Mina_signature_kind.t
     -> ?pids:Child_processes.Termination.t
     -> ?conf_dir:string option
     -> ?commit_id:string

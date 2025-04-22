@@ -17,6 +17,8 @@ let%test_module "network pool test" =
 
     let proof_level = precomputed_values.proof_level
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let time_controller = Block_time.Controller.basic ~logger
 
     let block_window_duration =
@@ -24,8 +26,8 @@ let%test_module "network pool test" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     module Mock_snark_pool =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)

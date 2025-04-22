@@ -189,7 +189,8 @@ let%test_module "Epoch ledger sync tests" =
         Block_time.Controller.create @@ Block_time.Controller.basic ~logger
       in
       let on_remote_push () = Deferred.unit in
-      let%bind verifier = make_verifier (module Context) in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      let%bind verifier = make_verifier ~signature_kind (module Context) in
       let block_reader, block_sink =
         let on_push () = Deferred.unit in
         Transition_handler.Block_sink.create

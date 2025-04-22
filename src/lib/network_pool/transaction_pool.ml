@@ -1672,6 +1672,8 @@ let%test_module _ =
 
     let proof_level = precomputed_values.proof_level
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let genesis_constants = precomputed_values.genesis_constants
 
     let minimum_fee =
@@ -1683,8 +1685,8 @@ let%test_module _ =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ()
@@ -3105,8 +3107,8 @@ let%test_module _ =
               authorization would be rejected" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier_full =
-            Verifier.For_tests.default ~constraint_constants ~logger
-              ~proof_level:Full ()
+            Verifier.For_tests.default ~signature_kind ~constraint_constants
+              ~logger ~proof_level:Full ()
           in
           let%bind test =
             setup_test ~verifier:verifier_full

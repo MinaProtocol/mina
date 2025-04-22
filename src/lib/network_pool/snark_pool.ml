@@ -588,14 +588,16 @@ let%test_module "random set test" =
 
     let proof_level = precomputed_values.proof_level
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     let mk_dummy_proof = Ledger_proof.For_tests.mk_dummy_proof
 

@@ -20,9 +20,10 @@ let m =
 include (val m)
 
 module For_tests = struct
-  let get_verification_keys_eagerly ~constraint_constants ~proof_level =
+  let get_verification_keys_eagerly ~signature_kind ~constraint_constants
+      ~proof_level =
     let module T = Transaction_snark.Make (struct
-      let signature_kind = Mina_signature_kind.t_DEPRECATED
+      let signature_kind = signature_kind
 
       let constraint_constants = constraint_constants
 
@@ -41,15 +42,16 @@ module For_tests = struct
     return (`Blockchain blockchain_vk, `Transaction transaction_vk)
 
   let default ~logger ~constraint_constants ?enable_internal_tracing
-      ?internal_trace_filename ~proof_level
+      ?internal_trace_filename ~proof_level ~signature_kind
       ?(pids = Child_processes.Termination.create_pid_table ())
       ?(conf_dir = None) ?(commit_id = "not specified for unit tests") () =
     let open Async.Deferred.Let_syntax in
     let%bind ( `Blockchain blockchain_verification_key
              , `Transaction transaction_verification_key ) =
-      get_verification_keys_eagerly ~constraint_constants ~proof_level
+      get_verification_keys_eagerly ~signature_kind ~constraint_constants
+        ~proof_level
     in
-    create ~logger ?enable_internal_tracing ?internal_trace_filename
-      ~proof_level ~pids ~conf_dir ~commit_id ~blockchain_verification_key
-      ~transaction_verification_key ()
+    create ~signature_kind ~logger ?enable_internal_tracing
+      ?internal_trace_filename ~proof_level ~pids ~conf_dir ~commit_id
+      ~blockchain_verification_key ~transaction_verification_key ()
 end
