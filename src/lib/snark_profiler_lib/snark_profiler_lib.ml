@@ -117,6 +117,7 @@ module Transaction_key = struct
   let of_zkapp_command
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~ledger
       (p : Zkapp_command.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let second_pass_ledger =
       let new_mask =
         Mina_ledger.Ledger.Mask.create
@@ -134,7 +135,8 @@ module Transaction_key = struct
       |> Or_error.ok_exn
     in
     let segments =
-      Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
+      Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
+        ~constraint_constants
         ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero

@@ -79,6 +79,7 @@ module Inputs = struct
     Fn.compose impl convert
 
   let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
@@ -122,6 +123,7 @@ module Inputs = struct
                           let%bind witnesses_specs_stmts =
                             Or_error.try_with (fun () ->
                                 Transaction_snark.zkapp_command_witnesses_exn
+                                  ~signature_kind
                                   ~constraint_constants:M.constraint_constants
                                   ~global_slot:w.block_global_slot
                                   ~state_body:w.protocol_state_body

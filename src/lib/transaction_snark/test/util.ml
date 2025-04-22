@@ -75,6 +75,7 @@ let logger_null = Logger.null ()
 let check_zkapp_command_with_merges_exn ?(logger = logger_null)
     ?expected_failure ?ignore_outside_snark ?global_slot
     ?(state_body = genesis_state_body) ledger zkapp_commands =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let module T = (val Lazy.force snark_module) in
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
@@ -140,7 +141,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
            ->
           match
             Or_error.try_with (fun () ->
-                Transaction_snark.zkapp_command_witnesses_exn
+                Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
                   ~constraint_constants ~global_slot ~state_body
                   ~fee_excess:Amount.Signed.zero
                   [ ( `Pending_coinbase_init_stack init_stack
