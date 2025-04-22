@@ -352,7 +352,7 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let ps =
                     Zkapp_command.Call_forest.With_hashes
-                    .of_zkapp_command_simple_list
+                    .of_zkapp_command_simple_list ~signature_kind
                       [ sender_account_update; snapp_account_update ]
                   in
                   let account_updates_hash =
@@ -952,7 +952,7 @@ let%test_module "Account precondition tests" =
               in
               let ps =
                 Zkapp_command.Call_forest.With_hashes
-                .of_zkapp_command_simple_list
+                .of_zkapp_command_simple_list ~signature_kind
                   [ sender_account_update; snapp_account_update ]
               in
               let account_updates_hash = Zkapp_command.Call_forest.hash ps in

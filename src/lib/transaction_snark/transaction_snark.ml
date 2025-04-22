@@ -4463,7 +4463,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let ps =
         Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
-          account_updates_data
+          ~signature_kind account_updates_data
       in
       let account_updates_hash = Zkapp_command.Call_forest.hash ps in
       let commitment : Zkapp_command.Transaction_commitment.t =
@@ -4897,7 +4897,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         snapp_zkapp_command
         |> List.map ~f:(fun p -> (p, p))
         |> Zkapp_command.Call_forest.With_hashes_and_data
-           .of_zkapp_command_simple_list
+           .of_zkapp_command_simple_list ~signature_kind
         |> Zkapp_statement.zkapp_statements_of_forest
         |> Zkapp_command.Call_forest.to_account_updates
       in
@@ -5160,6 +5160,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let memo = Signed_command_memo.empty in
       let ps =
         Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+          ~signature_kind
           [ sender_account_update_data; snapp_account_update_data ]
       in
       let account_updates_hash = Zkapp_command.Call_forest.hash ps in
@@ -5170,6 +5171,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let proof_account_update =
         let tree =
           Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+            ~signature_kind
             [ snapp_account_update_data ]
           |> List.hd_exn
         in

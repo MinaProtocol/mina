@@ -554,17 +554,16 @@ module With_hashes_and_data = struct
       ~hash_account_update:(hash_account_update ~signature_kind)
       xs
 
-  let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let of_zkapp_command_simple_list ~signature_kind
+      (xs : (Account_update.Simple.t * 'a) list) =
     of_account_updates xs
       ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
         p.body.call_depth )
     |> map ~f:(fun (p, x) -> (Account_update.of_simple p, x))
     |> accumulate_hashes ~signature_kind
 
-  let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) : _ t
-      =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let of_account_updates ~signature_kind
+      (xs : (Account_update.Graphql_repr.t * 'a) list) : _ t =
     of_account_updates_map
       ~account_update_depth:(fun ((p : Account_update.Graphql_repr.t), _) ->
         p.body.call_depth )
@@ -577,7 +576,10 @@ module With_hashes_and_data = struct
   let to_zkapp_command_with_hashes_list (x : _ t) =
     to_zkapp_command_with_hashes_list x
 
-  let account_updates_hash' xs = of_account_updates xs |> hash
+  let account_updates_hash' xs =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+
+    of_account_updates ~signature_kind xs |> hash
 
   let account_updates_hash xs =
     List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash'
@@ -613,17 +615,16 @@ module With_hashes = struct
       ~hash_account_update:(hash_account_update ~signature_kind)
       xs
 
-  let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let of_zkapp_command_simple_list ~signature_kind
+      (xs : Account_update.Simple.t list) =
     of_account_updates xs
       ~account_update_depth:(fun (p : Account_update.Simple.t) ->
         p.body.call_depth )
     |> map ~f:Account_update.of_simple
     |> accumulate_hashes ~signature_kind
 
-  let of_account_updates (xs : Account_update.Graphql_repr.t list) :
-      Stable.Latest.t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let of_account_updates ~signature_kind
+      (xs : Account_update.Graphql_repr.t list) : Stable.Latest.t =
     of_account_updates_map
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
@@ -636,7 +637,9 @@ module With_hashes = struct
   let to_zkapp_command_with_hashes_list (x : t) =
     to_zkapp_command_with_hashes_list x
 
-  let account_updates_hash' xs = of_account_updates xs |> hash
+  let account_updates_hash' xs =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    of_account_updates ~signature_kind xs |> hash
 
   let account_updates_hash xs =
     List.map ~f:(fun x -> x) xs |> account_updates_hash'
