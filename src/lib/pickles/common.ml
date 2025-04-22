@@ -53,8 +53,7 @@ let hash_messages_for_next_step_proof ~app_state
          Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
        ~app_state )
 
-let dlog_pcs_batch (type nat proofs_verified total) _ =
-  Pcs_batch.create ~with_degree_bound:[]
+let dlog_pcs_batch = Pcs_batch.empty
 
 let when_profiling profiling default =
   match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with

@@ -1297,7 +1297,6 @@ struct
             Nat.N11.add Nat.N8.n
           in
           let len_6, len_6_add = Nat.N45.add len_5 in
-          let num_commitments_without_degree_bound = len_6 in
           let without_degree_bound =
             let append_chain len second first =
               Vector.append first second len
@@ -1352,10 +1351,7 @@ struct
                            ; m.lookup_selector_ffmul
                            ] ) )
           in
-          check_bulletproof
-            ~pcs_batch:
-              (Common.dlog_pcs_batch
-                 (Max_proofs_verified.add num_commitments_without_degree_bound) )
+          check_bulletproof ~pcs_batch:Common.dlog_pcs_batch
             ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound

@@ -2,6 +2,8 @@
 
 type ('a, 'm) t
 
+val empty : ('a, Nat.z) t
+
 val map : ('a, 'm) t -> f:('a -> 'b) -> ('b, 'm) t
 
 val pow : one:'f -> mul:('f -> 'f -> 'f) -> 'f -> int -> 'f

@@ -2,6 +2,8 @@ open Core_kernel
 
 type ('a, 'm) t = { with_degree_bound : ('a, 'm) Vector.t }
 
+let empty = { with_degree_bound = [] }
+
 let map t ~f = { with_degree_bound = Vector.map t.with_degree_bound ~f }
 
 let num_bits n = Int.floor_log2 n + 1

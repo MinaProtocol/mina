@@ -51,10 +51,7 @@ val ft_comm :
   -> t_comm:'comm array
   -> 'comm
 
-val dlog_pcs_batch :
-     'total Pickles_types.Nat.t
-     * ('proofs_verified, 'n, 'total) Pickles_types.Nat.Adds.t
-  -> ('total, Pickles_types.Nat.z) Pickles_types.Pcs_batch.t
+val dlog_pcs_batch : ('total, Pickles_types.Nat.z) Pickles_types.Pcs_batch.t
 
 val combined_evaluation :
      (module Snarky_backendless.Snark_intf.Run

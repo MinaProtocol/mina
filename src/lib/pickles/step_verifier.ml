@@ -604,11 +604,7 @@ struct
                     num_commitments_without_degree_bound ) )
           in
           with_label "check_bulletproof" (fun () ->
-              check_bulletproof
-                ~pcs_batch:
-                  (Common.dlog_pcs_batch
-                     (Wrap_hack.Padded_length.add
-                        num_commitments_without_degree_bound ) )
+              check_bulletproof ~pcs_batch:Common.dlog_pcs_batch
                 ~sponge:sponge_before_evaluations ~xi ~advice ~opening
                 ~polynomials:(without_degree_bound, []) )
         in
