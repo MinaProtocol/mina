@@ -545,9 +545,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ~fee_payer_account ~source_account ~receiver_account txn)
     end
 
-    let%snarkydef_ check_signature shifted ~payload ~is_user_command ~signer
-        ~signature =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let%snarkydef_ check_signature ~signature_kind shifted ~payload
+        ~is_user_command ~signer ~signature =
       let%bind input =
         Transaction_union_payload.Checked.to_input_legacy payload
       in
@@ -634,8 +633,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~max_proofs_verified:
               (module Pickles.Side_loaded.Verification_key.Max_width) )
 
-    let signature_verifies ~shifted ~payload_digest signature pk =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let signature_verifies ~signature_kind ~shifted ~payload_digest signature pk
+        =
       let%bind pk =
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
@@ -1621,7 +1620,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
             let increment_nonce (t : t) = t.account_update.data.increment_nonce
 
-            let check_authorization ~will_succeed ~commitment
+            let check_authorization ~signature_kind ~will_succeed ~commitment
                 ~calls:({ hash = calls; _ } : Call_forest.t)
                 ({ account_update; control; _ } : t) =
               let proof_verifies =
@@ -1656,7 +1655,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                       (let%bind (module S) =
                          Tick.Inner_curve.Checked.Shifted.create ()
                        in
-                       signature_verifies
+                       signature_verifies ~signature_kind
                          ~shifted:(module S)
                          ~payload_digest:commitment signature
                          account_update.data.public_key )
@@ -2206,7 +2205,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       Amount.Checked.if_ accumulate_burned_tokens ~then_:amt
         ~else_:acc_burned_tokens
 
-    let%snarkydef_ apply_tagged_transaction
+    let%snarkydef_ apply_tagged_transaction ~signature_kind
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         (type shifted)
         (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
@@ -2219,7 +2218,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let%bind () =
         [%with_label_ "Check transaction signature"] (fun () ->
-            check_signature shifted ~payload ~is_user_command ~signer ~signature )
+            check_signature shifted ~signature_kind ~payload ~is_user_command
+              ~signer ~signature )
       in
       let%bind signer_pk = Public_key.compress_var signer in
       let%bind () =
@@ -3074,7 +3074,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           supply_increase : Amount.Signed.t
           pc: Pending_coinbase_stack_state.t
     *)
-    let%snarkydef_ main ~constraint_constants
+    let%snarkydef_ main ~signature_kind ~constraint_constants
         (statement : Statement.With_sok.var) =
       let%bind () = dummy_constraints () in
       let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
@@ -3095,7 +3095,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~request:(As_prover.return Global_slot)
       in
       let%bind fee_payment_root_after, fee_excess, supply_increase =
-        apply_tagged_transaction ~constraint_constants
+        apply_tagged_transaction ~signature_kind ~constraint_constants
           (module Shifted)
           statement.source.first_pass_ledger global_slot pending_coinbase_init
           statement.source.pending_coinbase_stack
@@ -3147,12 +3147,13 @@ module Make_str (A : Wire_types.Concrete) = struct
               Fee_excess.assert_equal_checked fee_excess statement.fee_excess )
         ]
 
-    let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
+    let rule ~signature_kind ~constraint_constants : _ Pickles.Inductive_rule.t
+        =
       { identifier = "transaction"
       ; prevs = []
       ; main =
           (fun { public_input = x } ->
-            Run.run_checked (main ~constraint_constants x) ;
+            Run.run_checked (main ~signature_kind ~constraint_constants x) ;
             { previous_proof_statements = []
             ; public_output = ()
             ; auxiliary_output = ()
@@ -3329,7 +3330,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     , Nat.N5.n )
     Pickles.Tag.t
 
-  let system ~proof_level ~constraint_constants =
+  let system ~signature_kind ~proof_level ~constraint_constants =
     Pickles.compile () ~cache:Cache_dir.cache ?proof_cache:!proof_cache
       ~override_wrap_domain:Pickles_base.Proofs_verified.N1
       ~public_input:(Input Statement.With_sok.typ) ~auxiliary_typ:Typ.unit
@@ -3339,7 +3340,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let zkapp_command x =
           Base.Zkapp_command_snark.rule ~constraint_constants ~proof_level x
         in
-        [ Base.rule ~constraint_constants
+        [ Base.rule ~signature_kind ~constraint_constants
         ; Merge.rule ~proof_level self
         ; zkapp_command Opt_signed_opt_signed
         ; zkapp_command Opt_signed
@@ -3404,6 +3405,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~supply_increase ~source_first_pass_ledger ~target_first_pass_ledger
       sok_message init_stack pending_coinbase_stack_state transaction state_body
       global_slot handler =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     if preeval then failwith "preeval currently disabled" ;
     let sok_digest = Sok_message.digest sok_message in
     let handler =
@@ -3430,7 +3432,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     (let open Checked in
                     exists Statement.With_sok.typ
                       ~compute:(As_prover.return statement)
-                    >>= Base.main ~constraint_constants) )
+                    >>= Base.main ~signature_kind ~constraint_constants) )
                 handler ) )
         : unit )
 
@@ -3473,6 +3475,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~constraint_constants ~supply_increase ~source_first_pass_ledger
       ~target_first_pass_ledger sok_message transaction_in_block init_stack
       pending_coinbase_stack_state handler =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     if preeval then failwith "preeval currently disabled" ;
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
@@ -3499,7 +3502,11 @@ module Make_str (A : Wire_types.Concrete) = struct
         ~pending_coinbase_stack_state
     in
     let open Tick in
-    let main x = handle (fun () -> Base.main ~constraint_constants x) handler in
+    let main x =
+      handle
+        (fun () -> Base.main ~signature_kind ~constraint_constants x)
+        handler
+    in
     generate_auxiliary_input ~input_typ:Statement.With_sok.typ
       ~return_typ:Typ.unit main statement
 
@@ -3543,6 +3550,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       ~f:(Pickles.verify (module Nat.N2) (module Statement.With_sok) key)
 
   let constraint_system_digests ~constraint_constants () =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let digest = Tick.R1CS_constraint_system.digest in
     [ ( "transaction-merge"
       , digest
@@ -3556,7 +3564,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Base.(
             Tick.constraint_system ~input_typ:Statement.With_sok.typ
               ~return_typ:Tick.Typ.unit
-              (main ~constraint_constants)) )
+              (main ~signature_kind ~constraint_constants)) )
     ]
 
   module Account_update_group = Zkapp_command.Make_update_group (struct
@@ -3962,6 +3970,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   struct
     open Inputs
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let constraint_constants = constraint_constants
 
     let ( tag
@@ -3969,7 +3979,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         , p
         , Pickles.Provers.
             [ base; merge; opt_signed_opt_signed; opt_signed; proved ] ) =
-      system ~proof_level ~constraint_constants
+      system ~signature_kind ~proof_level ~constraint_constants
 
     module Proof = (val p)
 

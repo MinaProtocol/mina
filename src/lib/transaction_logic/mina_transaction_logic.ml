@@ -1373,8 +1373,8 @@ module Make (L : Ledger_intf.S) :
       let may_use_token_inherited_from_parent (p : t) =
         May_use_token.inherit_from_parent p.body.may_use_token
 
-      let check_authorization ~will_succeed:_ ~commitment:_ ~calls:_
-          (account_update : t) =
+      let check_authorization ~signature_kind:_ ~will_succeed:_ ~commitment:_
+          ~calls:_ (account_update : t) =
         (* The transaction's validity should already have been checked before
            this point.
         *)
