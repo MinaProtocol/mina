@@ -4,7 +4,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_compare))
+  (pps ppx_compare ppx_jane ppx_version))
  (inline_tests
   (flags -verbose -show-counts))
  (libraries core_kernel))
