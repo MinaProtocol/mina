@@ -115,7 +115,6 @@ module Make (Input : Input_intf) = struct
 
   let test_non_zkapp_to_zkapp ?(new_account = true) test_spec init_ledger
       (zkapp_kp : Keypair.t) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Mina_transaction_logic.For_tests in
     let get_account ledger id =
       let location = Option.value_exn (Ledger.location_of_account ledger id) in
@@ -135,8 +134,8 @@ module Make (Input : Input_intf) = struct
             in
             let%bind zkapp_command =
               let zkapp_prover_and_vk = (zkapp_prover, vk) in
-              Transaction_snark.For_tests.update_states ~signature_kind
-                ~zkapp_prover_and_vk
+              Transaction_snark.For_tests.update_states
+                ~signature_kind:U.signature_kind ~zkapp_prover_and_vk
                 ~constraint_constants:U.constraint_constants test_spec
             in
             ( if new_account then

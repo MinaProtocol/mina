@@ -8,8 +8,6 @@ module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
-let signature_kind = Mina_signature_kind.Testnet
-
 let sk = Private_key.create ()
 
 let pk = Public_key.of_private_key_exn sk

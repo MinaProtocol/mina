@@ -16,6 +16,8 @@ let%test_module "multisig_account" =
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
+    let signature_kind = U.signature_kind
+
     module M_of_n_predicate = struct
       type _witness = (Schnorr.Chunked.Signature.t * Public_key.t) list
 
@@ -46,7 +48,6 @@ let%test_module "multisig_account" =
 
       (* check a signature on msg against a public key *)
       let check_sig pk msg sigma : Boolean.var Checked.t =
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind (module S) = Inner_curve.Checked.Shifted.create () in
         Schnorr.Chunked.Checked.verifies ~signature_kind (module S) sigma pk msg
 
@@ -77,7 +78,6 @@ let%test_module "multisig_account" =
           >>= fun () -> verify_sigs pubkeys commitment witness
 
       let%test_unit "1-of-1" =
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let gen =
           let open Quickcheck.Generator.Let_syntax in
           let%map sk = Private_key.gen and msg = Field.gen_uniform in
@@ -104,7 +104,6 @@ let%test_module "multisig_account" =
             |> run_and_check |> Or_error.ok_exn )
 
       let%test_unit "2-of-2" =
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let gen =
           let open Quickcheck.Generator.Let_syntax in
           let%map sk0 = Private_key.gen
@@ -148,7 +147,6 @@ let%test_module "multisig_account" =
 
     (* test with a 2-of-3 multisig *)
     let%test_unit "zkapps-based proved transaction" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       let gen =
         let open Quickcheck.Generator.Let_syntax in

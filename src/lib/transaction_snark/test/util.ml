@@ -14,6 +14,8 @@ let genesis_constants = Genesis_constants.Compiled.genesis_constants
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full
 
+let signature_kind = Mina_signature_kind.Testnet
+
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants
     ~protocol_constants:genesis_constants.protocol
@@ -35,7 +37,7 @@ let ledger_depth = constraint_constants.ledger_depth
 let snark_module =
   lazy
     ( module Transaction_snark.Make (struct
-      let signature_kind = Mina_signature_kind.t_DEPRECATED
+      let signature_kind = signature_kind
 
       let constraint_constants = constraint_constants
 
@@ -77,7 +79,6 @@ let logger_null = Logger.null ()
 let check_zkapp_command_with_merges_exn ?(logger = logger_null)
     ?expected_failure ?ignore_outside_snark ?global_slot
     ?(state_body = genesis_state_body) ledger zkapp_commands =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let module T = (val Lazy.force snark_module) in
   let ignore_outside_snark = Option.value ~default:false ignore_outside_snark in
   let state_view = Mina_state.Protocol_state.Body.view state_body in
@@ -382,7 +383,6 @@ let gen_snapp_ledger =
 
 let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
     ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -671,8 +671,6 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           ~constraint_constants txn
         |> Or_error.ok_exn )
   in
-
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   match
     Or_error.try_with (fun () ->
         Transaction_snark.check_transaction ~signature_kind

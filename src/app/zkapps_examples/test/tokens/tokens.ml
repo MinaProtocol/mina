@@ -34,8 +34,6 @@ let%test_module "Tokens test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
-    let signature_kind = Mina_signature_kind.Testnet
-
     let pk, sk = gen_keys ()
 
     let token_id = Token_id.default

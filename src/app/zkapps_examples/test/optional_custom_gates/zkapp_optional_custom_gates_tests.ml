@@ -55,8 +55,6 @@ let%test_module "Zkapp with optional custom gates" =
   ( module struct
     let () = Backtrace.elide := false
 
-    let signature_kind = Mina_signature_kind.Testnet
-
     module Account_info = Account_info ()
 
     module Circuits = Circuits (Account_info)

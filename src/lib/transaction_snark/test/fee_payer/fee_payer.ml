@@ -21,6 +21,8 @@ let%test_module "Fee payer tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let signature_kind = U.signature_kind
+
     let snapp_update : Account_update.Update.t =
       { Account_update.Update.dummy with
         app_state =
@@ -163,7 +165,6 @@ let%test_module "Fee payer tests" =
                 ; authorization_kind = Signature
                 }
               in
-              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let zkapp_command =
                 Async.Thread_safe.block_on_async_exn (fun () ->
                     Transaction_snark.For_tests.deploy_snapp ~signature_kind
@@ -228,7 +229,6 @@ let%test_module "Fee payer tests" =
                   (Public_key.compress zkapp_kp.public_key)
                   Token_id.default
               in
-              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let%bind zkapp_command =
                 let zkapp_prover_and_vk = (zkapp_prover, vk) in
                 Transaction_snark.For_tests.update_states ~signature_kind
@@ -310,7 +310,6 @@ let%test_module "Fee payer tests" =
             ; preconditions = None
             }
           in
-          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   Mina_transaction_logic.For_tests.Init_ledger.init

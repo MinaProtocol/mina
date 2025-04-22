@@ -2,6 +2,8 @@ open Core_kernel
 open Mina_base
 open Snark_params
 
+val signature_kind : Mina_signature_kind.t
+
 val genesis_constants : Genesis_constants.t
 
 val proof_level : Genesis_constants.Proof_level.t

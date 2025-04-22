@@ -47,7 +47,6 @@ let%test_module "Access permission tests" =
     let memo = Signed_command_memo.empty
 
     let run_test ?expected_failure auth_kind access_permission =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account_update : Account_update.t =
         match auth_kind with
         | Account_update.Authorization_kind.Proof _ ->

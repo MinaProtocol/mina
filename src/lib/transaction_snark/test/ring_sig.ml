@@ -14,7 +14,6 @@ open Snark_params.Tick.Let_syntax
 
 (* check a signature on msg against a public key *)
 let check_sig pk msg sigma : Boolean.var Checked.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind (module S) = Inner_curve.Checked.Shifted.create () in
   Schnorr.Chunked.Checked.verifies ~signature_kind (module S) sigma pk msg
 
@@ -61,7 +60,6 @@ let ring_sig_rule (ring_member_pks : Schnorr.Chunked.Public_key.t list) :
   }
 
 let%test_unit "1-of-1" =
-  let signature_kind = Mina_signature_kind.Testnet in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map sk = Private_key.gen and msg = Field.gen_uniform in
@@ -80,7 +78,6 @@ let%test_unit "1-of-1" =
       |> run_and_check |> Or_error.ok_exn )
 
 let%test_unit "1-of-2" =
-  let signature_kind = Mina_signature_kind.Testnet in
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map sk0 = Private_key.gen
@@ -103,7 +100,6 @@ let%test_unit "1-of-2" =
 
 (* test a snapp tx with a 3-account_update ring *)
 let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
-  let signature_kind = Mina_signature_kind.Testnet in
   let proof_cache =
     Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
     @@ Yojson.Safe.from_file "proof_cache.json"

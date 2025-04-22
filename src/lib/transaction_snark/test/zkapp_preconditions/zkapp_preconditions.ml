@@ -16,6 +16,8 @@ let%test_module "Valid_while precondition tests" =
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
+    let signature_kind = U.signature_kind
+
     let constraint_constants = U.constraint_constants
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
@@ -73,7 +75,6 @@ let%test_module "Valid_while precondition tests" =
                     ~ledger
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
-                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants
@@ -97,7 +98,6 @@ let%test_module "Valid_while precondition tests" =
                     ~ledger
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
-                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants
@@ -435,6 +435,8 @@ let%test_module "Account precondition tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let signature_kind = U.signature_kind
+
     let memo = Signed_command_memo.create_from_string_exn "account precondition"
 
     let snapp_update : Account_update.Update.t =
@@ -557,7 +559,6 @@ let%test_module "Account precondition tests" =
                   Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
-                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
@@ -620,7 +621,6 @@ let%test_module "Account precondition tests" =
                           }
                     }
                   in
-                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
@@ -658,7 +658,6 @@ let%test_module "Account precondition tests" =
           else update )
 
     let%test_unit "delegate precondition on new account" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let gen = U.gen_snapp_ledger in
       Quickcheck.test ~trials:5 gen ~f:(fun ({ specs; _ }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -722,7 +721,6 @@ let%test_module "Account precondition tests" =
                     [ zkapp_command ] ) ) )
 
     let%test_unit "unsatisfied delegate precondition, custom token" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       (* when new account has a custom token, it doesn't get a self-delegation *)
       let constraint_constants = U.constraint_constants in
       let account_creation_fee =
@@ -847,7 +845,6 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let open Async.Deferred.Let_syntax in
-                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec

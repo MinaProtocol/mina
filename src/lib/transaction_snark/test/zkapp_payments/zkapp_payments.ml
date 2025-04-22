@@ -21,6 +21,8 @@ let%test_module "Zkapp payments tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let signature_kind = U.signature_kind
+
     let merkle_root_after_zkapp_command_exn t
         ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
         ~global_slot txn =
@@ -222,7 +224,6 @@ let%test_module "Zkapp payments tests" =
                     ; preconditions = None
                     }
                   in
-                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers
                       ~signature_kind ~constraint_constants test_spec
@@ -290,7 +291,6 @@ let%test_module "Zkapp payments tests" =
                     ; preconditions = None
                     }
                   in
-                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers
                       ~signature_kind ~constraint_constants test_spec

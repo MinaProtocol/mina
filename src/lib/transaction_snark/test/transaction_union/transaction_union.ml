@@ -10,6 +10,8 @@ let state_body = U.genesis_state_body
 
 let constraint_constants = U.constraint_constants
 
+let signature_kind = U.signature_kind
+
 let consensus_constants = U.consensus_constants
 
 let ledger_depth = U.ledger_depth
@@ -147,7 +149,6 @@ let%test_module "Transaction union tests" =
               ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
-          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           Transaction_snark.check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~signature_kind ~constraint_constants:U.constraint_constants
@@ -227,8 +228,6 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
-
-              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               Transaction_snark.check_user_command ~signature_kind
                 ~constraint_constants ~sok_message
                 ~source_first_pass_ledger:(Ledger.merkle_root ledger)

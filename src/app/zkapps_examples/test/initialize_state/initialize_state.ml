@@ -13,8 +13,6 @@ let%test_module "Initialize state test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
-    let signature_kind = Mina_signature_kind.Testnet
-
     let sk = Private_key.create ()
 
     let pk = Public_key.of_private_key_exn sk

@@ -18,6 +18,8 @@ let%test_module "Zkapp tokens tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let signature_kind = U.signature_kind
+
     let account_creation_fee =
       Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
 
@@ -57,7 +59,6 @@ let%test_module "Zkapp tokens tests" =
           acct
 
     let%test_unit "token operations" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Test_util.with_randomness 987654321 (fun () ->
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               let check_token_balance (keypair : Keypair.t) token_id balance =
