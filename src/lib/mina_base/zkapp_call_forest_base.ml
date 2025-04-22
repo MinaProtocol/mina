@@ -576,13 +576,11 @@ module With_hashes_and_data = struct
   let to_zkapp_command_with_hashes_list (x : _ t) =
     to_zkapp_command_with_hashes_list x
 
-  let account_updates_hash' xs =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
-
+  let account_updates_hash' ~signature_kind xs =
     of_account_updates ~signature_kind xs |> hash
 
-  let account_updates_hash xs =
-    List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash'
+  let account_updates_hash ~signature_kind xs =
+    List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash' ~signature_kind
 end
 
 module With_hashes = struct
@@ -637,12 +635,11 @@ module With_hashes = struct
   let to_zkapp_command_with_hashes_list (x : t) =
     to_zkapp_command_with_hashes_list x
 
-  let account_updates_hash' xs =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let account_updates_hash' ~signature_kind xs =
     of_account_updates ~signature_kind xs |> hash
 
-  let account_updates_hash xs =
-    List.map ~f:(fun x -> x) xs |> account_updates_hash'
+  let account_updates_hash ~signature_kind xs =
+    List.map ~f:(fun x -> x) xs |> account_updates_hash' ~signature_kind
 end
 
 let is_empty : _ t -> bool = List.is_empty
