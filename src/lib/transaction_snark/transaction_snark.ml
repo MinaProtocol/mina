@@ -3961,14 +3961,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         (w, spec, statement) :: witnesses )
 
   module Make (Inputs : sig
+    val signature_kind : Mina_signature_kind.t
+
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val proof_level : Genesis_constants.Proof_level.t
   end) =
   struct
     open Inputs
-
-    let signature_kind = Mina_signature_kind.t_DEPRECATED
 
     let constraint_constants = constraint_constants
 

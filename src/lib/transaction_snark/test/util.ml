@@ -35,6 +35,8 @@ let ledger_depth = constraint_constants.ledger_depth
 let snark_module =
   lazy
     ( module Transaction_snark.Make (struct
+      let signature_kind = Mina_signature_kind.t_DEPRECATED
+
       let constraint_constants = constraint_constants
 
       let proof_level = proof_level

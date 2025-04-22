@@ -207,6 +207,8 @@ module type Full = sig
        list
 
   module Make (Inputs : sig
+    val signature_kind : Mina_signature_kind.t
+
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val proof_level : Genesis_constants.Proof_level.t

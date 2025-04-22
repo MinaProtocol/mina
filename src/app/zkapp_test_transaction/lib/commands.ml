@@ -44,6 +44,8 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
 
 let print_witnesses ~constraint_constants ~proof_level witnesses =
   let module T = Transaction_snark.Make (struct
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let constraint_constants = constraint_constants
 
     let proof_level = proof_level
