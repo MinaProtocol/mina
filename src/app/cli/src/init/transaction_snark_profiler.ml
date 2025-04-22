@@ -6,13 +6,14 @@ let name = "transaction-snark-profiler"
 let run ~genesis_constants ~constraint_constants ~proof_level
     ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     ?min_num_updates repeats preeval use_zkapps : unit =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let logger = Logger.null () in
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          create_ledger_and_zkapps ~genesis_constants ~constraint_constants
-            ?min_num_updates ~max_num_updates () )
+          create_ledger_and_zkapps ~signature_kind ~genesis_constants
+            ~constraint_constants ?min_num_updates ~max_num_updates () )
     in
     Parallel.init_master () ;
     let verifier =
@@ -60,10 +61,12 @@ let dry ~genesis_constants ~constraint_constants ~proof_level ~max_num_updates
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't check base SNARKs on zkApps"
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Test_util.with_randomness 123456789 (fun () ->
       run ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
-          (check_base_snarks ~genesis_constants ~constraint_constants)
+          (check_base_snarks ~signature_kind ~genesis_constants
+             ~constraint_constants )
         ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
         repeats preeval use_zkapps )
 
@@ -73,10 +76,12 @@ let witness ~genesis_constants ~constraint_constants ~proof_level
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't generate witnesses for base SNARKs on zkApps"
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Test_util.with_randomness 123456789 (fun () ->
       run ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
-          (generate_base_snarks_witness ~genesis_constants ~constraint_constants)
+          (generate_base_snarks_witness ~signature_kind ~genesis_constants
+             ~constraint_constants )
         ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
         repeats preeval use_zkapps )
 
@@ -84,9 +89,10 @@ let main ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
     preeval use_zkapps () =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
-        let signature_kind = Mina_signature_kind.t_DEPRECATED
+        let signature_kind = signature_kind
 
         let constraint_constants = constraint_constants
 
@@ -96,7 +102,7 @@ let main ~(genesis_constants : Genesis_constants.t)
         ~user_command_profiler:
           (profile_user_command ~genesis_constants ~constraint_constants
              (module T) )
-        ~zkapp_profiler:(profile_zkapps ~constraint_constants)
+        ~zkapp_profiler:(profile_zkapps ~signature_kind ~constraint_constants)
         num_transactions ~max_num_updates ?min_num_updates repeats preeval
         use_zkapps )
 

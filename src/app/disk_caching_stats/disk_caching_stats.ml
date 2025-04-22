@@ -713,6 +713,7 @@ let compute_ram_usage ~config (sizes : size_params) =
   Printf.printf "TOTAL: %fGB\n" (format_gb total_size)
 
 let () =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -720,8 +721,8 @@ let () =
   let config = { constraint_constants; genesis_constants } in
   let%bind.Async_kernel.Deferred _, generated_zkapps =
     let num_updates = 1 in
-    Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
-      ~constraint_constants ~min_num_updates:num_updates
+    Snark_profiler_lib.create_ledger_and_zkapps ~signature_kind
+      ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
       ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
   in
   let%map.Async_kernel.Deferred vk =
