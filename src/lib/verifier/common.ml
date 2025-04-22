@@ -78,9 +78,8 @@ let collect_vk_assumptions zkapp_command =
      .to_zkapp_command_with_hashes_list
   |> List.fold_result ~f:collect_vk_assumption' ~init:[]
 
-let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
-    (unit, invalid) Result.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let check_signatures_of_zkapp_command ~signature_kind
+    (zkapp_command : _ Zkapp_command.Poly.t) : (unit, invalid) Result.t =
   let account_updates_hash =
     Zkapp_command.Call_forest.hash
       zkapp_command.Zkapp_command.Poly.account_updates
@@ -130,17 +129,21 @@ let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
                (`Mismatched_authorization_kind
                  [ Account_id.public_key @@ Account_update.account_id p ] ) )
 
-let check : _ With_status.t -> ([ `Assuming of _ list ], invalid) Result.t =
-  function
+let check ~signature_kind :
+    _ With_status.t -> ([ `Assuming of _ list ], invalid) Result.t = function
   | { With_status.data = User_command.Signed_command c; status = _ } ->
       check_signed_command c
   | { With_status.data = Zkapp_command verifiable; status = Failed _ } ->
       let command = Zkapp_command.of_verifiable verifiable in
-      let%map.Result () = check_signatures_of_zkapp_command command in
+      let%map.Result () =
+        check_signatures_of_zkapp_command ~signature_kind command
+      in
       `Assuming []
   | { With_status.data = Zkapp_command verifiable; status = Applied } ->
       let command = Zkapp_command.of_verifiable verifiable in
-      let%bind.Result () = check_signatures_of_zkapp_command command in
+      let%bind.Result () =
+        check_signatures_of_zkapp_command ~signature_kind command
+      in
       let%map.Result assuming = collect_vk_assumptions verifiable in
       `Assuming assuming
 

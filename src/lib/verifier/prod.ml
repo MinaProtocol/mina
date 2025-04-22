@@ -14,7 +14,8 @@ type ledger_proof = Ledger_proof.Prod.t
 
 module Processor = struct
   let verify_commands (cs : User_command.Verifiable.t With_status.t list) =
-    let results = List.map cs ~f:Common.check in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let results = List.map cs ~f:(Common.check ~signature_kind) in
     let to_verify =
       List.concat_map
         ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
@@ -156,7 +157,9 @@ module Worker_state = struct
         Deferred.return
         @@ ( module struct
              let verify_commands tagged_commands =
-               List.map tagged_commands ~f:(Fn.compose f Common.check)
+               let signature_kind = Mina_signature_kind.t_DEPRECATED in
+               List.map tagged_commands
+                 ~f:(Fn.compose f (Common.check ~signature_kind))
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return (Ok ())

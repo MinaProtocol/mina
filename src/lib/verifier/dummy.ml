@@ -91,6 +91,7 @@ let verify_commands { proof_level; _ }
     | Common.invalid ]
     list
     Deferred.Or_error.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let valid { With_status.data = cmd; _ } =
     (* Since we have stripped the transaction from the result, we reconstruct it here.
        The use of [to_valid_unsafe] is justified because a [`Valid] result for this
@@ -108,10 +109,10 @@ let verify_commands { proof_level; _ }
         | Ok (`Assuming _) ->
             valid cmd
       in
-      let f cmd = convert_check_res cmd (Common.check cmd) in
+      let f cmd = convert_check_res cmd (Common.check ~signature_kind cmd) in
       List.map cs ~f |> Deferred.Or_error.return
   | Full ->
-      let results = List.map cs ~f:Common.check in
+      let results = List.map cs ~f:(Common.check ~signature_kind) in
       let to_verify =
         List.concat_map
           ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
