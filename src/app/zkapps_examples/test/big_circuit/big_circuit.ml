@@ -8,6 +8,8 @@ module Nat = Pickles_types.Nat
 module Local_state = Mina_state.Local_state
 module Zkapp_command_segment = Transaction_snark.Zkapp_command_segment
 
+let signature_kind = Mina_signature_kind.Testnet
+
 let sk = Private_key.create ()
 
 let pk = Public_key.of_private_key_exn sk
@@ -64,7 +66,6 @@ let deploy_account_update : Account_update.t =
   }
 
 let account_updates =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   []
   |> Zkapp_command.Call_forest.cons ~signature_kind account_update
   |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
@@ -85,7 +86,6 @@ let fee_payer =
   }
 
 let full_commitment =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Zkapp_command.Transaction_commitment.create_complete transaction_commitment
     ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:
@@ -94,7 +94,6 @@ let full_commitment =
 
 let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
     Zkapp_command.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let fee_payer =
     match fee_payer with
     | { body = { public_key; _ }; _ }
