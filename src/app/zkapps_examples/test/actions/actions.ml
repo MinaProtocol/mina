@@ -9,6 +9,8 @@ let%test_module "Actions test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let sk = Private_key.create ()
 
     let pk = Public_key.of_private_key_exn sk
@@ -98,7 +100,6 @@ let%test_module "Actions test" =
 
     let test_zkapp_command ?expected_failure ?state_body ?global_slot
         ?(fee_payer_nonce = 0) ~ledger zkapp_command =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash =
@@ -127,7 +128,6 @@ let%test_module "Actions test" =
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
           Zkapp_command.t =
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -186,7 +186,6 @@ let%test_module "Actions test" =
       (Pickles_types.Vector.Vector_5.to_list action_state, last_action_slot)
 
     let%test_unit "Initialize" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         let ledger = create_ledger () in
         []
@@ -205,7 +204,6 @@ let%test_module "Actions test" =
           assert (List.is_empty account_update.body.actions) )
 
     let%test_unit "Initialize and add sequence events" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command0, account0 =
         let ledger = create_ledger () in
         []
@@ -270,7 +268,6 @@ let%test_module "Actions test" =
         Mina_numbers.Global_slot_since_genesis.(equal zero) last_action_slot1 )
 
     let%test_unit "Add sequence events in different slots" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let ledger = create_ledger () in
       let slot1 = Mina_numbers.Global_slot_since_genesis.of_int 1 in
       let _zkapp_command0, account0 =
