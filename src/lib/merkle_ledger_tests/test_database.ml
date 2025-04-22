@@ -122,7 +122,7 @@ module Make (Test : Test_intf) = struct
             [%test_eq: int] result num_initial_accounts ) )
 
   let () =
-    add_test "no update on get_or_create_acount if key already exists"
+    add_test "no update on get_or_create_account if key already exists"
       (fun () ->
         Test.with_instance (fun mdb ->
             let account_id = Quickcheck.random_value Account_id.gen in
