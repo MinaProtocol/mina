@@ -356,13 +356,11 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
                     submit_work
               | Ok message_from_server ->
                   ( match message_from_server with
-                  | `Finished_by_others when_done ->
-                      [%log info] "Work is finished by another worker at %s"
-                        (Time.to_string when_done)
-                  | `Timeout ->
-                      [%log info]
-                        "The submission is timeout, this means the worker take \
-                         too long to complete the job, the coordinator rejects"
+                  | `Slashed ->
+                      [%log info] "The submission is slashed"
+                  | `SchemeUnmatched ->
+                      [%log error]
+                        "The submission is of wrong shape, this is a bug"
                   | `Ok ->
                       () ) ;
                   go ()

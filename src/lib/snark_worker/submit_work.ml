@@ -14,10 +14,10 @@ module Rpc = struct
     module T = struct
       type query = Work.Partitioned.Result.t
 
-      (* NOTE: this `Finished case is suppoed to track all duplicated case,
+      (* NOTE: this `Slashed case is suppoed to track all duplicated case,
          but since we didn't touch on Work_selector, this is not true.
          We should get back to Work_partitioner implementation to fix this. *)
-      type response = [ `Ok | `Finished_by_others of Time.t | `Timeout ]
+      type response = [ `Ok | `Slashed | `SchemeUnmatched ]
     end
 
     module Caller = T
@@ -34,7 +34,7 @@ module Stable = struct
     module T = struct
       type query = Work.Partitioned.Result.Stable.V1.t
 
-      type response = [ `Ok | `Finished_by_others of Time.t | `Timeout ]
+      type response = [ `Ok | `Slashed | `SchemeUnmatched ]
 
       let query_of_caller_model : Rpc.Master.Caller.query -> query =
         Work.Partitioned.Result.materialize
@@ -73,16 +73,15 @@ module Stable = struct
       let response_of_callee_model = function
         | `Ok ->
             ()
-        | `Finished_by_others finished_when ->
+        | `Slashed ->
             printf
               "Trying to notify worker that the work they submitted is \
-               finished by another worker at %s, but they're too old to \
-               receive this message."
-              (Time.to_string finished_when)
-        | `Timeout ->
+               slashed(completed by others, or timeouted), but they're too old \
+               to receive this message."
+        | `SchemeUnmatched ->
             printf
-              "Trying to notify worker that the work they submitted is \
-               timeout, but they're too old to receive this message."
+              "Trying to notify worker that the work they submitted is in a \
+               wrong shape, but they're too old to receive this message."
 
       (* There's no way we can tell if the proof we submitted is duplicated/timeouted,
          just assume everything is fine on worker's side *)

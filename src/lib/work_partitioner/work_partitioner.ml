@@ -1,4 +1,5 @@
 open Core_kernel
+open Async
 module Shared = Shared
 module Partitioned_work = Snark_work_lib.Partitioned
 module Selector_work = Snark_work_lib.Selector
@@ -262,14 +263,21 @@ let request_partitioned_work
 
 (* Logics for work submitting *)
 
-let submit_directly_to_work_selector ~(result : Partitioned_work.Result.t)
-    ~(callback : Selector_work.Result.t -> unit) () =
-  let open Option.Let_syntax in
-  let%map result = Partitioned_work.Result.to_selector_result result in
-  callback result
+type submit_result =
+  | SchemeUnmatched
+  | Processed of (Selector_work.Result.t option * [ `Ok | `Slashed ])
+(* If the first `option` in Processed is present, it indicates we need to submit to the underlying selector *)
 
-let submit_single ~partitioner ~this_single ~uuid ~callback =
+let submit_directly_to_work_selector ~(result : Partitioned_work.Result.t) () =
+  match Partitioned_work.Result.to_selector_result result with
+  | Some result ->
+      Processed (Some result, `Ok)
+  | None ->
+      SchemeUnmatched
+
+let submit_single ~partitioner ~this_single ~uuid =
   let Single_work.{ which_half; _ } = this_single in
+  let result = ref None in
   Hashtbl.change partitioner.pairing_pool uuid ~f:(function
     | Some other_single ->
         let work =
@@ -284,12 +292,18 @@ let submit_single ~partitioner ~this_single ~uuid ~callback =
            let (Pairing_UUID uuid) = uuid in
            UUID_generator.recycle_uuid partitioner.uuid_generator uuid ;
         *)
-        callback work ; None
+        result := Some work ;
+        None
     | None ->
-        Some this_single )
+        Some this_single ) ;
+  match !result with
+  | Some result ->
+      Processed (Some result, `Ok)
+  | None ->
+      SchemeUnmatched
 
 let submit_one_in_pair_to_work_partitioner ~partitioner
-    ~(result : Partitioned_work.Result.t) ~callback () =
+    ~(result : Partitioned_work.Result.t) () =
   match result with
   (* NOTE: This is terrible, why are we designing the RPC like this?
      `proofs`, `spec.instances` and `metrics` should be merged together.
@@ -312,13 +326,12 @@ let submit_one_in_pair_to_work_partitioner ~partitioner
         Single_work.{ which_half; proof; metric; spec; prover; fee }
       in
 
-      submit_single ~partitioner ~this_single ~uuid ~callback ;
-      Some ()
+      submit_single ~partitioner ~this_single ~uuid
   | _ ->
-      None
+      SchemeUnmatched
 
 let submit_into_pending_zkapp_command ~partitioner
-    ~(result : Partitioned_work.Result.t) ~callback () =
+    ~(result : Partitioned_work.Result.t) () =
   match result with
   (* NOTE: This is terrible, why are we designing the RPC like this?
      `proofs`, `spec.instances` and `metrics` should be merged together.
@@ -350,13 +363,13 @@ let submit_into_pending_zkapp_command ~partitioner
               pairing_id
           with
           | None ->
-              Printf.printf
+              printf
                 "Worker submit a work that's already slashed from pending \
                  zkapp command pool, ignoring " ;
-              Some ()
+              Processed (None, `Slashed)
           | Some pending ->
               Pending_Zkapp_command.submit_proof ~proof ~elapsed pending ;
-              if 0 = pending.merge_remaining then (
+              if 0 = pending.merge_remaining then
                 let final_proof =
                   Deque.dequeue_front_exn pending.pending_mergable_proofs
                 in
@@ -382,7 +395,7 @@ let submit_into_pending_zkapp_command ~partitioner
                       ; prover
                       }
                     in
-                    submit_directly_to_work_selector ~result ~callback ()
+                    submit_directly_to_work_selector ~result ()
                 | (`First | `Second) as which_half ->
                     let this_single =
                       Single_work.
@@ -394,22 +407,46 @@ let submit_into_pending_zkapp_command ~partitioner
                         ; fee
                         }
                     in
-                    submit_single ~partitioner ~this_single ~uuid ~callback ;
-                    Some () )
-              else Some () )
+                    submit_single ~partitioner ~this_single ~uuid
+              else Processed (None, `Ok) )
       | None ->
-          None )
+          printf
+            "Worker submit a work that's already slashed from sent job pool, \
+             ignoring" ;
+          Processed (None, `Slashed) )
   | _ ->
-      None
+      SchemeUnmatched
+
+type rpc_result = [ `SchemeUnmatched | `Ok | `Slashed ]
+
+let submit_result_to_rpc_result : [ `Ok | `Slashed ] -> rpc_result = function
+  | `Ok ->
+      `Ok
+  | `Slashed ->
+      `Slashed
 
 let submit_partitioned_work ~(result : Partitioned_work.Result.t) ~callback
     ~(partitioner : t) =
   (* NOTE: there's some space for optimization as the pattern matching logic is essentially repeated inside these different branches*)
-  List.find_map
-    ~f:(fun f -> f ())
-    [ submit_directly_to_work_selector ~result ~callback
-    ; submit_one_in_pair_to_work_partitioner ~partitioner ~result ~callback
-    ; submit_into_pending_zkapp_command ~partitioner ~result ~callback
-    ]
-  |> Option.value_exn
-       ~message:"Failed to submit work back to Work_partitioner & Work_selector"
+  let unwrap_processed f =
+    match f () with
+    | Processed (to_submit, rpc_result) ->
+        Some (to_submit, rpc_result |> submit_result_to_rpc_result)
+    | SchemeUnmatched ->
+        None
+  in
+
+  let select_work_result, rpc_result =
+    List.find_map ~f:unwrap_processed
+      [ submit_directly_to_work_selector ~result
+      ; submit_one_in_pair_to_work_partitioner ~partitioner ~result
+      ; submit_into_pending_zkapp_command ~partitioner ~result
+      ]
+    |> Option.value ~default:(None, `SchemeUnmatched)
+  in
+  ( match select_work_result with
+  | Some to_submit ->
+      callback to_submit
+  | None ->
+      () ) ;
+  rpc_result

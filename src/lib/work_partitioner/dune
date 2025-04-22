@@ -12,7 +12,8 @@
    ledger_proof
    signature_lib
    currency
-   work_selector)
+   work_selector
+   network_pool)
    
  (preprocess
   (pps
