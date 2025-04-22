@@ -494,7 +494,7 @@ struct
       type t = { point : Inner_curve.t; non_zero : Boolean.var }
     end
 
-    let combine batch ~xi without_bound with_bound =
+    let combine ~xi without_bound with_bound =
       let reduce_point p =
         let point = ref (Point.underlying p.(Array.length p - 1)) in
         for i = Array.length p - 2 downto 0 do
@@ -503,7 +503,7 @@ struct
         !point
       in
       let { Curve_opt.non_zero; point } =
-        Pcs_batch.combine_split_commitments batch
+        Pcs_batch.combine_split_commitments
           ~reduce_with_degree_bound:(fun _ -> assert false)
           ~reduce_without_degree_bound:(fun x -> [ x ])
           ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
@@ -567,8 +567,7 @@ struct
 
   let scale_fast = Ops.scale_fast
 
-  let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
-      ~(xi : Scalar_challenge.t)
+  let check_bulletproof ~(sponge : Sponge.t) ~(xi : Scalar_challenge.t)
       ~(advice :
          Other_field.Packed.t Shifted_value.Type1.t
          Types.Step.Bulletproof.Advice.t )
@@ -592,8 +591,7 @@ struct
         in
         let open Inner_curve in
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-          Split_commitments.combine pcs_batch ~xi without_degree_bound
-            with_degree_bound
+          Split_commitments.combine ~xi without_degree_bound with_degree_bound
         in
         let scale_fast =
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
@@ -1351,8 +1349,8 @@ struct
                            ; m.lookup_selector_ffmul
                            ] ) )
           in
-          check_bulletproof ~pcs_batch:Common.dlog_pcs_batch
-            ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
+          check_bulletproof ~sponge:sponge_before_evaluations ~xi ~advice
+            ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound
                   ~f:
