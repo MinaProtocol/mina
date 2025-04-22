@@ -2639,7 +2639,7 @@ module Input = struct
         ~to_json:(function
           | (c : input) -> `String (Currency.Amount.to_string c) )
         ~doc:
-          "uint64 encoded as a json string representing an ammount of currency"
+          "uint64 encoded as a json string representing an amount of currency"
   end
 
   module Fee = struct
