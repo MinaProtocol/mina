@@ -13,14 +13,6 @@ val create :
   -> with_degree_bound:('a, 'm) Vector.t
   -> ('a, 'n, 'm) t
 
-val combine_commitments :
-     scale:('g -> 'f -> 'g)
-  -> add:('g -> 'g -> 'g)
-  -> xi:'f
-  -> ('g, 'n) Vector.t
-  -> ('g * 'g, 'm) Vector.t
-  -> 'g
-
 val combine_evaluations :
      (int, 'n, 'm) t
   -> crs_max_degree:int

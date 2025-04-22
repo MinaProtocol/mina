@@ -23,19 +23,6 @@ let pow ~one ~mul x n =
 let create ~without_degree_bound ~with_degree_bound =
   { without_degree_bound; with_degree_bound }
 
-let combine_commitments ~scale ~add ~xi (type n)
-    (without_degree_bound : (_, n) Vector.t) with_degree_bound =
-  match without_degree_bound with
-  | [] ->
-      failwith "combine_commitments: empty list"
-  | init :: without_degree_bound ->
-      let polys =
-        Vector.to_list without_degree_bound
-        @ List.concat_map (Vector.to_list with_degree_bound)
-            ~f:(fun (unshifted, shifted) -> [ unshifted; shifted ])
-      in
-      List.fold_left polys ~init ~f:(fun acc p -> add p (scale acc xi))
-
 let combine_evaluations' (type a n m)
     ({ without_degree_bound = _; with_degree_bound } : (a, n Nat.s, m) t)
     ~shifted_pow ~mul ~add ~one:_ ~evaluation_point ~xi
