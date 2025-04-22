@@ -9,6 +9,8 @@ let%test_module "Add events test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let sk = Private_key.create ()
 
     let pk = Public_key.of_private_key_exn sk
@@ -97,7 +99,6 @@ let%test_module "Add events test" =
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash =
@@ -125,7 +126,6 @@ let%test_module "Add events test" =
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
           Zkapp_command.t =
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
@@ -187,7 +187,6 @@ let%test_module "Add events test" =
     end)
 
     let%test_unit "Initialize" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree
@@ -205,7 +204,6 @@ let%test_module "Add events test" =
           assert (List.is_empty account_update.body.events) )
 
     let%test_unit "Initialize and add events" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
@@ -224,7 +222,6 @@ let%test_module "Add events test" =
           else assert (List.is_empty account_update.body.events) )
 
     let%test_unit "Initialize and add several events" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         []
         |> Zkapp_command.Call_forest.cons_tree Add_events.account_update
