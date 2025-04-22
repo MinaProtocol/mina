@@ -26,7 +26,7 @@ git config --global user.name "It's me, CI"
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
 #   straightforward fast-forward
-git merge --no-commit --no-ff ${REMOTE}/$BRANCH
+git merge --no-commit --no-ff origin/$BRANCH
 
 RET=$?
 

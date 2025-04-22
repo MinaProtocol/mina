@@ -192,7 +192,7 @@ end
 
 type Structured_log_events.t +=
   | Rejecting_command_for_reason of
-      { command : User_command.t
+      { transaction_hash : Transaction_hash.t
       ; reason : Diff_versioned.Diff_error.t
       ; error_extra : (string * Yojson.Safe.t) list
       }
@@ -429,8 +429,7 @@ struct
       ; verification_key_table : Vk_refcount_table.t
       }
 
-    let member t x =
-      Indexed_pool.member t.pool (Transaction_hash.User_command.of_checked x)
+    let member t x = Indexed_pool.member t.pool x
 
     let transactions t = Indexed_pool.transactions ~logger:t.logger t.pool
 
@@ -1052,28 +1051,32 @@ struct
       let of_indexed_pool_error e =
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
-      let report_command_error ~logger ~is_sender_local tx (e : Command_error.t)
-          =
+      let report_command_error ~logger ~is_sender_local transaction_hash
+          (e : Command_error.t) =
         let diff_err, error_extra = of_indexed_pool_error e in
         if is_sender_local then
           [%str_log error]
             (Rejecting_command_for_reason
-               { command = tx; reason = diff_err; error_extra } ) ;
+               { transaction_hash; reason = diff_err; error_extra } ) ;
         let log = if is_sender_local then [%log error] else [%log debug] in
         match e with
         | Insufficient_replace_fee (`Replace_fee rfee, fee) ->
             log
-              "rejecting $cmd because of insufficient replace fee ($rfee > \
-               $fee)"
+              "rejecting command with hash $transaction_hash because of \
+               insufficient replace fee ($rfee > $fee)"
               ~metadata:
-                [ ("cmd", User_command.to_yojson tx)
+                [ ( "transaction_hash"
+                  , Transaction_hash.to_yojson transaction_hash )
                 ; ("rfee", Currency.Fee.to_yojson rfee)
                 ; ("fee", Currency.Fee.to_yojson fee)
                 ]
         | Unwanted_fee_token fee_token ->
-            log "rejecting $cmd because we don't accept fees in $token"
+            log
+              "rejecting command with hash $transaction_hash because we don't \
+               accept fees in $token"
               ~metadata:
-                [ ("cmd", User_command.to_yojson tx)
+                [ ( "transaction_hash"
+                  , Transaction_hash.to_yojson transaction_hash )
                 ; ("token", Token_id.to_yojson fee_token)
                 ]
         | _ ->
@@ -1277,7 +1280,8 @@ struct
         let check_command pool cmd =
           let already_in_pool =
             Indexed_pool.member pool
-              (Transaction_hash.User_command.of_checked cmd)
+              (Transaction_hash.User_command_with_valid_signature
+               .transaction_hash cmd )
           in
           let%map.Result () =
             if already_in_pool then
@@ -1323,7 +1327,7 @@ struct
                   | Error err ->
                       report_command_error ~logger:t.logger ~is_sender_local
                         (Transaction_hash.User_command_with_valid_signature
-                         .command cmd )
+                         .transaction_hash cmd )
                         err ;
                       Error (diff_error_of_indexed_pool_error err)
               in
@@ -1882,7 +1886,8 @@ let%test_module _ =
         ~f:(fun ~key ~data:_ ->
           assert (
             Indexed_pool.member pool.pool
-              (Transaction_hash.User_command.of_checked key) ) )
+              (Transaction_hash.User_command_with_valid_signature
+               .transaction_hash key ) ) )
 
     let assert_fee_wu_ordering (pool : Test.Resource_pool.t) =
       let txns = Test.Resource_pool.transactions pool |> Sequence.to_list in
