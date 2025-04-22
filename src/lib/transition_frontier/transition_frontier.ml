@@ -581,30 +581,6 @@ module For_tests = struct
     let%bind () = f root in
     Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f)
 
-  (*
-  let with_frontier_from_rose_tree (Rose_tree.T (root, trees)) ~logger ~verifier ~consensus_local_state ~max_length ~root_snarked_ledger ~f =
-    with_temp_persistence ~f:(fun ~persistent_root ~persistent_frontier ->
-      Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
-        Persistent_root.Instance.set_root_state_hash instance (Breadcrumb.state_hash @@ root);
-        ignore @@ Ledger_transfer.transfer_accounts
-          ~src:root_snarked_ledger
-          ~dest:(Persistent_root.snarked_ledger instance));
-      let frontier =
-        let fail msg = failwith ("failed to load transition frontier: "^msg) in
-        load_with_max_length
-          {logger; verifier; consensus_local_state}
-          ~persistent_root ~persistent_frontier
-          ~max_length
-        >>| Result.map_error ~f:(Fn.compose fail (function
-          | `Bootstrap_required -> "bootstrap required"
-          | `Persistent_frontier_malformed -> "persistent frontier malformed"
-          | `Failure msg -> msg))
-        >>| Result.ok_or_failwith
-      in
-      let%bind () = Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) in
-      f frontier)
-  *)
-
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~verifier
       ~(precomputed_values : Precomputed_values.t) () =
