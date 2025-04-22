@@ -55,6 +55,8 @@ let%test_module "Zkapp with optional custom gates" =
   ( module struct
     let () = Backtrace.elide := false
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     module Account_info = Account_info ()
 
     module Circuits = Circuits (Account_info)
@@ -87,7 +89,6 @@ let%test_module "Zkapp with optional custom gates" =
 
     let%test_unit "Zkapp using a combination of optional custom gates verifies"
         =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn
       @@ fun () ->
       let%map.Async_kernel.Deferred vk =
