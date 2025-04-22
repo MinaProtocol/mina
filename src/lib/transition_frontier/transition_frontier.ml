@@ -524,7 +524,7 @@ include struct
 
   let common_ancestor = proxy1 common_ancestor
 
-  (* reduce sucessors functions (probably remove hashes special case *)
+  (* reduce successors functions (probably remove hashes special case *)
   let successors = proxy1 successors
 
   let successors_rec = proxy1 successors_rec
@@ -598,7 +598,7 @@ module For_tests = struct
         >>| Result.map_error ~f:(Fn.compose fail (function
           | `Bootstrap_required -> "bootstrap required"
           | `Persistent_frontier_malformed -> "persistent frontier malformed"
-          | `Faliure msg -> msg))
+          | `Failure msg -> msg))
         >>| Result.ok_or_failwith
       in
       let%bind () = Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) in
