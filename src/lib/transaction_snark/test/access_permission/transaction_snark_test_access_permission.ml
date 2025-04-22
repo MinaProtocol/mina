@@ -129,7 +129,7 @@ let%test_module "Access permission tests" =
           transaction_commitment
           ~memo_hash:(Signed_command_memo.hash memo)
           ~fee_payer_hash:
-            (Zkapp_command.Digest.Account_update.create
+            (Zkapp_command.Digest.Account_update.create ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       (* TODO: Make this better. *)

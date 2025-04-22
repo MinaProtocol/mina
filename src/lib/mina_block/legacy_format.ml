@@ -27,7 +27,9 @@ module User_command = struct
     module V1 = struct
       type t = User_command.Stable.V2.t [@@deriving sexp]
 
-      let to_yojson : t -> Yojson.Safe.t = function
+      let to_yojson : t -> Yojson.Safe.t =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
+        function
         | User_command.Poly.Signed_command tx ->
             Helper.to_yojson ~proof_to_yojson:Proof.to_yojson (Signed_command tx)
         | User_command.Poly.Zkapp_command { fee_payer; memo; account_updates }
@@ -39,7 +41,8 @@ module User_command = struct
                  ; account_updates =
                      Zkapp_command.(
                        Call_forest.accumulate_hashes
-                         ~hash_account_update:Digest.Account_update.create)
+                         ~hash_account_update:
+                           (Digest.Account_update.create ~signature_kind))
                        account_updates
                  } )
 

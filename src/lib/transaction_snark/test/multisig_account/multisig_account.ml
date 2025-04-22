@@ -444,6 +444,7 @@ let%test_module "multisig_account" =
                     ~memo_hash:(Signed_command_memo.hash memo)
                     ~fee_payer_hash:
                       (Zkapp_command.Digest.Account_update.create
+                         ~signature_kind
                          (Account_update.of_fee_payer fee_payer) )
                 in
                 { fee_payer with

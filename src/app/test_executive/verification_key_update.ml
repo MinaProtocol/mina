@@ -210,6 +210,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
     in
     let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash = Zkapp_command.Call_forest.hash call_forest in
@@ -231,6 +232,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           transaction_commitment ~memo_hash
           ~fee_payer_hash:
             (Zkapp_command.Call_forest.Digest.Account_update.create
+               ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :

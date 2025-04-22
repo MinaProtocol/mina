@@ -86,11 +86,12 @@ let fee_payer =
   }
 
 let full_commitment =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   (* TODO: This is a pain. *)
   Zkapp_command.Transaction_commitment.create_complete transaction_commitment
     ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:
-      (Zkapp_command.Digest.Account_update.create
+      (Zkapp_command.Digest.Account_update.create ~signature_kind
          (Account_update.of_fee_payer fee_payer) )
 
 (* TODO: Make this better. *)

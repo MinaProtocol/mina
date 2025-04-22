@@ -214,6 +214,7 @@ let%test_module "Composability test" =
     end
 
     let test_zkapp_command ?expected_failure zkapp_command =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
         let account_updates_hash =
@@ -237,6 +238,7 @@ let%test_module "Composability test" =
           transaction_commitment ~memo_hash
           ~fee_payer_hash:
             (Zkapp_command.Call_forest.Digest.Account_update.create
+               ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :

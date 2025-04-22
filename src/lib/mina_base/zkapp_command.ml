@@ -151,13 +151,14 @@ let map_proofs ~(f : 'p -> 'q)
   }
 
 let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
       w.account_updates
       |> Call_forest.accumulate_hashes
            ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
+             Digest.Account_update.create ~signature_kind p )
   }
 
 let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
@@ -178,6 +179,7 @@ let forget_digests_and_proofs
 [%%define_locally Stable.Latest.(gen)]
 
 let of_simple (w : Simple.t) : t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
@@ -187,7 +189,7 @@ let of_simple (w : Simple.t) : t =
       |> Call_forest.map ~f:Account_update.of_simple
       |> Call_forest.accumulate_hashes
            ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
+             Digest.Account_update.create ~signature_kind p )
   }
 
 let to_simple (t : t) : Simple.t =
@@ -220,6 +222,7 @@ let to_simple (t : t) : Simple.t =
   }
 
 let all_account_updates t : _ Call_forest.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let p = t.Poly.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
   let account_update =
@@ -228,7 +231,7 @@ let all_account_updates t : _ Call_forest.t =
     }
   in
   let fee_payer_digest : Digest.Account_update.t =
-    Digest.Account_update.create account_update
+    Digest.Account_update.create ~signature_kind account_update
   in
   let tree : _ Call_forest.Tree.t =
     { account_update; account_update_digest = fee_payer_digest; calls = [] }
@@ -1398,10 +1401,11 @@ let is_incompatible_version
           not Mina_numbers.Txn_version.(equal_to_current txn_version) )
 
 let get_transaction_commitments (zkapp_command : _ Poly.t) =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =
     Account_update.of_fee_payer zkapp_command.fee_payer
-    |> Digest.Account_update.create
+    |> Digest.Account_update.create ~signature_kind
   in
   let account_updates_hash = account_updates_hash zkapp_command in
   let txn_commitment = Transaction_commitment.create ~account_updates_hash in

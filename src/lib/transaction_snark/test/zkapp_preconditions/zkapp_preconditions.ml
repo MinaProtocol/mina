@@ -364,7 +364,7 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let memo_hash = Signed_command_memo.hash memo in
                   let fee_payer_hash =
-                    Zkapp_command.Digest.Account_update.create
+                    Zkapp_command.Digest.Account_update.create ~signature_kind
                       (Account_update.of_fee_payer fee_payer)
                   in
                   let full_commitment =
@@ -960,7 +960,7 @@ let%test_module "Account precondition tests" =
               in
               let memo_hash = Signed_command_memo.hash memo in
               let fee_payer_hash =
-                Zkapp_command.Digest.Account_update.create
+                Zkapp_command.Digest.Account_update.create ~signature_kind
                   (Account_update.of_fee_payer fee_payer)
               in
               let full_commitment =
