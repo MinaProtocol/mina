@@ -34,6 +34,8 @@ let%test_module "Tokens test" =
   ( module struct
     let () = Base.Backtrace.elide := false
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let pk, sk = gen_keys ()
 
     let token_id = Token_id.default
@@ -95,7 +97,6 @@ let%test_module "Tokens test" =
     let finalize_ledger loc ledger = Ledger.get ledger loc
 
     let%test_unit "Initialize and mint" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
@@ -108,7 +109,6 @@ let%test_module "Tokens test" =
       ignore account
 
     let%test_unit "Initialize, mint, transfer none" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
@@ -124,7 +124,6 @@ let%test_module "Tokens test" =
       ignore account
 
     let%test_unit "Proof aborts if token balance changes do not sum to 0" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
@@ -149,7 +148,6 @@ let%test_module "Tokens test" =
           ()
 
     let%test_unit "Initialize, mint, transfer two succeeds" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
@@ -185,7 +183,6 @@ let%test_module "Tokens test" =
       ignore account
 
     let%test_unit "Initialize, mint, transfer two succeeds, ignores non-token" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
@@ -243,7 +240,6 @@ let%test_module "Tokens test" =
 
     let%test_unit "Initialize, mint, transfer recursive succeeds, ignores \
                    non-token" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
@@ -376,7 +372,6 @@ let%test_module "Tokens test" =
 
     let%test_unit "Initialize, mint, transfer two and non-token without auth \
                    fails" =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
