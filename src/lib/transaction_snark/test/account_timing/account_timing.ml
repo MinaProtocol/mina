@@ -15,6 +15,8 @@ let%test_module "account timing check" =
   ( module struct
     open Mina_ledger.Ledger.For_tests
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
@@ -365,7 +367,6 @@ let%test_module "account timing check" =
           ~constraint_constants txn_applied
         |> Or_error.ok_exn
       in
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Transaction_snark.check_transaction ~signature_kind ~constraint_constants
         ~sok_message
         ~source_first_pass_ledger:
