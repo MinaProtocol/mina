@@ -1,17 +1,14 @@
 (** Batch of Polynomial Commitment Scheme *)
 
-type ('a, 'n, 'm) t
+type ('a, 'm) t
 
-val map : ('a, 'n, 'm) t -> f:('a -> 'b) -> ('b, 'n, 'm) t
+val map : ('a, 'm) t -> f:('a -> 'b) -> ('b, 'm) t
 
 val pow : one:'f -> mul:('f -> 'f -> 'f) -> 'f -> int -> 'f
 
 val num_bits : int -> int
 
-val create :
-     without_degree_bound:'n Nat.t
-  -> with_degree_bound:('a, 'm) Vector.t
-  -> ('a, 'n, 'm) t
+val create : with_degree_bound:('a, 'm) Vector.t -> ('a, 'm) t
 
 (*
 val combine_commitments :
@@ -50,7 +47,7 @@ val combine_evaluations' :
 *)
 
 val combine_split_commitments :
-     (_, 'n, 'm) t
+     (_, 'm) t
   -> scale_and_add:(acc:'g_acc -> xi:'f -> 'g -> 'g_acc)
   -> init:('g -> 'g_acc option)
   -> xi:'f

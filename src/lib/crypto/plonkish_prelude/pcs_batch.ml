@@ -1,11 +1,8 @@
 open Core_kernel
-[@@@warning "-69"]
 
+type ('a, 'm) t = { with_degree_bound : ('a, 'm) Vector.t }
 
-type ('a, 'n, 'm) t = 
-  { without_degree_bound : 'n Nat.t [@warning "-69"]; with_degree_bound : ('a, 'm) Vector.t }
-
-let map t ~f = { t with with_degree_bound = Vector.map t.with_degree_bound ~f }
+let map t ~f = { with_degree_bound = Vector.map t.with_degree_bound ~f }
 
 let num_bits n = Int.floor_log2 n + 1
 
@@ -22,8 +19,7 @@ let pow ~one ~mul x n =
   in
   go one (k - 1)
 
-let create ~without_degree_bound ~with_degree_bound =
-  { without_degree_bound; with_degree_bound }
+let create ~with_degree_bound = { with_degree_bound }
 
 (*
 let combine_commitments _t ~scale ~add ~xi (type n)
