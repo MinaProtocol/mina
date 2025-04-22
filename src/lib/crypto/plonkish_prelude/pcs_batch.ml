@@ -23,7 +23,7 @@ let pow ~one ~mul x n =
 let create ~without_degree_bound ~with_degree_bound =
   { without_degree_bound; with_degree_bound }
 
-let combine_commitments _t ~scale ~add ~xi (type n)
+let combine_commitments ~scale ~add ~xi (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
   match without_degree_bound with
   | [] ->

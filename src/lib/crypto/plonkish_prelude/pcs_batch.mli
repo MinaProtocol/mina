@@ -14,8 +14,7 @@ val create :
   -> ('a, 'n, 'm) t
 
 val combine_commitments :
-     (int, 'n, 'm) t
-  -> scale:('g -> 'f -> 'g)
+     scale:('g -> 'f -> 'g)
   -> add:('g -> 'g -> 'g)
   -> xi:'f
   -> ('g, 'n) Vector.t
