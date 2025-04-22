@@ -330,7 +330,9 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                   make_interruptible
                     (Uptime_snark_worker.perform_single snark_worker
                        ( message
-                       , read_all_proofs_for_work_single_spec single_spec ) )
+                       , Regular
+                           ( read_all_proofs_for_work_single_spec single_spec
+                           , { one_or_two = `One; pair_uuid = None } ) ) )
                 with
                 | Error e ->
                     (* error in submitting to process *)

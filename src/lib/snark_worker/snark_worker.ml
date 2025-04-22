@@ -14,6 +14,8 @@ end
 
 (* module providing swappable implementation for worker *)
 module Impl = struct
+  module type intf = Worker_impl.S
+
   module Prod = Prod.Impl
   module Debug = Debug.Impl
 end
