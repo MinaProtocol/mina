@@ -711,7 +711,8 @@ let%test_module "Account precondition tests" =
                         ; (zkapp_pk, new_kp.private_key)
                         ]
                     in
-                    Zkapp_command_builder.replace_authorizations ~keymap zkapp
+                    Zkapp_command_builder.replace_authorizations ~signature_kind
+                      ~keymap zkapp
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
                     [ zkapp_command ] ) ) )
@@ -770,8 +771,8 @@ let%test_module "Account precondition tests" =
                                 []
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:token_owner_pk
-                           ~fee_payer_nonce:nonce
+                      |> mk_zkapp_command ~signature_kind ~fee:7
+                           ~fee_payer_pk:token_owner_pk ~fee_payer_nonce:nonce
                     in
                     let zkapp_dummy_signatures =
                       let delegate_precondition =
@@ -785,7 +786,8 @@ let%test_module "Account precondition tests" =
                              .accumulate_hashes_predicated ~signature_kind
                       }
                     in
-                    replace_authorizations ~keymap zkapp_dummy_signatures
+                    replace_authorizations ~signature_kind ~keymap
+                      zkapp_dummy_signatures
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:

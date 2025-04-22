@@ -96,6 +96,7 @@ let mk_ledgers_and_fee_payers ?(is_timed = false) ~num_of_fee_payers () =
 
 let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
     ~max_account_updates ~individual_test_timeout random =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:5 ()
   in
@@ -112,8 +113,8 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
            ~keymap ~ledger ~vk () )
     in
     let%bind.Deferred zkapp_command =
-      Zkapp_command_builder.replace_authorizations ~prover ~keymap
-        zkapp_command_dummy_auths
+      Zkapp_command_builder.replace_authorizations ~signature_kind ~prover
+        ~keymap zkapp_command_dummy_auths
     in
     let%map () =
       match%map
@@ -150,6 +151,7 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
 
 let generate_zkapp_commands_and_apply_them_freshly ~successful
     ~max_account_updates ~individual_test_timeout random =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:3 ()
   in
@@ -164,7 +166,7 @@ let generate_zkapp_commands_and_apply_them_freshly ~successful
          ~ledger ~vk () )
   in
   let%bind.Deferred zkapp_command =
-    Zkapp_command_builder.replace_authorizations ~prover ~keymap
+    Zkapp_command_builder.replace_authorizations ~signature_kind ~prover ~keymap
       zkapp_command_dummy_auths
   in
   let%map () =
@@ -198,6 +200,7 @@ let generate_zkapp_commands_and_apply_them_freshly ~successful
 
 let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
     ~expected_failure_status ~individual_test_timeout random =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~num_of_fee_payers:3 ()
   in
@@ -213,7 +216,7 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
   in
 
   let%bind.Deferred zkapp_command =
-    Zkapp_command_builder.replace_authorizations ~prover ~keymap
+    Zkapp_command_builder.replace_authorizations ~signature_kind ~prover ~keymap
       zkapp_command_dummy_auths
   in
   let%map () =
@@ -255,6 +258,7 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
 
 let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
     random =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let ledger, fee_payer_keypairs, keymap =
     mk_ledgers_and_fee_payers ~is_timed:true ~num_of_fee_payers:3 ()
   in
@@ -268,7 +272,7 @@ let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
          ~ledger ~vk () )
   in
   let%bind zkapp_command =
-    Zkapp_command_builder.replace_authorizations ~prover ~keymap
+    Zkapp_command_builder.replace_authorizations ~signature_kind ~prover ~keymap
       zkapp_command_dummy_auths
   in
   let%map () =

@@ -2933,6 +2933,7 @@ let%test_module "staged ledger tests" =
     let gen_zkapps ?ledger_init_state ?failure ~num_zkapps zkapps_per_iter :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Quickcheck.Generator.Let_syntax in
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
@@ -2945,7 +2946,8 @@ let%test_module "staged ledger tests" =
           | Zkapp_command zkapp_command_valid, _fee_payer_keypair, keymap ->
               let zkapp_command_with_auths =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    Zkapp_command_builder.replace_authorizations ~keymap
+                    Zkapp_command_builder.replace_authorizations ~signature_kind
+                      ~keymap
                       (Zkapp_command.Valid.forget zkapp_command_valid) )
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
@@ -4769,10 +4771,11 @@ let%test_module "staged ledger tests" =
 
     let mk_basic_zkapp_command ?prover ~keymap ~fee ~fee_payer_pk
         ~fee_payer_nonce nodes =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Zkapp_command_builder in
       mk_forest nodes
-      |> mk_zkapp_command ~fee ~fee_payer_pk ~fee_payer_nonce
-      |> replace_authorizations ?prover ~keymap
+      |> mk_zkapp_command ~signature_kind ~fee ~fee_payer_pk ~fee_payer_nonce
+      |> replace_authorizations ~signature_kind ?prover ~keymap
 
     let%test_unit "Setting verification keys across differing accounts" =
       test_staged_ledger_diff_validity ~expectation:`Accept

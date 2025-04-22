@@ -43,9 +43,8 @@ let mk_account_update_body ?preconditions ?(increment_nonce = false)
   ; authorization_kind
   }
 
-let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
-    Zkapp_command.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let mk_zkapp_command ~signature_kind ?memo ~fee ~fee_payer_pk ~fee_payer_nonce
+    account_updates : Zkapp_command.t =
   let fee_payer : Account_update.Fee_payer.t =
     { body =
         { public_key = fee_payer_pk
@@ -83,9 +82,9 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
 (* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
    [keymap] maps compressed public keys to private keys
 *)
-let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
-    Zkapp_command.t Async_kernel.Deferred.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let replace_authorizations ~signature_kind ?prover ~keymap
+    (zkapp_command : Zkapp_command.t) : Zkapp_command.t Async_kernel.Deferred.t
+    =
   let txn_commitment, full_txn_commitment =
     Zkapp_command.get_transaction_commitments zkapp_command
   in

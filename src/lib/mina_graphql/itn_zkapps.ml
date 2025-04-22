@@ -162,6 +162,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
     ~fee_payer_array ~tm_end ~scheduler_tbl ~uuid ~keymap ~unused_pks
     ~stop_signal ~mina ~zkapp_command_details ~wait_span ~logger
     ~account_state_tbl init_tm_next init_counter =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
   let repeat tm_next counter =
     let%map () = Async_unix.at tm_next in
@@ -281,8 +282,8 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
         let%bind zkapp_command =
           O1trace.thread "itn_replace_zkapp_auth"
           @@ fun () ->
-          Zkapp_command_builder.replace_authorizations ~prover ~keymap
-            zkapp_dummy
+          Zkapp_command_builder.replace_authorizations ~signature_kind ~prover
+            ~keymap zkapp_dummy
         in
         let%bind () =
           O1trace.thread "itn_send_zkapp"

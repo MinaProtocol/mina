@@ -88,6 +88,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         >>| ignore )
 
   let run network t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Malleable_error.Let_syntax in
     let constants : Test_config.constants =
       { genesis_constants = Network.genesis_constants network
@@ -167,10 +168,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"invalid zkapp from fish1" ~fee:12_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 0)
+        |> mk_zkapp_command ~signature_kind ~memo:"invalid zkapp from fish1"
+             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 0)
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      replace_authorizations ~signature_kind ~keymap with_dummy_signatures
     in
     (*Transaction that updates fee payer account in account_updates but passes
        because the nonce precondition is true. There should be no other fee
@@ -194,10 +196,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
+        |> mk_zkapp_command ~signature_kind ~memo:"valid zkapp from fish1"
+             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 1)
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      replace_authorizations ~signature_kind ~keymap with_dummy_signatures
     in
     (*Set fee payer send permission to Proof. New transactions with the same
       fee payer are accepted into the pool.
@@ -220,11 +223,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"precondition zkapp from fish1"
-             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
-             ~fee_payer_nonce:(Account.Nonce.of_int 2)
+        |> mk_zkapp_command ~signature_kind
+             ~memo:"precondition zkapp from fish1" ~fee:12_000_000
+             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 2)
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      replace_authorizations ~signature_kind ~keymap with_dummy_signatures
     in
     (*Transaction with fee payer update in account_updates. The account update
       should fail if the send permission is changed to Proof*)
@@ -244,10 +247,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:12_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+        |> mk_zkapp_command ~signature_kind ~memo:"valid zkapp from fish1"
+             ~fee:12_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 3)
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      replace_authorizations ~signature_kind ~keymap with_dummy_signatures
     in
     (*Transaction that doesn't make it into a block and should be evicted from
       the pool after fee payer's send permission is changed
@@ -264,10 +268,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             ]
         in
         account_updates
-        |> mk_zkapp_command ~memo:"valid zkapp from fish1" ~fee:2_000_000
-             ~fee_payer_pk:fish1_pk ~fee_payer_nonce:(Account.Nonce.of_int 4)
+        |> mk_zkapp_command ~signature_kind ~memo:"valid zkapp from fish1"
+             ~fee:2_000_000 ~fee_payer_pk:fish1_pk
+             ~fee_payer_nonce:(Account.Nonce.of_int 4)
       in
-      replace_authorizations ~keymap with_dummy_signatures
+      replace_authorizations ~signature_kind ~keymap with_dummy_signatures
     in
     let snark_work_event_subscription =
       Event_router.on (event_router t) Snark_work_gossip ~f:(fun _ _ ->

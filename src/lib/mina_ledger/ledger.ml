@@ -454,14 +454,15 @@ let%test_unit "tokens test" =
         (account_updates :
           (Account_update.Body.Simple.t, unit, unit) Zkapp_command.Call_forest.t
           ) : unit =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let _, ({ nonce; _ } : Account.t), _ =
         Ledger_inner.get_or_create ledger
           (Account_id.create pk Token_id.default)
         |> Or_error.ok_exn
       in
       let zkapp_command =
-        mk_zkapp_command ~fee:7 ~fee_payer_pk:pk ~fee_payer_nonce:nonce
-          account_updates
+        mk_zkapp_command ~signature_kind ~fee:7 ~fee_payer_pk:pk
+          ~fee_payer_nonce:nonce account_updates
       in
       match
         apply_zkapp_command_unchecked ~constraint_constants

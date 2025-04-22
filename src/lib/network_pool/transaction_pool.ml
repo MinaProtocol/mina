@@ -1835,6 +1835,7 @@ let%test_module _ =
 
     let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
         User_command.Valid.t list Deferred.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Deferred.Let_syntax in
       let%map zkapp_commands_fixed =
         Deferred.List.map
@@ -1842,7 +1843,8 @@ let%test_module _ =
           ~f:(function
             | Zkapp_command zkapp_command_dummy_auths ->
                 let%map cmd =
-                  Zkapp_command_builder.replace_authorizations ~keymap ~prover
+                  Zkapp_command_builder.replace_authorizations ~signature_kind
+                    ~keymap ~prover
                     (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
                 in
                 User_command.Zkapp_command cmd
@@ -2915,6 +2917,7 @@ let%test_module _ =
 
     let mk_basic_zkapp ?(fee = 10_000_000_000) ?(empty_update = false)
         ?preconditions ?permissions nonce fee_payer_kp =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Zkapp_command_builder in
       let preconditions =
         Option.value preconditions
@@ -2946,7 +2949,7 @@ let%test_module _ =
             ]
       in
       account_updates
-      |> mk_zkapp_command ~memo:"" ~fee
+      |> mk_zkapp_command ~signature_kind ~memo:"" ~fee
            ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
            ~fee_payer_nonce:(Account.Nonce.of_int nonce)
 

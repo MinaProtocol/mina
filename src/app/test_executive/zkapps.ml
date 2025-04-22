@@ -121,6 +121,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         |> Malleable_error.ignore_m
 
   let run network t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let constants : Test_config.constants =
@@ -466,10 +467,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     []
                 ]
             ]
-          |> mk_zkapp_command ~memo:"mint token" ~fee:12_000_000 ~fee_payer_pk
-               ~fee_payer_nonce:(Account.Nonce.of_int 1)
+          |> mk_zkapp_command ~signature_kind ~memo:"mint token" ~fee:12_000_000
+               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 1)
         in
-        replace_authorizations ~keymap with_dummy_signatures
+        replace_authorizations ~signature_kind ~keymap with_dummy_signatures
       in
       let%bind.Deferred zkapp_command_mint_token2 =
         let open Zkapp_command_builder in
@@ -489,10 +490,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     ]
                 ]
             ]
-          |> mk_zkapp_command ~memo:"zkapp to mint token2" ~fee:11_500_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 2)
+          |> mk_zkapp_command ~signature_kind ~memo:"zkapp to mint token2"
+               ~fee:11_500_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 2)
         in
-        replace_authorizations ~keymap with_dummy_signatures
+        replace_authorizations ~signature_kind ~keymap with_dummy_signatures
       in
       let%bind.Deferred zkapp_command_token_transfer =
         let open Zkapp_command_builder in
@@ -521,10 +523,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     []
                 ]
             ]
-          |> mk_zkapp_command ~memo:"zkapp for tokens transfer" ~fee:11_000_000
-               ~fee_payer_pk ~fee_payer_nonce:(Account.Nonce.of_int 3)
+          |> mk_zkapp_command ~signature_kind ~memo:"zkapp for tokens transfer"
+               ~fee:11_000_000 ~fee_payer_pk
+               ~fee_payer_nonce:(Account.Nonce.of_int 3)
         in
-        replace_authorizations ~keymap with_dummy_signatures
+        replace_authorizations ~signature_kind ~keymap with_dummy_signatures
       in
       let%map.Deferred zkapp_command_token_transfer2 =
         let open Zkapp_command_builder in
@@ -557,11 +560,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     ]
                 ]
             ]
-          |> mk_zkapp_command ~memo:"zkapp for tokens transfer 2"
-               ~fee:10_000_000 ~fee_payer_pk
+          |> mk_zkapp_command ~signature_kind
+               ~memo:"zkapp for tokens transfer 2" ~fee:10_000_000 ~fee_payer_pk
                ~fee_payer_nonce:(Account.Nonce.of_int 4)
         in
-        replace_authorizations ~keymap with_dummy_signatures
+        replace_authorizations ~signature_kind ~keymap with_dummy_signatures
       in
       ( zkapp_command_mint_token
       , zkapp_command_mint_token2

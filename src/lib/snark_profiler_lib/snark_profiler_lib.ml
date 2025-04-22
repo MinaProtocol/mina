@@ -189,6 +189,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~max_num_updates () :
     (Mina_ledger.Ledger.t * Zkapp_command.t list) Async.Deferred.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let `VK verification_key, `Prover prover =
     Transaction_snark.For_tests.create_trivial_snapp ()
   in
@@ -421,8 +422,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
                    i perm_string ;
                  (*Update the authorizations*)
                  let%map.Async.Deferred p =
-                   Zkapp_command_builder.replace_authorizations ~prover ~keymap
-                     p
+                   Zkapp_command_builder.replace_authorizations ~signature_kind
+                     ~prover ~keymap p
                  in
                  Transaction_key.Table.add_exn transaction_combinations
                    ~key:combination
