@@ -65,10 +65,6 @@ module Worker = struct
         (C : Rpc_parallel.Creator
                with type worker_state := Worker_state.t
                 and type connection_state := Connection_state.t) =
-    (*(perform_single : Worker_state.t ->
-      Sok_message.t * Work.Partitioned.Single.Spec.Stable.V2.t ->
-      (Ledger_proof.t * Core_kernel_private.Span_float.t)
-      Async_kernel__Deferred_or_error.t)*)
     struct
       let perform_single (w : Worker_state.t) msg_and_single_spec =
         let (module M) = Worker_state.get w in
