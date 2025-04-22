@@ -254,7 +254,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
   in
   Comparable.lift
     (fun existing candidate ->
-      (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
+      (* To prevent the logger to spam a lot of messages, the logger input is set to null *)
       if
         State_hash.equal
           (State_hash.With_state_hashes.state_hash existing)
