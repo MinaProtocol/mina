@@ -80,6 +80,7 @@ let collect_vk_assumptions zkapp_command =
 
 let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
     (unit, invalid) Result.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let account_updates_hash =
     Zkapp_command.Call_forest.hash
       zkapp_command.Zkapp_command.Poly.account_updates
@@ -102,7 +103,7 @@ let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
     | Some pk ->
         if
           not
-            (Signature_lib.Schnorr.Chunked.verify s
+            (Signature_lib.Schnorr.Chunked.verify ~signature_kind s
                (Backend.Tick.Inner_curve.of_affine pk)
                (Random_oracle_input.Chunked.field msg) )
         then Error (`Invalid_signature [ Signature_lib.Public_key.compress pk ])

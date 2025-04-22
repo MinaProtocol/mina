@@ -46,8 +46,9 @@ let%test_module "multisig_account" =
 
       (* check a signature on msg against a public key *)
       let check_sig pk msg sigma : Boolean.var Checked.t =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-        Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
+        Schnorr.Chunked.Checked.verifies ~signature_kind (module S) sigma pk msg
 
       (* verify witness signatures against public keys *)
       let%snarkydef_ verify_sigs pubkeys commitment witness =
@@ -76,6 +77,7 @@ let%test_module "multisig_account" =
           >>= fun () -> verify_sigs pubkeys commitment witness
 
       let%test_unit "1-of-1" =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let gen =
           let open Quickcheck.Generator.Let_syntax in
           let%map sk = Private_key.gen and msg = Field.gen_uniform in
@@ -86,7 +88,7 @@ let%test_module "multisig_account" =
             (let%bind pk_var =
                exists Inner_curve.typ ~compute:(As_prover.return pk)
              in
-             let sigma = Schnorr.Chunked.sign sk msg in
+             let sigma = Schnorr.Chunked.sign ~signature_kind sk msg in
              let%bind sigma_var =
                exists Schnorr.Chunked.Signature.typ
                  ~compute:(As_prover.return sigma)
@@ -102,6 +104,7 @@ let%test_module "multisig_account" =
             |> run_and_check |> Or_error.ok_exn )
 
       let%test_unit "2-of-2" =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let gen =
           let open Quickcheck.Generator.Let_syntax in
           let%map sk0 = Private_key.gen
@@ -118,8 +121,8 @@ let%test_module "multisig_account" =
              let%bind pk1_var =
                exists Inner_curve.typ ~compute:(As_prover.return pk1)
              in
-             let sigma0 = Schnorr.Chunked.sign sk0 msg in
-             let sigma1 = Schnorr.Chunked.sign sk1 msg in
+             let sigma0 = Schnorr.Chunked.sign ~signature_kind sk0 msg in
+             let sigma1 = Schnorr.Chunked.sign ~signature_kind sk1 msg in
              let%bind sigma0_var =
                exists Schnorr.Chunked.Signature.typ
                  ~compute:(As_prover.return sigma0)
@@ -145,6 +148,7 @@ let%test_module "multisig_account" =
 
     (* test with a 2-of-3 multisig *)
     let%test_unit "zkapps-based proved transaction" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Mina_transaction_logic.For_tests in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -408,9 +412,9 @@ let%test_module "multisig_account" =
                 tx_statement |> Zkapp_statement.to_field_elements
                 |> Random_oracle_input.Chunked.field_elements
               in
-              let sigma0 = Schnorr.Chunked.sign sk0 msg in
-              let sigma1 = Schnorr.Chunked.sign sk1 msg in
-              let sigma2 = Schnorr.Chunked.sign sk2 msg in
+              let sigma0 = Schnorr.Chunked.sign ~signature_kind sk0 msg in
+              let sigma1 = Schnorr.Chunked.sign ~signature_kind sk1 msg in
+              let sigma2 = Schnorr.Chunked.sign ~signature_kind sk2 msg in
               let handler (Snarky_backendless.Request.With { request; respond })
                   =
                 match request with
@@ -444,7 +448,8 @@ let%test_module "multisig_account" =
                 in
                 { fee_payer with
                   authorization =
-                    Signature_lib.Schnorr.Chunked.sign sender.private_key
+                    Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                      sender.private_key
                       (Random_oracle.Input.Chunked.field txn_comm)
                 }
               in
@@ -452,7 +457,8 @@ let%test_module "multisig_account" =
                 { body = sender_account_update_data.body
                 ; authorization =
                     Signature
-                      (Signature_lib.Schnorr.Chunked.sign sender.private_key
+                      (Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                         sender.private_key
                          (Random_oracle.Input.Chunked.field transaction) )
                 }
               in

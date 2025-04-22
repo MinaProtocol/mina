@@ -47,6 +47,7 @@ let%test_module "Access permission tests" =
     let memo = Signed_command_memo.empty
 
     let run_test ?expected_failure auth_kind access_permission =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account_update : Account_update.t =
         match auth_kind with
         | Account_update.Authorization_kind.Proof _ ->
@@ -140,7 +141,7 @@ let%test_module "Access permission tests" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -160,7 +161,7 @@ let%test_module "Access permission tests" =
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign sk
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->

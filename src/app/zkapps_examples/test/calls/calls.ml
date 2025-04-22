@@ -241,13 +241,14 @@ let%test_module "Composability test" =
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
           Zkapp_command.t =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -267,7 +268,7 @@ let%test_module "Composability test" =
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign sk
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->

@@ -68,6 +68,7 @@ let generate_test_ledger =
     exit 0)
 
 let validate_keypair =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Command.async ~summary:"Validate a public, private keypair"
     (let open Command.Let_syntax in
     let open Core_kernel in
@@ -113,7 +114,7 @@ let validate_keypair =
       in
       let message = Mina_base.Signed_command.to_input_legacy dummy_payload in
       let verified =
-        Schnorr.Legacy.verify signature
+        Schnorr.Legacy.verify ~signature_kind signature
           (Snark_params.Tick.Inner_curve.of_affine keypair.public_key)
           message
       in
