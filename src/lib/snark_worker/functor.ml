@@ -232,8 +232,8 @@ module Make (Inputs : Intf.Inputs_intf) :
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
         with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
-      ~proof_level ~constraint_constants daemon_address shutdown_on_disconnect =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      ~signature_kind ~proof_level ~constraint_constants daemon_address
+      shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~signature_kind ~constraint_constants ~proof_level ()
     in
@@ -366,6 +366,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
       and conf_dir = Cli_lib.Flag.conf_dir in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       fun () ->
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
@@ -390,7 +391,7 @@ module Make (Inputs : Intf.Inputs_intf) :
             Core.exit 0 ) ;
         main
           (module Rpcs_versioned)
-          ~logger ~proof_level ~constraint_constants daemon_port
+          ~logger ~signature_kind ~proof_level ~constraint_constants daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
