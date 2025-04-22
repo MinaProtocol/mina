@@ -8,6 +8,9 @@ module type Monadic2 = sig
 
   val map : 'a t -> f:('a -> ('b, 'e) m) -> ('b t, 'e) m
 
+  val map_biased :
+    'a t -> f:([ `One | `First | `Second ] -> 'a -> ('b, 'e) m) -> ('b t, 'e) m
+
   val fold :
     'a t -> init:'accum -> f:('accum -> 'a -> ('accum, 'e) m) -> ('accum, 'e) m
 end

@@ -133,4 +133,7 @@ module Result_without_metrics = struct
     ; fee : Currency.Fee.t
     }
   [@@deriving yojson, sexp]
+
+  let map ~f_proof { proofs; statements; prover; fee } =
+    { proofs = One_or_two.map ~f:f_proof proofs; statements; prover; fee }
 end

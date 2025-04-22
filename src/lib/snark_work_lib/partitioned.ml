@@ -224,7 +224,7 @@ module Spec = struct
 
     module V1 = struct
       type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
-      [@@deriving to_yojson]
+      [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
     end
