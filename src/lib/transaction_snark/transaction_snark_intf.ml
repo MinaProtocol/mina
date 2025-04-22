@@ -62,7 +62,8 @@ module type Full = sig
   end
 
   val check_transaction :
-       ?preeval:bool
+       signature_kind:Mina_signature_kind.t
+    -> ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
@@ -75,7 +76,8 @@ module type Full = sig
     -> unit
 
   val check_user_command :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
     -> target_first_pass_ledger:Frozen_ledger_hash.t
@@ -87,7 +89,8 @@ module type Full = sig
     -> unit
 
   val generate_transaction_witness :
-       ?preeval:bool
+       signature_kind:Mina_signature_kind.t
+    -> ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
@@ -210,7 +213,8 @@ module type Full = sig
   end) : S
 
   val constraint_system_digests :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> unit
     -> (string * Md5.t) list
 

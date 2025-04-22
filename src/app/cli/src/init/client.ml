@@ -955,12 +955,14 @@ let currency_in_ledger =
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
+         let signature_kind = Mina_signature_kind.t_DEPRECATED in
          let constraint_constants =
            Genesis_constants.Compiled.constraint_constants
          in
          let proof_level = Genesis_constants.Compiled.proof_level in
          let all =
-           Transaction_snark.constraint_system_digests ~constraint_constants ()
+           Transaction_snark.constraint_system_digests ~signature_kind
+             ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
                ~proof_level ~constraint_constants ()
          in
@@ -1248,7 +1250,8 @@ let import_key =
        Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
     (let%map_open.Command access_method =
-       choose_one ~if_nothing_chosen:(Default_to `None)
+       choose_one
+         ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1458,7 +1461,8 @@ let export_key =
 let list_accounts =
   Command.async ~summary:"List all owned accounts"
     (let%map_open.Command access_method =
-       choose_one ~if_nothing_chosen:(Default_to `None)
+       choose_one
+         ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir

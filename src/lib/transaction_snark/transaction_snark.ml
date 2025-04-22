@@ -3401,11 +3401,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
   end
 
-  let check_transaction_union ?(preeval = false) ~constraint_constants
-      ~supply_increase ~source_first_pass_ledger ~target_first_pass_ledger
-      sok_message init_stack pending_coinbase_stack_state transaction state_body
-      global_slot handler =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let check_transaction_union ~signature_kind ?(preeval = false)
+      ~constraint_constants ~supply_increase ~source_first_pass_ledger
+      ~target_first_pass_ledger sok_message init_stack
+      pending_coinbase_stack_state transaction state_body global_slot handler =
     if preeval then failwith "preeval currently disabled" ;
     let sok_digest = Sok_message.digest sok_message in
     let handler =
@@ -3436,9 +3435,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                 handler ) )
         : unit )
 
-  let check_transaction ?preeval ~constraint_constants ~sok_message
-      ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
-      ~pending_coinbase_stack_state ~supply_increase
+  let check_transaction ~signature_kind ?preeval ~constraint_constants
+      ~sok_message ~source_first_pass_ledger ~target_first_pass_ledger
+      ~init_stack ~pending_coinbase_stack_state ~supply_increase
       (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
       handler =
     let transaction =
@@ -3455,27 +3454,26 @@ module Make_str (A : Wire_types.Concrete) = struct
         failwith
           "Called non-account_update transaction with zkapp_command transaction"
     | `Transaction t ->
-        check_transaction_union ?preeval ~constraint_constants ~supply_increase
-          ~source_first_pass_ledger ~target_first_pass_ledger sok_message
-          init_stack pending_coinbase_stack_state
+        check_transaction_union ~signature_kind ?preeval ~constraint_constants
+          ~supply_increase ~source_first_pass_ledger ~target_first_pass_ledger
+          sok_message init_stack pending_coinbase_stack_state
           (Transaction_union.of_transaction t)
           state_body global_slot handler
 
-  let check_user_command ~constraint_constants ~sok_message
+  let check_user_command ~signature_kind ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
       ~pending_coinbase_stack_state ~supply_increase t_in_block handler =
     let user_command = Transaction_protocol_state.transaction t_in_block in
-    check_transaction ~constraint_constants ~sok_message
+    check_transaction ~signature_kind ~constraint_constants ~sok_message
       ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
       ~pending_coinbase_stack_state ~supply_increase
       { t_in_block with transaction = Command (Signed_command user_command) }
       handler
 
-  let generate_transaction_union_witness ?(preeval = false)
+  let generate_transaction_union_witness ~signature_kind ?(preeval = false)
       ~constraint_constants ~supply_increase ~source_first_pass_ledger
       ~target_first_pass_ledger sok_message transaction_in_block init_stack
       pending_coinbase_stack_state handler =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     if preeval then failwith "preeval currently disabled" ;
     let transaction =
       Transaction_protocol_state.transaction transaction_in_block
@@ -3510,9 +3508,10 @@ module Make_str (A : Wire_types.Concrete) = struct
     generate_auxiliary_input ~input_typ:Statement.With_sok.typ
       ~return_typ:Typ.unit main statement
 
-  let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
-      ~source_first_pass_ledger ~target_first_pass_ledger ~init_stack
-      ~pending_coinbase_stack_state ~supply_increase
+  let generate_transaction_witness ~signature_kind ?preeval
+      ~constraint_constants ~sok_message ~source_first_pass_ledger
+      ~target_first_pass_ledger ~init_stack ~pending_coinbase_stack_state
+      ~supply_increase
       (transaction_in_block : Transaction.Valid.t Transaction_protocol_state.t)
       handler =
     match
@@ -3524,9 +3523,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         failwith
           "Called non-account_update transaction with zkapp_command transaction"
     | `Transaction t ->
-        generate_transaction_union_witness ?preeval ~constraint_constants
-          ~supply_increase ~source_first_pass_ledger ~target_first_pass_ledger
-          sok_message
+        generate_transaction_union_witness ~signature_kind ?preeval
+          ~constraint_constants ~supply_increase ~source_first_pass_ledger
+          ~target_first_pass_ledger sok_message
           { transaction_in_block with
             transaction = Transaction_union.of_transaction t
           }
@@ -3549,8 +3548,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     verify_impl
       ~f:(Pickles.verify (module Nat.N2) (module Statement.With_sok) key)
 
-  let constraint_system_digests ~constraint_constants () =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let constraint_system_digests ~signature_kind ~constraint_constants () =
     let digest = Tick.R1CS_constraint_system.digest in
     [ ( "transaction-merge"
       , digest
@@ -4133,7 +4131,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       Ok { Proof_carrying_data.data = s; proof }
 
     let constraint_system_digests =
-      lazy (constraint_system_digests ~constraint_constants ())
+      lazy (constraint_system_digests ~signature_kind ~constraint_constants ())
   end
 
   module For_tests = struct

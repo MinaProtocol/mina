@@ -668,11 +668,13 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           ~constraint_constants txn
         |> Or_error.ok_exn )
   in
+
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   match
     Or_error.try_with (fun () ->
-        Transaction_snark.check_transaction ~constraint_constants ~sok_message
-          ~source_first_pass_ledger ~target_first_pass_ledger
-          ~init_stack:pending_coinbase_stack
+        Transaction_snark.check_transaction ~signature_kind
+          ~constraint_constants ~sok_message ~source_first_pass_ledger
+          ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
           ~pending_coinbase_stack_state:
             { Transaction_snark.Pending_coinbase_stack_state.source =
                 pending_coinbase_stack

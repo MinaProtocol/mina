@@ -800,8 +800,9 @@ let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
                  ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
+             let signature_kind = Mina_signature_kind.t_DEPRECATED in
              let () =
-               Transaction_snark.check_transaction ?preeval
+               Transaction_snark.check_transaction ~signature_kind ?preeval
                  ~constraint_constants ~sok_message
                  ~source_first_pass_ledger:
                    (Sparse_ledger.merkle_root source_ledger)
@@ -862,9 +863,10 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
                  ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
+             let signature_kind = Mina_signature_kind.t_DEPRECATED in
              let () =
-               Transaction_snark.generate_transaction_witness ?preeval
-                 ~constraint_constants ~sok_message
+               Transaction_snark.generate_transaction_witness ~signature_kind
+                 ?preeval ~constraint_constants ~sok_message
                  ~source_first_pass_ledger:
                    (Sparse_ledger.merkle_root source_ledger)
                  ~target_first_pass_ledger:

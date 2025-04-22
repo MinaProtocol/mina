@@ -365,7 +365,9 @@ let%test_module "account timing check" =
           ~constraint_constants txn_applied
         |> Or_error.ok_exn
       in
-      Transaction_snark.check_transaction ~constraint_constants ~sok_message
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      Transaction_snark.check_transaction ~signature_kind ~constraint_constants
+        ~sok_message
         ~source_first_pass_ledger:
           (Mina_ledger.Sparse_ledger.merkle_root sparse_ledger_before)
         ~target_first_pass_ledger:
