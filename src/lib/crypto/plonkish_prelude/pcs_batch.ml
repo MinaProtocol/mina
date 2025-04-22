@@ -1,7 +1,9 @@
 open Core_kernel
+[@@@warning "-69"]
 
-type ('a, 'n, 'm) t =
-  { without_degree_bound : 'n Nat.t; with_degree_bound : ('a, 'm) Vector.t }
+
+type ('a, 'n, 'm) t = 
+  { without_degree_bound : 'n Nat.t [@warning "-69"]; with_degree_bound : ('a, 'm) Vector.t }
 
 let map t ~f = { t with with_degree_bound = Vector.map t.with_degree_bound ~f }
 
@@ -23,6 +25,7 @@ let pow ~one ~mul x n =
 let create ~without_degree_bound ~with_degree_bound =
   { without_degree_bound; with_degree_bound }
 
+(*
 let combine_commitments _t ~scale ~add ~xi (type n)
     (without_degree_bound : (_, n) Vector.t) with_degree_bound =
   match without_degree_bound with
@@ -64,6 +67,8 @@ let combine_evaluations (type f) t ~crs_max_degree ~(mul : f -> f -> f) ~add
   combine_evaluations' t evals0 evals1
     ~shifted_pow:(fun deg x -> pow x (crs_max_degree - deg))
     ~mul ~add ~one ~evaluation_point ~xi
+
+*)
 
 let combine_split_commitments _t ~scale_and_add ~init:i ~xi
     ~reduce_without_degree_bound ~reduce_with_degree_bound (type n)

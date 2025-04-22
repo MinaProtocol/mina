@@ -13,6 +13,7 @@ val create :
   -> with_degree_bound:('a, 'm) Vector.t
   -> ('a, 'n, 'm) t
 
+(*
 val combine_commitments :
      (int, 'n, 'm) t
   -> scale:('g -> 'f -> 'g)
@@ -45,6 +46,8 @@ val combine_evaluations' :
   -> ('f, 'n) Vector.t
   -> ('f, 'm) Vector.t
   -> 'f
+
+*)
 
 val combine_split_commitments :
      (_, 'n, 'm) t
