@@ -1,7 +1,7 @@
 (library
  (name fields_derivers)
  (public_name fields_derivers)
- (libraries core_kernel ppx_inline_test.config fieldslib)
+ (libraries core_kernel fieldslib ppx_inline_test.config)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
@@ -9,9 +9,9 @@
  (preprocess
   (pps
    ppx_annot
-   ppx_jane
-   ppx_fields_conv
-   ppx_let
-   ppx_inline_test
    ppx_custom_printf
+   ppx_fields_conv
+   ppx_inline_test
+   ppx_jane
+   ppx_let
    ppx_version)))
