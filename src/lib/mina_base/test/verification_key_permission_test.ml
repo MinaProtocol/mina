@@ -4,6 +4,7 @@ open Mina_base
 let different_version = Mina_numbers.Txn_version.(succ current)
 
 let update_vk_perm_to_be ~auth : Zkapp_command.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let account_update : Account_update.t =
     { body =
         { Account_update.Body.dummy with
@@ -26,7 +27,8 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
     }
   in
   { fee_payer
-  ; account_updates = Zkapp_command.Call_forest.cons account_update []
+  ; account_updates =
+      Zkapp_command.Call_forest.cons ~signature_kind account_update []
   ; memo = Signed_command_memo.empty
   }
 

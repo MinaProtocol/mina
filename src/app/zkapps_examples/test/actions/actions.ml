@@ -186,12 +186,14 @@ let%test_module "Actions test" =
       (Pickles_types.Vector.Vector_5.to_list action_state, last_action_slot)
 
     let%test_unit "Initialize" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command, account =
         let ledger = create_ledger () in
         []
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command ~ledger
       in
       assert (Option.is_some account) ;
@@ -203,12 +205,14 @@ let%test_module "Actions test" =
           assert (List.is_empty account_update.body.actions) )
 
     let%test_unit "Initialize and add sequence events" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command0, account0 =
         let ledger = create_ledger () in
         []
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command ~ledger
              ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
       in
@@ -235,7 +239,8 @@ let%test_module "Actions test" =
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command ~ledger
              ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
       in
@@ -265,6 +270,7 @@ let%test_module "Actions test" =
         Mina_numbers.Global_slot_since_genesis.(equal zero) last_action_slot1 )
 
     let%test_unit "Add sequence events in different slots" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let ledger = create_ledger () in
       let slot1 = Mina_numbers.Global_slot_since_genesis.of_int 1 in
       let _zkapp_command0, account0 =
@@ -272,7 +278,8 @@ let%test_module "Actions test" =
         |> Zkapp_command.Call_forest.cons_tree Add_actions.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command ~global_slot:slot1 ~ledger
       in
       assert (Option.is_some account0) ;

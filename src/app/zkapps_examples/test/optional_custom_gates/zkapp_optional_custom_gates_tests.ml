@@ -87,6 +87,7 @@ let%test_module "Zkapp with optional custom gates" =
 
     let%test_unit "Zkapp using a combination of optional custom gates verifies"
         =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       Async.Thread_safe.block_on_async_exn
       @@ fun () ->
       let%map.Async_kernel.Deferred vk =
@@ -96,7 +97,7 @@ let%test_module "Zkapp with optional custom gates" =
       let account_updates =
         []
         |> Zkapp_command.Call_forest.cons_tree account_update
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              (Zkapps_examples.Deploy_account_update.full ~access:Either
                 Account_info.public_key Account_info.token_id vk )
       in

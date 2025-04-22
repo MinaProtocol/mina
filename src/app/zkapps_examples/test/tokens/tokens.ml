@@ -95,11 +95,12 @@ let%test_module "Tokens test" =
     let finalize_ledger loc ledger = Ledger.get ledger loc
 
     let%test_unit "Initialize and mint" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 1))
         |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
              ~finalize_ledger
@@ -107,6 +108,7 @@ let%test_module "Tokens test" =
       ignore account
 
     let%test_unit "Initialize, mint, transfer none" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
@@ -114,7 +116,7 @@ let%test_module "Tokens test" =
              @@ Zkapps_tokens.child_forest pk token_id [] )
         |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 1))
         |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
              ~finalize_ledger
@@ -122,9 +124,10 @@ let%test_module "Tokens test" =
       ignore account
 
     let%test_unit "Proof aborts if token balance changes do not sum to 0" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -146,9 +149,10 @@ let%test_module "Tokens test" =
           ()
 
     let%test_unit "Initialize, mint, transfer two succeeds" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -156,7 +160,7 @@ let%test_module "Tokens test" =
                    ~use_full_commitment:true ~balance_change:(int_to_amount 1)
                    ~token_id:owned_token_id ~may_use_token:Parents_own_token
              }
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -173,7 +177,7 @@ let%test_module "Tokens test" =
              @@ Zkapps_tokens.child_forest pk token_id subtree )
         |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 1))
         |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
              ~finalize_ledger
@@ -181,9 +185,10 @@ let%test_module "Tokens test" =
       ignore account
 
     let%test_unit "Initialize, mint, transfer two succeeds, ignores non-token" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -192,7 +197,7 @@ let%test_module "Tokens test" =
                    ~token_id:owned_token_id ~may_use_token:Parents_own_token
              }
         (* This account update should be ignored by the token zkApp. *)
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -200,7 +205,7 @@ let%test_module "Tokens test" =
                    ~use_full_commitment:true ~balance_change:(int_to_amount 30)
                    ~token_id:Token_id.default ~may_use_token:Parents_own_token
              }
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -215,7 +220,7 @@ let%test_module "Tokens test" =
         (* This account update should bring the total balance back to 0,
            counteracting the effect of the ignored update above.
         *)
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -229,7 +234,7 @@ let%test_module "Tokens test" =
              @@ Zkapps_tokens.child_forest pk token_id subtree )
         |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 2))
         |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
              ~finalize_ledger
@@ -238,9 +243,10 @@ let%test_module "Tokens test" =
 
     let%test_unit "Initialize, mint, transfer recursive succeeds, ignores \
                    non-token" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -251,7 +257,7 @@ let%test_module "Tokens test" =
              ~calls:
                ( []
                (* Delegate call, should be checked. *)
-               |> Zkapp_command.Call_forest.cons
+               |> Zkapp_command.Call_forest.cons ~signature_kind
                     { Account_update.Poly.authorization =
                         Control.Poly.Signature Signature.dummy
                     ; body =
@@ -264,7 +270,7 @@ let%test_module "Tokens test" =
                     ~calls:
                       ( []
                       (* Delegate call, should be checked. *)
-                      |> Zkapp_command.Call_forest.cons
+                      |> Zkapp_command.Call_forest.cons ~signature_kind
                            { Account_update.Poly.authorization =
                                Control.Poly.Signature Signature.dummy
                            ; body =
@@ -275,7 +281,7 @@ let%test_module "Tokens test" =
                                  ~may_use_token:Inherit_from_parent
                            }
                       (* Parents_own_token, should be skipped. *)
-                      |> Zkapp_command.Call_forest.cons
+                      |> Zkapp_command.Call_forest.cons ~signature_kind
                            { Account_update.Poly.authorization =
                                Control.Poly.Signature Signature.dummy
                            ; body =
@@ -285,7 +291,7 @@ let%test_module "Tokens test" =
                                  ~may_use_token:Parents_own_token
                            }
                       (* Blind call, should be skipped. *)
-                      |> Zkapp_command.Call_forest.cons
+                      |> Zkapp_command.Call_forest.cons ~signature_kind
                            { Account_update.Poly.authorization =
                                Control.Poly.Signature Signature.dummy
                            ; body =
@@ -295,7 +301,7 @@ let%test_module "Tokens test" =
                                  ~may_use_token:No
                            }
                       (* Blind call, should be skipped. *)
-                      |> Zkapp_command.Call_forest.cons
+                      |> Zkapp_command.Call_forest.cons ~signature_kind
                            { Account_update.Poly.authorization =
                                Control.Poly.Signature Signature.dummy
                            ; body =
@@ -325,7 +331,7 @@ let%test_module "Tokens test" =
                     (Account_updates.mint_with_used_token Inherit_from_parent)
                )
         (* This account update should be ignored by the token zkApp. *)
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -333,7 +339,7 @@ let%test_module "Tokens test" =
                    ~use_full_commitment:true ~balance_change:(int_to_amount 15)
                    ~may_use_token:Inherit_from_parent
              }
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -348,7 +354,7 @@ let%test_module "Tokens test" =
         (* This account update should bring the total balance back to 0,
            counteracting the effect of the ignored update above.
         *)
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -361,7 +367,7 @@ let%test_module "Tokens test" =
              @@ Zkapps_tokens.child_forest pk token_id subtree )
         |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 2))
         |> test_zkapp_command ~fee_payer_pk:pk ~signers ~initialize_ledger
              ~finalize_ledger
@@ -370,9 +376,10 @@ let%test_module "Tokens test" =
 
     let%test_unit "Initialize, mint, transfer two and non-token without auth \
                    fails" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let subtree =
         []
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -381,7 +388,7 @@ let%test_module "Tokens test" =
                    ~token_id:owned_token_id ~may_use_token:Inherit_from_parent
              }
         (* This account update should be ignored by the token zkApp. *)
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -389,7 +396,7 @@ let%test_module "Tokens test" =
                    ~use_full_commitment:true ~balance_change:(int_to_amount 30)
                    ~may_use_token:Inherit_from_parent
              }
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -404,7 +411,7 @@ let%test_module "Tokens test" =
         (* This account update should bring the total balance back to 0,
            counteracting the effect of the ignored update above.
         *)
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              { Account_update.Poly.authorization =
                  Control.Poly.Signature Signature.dummy
              ; body =
@@ -412,7 +419,7 @@ let%test_module "Tokens test" =
                    ~use_full_commitment:true
                    ~balance_change:(int_to_amount (-30)) ~may_use_token:No
              }
-        |> Zkapp_command.Call_forest.cons ~calls:subtree
+        |> Zkapp_command.Call_forest.cons ~signature_kind ~calls:subtree
              { Account_update.Poly.authorization = Control.Poly.None_given
              ; body =
                  Zkapps_examples.mk_update_body pk
@@ -420,7 +427,7 @@ let%test_module "Tokens test" =
              }
         |> Zkapp_command.Call_forest.cons_tree Account_updates.mint
         |> Zkapp_command.Call_forest.cons_tree Account_updates.initialize
-        |> Zkapp_command.Call_forest.cons
+        |> Zkapp_command.Call_forest.cons ~signature_kind
              (Account_updates.deploy ~balance_change:(fee_to_create_signed 2))
         |> test_zkapp_command
              ~expected_failure:(Update_not_permitted_access, Pass_2)

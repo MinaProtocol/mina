@@ -189,11 +189,13 @@ let%test_module "Initialize state test" =
           Ledger.get ledger loc )
 
     let%test_unit "Initialize" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -204,13 +206,15 @@ let%test_module "Initialize state test" =
         zkapp_state
 
     let%test_unit "Initialize and update" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Update_state_account_update.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -221,6 +225,7 @@ let%test_module "Initialize state test" =
         zkapp_state
 
     let%test_unit "Initialize and multiple update" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
@@ -229,7 +234,8 @@ let%test_module "Initialize state test" =
              Update_state_account_update.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -240,11 +246,13 @@ let%test_module "Initialize state test" =
         zkapp_state
 
     let%test_unit "Update without initialize fails" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Update_state_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
              ~expected_failure:
                (Account_proved_state_precondition_unsatisfied, Pass_2)
@@ -252,13 +260,15 @@ let%test_module "Initialize state test" =
       assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Double initialize fails" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
              ~expected_failure:
                (Account_proved_state_precondition_unsatisfied, Pass_2)
@@ -266,6 +276,7 @@ let%test_module "Initialize state test" =
       assert (Option.is_none (Option.value_exn account).zkapp)
 
     let%test_unit "Initialize after update fails" =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let account =
         []
         |> Zkapp_command.Call_forest.cons_tree
@@ -274,7 +285,8 @@ let%test_module "Initialize state test" =
              Update_state_account_update.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
              ~expected_failure:
                (Account_proved_state_precondition_unsatisfied, Pass_2)

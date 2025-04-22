@@ -5014,6 +5014,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let multiple_transfers ~constraint_constants
         (spec : Multiple_transfers_spec.t) =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let ( `Zkapp_command zkapp_command
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
@@ -5027,7 +5028,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       assert (List.is_empty snapp_zkapp_command) ;
       let account_updates =
         let sender_account_update = Option.value_exn sender_account_update in
-        Zkapp_command.Call_forest.cons
+        Zkapp_command.Call_forest.cons ~signature_kind
           (Account_update.of_simple sender_account_update)
           zkapp_command.account_updates
       in

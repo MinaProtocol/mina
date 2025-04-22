@@ -103,8 +103,8 @@ let%test_module "Access permission tests" =
       in
       let account_updates =
         []
-        |> Zkapp_command.Call_forest.cons account_update
-        |> Zkapp_command.Call_forest.cons deploy_account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
       in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)

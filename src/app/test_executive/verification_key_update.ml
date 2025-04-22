@@ -98,6 +98,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let logger = Logger.create ()
 
   let run network t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Malleable_error.Let_syntax in
     let%bind () =
       section_hard "Wait for nodes to initialize"
@@ -278,7 +279,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest1 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update1
-      |> Zkapp_command.Call_forest.cons (update_vk vk1)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk1)
     in
     let zkapp_command_update_vk1 =
       call_forest_to_zkapp ~call_forest:call_forest1
@@ -287,7 +288,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest2 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update1
-      |> Zkapp_command.Call_forest.cons (update_vk vk2)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk2)
     in
     let zkapp_command_update_vk2_refers_vk1 =
       call_forest_to_zkapp ~call_forest:call_forest2
@@ -296,7 +297,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest_update_vk2 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update2
-      |> Zkapp_command.Call_forest.cons (update_vk vk2)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk2)
     in
     let zkapp_command_update_vk2 =
       call_forest_to_zkapp ~call_forest:call_forest_update_vk2

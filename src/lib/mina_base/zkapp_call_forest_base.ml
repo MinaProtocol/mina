@@ -473,8 +473,7 @@ let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
   let tree : _ Tree.t = { account_update; account_update_digest; calls } in
   cons_tree tree xs
 
-let cons ?calls (account_update : Account_update.t) xs =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let cons ~signature_kind ?calls (account_update : Account_update.t) xs =
   cons_aux
     ~digest_account_update:(Digest.Account_update.create ~signature_kind)
     ?calls account_update xs

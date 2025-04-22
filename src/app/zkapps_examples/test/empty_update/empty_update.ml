@@ -64,9 +64,10 @@ let deploy_account_update : Account_update.t =
   }
 
 let account_updates =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   []
   |> Zkapp_command.Call_forest.cons_tree account_update
-  |> Zkapp_command.Call_forest.cons deploy_account_update
+  |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
 
 let memo = Signed_command_memo.empty
 
