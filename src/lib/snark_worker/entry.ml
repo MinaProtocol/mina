@@ -1,6 +1,8 @@
 open Core
 open Async
 
+let command_name = "snark-worker"
+
 module Time_span_with_json = struct
   type t = Time.Span.t
 
