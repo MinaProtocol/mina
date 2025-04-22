@@ -163,10 +163,11 @@ let%test_module "Fee payer tests" =
                 ; authorization_kind = Signature
                 }
               in
+              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let zkapp_command =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants )
+                    Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                      test_spec ~constraint_constants )
               in
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view U.genesis_state_body
@@ -227,10 +228,11 @@ let%test_module "Fee payer tests" =
                   (Public_key.compress zkapp_kp.public_key)
                   Token_id.default
               in
+              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let%bind zkapp_command =
                 let zkapp_prover_and_vk = (zkapp_prover, vk) in
-                Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
-                  ~constraint_constants test_spec
+                Transaction_snark.For_tests.update_states ~signature_kind
+                  ~zkapp_prover_and_vk ~constraint_constants test_spec
               in
               ( if new_account then
                 ignore
@@ -308,6 +310,7 @@ let%test_module "Fee payer tests" =
             ; preconditions = None
             }
           in
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   Mina_transaction_logic.For_tests.Init_ledger.init
@@ -316,7 +319,7 @@ let%test_module "Fee payer tests" =
                   let open Async.Deferred.Let_syntax in
                   let%bind zkapp_command =
                     let zkapp_prover_and_vk = (zkapp_prover, vk) in
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   assert (

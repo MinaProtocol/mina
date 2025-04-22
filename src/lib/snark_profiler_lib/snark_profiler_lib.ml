@@ -358,8 +358,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
         test_spec nonce ~num_proof_updates ~num_updates
       in
       let%bind.Async.Deferred parties =
-        Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
-          ~constraint_constants ~empty_sender spec
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~zkapp_prover_and_vk ~constraint_constants ~empty_sender spec
           ~receiver_auth:Control.Tag.Signature
       in
       let simple_parties = Zkapp_command.to_simple parties in

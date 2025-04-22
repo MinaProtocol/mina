@@ -178,8 +178,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Malleable_error.lift
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+      @@ Transaction_snark.For_tests.deploy_snapp ~signature_kind
+           ~constraint_constants zkapp_command_spec
     in
     let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
       (* construct a Zkapp_command.t, similar to zkapp_test_transaction update-permissions *)
@@ -227,8 +227,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let%map.Deferred zkapp_command =
-        Transaction_snark.For_tests.update_states ~constraint_constants
-          zkapp_command_spec
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants zkapp_command_spec
       in
       (zkapp_command, new_permissions)
     in
@@ -300,17 +300,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       let%bind.Deferred zkapp_command_update_all =
-        Transaction_snark.For_tests.update_states ~constraint_constants
-          zkapp_command_spec
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants zkapp_command_spec
       in
       let%bind.Deferred zkapp_command_invalid_nonce =
-        Transaction_snark.For_tests.update_states ~constraint_constants
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants
           { zkapp_command_spec with
             sender = (fish2_kp, Account.Nonce.max_value)
           }
       in
       let%bind.Deferred zkapp_command_insufficient_funds =
-        Transaction_snark.For_tests.update_states ~constraint_constants
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants
           { zkapp_command_spec with fee = Currency.Fee.max_int }
       in
       let%bind.Deferred zkapp_command_insufficient_replace_fee =
@@ -320,8 +322,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             fee = Currency.Fee.of_nanomina_int_exn 5_000_000
           }
         in
-        Transaction_snark.For_tests.update_states ~constraint_constants
-          spec_insufficient_replace_fee
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants spec_insufficient_replace_fee
       in
       let%bind.Deferred zkapp_command_insufficient_fee =
         let spec_insufficient_fee :
@@ -330,8 +332,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             fee = Currency.Fee.of_nanomina_int_exn 1000
           }
         in
-        Transaction_snark.For_tests.update_states ~constraint_constants
-          spec_insufficient_fee
+        Transaction_snark.For_tests.update_states ~signature_kind
+          ~constraint_constants spec_insufficient_fee
       in
 
       let%map.Deferred zkapp_command_cross_network_replay =
@@ -407,7 +409,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; preconditions = None
         }
       in
-      Transaction_snark.For_tests.update_states ~constraint_constants spec
+      Transaction_snark.For_tests.update_states ~signature_kind
+        ~constraint_constants spec
     in
     let%bind.Deferred ( zkapp_command_mint_token
                       , zkapp_command_mint_token2

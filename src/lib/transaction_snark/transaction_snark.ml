@@ -4249,10 +4249,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           test_distinct_verification ~prover:prover_b ~valid_vk:vk_b.data
             ~invalid_vk:vk_a.data )
 
-    let create_zkapp_command ?receiver_auth ?empty_sender
+    let create_zkapp_command ~signature_kind ?receiver_auth ?empty_sender
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
         ~update ~receiver_update =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let { Spec.fee
           ; sender = sender, sender_nonce
           ; fee_payer = fee_payer_opt
@@ -4592,9 +4591,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
-        (spec : Deploy_snapp_spec.t) =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let deploy_snapp ~signature_kind ?(no_auth = false) ?permissions
+        ~constraint_constants (spec : Deploy_snapp_spec.t) =
       let `VK vk, `Prover _trivial_prover = create_trivial_snapp () in
       let%map.Async.Deferred vk = vk in
       (* only allow timing on a single new snapp account
@@ -4626,7 +4624,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
           , `Full_txn_commitment full_commitment ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ~signature_kind ~constraint_constants
           (Deploy_snapp_spec.spec_of_t spec)
           ~update:update_vk
           ~receiver_update:Mina_base.Account_update.Update.noop
@@ -4737,7 +4735,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Proof_zkapp_command _
           , `Txn_commitment _
           , `Full_txn_commitment _ ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ~signature_kind ~constraint_constants
           (Single_account_update_spec.spec_of_t ~vk spec)
           ~update:spec.update ~receiver_update:Account_update.Update.noop
       in
@@ -4875,9 +4873,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
-        ~constraint_constants (spec : Update_states_spec.t) =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let update_states ~signature_kind ?receiver_auth ?zkapp_prover_and_vk
+        ?empty_sender ~constraint_constants (spec : Update_states_spec.t) =
       let prover, vk =
         match zkapp_prover_and_vk with
         | Some (prover, vk) ->
@@ -4893,7 +4890,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment commitment
           , `Full_txn_commitment full_commitment ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ~signature_kind ~constraint_constants
           (Update_states_spec.spec_of_t ~vk spec)
           ~update:spec.snapp_update
           ~receiver_update:Mina_base.Account_update.Update.noop ?receiver_auth
@@ -5019,15 +5016,14 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let multiple_transfers ~constraint_constants
+    let multiple_transfers ~signature_kind ~constraint_constants
         (spec : Multiple_transfers_spec.t) =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let ( `Zkapp_command zkapp_command
           , `Sender_account_update sender_account_update
           , `Proof_zkapp_command snapp_zkapp_command
           , `Txn_commitment _commitment
           , `Full_txn_commitment _full_commitment ) =
-        create_zkapp_command ~constraint_constants
+        create_zkapp_command ~signature_kind ~constraint_constants
           (Multiple_transfers_spec.spec_of_t spec)
           ~update:spec.snapp_update ~receiver_update:spec.snapp_update
       in
@@ -5064,10 +5060,9 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account : Account.t = trivial_zkapp_account ~permissions ~vk pk in
       create ledger id account
 
-    let create_trivial_predicate_snapp
+    let create_trivial_predicate_snapp ~signature_kind
         ?(protocol_state_predicate = Zkapp_precondition.Protocol_state.accept)
         ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let { Mina_transaction_logic.For_tests.Transaction_spec.fee
           ; sender = sender, sender_nonce
           ; receiver = _

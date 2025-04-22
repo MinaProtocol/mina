@@ -138,8 +138,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ; authorization_kind = Signature
              }
            in
+           let signature_kind = Mina_signature_kind.t_DEPRECATED in
            Malleable_error.lift
-           @@ Transaction_snark.For_tests.deploy_snapp
+           @@ Transaction_snark.For_tests.deploy_snapp ~signature_kind
                 ~constraint_constants:(Network.constraint_constants network)
                 parties_spec
          in

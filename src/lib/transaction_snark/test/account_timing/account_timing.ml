@@ -1431,8 +1431,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1502,8 +1502,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1584,8 +1584,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1673,8 +1673,8 @@ let%test_module "account timing check" =
           Token_id.default
       in
       let zkapp_command, _, _, _ =
-        ( Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-            create_timed_account_spec
+        ( Transaction_snark.For_tests.deploy_snapp ~signature_kind
+            ~constraint_constants create_timed_account_spec
         , timed_account_id
         , create_timed_account_spec.snapp_update
         , zkapp_keypair )
@@ -1802,8 +1802,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1889,8 +1889,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1966,8 +1966,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2044,8 +2044,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2125,8 +2125,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2201,8 +2201,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-            zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~signature_kind
+            ~constraint_constants zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2268,7 +2268,7 @@ let%test_module "account timing check" =
           Token_id.default
       in
       let create_timed_account_zkapp_command, _, _, _ =
-        ( Transaction_snark.For_tests.deploy_snapp ~no_auth:true
+        ( Transaction_snark.For_tests.deploy_snapp ~signature_kind ~no_auth:true
             ~constraint_constants create_timed_account_spec
         , timing_account_id
         , create_timed_account_spec.snapp_update
@@ -2349,8 +2349,8 @@ let%test_module "account timing check" =
           in
           let open Async.Deferred.Let_syntax in
           let%bind update_timing_zkapp_command =
-            Transaction_snark.For_tests.update_states ~constraint_constants
-              update_timing_spec
+            Transaction_snark.For_tests.update_states ~signature_kind
+              ~constraint_constants update_timing_spec
           in
           let gen =
             Quickcheck.Generator.return
@@ -2433,8 +2433,8 @@ let%test_module "account timing check" =
           in
           let open Async.Deferred.Let_syntax in
           let%map update_timing_zkapp_command =
-            Transaction_snark.For_tests.update_states ~constraint_constants
-              update_timing_spec
+            Transaction_snark.For_tests.update_states ~signature_kind
+              ~constraint_constants update_timing_spec
           in
           let gen =
             Quickcheck.Generator.return

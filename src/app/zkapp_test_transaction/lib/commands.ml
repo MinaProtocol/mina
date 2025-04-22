@@ -184,7 +184,7 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
          ~random:(Splittable_random.State.create Random.State.default)
   in
   let%bind zkapp_command =
-    Transaction_snark.For_tests.create_trivial_predicate_snapp
+    Transaction_snark.For_tests.create_trivial_predicate_snapp ~signature_kind
       ~protocol_state_predicate spec ledger ~snapp_kp:zkapp_kp
   in
   printf "ZkApp transaction yojson: %s\n\n%!"
@@ -364,8 +364,9 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
     ; authorization_kind = Signature
     }
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind zkapp_command =
-    Transaction_snark.For_tests.deploy_snapp
+    Transaction_snark.For_tests.deploy_snapp ~signature_kind
       ~permissions:Permissions.user_default ~constraint_constants spec
   in
   let%map () =
@@ -411,10 +412,11 @@ let upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; preconditions = None
     }
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind zkapp_command =
     let `VK vk, `Prover prover = Lazy.force @@ vk_and_prover in
-    Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
-      ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~signature_kind
+      ~zkapp_prover_and_vk:(prover, vk) ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -455,8 +457,9 @@ let transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer ~fee_payer_nonce
     ; preconditions = None
     }
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let zkapp_command =
-    Transaction_snark.For_tests.multiple_transfers
+    Transaction_snark.For_tests.multiple_transfers ~signature_kind
       ~constraint_constants:
         Genesis_constants.For_unit_tests.Constraint_constants.t spec
   in
@@ -491,10 +494,11 @@ let update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
     ; preconditions = None
     }
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind zkapp_command =
     let `VK vk, `Prover prover = Lazy.force @@ vk_and_prover in
-    Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
-      ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~signature_kind
+      ~zkapp_prover_and_vk:(prover, vk) ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -529,10 +533,11 @@ let update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
     ; preconditions = None
     }
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind zkapp_command =
     let `VK vk, `Prover prover = Lazy.force @@ vk_and_prover in
-    Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
-      ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~signature_kind
+      ~zkapp_prover_and_vk:(prover, vk) ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -569,10 +574,11 @@ let update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
     ; preconditions = None
     }
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind zkapp_command =
     let `VK vk, `Prover prover = Lazy.force @@ vk_and_prover in
-    Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
-      ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~signature_kind
+      ~zkapp_prover_and_vk:(prover, vk) ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -607,10 +613,11 @@ let update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
     ; preconditions = None
     }
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind zkapp_command =
     let `VK vk, `Prover prover = Lazy.force @@ vk_and_prover in
-    Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
-      ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~signature_kind
+      ~zkapp_prover_and_vk:(prover, vk) ~constraint_constants spec
   in
   let%map () =
     if debug then
@@ -646,10 +653,11 @@ let update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~snapp_update
     ; preconditions = None
     }
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind zkapp_command =
     let `VK vk, `Prover prover = Lazy.force @@ vk_and_prover in
-    Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk:(prover, vk)
-      ~constraint_constants spec
+    Transaction_snark.For_tests.update_states ~signature_kind
+      ~zkapp_prover_and_vk:(prover, vk) ~constraint_constants spec
   in
   (*Util.print_snapp_transaction zkapp_command ;*)
   let%map () =

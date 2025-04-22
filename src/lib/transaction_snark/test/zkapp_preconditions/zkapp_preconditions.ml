@@ -73,8 +73,9 @@ let%test_module "Valid_while precondition tests" =
                     ~ledger
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -96,8 +97,9 @@ let%test_module "Valid_while precondition tests" =
                     ~ledger
                     (Signature_lib.Public_key.compress new_kp.public_key) ;
                   let open Async.Deferred.Let_syntax in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants
                       (create_spec specs new_kp global_slot)
                   in
@@ -555,8 +557,9 @@ let%test_module "Account precondition tests" =
                   Transaction_snark.For_tests.create_trivial_zkapp_account ~vk
                     ~ledger snapp_pk ;
                   let open Async.Deferred.Let_syntax in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
@@ -617,8 +620,9 @@ let%test_module "Account precondition tests" =
                           }
                     }
                   in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn ~state_body ledger
@@ -687,7 +691,7 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let%bind zkapp_command0 =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   (* add delegate precondition for new account *)
@@ -843,8 +847,9 @@ let%test_module "Account precondition tests" =
                     }
                   in
                   let open Async.Deferred.Let_syntax in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init

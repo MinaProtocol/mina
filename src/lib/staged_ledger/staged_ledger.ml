@@ -4483,8 +4483,9 @@ let%test_module "staged ledger tests" =
               ; preconditions = None
               }
             in
+            let signature_kind = Mina_signature_kind.t_DEPRECATED in
             let%map zkapp_command =
-              Transaction_snark.For_tests.update_states
+              Transaction_snark.For_tests.update_states ~signature_kind
                 ~zkapp_prover_and_vk:(zkapp_prover, Async.Deferred.return vk)
                 ~constraint_constants spec
             in
@@ -4983,11 +4984,12 @@ let%test_module "staged ledger tests" =
                       ~permissions:snapp_permissions ~vk ~ledger:l snapp_pk ;
                     l
                   in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
                     let zkapp_prover_and_vk =
                       (zkapp_prover, Async.Deferred.return vk)
                     in
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =

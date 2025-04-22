@@ -208,7 +208,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Malleable_error.lift
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+      @@ Transaction_snark.For_tests.deploy_snapp ~signature_kind
+           ~constraint_constants spec
     in
     let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
       let signature_kind = Mina_signature_kind.t_DEPRECATED in
@@ -381,23 +382,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
       let%bind invalid_update_vk_perm_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_proof
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_invalid_proof
       in
       let%bind invalid_update_vk_perm_impossible =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_impossible
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_invalid_impossible
       in
       let%bind update_vk_perm_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_proof
       in
       let%map update_vk_perm_impossible =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_impossible
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_impossible
       in
       ( invalid_update_vk_perm_proof
       , invalid_update_vk_perm_impossible
@@ -449,18 +450,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%bind failed_update_vk_signature_1 =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_failed_signature_1
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_failed_signature_1
       in
       let%bind failed_update_vk_signature_2 =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_failed_signature_2
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_failed_signature_2
       in
       let%map update_vk_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_proof
       in
       ( failed_update_vk_signature_1
       , failed_update_vk_signature_2

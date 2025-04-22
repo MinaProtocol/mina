@@ -2068,9 +2068,10 @@ let%test_module _ =
               }
         }
       in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command =
-        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-          test_spec
+        Transaction_snark.For_tests.multiple_transfers ~signature_kind
+          ~constraint_constants test_spec
       in
       let zkapp_command =
         Or_error.ok_exn

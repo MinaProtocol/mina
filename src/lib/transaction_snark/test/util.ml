@@ -382,6 +382,7 @@ let gen_snapp_ledger =
 
 let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
     ~zkapp_prover test_spec ~init_ledger ~snapp_pk =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Mina_transaction_logic.For_tests in
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -393,8 +394,8 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
             ?permissions:snapp_permissions ~vk:vk' ~ledger snapp_pk ;
           let%bind zkapp_command =
             let zkapp_prover_and_vk = (zkapp_prover, vk) in
-            Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
-              ~constraint_constants test_spec
+            Transaction_snark.For_tests.update_states ~signature_kind
+              ~zkapp_prover_and_vk ~constraint_constants test_spec
           in
           check_zkapp_command_with_merges_exn ?expected_failure ?state_body
             ledger [ zkapp_command ] ) )

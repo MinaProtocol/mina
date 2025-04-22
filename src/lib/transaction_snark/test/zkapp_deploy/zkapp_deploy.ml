@@ -38,10 +38,11 @@ let%test_module "zkApp deploy tests" =
                     ; authorization_kind = Signature
                     }
                   in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -77,10 +78,11 @@ let%test_module "zkApp deploy tests" =
                     ; authorization_kind = Signature
                     }
                   in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -110,10 +112,11 @@ let%test_module "zkApp deploy tests" =
                     ; authorization_kind = Signature
                     }
                   in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -144,10 +147,11 @@ let%test_module "zkApp deploy tests" =
                     ; authorization_kind = Signature
                     }
                   in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -178,10 +182,11 @@ let%test_module "zkApp deploy tests" =
                     ; authorization_kind = Signature
                     }
                   in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)

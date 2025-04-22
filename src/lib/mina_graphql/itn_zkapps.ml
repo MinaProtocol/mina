@@ -52,8 +52,10 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
           ; authorization_kind = Account_update.Authorization_kind.Signature
           }
         in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let zkapp_command =
-          Transaction_snark.For_tests.deploy_snapp ~constraint_constants
+          Transaction_snark.For_tests.deploy_snapp ~signature_kind
+            ~constraint_constants
             ~permissions:
               ( if max_cost then
                 { Permissions.user_default with

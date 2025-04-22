@@ -302,11 +302,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-        zkapp_command_spec
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      Transaction_snark.For_tests.deploy_snapp ~signature_kind
+        ~constraint_constants zkapp_command_spec
     in
 
     let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let snapp_update =
         { Account_update.Update.dummy with
           verification_key =
@@ -345,13 +347,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let constraint_constants = Network.constraint_constants network in
       let%bind vk_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_proof
       in
       let%map vk_impossible =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_impossible
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_impossible
       in
       (vk_proof, vk_impossible)
     in
