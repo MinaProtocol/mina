@@ -16,10 +16,12 @@ let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
 let () = ignore sexp_to_sexp
 
 let main (spec_path : string) ~constraint_constants ~proof_level =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let module Inputs = Snark_worker.Prod.Inputs in
   let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in
   let%bind worker =
-    Inputs.Worker_state.create ~constraint_constants ~proof_level ()
+    Inputs.Worker_state.create ~signature_kind ~constraint_constants
+      ~proof_level ()
   in
   let message =
     Mina_base.Sok_message.create ~fee:Currency.Fee.zero

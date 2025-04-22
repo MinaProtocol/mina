@@ -104,13 +104,15 @@ let command =
        flag "--graphql-uri" ~doc:"Graphql endpoint to submit proofs"
          (optional Cli_lib.Arg_type.uri)
      in
+     let signature_kind = Mina_signature_kind.t_DEPRECATED in
      fun () ->
        let open Async in
        let constraint_constants =
          Genesis_constants.Compiled.constraint_constants
        in
        let%bind worker_state =
-         Prod.Worker_state.create ~constraint_constants ~proof_level ()
+         Prod.Worker_state.create ~signature_kind ~constraint_constants
+           ~proof_level ()
        in
        let%bind spec =
          let spec_of_json json =

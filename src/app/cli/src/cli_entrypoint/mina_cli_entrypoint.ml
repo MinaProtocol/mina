@@ -1721,6 +1721,7 @@ let internal_commands logger ~itn_features =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
         in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
@@ -1736,8 +1737,8 @@ let internal_commands logger ~itn_features =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
-                  ~constraint_constants ()
+                Snark_worker.Prod.Inputs.Worker_state.create ~signature_kind
+                  ~proof_level ~constraint_constants ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
