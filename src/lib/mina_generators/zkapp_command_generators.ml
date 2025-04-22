@@ -1535,12 +1535,14 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         Signed_command_memo.gen
   in
   let zkapp_command_dummy_authorizations : Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer
     ; account_updates =
         Zkapp_command.Call_forest.map
           ~f:(Fn.compose map_account_update Account_update.of_simple)
           account_updates
         |> Zkapp_command.Call_forest.accumulate_hashes_predicated
+             ~signature_kind
     ; memo
     }
   in

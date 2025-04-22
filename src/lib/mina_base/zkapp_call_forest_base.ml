@@ -498,16 +498,13 @@ let rec accumulate_hashes ~hash_account_update (xs : _ t) =
       let node_hash = Digest.Tree.create node in
       { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) } :: xs
 
-let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
+let accumulate_hashes' (type a b) ~signature_kind
+    (xs : (Account_update.t, a, b) t) :
     (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  let hash_account_update (p : Account_update.t) =
-    Digest.Account_update.create ~signature_kind p
-  in
+  let hash_account_update = Digest.Account_update.create ~signature_kind in
   accumulate_hashes ~hash_account_update xs
 
-let accumulate_hashes_predicated xs =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let accumulate_hashes_predicated ~signature_kind xs =
   accumulate_hashes
     ~hash_account_update:(Digest.Account_update.create ~signature_kind)
     xs
@@ -548,27 +545,32 @@ module With_hashes_and_data = struct
 
   let empty = Digest.Forest.empty
 
-  let hash_account_update ((p : Account_update.Stable.Latest.t), _) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let hash_account_update ~signature_kind
+      ((p : Account_update.Stable.Latest.t), _) =
     Digest.Account_update.create ~signature_kind p
 
-  let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
+  let accumulate_hashes ~signature_kind xs : _ t =
+    accumulate_hashes
+      ~hash_account_update:(hash_account_update ~signature_kind)
+      xs
 
   let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     of_account_updates xs
       ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
         p.body.call_depth )
     |> map ~f:(fun (p, x) -> (Account_update.of_simple p, x))
-    |> accumulate_hashes
+    |> accumulate_hashes ~signature_kind
 
   let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) : _ t
       =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     of_account_updates_map
       ~account_update_depth:(fun ((p : Account_update.Graphql_repr.t), _) ->
         p.body.call_depth )
       ~f:(fun (p, x) -> (Account_update.of_graphql_repr p, x))
       xs
-    |> accumulate_hashes
+    |> accumulate_hashes ~signature_kind
 
   let to_account_updates (x : _ t) = to_account_updates x
 
@@ -604,27 +606,30 @@ module With_hashes = struct
 
   let empty = Digest.Forest.empty
 
-  let hash_account_update p =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
-    Digest.Account_update.create ~signature_kind p
+  let hash_account_update = Digest.Account_update.create
 
-  let accumulate_hashes xs = accumulate_hashes ~hash_account_update xs
+  let accumulate_hashes ~signature_kind xs =
+    accumulate_hashes
+      ~hash_account_update:(hash_account_update ~signature_kind)
+      xs
 
   let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     of_account_updates xs
       ~account_update_depth:(fun (p : Account_update.Simple.t) ->
         p.body.call_depth )
     |> map ~f:Account_update.of_simple
-    |> accumulate_hashes
+    |> accumulate_hashes ~signature_kind
 
   let of_account_updates (xs : Account_update.Graphql_repr.t list) :
       Stable.Latest.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     of_account_updates_map
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
       ~f:(fun p -> Account_update.of_graphql_repr p)
       xs
-    |> accumulate_hashes
+    |> accumulate_hashes ~signature_kind
 
   let to_account_updates (x : t) = to_account_updates x
 

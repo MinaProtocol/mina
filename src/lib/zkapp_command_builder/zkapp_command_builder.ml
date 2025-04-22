@@ -45,6 +45,7 @@ let mk_account_update_body ?preconditions ?(increment_nonce = false)
 
 let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
     Zkapp_command.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let fee_payer : Account_update.Fee_payer.t =
     { body =
         { public_key = fee_payer_pk
@@ -76,7 +77,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
                    Control.Poly.Signature Signature.dummy
              in
              { body = Account_update.Body.of_simple p; authorization } )
-      |> Zkapp_command.Call_forest.accumulate_hashes_predicated
+      |> Zkapp_command.Call_forest.accumulate_hashes_predicated ~signature_kind
   }
 
 (* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
