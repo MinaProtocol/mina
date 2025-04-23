@@ -3,6 +3,7 @@
  (libraries
   ;; opam libraries
   alcotest
+  alcotest-async
   async
   core
   ;; local libraries
