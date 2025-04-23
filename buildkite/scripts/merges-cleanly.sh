@@ -15,13 +15,13 @@ if [ "${BUILDKITE:-false}" == true ]
 then
     # Tell git where to find ssl certs
     git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
+    git config --global user.email "hello@ci.com"
+    git config --global user.name "It's me, CI"
 fi
 
 # Fetch a fresh copy of the target branch
 source buildkite/scripts/refresh_code.sh
 
-git config --global user.email "hello@ci.com"
-git config --global user.name "It's me, CI"
 # Check mergeability. We use flags so that
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
