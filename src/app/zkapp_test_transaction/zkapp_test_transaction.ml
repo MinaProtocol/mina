@@ -53,12 +53,12 @@ module Flags = struct
 end
 
 let create_zkapp_account =
-  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
-      ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo () =
+  let create_command ~signature_kind ~debug ~sender ~sender_nonce ~fee
+      ~fee_payer ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
-        ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo
+      create_zkapp_account ~signature_kind ~debug ~sender ~sender_nonce ~fee
+        ~fee_payer ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -82,22 +82,23 @@ let create_zkapp_account =
            ~doc:"KEYFILE Private key file for the zkApp account to be created"
            Param.(required string)
        and amount = Flags.amount in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
-         ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ))
+       create_command ~signature_kind ~debug ~sender ~sender_nonce ~fee
+         ~fee_payer ~fee_payer_nonce ~zkapp_keyfile ~amount ~memo ))
 
 let upgrade_zkapp =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~verification_key ~zkapp_uri ~auth ~constraint_constants
+  let create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+      ~zkapp_keyfile ~verification_key ~zkapp_uri ~auth ~constraint_constants
       ~genesis_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      upgrade_zkapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~verification_key ~zkapp_uri ~auth ~constraint_constants
+      upgrade_zkapp ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+        ~zkapp_keyfile ~verification_key ~zkapp_uri ~auth ~constraint_constants
         ~genesis_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -126,6 +127,7 @@ let upgrade_zkapp =
               to change the verification key"
            Param.(required string)
        in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        let auth = Util.auth_of_string auth in
        let constraint_constants =
@@ -137,18 +139,19 @@ let upgrade_zkapp =
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
        let zkapp_uri = Zkapp_basic.Set_or_keep.of_option zkapp_uri_str in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~verification_key ~zkapp_uri ~auth ~constraint_constants
+       create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+         ~zkapp_keyfile ~verification_key ~zkapp_uri ~auth ~constraint_constants
          ~genesis_constants ))
 
 let transfer_funds_one_receiver =
-  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
-      ~fee_payer_nonce ~memo ~receiver ~amount ~genesis_constants
+  let create_command ~signature_kind ~debug ~sender ~sender_nonce ~fee
+      ~fee_payer ~fee_payer_nonce ~memo ~receiver ~amount ~genesis_constants
       ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
-        ~fee_payer_nonce ~memo ~genesis_constants ~constraint_constants
+      transfer_funds ~signature_kind ~debug ~sender ~sender_nonce ~fee
+        ~fee_payer ~fee_payer_nonce ~memo ~genesis_constants
+        ~constraint_constants
         ~receivers:(Deferred.return [ (receiver, amount) ])
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -175,6 +178,7 @@ let transfer_funds_one_receiver =
            ~doc:"PUBLIC_KEY the public key of the receiver"
            Param.(required public_key_compressed)
        and amount = Flags.amount in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwithf "Fee must at least be %s"
@@ -184,18 +188,18 @@ let transfer_funds_one_receiver =
          Genesis_constants.Compiled.constraint_constants
        in
        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
-         ~fee_payer_nonce ~memo ~receiver ~amount ~genesis_constants
+       create_command ~signature_kind ~debug ~sender ~sender_nonce ~fee
+         ~fee_payer ~fee_payer_nonce ~memo ~receiver ~amount ~genesis_constants
          ~constraint_constants ))
 
 let transfer_funds =
-  let create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
-      ~fee_payer_nonce ~memo ~receivers ~genesis_constants ~constraint_constants
-      () =
+  let create_command ~signature_kind ~debug ~sender ~sender_nonce ~fee
+      ~fee_payer ~fee_payer_nonce ~memo ~receivers ~genesis_constants
+      ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      transfer_funds ~debug ~sender ~sender_nonce ~fee ~fee_payer
-        ~fee_payer_nonce ~memo ~receivers ~genesis_constants
+      transfer_funds ~signature_kind ~debug ~sender ~sender_nonce ~fee
+        ~fee_payer ~fee_payer_nonce ~memo ~receivers ~genesis_constants
         ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
@@ -258,6 +262,7 @@ let transfer_funds =
          Param.flag "--sender-nonce" ~doc:"NN Nonce of the sender account"
            Param.(required txn_nonce)
        in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        if Currency.Fee.(fee < Flags.min_fee) then
          failwithf "Fee must at least be %s"
@@ -269,17 +274,17 @@ let transfer_funds =
          Genesis_constants.Compiled.constraint_constants
        in
        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-       create_command ~debug ~sender ~sender_nonce ~fee ~fee_payer
-         ~fee_payer_nonce ~memo ~receivers ~genesis_constants
+       create_command ~signature_kind ~debug ~sender ~sender_nonce ~fee
+         ~fee_payer ~fee_payer_nonce ~memo ~receivers ~genesis_constants
          ~constraint_constants ))
 
 let update_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-      ~genesis_constants ~constraint_constants () =
+  let create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+      ~zkapp_keyfile ~app_state ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile ~app_state
-        ~genesis_constants ~constraint_constants
+      update_state ~debug ~signature_kind ~keyfile ~fee ~nonce ~memo
+        ~zkapp_keyfile ~app_state ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -300,6 +305,7 @@ let update_state =
               represent the zkApp state (Use empty string for no-op)"
            Param.(listed string)
        in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        let constraint_constants =
          Genesis_constants.Compiled.constraint_constants
@@ -309,16 +315,17 @@ let update_state =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~app_state ~genesis_constants ~constraint_constants ))
+       create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+         ~zkapp_keyfile ~app_state ~genesis_constants ~constraint_constants ))
 
 let update_zkapp_uri =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile ~zkapp_uri
-      ~auth ~genesis_constants ~constraint_constants () =
+  let create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+      ~snapp_keyfile ~zkapp_uri ~auth ~genesis_constants ~constraint_constants
+      () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_zkapp_uri ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-        ~zkapp_uri ~auth ~genesis_constants ~constraint_constants
+      update_zkapp_uri ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+        ~snapp_keyfile ~zkapp_uri ~auth ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -343,6 +350,7 @@ let update_zkapp_uri =
               to change the zkApp URI"
            Param.(required string)
        in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        let auth = Util.auth_of_string auth in
        if Currency.Fee.(fee < Flags.min_fee) then
@@ -353,16 +361,17 @@ let update_zkapp_uri =
        let constraint_constants =
          Genesis_constants.Compiled.constraint_constants
        in
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~zkapp_uri ~auth ~genesis_constants ~constraint_constants ))
+       create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+         ~snapp_keyfile ~zkapp_uri ~auth ~genesis_constants
+         ~constraint_constants ))
 
 let update_action_state =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~action_state ~genesis_constants ~constraint_constants () =
+  let create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+      ~zkapp_keyfile ~action_state ~genesis_constants ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_action_state ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~action_state ~genesis_constants ~constraint_constants
+      update_action_state ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+        ~zkapp_keyfile ~action_state ~genesis_constants ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -405,6 +414,7 @@ let update_action_state =
                (Arg_type.comma_separated ~allow_empty:false
                   ~strip_whitespace:true string ))
        in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        let action_state =
          List.filter_map
@@ -419,16 +429,19 @@ let update_action_state =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~action_state ~genesis_constants ~constraint_constants ))
+       create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+         ~zkapp_keyfile ~action_state ~genesis_constants ~constraint_constants
+      ))
 
 let update_token_symbol =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-      ~token_symbol ~auth ~genesis_constants ~constraint_constants () =
+  let create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+      ~snapp_keyfile ~token_symbol ~auth ~genesis_constants
+      ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_token_symbol ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-        ~token_symbol ~auth ~genesis_constants ~constraint_constants
+      update_token_symbol ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+        ~snapp_keyfile ~token_symbol ~auth ~genesis_constants
+        ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -453,6 +466,7 @@ let update_token_symbol =
               to change the token symbol"
            Param.(required string)
        in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        let auth = Util.auth_of_string auth in
        let constraint_constants =
@@ -463,16 +477,19 @@ let update_token_symbol =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~snapp_keyfile
-         ~token_symbol ~auth ~genesis_constants ~constraint_constants ))
+       create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+         ~snapp_keyfile ~token_symbol ~auth ~genesis_constants
+         ~constraint_constants ))
 
 let update_permissions =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~snapp_update ~current_auth ~genesis_constants ~constraint_constants () =
+  let create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+      ~zkapp_keyfile ~snapp_update ~current_auth ~genesis_constants
+      ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~snapp_update ~current_auth ~genesis_constants ~constraint_constants
+      update_snapp ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+        ~zkapp_keyfile ~snapp_update ~current_auth ~genesis_constants
+        ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -534,6 +551,7 @@ let update_permissions =
               to change permissions"
            Param.(required string)
        in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        let permissions : Permissions.t Zkapp_basic.Set_or_keep.t =
          Zkapp_basic.Set_or_keep.Set
@@ -563,17 +581,19 @@ let update_permissions =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~genesis_constants ~constraint_constants ~snapp_update
+       create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+         ~zkapp_keyfile ~genesis_constants ~constraint_constants ~snapp_update
          ~current_auth:(Util.auth_of_string current_auth) ))
 
 let update_timings =
-  let create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-      ~snapp_update ~current_auth ~genesis_constants ~constraint_constants () =
+  let create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+      ~zkapp_keyfile ~snapp_update ~current_auth ~genesis_constants
+      ~constraint_constants () =
     let open Deferred.Let_syntax in
     let%map zkapp_command =
-      update_snapp ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-        ~snapp_update ~current_auth ~genesis_constants ~constraint_constants
+      update_snapp ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+        ~zkapp_keyfile ~snapp_update ~current_auth ~genesis_constants
+        ~constraint_constants
     in
     Util.print_snapp_transaction ~debug zkapp_command ;
     ()
@@ -611,6 +631,7 @@ let update_timings =
               to change permissions"
            Param.(required string)
        in
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let fee = Option.value ~default:Flags.default_fee fee in
        let timing =
          Zkapp_basic.Set_or_keep.Set
@@ -635,8 +656,8 @@ let update_timings =
          failwith
            (sprintf "Fee must at least be %s"
               (Currency.Fee.to_mina_string Flags.min_fee) ) ;
-       create_command ~debug ~keyfile ~fee ~nonce ~memo ~zkapp_keyfile
-         ~snapp_update ~genesis_constants ~constraint_constants
+       create_command ~signature_kind ~debug ~keyfile ~fee ~nonce ~memo
+         ~zkapp_keyfile ~snapp_update ~genesis_constants ~constraint_constants
          ~current_auth:(Util.auth_of_string current_auth) ))
 
 let test_zkapp_with_genesis_ledger =
