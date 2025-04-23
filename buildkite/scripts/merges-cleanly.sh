@@ -1,8 +1,7 @@
 #!/bin/bash
 
 BRANCH=$1
-CURRENT=$(git branch --show-current)
-echo 'Testing for conflicts between the current branch `'"${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"'` and `'"${BRANCH}"'`...'
+echo "Checking conflicts: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} <--> ${BRANCH}"
 
 
 # Adapted from this stackoverflow answer: https://stackoverflow.com/a/10856937
@@ -26,7 +25,7 @@ source buildkite/scripts/refresh_code.sh
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
 #   straightforward fast-forward
-git merge --no-commit --no-ff origin/$BRANCH
+git merge --no-commit --no-ff origin/"${BRANCH}"
 
 RET=$?
 
