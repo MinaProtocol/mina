@@ -161,7 +161,6 @@ copy_common_daemon_configs() {
   # Include all useful genesis ledgers
   cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
   cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
-  cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
   # Set the default configuration based on Network name ($1)
   cp ../genesis_ledgers/"${1}".json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   cp ../scripts/hardfork/create_runtime_config.sh "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
@@ -238,6 +237,10 @@ build_batch_txn_deb() {
 ##################################### GENERATE TEST SUITE PACKAGE #######################################
 build_functional_test_suite_deb() {
   create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
+
+  mkdir -p "${BUILDDIR}/etc/mina/test/archive"
+
+  cp -r ../src/test/archive/* "${BUILDDIR}"/etc/mina/test/archive/
 
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
@@ -333,7 +336,7 @@ build_daemon_devnet_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
 
-  create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+  create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
@@ -345,14 +348,13 @@ build_daemon_devnet_deb() {
 build_daemon_berkeley_deb() {
 
   echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
+  echo "--- Building testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+  create_control_file ${MINA_DEB_NAME} "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Berkeley Network'
 
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+  copy_common_daemon_configs berkeley testnet 'seed-lists/devnet_seeds.txt'
 
-  build_deb "${MINA_DEB_NAME}"
-
+  build_deb ${MINA_DEB_NAME}
 }
 ##################################### END BERKELEY PACKAGE ######################################
 
