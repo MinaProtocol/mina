@@ -1850,7 +1850,9 @@ let create ~commit_id ?wallets (config : Config.t) =
                   (fun () ->
                     O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
+                        let signature_kind = Mina_signature_kind.t_DEPRECATED in
                         Uptime_service.Uptime_snark_worker.create
+                          ~signature_kind
                           ~constraint_constants:
                             config.precomputed_values.constraint_constants
                           ~logger:config.logger ~pids:config.pids ) )
