@@ -4,15 +4,23 @@ module Helper = struct
   open Mina_base
 
   let to_yojson ~proof_to_yojson tx =
+    let update_to_yojson =
+      Account_update.Poly.to_yojson Account_update.Body.to_yojson
+      @@ Control.Poly.to_yojson proof_to_yojson Signature.to_yojson
+    in
     User_command.Poly.to_yojson Signed_command.to_yojson
-      (Zkapp_command.with_forest_to_yojson proof_to_yojson
+      (Zkapp_command.with_forest_to_yojson update_to_yojson
          Zkapp_command.Digest.Account_update.to_yojson
          Zkapp_command.Digest.Forest.to_yojson )
       tx
 
   let of_yojson ~proof_of_yojson =
+    let update_of_yojson =
+      Account_update.Poly.of_yojson Account_update.Body.of_yojson
+      @@ Control.Poly.of_yojson proof_of_yojson Signature.of_yojson
+    in
     User_command.Poly.of_yojson Signed_command.of_yojson
-    @@ Zkapp_command.with_forest_of_yojson proof_of_yojson
+    @@ Zkapp_command.with_forest_of_yojson update_of_yojson
          Zkapp_command.Digest.Account_update.of_yojson
          Zkapp_command.Digest.Forest.of_yojson
 end
@@ -28,8 +36,8 @@ module User_command = struct
       type t = User_command.Stable.V2.t [@@deriving sexp]
 
       let to_yojson : t -> Yojson.Safe.t = function
-        | User_command.Poly.Signed_command tx ->
-            Helper.to_yojson ~proof_to_yojson:Proof.to_yojson (Signed_command tx)
+        | User_command.Poly.Signed_command _ as tx ->
+            Helper.to_yojson ~proof_to_yojson:Nothing.unreachable_code tx
         | User_command.Poly.Zkapp_command { fee_payer; memo; account_updates }
           ->
             Helper.to_yojson ~proof_to_yojson:Proof.to_yojson

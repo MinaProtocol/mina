@@ -73,7 +73,12 @@ let hash_signed_command (cmd : Signed_command.t) =
 
 let hash_zkapp_command (type p)
     ({ fee_payer; account_updates; memo } :
-      (p, unit, unit) Zkapp_command.with_forest ) =
+      ( ( Account_update.Body.t
+        , (p, Signature.t) Control.Poly.t )
+        Account_update.Poly.t
+      , unit
+      , unit )
+      Zkapp_command.with_forest ) =
   let cmd_dummy_signatures_and_proofs =
     { Zkapp_command.Poly.memo
     ; fee_payer = { fee_payer with authorization = Signature.dummy }
