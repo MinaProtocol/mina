@@ -227,6 +227,9 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
 
     let cost_limit = genesis_constants.zkapp_transaction_cost_limit
 
+    (* A strict bound on the maximum number of segments of each type *)
+    let max_num_segments = 7
+
     (* The number of proof updates required for a command to have this
        constitution *)
     let num_proof_updates constitution = constitution.proof_segments
@@ -247,7 +250,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
         ~signed_pair_segments ~genesis_constants ()
 
     (* A Constition.t is valid if it can be represented as the constitution of a
-       valid block *)
+       valid transaction *)
     let is_valid t =
       Float.(cost t <. cost_limit)
       (* Pigeonhole principle - there cannot be more odd-length runs of
@@ -258,14 +261,22 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
       && num_paymentlike_updates t > 0
 
     let all_valid_constitutions =
-      let values = List.init 20 ~f:Fn.id in
-      let%bind.List proof_segments = values in
-      let%bind.List signed_single_segments = values in
-      let%bind.List signed_pair_segments = values in
-      let constitution =
-        { proof_segments; signed_single_segments; signed_pair_segments }
+      let constitutions_with_bound bound =
+        let values = List.init bound ~f:Fn.id in
+        let%bind.List proof_segments = values in
+        let%bind.List signed_single_segments = values in
+        let%bind.List signed_pair_segments = values in
+        let constitution =
+          { proof_segments; signed_single_segments; signed_pair_segments }
+        in
+        if is_valid constitution then [ constitution ] else []
       in
-      if is_valid constitution then [ constitution ] else []
+      let constitutions = constitutions_with_bound max_num_segments in
+      (* Make sure our max_num_segments isn't too small *)
+      assert (
+        List.length constitutions
+        = List.length (constitutions_with_bound @@ (max_num_segments + 1)) ) ;
+      constitutions
 
     (* Arrange the account_updates of a Zkapp_command so that the resulting
        transaction has the given constitution. The constitution is assumed to be
@@ -369,6 +380,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
       in
       interpose proof_updates partitioned_payments
   end in
+  (* Only consider constitutions that fit the given update bounds *)
   let all_constitutions =
     Constitution.all_valid_constitutions
     |> List.filter ~f:(fun constitution ->
@@ -383,6 +395,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
          "No constitutions exist with %d <= updates <= %d and proof updates <= \
           %d"
          min_num_updates max_num_updates min_num_proof_updates ) ;
+  (* Once the constitutions have been filtered, we can calculate the actual
+     max_num_updates across all the commands we will generate very precisely. *)
   let max_num_updates =
     Constitution.all_valid_constitutions
     |> List.map ~f:Constitution.num_updates_needed
@@ -524,16 +538,28 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
       ; preconditions = None
       } )
   in
+  (* Given a target [constitution], generate a Zkapp_command that has that
+     constitution. Also record that command in the [transaction_combinations]
+     table so the benchmark can look it up later.
+
+     As an example, for the constitution {proof: 3; pair: 2; single: 2} we might
+     generate a command with perm_string SSPSSSPSP. A possible segmentation of
+     this command is (SS)(P)(SS)(S)(P)(S)(P), and the number of segments of each
+     type is correct, as you can see. *)
   let generate_command_of_constitution constitution nonce =
     let start = Time.now () in
     let num_updates = Constitution.num_updates_needed constitution - 1 in
     let num_proof_updates = constitution.proof_segments in
     let empty_sender, spec = test_spec nonce ~num_proof_updates ~num_updates in
+    (* Generate a command with the right number of proof/non-proof updates, but
+       not necessarily in the right order. *)
     let%bind.Async.Deferred parties =
       Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
         ~constraint_constants ~empty_sender spec
         ~receiver_auth:Control.Tag.Signature
     in
+    (* Harvest the updates (aside from the fee payer update) from the command
+       and partition them. *)
     let simple_parties = Zkapp_command.to_simple parties in
     let other_parties = simple_parties.account_updates in
     let proof_parties, signature_parties, no_auths, _next_nonce =
@@ -562,10 +588,12 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
       (List.length other_parties + 1)
       (List.length proof_parties)
       Time.(Span.to_sec (diff (now ()) start)) ;
+    (* Arrange the account updates according to the target constitution *)
     let account_updates =
       Constitution.rearrange_updates constitution proof_parties
         (signature_parties @ no_auths)
     in
+    (* Create the command we want, with the right constitution *)
     let p =
       Zkapp_command.of_simple ~signature_kind ~proof_cache_db
         { simple_parties with account_updates }
@@ -596,7 +624,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
     assert (combination.signed_single = constitution.signed_single_segments) ;
     Transaction_key.Table.add_exn transaction_combinations ~key:combination
       ~data:(p, Time_values.empty, perm_string) ;
-    (*Update the authorizations*)
+    (* Update the authorizations *)
     let%map.Async.Deferred p =
       Zkapp_command_builder.replace_authorizations ~prover ~keymap p
     in
