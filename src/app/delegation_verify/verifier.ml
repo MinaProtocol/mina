@@ -1,6 +1,6 @@
-let verify_functions ~constraint_constants ~proof_level () =
+let verify_functions ~signature_kind ~constraint_constants ~proof_level () =
   let module T = Transaction_snark.Make (struct
-    let signature_kind = Mina_signature_kind.t_DEPRECATED
+    let signature_kind = signature_kind
 
     let constraint_constants = constraint_constants
 
