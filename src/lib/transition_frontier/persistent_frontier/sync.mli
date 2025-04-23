@@ -1,6 +1,6 @@
 (** This module provides the implementation for actively "syncing" the
  *  persistent frontier database. A [Sync] job can be created, and can
- *  then be sent diffs to accumulate and apply to the databse in chunks
+ *  then be sent diffs to accumulate and apply to the database in chunks
  *  (using the [Diff_buffer]).
  *)
 

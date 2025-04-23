@@ -100,7 +100,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
            - The next step proof also computes the deferred values inside the circuit and verifies
              that they match those used by the previous wrap proof.
 
-      The code below generates the deferred values so that we can verifiy that we can actually
+      The code below generates the deferred values so that we can verify that we can actually
       compute those values correctly inside the circuit.  Special thanks to Matthew Ryan for
       explaining this in detail. *)
   let { Wrap.For_tests_only.deferred_values

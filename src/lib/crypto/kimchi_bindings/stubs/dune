@@ -156,7 +156,7 @@
   (= %{env:KIMCHI_STUBS=n} n))
  (mode promote)
  (deps
-  ../../../../.ocamlformat
+  ../../../../../.ocamlformat
   Cargo.toml
   rust-toolchain.toml
   (source_tree src)
@@ -183,7 +183,7 @@
   (<> %{env:KIMCHI_STUBS=n} n))
  (mode promote)
  (deps
-  ../../../../.ocamlformat
+  ../../../../../.ocamlformat
   (env_var KIMCHI_STUBS))
  (action
   (progn
