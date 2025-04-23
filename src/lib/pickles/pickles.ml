@@ -36,7 +36,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Util = Util
   module Tick_field_sponge = Tick_field_sponge
   module Impls = Impls
-  module Inductive_rule = Inductive_rule
+  module Inductive_rule = Inductive_rule.Kimchi
   module Tag = Tag
   module Types_map = Types_map
   module Dirty = Dirty
@@ -47,6 +47,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Cache = Cache
   module Storables = Compile.Storables
   module Ro = Ro
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
   type chunking_data = Verify.Instance.chunking_data =
     { num_chunks : int; domain_size : int; zk_rows : int }
@@ -1301,7 +1302,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (r, disk_key_verifier)
           in
           let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
-          let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
+          let module S =
+            Step.Make (Inductive_rule) (A) (A_value) (Max_proofs_verified)
+          in
           let prover =
             let f :
                    ( unit * (unit * unit)

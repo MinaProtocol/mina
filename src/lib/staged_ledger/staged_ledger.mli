@@ -158,7 +158,7 @@ module Staged_ledger_error : sig
     | Invalid_public_key of Public_key.Compressed.t
     | ZkApps_exceed_limit of int * int
     | Unexpected of Error.t
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 
   val to_string : t -> string
 

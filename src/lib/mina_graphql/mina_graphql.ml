@@ -1081,7 +1081,7 @@ module Mutations = struct
           in
           let%bind.Result () =
             let open Currency.Fee in
-            Result.ok_if_true ~error:"Maximum fee less than mininum fee"
+            Result.ok_if_true ~error:"Maximum fee less than minimum fee"
               (payment_details.max_fee >= payment_details.min_fee)
           in
           let logger = Mina_lib.top_level_logger mina in
@@ -2052,8 +2052,7 @@ module Queries = struct
         let transaction_pool = Mina_lib.transaction_pool mina in
         (* TODO: do not compute hashes to just get the status *)
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
-          ~transaction_pool
-        @@ User_command.write_all_proofs_to_disk txn.data )
+          ~transaction_pool txn.data )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
@@ -2375,6 +2374,13 @@ module Queries = struct
         let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
         let to_bundle_specs =
           List.map ~f:(fun (spec, fee_prover) ->
+              let spec =
+                One_or_two.map spec
+                  ~f:
+                    (Snark_work_lib.Work.Single.Spec.map
+                       ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                       ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+              in
               { Types.Snark_work_bundle.spec; fee_prover } )
         in
         match end_idx with
