@@ -71,6 +71,7 @@ module Worker_state = struct
     ; internal_trace_filename : string option
     ; logger : Logger.t
     ; proof_level : Genesis_constants.Proof_level.t
+    ; signature_kind : Mina_signature_kind.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; commit_id : string
     }
@@ -89,12 +90,18 @@ module Worker_state = struct
           }
         , Lazy.force Proof.transaction_dummy )
 
-  let create { logger; proof_level; constraint_constants; commit_id; _ } :
-      t Deferred.t =
+  let create
+      { logger
+      ; proof_level
+      ; signature_kind
+      ; constraint_constants
+      ; commit_id
+      ; _
+      } : t Deferred.t =
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
         let module T = Transaction_snark.Make (struct
-          let signature_kind = Mina_signature_kind.t_DEPRECATED
+          let signature_kind = signature_kind
 
           let constraint_constants = constraint_constants
 
@@ -368,6 +375,7 @@ module Worker = struct
             ; internal_trace_filename
             ; logger
             ; proof_level
+            ; signature_kind
             ; constraint_constants
             ; commit_id
             } =
@@ -398,6 +406,7 @@ module Worker = struct
           ; internal_trace_filename
           ; logger
           ; proof_level
+          ; signature_kind
           ; constraint_constants
           ; commit_id
           }
@@ -413,7 +422,8 @@ type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~pids ~conf_dir ~proof_level ~constraint_constants ~commit_id () =
+    ~pids ~conf_dir ~proof_level ~signature_kind ~constraint_constants
+    ~commit_id () =
   [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
@@ -429,6 +439,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       ; internal_trace_filename
       ; logger
       ; proof_level
+      ; signature_kind
       ; constraint_constants
       ; commit_id
       }

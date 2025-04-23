@@ -14,6 +14,7 @@ module type S = sig
       ; internal_trace_filename : string option
       ; logger : Logger.t
       ; proof_level : Genesis_constants.Proof_level.t
+      ; signature_kind : Mina_signature_kind.t
       ; constraint_constants : Genesis_constants.Constraint_constants.t
       ; commit_id : string
       }
@@ -30,6 +31,7 @@ module type S = sig
     -> pids:Child_processes.Termination.t
     -> conf_dir:string
     -> proof_level:Genesis_constants.Proof_level.t
+    -> signature_kind:Mina_signature_kind.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> commit_id:string
     -> unit

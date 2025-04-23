@@ -1738,6 +1738,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                       "unhandled exception from daemon-side prover server: $exn"
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
+                let signature_kind = Mina_signature_kind.t_DEPRECATED in
                 O1trace.thread "manage_prover_subprocess" (fun () ->
                     let%bind prover =
                       Prover.create ~commit_id ~logger:config.logger
@@ -1745,7 +1746,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
-                        ~constraint_constants ~pids:config.pids
+                        ~signature_kind ~constraint_constants ~pids:config.pids
                         ~conf_dir:config.conf_dir ()
                     in
                     let%map () = set_itn_data (module Prover) prover in

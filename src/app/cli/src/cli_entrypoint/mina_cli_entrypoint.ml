@@ -1705,9 +1705,10 @@ let internal_commands logger ~itn_features =
              | `Ok sexp ->
                  let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
                  [%log info] "Prover state being logged to %s" conf_dir ;
+                 let signature_kind = Mina_signature_kind.t_DEPRECATED in
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level ~constraint_constants
+                     ~proof_level ~signature_kind ~constraint_constants
                      ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
@@ -1961,12 +1962,13 @@ let internal_commands logger ~itn_features =
               ~cli_proof_level:None
           in
           let pids = Child_processes.Termination.create_pid_table () in
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           let%bind prover =
             (* We create a prover process (unnecessarily) here, to have a more
                realistic test.
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
-              ~conf_dir ~proof_level
+              ~conf_dir ~proof_level ~signature_kind
               ~constraint_constants:precomputed_values.constraint_constants ()
           in
           match%bind
