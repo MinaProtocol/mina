@@ -468,12 +468,6 @@ struct
         [ `Finite of Inner_curve.t
         | `Maybe_finite of Boolean.var * Inner_curve.t ]
 
-      let _finite : t -> Boolean.var = function
-        | `Finite _ ->
-            Boolean.true_
-        | `Maybe_finite (b, _) ->
-            b
-
       let assert_finite : t -> unit = function
         | `Finite _ ->
             ()
