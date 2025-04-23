@@ -18,8 +18,6 @@ in  Pipeline.build
             , Artifacts.Type.BatchTxn
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
-            , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.FunctionalTestSuite
             ]
           , tags = [ PipelineTag.Type.Debian ]
           , channel = DebianChannel.Type.Experimental
