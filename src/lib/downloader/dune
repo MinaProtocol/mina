@@ -4,17 +4,17 @@
  (libraries
   ;; opam libraries
   async
+  async_unix
   core
   core_kernel.pairing_heap
-  async_unix
   ;; local libraries
-  network_peer
-  pipe_lib
-  trust_system
+  bounded_types
   logger
+  network_peer
   o1trace
-  bounded_types)
+  pipe_lib
+  trust_system)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version ppx_deriving.std ppx_deriving_yojson)))
+  (pps ppx_deriving.std ppx_deriving_yojson ppx_jane ppx_mina ppx_version)))

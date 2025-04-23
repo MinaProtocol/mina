@@ -93,7 +93,7 @@ else
     exit 1
 fi
 
-REMOTE_BRANCH="${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+REMOTE_BRANCH="origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
 
 BASE_COMMIT=$(git log "${REMOTE_BRANCH}" -1 --pretty=format:%H)
 echo "Diffing current commit: ${BUILDKITE_COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2
