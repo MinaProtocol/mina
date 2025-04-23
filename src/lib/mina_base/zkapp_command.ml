@@ -46,19 +46,18 @@ end
 module Call_forest = Zkapp_call_forest_base
 module Digest = Call_forest.Digest
 
-type ('proof, 'account_update_digest, 'forest_digest) with_forest =
-  ( ( Account_update.Body.t
-    , ('proof, Signature.t) Control.Poly.t )
-    Account_update.Poly.t
-  , 'account_update_digest
-  , 'forest_digest )
-  Call_forest.t
-  Poly.t
+type ('account_update, 'account_update_digest, 'forest_digest) with_forest =
+  ('account_update, 'account_update_digest, 'forest_digest) Call_forest.t Poly.t
 [@@deriving sexp, compare, equal, hash, yojson]
 
 module T = struct
   type t =
-    (Proof_cache_tag.t, Digest.Account_update.t, Digest.Forest.t) with_forest
+    ( ( Account_update.Body.t
+      , (Proof_cache_tag.t, Signature.t) Control.Poly.t )
+      Account_update.Poly.t
+    , Digest.Account_update.t
+    , Digest.Forest.t )
+    with_forest
   [@@deriving sexp_of, to_yojson]
 
   [%%versioned
@@ -161,8 +160,12 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   }
 
 let forget_digests_and_proofs
-    ({ fee_payer; memo; account_updates } : (_, _, _) with_forest) :
-    (unit, unit, unit) with_forest =
+    ({ fee_payer; memo; account_updates } :
+      ((_, (_, _) Control.Poly.t) Account_update.Poly.t, _, _) with_forest ) :
+    ( (_, (unit, _) Control.Poly.t) Account_update.Poly.t
+    , unit
+    , unit )
+    with_forest =
   { Poly.fee_payer
   ; memo
   ; account_updates = Call_forest.forget_hashes_and_proofs account_updates
@@ -239,7 +242,9 @@ let fee_payer_account_update (t : (_, _, _) with_forest) = t.fee_payer
 let applicable_at_nonce (t : (_, _, _) with_forest) : Account.Nonce.t =
   t.fee_payer.body.nonce
 
-let target_nonce_on_success (t : (_, _, _) with_forest) : Account.Nonce.t =
+let target_nonce_on_success
+    (t : ((Account_update.Body.t, _) Account_update.Poly.t, _, _) with_forest) :
+    Account.Nonce.t =
   let base_nonce = Account.Nonce.succ (applicable_at_nonce t) in
   let fee_payer_pubkey = t.fee_payer.body.public_key in
   let fee_payer_account_update_increments =
@@ -250,7 +255,8 @@ let target_nonce_on_success (t : (_, _, _) with_forest) : Account.Nonce.t =
   Account.Nonce.add base_nonce
     (Account.Nonce.of_int fee_payer_account_update_increments)
 
-let nonce_increments (t : (_, _, _) with_forest) :
+let nonce_increments
+    (t : ((Account_update.Body.t, _) Account_update.Poly.t, _, _) with_forest) :
     int Public_key.Compressed.Map.t =
   let base_increments =
     Public_key.Compressed.Map.of_alist_exn [ (t.fee_payer.body.public_key, 1) ]
@@ -956,7 +962,13 @@ end) : sig
   end
 
   val group_by_zkapp_command_rev :
-       (_, _, _) with_forest list
+       ( ( Account_update.Body.t
+         , (_, Signature.t) Control.Poly.t )
+         Account_update.Poly.t
+       , _
+       , _ )
+       with_forest
+       list
     -> (Input.global_state * Input.local_state * Input.connecting_ledger_hash)
        list
        list
@@ -997,7 +1009,7 @@ end = struct
       will need to be passed as part of the snark witness while applying that
       pair.
   *)
-  let group_by_zkapp_command_rev (zkapp_commands : (_, _, _) with_forest list)
+  let group_by_zkapp_command_rev zkapp_commands
       (stmtss : (global_state * local_state * connecting_ledger_hash) list list)
       : Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
@@ -1300,7 +1312,8 @@ let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
    - in incoming blocks
 *)
 let valid_size ~(genesis_constants : Genesis_constants.t)
-    (t : (_, _, _) with_forest) : unit Or_error.t =
+    (t : ((Account_update.Body.t, _) Account_update.Poly.t, _, _) with_forest) :
+    unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
