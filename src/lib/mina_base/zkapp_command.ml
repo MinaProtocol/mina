@@ -883,8 +883,6 @@ end
 (* so transaction ids have a version tag *)
 include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
-type account_updates = (Account_update.t, unit, unit) Call_forest.t
-
 let account_updates_deriver obj =
   let of_zkapp_command_with_depth (ps : Account_update.Graphql_repr.t list) =
     Call_forest.of_account_updates ps

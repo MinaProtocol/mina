@@ -1083,7 +1083,7 @@ module Mutations = struct
           in
           let%bind.Result () =
             let open Currency.Fee in
-            Result.ok_if_true ~error:"Maximum fee less than mininum fee"
+            Result.ok_if_true ~error:"Maximum fee less than minimum fee"
               (payment_details.max_fee >= payment_details.min_fee)
           in
           let logger = Mina_lib.top_level_logger mina in
