@@ -103,12 +103,15 @@ let read_all_proofs_from_disk : t -> Stable.Latest.t = function
   | Zkapp_command zc ->
       Zkapp_command (Zkapp_command.read_all_proofs_from_disk zc)
 
-type ('p, 'a, 'b) with_forest =
-  (Signed_command.t, ('p, 'a, 'b) Zkapp_command.with_forest) Poly.t
+type ('u, 'a, 'b) with_forest =
+  (Signed_command.t, ('u, 'a, 'b) Zkapp_command.with_forest) Poly.t
 [@@deriving equal]
 
 let forget_digests_and_proofs (t : (_, _, _) with_forest) :
-    (unit, unit, unit) with_forest =
+    ( (_, (unit, _) Control.Poly.t) Account_update.Poly.t
+    , unit
+    , unit )
+    with_forest =
   match t with
   | Signed_command sc ->
       Signed_command sc
@@ -116,10 +119,10 @@ let forget_digests_and_proofs (t : (_, _, _) with_forest) :
       Zkapp_command (Zkapp_command.forget_digests_and_proofs zc)
 
 let equal_ignoring_proofs_and_hashes
-    (type proof_l account_update_digest_l forest_digest_l proof_r
-    account_update_digest_r forest_digest_r )
-    (t1 : (proof_l, account_update_digest_l, forest_digest_l) with_forest)
-    (t2 : (proof_r, account_update_digest_r, forest_digest_r) with_forest) =
+    (type account_update_digest_l forest_digest_l account_update_digest_r
+    forest_digest_r )
+    (t1 : (_, account_update_digest_l, forest_digest_l) with_forest)
+    (t2 : (_, account_update_digest_r, forest_digest_r) with_forest) =
   let ignore2 _ _ = true in
   let t1' = forget_digests_and_proofs t1 in
   let t2' = forget_digests_and_proofs t2 in
@@ -419,7 +422,9 @@ let is_incompatible_version = function
   | Zkapp_command p ->
       Zkapp_command.is_incompatible_version p
 
-let has_invalid_call_forest : (_, _, _) with_forest -> bool = function
+let has_invalid_call_forest :
+    ((Account_update.Body.t, _) Account_update.Poly.t, _, _) with_forest -> bool
+    = function
   | Signed_command _ ->
       false
   | Zkapp_command cmd ->
