@@ -2,8 +2,6 @@
  (name work_partitioner)
  (public_name work_partitioner)
  (library_flags -linkall)
- (inline_tests
-  (flags -verbose -show-counts))
  (libraries 
    ; OPAM libraries
    core_kernel 
