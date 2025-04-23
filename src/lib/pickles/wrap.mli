@@ -152,13 +152,13 @@ val combined_inner_product :
        ( (Backend.Tick.Field.t, 'a) Pickles_types.Vector.t
        , 'actual_proofs_verified )
        Pickles_types.Vector.t
-  -> r:Backend.Tick.Field.t
+  -> evalscale:Backend.Tick.Field.t
   -> plonk:
        ( Backend.Tick.Field.t
        , Backend.Tick.Field.t
        , bool )
        Composition_types.Wrap.Proof_state.Deferred_values.Plonk.Minimal.t
-  -> xi:Backend.Tick.Field.t
+  -> polyscale:Backend.Tick.Field.t
   -> zeta:Backend.Tick.Field.t
   -> zetaw:Backend.Tick.Field.t
   -> Backend.Tick.Field.t

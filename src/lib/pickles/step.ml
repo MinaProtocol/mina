@@ -279,7 +279,7 @@ struct
                  ; combined_inner_product =
                      deferred_values.combined_inner_product
                  ; b = deferred_values.b
-                 ; xi = deferred_values.xi
+                 ; polyscale = deferred_values.polyscale
                  ; bulletproof_challenges =
                      statement.proof_state.deferred_values
                        .bulletproof_challenges
@@ -335,8 +335,8 @@ struct
         ; feature_flags = Plonk_types.Features.none_bool
         }
       in
-      let xi = scalar_chal O.v in
-      let r = scalar_chal O.u in
+      let polyscale = scalar_chal O.v in
+      let evalscale = scalar_chal O.u in
       let sponge_digest_before_evaluations = O.digest_before_evaluations o in
       let to_field =
         SC.to_field_constant
@@ -344,9 +344,9 @@ struct
           ~endo:Endo.Step_inner_curve.scalar
       in
       let module As_field = struct
-        let r = to_field r
+        let evalscale = to_field evalscale
 
-        let xi = to_field xi
+        let polyscale = to_field polyscale
 
         let zeta = to_field plonk0.zeta
 
@@ -370,7 +370,7 @@ struct
         let open As_field in
         let b =
           let open Tock.Field in
-          challenge_polynomial zeta + (r * challenge_polynomial zetaw)
+          challenge_polynomial zeta + (evalscale * challenge_polynomial zetaw)
         in
         let prechals =
           Vector.of_list_and_length_exn
@@ -482,8 +482,8 @@ struct
               ([| f x_hat |] :: [| ft_eval |] :: a)
           in
           let open Tock.Field in
-          Pcs_batch.combine_split_evaluations ~xi ~init:Fn.id
-            ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
+          Pcs_batch.combine_split_evaluations ~polyscale ~init:Fn.id
+            ~mul_and_add:(fun ~acc ~polyscale fx -> fx + (polyscale * acc))
             v
         in
         let ft_eval0 =
@@ -494,7 +494,8 @@ struct
         in
         let open Tock.Field in
         combine ~which_eval:`Fst ~ft_eval:ft_eval0 As_field.zeta
-        + (r * combine ~which_eval:`Snd ~ft_eval:proof.openings.ft_eval1 zetaw)
+        + evalscale
+          * combine ~which_eval:`Snd ~ft_eval:proof.openings.ft_eval1 zetaw
       in
       let chal = Challenge.Constant.of_tock_field in
       let plonk =
@@ -524,7 +525,7 @@ struct
                 ; gamma = chal plonk0.gamma
                 }
             ; combined_inner_product = shifted_value combined_inner_product
-            ; xi
+            ; polyscale
             ; bulletproof_challenges = new_bulletproof_challenges
             ; b = shifted_value b
             }

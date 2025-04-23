@@ -1512,17 +1512,17 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         ; feature_flags = Plonk_types.Features.none_bool
                         }
                       in
-                      let r = scalar_chal O.u in
-                      let xi = scalar_chal O.v in
+                      let evalscale = scalar_chal O.u in
+                      let polyscale = scalar_chal O.v in
                       let to_field =
                         SC.to_field_constant
                           (module Tick.Field)
                           ~endo:Endo.Wrap_inner_curve.scalar
                       in
                       let module As_field = struct
-                        let r = to_field r
+                        let evalscale = to_field evalscale
 
-                        let xi = to_field xi
+                        let polyscale = to_field polyscale
 
                         let zeta = to_field plonk0.zeta
 
@@ -1610,7 +1610,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                               (let x1, x2 = x_hat in
                                ([| x1 |], [| x2 |]) )
                           }
-                          ~r ~xi ~zeta ~zetaw
+                          ~evalscale ~polyscale ~zeta ~zetaw
                           ~old_bulletproof_challenges:prev_challenges
                           ~env:tick_env ~domain:tick_domain
                           ~ft_eval1:proof.proof.openings.ft_eval1
@@ -1637,7 +1637,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         let b =
                           let open Tick.Field in
                           challenge_polynomial zeta
-                          + (r * challenge_polynomial zetaw)
+                          + (evalscale * challenge_polynomial zetaw)
                         in
                         let overwritten_prechals =
                           Array.map prechals
@@ -1713,7 +1713,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                       in
                       { proof_state =
                           { deferred_values =
-                              { xi
+                              { polyscale
                               ; b = shift_value b
                               ; bulletproof_challenges =
                                   Vector.of_array_and_length_exn

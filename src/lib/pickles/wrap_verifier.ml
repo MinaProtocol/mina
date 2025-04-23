@@ -488,11 +488,11 @@ struct
       type t = { point : Inner_curve.t; non_zero : Boolean.var }
     end
 
-    let combine batch ~xi without_bound with_bound =
+    let combine batch ~polyscale without_bound with_bound =
       let reduce_point p =
         let point = ref (Point.underlying p.(Array.length p - 1)) in
         for i = Array.length p - 2 downto 0 do
-          point := Point.add p.(i) (Scalar_challenge.endo !point xi)
+          point := Point.add p.(i) (Scalar_challenge.endo !point polyscale)
         done ;
         !point
       in
@@ -500,20 +500,21 @@ struct
         Pcs_batch.combine_split_commitments batch
           ~reduce_with_degree_bound:(fun _ -> assert false)
           ~reduce_without_degree_bound:(fun x -> [ x ])
-          ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
+          ~scale_and_add:(fun ~(acc : Curve_opt.t) ~polyscale
                               (p : (Point.t array, Boolean.var) Opt.t) ->
             (* match acc.non_zero, keep with
                | false, false -> acc
                | true, false -> acc
                | false, true -> { point= p; non_zero= true }
-               | true, true -> { point= p + xi * acc; non_zero= true }
+               | true, true -> { point= p + polyscale * acc; non_zero= true }
             *)
             let point keep p =
               let base_point =
                 let p = p.(Array.length p - 1) in
                 Inner_curve.(
                   if_ acc.non_zero
-                    ~then_:(Point.add p (Scalar_challenge.endo acc.point xi))
+                    ~then_:
+                      (Point.add p (Scalar_challenge.endo acc.point polyscale))
                     ~else_:
                       ((* In this branch, the accumulator was zero, so there is no harm in
                           putting the potentially junk underlying point here. *)
@@ -521,7 +522,8 @@ struct
               in
               let point = ref base_point in
               for i = Array.length p - 2 downto 0 do
-                point := Point.add p.(i) (Scalar_challenge.endo !point xi)
+                point :=
+                  Point.add p.(i) (Scalar_challenge.endo !point polyscale)
               done ;
               let point =
                 Inner_curve.(if_ keep ~then_:!point ~else_:acc.point)
@@ -537,7 +539,7 @@ struct
                 point keep p
             | Opt.Just p ->
                 point Boolean.true_ p )
-          ~xi
+          ~polyscale
           ~init:(function
             | Opt.Nothing ->
                 None
@@ -562,7 +564,7 @@ struct
   let scale_fast = Ops.scale_fast
 
   let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
-      ~(xi : Scalar_challenge.t)
+      ~(polyscale : Scalar_challenge.t)
       ~(advice :
          Other_field.Packed.t Shifted_value.Type1.t
          Types.Step.Bulletproof.Advice.t )
@@ -585,8 +587,9 @@ struct
           group_map t
         in
         let open Inner_curve in
-        let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-          Split_commitments.combine pcs_batch ~xi without_degree_bound
+        let combined_polynomial
+            (* Corresponds to polyscale in figure 7 of WTS *) =
+          Split_commitments.combine pcs_batch ~polyscale without_degree_bound
             with_degree_bound
         in
         let scale_fast =
@@ -802,7 +805,7 @@ struct
       (module Max_proofs_verified : Nat.Add.Intf with type n = b)
       ~actual_proofs_verified_mask ~step_domains ~srs
       ~verification_key:(m : (_ array, _) Plonk_verification_key_evals.Step.t)
-      ~xi ~sponge
+      ~polyscale ~sponge
       ~(public_input :
          [ `Field of Field.t * Boolean.var | `Packed_bits of Field.t * int ]
          array ) ~(sg_old : (_, Max_proofs_verified.n) Vector.t) ~advice
@@ -1250,7 +1253,7 @@ struct
         let sponge_before_evaluations = Sponge.copy sponge in
         let sponge_digest_before_evaluations = Sponge.squeeze_field sponge in
 
-        (* xi, r are sampled here using the other sponge. *)
+        (* polyscale, evalscale are sampled here using the other sponge. *)
         (* No need to expose the polynomial evaluations as deferred values as they're
            not needed here for the incremental verification. All we need is a_hat and
            "combined_inner_product".
@@ -1350,7 +1353,7 @@ struct
             ~pcs_batch:
               (Common.dlog_pcs_batch
                  (Max_proofs_verified.add num_commitments_without_degree_bound) )
-            ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
+            ~sponge:sponge_before_evaluations ~polyscale ~advice ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound
                   ~f:
@@ -1446,7 +1449,7 @@ struct
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
      It
-     1. Checks that [xi] and [r] where sampled correctly. I.e., by absorbing all the
+     1. Checks that [polyscale] and [evalscale] where sampled correctly. I.e., by absorbing all the
      evaluation openings and then squeezing.
      2. Checks that the "combined inner product" value used in the elliptic curve part of
      the opening proof was computed correctly, in terms of the evaluation openings and the
@@ -1456,7 +1459,7 @@ struct
   let finalize_other_proof (type b)
       (module Proofs_verified : Nat.Add.Intf with type n = b) ~domain ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
-      ({ xi; combined_inner_product; bulletproof_challenges; b; plonk } :
+      ({ polyscale; combined_inner_product; bulletproof_challenges; b; plonk } :
         ( _
         , _
         , _ Shifted_value.Type2.t
@@ -1528,18 +1531,22 @@ struct
       Array.copy sponge.state
     in
     sponge.state <- sponge_state ;
-    let xi_actual = squeeze_scalar sponge in
-    let r_actual = squeeze_challenge sponge in
-    let xi_correct =
+    let polyscale_actual = squeeze_scalar sponge in
+    let evalscale_actual = squeeze_challenge sponge in
+    let polyscale_correct =
       with_label __LOC__ (fun () ->
-          let { Import.Scalar_challenge.inner = xi_actual } = xi_actual in
-          let { Import.Scalar_challenge.inner = xi } = xi in
+          let { Import.Scalar_challenge.inner = polyscale_actual } =
+            polyscale_actual
+          in
+          let { Import.Scalar_challenge.inner = polyscale } = polyscale in
           (* Sample new sg challenge point here *)
-          Field.equal xi_actual xi )
+          Field.equal polyscale_actual polyscale )
     in
-    let xi = scalar_to_field xi in
-    (* TODO: r actually does not need to be a scalar challenge. *)
-    let r = scalar_to_field (Import.Scalar_challenge.create r_actual) in
+    let polyscale = scalar_to_field polyscale in
+    (* TODO: evalscale actually does not need to be a scalar challenge. *)
+    let evalscale =
+      scalar_to_field (Import.Scalar_challenge.create evalscale_actual)
+    in
     let plonk_minimal =
       plonk |> Plonk.to_minimal
       |> Plonk.Minimal.to_wrap
@@ -1596,7 +1603,7 @@ struct
                   (module Field)
                   ~env ~domain plonk_minimal combined_evals evals1.public_input )
           in
-          (* sum_i r^i sum_j xi^j f_j(beta_i) *)
+          (* sum_i evalscale^i sum_j polyscale^j f_j(beta_i) *)
           let actual_combined_inner_product =
             let combine ~ft ~sg_evals x_hat
                 (e : (Field.t array, _) Evals.In_circuit.t) =
@@ -1633,11 +1640,11 @@ struct
                   :: [| Pickles_types.Opt.just ft |]
                   :: a )
               in
-              Common.combined_evaluation (module Impl) ~xi v
+              Common.combined_evaluation (module Impl) ~polyscale v
             in
             combine ~ft:ft_eval0 ~sg_evals:sg_evals1 evals1.public_input
               evals1.evals
-            + r
+            + evalscale
               * combine ~ft:ft_eval1 ~sg_evals:sg_evals2 evals2.public_input
                   evals2.evals
           in
@@ -1659,7 +1666,7 @@ struct
               (challenge_polynomial (Vector.to_array bulletproof_challenges))
           in
           let b_actual =
-            challenge_poly plonk.zeta + (r * challenge_poly zetaw)
+            challenge_poly plonk.zeta + (evalscale * challenge_poly zetaw)
           in
           equal
             (Shifted_value.Type2.to_field (module Field) ~shift:shift2 b)
@@ -1676,12 +1683,12 @@ struct
                plonk )
             combined_evals )
     in
-    print_bool "xi_correct" xi_correct ;
+    print_bool "polyscale_correct" polyscale_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;
     print_bool "plonk_checks_passed" plonk_checks_passed ;
     print_bool "b_correct" b_correct ;
     ( Boolean.all
-        [ xi_correct
+        [ polyscale_correct
         ; b_correct
         ; combined_inner_product_correct
         ; plonk_checks_passed
@@ -1691,7 +1698,7 @@ struct
   let _map_challenges
       { Import.Types.Step.Proof_state.Deferred_values.plonk
       ; combined_inner_product
-      ; xi
+      ; polyscale
       ; bulletproof_challenges
       ; b
       } ~f ~scalar =
@@ -1701,9 +1708,9 @@ struct
     ; combined_inner_product
     ; bulletproof_challenges =
         Vector.map bulletproof_challenges
-          ~f:(fun (r : _ Bulletproof_challenge.t) ->
-            Bulletproof_challenge.map ~f:scalar r )
-    ; xi = scalar xi
+          ~f:(fun (ch : _ Bulletproof_challenge.t) ->
+            Bulletproof_challenge.map ~f:scalar ch )
+    ; polyscale = scalar polyscale
     ; b
     }
 end
