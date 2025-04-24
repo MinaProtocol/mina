@@ -202,6 +202,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
   end]
 
+  type regular_snarked_ledger_state = t
+
   type var =
     ( Frozen_ledger_hash.var
     , Currency.Amount.Signed.var
@@ -387,6 +389,25 @@ module Make_str (A : Wire_types.Concrete) = struct
     let to_field_elements =
       let (Typ { value_to_fields; _ }) = typ in
       Fn.compose fst value_to_fields
+
+    let drop_sok
+        ({ source
+         ; target
+         ; connecting_ledger_left
+         ; connecting_ledger_right
+         ; supply_increase
+         ; fee_excess
+         ; sok_digest = _
+         } :
+          t ) : regular_snarked_ledger_state =
+      { source
+      ; target
+      ; connecting_ledger_left
+      ; connecting_ledger_right
+      ; supply_increase
+      ; fee_excess
+      ; sok_digest = ()
+      }
   end
 
   let option lab =
