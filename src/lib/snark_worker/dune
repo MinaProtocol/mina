@@ -46,7 +46,9 @@
   mina_node_config.unconfigurable_constants
   mina_state
   transaction_protocol_state
-  ppx_version.runtime)
+  ppx_version.runtime
+  proof_cache_tag)
+  
  (preprocess
   (pps
    ppx_bin_prot
