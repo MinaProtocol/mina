@@ -132,7 +132,6 @@
 (package (name non_zero_curve_point))
 (package (name o1trace))
 (package (name o1trace_webkit_event))
-(package (name one_or_two))
 (package (name otp_lib))
 (package (name outside_hash_image))
 (package (name parallel))

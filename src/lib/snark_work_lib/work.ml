@@ -65,31 +65,31 @@ module Spec = struct
 
     module V1 = struct
       type 'single t =
-        { instances : 'single One_or_two.Stable.V1.t
+        { instances : 'single Mina_stdlib.One_or_two.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         }
       [@@deriving fields, sexp, to_yojson]
 
       let to_latest single_latest { instances; fee } =
-        { instances = One_or_two.Stable.V1.to_latest single_latest instances
+        { instances = Mina_stdlib.One_or_two.Stable.V1.to_latest single_latest instances
         ; fee
         }
 
       let of_latest single_latest { instances; fee } =
         let open Result.Let_syntax in
         let%map instances =
-          One_or_two.Stable.V1.of_latest single_latest instances
+          Mina_stdlib.One_or_two.Stable.V1.of_latest single_latest instances
         in
         { instances; fee }
     end
   end]
 
   type 'single t = 'single Stable.Latest.t =
-    { instances : 'single One_or_two.t; fee : Currency.Fee.t }
+    { instances : 'single Mina_stdlib.One_or_two.t; fee : Currency.Fee.t }
   [@@deriving fields, sexp, yojson]
 
   let map ~f { instances; fee } =
-    { instances = One_or_two.map ~f instances; fee }
+    { instances = Mina_stdlib.One_or_two.map ~f instances; fee }
 end
 
 module Result = struct
@@ -97,10 +97,10 @@ module Result = struct
   module Stable = struct
     module V1 = struct
       type ('spec, 'single) t =
-        { proofs : 'single One_or_two.Stable.V1.t
+        { proofs : 'single Mina_stdlib.One_or_two.Stable.V1.t
         ; metrics :
             (Core.Time.Stable.Span.V1.t * [ `Transition | `Merge ])
-            One_or_two.Stable.V1.t
+            Mina_stdlib.One_or_two.Stable.V1.t
         ; spec : 'spec
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
         }
@@ -111,8 +111,8 @@ end
 
 module Result_without_metrics = struct
   type 'proof t =
-    { proofs : 'proof One_or_two.t
-    ; statements : Transaction_snark.Statement.t One_or_two.t
+    { proofs : 'proof Mina_stdlib.One_or_two.t
+    ; statements : Transaction_snark.Statement.t Mina_stdlib.One_or_two.t
     ; prover : Signature_lib.Public_key.Compressed.t
     ; fee : Currency.Fee.t
     }

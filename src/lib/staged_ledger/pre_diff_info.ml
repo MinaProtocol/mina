@@ -225,7 +225,7 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
         |> List.map ~f:(fun (receiver_pk, fee) ->
                Fee_transfer.Single.create ~receiver_pk ~fee
                  ~fee_token:Token_id.default )
-        |> One_or_two.group_list
+        |> Mina_stdlib.One_or_two.group_list
         |> List.map ~f:Fee_transfer.of_singles
         |> Or_error.all )
     |> Or_error.join |> to_staged_ledger_or_error

@@ -44,7 +44,7 @@
   archive_lib
   mina_wire_types
   perf_histograms
-  one_or_two
+  mina_stdlib
   block_time
   child_processes
   mina_net2

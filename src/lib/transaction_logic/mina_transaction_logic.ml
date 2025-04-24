@@ -1938,7 +1938,7 @@ module Make (L : Ledger_intf.S) :
       if
         List.for_all
           ~f:Token_id.(equal default)
-          (One_or_two.to_list (Fee_transfer.fee_tokens transfer))
+          (Mina_stdlib.One_or_two.to_list (Fee_transfer.fee_tokens transfer))
       then return ()
       else Or_error.errorf "Cannot pay fees in non-default tokens."
     in

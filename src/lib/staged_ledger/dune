@@ -40,10 +40,9 @@
   mina_signature_kind
   currency
   genesis_constants
-  one_or_two
+  mina_stdlib
   o1trace
   mina_state
-  mina_stdlib
   snark_work_lib
   child_processes
   consensus

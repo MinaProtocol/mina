@@ -9,7 +9,7 @@
   network_pool
   mina_base
   signature_lib
-  one_or_two
+  mina_stdlib
   currency
   ledger_proof
   mina_state

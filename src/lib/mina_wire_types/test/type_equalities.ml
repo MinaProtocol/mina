@@ -306,7 +306,7 @@ module Mina_base = struct
 end
 
 module One_or_two = struct
-  module O = One_or_two
+  module O = Mina_stdlib.One_or_two
   module W = WT.One_or_two
   include Assert_equal1V1 (O.Stable) (W)
 end

@@ -15,7 +15,7 @@
   transaction_snark
   mina_state
   signature_lib
-  one_or_two
+  mina_stdlib
   currency
   ppx_version.runtime)
  (preprocess

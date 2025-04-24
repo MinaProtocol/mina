@@ -32,7 +32,7 @@
   ledger_proof
   verifier
   pipe_lib
-  one_or_two
+  mina_stdlib
   quickcheck_lib
   mina_base
   mina_transaction

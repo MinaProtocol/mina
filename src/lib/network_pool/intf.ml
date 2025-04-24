@@ -271,20 +271,20 @@ module type Snark_resource_pool_intf = sig
        ?is_local:bool
     -> t
     -> work:Transaction_snark_work.Statement.t
-    -> proof:Ledger_proof.Cached.t One_or_two.t
+    -> proof:Ledger_proof.Cached.t Mina_stdlib.One_or_two.t
     -> fee:Fee_with_prover.t
     -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t
     -> Transaction_snark_work.Statement.t
-    -> Ledger_proof.Cached.t One_or_two.t Priced_proof.t option
+    -> Ledger_proof.Cached.t Mina_stdlib.One_or_two.t Priced_proof.t option
 
   val verify_and_act :
        t
     -> work:
          Transaction_snark_work.Statement.t
-         * Ledger_proof.t One_or_two.t Priced_proof.t
+         * Ledger_proof.t Mina_stdlib.One_or_two.t Priced_proof.t
     -> sender:Envelope.Sender.t
     -> (unit, Verification_error.t) Deferred.Result.t
 
@@ -303,14 +303,14 @@ module type Snark_pool_diff_intf = sig
   type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
-        * Ledger_proof.t One_or_two.t Priced_proof.t
+        * Ledger_proof.t Mina_stdlib.One_or_two.t Priced_proof.t
     | Empty
 
   module Cached : sig
     type t =
       | Add_solved_work of
           Transaction_snark_work.Statement.t
-          * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+          * Ledger_proof.Cached.t Mina_stdlib.One_or_two.t Priced_proof.t
       | Empty
 
     val read_all_proofs_from_disk :
@@ -325,7 +325,7 @@ module type Snark_pool_diff_intf = sig
   type verified = Cached.t
 
   type compact =
-    { work_ids : int One_or_two.t
+    { work_ids : int Mina_stdlib.One_or_two.t
     ; fee : Currency.Fee.t
     ; prover : Signature_lib.Public_key.Compressed.t
     }

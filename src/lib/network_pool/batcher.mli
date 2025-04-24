@@ -4,7 +4,7 @@ open Network_peer
 
 module Snark_pool : sig
   type proof_envelope =
-    (Ledger_proof.t One_or_two.t * Mina_base.Sok_message.t) Envelope.Incoming.t
+    (Ledger_proof.t Mina_stdlib.One_or_two.t * Mina_base.Sok_message.t) Envelope.Incoming.t
   [@@deriving sexp]
 
   type t [@@deriving sexp]

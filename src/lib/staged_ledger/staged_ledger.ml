@@ -708,7 +708,7 @@ module T = struct
       @@ Scan_state.statement_of_job job
     in
     try
-      let job_statements = One_or_two.map ~f:statement_of_job_exn jobs in
+      let job_statements = Mina_stdlib.One_or_two.map ~f:statement_of_job_exn jobs in
       let work_statement = Transaction_snark_work.statement work in
       let statements_match =
         Transaction_snark_work.Statement.equal job_statements work_statement
@@ -718,11 +718,11 @@ module T = struct
       | true, Some (completed_work : Transaction_snark_work.Checked.t) ->
           let verified_proofs =
             Transaction_snark_work.Checked.proofs completed_work
-            |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
+            |> Mina_stdlib.One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
           in
           let block_work_proofs =
             Transaction_snark_work.proofs work
-            |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
+            |> Mina_stdlib.One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
           in
           if
             not
@@ -738,7 +738,7 @@ module T = struct
           then Second "prover_account_not_equal"
           else if
             not
-            @@ One_or_two.equal Ledger_proof.equal verified_proofs
+            @@ Mina_stdlib.One_or_two.equal Ledger_proof.equal verified_proofs
                  block_work_proofs
           then Second "proof_not_equal"
           else First ()
@@ -766,7 +766,7 @@ module T = struct
               let message =
                 Sok_message.create ~fee:work.fee ~prover:work.prover
               in
-              One_or_two.(
+              Mina_stdlib.One_or_two.(
                 to_list
                   (map (zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
                        ( job
@@ -2131,7 +2131,7 @@ module T = struct
                       then
                         Continue
                           ( Sequence.append seq (Sequence.singleton cw_checked)
-                          , One_or_two.length
+                          , Mina_stdlib.One_or_two.length
                               (Transaction_snark_work.Checked.proofs cw_checked)
                             + count )
                       else (
@@ -2569,7 +2569,7 @@ let%test_module "staged ledger tests" =
         Transaction_snark_work.Statement.t -> Public_key.Compressed.t =
      fun stmts ->
       let prover_seed =
-        One_or_two.fold stmts ~init:"P" ~f:(fun p stmt ->
+        Mina_stdlib.One_or_two.fold stmts ~init:"P" ~f:(fun p stmt ->
             p
             ^ Frozen_ledger_hash.to_bytes stmt.target.first_pass_ledger
             ^ Frozen_ledger_hash.to_bytes stmt.target.second_pass_ledger )
@@ -2577,9 +2577,9 @@ let%test_module "staged ledger tests" =
       Quickcheck.random_value ~seed:(`Deterministic prover_seed)
         Public_key.Compressed.gen
 
-    let proofs stmts : Ledger_proof.Cached.t One_or_two.t =
+    let proofs stmts : Ledger_proof.Cached.t Mina_stdlib.One_or_two.t =
       let sok_digest = Sok_message.Digest.default in
-      One_or_two.map stmts ~f:(fun statement ->
+      Mina_stdlib.One_or_two.map stmts ~f:(fun statement ->
           Ledger_proof.Cached.create ~statement ~sok_digest
             ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
 

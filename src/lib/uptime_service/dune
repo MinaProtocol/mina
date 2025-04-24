@@ -51,7 +51,7 @@
   random_oracle
   interruptible
   truth
-  one_or_two
+  mina_stdlib
   transaction_snark
   pickles.backend
   consensus

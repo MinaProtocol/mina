@@ -309,12 +309,12 @@ let%test_module "Transaction union tests" =
                   List.fold ~init:receivers
                     (List.init (txns_per_receiver - 1) ~f:Fn.id)
                     ~f:(fun acc _ -> receivers @ acc)
-                  |> One_or_two.group_list
+                  |> Mina_stdlib.One_or_two.group_list
                 in
                 List.fold receivers ~init:[] ~f:(fun txns receiver ->
                     let ft : Fee_transfer.t =
                       Or_error.ok_exn @@ Fee_transfer.of_singles
-                      @@ One_or_two.map receiver ~f:(fun receiver ->
+                      @@ Mina_stdlib.One_or_two.map receiver ~f:(fun receiver ->
                              Fee_transfer.Single.create
                                ~receiver_pk:receiver.account.public_key
                                ~fee:(Currency.Fee.of_nanomina_int_exn fee)

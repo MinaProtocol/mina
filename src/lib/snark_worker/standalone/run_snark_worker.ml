@@ -34,8 +34,8 @@ let perform (s : Prod.Worker_state.t) ~fee ~public_key
       ( Transaction_witness.Stable.Latest.t
       , Ledger_proof.t )
       Snark_work_lib.Work.Single.Spec.t
-      One_or_two.t ) =
-  One_or_two.Deferred_result.map spec ~f:(fun w ->
+      Mina_stdlib.One_or_two.t ) =
+  Mina_stdlib.One_or_two.Deferred_result.map spec ~f:(fun w ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
         Prod.perform_single s
@@ -46,9 +46,9 @@ let perform (s : Prod.Worker_state.t) ~fee ~public_key
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
   |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
          { Snark_work_lib.Work.Result_without_metrics.proofs =
-             One_or_two.map proofs_and_time ~f:fst
+             Mina_stdlib.One_or_two.map proofs_and_time ~f:fst
          ; statements =
-             One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+             Mina_stdlib.One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
          ; prover = public_key
          ; fee
          } )
@@ -112,7 +112,7 @@ let command =
          let spec_of_json json =
            match
              Yojson.Safe.from_string json
-             |> One_or_two.of_yojson
+             |> Mina_stdlib.One_or_two.of_yojson
                   (Snark_work_lib.Work.Single.Spec.of_yojson
                      Transaction_witness.Stable.Latest.of_yojson
                      Ledger_proof.of_yojson )
@@ -135,7 +135,7 @@ let command =
                  @@
                  match spec_sexp with
                  | Some spec ->
-                     One_or_two.t_of_sexp
+                     Mina_stdlib.One_or_two.t_of_sexp
                        (Snark_work_lib.Work.Single.Spec.t_of_sexp
                           Transaction_witness.Stable.Latest.t_of_sexp
                           Ledger_proof.t_of_sexp )

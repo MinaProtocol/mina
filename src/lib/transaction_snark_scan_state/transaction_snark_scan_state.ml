@@ -349,7 +349,7 @@ let create_expected_statement ~constraint_constants
   }
 
 let total_proofs (works : Transaction_snark_work.t list) =
-  List.sum (module Int) works ~f:(fun w -> One_or_two.length w.proofs)
+  List.sum (module Int) works ~f:(fun w -> Mina_stdlib.One_or_two.length w.proofs)
 
 (*************exposed functions*****************)
 
@@ -1267,7 +1267,7 @@ let snark_job_list_json t =
 let all_work_statements_exn t : Transaction_snark_work.Statement.t list =
   let work_seqs = all_jobs t in
   List.concat_map work_seqs ~f:(fun work_seq ->
-      One_or_two.group_list
+      Mina_stdlib.One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
              match statement_of_job job with
              | None ->
@@ -1277,18 +1277,18 @@ let all_work_statements_exn t : Transaction_snark_work.Statement.t list =
 
 let required_work_pairs t ~slots =
   let work_list = Parallel_scan.jobs_for_slots t.scan_state ~slots in
-  List.concat_map work_list ~f:(fun works -> One_or_two.group_list works)
+  List.concat_map work_list ~f:(fun works -> Mina_stdlib.One_or_two.group_list works)
 
 let k_work_pairs_for_new_diff t ~k =
   let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
   List.(
-    take (concat_map work_list ~f:(fun works -> One_or_two.group_list works)) k)
+    take (concat_map work_list ~f:(fun works -> Mina_stdlib.One_or_two.group_list works)) k)
 
 (*Always the same pairing of jobs*)
 let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
   let work_list = Parallel_scan.jobs_for_next_update t.scan_state in
   List.concat_map work_list ~f:(fun work_seq ->
-      One_or_two.group_list
+      Mina_stdlib.One_or_two.group_list
         (List.map work_seq ~f:(fun job ->
              match statement_of_job job with
              | None ->
@@ -1301,7 +1301,7 @@ let all_work_pairs t
     ( Transaction_witness.t
     , Ledger_proof.Cached.t )
     Snark_work_lib.Work.Single.Spec.t
-    One_or_two.t
+    Mina_stdlib.One_or_two.t
     list
     Or_error.t =
   let all_jobs = all_jobs t in
@@ -1354,11 +1354,11 @@ let all_work_pairs t
   List.fold_until all_jobs ~init:[]
     ~finish:(fun lst -> Ok lst)
     ~f:(fun acc jobs ->
-      let specs_list : 'a One_or_two.t list Or_error.t =
-        List.fold ~init:(Ok []) (One_or_two.group_list jobs)
+      let specs_list : 'a Mina_stdlib.One_or_two.t list Or_error.t =
+        List.fold ~init:(Ok []) (Mina_stdlib.One_or_two.group_list jobs)
           ~f:(fun acc' pair ->
             let%bind acc' = acc' in
-            let%map spec = One_or_two.Or_error.map ~f:single_spec pair in
+            let%map spec = Mina_stdlib.One_or_two.Or_error.map ~f:single_spec pair in
             spec :: acc' )
       in
       match specs_list with
@@ -1375,9 +1375,9 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
       Ledger_proof_with_sok_message.t list =
     let fee = Transaction_snark_work.fee w in
     let prover = Transaction_snark_work.prover w in
-    One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
+    Mina_stdlib.One_or_two.map (Transaction_snark_work.proofs w) ~f:(fun proof ->
         (proof, Sok_message.create ~fee ~prover) )
-    |> One_or_two.to_list
+    |> Mina_stdlib.One_or_two.to_list
   in
   (*get incomplete transactions from previous proof which will be completed in
      the new proof, if there's one*)

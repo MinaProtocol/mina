@@ -17,7 +17,7 @@
   genesis_constants
   mina_base.import
   pickles.backend
-  one_or_two
+  mina_stdlib
   transition_frontier_extensions
   child_processes
   block_time
@@ -34,7 +34,6 @@
   mina_metrics
   pipe_lib
   transition_handler
-  mina_stdlib
   transition_frontier
   consensus
   mina_base

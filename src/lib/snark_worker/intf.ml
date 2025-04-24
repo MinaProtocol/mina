@@ -81,7 +81,7 @@ module type Work_S = sig
     val transactions :
          t
       -> Mina_transaction.Transaction.Stable.Latest.t option
-         One_or_two.Stable.Latest.t
+         Mina_stdlib.One_or_two.Stable.Latest.t
   end
 end
 

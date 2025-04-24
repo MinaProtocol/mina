@@ -13,7 +13,7 @@
   currency
   transaction_snark
   mina_state
-  one_or_two
+  mina_stdlib
   ledger_proof
   signature_lib
   ppx_version.runtime

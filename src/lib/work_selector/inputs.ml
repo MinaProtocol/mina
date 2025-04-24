@@ -40,7 +40,7 @@ module Test_inputs = struct
     include Checked
 
     module Statement = struct
-      type t = Transaction_snark.Statement.t One_or_two.t
+      type t = Transaction_snark.Statement.t Mina_stdlib.One_or_two.t
     end
   end
 
@@ -50,7 +50,7 @@ module Test_inputs = struct
       [@@@no_toplevel_latest_type]
 
       module V2 = struct
-        type t = Transaction_snark.Statement.Stable.V2.t One_or_two.Stable.V1.t
+        type t = Transaction_snark.Statement.Stable.V2.t Mina_stdlib.One_or_two.Stable.V1.t
         [@@deriving hash, compare, sexp]
 
         let to_latest = Fn.id
@@ -79,7 +79,7 @@ module Test_inputs = struct
 
     let work = Fn.id
 
-    let all_work_pairs t ~get_state:_ = Ok (One_or_two.group_list t)
+    let all_work_pairs t ~get_state:_ = Ok (Mina_stdlib.One_or_two.group_list t)
   end
 
   module Transition_frontier = struct

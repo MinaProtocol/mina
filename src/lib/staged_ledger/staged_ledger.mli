@@ -337,7 +337,7 @@ val all_work_pairs :
   -> ( Transaction_witness.t
      , Ledger_proof.Cached.t )
      Snark_work_lib.Work.Single.Spec.t
-     One_or_two.t
+     Mina_stdlib.One_or_two.t
      list
      Or_error.t
 

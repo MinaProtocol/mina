@@ -18,7 +18,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module State = struct
     module Seen_key = struct
       module T = struct
-        type t = Transaction_snark.Statement.t One_or_two.t
+        type t = Transaction_snark.Statement.t Mina_stdlib.One_or_two.t
         [@@deriving compare, sexp, to_yojson, hash]
       end
 
@@ -31,7 +31,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           ( Inputs.Transaction_witness.t
           , Inputs.Ledger_proof.Cached.t )
           Work_spec.t
-          One_or_two.t
+          Mina_stdlib.One_or_two.t
           list
       ; mutable jobs_seen : Job_status.t Seen_key.Map.t
       ; reassignment_wait : int
@@ -94,7 +94,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       O1trace.sync_thread "work_lib_all_unseen_works" (fun () ->
           List.filter t.available_jobs ~f:(fun js ->
               not
-              @@ Map.mem t.jobs_seen (One_or_two.map ~f:Work_spec.statement js) ) )
+              @@ Map.mem t.jobs_seen (Mina_stdlib.One_or_two.map ~f:Work_spec.statement js) ) )
 
     let remove_old_assignments t ~logger =
       O1trace.sync_thread "work_lib_remove_old_assignments" (fun () ->
@@ -119,7 +119,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     let set t x =
       t.jobs_seen <-
         Map.set t.jobs_seen
-          ~key:(One_or_two.map ~f:Work_spec.statement x)
+          ~key:(Mina_stdlib.One_or_two.map ~f:Work_spec.statement x)
           ~data:(Job_status.Assigned (Time.now ()))
   end
 
@@ -138,12 +138,12 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   end
 
   let get_expensive_work ~snark_pool ~fee
-      (jobs : ('a, 'b) Work_spec.t One_or_two.t list) :
-      ('a, 'b) Work_spec.t One_or_two.t list =
+      (jobs : ('a, 'b) Work_spec.t Mina_stdlib.One_or_two.t list) :
+      ('a, 'b) Work_spec.t Mina_stdlib.One_or_two.t list =
     O1trace.sync_thread "work_lib_get_expensive_work" (fun () ->
         List.filter jobs ~f:(fun job ->
             does_not_have_better_fee ~snark_pool ~fee
-              (One_or_two.map job ~f:Work_spec.statement) ) )
+              (Mina_stdlib.One_or_two.map job ~f:Work_spec.statement) ) )
 
   let all_pending_work ~snark_pool statements =
     List.filter statements ~f:(fun st ->
@@ -152,7 +152,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   let all_work ~snark_pool (state : State.t) =
     O1trace.sync_thread "work_lib_all_unseen_works" (fun () ->
         List.map state.available_jobs ~f:(fun job ->
-            let statement = One_or_two.map ~f:Work_spec.statement job in
+            let statement = Mina_stdlib.One_or_two.map ~f:Work_spec.statement job in
             let fee_prover_opt =
               Option.map
                 (Inputs.Snark_pool.get_completed_work snark_pool statement)
@@ -169,7 +169,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   (*Seen/Unseen jobs that are not in the snark pool yet*)
   let pending_work_statements ~snark_pool ~fee_opt (state : State.t) =
     let all_todo_statements =
-      List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
+      List.map state.available_jobs ~f:(Mina_stdlib.One_or_two.map ~f:Work_spec.statement)
     in
     let expensive_work statements ~fee =
       List.filter statements ~f:(does_not_have_better_fee ~snark_pool ~fee)
@@ -182,7 +182,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
   let completed_work_statements ~snark_pool (state : State.t) =
     let all_todo_statements =
-      List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
+      List.map state.available_jobs ~f:(Mina_stdlib.One_or_two.map ~f:Work_spec.statement)
     in
     all_completed_work ~snark_pool all_todo_statements
 end

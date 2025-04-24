@@ -87,7 +87,7 @@ module Diff_versioned : sig
       type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t
-            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+            * Ledger_proof.Stable.V2.t Mina_stdlib.One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving equal]
@@ -97,6 +97,6 @@ module Diff_versioned : sig
   type t = Resource_pool.Diff.Cached.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
-        * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+        * Ledger_proof.Cached.t Mina_stdlib.One_or_two.t Priced_proof.t
     | Empty
 end
