@@ -13,7 +13,6 @@
   integers
   ;; local libraries
   bounded_types
-  mina_generators
   sgn
   sgn_type
   transition_frontier_base
