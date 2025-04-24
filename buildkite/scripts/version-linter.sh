@@ -7,7 +7,7 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-TESTNET_NAME="${TESTNET_NAME:-devnet}"
+TESTNET_NAME="${TESTNET_NAME:-berkeley}"
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive

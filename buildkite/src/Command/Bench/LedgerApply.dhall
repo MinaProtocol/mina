@@ -10,11 +10,11 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
+
+let Network = ../../Constants/Network.dhall
 
 let Spec =
       { Type =
