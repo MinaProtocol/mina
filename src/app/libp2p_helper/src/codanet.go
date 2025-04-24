@@ -642,22 +642,26 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
-	} else if n != len(h.NodeStatus) {
-		// Keep writing the remaining data
-		remaining := h.NodeStatus[n:]
-		for len(remaining) > 0 {
-			written, err := s.Write(remaining)
-			if err != nil {
-				logger.Error("failed to write remaining data to stream", err)
-				return
-			}
-			if written == 0 {
-				// No progress made
-				logger.Error("unable to make progress writing to stream")
-				return
-			}
-			remaining = remaining[written:]
+	}
+
+	remaining := h.NodeStatus[n:]
+	// Keep writing the remaining data
+	// It could happen when:
+	// - working with large amounts of data in conditions of limited network bandwidth
+	// - interacting with overloaded nodes where partial writes may occur
+	// - under unstable network connection
+	for len(remaining) > 0 {
+		written, err := s.Write(remaining)
+		if err != nil {
+			logger.Error("failed to write remaining data to stream", err)
+			return
 		}
+		if written == 0 {
+			// No progress made
+			logger.Error("unable to make progress writing to stream")
+			return
+		}
+		remaining = remaining[written:]
 	}
 
 	logger.Debugf("wrote node status to stream %s", s.Protocol())
