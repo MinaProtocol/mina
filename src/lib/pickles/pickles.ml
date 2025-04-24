@@ -461,7 +461,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       open Impls.Step
 
-      let () = Snarky_backendless.Snark0.set_eval_constraints true
+      let () = Snarky_backendless.Snark.set_eval_constraints true
 
       (* Currently, a circuit must have at least 1 of every type of constraint. *)
       let dummy_constraints () =
@@ -992,7 +992,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     ( module struct
       let () = Backtrace.elide := false
 
-      let () = Snarky_backendless.Snark0.set_eval_constraints true
+      let () = Snarky_backendless.Snark.set_eval_constraints true
 
       module Statement = struct
         type t = unit
@@ -1967,7 +1967,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let () = Backtrace.elide := false
 
-      let () = Snarky_backendless.Snark0.set_eval_constraints true
+      let () = Snarky_backendless.Snark.set_eval_constraints true
 
       let%test_module "test domain size too large" =
         ( module Compile.Make_adversarial_test (struct

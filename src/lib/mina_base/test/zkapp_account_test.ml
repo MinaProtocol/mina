@@ -57,7 +57,7 @@ let checked_pop_reverses_push (module E : Events_list_intf) () =
                   in
                   go (event :: acc) tl_var
                 with
-                | Snarky_backendless.Snark0.Runtime_error (_, Failure s, _)
+                | Snarky_backendless.Snark.Runtime_error (_, Failure s, _)
                 | Failure s
                 when String.equal s E.empty_stack_msg
                 ->
