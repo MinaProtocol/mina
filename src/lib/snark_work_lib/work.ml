@@ -84,6 +84,21 @@ module Spec = struct
 
   let map ~f { instances; fee } =
     { instances = One_or_two.map ~f instances; fee }
+
+  let map_opt ~f_single { instances; fee } =
+    let open Option.Let_syntax in
+    let%map instances = One_or_two.Option.map ~f:f_single instances in
+    { instances; fee }
+
+  let map_biased ~f_single { instances; fee } =
+    let instances =
+      match instances with
+      | `One i ->
+          `One (f_single ~one_or_two:`One i)
+      | `Two (l, r) ->
+          `Two (f_single ~one_or_two:`First l, f_single ~one_or_two:`Second r)
+    in
+    { instances; fee }
 end
 
 module Result = struct
@@ -101,6 +116,13 @@ module Result = struct
       [@@deriving fields]
     end
   end]
+
+  let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
+    { proofs = One_or_two.map ~f:f_single proofs
+    ; metrics
+    ; spec = f_spec spec
+    ; prover
+    }
 end
 
 module Result_without_metrics = struct
@@ -111,4 +133,7 @@ module Result_without_metrics = struct
     ; fee : Currency.Fee.t
     }
   [@@deriving yojson, sexp]
+
+  let map ~f_proof { proofs; statements; prover; fee } =
+    { proofs = One_or_two.map ~f:f_proof proofs; statements; prover; fee }
 end
