@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 
-module Inputs = struct
+module Impl : Intf.Single_worker = struct
   module Worker_state = struct
     include Unit
 
