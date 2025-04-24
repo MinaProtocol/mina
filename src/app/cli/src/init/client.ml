@@ -4,11 +4,7 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-module Client = Graphql_lib.Client.Make (struct
-  let preprocess_variables_string = Fn.id
-
-  let headers = String.Map.empty
-end)
+module Client = Graphql_lib.Client
 
 module Args = struct
   open Command.Param
@@ -1341,7 +1337,7 @@ let import_key =
                !"\n😄 Imported account!\nPublic key: %s\n"
                (Public_key.Compressed.to_base58_check public_key)
          | `Graphql_error _ as e ->
-             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn e)
+             don't_wait_for (Client.Connection_error.ok_exn e)
        in
        match access_method with
        | `GraphQL graphql_endpoint -> (
@@ -1349,7 +1345,7 @@ let import_key =
            | Ok res ->
                print_result res
            | Error err ->
-               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) )
+               don't_wait_for (Client.Connection_error.ok_exn err) )
        | `Conf_dir conf_dir ->
            let%map res = do_local conf_dir in
            print_result res
@@ -1496,7 +1492,7 @@ let list_accounts =
          | Error (`Failed_request _ as err) ->
              Error err
          | Error (`Graphql_error _ as err) ->
-             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) ;
+             don't_wait_for (Client.Connection_error.ok_exn err) ;
              Ok ()
        in
        let do_local conf_dir =
@@ -1521,7 +1517,7 @@ let list_accounts =
            | Ok () ->
                ()
            | Error err ->
-               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) )
+               don't_wait_for (Client.Connection_error.ok_exn err) )
        | `Conf_dir conf_dir ->
            do_local conf_dir
        | `None -> (
