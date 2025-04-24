@@ -74,8 +74,6 @@ help:
 	@echo "heap_usage         - Build heap usage analysis tool"
 	@echo "help               - Display this help information"
 	@echo "libp2p_helper      - Build libp2p helper"
-	@echo "macos-portable     - Create portable macOS package"
-	@echo "macos-setup        - Set up development environment on macOS"
 	@echo "missing_blocks_auditor - Build missing blocks auditor tool"
 	@echo "ml-docs            - Generate OCaml documentation"
 	@echo "ocaml_checks       - Run OCaml version and config checks"
@@ -218,14 +216,6 @@ zkapp_limits: ocaml_checks
 
 dev: build
 
-macos-portable:
-	@rm -rf _build/coda-daemon-macos/
-	@rm -rf _build/coda-daemon-macos.zip
-	@./scripts/macos-portable.sh _build/default/src/app/cli/src/mina.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
-	@cp -a package/keys/. _build/coda-daemon-macos/keys/
-	@cd _build/coda-daemon-macos && zip -r ../coda-daemon-macos.zip .
-	@echo Find coda-daemon-macos.zip inside _build/
-
 update-graphql:
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build --profile=$(DUNE_PROFILE) graphql_schema.json
 
@@ -244,12 +234,6 @@ check-format: ocaml_checks
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
-
-#######################################
-## Environment setup
-
-macos-setup:
-	./scripts/macos-setup-brew.sh
 
 ########################################
 ## Artifacts
@@ -352,4 +336,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks ocaml_version ocaml_word_size ocaml_checks switch help
+.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks ocaml_version ocaml_word_size ocaml_checks switch help

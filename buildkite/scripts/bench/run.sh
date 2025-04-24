@@ -7,6 +7,7 @@ set -eox pipefail
 YELLOW_THRESHOLD="0.1"
 RED_THRESHOLD="0.3"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
+BRANCH="${BRANCH:-BUILDKITE_BRANCH}"
 
 source buildkite/scripts/bench/install.sh
 
@@ -34,4 +35,4 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
-python3 ./scripts/benchmarks test --benchmark ${BENCHMARK}  --branch ${BUILDKITE_BRANCH} --tmpfile ${BENCHMARK}.csv --yellow-threshold $YELLOW_THRESHOLD --red-threshold $RED_THRESHOLD $MAINLINE_BRANCHES $EXTRA_ARGS
+python3 ./scripts/benchmarks test --benchmark ${BENCHMARK}  --branch ${BRANCH} --tmpfile ${BENCHMARK}.csv --yellow-threshold $YELLOW_THRESHOLD --red-threshold $RED_THRESHOLD $MAINLINE_BRANCHES $EXTRA_ARGS

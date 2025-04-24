@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (libraries core_kernel)
  (preprocess
-  (pps ppx_version ppx_jane ppx_compare))
+  (pps ppx_compare ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Representation of direction in a binary tree"))

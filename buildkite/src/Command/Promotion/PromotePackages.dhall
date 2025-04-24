@@ -50,7 +50,14 @@ let PromotePackagesSpec =
           , to_channel : DebianChannel.Type
           , source_debian_repo : DebianRepo.Type
           , target_debian_repo : DebianRepo.Type
-          , new_tags : List Text
+          , new_tags :
+                  DebianVersions.DebVersion
+              ->  DebianChannel.Type
+              ->  Text
+              ->  DebianRepo.Type
+              ->  Text
+              ->  Text
+              ->  List Text
           , remove_profile_from_name : Bool
           , publish : Bool
           , depends_on : List Command.TaggedKey.Type
@@ -143,7 +150,14 @@ let promotePackagesToDockerSpecs
                                 , name = docker
                                 , version = promote_artifacts.version
                                 , codename = codename
-                                , new_tags = promote_artifacts.new_tags
+                                , new_tags =
+                                    promote_artifacts.new_tags
+                                      codename
+                                      promote_artifacts.to_channel
+                                      "\\\${BUILDKITE_BRANCH}"
+                                      promote_artifacts.target_debian_repo
+                                      "\\\${GITTAG}"
+                                      "\\\$(date \"+%Y%m%d\")"
                                 , network = promote_artifacts.network
                                 , publish = promote_artifacts.publish
                                 , remove_profile_from_name =

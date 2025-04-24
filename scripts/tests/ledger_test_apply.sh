@@ -47,7 +47,7 @@ $RUNTIME_LEDGER_APP --config-file $GENESIS_LEDGER --genesis-dir $TEMP_FOLDER/gen
 
 
 # Silently passing MINA_PRIVKEY_PASS & CODA_PRIVKEY
-CODA_PRIVKEY=$(cat $ACCOUNTS_FILE | jq -r .[0].sk) MINA_PRIVKEY_PASS=$MINA_PRIVKEY_PASS mina advanced wrap-key --privkey-path $SENDER
+CODA_PRIVKEY=$(cat $ACCOUNTS_FILE | jq -r .[0].sk) MINA_PRIVKEY_PASS=$MINA_PRIVKEY_PASS $MINA_APP advanced wrap-key --privkey-path $SENDER
 chmod 700 $SENDER
 
 mkdir $TEMP_FOLDER/genesis/ledger

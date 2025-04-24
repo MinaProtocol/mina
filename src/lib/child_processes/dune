@@ -11,32 +11,32 @@
  (preprocess
   (pps
    ppx_assert
-   ppx_mina
-   ppx_version
-   ppx_here
    ppx_custom_printf
    ppx_deriving.show
+   ppx_here
    ppx_inline_test
    ppx_let
-   ppx_pipebang))
+   ppx_mina
+   ppx_pipebang
+   ppx_version))
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
-  integers
-  async_unix
-  base.base_internalhash_types
-  core_kernel
   async
+  async_kernel
+  async_unix
+  base
+  base.base_internalhash_types
+  base.caml
   core
+  core_kernel
   ctypes
   ctypes.foreign
-  base
+  integers
   ppx_hash.runtime-lib
-  async_kernel
-  base.caml
+  ppx_inline_test.config
   sexplib0
   ;; local libraries
-  file_system
   error_json
+  file_system
   logger
   pipe_lib))

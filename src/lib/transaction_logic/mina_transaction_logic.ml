@@ -1085,7 +1085,7 @@ module Make (L : Ledger_intf.S) :
     module Actions = struct
       type t = Zkapp_account.Actions.t
 
-      let is_empty = List.is_empty
+      let is_empty = Zkapp_account.Actions.is_empty
 
       let push_events = Account_update.Actions.push_events
     end

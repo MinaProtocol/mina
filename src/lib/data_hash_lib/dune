@@ -6,40 +6,40 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
+  base
   core_kernel
   ppx_inline_test.config
-  base
   ;; local libraries
-  fields_derivers.graphql
-  fields_derivers
-  bitstring_lib
-  pickles
-  snark_params
-  outside_hash_image
-  random_oracle_input
-  bignum_bigint
-  snarky.backendless
-  fold_lib
-  snark_bits
-  codable
-  random_oracle
   base58_check
-  snarky.intf
-  fields_derivers.zkapps
+  bignum_bigint
+  bitstring_lib
+  codable
+  fields_derivers
+  fields_derivers.graphql
   fields_derivers.json
-  test_util
+  fields_derivers.zkapps
+  fold_lib
+  mina_wire_types
+  outside_hash_image
+  pickles
   ppx_version.runtime
-  mina_wire_types)
+  random_oracle
+  random_oracle_input
+  snark_bits
+  snark_params
+  snarky.backendless
+  snarky.intf
+  test_util)
  (preprocess
   (pps
-   ppx_mina
-   ppx_version
-   ppx_snarky
-   ppx_let
-   ppx_inline_test
-   ppx_sexp_conv
    ppx_compare
-   ppx_hash))
+   ppx_hash
+   ppx_inline_test
+   ppx_let
+   ppx_mina
+   ppx_sexp_conv
+   ppx_snarky
+   ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Data hash"))

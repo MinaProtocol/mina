@@ -408,7 +408,7 @@ module type Transaction_resource_pool_intf = sig
     -> vk_cache_db:Zkapp_vk_cache_tag.cache_db
     -> Config.t
 
-  val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
+  val member : t -> Transaction_hash.t -> bool
 
   val transactions :
     t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t

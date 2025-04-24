@@ -100,7 +100,7 @@ The database supports the following schema:
 | `Db_version`                          | `()`           | `int`                       | The current schema version stored in the database. |
 | `Root`                                | `()`           | `Root_data.Minimal.t`       | The auxiliary root data. |
 | `Best_tip`                            | `()`           | `State_hash.t`              | Pointer to the current best tip. |
-| `Protocol_states_for_root_scan_state` | `()`           | `Protocol_state.value list` | Auxilliary block headers required for constructing the scan state at the root |
+| `Protocol_states_for_root_scan_state` | `()`           | `Protocol_state.value list` | Auxiliary block headers required for constructing the scan state at the root |
 | `Transition`                          | `State_hash.t` | `External_transition.t`     | Block storage by state hash. |
 | `Arcs`                                | `State_hash.t` | `State_hash.t list`         | Successor hash storage by predecessor hash. |
 
@@ -110,7 +110,7 @@ TODO
 
 ### Root History
 
-TOOD
+TODO
 
 TODO: note about the fact it is currently an extension
 

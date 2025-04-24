@@ -41,7 +41,7 @@ module Stable = struct
   end
 end]
 
-type t = User_command.t Poly.t [@@deriving sexp, yojson]
+type t = User_command.t Poly.t [@@deriving sexp_of, to_yojson]
 
 type ('a, 'b, 'c) with_forest = ('a, 'b, 'c) User_command.with_forest Poly.t
 

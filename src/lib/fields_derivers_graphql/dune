@@ -4,13 +4,13 @@
  (libraries
   ;; opam libraries
   async_kernel
-  graphql_parser
-  graphql-async
-  graphql
-  fieldslib
   core_kernel
-  yojson
+  fieldslib
+  graphql
+  graphql-async
+  graphql_parser
   ppx_inline_test.config
+  yojson
   ;; local libraries
   fields_derivers)
  (instrumentation
@@ -20,9 +20,9 @@
  (preprocess
   (pps
    ppx_annot
-   ppx_jane
-   ppx_fields_conv
-   ppx_let
-   ppx_inline_test
    ppx_custom_printf
+   ppx_fields_conv
+   ppx_inline_test
+   ppx_jane
+   ppx_let
    ppx_version)))
