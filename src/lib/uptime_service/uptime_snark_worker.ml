@@ -3,12 +3,15 @@
 open Core_kernel
 open Async
 open Mina_base
-module Prod = Snark_worker__Prod.Inputs
+module Prod = Snark_worker.Single_worker.Prod
+module Work = Snark_work_lib
+
+let proof_cache_db = Proof_cache_tag.create_identity_db ()
 
 module Worker_state = struct
   module type S = sig
     val perform_single :
-         Sok_message.t * Prod.single_spec
+         Sok_message.t * Work.Selector.Single.Spec.Stable.Latest.t
       -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
   end
 
@@ -25,6 +28,9 @@ module Worker_state = struct
            let%bind (worker_state : Prod.Worker_state.t) =
              Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
+           let single_spec =
+             Work.Selector.Single.Spec.cache ~proof_cache_db single_spec
+           in
            Prod.perform_single worker_state ~message single_spec
        end in
       (module M : S) )
@@ -39,8 +45,10 @@ module Worker = struct
     type 'w functions =
       { perform_single :
           ( 'w
-          , Sok_message.t * Prod.single_spec
-          , (Ledger_proof.t * Time.Span.t) Or_error.t )
+          , Sok_message.Stable.Latest.t
+            * Work.Selector.Single.Spec.Stable.Latest.t
+          , (Ledger_proof.Stable.Latest.t * Time.Stable.Span.V1.t) Or_error.t
+          )
           F.t
       }
 
@@ -70,7 +78,9 @@ module Worker = struct
         in
         { perform_single =
             f
-              ( [%bin_type_class: Sok_message.Stable.Latest.t * Prod.single_spec]
+              ( [%bin_type_class:
+                  Sok_message.Stable.Latest.t
+                  * Work.Selector.Single.Spec.Stable.Latest.t]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_single )
