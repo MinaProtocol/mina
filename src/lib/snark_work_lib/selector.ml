@@ -29,6 +29,9 @@ module Single = struct
       Work.Single.Spec.map
         ~f_witness:Transaction_witness.write_all_proofs_to_disk
         ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
+
+    let transaction (t : t) =
+      Option.map (Work.Single.Spec.witness t) ~f:(fun w -> w.transaction)
   end
 end
 
@@ -79,4 +82,7 @@ module Result = struct
     Work.Result.map
       ~f_spec:(Spec.cache ~proof_cache_db)
       ~f_single:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
+
+  let transactions (t : t) =
+    One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
 end
