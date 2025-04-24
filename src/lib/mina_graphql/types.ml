@@ -638,7 +638,8 @@ module Snark_work_bundle = struct
             ~doc:"Snark work specification in json format"
             ~args:Arg.[]
             ~resolve:(fun _ { spec; _ } ->
-              One_or_two.to_yojson Work_selector.in_memory_work_to_yojson spec
+              One_or_two.to_yojson
+                Snark_work_lib.Selector.Single.Spec.Stable.Latest.to_yojson spec
               |> Yojson.Safe.to_string )
         ; field "snarkFee" ~typ:fee
             ~doc:"Fee if proof for the spec exists in snark pool"
