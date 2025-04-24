@@ -54,4 +54,6 @@ module Stable = struct
     include T
     include Register (T)
   end
+
+  module Latest = V2
 end]
