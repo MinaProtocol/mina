@@ -58,7 +58,6 @@
   mina_base.util
   ppx_version.runtime
   logger
-  zkapp_command_builder
   snark_keys_header
   proof_carrying_data)
  (preprocess
