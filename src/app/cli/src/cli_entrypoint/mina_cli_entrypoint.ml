@@ -2012,6 +2012,7 @@ let print_version_help coda_exe version =
   in
   List.iter lines ~f:(Core.printf "%s\n%!")
 
+  
 let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
