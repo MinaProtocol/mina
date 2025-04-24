@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
-module Prod = Snark_worker__Prod.Inputs
+module Single_worker = Snark_worker.Single_worker.Prod
+module Work = Snark_work_lib
 
 module Graphql_client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -33,16 +34,14 @@ let submit_graphql input graphql_endpoint =
       Caml.Format.printf "Graphql error: %s\n" s ;
       exit 1
 
-let perform (s : Prod.Worker_state.t) ~fee ~public_key
-    (spec :
-      ( Transaction_witness.Stable.Latest.t
-      , Ledger_proof.t )
-      Snark_work_lib.Work.Single.Spec.t
-      One_or_two.t ) =
-  One_or_two.Deferred_result.map spec ~f:(fun w ->
+let proof_cache_db = Proof_cache_tag.create_identity_db ()
+
+let perform (s : Single_worker.Worker_state.t) ~fee ~public_key
+    (instances : Work.Selector.Single.Spec.t One_or_two.t) =
+  One_or_two.Deferred_result.map instances ~f:(fun w ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
-        Prod.perform_single s
+        Single_worker.perform_single s
           ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
           w
       in
@@ -52,7 +51,8 @@ let perform (s : Prod.Worker_state.t) ~fee ~public_key
          { Snark_work_lib.Work.Result_without_metrics.proofs =
              One_or_two.map proofs_and_time ~f:fst
          ; statements =
-             One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
+             One_or_two.map instances
+               ~f:Snark_work_lib.Work.Single.Spec.statement
          ; prover = public_key
          ; fee
          } )
@@ -110,16 +110,14 @@ let command =
          Genesis_constants.Compiled.constraint_constants
        in
        let%bind worker_state =
-         Prod.Worker_state.create ~constraint_constants ~proof_level ()
+         Single_worker.Worker_state.create ~constraint_constants ~proof_level ()
        in
        let%bind spec =
          let spec_of_json json =
            match
              Yojson.Safe.from_string json
              |> One_or_two.of_yojson
-                  (Snark_work_lib.Work.Single.Spec.of_yojson
-                     Transaction_witness.Stable.Latest.of_yojson
-                     Ledger_proof.of_yojson )
+                  Work.Selector.Single.Spec.Stable.Latest.of_yojson
            with
            | Ok spec ->
                spec
@@ -146,6 +144,11 @@ let command =
                        (Sexp.of_string spec)
                  | None ->
                      failwith "Provide a spec either in json or sexp format" ) )
+       in
+       let spec =
+         One_or_two.map
+           ~f:(Work.Selector.Single.Spec.cache ~proof_cache_db)
+           spec
        in
        let public_key =
          Option.value
