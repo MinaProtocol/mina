@@ -32,12 +32,6 @@ To compile the `archive_blocks` executable, run:
 $ dune build src/app/archive_blocks/archive_blocks.exe --profile=dev
 ```
 
-Or use the following make command:
-
-```shell
-$ make archive_blocks
-```
-
 The executable will be built at:
 `_build/default/src/app/archive_blocks/archive_blocks.exe`
 
