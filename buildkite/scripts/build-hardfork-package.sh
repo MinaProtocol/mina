@@ -23,9 +23,8 @@ export DUNE_PROFILE
 export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
 [ ! -f "${FORKING_FROM_CONFIG_JSON}" ] && echo "${NETWORK_NAME} is not a known network name; check for existing network configs in 'genesis_ledgers/'" && exit 1
 
+# shellcheck disable=SC1090
 source ~/.profile
-
-MINA_COMMIT_SHA1=$(git rev-parse HEAD)
 
 echo "--- Download and extract previous network config"
 curl -o config.json.gz $CONFIG_JSON_GZ_URL
