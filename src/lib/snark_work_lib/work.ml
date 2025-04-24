@@ -1,5 +1,3 @@
-(* TODO: remove type generalizations #2594 *)
-
 open Core_kernel
 
 module Single = struct
