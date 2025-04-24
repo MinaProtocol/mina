@@ -98,7 +98,7 @@ module Wrap = struct
     (module R)
 end
 
-module Step = struct
+module Step (Inductive_rule : Inductive_rule.Intf) = struct
   module type S = sig
     type statement
 
