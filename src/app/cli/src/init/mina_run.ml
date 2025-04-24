@@ -466,7 +466,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
         ->
           [%str_log error]
             (Snark_worker.Generating_snark_work_failed
-               { error = Error_json.error_to_yojson error } ) ;
+               { error = Mina_stdlib.Error_json.error_to_yojson error } ) ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
           Deferred.unit )
     ]
@@ -677,7 +677,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
   Hashtbl.keys child_pids
   |> List.iter ~f:(fun pid ->
          ignore (Signal.send Signal.kill (`Pid pid) : [ `No_such_process | `Ok ]) ) ;
-  let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
+  let exn_json = Mina_stdlib.Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
     ~metadata:[ ("exn", exn_json) ] ;
@@ -703,7 +703,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
         no_report exn_json status
     | `Ok (Error e) ->
         [%log' fatal top_logger] "Exception when generating crash report: $exn"
-          ~metadata:[ ("exn", Error_json.error_to_yojson e) ] ;
+          ~metadata:[ ("exn", Mina_stdlib.Error_json.error_to_yojson e) ] ;
         no_report exn_json status
     | `Timeout ->
         [%log' fatal top_logger] "Timed out while generated crash report" ;

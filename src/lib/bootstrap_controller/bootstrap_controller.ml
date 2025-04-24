@@ -92,7 +92,7 @@ let received_bad_proof ({ context = (module Context); _ } as t) host e =
         ( Violated_protocol
         , Some
             ( "Bad ancestor proof: $error"
-            , [ ("error", Error_json.error_to_yojson e) ] ) ))
+            , [ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ) ))
 
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Db.peek_valid_tree root_sync_ledger)
@@ -169,7 +169,7 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
     with
     | Error e ->
         [%log error]
-          ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+          ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
           !"Could not get the proof of the root transition from the network: \
             $error" ;
         Deferred.return `Ignored
@@ -522,7 +522,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
             in
             [%log error]
               ~metadata:
-                [ ("error", Error_json.error_to_yojson e)
+                [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
                 ; ("state_hash", State_hash.to_yojson hash)
                 ; ( "expected_staged_ledger_hash"
                   , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
@@ -591,7 +591,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
             match local_state_sync_result with
             | Error e ->
                 [%log error]
-                  ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                  ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
                   "Local state sync failed: $error. Retry bootstrap" ;
                 Writer.close sync_ledger_writer ;
                 let this_cycle =

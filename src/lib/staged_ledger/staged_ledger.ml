@@ -86,7 +86,7 @@ module T = struct
                  , Transaction_snark.Statement.hash s
                  , Yojson.Safe.to_string
                    @@ Public_key.Compressed.to_yojson m.prover ) ) )
-            (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err))
+            (Yojson.Safe.pretty_to_string (Mina_stdlib.Error_json.error_to_yojson err))
       | Insufficient_work str ->
           str
       | Mismatched_statuses (transaction, status) ->
@@ -176,7 +176,7 @@ module T = struct
                 , `List
                     (List.map proofs ~f:(fun (_, s, _) ->
                          Transaction_snark.Statement.to_yojson s ) ) )
-              ; ("error", Error_json.error_to_yojson e)
+              ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
               ]
             "Verifier error when checking transaction snark for statement \
              $statement: $error" ;
@@ -1121,7 +1121,7 @@ module T = struct
                   [ ( "scan_state"
                     , `String (Scan_state.snark_job_list_json t.scan_state) )
                   ; ("data", data_json)
-                  ; ("error", Error_json.error_to_yojson e)
+                  ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
                   ; ("prefix", `String log_prefix)
                   ]
                 !"$prefix: Unexpected error when applying diff data $data to \
@@ -1277,7 +1277,7 @@ module T = struct
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
           [%log error]
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+            ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
             !"Error updating metrics after applying staged_ledger diff: $error" )
     in
     res
@@ -1770,7 +1770,7 @@ module T = struct
             res''
         | Error e ->
             [%log' error t.logger] "Error when increasing coinbase: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+              ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -2053,7 +2053,7 @@ module T = struct
                   [%log error]
                     ~metadata:
                       [ ("user_command", User_command.Valid.to_yojson txn)
-                      ; ("error", Error_json.error_to_yojson e)
+                      ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
                       ]
                     "Staged_ledger_diff creation: Skipping user command: \
                      $user_command due to error: $error" ) ;

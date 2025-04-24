@@ -123,7 +123,7 @@ module Worker_state = struct
                    result
                | Error e ->
                    [%log error]
-                     ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                     ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
@@ -350,7 +350,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
     ~transaction_verification_key () : t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
-      ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
+      ~metadata:[ ("err", Mina_stdlib.Error_json.error_to_yojson err) ] ;
     Error.raise err
   in
   let create_worker () =
@@ -374,7 +374,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
             (fun exn ->
               let err = Error.of_exn ~backtrace:`Get exn in
               [%log error] "Error from verifier worker $err"
-                ~metadata:[ ("err", Error_json.error_to_yojson err) ] ) )
+                ~metadata:[ ("err", Mina_stdlib.Error_json.error_to_yojson err) ] ) )
         (fun () ->
           Worker.spawn_in_foreground_exn
             ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
@@ -460,7 +460,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
                   [%log info]
                     "Saw an exception while trying to wait for the verifier \
                      process: $exn"
-                    ~metadata:[ ("exn", Error_json.error_to_yojson err) ]
+                    ~metadata:[ ("exn", Mina_stdlib.Error_json.error_to_yojson err) ]
               | _ ->
                   () ) ;
               match Signal.send Signal.kill (`Pid pid) with
@@ -483,7 +483,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
                  ]
              | Error err ->
                  [ ("exit_status", `String "Unknown: wait threw an error")
-                 ; ("exn", Error_json.error_to_yojson err)
+                 ; ("exn", Mina_stdlib.Error_json.error_to_yojson err)
                  ]
            in
            [%log info] "verifier successfully stopped"
@@ -503,7 +503,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
              | Error err ->
                  [%log error]
                    "Failed to create a new verifier process: $err. Retrying..."
-                   ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
+                   ~metadata:[ ("err", Mina_stdlib.Error_json.error_to_yojson err) ] ;
                  (* Wait 5s before retrying. *)
                  let%bind () = after Time.Span.(of_sec 5.) in
                  try_create_worker ()
@@ -572,9 +572,9 @@ let verify_transaction_snarks { worker; logger } ts =
         | Ok (Ok ()) ->
             `String "ok"
         | Error err ->
-            Error_json.error_to_yojson (Error.tag ~tag:"Verifier issue" err)
+            Mina_stdlib.Error_json.error_to_yojson (Error.tag ~tag:"Verifier issue" err)
         | Ok (Error err) ->
-            Error_json.error_to_yojson err
+            Mina_stdlib.Error_json.error_to_yojson err
       in
       [%log trace] "verify $n transaction_snarks (after)!"
         ~metadata:(("result", res_json) :: metadata) ;

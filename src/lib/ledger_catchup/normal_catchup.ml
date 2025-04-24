@@ -120,7 +120,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
           Ok (`In_frontier hash) )
   | Error (`Verifier_error error) ->
       [%log warn]
-        ~metadata:[ ("error", Error_json.error_to_yojson error) ]
+        ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson error) ]
         "verifier threw an error while verifying transiton queried during \
          ledger catchup: $error" ;
       Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
@@ -523,7 +523,7 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
                     { e with data } ) ) )
       | Error (`Verifier_error error) ->
           [%log warn]
-            ~metadata:[ ("error", Error_json.error_to_yojson error) ]
+            ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson error) ]
             "verifier threw an error while verifying transition queried during \
              ledger catchup: $error" ;
           Deferred.Or_error.fail
@@ -877,7 +877,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                    Catchup_jobs.decr ()
              | Error e ->
                  [%log warn]
-                   ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                   ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
                    "Catchup process failed -- unable to receive valid data \
                     from peers or transition frontier progressed faster than \
                     catchup data received. See error for details: $error" ;

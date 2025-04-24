@@ -335,7 +335,7 @@ struct
         in
         let log_and_punish ?(punish = true) statement e =
           let metadata =
-            [ ("error", Error_json.error_to_yojson e)
+            [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
             ; ("work_id", `Int (Transaction_snark.Statement.hash statement))
             ]
             @ metadata
@@ -464,7 +464,7 @@ struct
         | Error e ->
             [%log' error t.logger]
               ~metadata:
-                ( [ ("error", Error_json.error_to_yojson e)
+                ( [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
                   ; ( "work_ids"
                     , Transaction_snark_work.Statement.compact_json statements
                     )

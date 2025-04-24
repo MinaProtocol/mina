@@ -239,7 +239,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
             [%log debug]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", Error_json.error_to_yojson e)
+                ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
                 ]
               "Couldn't get best tip from peer: $error" ;
             return None
@@ -264,7 +264,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 [%log warn]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
-                    ; ("error", Error_json.error_to_yojson e)
+                    ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
                     ]
                   "Peer sent us bad proof for their best tip" ;
                 let%map () =

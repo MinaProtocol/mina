@@ -52,13 +52,13 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         ; ( "protocol_state"
           , Header.protocol_state header |> Protocol_state.value_to_yojson )
         ; ("proof", Header.protocol_state_proof header |> Proof.to_yojson)
-        ; ("error", Error_json.error_to_yojson err)
+        ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
         ]
     | `Invalid_delta_block_chain_proof ->
         [ ("reason", `String "invalid delta transition chain proof") ]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
-        ; ("error", Error_json.error_to_yojson err)
+        ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
         ]
     | `Mismatched_protocol_version ->
         [ ("reason", `String "protocol version mismatch") ]
@@ -87,7 +87,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
      rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
-      let error_metadata = [ ("error", Error_json.error_to_yojson err) ] in
+      let error_metadata = [ ("error", Mina_stdlib.Error_json.error_to_yojson err) ] in
       [%log error]
         ~metadata:
           (error_metadata @ [ ("state_hash", State_hash.to_yojson state_hash) ])

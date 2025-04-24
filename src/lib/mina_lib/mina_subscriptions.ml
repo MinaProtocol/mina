@@ -235,7 +235,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                              | Error e ->
                                  [%log warn]
                                    ~metadata:
-                                     [ ("error", Error_json.error_to_yojson e)
+                                     [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
                                      ; ("command", `String command)
                                      ]
                                    "Uploading block to gcloud with command \

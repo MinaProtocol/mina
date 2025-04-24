@@ -1596,7 +1596,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
             [%log debug]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", Error_json.error_to_yojson e)
+                ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
                 ]
               "Failed to fetch completed snarks from peer: $error" ;
             []
@@ -1669,7 +1669,7 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
                       )
                     ; ( "error"
                       , Network_pool.Intf.Verification_error.to_error e
-                        |> Error_json.error_to_yojson )
+                        |> Mina_stdlib.Error_json.error_to_yojson )
                     ]
                   "Failed to verify snark work from peer: $peer" ;
                 Deferred.unit )
@@ -1736,7 +1736,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     let err = Error.of_exn ~backtrace:`Get exn in
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side prover server: $exn"
-                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
+                      ~metadata:[ ("exn", Mina_stdlib.Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_prover_subprocess" (fun () ->
                     let%bind prover =
@@ -1761,7 +1761,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side verifier server: \
                        $exn"
-                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
+                      ~metadata:[ ("exn", Mina_stdlib.Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_verifier_subprocess" (fun () ->
                     let%bind blockchain_verification_key =
@@ -1811,7 +1811,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side vrf evaluator \
                        server: $exn"
-                      ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
+                      ~metadata:[ ("exn", Mina_stdlib.Error_json.error_to_yojson err) ] ) )
               (fun () ->
                 O1trace.thread "manage_vrf_evaluator_subprocess" (fun () ->
                     Vrf_evaluator.create ~commit_id ~constraint_constants
@@ -1842,7 +1842,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                         [%log' fatal config.logger]
                           "unhandled exception when creating uptime service \
                            SNARK worker: $exn, terminating daemon"
-                          ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ;
+                          ~metadata:[ ("exn", Mina_stdlib.Error_json.error_to_yojson err) ] ;
                         (* make sure Async shutdown handlers are called *)
                         don't_wait_for (Async.exit 1) ) )
                   (fun () ->
@@ -2128,7 +2128,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   | Error e ->
                       [%log' error config.logger]
                         "Failed to submit user commands: $error"
-                        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                        ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ;
                       result_cb (Error e) ;
                       Deferred.unit )
               | Zkapp_command_command_inputs zkapp_commands ->

@@ -5,7 +5,7 @@ type invalid =
   [ `Invalid_keys of Signature_lib.Public_key.Compressed.Stable.Latest.t list
   | `Invalid_signature of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list
-  | `Invalid_proof of (Error.t[@to_yojson Error_json.error_to_yojson])
+  | `Invalid_proof of (Error.t[@to_yojson Mina_stdlib.Error_json.error_to_yojson])
   | `Missing_verification_key of
     Signature_lib.Public_key.Compressed.Stable.Latest.t list
   | `Unexpected_verification_key of

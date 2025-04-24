@@ -76,7 +76,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                 [%log warn] "Could not read configuration from $config_file"
                   ~metadata:
                     [ ("config_file", `String config_file)
-                    ; ("error", Error_json.error_to_yojson err)
+                    ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
                     ] ;
                 return None ) )
   in
@@ -127,7 +127,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                   (Option.value ~default:"not provided"
                      (let%bind.Option ledger = config.ledger in
                       Option.first_some ledger.name ledger.hash ) ) )
-            ; ("error", Error_json.error_to_yojson err)
+            ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
             ]
         in
         [%log info]
@@ -1057,7 +1057,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             List.map monitors ~f:(fun monitor ->
                 match Async_kernel.Monitor.sexp_of_t monitor with
                 | Sexp.List sexps ->
-                    `List (List.map ~f:Error_json.sexp_record_to_yojson sexps)
+                    `List (List.map ~f:Mina_stdlib.Error_json.sexp_record_to_yojson sexps)
                 | Sexp.Atom _ ->
                     failwith "Expected a sexp list" )
           in
@@ -1758,7 +1758,7 @@ let internal_commands logger ~itn_features =
                   [%log info] "Successfully worked"
               | Error err ->
                   [%log error] "Work didn't work: $err"
-                    ~metadata:[ ("err", Error_json.error_to_yojson err) ] )
+                    ~metadata:[ ("err", Mina_stdlib.Error_json.error_to_yojson err) ] )
           | `Eof ->
               failwith "early EOF while reading sexp") )
   ; ( "run-verifier"
@@ -1878,7 +1878,7 @@ let internal_commands logger ~itn_features =
               exit 0
           | Ok (Error err) ->
               printf "Proofs failed to verify:\n%s\n"
-                (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+                (Yojson.Safe.pretty_to_string (Mina_stdlib.Error_json.error_to_yojson err)) ;
               exit 1
           | Error err ->
               printf "Failed while verifying proofs:\n%s"
@@ -1979,7 +1979,7 @@ let internal_commands logger ~itn_features =
               exit 0
           | Error err ->
               Format.eprintf "Failed to generate block@.%s@."
-                (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
+                (Yojson.Safe.to_string @@ Mina_stdlib.Error_json.error_to_yojson err) ;
               exit 1) )
   ]
 

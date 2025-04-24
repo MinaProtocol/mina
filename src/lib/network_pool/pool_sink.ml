@@ -123,7 +123,7 @@ module Base
                         "Refusing to rebroadcast $diff. Verification error: \
                          $error"
                         ~metadata:
-                          (("error", Error_json.error_to_yojson err) :: metadata) ;
+                          (("error", Mina_stdlib.Error_json.error_to_yojson err) :: metadata) ;
                       (*reject incoming messages*)
                       BC.error err cb ;
                       None

@@ -1038,7 +1038,7 @@ struct
         in
         let is_local = Envelope.Sender.(equal Local sender) in
         let metadata =
-          [ ("error", Error_json.error_to_yojson e)
+          [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
           ; ("sender", Envelope.Sender.to_yojson sender)
           ]
         in
@@ -1210,7 +1210,7 @@ struct
             let err = Verifier.invalid_to_error invalid in
             [%log' error t.logger]
               "Batch verification failed when adding from gossip"
-              ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+              ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson err) ] ;
             let%map.Deferred () =
               Trust_system.record_envelope_sender t.config.trust_system t.logger
                 sender

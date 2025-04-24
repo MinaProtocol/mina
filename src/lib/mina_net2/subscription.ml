@@ -94,7 +94,7 @@ let publish_raw ~logger ~helper ~topic data =
   | Error e ->
       [%log' error logger] "error while publishing message on $topic: $err"
         ~metadata:
-          [ ("topic", `String topic); ("err", Error_json.error_to_yojson e) ]
+          [ ("topic", `String topic); ("err", Mina_stdlib.Error_json.error_to_yojson e) ]
 
 let publish ~logger ~helper { topic; encode; _ } message =
   publish_raw ~logger ~helper ~topic (encode message)

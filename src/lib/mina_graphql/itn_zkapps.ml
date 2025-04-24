@@ -267,7 +267,7 @@ let send_zkapps ~(genesis_constants : Genesis_constants.t)
         [%log error]
           "Error $error creating zkapp transaction, stopping handle %s"
           (Uuid.to_string uuid)
-          ~metadata:[ ("error", Error_json.error_to_yojson @@ Error.of_exn e) ] ;
+          ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson @@ Error.of_exn e) ] ;
         Deferred.return (`Finished ())
     | Ok None ->
         repeat tm_next counter

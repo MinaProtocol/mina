@@ -172,14 +172,14 @@ let validate_transaction =
                        Failed with error:%s@]@."
                       (Yojson.Safe.pretty_to_string transaction_json)
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err) ) )
+                         (Mina_stdlib.Error_json.error_to_yojson err) ) )
               jsons )
       with
     | Ok () ->
         ()
     | Error err ->
         Format.eprintf "@[<v>Error:@,%s@,@]@."
-          (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+          (Yojson.Safe.pretty_to_string (Mina_stdlib.Error_json.error_to_yojson err)) ;
         Format.printf "Invalid transaction.@." ;
         Core_kernel.exit 1 ) ;
     if !num_fails > 0 then (
@@ -342,7 +342,7 @@ module Vrf = struct
                 | Error err ->
                     Format.eprintf "@[<v>Error:@,%s@,@]@."
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err) ) ;
+                         (Mina_stdlib.Error_json.error_to_yojson err) ) ;
                     `Repeat () )
         | Error err ->
             eprintf "Could not read the specified keypair: %s\n"
@@ -396,7 +396,7 @@ module Vrf = struct
             | Error err ->
                 Format.eprintf "@[<v>Error:@,%s@,@]@."
                   (Yojson.Safe.pretty_to_string
-                     (Error_json.error_to_yojson err) ) ;
+                     (Mina_stdlib.Error_json.error_to_yojson err) ) ;
                 `Repeat () )
       in
       exit 0 )

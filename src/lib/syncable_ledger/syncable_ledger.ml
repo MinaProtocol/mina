@@ -416,7 +416,7 @@ end = struct
                     Either.First answer
                 | Error e ->
                     [%log error]
-                      ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                      ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
                       "When handling What_child_hashes request, the following \
                        error happended: $error" ;
                     Either.Second

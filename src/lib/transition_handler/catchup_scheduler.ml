@@ -111,7 +111,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
             [%log debug]
               !"Error during buildup breadcrumbs inside catchup_scheduler: \
                 $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+              ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
                 Rose_tree.iter subtree ~f:(fun (cached_transition, vc) ->
                     (* TODO consider rejecting the callback in some cases,

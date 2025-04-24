@@ -151,7 +151,7 @@ let report_transaction_inclusion_failures ~commit_id ~logger failed_txns =
           let element =
             `Assoc
               [ ("transaction", User_command.Valid.to_yojson txn)
-              ; ("error", Error_json.error_to_yojson error)
+              ; ("error", Mina_stdlib.Error_json.error_to_yojson error)
               ]
           in
           let element_size = count_size element in
@@ -303,7 +303,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 , pending_coinbase_update )
           | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
               [%log error] "Failed to apply the diff: $error"
-                ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ;
               None
           | Error e ->
               ( match diff with
@@ -457,7 +457,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         "Prover failed to prove freshly generated transition: $error"
       in
       let metadata =
-        [ ("error", Error_json.error_to_yojson err)
+        [ ("error", Mina_stdlib.Error_json.error_to_yojson err)
         ; ("prev_state", Protocol_state.value_to_yojson previous_protocol_state)
         ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
         ; ("next_state", Protocol_state.value_to_yojson protocol_state)
@@ -529,7 +529,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
          staged ledger diff: $error"
       in
       let metadata =
-        [ ("error", Error_json.error_to_yojson e)
+        [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
         ; ("diff", Staged_ledger_diff.Stable.Latest.to_yojson staged_ledger_diff)
         ]
       in
@@ -672,7 +672,7 @@ let genesis_breadcrumb_creator ~context:(module Context : CONTEXT) prover =
             return (Ok res)
         | Error err ->
             [%log error] "Failed to generate genesis breadcrumb: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+              ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson err) ] ;
             if retries > 0 then go (retries - 1)
             else (
               Ivar.fill genesis_breadcrumb_ivar (Error err) ;
@@ -758,7 +758,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           | Error err ->
               [%log error]
                 "Aborting block production: cannot generate a genesis proof"
-                ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
+                ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson err) ] ;
               Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
         else
           return
