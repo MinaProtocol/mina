@@ -98,6 +98,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let logger = Logger.create ()
 
   let run network t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Malleable_error.Let_syntax in
     let%bind () =
       section_hard "Wait for nodes to initialize"
@@ -207,9 +208,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Malleable_error.lift
-      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+      @@ Transaction_snark.For_tests.deploy_snapp ~signature_kind
+           ~constraint_constants spec
     in
     let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let memo = Signed_command_memo.empty in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         let account_updates_hash = Zkapp_command.Call_forest.hash call_forest in
@@ -231,17 +234,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           transaction_commitment ~memo_hash
           ~fee_payer_hash:
             (Zkapp_command.Call_forest.Digest.Account_update.create
+               ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
           Zkapp_command.t =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let fee_payer =
           match fee_payer with
           | { body = { public_key; _ }; _ }
             when Public_key.Compressed.equal public_key account_a_pk ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign account_a_kp.private_key
+                  Schnorr.Chunked.sign ~signature_kind account_a_kp.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -261,7 +266,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign account_a_kp.private_key
+                      (Schnorr.Chunked.sign ~signature_kind
+                         account_a_kp.private_key
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->
@@ -274,7 +280,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest1 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update1
-      |> Zkapp_command.Call_forest.cons (update_vk vk1)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk1)
     in
     let zkapp_command_update_vk1 =
       call_forest_to_zkapp ~call_forest:call_forest1
@@ -283,7 +289,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest2 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update1
-      |> Zkapp_command.Call_forest.cons (update_vk vk2)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk2)
     in
     let zkapp_command_update_vk2_refers_vk1 =
       call_forest_to_zkapp ~call_forest:call_forest2
@@ -292,7 +298,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest_update_vk2 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update2
-      |> Zkapp_command.Call_forest.cons (update_vk vk2)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk2)
     in
     let zkapp_command_update_vk2 =
       call_forest_to_zkapp ~call_forest:call_forest_update_vk2
@@ -376,23 +382,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
       let%bind invalid_update_vk_perm_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_proof
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_invalid_proof
       in
       let%bind invalid_update_vk_perm_impossible =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_invalid_impossible
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_invalid_impossible
       in
       let%bind update_vk_perm_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_proof
       in
       let%map update_vk_perm_impossible =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_impossible
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_impossible
       in
       ( invalid_update_vk_perm_proof
       , invalid_update_vk_perm_impossible
@@ -444,18 +450,18 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       let%bind failed_update_vk_signature_1 =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_failed_signature_1
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_failed_signature_1
       in
       let%bind failed_update_vk_signature_2 =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_failed_signature_2
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_failed_signature_2
       in
       let%map update_vk_proof =
         Malleable_error.lift
-        @@ Transaction_snark.For_tests.update_states ~constraint_constants
-             spec_proof
+        @@ Transaction_snark.For_tests.update_states ~signature_kind
+             ~constraint_constants spec_proof
       in
       ( failed_update_vk_signature_1
       , failed_update_vk_signature_2

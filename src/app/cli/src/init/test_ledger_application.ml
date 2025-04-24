@@ -75,7 +75,9 @@ let mk_tx ~event_elements ~action_elements
     ; preconditions
     }
   in
-  Transaction_snark.For_tests.multiple_transfers ~constraint_constants multispec
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  Transaction_snark.For_tests.multiple_transfers ~signature_kind
+    ~constraint_constants multispec
 
 let generate_protocol_state_stub ~consensus_constants ~constraint_constants
     ledger =

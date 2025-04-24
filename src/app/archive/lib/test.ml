@@ -18,10 +18,12 @@ let%test_module "Archive node unit tests" =
 
     let genesis_constants = precomputed_values.genesis_constants
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 

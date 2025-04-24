@@ -1738,6 +1738,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                       "unhandled exception from daemon-side prover server: $exn"
                       ~metadata:[ ("exn", Error_json.error_to_yojson err) ] ) )
               (fun () ->
+                let signature_kind = Mina_signature_kind.t_DEPRECATED in
                 O1trace.thread "manage_prover_subprocess" (fun () ->
                     let%bind prover =
                       Prover.create ~commit_id ~logger:config.logger
@@ -1745,7 +1746,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
-                        ~constraint_constants ~pids:config.pids
+                        ~signature_kind ~constraint_constants ~pids:config.pids
                         ~conf_dir:config.conf_dir ()
                     in
                     let%map () = set_itn_data (module Prover) prover in
@@ -1772,13 +1773,15 @@ let create ~commit_id ?wallets (config : Config.t) =
                       Prover.get_transaction_verification_key prover
                       >>| Or_error.ok_exn
                     in
+                    let signature_kind = Mina_signature_kind.t_DEPRECATED in
                     let%bind verifier =
                       Verifier.create ~commit_id ~logger:config.logger
                         ~enable_internal_tracing:
                           (Internal_tracing.is_enabled ())
                         ~internal_trace_filename:"verifier-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
-                        ~pids:config.pids ~conf_dir:(Some config.conf_dir)
+                        ~signature_kind ~pids:config.pids
+                        ~conf_dir:(Some config.conf_dir)
                         ~blockchain_verification_key
                         ~transaction_verification_key ()
                     in
@@ -1848,7 +1851,9 @@ let create ~commit_id ?wallets (config : Config.t) =
                   (fun () ->
                     O1trace.thread "manage_uptime_snark_worker_subprocess"
                       (fun () ->
+                        let signature_kind = Mina_signature_kind.t_DEPRECATED in
                         Uptime_service.Uptime_snark_worker.create
+                          ~signature_kind
                           ~constraint_constants:
                             config.precomputed_values.constraint_constants
                           ~logger:config.logger ~pids:config.pids ) )

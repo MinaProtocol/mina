@@ -102,8 +102,8 @@ let%test_module "Access permission tests" =
       in
       let account_updates =
         []
-        |> Zkapp_command.Call_forest.cons account_update
-        |> Zkapp_command.Call_forest.cons deploy_account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
       in
       let transaction_commitment : Zkapp_command.Transaction_commitment.t =
         (* TODO: This is a pain. *)
@@ -128,7 +128,7 @@ let%test_module "Access permission tests" =
           transaction_commitment
           ~memo_hash:(Signed_command_memo.hash memo)
           ~fee_payer_hash:
-            (Zkapp_command.Digest.Account_update.create
+            (Zkapp_command.Digest.Account_update.create ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       (* TODO: Make this better. *)
@@ -140,7 +140,7 @@ let%test_module "Access permission tests" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -160,7 +160,7 @@ let%test_module "Access permission tests" =
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign sk
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->

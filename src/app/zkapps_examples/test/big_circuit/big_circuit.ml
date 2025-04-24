@@ -65,8 +65,8 @@ let deploy_account_update : Account_update.t =
 
 let account_updates =
   []
-  |> Zkapp_command.Call_forest.cons account_update
-  |> Zkapp_command.Call_forest.cons deploy_account_update
+  |> Zkapp_command.Call_forest.cons ~signature_kind account_update
+  |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
 
 let memo = Signed_command_memo.empty
 
@@ -87,7 +87,7 @@ let full_commitment =
   Zkapp_command.Transaction_commitment.create_complete transaction_commitment
     ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:
-      (Zkapp_command.Digest.Account_update.create
+      (Zkapp_command.Digest.Account_update.create ~signature_kind
          (Account_update.of_fee_payer fee_payer) )
 
 let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
@@ -98,7 +98,7 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
       when Public_key.Compressed.equal public_key pk_compressed ->
         { fee_payer with
           authorization =
-            Schnorr.Chunked.sign sk
+            Schnorr.Chunked.sign ~signature_kind sk
               (Random_oracle.Input.Chunked.field full_commitment)
         }
     | fee_payer ->
@@ -118,7 +118,7 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
           { account_update with
             authorization =
               Control.Poly.Signature
-                (Schnorr.Chunked.sign sk
+                (Schnorr.Chunked.sign ~signature_kind sk
                    (Random_oracle.Input.Chunked.field commitment) )
           }
       | account_update ->

@@ -2369,6 +2369,8 @@ let%test_module "staged ledger tests" =
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let zkapp_cmd_limit_hardcap = 200
 
     let logger = Logger.null ()
@@ -2380,8 +2382,8 @@ let%test_module "staged ledger tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     let find_vk ledger =
       Zkapp_command.Verifiable.load_vk_from_ledger ~get:(Ledger.get ledger)
@@ -2933,6 +2935,7 @@ let%test_module "staged ledger tests" =
     let gen_zkapps ?ledger_init_state ?failure ~num_zkapps zkapps_per_iter :
         (Ledger.t * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Quickcheck.Generator.Let_syntax in
       let%bind zkapp_command_and_fee_payer_keypairs, ledger =
         Mina_generators.User_command_generators
@@ -2945,7 +2948,8 @@ let%test_module "staged ledger tests" =
           | Zkapp_command zkapp_command_valid, _fee_payer_keypair, keymap ->
               let zkapp_command_with_auths =
                 Async.Thread_safe.block_on_async_exn (fun () ->
-                    Zkapp_command_builder.replace_authorizations ~keymap
+                    Zkapp_command_builder.replace_authorizations ~signature_kind
+                      ~keymap
                       (Zkapp_command.Valid.forget zkapp_command_valid) )
               in
               let valid_zkapp_command_with_auths : Zkapp_command.Valid.t =
@@ -4481,8 +4485,9 @@ let%test_module "staged ledger tests" =
               ; preconditions = None
               }
             in
+            let signature_kind = Mina_signature_kind.t_DEPRECATED in
             let%map zkapp_command =
-              Transaction_snark.For_tests.update_states
+              Transaction_snark.For_tests.update_states ~signature_kind
                 ~zkapp_prover_and_vk:(zkapp_prover, Async.Deferred.return vk)
                 ~constraint_constants spec
             in
@@ -4769,10 +4774,11 @@ let%test_module "staged ledger tests" =
 
     let mk_basic_zkapp_command ?prover ~keymap ~fee ~fee_payer_pk
         ~fee_payer_nonce nodes =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Zkapp_command_builder in
       mk_forest nodes
-      |> mk_zkapp_command ~fee ~fee_payer_pk ~fee_payer_nonce
-      |> replace_authorizations ?prover ~keymap
+      |> mk_zkapp_command ~signature_kind ~fee ~fee_payer_pk ~fee_payer_nonce
+      |> replace_authorizations ~signature_kind ?prover ~keymap
 
     let%test_unit "Setting verification keys across differing accounts" =
       test_staged_ledger_diff_validity ~expectation:`Accept
@@ -4980,11 +4986,12 @@ let%test_module "staged ledger tests" =
                       ~permissions:snapp_permissions ~vk ~ledger:l snapp_pk ;
                     l
                   in
+                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   let%bind zkapp_command =
                     let zkapp_prover_and_vk =
                       (zkapp_prover, Async.Deferred.return vk)
                     in
-                    Transaction_snark.For_tests.update_states
+                    Transaction_snark.For_tests.update_states ~signature_kind
                       ~zkapp_prover_and_vk ~constraint_constants test_spec
                   in
                   let valid_zkapp_command =
@@ -5113,7 +5120,8 @@ let%test_module "staged ledger tests" =
                   in
                   let%bind zkapp_command =
                     single_account_update
-                      ~chain:Mina_signature_kind.(Other_network "invalid")
+                      ~signature_kind:
+                        Mina_signature_kind.(Other_network "invalid")
                       ~zkapp_prover_and_vk ~constraint_constants spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
@@ -5163,8 +5171,8 @@ let%test_module "staged ledger tests" =
                         = 1 ) ;
 
                       let%bind verifier_full =
-                        Verifier.For_tests.default ~constraint_constants ~logger
-                          ~proof_level:Full ()
+                        Verifier.For_tests.default ~signature_kind
+                          ~constraint_constants ~logger ~proof_level:Full ()
                       in
                       match%map
                         Sl.apply ~constraint_constants ~global_slot !sl

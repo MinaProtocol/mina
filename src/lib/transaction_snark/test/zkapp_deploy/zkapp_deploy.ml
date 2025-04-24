@@ -16,6 +16,8 @@ let%test_module "zkApp deploy tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let signature_kind = U.signature_kind
+
     let%test_unit "create a new zkAapp account/deploy a smart contract" =
       let open Mina_transaction_logic.For_tests in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -40,8 +42,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -79,8 +81,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -112,8 +114,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -146,8 +148,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -180,8 +182,8 @@ let%test_module "zkApp deploy tests" =
                   in
                   let zkapp_command =
                     Async.Thread_safe.block_on_async_exn (fun () ->
-                        Transaction_snark.For_tests.deploy_snapp test_spec
-                          ~constraint_constants )
+                        Transaction_snark.For_tests.deploy_snapp ~signature_kind
+                          test_spec ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)

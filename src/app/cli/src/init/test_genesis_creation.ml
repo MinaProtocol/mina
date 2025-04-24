@@ -23,6 +23,7 @@ let time_genesis_creation () =
       ; internal_trace_filename = None
       ; logger
       ; proof_level = Full
+      ; signature_kind = Mina_signature_kind.Testnet
       ; constraint_constants =
           Genesis_constants.For_unit_tests.Constraint_constants.t
       ; commit_id

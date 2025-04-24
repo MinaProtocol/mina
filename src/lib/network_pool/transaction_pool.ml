@@ -1672,6 +1672,8 @@ let%test_module _ =
 
     let proof_level = precomputed_values.proof_level
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let genesis_constants = precomputed_values.genesis_constants
 
     let minimum_fee =
@@ -1683,8 +1685,8 @@ let%test_module _ =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     let `VK vk, `Prover prover =
       Transaction_snark.For_tests.create_trivial_snapp ()
@@ -1835,6 +1837,7 @@ let%test_module _ =
 
     let replace_valid_zkapp_command_authorizations ~keymap ~ledger valid_cmds :
         User_command.Valid.t list Deferred.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Deferred.Let_syntax in
       let%map zkapp_commands_fixed =
         Deferred.List.map
@@ -1842,7 +1845,8 @@ let%test_module _ =
           ~f:(function
             | Zkapp_command zkapp_command_dummy_auths ->
                 let%map cmd =
-                  Zkapp_command_builder.replace_authorizations ~keymap ~prover
+                  Zkapp_command_builder.replace_authorizations ~signature_kind
+                    ~keymap ~prover
                     (Zkapp_command.Valid.forget zkapp_command_dummy_auths)
                 in
                 User_command.Zkapp_command cmd
@@ -1981,8 +1985,8 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_single_account_update ~chain ~fee_payer_idx ~zkapp_account_idx ~fee
-        ~nonce ~ledger =
+    let mk_single_account_update ~signature_kind ~fee_payer_idx
+        ~zkapp_account_idx ~fee ~nonce ~ledger =
       let fee = Currency.Fee.of_nanomina_int_exn fee in
       let fee_payer_kp = test_keys.(fee_payer_idx) in
       let nonce = Account.Nonce.of_int nonce in
@@ -1999,7 +2003,7 @@ let%test_module _ =
           }
       in
       let%map zkapp_command =
-        Transaction_snark.For_tests.single_account_update ~chain
+        Transaction_snark.For_tests.single_account_update ~signature_kind
           ~constraint_constants spec
       in
       Or_error.ok_exn
@@ -2066,9 +2070,10 @@ let%test_module _ =
               }
         }
       in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let zkapp_command =
-        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-          test_spec
+        Transaction_snark.For_tests.multiple_transfers ~signature_kind
+          ~constraint_constants test_spec
       in
       let zkapp_command =
         Or_error.ok_exn
@@ -2915,6 +2920,7 @@ let%test_module _ =
 
     let mk_basic_zkapp ?(fee = 10_000_000_000) ?(empty_update = false)
         ?preconditions ?permissions nonce fee_payer_kp =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let open Zkapp_command_builder in
       let preconditions =
         Option.value preconditions
@@ -2946,7 +2952,7 @@ let%test_module _ =
             ]
       in
       account_updates
-      |> mk_zkapp_command ~memo:"" ~fee
+      |> mk_zkapp_command ~signature_kind ~memo:"" ~fee
            ~fee_payer_pk:(Public_key.compress fee_payer_kp.public_key)
            ~fee_payer_nonce:(Account.Nonce.of_int nonce)
 
@@ -3101,8 +3107,8 @@ let%test_module _ =
               authorization would be rejected" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier_full =
-            Verifier.For_tests.default ~constraint_constants ~logger
-              ~proof_level:Full ()
+            Verifier.For_tests.default ~signature_kind ~constraint_constants
+              ~logger ~proof_level:Full ()
           in
           let%bind test =
             setup_test ~verifier:verifier_full
@@ -3112,7 +3118,7 @@ let%test_module _ =
           in
           let%bind zkapp_command =
             mk_single_account_update
-              ~chain:Mina_signature_kind.(Other_network "invalid")
+              ~signature_kind:Mina_signature_kind.(Other_network "invalid")
               ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
           in

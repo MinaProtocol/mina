@@ -63,12 +63,14 @@ let update_body ?preconditions ?(update = Account_update.Update.noop) ~account
     }
 
 let update ?(calls = []) body =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open With_stack_hash in
   let open Zkapp_command.Call_forest.Tree in
   { elt =
       { account_update = body
       ; account_update_digest =
-          Zkapp_command.Call_forest.Digest.Account_update.create body
+          Zkapp_command.Call_forest.Digest.Account_update.create ~signature_kind
+            body
       ; calls
       }
   ; stack_hash = Zkapp_command.Call_forest.Digest.Forest.empty

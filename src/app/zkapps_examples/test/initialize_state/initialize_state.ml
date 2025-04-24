@@ -128,6 +128,7 @@ let%test_module "Initialize state test" =
           transaction_commitment ~memo_hash
           ~fee_payer_hash:
             (Zkapp_command.Call_forest.Digest.Account_update.create
+               ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
@@ -138,7 +139,7 @@ let%test_module "Initialize state test" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -158,7 +159,7 @@ let%test_module "Initialize state test" =
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign sk
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->
@@ -190,7 +191,8 @@ let%test_module "Initialize state test" =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -207,7 +209,8 @@ let%test_module "Initialize state test" =
              Update_state_account_update.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -226,7 +229,8 @@ let%test_module "Initialize state test" =
              Update_state_account_update.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       let zkapp_state =
@@ -241,7 +245,8 @@ let%test_module "Initialize state test" =
         []
         |> Zkapp_command.Call_forest.cons_tree
              Update_state_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
              ~expected_failure:
                (Account_proved_state_precondition_unsatisfied, Pass_2)
@@ -255,7 +260,8 @@ let%test_module "Initialize state test" =
              Initialize_account_update.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
              ~expected_failure:
                (Account_proved_state_precondition_unsatisfied, Pass_2)
@@ -271,7 +277,8 @@ let%test_module "Initialize state test" =
              Update_state_account_update.account_update
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
              ~expected_failure:
                (Account_proved_state_precondition_unsatisfied, Pass_2)

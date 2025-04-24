@@ -10,6 +10,8 @@ let state_body = U.genesis_state_body
 
 let constraint_constants = U.constraint_constants
 
+let signature_kind = U.signature_kind
+
 let consensus_constants = U.consensus_constants
 
 let ledger_depth = U.ledger_depth
@@ -149,7 +151,7 @@ let%test_module "Transaction union tests" =
           in
           Transaction_snark.check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
-            ~constraint_constants:U.constraint_constants
+            ~signature_kind ~constraint_constants:U.constraint_constants
             ~sok_message:
               (Mina_base.Sok_message.create ~fee:Currency.Fee.zero
                  ~prover:Public_key.Compressed.empty )
@@ -226,8 +228,8 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
-              Transaction_snark.check_user_command ~constraint_constants
-                ~sok_message
+              Transaction_snark.check_user_command ~signature_kind
+                ~constraint_constants ~sok_message
                 ~source_first_pass_ledger:(Ledger.merkle_root ledger)
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state

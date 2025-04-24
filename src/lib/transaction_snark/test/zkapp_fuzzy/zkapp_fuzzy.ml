@@ -112,7 +112,8 @@ let generate_zkapp_commands_and_apply_them_consecutively_5_times ~successful
            ~keymap ~ledger ~vk () )
     in
     let%bind.Deferred zkapp_command =
-      Zkapp_command_builder.replace_authorizations ~prover ~keymap
+      Zkapp_command_builder.replace_authorizations
+        ~signature_kind:U.signature_kind ~prover ~keymap
         zkapp_command_dummy_auths
     in
     let%map () =
@@ -164,8 +165,8 @@ let generate_zkapp_commands_and_apply_them_freshly ~successful
          ~ledger ~vk () )
   in
   let%bind.Deferred zkapp_command =
-    Zkapp_command_builder.replace_authorizations ~prover ~keymap
-      zkapp_command_dummy_auths
+    Zkapp_command_builder.replace_authorizations
+      ~signature_kind:U.signature_kind ~prover ~keymap zkapp_command_dummy_auths
   in
   let%map () =
     match%map
@@ -213,8 +214,8 @@ let mk_invalid_test ~successful ~max_account_updates ~type_of_failure
   in
 
   let%bind.Deferred zkapp_command =
-    Zkapp_command_builder.replace_authorizations ~prover ~keymap
-      zkapp_command_dummy_auths
+    Zkapp_command_builder.replace_authorizations
+      ~signature_kind:U.signature_kind ~prover ~keymap zkapp_command_dummy_auths
   in
   let%map () =
     match%map
@@ -268,8 +269,8 @@ let test_timed_account ~successful ~max_account_updates ~individual_test_timeout
          ~ledger ~vk () )
   in
   let%bind zkapp_command =
-    Zkapp_command_builder.replace_authorizations ~prover ~keymap
-      zkapp_command_dummy_auths
+    Zkapp_command_builder.replace_authorizations
+      ~signature_kind:U.signature_kind ~prover ~keymap zkapp_command_dummy_auths
   in
   let%map () =
     match%map

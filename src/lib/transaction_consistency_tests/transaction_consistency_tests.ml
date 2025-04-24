@@ -90,7 +90,8 @@ let%test_module "transaction logic consistency" =
 
     let transaction_snark ~source ~target transaction =
       Or_error.try_with ~here:[%here] ~backtrace:true (fun () ->
-          Transaction_snark.check_transaction ~constraint_constants
+          Transaction_snark.check_transaction ~signature_kind
+            ~constraint_constants
             ~sok_message:
               { Sok_message.fee = Fee.zero
               ; prover = Public_key.Compressed.empty

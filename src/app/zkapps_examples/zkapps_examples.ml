@@ -486,6 +486,7 @@ type return_type =
 
 let to_account_update (account_update : account_update) :
     Zkapp_statement.Checked.t * return_type Prover_value.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   dummy_constraints () ;
   let account_update, calls =
     Account_update_under_construction.In_circuit.to_account_update_and_calls
@@ -493,7 +494,7 @@ let to_account_update (account_update : account_update) :
   in
   let account_update_digest =
     Zkapp_command.Call_forest.Digest.Account_update.Checked.create
-      account_update
+      ~signature_kind account_update
   in
   let public_output : Zkapp_statement.Checked.t =
     { account_update = (account_update_digest :> Field.t)
@@ -787,6 +788,7 @@ end
 
 let insert_signatures pk_compressed sk
     ({ fee_payer; account_updates; memo } : Zkapp_command.t) : Zkapp_command.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let transaction_commitment : Zkapp_command.Transaction_commitment.t =
     (* TODO: This is a pain. *)
     let account_updates_hash = Zkapp_command.Call_forest.hash account_updates in
@@ -797,7 +799,7 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Transaction_commitment.create_complete transaction_commitment
       ~memo_hash
       ~fee_payer_hash:
-        (Zkapp_command.Call_forest.Digest.Account_update.create
+        (Zkapp_command.Call_forest.Digest.Account_update.create ~signature_kind
            (Account_update.of_fee_payer fee_payer) )
   in
   let fee_payer =
@@ -806,7 +808,7 @@ let insert_signatures pk_compressed sk
       when Public_key.Compressed.equal public_key pk_compressed ->
         { fee_payer with
           authorization =
-            Schnorr.Chunked.sign sk
+            Schnorr.Chunked.sign ~signature_kind sk
               (Random_oracle.Input.Chunked.field full_commitment)
         }
     | fee_payer ->
@@ -826,7 +828,7 @@ let insert_signatures pk_compressed sk
           { account_update with
             authorization =
               Control.Poly.Signature
-                (Schnorr.Chunked.sign sk
+                (Schnorr.Chunked.sign ~signature_kind sk
                    (Random_oracle.Input.Chunked.field commitment) )
           }
       | account_update ->

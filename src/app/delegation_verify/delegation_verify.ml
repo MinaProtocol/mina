@@ -44,11 +44,12 @@ let timestamp =
   let open Command.Param in
   anon ("timestamp" %: string)
 
-let instantiate_verify_functions ~logger ~genesis_constants
+let instantiate_verify_functions ~logger ~signature_kind ~genesis_constants
     ~constraint_constants ~proof_level ~cli_proof_level = function
   | None ->
       Deferred.return
-        (Verifier.verify_functions ~constraint_constants ~proof_level ())
+        (Verifier.verify_functions ~signature_kind ~constraint_constants
+           ~proof_level () )
   | Some config_file ->
       let%bind.Deferred precomputed_values =
         let%bind.Deferred.Or_error config_json =
@@ -73,7 +74,8 @@ let instantiate_verify_functions ~logger ~genesis_constants
       let constraint_constants =
         Precomputed_values.constraint_constants precomputed_values
       in
-      Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
+      Verifier.verify_functions ~signature_kind ~constraint_constants
+        ~proof_level:Full ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
   let verify_transaction_snarks = Source.verify_transaction_snarks
@@ -151,6 +153,7 @@ let filesystem_command =
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
       and config_file = config_flag in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       fun () ->
         let logger = Logger.create () in
         let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -159,8 +162,9 @@ let filesystem_command =
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level ~cli_proof_level:None
+          instantiate_verify_functions ~logger config_file ~signature_kind
+            ~genesis_constants ~constraint_constants ~proof_level
+            ~cli_proof_level:None
         in
         let submission_paths = get_filenames inputs in
         let module V = Make_verifier (struct
@@ -193,13 +197,15 @@ let cassandra_command =
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
         let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let constraint_constants =
           Genesis_constants.Compiled.constraint_constants
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level ~cli_proof_level:None
+            ~signature_kind ~constraint_constants ~proof_level
+            ~cli_proof_level:None
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -231,13 +237,15 @@ let stdin_command =
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
         let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let constraint_constants =
           Genesis_constants.Compiled.constraint_constants
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
-            ~constraint_constants ~proof_level ~cli_proof_level:None
+            ~signature_kind ~constraint_constants ~proof_level
+            ~cli_proof_level:None
         in
         let module V = Make_verifier (struct
           include Submission.Stdin

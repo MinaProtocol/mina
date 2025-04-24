@@ -18,6 +18,8 @@ let%test_module "Zkapp tokens tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let signature_kind = U.signature_kind
+
     let account_creation_fee =
       Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
 
@@ -109,10 +111,11 @@ let%test_module "Zkapp tokens tests" =
                                (10 * account_creation_fee) )
                             []
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
-                           ~fee_payer_nonce:nonce
+                      |> mk_zkapp_command ~signature_kind ~fee:7
+                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
-                    replace_authorizations ~keymap with_dummy_signatures
+                    replace_authorizations ~signature_kind ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_zkapp_command_with_merges_exn ledger
@@ -138,10 +141,11 @@ let%test_module "Zkapp tokens tests" =
                                 []
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
-                           ~fee_payer_nonce:nonce
+                      |> mk_zkapp_command ~signature_kind ~fee:7
+                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
-                    replace_authorizations ~keymap with_dummy_signatures
+                    replace_authorizations ~signature_kind ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_zkapp_command_with_merges_exn ledger
@@ -169,10 +173,11 @@ let%test_module "Zkapp tokens tests" =
                                 ]
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
-                           ~fee_payer_nonce:nonce
+                      |> mk_zkapp_command ~signature_kind ~fee:7
+                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
-                    replace_authorizations ~keymap with_dummy_signatures
+                    replace_authorizations ~signature_kind ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_zkapp_command_with_merges_exn ledger
@@ -245,10 +250,11 @@ let%test_module "Zkapp tokens tests" =
                                 ]
                             ]
                         ]
-                      |> mk_zkapp_command ~fee:7 ~fee_payer_pk:pk
-                           ~fee_payer_nonce:nonce
+                      |> mk_zkapp_command ~signature_kind ~fee:7
+                           ~fee_payer_pk:pk ~fee_payer_nonce:nonce
                     in
-                    replace_authorizations ~keymap with_dummy_signatures
+                    replace_authorizations ~signature_kind ~keymap
+                      with_dummy_signatures
                   in
                   let%bind () =
                     U.check_zkapp_command_with_merges_exn ledger

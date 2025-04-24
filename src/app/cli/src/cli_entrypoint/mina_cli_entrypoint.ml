@@ -1705,9 +1705,10 @@ let internal_commands logger ~itn_features =
              | `Ok sexp ->
                  let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
                  [%log info] "Prover state being logged to %s" conf_dir ;
+                 let signature_kind = Mina_signature_kind.t_DEPRECATED in
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level ~constraint_constants
+                     ~proof_level ~signature_kind ~constraint_constants
                      ~pids:(Pid.Table.create ()) ~conf_dir ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
@@ -1721,6 +1722,7 @@ let internal_commands logger ~itn_features =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
         in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
@@ -1736,8 +1738,8 @@ let internal_commands logger ~itn_features =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
-                  ~constraint_constants ()
+                Snark_worker.Prod.Inputs.Worker_state.create ~signature_kind
+                  ~proof_level ~constraint_constants ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1856,10 +1858,10 @@ let internal_commands logger ~itn_features =
                     | Error err ->
                         failwithf "Could not parse JSON: %s" err () ) )
           in
-
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           let%bind verifier =
-            Verifier.For_tests.default ~constraint_constants ~proof_level
-              ~commit_id:Mina_version.commit_id ~logger
+            Verifier.For_tests.default ~signature_kind ~constraint_constants
+              ~proof_level ~commit_id:Mina_version.commit_id ~logger
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
           in
           let%bind result =
@@ -1960,12 +1962,13 @@ let internal_commands logger ~itn_features =
               ~cli_proof_level:None
           in
           let pids = Child_processes.Termination.create_pid_table () in
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           let%bind prover =
             (* We create a prover process (unnecessarily) here, to have a more
                realistic test.
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
-              ~conf_dir ~proof_level
+              ~conf_dir ~proof_level ~signature_kind
               ~constraint_constants:precomputed_values.constraint_constants ()
           in
           match%bind

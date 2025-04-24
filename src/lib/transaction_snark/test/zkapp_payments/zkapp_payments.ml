@@ -21,6 +21,8 @@ let%test_module "Zkapp payments tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let signature_kind = U.signature_kind
+
     let merkle_root_after_zkapp_command_exn t
         ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
         ~global_slot txn =
@@ -224,7 +226,7 @@ let%test_module "Zkapp payments tests" =
                   in
                   let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers
-                      ~constraint_constants test_spec
+                      ~signature_kind ~constraint_constants test_spec
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -291,7 +293,7 @@ let%test_module "Zkapp payments tests" =
                   in
                   let zkapp_command =
                     Transaction_snark.For_tests.multiple_transfers
-                      ~constraint_constants test_spec
+                      ~signature_kind ~constraint_constants test_spec
                   in
                   U.check_zkapp_command_with_merges_exn
                     ~expected_failure:

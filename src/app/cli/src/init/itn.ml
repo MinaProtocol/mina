@@ -176,9 +176,10 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
           ; preconditions
           }
         in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         fee_payer_current_nonce := Account.Nonce.succ !fee_payer_current_nonce ;
-        Transaction_snark.For_tests.multiple_transfers ~constraint_constants
-          multispec )
+        Transaction_snark.For_tests.multiple_transfers ~signature_kind
+          ~constraint_constants multispec )
   in
   (* TODO do not compute hashes and remove Zkapp_command.read_all_proofs_from_disk *)
   let zkapps_batches = List.chunks_of zkapps ~length:zkapps_per_block in

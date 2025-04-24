@@ -334,6 +334,7 @@ module Values (S : Sample) = struct
     }
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer =
         { body =
             { public_key = public_key ()
@@ -346,7 +347,7 @@ module Values (S : Sample) = struct
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())
         |> List.fold_left ~init:[] ~f:(fun acc () ->
-               Mina_base.Zkapp_command.Call_forest.cons
+               Mina_base.Zkapp_command.Call_forest.cons ~signature_kind
                  (zkapp_account_update ()) acc )
     ; memo = signed_command_memo ()
     }
@@ -712,6 +713,7 @@ let compute_ram_usage ~config (sizes : size_params) =
   Printf.printf "TOTAL: %fGB\n" (format_gb total_size)
 
 let () =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -719,8 +721,8 @@ let () =
   let config = { constraint_constants; genesis_constants } in
   let%bind.Async_kernel.Deferred _, generated_zkapps =
     let num_updates = 1 in
-    Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
-      ~constraint_constants ~min_num_updates:num_updates
+    Snark_profiler_lib.create_ledger_and_zkapps ~signature_kind
+      ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
       ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
   in
   let%map.Async_kernel.Deferred vk =

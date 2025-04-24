@@ -14,6 +14,8 @@ let genesis_constants = Genesis_constants.Compiled.genesis_constants
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full
 
+let signature_kind = Mina_signature_kind.Testnet
+
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants
     ~protocol_constants:genesis_constants.protocol
@@ -35,6 +37,8 @@ let ledger_depth = constraint_constants.ledger_depth
 let snark_module =
   lazy
     ( module Transaction_snark.Make (struct
+      let signature_kind = signature_kind
+
       let constraint_constants = constraint_constants
 
       let proof_level = proof_level
@@ -140,7 +144,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
            ->
           match
             Or_error.try_with (fun () ->
-                Transaction_snark.zkapp_command_witnesses_exn
+                Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
                   ~constraint_constants ~global_slot ~state_body
                   ~fee_excess:Amount.Signed.zero
                   [ ( `Pending_coinbase_init_stack init_stack
@@ -390,8 +394,8 @@ let test_snapp_update ?expected_failure ?state_body ?snapp_permissions ~vk
             ?permissions:snapp_permissions ~vk:vk' ~ledger snapp_pk ;
           let%bind zkapp_command =
             let zkapp_prover_and_vk = (zkapp_prover, vk) in
-            Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
-              ~constraint_constants test_spec
+            Transaction_snark.For_tests.update_states ~signature_kind
+              ~zkapp_prover_and_vk ~constraint_constants test_spec
           in
           check_zkapp_command_with_merges_exn ?expected_failure ?state_body
             ledger [ zkapp_command ] ) )
@@ -669,9 +673,9 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   in
   match
     Or_error.try_with (fun () ->
-        Transaction_snark.check_transaction ~constraint_constants ~sok_message
-          ~source_first_pass_ledger ~target_first_pass_ledger
-          ~init_stack:pending_coinbase_stack
+        Transaction_snark.check_transaction ~signature_kind
+          ~constraint_constants ~sok_message ~source_first_pass_ledger
+          ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
           ~pending_coinbase_stack_state:
             { Transaction_snark.Pending_coinbase_stack_state.source =
                 pending_coinbase_stack

@@ -134,7 +134,8 @@ module Make (Input : Input_intf) = struct
             in
             let%bind zkapp_command =
               let zkapp_prover_and_vk = (zkapp_prover, vk) in
-              Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
+              Transaction_snark.For_tests.update_states
+                ~signature_kind:U.signature_kind ~zkapp_prover_and_vk
                 ~constraint_constants:U.constraint_constants test_spec
             in
             ( if new_account then

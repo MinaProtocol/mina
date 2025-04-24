@@ -368,6 +368,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let trust_system = Trust_system.null ()
 
     let pids = Child_processes.Termination.create_pid_table ()
@@ -380,8 +382,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            ~pids () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level ~pids () )
 
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =

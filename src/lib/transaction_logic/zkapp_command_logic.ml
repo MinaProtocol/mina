@@ -393,7 +393,8 @@ module type Account_update_intf = sig
   val implicit_account_creation_fee : t -> bool
 
   val check_authorization :
-       will_succeed:bool
+       signature_kind:Mina_signature_kind.t
+    -> will_succeed:bool
     -> commitment:transaction_commitment
     -> calls:call_forest
     -> t
@@ -1337,7 +1338,8 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Account_update.check_authorization
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      Inputs.Account_update.check_authorization ~signature_kind
         ~will_succeed:local_state.will_succeed ~commitment
         ~calls:account_update_forest account_update
     in

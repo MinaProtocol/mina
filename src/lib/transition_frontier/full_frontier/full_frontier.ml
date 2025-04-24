@@ -952,6 +952,8 @@ module For_tests = struct
 
   let constraint_constants = precomputed_values.constraint_constants
 
+  let signature_kind = Mina_signature_kind.t_DEPRECATED
+
   let ledger_depth = constraint_constants.ledger_depth
 
   let proof_level = precomputed_values.proof_level
@@ -970,7 +972,8 @@ module For_tests = struct
 
   let verifier () =
     Async.Thread_safe.block_on_async_exn (fun () ->
-        Verifier.For_tests.default ~constraint_constants ~logger ~proof_level () )
+        Verifier.For_tests.default ~signature_kind ~constraint_constants ~logger
+          ~proof_level () )
 
   module Genesis_ledger = (val precomputed_values.genesis_ledger)
 

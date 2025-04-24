@@ -62,7 +62,8 @@ module type Full = sig
   end
 
   val check_transaction :
-       ?preeval:bool
+       signature_kind:Mina_signature_kind.t
+    -> ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
@@ -75,7 +76,8 @@ module type Full = sig
     -> unit
 
   val check_user_command :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
     -> target_first_pass_ledger:Frozen_ledger_hash.t
@@ -87,7 +89,8 @@ module type Full = sig
     -> unit
 
   val generate_transaction_witness :
-       ?preeval:bool
+       signature_kind:Mina_signature_kind.t
+    -> ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
@@ -184,7 +187,8 @@ module type Full = sig
       logic without an exception.
    *)
   val zkapp_command_witnesses_exn :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
@@ -203,13 +207,16 @@ module type Full = sig
        list
 
   module Make (Inputs : sig
+    val signature_kind : Mina_signature_kind.t
+
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val proof_level : Genesis_constants.Proof_level.t
   end) : S
 
   val constraint_system_digests :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       signature_kind:Mina_signature_kind.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> unit
     -> (string * Md5.t) list
 
@@ -281,7 +288,8 @@ module type Full = sig
     end
 
     val deploy_snapp :
-         ?no_auth:bool
+         signature_kind:Mina_signature_kind.t
+      -> ?no_auth:bool
       -> ?permissions:Permissions.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Deploy_snapp_spec.t
@@ -312,7 +320,7 @@ module type Full = sig
              , Snark_params.Tick.Field.t )
              With_hash.t
              Async.Deferred.t
-      -> chain:Mina_signature_kind.t
+      -> signature_kind:Mina_signature_kind.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Single_account_update_spec.t
       -> Zkapp_command.t Async.Deferred.t
@@ -340,7 +348,8 @@ module type Full = sig
     end
 
     val update_states :
-         ?receiver_auth:Control.Tag.t
+         signature_kind:Mina_signature_kind.t
+      -> ?receiver_auth:Control.Tag.t
       -> ?zkapp_prover_and_vk:
            ( unit
            , unit
@@ -358,7 +367,8 @@ module type Full = sig
       -> Zkapp_command.t Async.Deferred.t
 
     val create_trivial_predicate_snapp :
-         ?protocol_state_predicate:Zkapp_precondition.Protocol_state.t
+         signature_kind:Mina_signature_kind.t
+      -> ?protocol_state_predicate:Zkapp_precondition.Protocol_state.t
       -> snapp_kp:Signature_lib.Keypair.t
       -> Mina_transaction_logic.For_tests.Transaction_spec.t
       -> Mina_ledger.Ledger.t
@@ -414,7 +424,8 @@ module type Full = sig
     end
 
     val multiple_transfers :
-         constraint_constants:Genesis_constants.Constraint_constants.t
+         signature_kind:Mina_signature_kind.t
+      -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Multiple_transfers_spec.t
       -> Zkapp_command.t
 

@@ -13,8 +13,9 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.Prod.t
 
 module Processor = struct
-  let verify_commands (cs : User_command.Verifiable.t With_status.t list) =
-    let results = List.map cs ~f:Common.check in
+  let verify_commands ~signature_kind
+      (cs : User_command.Verifiable.t With_status.t list) =
+    let results = List.map cs ~f:(Common.check ~signature_kind) in
     let to_verify =
       List.concat_map
         ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
@@ -68,6 +69,7 @@ module Worker_state = struct
     ; internal_trace_filename : string option
     ; logger : Logger.t
     ; proof_level : Genesis_constants.Proof_level.t
+    ; signature_kind : Mina_signature_kind.t
     ; commit_id : string
     ; blockchain_verification_key : Pickles.Verification_key.Stable.Latest.t
     ; transaction_verification_key : Pickles.Verification_key.Stable.Latest.t
@@ -79,6 +81,7 @@ module Worker_state = struct
   let create
       { logger
       ; proof_level
+      ; signature_kind
       ; commit_id
       ; blockchain_verification_key
       ; transaction_verification_key
@@ -95,7 +98,7 @@ module Worker_state = struct
                Internal_tracing.Context_call.with_call_id
                @@ fun () ->
                [%log internal] "Verifier_verify_commands" ;
-               let%map result = Processor.verify_commands cs in
+               let%map result = Processor.verify_commands ~signature_kind cs in
                [%log internal] "Verifier_verify_commands_done" ;
                result
 
@@ -156,7 +159,8 @@ module Worker_state = struct
         Deferred.return
         @@ ( module struct
              let verify_commands tagged_commands =
-               List.map tagged_commands ~f:(Fn.compose f Common.check)
+               List.map tagged_commands
+                 ~f:(Fn.compose f (Common.check ~signature_kind))
                |> Deferred.return
 
              let verify_blockchain_snarks _ = Deferred.return (Ok ())
@@ -288,6 +292,7 @@ module Worker = struct
             ; internal_trace_filename
             ; logger
             ; proof_level
+            ; signature_kind
             ; commit_id
             ; blockchain_verification_key
             ; transaction_verification_key
@@ -323,6 +328,7 @@ module Worker = struct
           ; internal_trace_filename
           ; logger
           ; proof_level
+          ; signature_kind
           ; commit_id
           ; blockchain_verification_key
           ; transaction_verification_key
@@ -345,8 +351,9 @@ type t = { worker : worker Ivar.t ref; logger : Logger.t }
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~proof_level ~pids ~conf_dir ~commit_id ~blockchain_verification_key
-    ~transaction_verification_key () : t Deferred.t =
+    ~proof_level ~signature_kind ~pids ~conf_dir ~commit_id
+    ~blockchain_verification_key ~transaction_verification_key () : t Deferred.t
+    =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -383,6 +390,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
             ; internal_trace_filename
             ; logger
             ; proof_level
+            ; signature_kind
             ; commit_id
             ; blockchain_verification_key
             ; transaction_verification_key

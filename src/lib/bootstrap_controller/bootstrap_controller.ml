@@ -756,6 +756,8 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let ledger_sync_config =
       Syncable_ledger.create_config
         ~compile_config:Mina_compile_config.For_unit_tests.t
@@ -781,8 +783,8 @@ let%test_module "Bootstrap_controller tests" =
 
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
-            () )
+          Verifier.For_tests.default ~signature_kind ~constraint_constants
+            ~logger ~proof_level () )
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
