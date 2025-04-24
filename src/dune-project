@@ -45,7 +45,6 @@
 (package (name fields_derivers))
 (package (name file_system))
 (package (name filtered_external_transition))
-(package (name gadt_lib))
 (package (name generated_graphql_queries))
 (package (name generate_keypair))
 (package (name genesis_constants))

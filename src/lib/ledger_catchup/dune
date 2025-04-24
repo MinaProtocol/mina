@@ -52,7 +52,6 @@
   transition_frontier_base
   network_pool
   staged_ledger_diff
-  gadt_lib
   transaction_snark_work
   pickles
   snark_params
