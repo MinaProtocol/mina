@@ -1,5 +1,6 @@
 open Core
 open Async
+open Worker_proof_cache
 
 let command_name = "snark-worker"
 
@@ -66,7 +67,8 @@ include Impl
 module Work = Snark_work_lib
 
 let perform (s : Worker_state.t) public_key
-    ({ instances; fee } as spec : Work.Spec.t) =
+    ({ instances; fee } as spec : Work.Selector.Spec.t) :
+    Work.Selector.Result.t Deferred.Or_error.t =
   One_or_two.Deferred_result.map instances ~f:(fun w ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
@@ -74,7 +76,7 @@ let perform (s : Worker_state.t) public_key
           ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
           w
       in
-      ( proof
+      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
       , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
   |> Deferred.Or_error.map ~f:(function
        | `One (proof1, metrics1) ->
@@ -194,10 +196,8 @@ let emit_proof_metrics metrics instances logger =
                ; proof_zkapp_command_count
                } ) )
 
-let main
-    (module Rpcs_versioned : Intf.Rpcs_versioned_S
-      with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger ~proof_level
-    ~constraint_constants daemon_address shutdown_on_disconnect =
+let main ~logger ~proof_level ~constraint_constants daemon_address
+    shutdown_on_disconnect =
   let%bind state = Worker_state.create ~constraint_constants ~proof_level () in
   let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
   (* retry interval with jitter *)
@@ -237,7 +237,7 @@ let main
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
+      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
         daemon_address
     with
     | Error e ->
@@ -260,16 +260,20 @@ let main
             [ ("address", `String (Host_and_port.to_string daemon_address))
             ; ( "work_ids"
               , Transaction_snark_work.Statement.compact_json
-                  (One_or_two.map (Work.Spec.instances work)
-                     ~f:Work.Single.Spec.statement ) )
+                  (One_or_two.map
+                     (Work.Work.Spec.instances work)
+                     ~f:Work.Work.Single.Spec.statement ) )
             ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
-        match%bind perform state public_key work with
+        match%bind
+          perform state public_key
+            (Work.Selector.Spec.cache ~proof_cache_db work)
+        with
         | Error e ->
             let%bind () =
               match%map
-                dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+                dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
                   shutdown_on_disconnect (e, work, public_key) daemon_address
               with
               | Error e ->
@@ -282,19 +286,21 @@ let main
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
             emit_proof_metrics result.metrics
-              (Work.Result.transactions result)
+              (Work.Selector.Result.transactions result)
               logger ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", `String (Host_and_port.to_string daemon_address))
                 ; ( "work_ids"
                   , Transaction_snark_work.Statement.compact_json
-                      (One_or_two.map (Work.Spec.instances work)
-                         ~f:Work.Single.Spec.statement ) )
+                      (One_or_two.map
+                         (Work.Work.Spec.instances work)
+                         ~f:Work.Work.Single.Spec.statement ) )
                 ] ;
             let rec submit_work () =
+              let result = Work.Selector.Result.materialize result in
               match%bind
-                dispatch Rpcs_versioned.Submit_work.Latest.rpc
+                dispatch Rpc_submit_work.Stable.Latest.rpc
                   shutdown_on_disconnect result daemon_address
               with
               | Error e ->
@@ -308,9 +314,7 @@ let main
   go ()
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants
-    (module Rpcs_versioned : Intf.Rpcs_versioned_S
-      with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
+    ~constraint_constants =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -347,9 +351,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
           [%log info]
             !"Received signal to terminate. Aborting snark worker process" ;
           Core.exit 0 ) ;
-      main
-        (module Rpcs_versioned)
-        ~logger ~proof_level ~constraint_constants daemon_port
+      main ~logger ~proof_level ~constraint_constants daemon_port
         (Option.value ~default:true shutdown_on_disconnect))
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
