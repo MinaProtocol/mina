@@ -382,7 +382,7 @@ module As_prover_circuits = struct
     (* test that accessing non existent vars fails*)
     let generate_witness_fails () =
       Alcotest.(
-        check_raises "should fail accesing non existent var"
+        check_raises "should fail accessing non existent var"
           (Failure "vector_get") generate_witness_fails)
 
     (* test that as_prover doesn't affect constraints *)

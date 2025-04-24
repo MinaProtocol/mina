@@ -4,7 +4,7 @@
 
 open Pickles_types
 
-module Step : sig
+module Step (Inductive_rule : Inductive_rule.Intf) : sig
   module type S = sig
     type statement
 
