@@ -46,7 +46,6 @@ help:
 	@echo "Mina Makefile Targets:"
 	@echo "======================="
 	@echo "all                - Clean and build the project"
-	@echo "archive_blocks     - Build the archive_blocks executable"
 	@echo "benchmarks         - Build benchmarking tools"
 	@echo "build              - Build the main project executables"
 	@echo "build_all_sigs     - Build all signature variants of the daemon"
@@ -194,11 +193,6 @@ extract_blocks: ocaml_checks
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/extract_blocks/extract_blocks.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
-archive_blocks: ocaml_checks
-	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive_blocks/archive_blocks.exe --profile=testnet_postake_medium_curves
-	$(info Build complete)
-
 patch_archive_test: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/patch_archive_test/patch_archive_test.exe --profile=testnet_postake_medium_curves
@@ -336,4 +330,4 @@ ml-docs: ocaml_checks
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks ocaml_version ocaml_word_size ocaml_checks switch help
+.PHONY: all build check-format clean deb dev mina-docker reformat doc_diagrams ml-docs setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks ocaml_version ocaml_word_size ocaml_checks switch help
