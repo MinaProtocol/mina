@@ -239,6 +239,10 @@ build_batch_txn_deb() {
 build_functional_test_suite_deb() {
   create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
 
+  mkdir -p "${BUILDDIR}/etc/mina/test/archive"
+
+  cp -r ../src/test/archive/* "${BUILDDIR}"/etc/mina/test/archive/
+
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
   cp ./default/src/app/benchmarks/benchmarks.exe "${BUILDDIR}/usr/local/bin/mina-benchmarks"
@@ -347,7 +351,7 @@ build_daemon_berkeley_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
