@@ -9,7 +9,9 @@
    snark_work_lib
    ledger_proof
    signature_lib
-   currency)
+   currency
+   work_selector)
+   
  (preprocess
   (pps
    ppx_let
