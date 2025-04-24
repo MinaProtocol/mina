@@ -523,11 +523,8 @@ module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('proof, 'data) t =
-        ( ( Account_update.Body.Stable.V1.t
-          , ('proof, Signature.Stable.V1.t) Control.Poly.Stable.V1.t )
-          Account_update.Poly.Stable.V1.t
-          * 'data
+      type ('update, 'data) t =
+        ( 'update * 'data
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t
