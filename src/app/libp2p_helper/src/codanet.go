@@ -638,22 +638,19 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 		}
 	}()
 
-	n, err := s.Write(h.NodeStatus)
-	if err != nil {
-		logger.Error("failed to write to stream", err)
-		return
-	}
+	// Start with the full buffer of data to send
+	remaining := h.NodeStatus
 
-	remaining := h.NodeStatus[n:]
-	// Keep writing the remaining data
-	// It could happen when:
+	// Keep writing until all data is sent or an error occurs
+	// Partial writes may occur in several scenarios:
 	// - working with large amounts of data in conditions of limited network bandwidth
 	// - interacting with overloaded nodes where partial writes may occur
 	// - under unstable network connection
+	// This loop ensures we continue writing until all data is transmitted
 	for len(remaining) > 0 {
 		written, err := s.Write(remaining)
 		if err != nil {
-			logger.Error("failed to write remaining data to stream", err)
+			logger.Error("failed to write to stream", err)
 			return
 		}
 		if written == 0 {
