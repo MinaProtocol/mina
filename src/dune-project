@@ -2,7 +2,9 @@
 (implicit_transitive_deps true)
 
 (package (name allocation_functor))
+(package (name archive))
 (package (name archive_blocks))
+(package (name archive_lib))
 (package (name base58_check))
 (package (name bash_colors))
 (package (name best_tip_merger))
