@@ -2,6 +2,7 @@ open Core
 open Async
 open Mina_base
 open Mina_transaction
+module Work = Snark_work_lib
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
@@ -19,9 +20,7 @@ module Cache = struct
   let find (t : t) statement = Option.map ~f:snd (T.find t statement)
 end
 
-module Inputs = struct
-  module Ledger_proof = Ledger_proof.Prod
-
+module Impl : Intf.Single_worker = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
 
@@ -49,13 +48,6 @@ module Inputs = struct
     let worker_wait_time = 5.
   end
 
-  (* bin_io is for uptime service SNARK worker *)
-  type single_spec =
-    ( Transaction_witness.Stable.Latest.t
-    , Transaction_snark.Stable.Latest.t )
-    Snark_work_lib.Work.Single.Spec.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp]
-
   let zkapp_command_inputs_to_yojson =
     let convert =
       List.map
@@ -80,20 +72,24 @@ module Inputs = struct
 
   let perform_single ({ m; cache; proof_level } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
-    let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
     let logger = Logger.create () in
-    fun (single : single_spec) ->
+    fun (single : Work.Selector.Single.Spec.t) ->
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
           let (module M) = Option.value_exn m in
-          let statement = Work.Single.Spec.statement single in
+          let statement = Work.Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
             match%map.Async.Deferred
               Monitor.try_with_join_or_error ~here:[%here] k
             with
             | Error e ->
+                let sexp_string_of_single_spec =
+                  Work.Selector.Single.Spec.(
+                    materialize single |> Stable.Latest.sexp_of_t
+                    |> Sexp.to_string)
+                in
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
                     [ ("error", Error_json.error_to_yojson e)
@@ -101,7 +97,7 @@ module Inputs = struct
                         (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
                            so we use the less-desirable sexp here
                         *)
-                      , `String (Sexp.to_string (sexp_of_single_spec single)) )
+                      , `String sexp_string_of_single_spec )
                     ] ;
                 Error e
             | Ok res ->
@@ -114,8 +110,8 @@ module Inputs = struct
               Deferred.Or_error.return (proof, Time.Span.zero)
           | None -> (
               match single with
-              | Work.Single.Spec.Transition
-                  (input, (w : Transaction_witness.Stable.Latest.t)) ->
+              | Work.Work.Single.Spec.Transition
+                  (input, (w : Transaction_witness.t)) ->
                   process (fun () ->
                       match w.transaction with
                       | Command (Zkapp_command zkapp_command) -> (
@@ -139,17 +135,18 @@ module Inputs = struct
                                     , `Sparse_ledger w.second_pass_ledger
                                     , `Connecting_ledger_hash
                                         input.connecting_ledger_left
-                                    , Zkapp_command.write_all_proofs_to_disk
-                                        zkapp_command )
+                                    , zkapp_command )
                                   ]
                                 |> List.rev )
                             |> Result.map_error ~f:(fun e ->
                                    Error.createf
                                      !"Failed to generate inputs for \
                                        zkapp_command : %s: %s"
-                                     ( Zkapp_command.Stable.Latest.to_yojson
-                                         zkapp_command
-                                     |> Yojson.Safe.to_string )
+                                     Zkapp_command.(
+                                       zkapp_command
+                                       |> read_all_proofs_from_disk
+                                       |> Stable.Latest.to_yojson
+                                       |> Yojson.Safe.to_string)
                                      (Error.to_string_hum e) )
                             |> Deferred.return
                           in
@@ -289,12 +286,18 @@ module Inputs = struct
                                    (Mina_ledger.Sparse_ledger.handler
                                       w.first_pass_ledger ) ) ) )
               | Merge (_, proof1, proof2) ->
+                  let proof1 =
+                    Ledger_proof.Cached.read_proof_from_disk proof1
+                  in
+                  let proof2 =
+                    Ledger_proof.Cached.read_proof_from_disk proof2
+                  in
                   process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
       | Check | No_check ->
           (* Use a dummy proof. *)
           let stmt =
             match single with
-            | Work.Single.Spec.Transition (stmt, _) ->
+            | Work.Work.Single.Spec.Transition (stmt, _) ->
                 stmt
             | Merge (stmt, _, _) ->
                 stmt

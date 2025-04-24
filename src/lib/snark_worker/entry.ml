@@ -58,3 +58,5 @@ type Structured_log_events.t +=
            with $zkapp_command_count zkapp_command and \
            $proof_zkapp_command_count proof zkapp_command"
       }]
+
+module Impl : Intf.Single_worker = Prod.Impl
