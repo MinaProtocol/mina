@@ -31,9 +31,13 @@ val hash_signed_command : Signed_command.t -> t
 
 val hash_signed_command_v1 : Signed_command.Stable.V1.t -> t
 
-val hash_zkapp_command : Zkapp_command.t -> t
+val hash_zkapp_command : Zkapp_command.Stable.Latest.t -> t
 
-val hash_command : User_command.t -> t
+val hash_command : User_command.Stable.Latest.t -> t
+
+val hash_zkapp_command_with_hashes : Zkapp_command.t -> t
+
+val hash_command_with_hashes : User_command.t -> t
 
 val hash_fee_transfer : Fee_transfer.Single.t -> t
 
@@ -52,7 +56,7 @@ module User_command_with_valid_signature : sig
   type hash = t [@@deriving sexp, compare, hash, yojson]
 
   type t = private (User_command.Valid.t, hash) With_hash.t
-  [@@deriving hash, sexp, compare, to_yojson]
+  [@@deriving equal, sexp_of, to_yojson]
 
   val create : User_command.Valid.t -> t
 
@@ -64,7 +68,11 @@ module User_command_with_valid_signature : sig
 
   val forget_check : t -> (User_command.t, hash) With_hash.t
 
-  include Comparable.S with type t := t
+  module Set : sig
+    include Mina_stdlib.Generic_set.S0 with type el = t
+
+    val sexp_of_t : t -> Sexp.t
+  end
 
   val make : User_command.Valid.t -> hash -> t
 end
@@ -84,11 +92,11 @@ module User_command : sig
 
   type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
 
-  val create : User_command.t -> t
+  val create : User_command.Stable.Latest.t -> t
 
-  val data : t -> User_command.t
+  val data : t -> User_command.Stable.Latest.t
 
-  val command : t -> User_command.t
+  val command : t -> User_command.Stable.Latest.t
 
   val hash : t -> hash
 

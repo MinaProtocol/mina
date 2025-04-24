@@ -15,13 +15,11 @@
  (libraries
   ;; opam libraries
   yojson
-  core_kernel
   base_quickcheck
   core
   async
   async_unix
   base
-  sexplib0
   ppx_inline_test.config
   ppx_deriving_yojson.runtime
   ;; local libraries

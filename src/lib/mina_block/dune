@@ -4,14 +4,7 @@
  (libraries
   ;; opam libraries
   integers
-  core_kernel
-  async_kernel
-  bin_prot.shape
-  base.caml
-  sexplib0
   base64
-  result
-  base
   core
   ;; local libraries
   mina_ledger
@@ -55,7 +48,8 @@
   random_oracle_input
   ppx_version.runtime
   mina_wire_types
-  internal_tracing)
+  internal_tracing
+  proof_carrying_data)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

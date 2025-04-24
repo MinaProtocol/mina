@@ -149,7 +149,10 @@ let%test_module "Block storage tests" =
           f conf_dir helper )
 
     let send_and_receive ~helper ~reader ~db breadcrumb =
-      let body = Breadcrumb.block breadcrumb |> Mina_block.body in
+      let body =
+        Breadcrumb.block breadcrumb
+        |> Mina_block.body |> Mina_block.Body.read_all_proofs_from_disk
+      in
       let body_ref =
         Staged_ledger_diff.Body.compute_reference
           ~tag:Mina_net2.Bitswap_tag.(to_enum Body)

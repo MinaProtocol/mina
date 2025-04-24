@@ -26,6 +26,8 @@ let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
+let network = Network.Type.Berkeley
+
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
@@ -55,12 +57,13 @@ in  Pipeline.build
                   ([] : List Text)
                   "./src/test/archive/sample_db/archive_db.sql"
                   Artifacts.Type.Rosetta
-                  (Some Network.Type.Berkeley)
+                  (Some network)
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{
                   , image =
-                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-berkeley"
+                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-${Network.lowerName
+                                                                                   network}"
                   }
                   "buildkite/scripts/rosetta-integration-tests-fast.sh"
               ]
@@ -71,7 +74,7 @@ in  Pipeline.build
             , depends_on =
                 Dockers.dependsOn
                   Dockers.Type.Bullseye
-                  (Some Network.Type.Berkeley)
+                  network
                   Profiles.Type.Standard
                   Artifacts.Type.Rosetta
             }

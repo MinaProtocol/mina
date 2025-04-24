@@ -11,11 +11,14 @@ open Common
 (* This contains the "step" prover *)
 
 module Make
+    (Inductive_rule : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
     (A : T0) (A_value : sig
       type t
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule)
+
   let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
@@ -123,8 +126,8 @@ struct
            Impls.Wrap.Verification_key.t
         -> _ array Plonk_verification_key_evals.t
         -> value
-        -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
-        -> (var, value, local_max_proofs_verified, m) Types_map.Basic.t
+        -> local_max_proofs_verified Proof.t
+        -> (var, value, local_max_proofs_verified) Types_map.Basic.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
            * Unfinalized.Constant.t
@@ -286,7 +289,6 @@ struct
                 statement.proof_state.sponge_digest_before_evaluations
             ; messages_for_next_wrap_proof =
                 Wrap_hack.hash_messages_for_next_wrap_proof
-                  Local_max_proofs_verified.n
                   { old_bulletproof_challenges = prev_challenges
                   ; challenge_polynomial_commitment =
                       statement.proof_state.messages_for_next_wrap_proof
@@ -550,14 +552,13 @@ struct
         let rec go :
             type vars values ns ms.
                (vars, values, ns, ms) H4.T(Tag).t
-            -> (vars, values, ns, ms) H4.T(Types_map.Basic).t Promise.t =
-          function
+            -> (vars, values, ns) H3.T(Types_map.Basic).t Promise.t = function
           | [] ->
-              Promise.return ([] : _ H4.T(Types_map.Basic).t)
+              Promise.return ([] : _ H3.T(Types_map.Basic).t)
           | tag :: tags ->
               let%bind.Promise data = Types_map.lookup_basic tag in
               let%map.Promise rest = go tags in
-              (data :: rest : _ H4.T(Types_map.Basic).t)
+              (data :: rest : _ H3.T(Types_map.Basic).t)
         in
         go branch_data.rule.prevs
       in
@@ -571,7 +572,7 @@ struct
         let[@warning "-4"] rec go :
             type vars values ns ms k.
                (vars, values, ns, ms) H4.T(Tag).t
-            -> (vars, values, ns, ms) H4.T(Types_map.Basic).t
+            -> (vars, values, ns) H3.T(Types_map.Basic).t
             -> ( values
                , ns )
                H2.T(Inductive_rule.Previous_proof_statement.Constant).t
@@ -584,7 +585,7 @@ struct
                  , ns
                  , ms )
                  H3.T(Per_proof_witness.Constant.No_app_state).t
-               * (ns, ns) H2.T(Proof).t
+               * ns H1.T(Proof).t
                * (int, k) Vector.t =
          fun ts datas prev_proof_stmts l ->
           match (ts, datas, prev_proof_stmts, l) with
@@ -650,7 +651,7 @@ struct
         (module Extract : Extract.S with type res = res) =
       let rec go :
           type vars values ns ms len.
-             (ns, ns) H2.T(Proof).t
+             ns H1.T(Proof).t
           -> (values, vars, ns, ms) H4.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
@@ -725,8 +726,7 @@ struct
                       Lazy.force Dummy.Ipa.Wrap.challenges_computed )
               }
             in
-            Wrap_hack.hash_messages_for_next_wrap_proof Max_proofs_verified.n t
-            :: pad [] ms n
+            Wrap_hack.hash_messages_for_next_wrap_proof t :: pad [] ms n
       in
       lazy
         (Vector.rev
@@ -866,7 +866,7 @@ struct
     let messages_for_next_wrap_proof =
       let rec go :
           type a.
-             (a, a) H2.T(Proof).t
+             a H1.T(Proof).t
           -> a H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function
         | [] ->

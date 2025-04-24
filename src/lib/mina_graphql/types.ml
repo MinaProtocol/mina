@@ -624,7 +624,7 @@ let pending_work =
 
 module Snark_work_bundle = struct
   type t =
-    { spec : Work_selector.work One_or_two.t
+    { spec : Work_selector.in_memory_work One_or_two.t
     ; fee_prover : (Currency.Fee.t * Public_key.Compressed.t) option
     }
 
@@ -638,7 +638,7 @@ module Snark_work_bundle = struct
             ~doc:"Snark work specification in json format"
             ~args:Arg.[]
             ~resolve:(fun _ { spec; _ } ->
-              One_or_two.to_yojson Work_selector.work_to_yojson spec
+              One_or_two.to_yojson Work_selector.in_memory_work_to_yojson spec
               |> Yojson.Safe.to_string )
         ; field "snarkFee" ~typ:fee
             ~doc:"Fee if proof for the spec exists in snark pool"
@@ -2011,25 +2011,27 @@ module Zkapp_command = struct
 
   let zkapp_command =
     let conv
-        (x : (Mina_lib.t, Zkapp_command.t) Fields_derivers_graphql.Schema.typ) :
-        (Mina_lib.t, Zkapp_command.t) typ =
+        (x :
+          ( Mina_lib.t
+          , Zkapp_command.Stable.Latest.t )
+          Fields_derivers_graphql.Schema.typ ) :
+        (Mina_lib.t, Zkapp_command.Stable.Latest.t) typ =
       Obj.magic x
     in
     obj "ZkappCommandResult" ~fields:(fun _ ->
         [ field_no_status "id"
             ~doc:"A Base64 string representing the zkApp command"
             ~typ:(non_null transaction_id) ~args:[]
-            ~resolve:(fun _ zkapp_command ->
-              Zkapp_command zkapp_command.With_hash.data )
+            ~resolve:(fun _ { With_hash.data; _ } -> Zkapp_command data)
         ; field_no_status "hash"
             ~doc:"A cryptographic hash of the zkApp command"
             ~typ:(non_null transaction_hash) ~args:[]
-            ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.hash)
+            ~resolve:(fun _ { With_hash.hash; _ } -> hash)
         ; field_no_status "zkappCommand"
             ~typ:(Zkapp_command.typ () |> conv)
             ~args:Arg.[]
             ~doc:"zkApp command representing the transaction"
-            ~resolve:(fun _ zkapp_command -> zkapp_command.With_hash.data)
+            ~resolve:(fun _ { With_hash.data; _ } -> data)
         ; field "failureReason" ~typ:(list @@ Command_status.failure_reasons)
             ~args:[]
             ~doc:
@@ -2047,7 +2049,7 @@ module Zkapp_command = struct
 end
 
 let transactions =
-  let open Filtered_external_transition.Transactions in
+  let open Filtered_external_transition.Transactions.Stable.Latest in
   obj "Transactions" ~doc:"Different types of transactions in a block"
     ~fields:(fun _ ->
       [ field "userCommands"
@@ -2637,7 +2639,7 @@ module Input = struct
         ~to_json:(function
           | (c : input) -> `String (Currency.Amount.to_string c) )
         ~doc:
-          "uint64 encoded as a json string representing an ammount of currency"
+          "uint64 encoded as a json string representing an amount of currency"
   end
 
   module Fee = struct
@@ -2657,7 +2659,7 @@ module Input = struct
   end
 
   module SendTestZkappInput = struct
-    type input = Mina_base.Zkapp_command.t
+    type input = Mina_base.Zkapp_command.Stable.Latest.t
 
     let arg_typ =
       scalar "SendTestZkappInput" ~doc:"zkApp command for a test zkApp"
@@ -3019,8 +3021,10 @@ module Input = struct
     let arg_typ =
       let conv
           (x :
-            Mina_base.Zkapp_command.t Fields_derivers_graphql.Schema.Arg.arg_typ
-            ) : Mina_base.Zkapp_command.t Graphql_async.Schema.Arg.arg_typ =
+            Mina_base.Zkapp_command.Stable.Latest.t
+            Fields_derivers_graphql.Schema.Arg.arg_typ ) :
+          Mina_base.Zkapp_command.Stable.Latest.t
+          Graphql_async.Schema.Arg.arg_typ =
         Obj.magic x
       in
       let arg_typ =

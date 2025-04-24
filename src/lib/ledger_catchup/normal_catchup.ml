@@ -56,11 +56,14 @@ end
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
-let validate_block ~genesis_state_hash (b, v) =
+(** Validates block without time received validation *)
+let validate_block_skipping_time_received ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
   let h = (With_hash.map ~f:Mina_block.header b, v) in
-  validate_genesis_protocol_state ~genesis_state_hash h
+  Mina_block.Validation.skip_time_received_validation
+    `This_block_was_not_received_via_gossip h
+  |> validate_genesis_protocol_state ~genesis_state_hash
   >>= validate_protocol_versions >>= validate_delta_block_chain
   >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
 
@@ -85,10 +88,8 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let cached_initially_validated_transition_result =
     let open Result.Let_syntax in
     let%bind initially_validated_transition =
-      transition_with_hash
-      |> Mina_block.Validation.skip_time_received_validation
-           `This_block_was_not_received_via_gossip
-      |> validate_block ~genesis_state_hash
+      validate_block_skipping_time_received ~genesis_state_hash
+        transition_with_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -468,7 +469,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                            ~hash_data:
                              (Fn.compose Mina_state.Protocol_state.hashes
                                 (Fn.compose Mina_block.Header.protocol_state
-                                   Mina_block.header ) ) )
+                                   Mina_block.Stable.Latest.header ) ) )
                   in
                   if not @@ verify_against_hashes hashed_transitions hashes then (
                     let error_msg =
@@ -611,9 +612,9 @@ let verify_transitions_and_build_breadcrumbs ~context:(module Context : CONTEXT)
   in
   let open Deferred.Let_syntax in
   match%bind
-    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs
-      ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
-      ~frontier ~initial_hash trees_of_transitions
+    Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+      ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
+      trees_of_transitions
   with
   | Ok result ->
       [%log debug]
@@ -823,6 +824,14 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                  else
                    download_transitions ~logger ~trust_system ~network
                      ~preferred_peer ~hashes_of_missing_transitions ~target_hash
+                   >>| List.map
+                         ~f:
+                           (Envelope.Incoming.map
+                              ~f:
+                                (With_hash.map
+                                   ~f:
+                                     (Mina_block.write_all_proofs_to_disk
+                                        ~proof_cache_db ) ) )
                in
                [%log debug]
                  ~metadata:[ ("target_hash", State_hash.to_yojson target_hash) ]

@@ -35,8 +35,10 @@ function checkout_and_dump() {
 }
 
 
+source ./buildkite/scripts/handle-fork.sh
+
 if [[ $FORK == 1 ]]; then 
-    echo "⏩  Skipping type shape patching on for forked repository" 
+    echo "⏩  Skipping type shape patching on a forked repository" 
     exit 0
 fi
 
@@ -45,7 +47,7 @@ if ! $(source buildkite/scripts/cache/manager.sh read mina-type-shapes/"$RELEASE
 fi
 
 if [[ -n "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}" ]]; then 
-    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
+    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
     if ! gsutil ls "gs://mina-type-shapes/${BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT}*"; then
         checkout_and_dump $BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT
     fi
