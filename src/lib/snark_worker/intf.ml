@@ -1,8 +1,6 @@
 open Core
 open Async
 
-let command_name = "snark-worker"
-
 module Work = Snark_work_lib
 
 (* A worker that would only deal with one single work a time. This exists solely

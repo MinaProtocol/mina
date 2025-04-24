@@ -192,7 +192,7 @@ module Snark_worker = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary ?env
         ~args:
-          ( "internal" :: Snark_worker.Intf.command_name
+          ( "internal" :: Snark_worker.Entry.command_name
           :: Snark_worker.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)

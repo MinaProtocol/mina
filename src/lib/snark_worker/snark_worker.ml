@@ -117,3 +117,4 @@ module Worker = struct
 end
 
 include Worker
+module Entry = Entry
