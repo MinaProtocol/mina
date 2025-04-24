@@ -1,0 +1,24 @@
+(test
+ (name test_transaction_inclusion_status)
+ (libraries
+  ;; opam libraries
+  alcotest
+  alcotest-async
+  async
+  core
+  ;; local libraries
+  block_time
+  logger
+  mina_base
+  mina_numbers
+  mina_stdlib
+  network_pool
+  pipe_lib
+  precomputed_values
+  signature_lib
+  transaction_inclusion_status
+  transition_frontier
+  trust_system
+  verifier)
+ (preprocess
+  (pps ppx_jane ppx_mina ppx_version)))
