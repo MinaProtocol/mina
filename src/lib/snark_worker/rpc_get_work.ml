@@ -1,18 +1,57 @@
+(* External Libraries *)
 open Async
+open Core
+
+(* Local Libraries *)
 open Signature_lib
 module Work = Snark_work_lib
+open Worker_proof_cache
 
-module T = struct
+module Master = struct
   let name = "get_work"
 
   module T = struct
     type query = unit
 
-    type response = Work.Selector.Spec.t * Public_key.Compressed.t
+    type response = (Work.Selector.Spec.t * Public_key.Compressed.t) option
   end
 
   module Caller = T
   module Callee = T
 end
 
-include Versioned_rpc.Both_convert.Plain.Make (T)
+include Versioned_rpc.Both_convert.Plain.Make (Master)
+
+[%%versioned_rpc
+module Stable = struct
+  module V2 = struct
+    module T = struct
+      type query = unit
+
+      type response =
+        (Work.Selector.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
+        option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model : Master.Callee.response -> response =
+        function
+        | None ->
+            None
+        | Some (spec, key) ->
+            Some (Work.Selector.Spec.materialize spec, key)
+
+      let caller_model_of_response : response -> Master.Caller.response =
+        function
+        | None ->
+            None
+        | Some (spec, key) ->
+            Some (Work.Selector.Spec.cache ~proof_cache_db spec, key)
+    end
+
+    include T
+    include Register (T)
+  end
+end]
