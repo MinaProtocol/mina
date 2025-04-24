@@ -63,6 +63,5 @@
   transition_frontier_persistent_frontier
   transition_frontier_persistent_root
   trust_system
-  truth
   verifier
   with_hash))
