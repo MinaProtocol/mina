@@ -97,10 +97,14 @@ let account_update_or_stack_of_zkapp_command_list () =
        (of_account_updates ~account_update_depth:Fn.id zkapp_command_list_4) )
     zkapp_command_list_4
 
+let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
 let wire_embedded_in_t () =
   let open Stable.Latest in
   Quickcheck.test ~trials:10 ~shrinker gen ~f:(fun w ->
-      [%test_eq: t] (read_all_proofs_from_disk (write_all_proofs_to_disk w)) w )
+      [%test_eq: t]
+        (read_all_proofs_from_disk (write_all_proofs_to_disk ~proof_cache_db w))
+        w )
 
 let wire_embedded_in_graphql () =
   let open Stable.Latest in

@@ -510,8 +510,8 @@ module Initial_validate_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~logger ~verifier ~precomputed_values : _ t =
-    create
+  let create ~proof_cache_db ~logger ~verifier ~precomputed_values : _ t =
+    create ~proof_cache_db
       ~logger:
         (Logger.extend logger [ ("name", `String "initial_validate_batcher") ])
       ~how_to_add:`Insert ~max_weight_per_call:1000
@@ -555,13 +555,13 @@ module Verify_work_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~logger ~verifier : _ t =
+  let create ~proof_cache_db ~logger ~verifier : _ t =
     let works (x : input) =
       let wh, _ = x.data in
       Mina_block.Body.staged_ledger_diff (Mina_block.body wh.data)
       |> Staged_ledger_diff.completed_works
     in
-    create
+    create ~proof_cache_db
       ~logger:(Logger.extend logger [ ("name", `String "verify_work_batcher") ])
       ~weight:(fun (x : input) ->
         List.fold ~init:0 (works x) ~f:(fun acc { proofs; _ } ->
@@ -805,9 +805,12 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   let open Context in
   (* setup_state_machine_runner returns a fully configured lambda function, which is the state machine runner *)
   let initial_validation_batcher =
-    Initial_validate_batcher.create ~logger ~verifier ~precomputed_values
+    Initial_validate_batcher.create ~proof_cache_db ~logger ~verifier
+      ~precomputed_values
   in
-  let verify_work_batcher = Verify_work_batcher.create ~logger ~verifier in
+  let verify_work_batcher =
+    Verify_work_batcher.create ~proof_cache_db ~logger ~verifier
+  in
   let set_state t node s =
     set_state t node s ;
     try check_invariant ~downloader t

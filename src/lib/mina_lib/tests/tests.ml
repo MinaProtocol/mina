@@ -211,6 +211,7 @@ let%test_module "Epoch ledger sync tests" =
             ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
             ~genesis_constants:precomputed_values.genesis_constants
             ~slot_tx_end:None
+            ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
             ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
