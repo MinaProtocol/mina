@@ -1,0 +1,11 @@
+(test
+ (name test_disk_cache_lmdb)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  core
+  core_kernel
+  ;; local libraries
+  disk_cache.lmdb
+  disk_cache.test_lib))
