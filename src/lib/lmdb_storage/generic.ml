@@ -263,7 +263,7 @@ let%test_module "Lmdb storage tests" =
           let%bind dir = Async.Unix.mkdtemp "lmdb_storage" in
           Monitor.protect
             (fun () -> f dir)
-            ~finally:(fun () -> File_system.remove_dir dir) )
+            ~finally:(fun () -> Mina_stdlib.File_system.remove_dir dir) )
 
     let uint32 =
       Base_quickcheck.Generator.int_uniform_inclusive 0

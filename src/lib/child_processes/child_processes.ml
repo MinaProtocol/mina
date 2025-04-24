@@ -332,7 +332,7 @@ let%test_module _ =
 
     let async_with_temp_dir f =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          File_system.with_temp_dir
+          Mina_stdlib.File_system.with_temp_dir
             (Filename.temp_dir_name ^/ "child-processes")
             ~f )
 

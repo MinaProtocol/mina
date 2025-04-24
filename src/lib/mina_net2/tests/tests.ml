@@ -90,9 +90,9 @@ let%test_module "Mina network tests" =
         let%bind () = shutdown a in
         let%bind () = shutdown b in
         let%bind () = shutdown c in
-        let%bind () = File_system.remove_dir a_tmp in
-        let%bind () = File_system.remove_dir b_tmp in
-        File_system.remove_dir c_tmp
+        let%bind () = Mina_stdlib.File_system.remove_dir a_tmp in
+        let%bind () = Mina_stdlib.File_system.remove_dir b_tmp in
+        Mina_stdlib.File_system.remove_dir c_tmp
       in
       (b, c, shutdown)
 

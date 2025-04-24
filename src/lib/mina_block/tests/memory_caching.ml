@@ -78,4 +78,4 @@ let test large_precomputed_json_file : unit =
   in
   printf "Read %d ledger proofs\n" (List.length ledger_proofs) ;
   Thread_safe.block_on_async_exn (fun () ->
-      File_system.with_temp_dir "test_mem" ~f:(test_do ledger_proofs) )
+      Mina_stdlib.File_system.with_temp_dir "test_mem" ~f:(test_do ledger_proofs) )

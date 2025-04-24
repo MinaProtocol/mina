@@ -4,7 +4,7 @@ open Async
 (** [start dir] starts writing the trace output to [dir ^/ "trace" ^/(current_pid ^ ".trace")]. *)
 let start dir =
   let trace_dir = dir ^/ "trace" in
-  let%bind () = File_system.create_dir trace_dir in
+  let%bind () = Mina_stdlib.File_system.create_dir trace_dir in
   Writer.open_file ~append:true
     (trace_dir ^/ sprintf "%d.trace" (Unix.getpid () |> Pid.to_int))
   >>| O1trace_webkit_event.start_tracing

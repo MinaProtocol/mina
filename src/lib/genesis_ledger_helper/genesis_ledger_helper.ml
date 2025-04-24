@@ -235,7 +235,7 @@ module Ledger = struct
       Tar.filename_without_extension @@ Filename.basename filename
     in
     let dirname = genesis_dir ^/ dirname in
-    let%bind () = File_system.create_dir ~clear_if_exists:true dirname in
+    let%bind () = Mina_stdlib.File_system.create_dir ~clear_if_exists:true dirname in
     let%map.Deferred.Or_error () =
       Tar.extract ~root:dirname ~file:filename ()
     in

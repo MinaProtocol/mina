@@ -587,7 +587,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
     O1trace.thread "mina" (fun () ->
         let open Deferred.Let_syntax in
         let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
-        let%bind () = File_system.create_dir conf_dir in
+        let%bind () = Mina_stdlib.File_system.create_dir conf_dir in
         let () =
           if is_background then (
             Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
@@ -689,7 +689,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let make_version () =
             let%map () =
               (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
-              File_system.remove_dir (conf_dir ^/ "trace")
+              Mina_stdlib.File_system.remove_dir (conf_dir ^/ "trace")
             in
             Yojson.Safe.to_file version_filename (`Assoc version_metadata)
           in

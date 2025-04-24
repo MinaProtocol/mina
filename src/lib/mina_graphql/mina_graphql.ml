@@ -1577,7 +1577,7 @@ module Mutations = struct
                                 in
                                 match%bind Sys.file_exists path with
                                 | `Yes ->
-                                    File_system.remove_dir path
+                                    Mina_stdlib.File_system.remove_dir path
                                 | `No | `Unknown ->
                                     Deferred.unit
                               in
@@ -1607,7 +1607,7 @@ module Mutations = struct
                         let path = conf_dir ^/ dir in
                         match%bind Sys.file_exists path with
                         | `Yes ->
-                            File_system.remove_dir path
+                            Mina_stdlib.File_system.remove_dir path
                         | `No | `Unknown ->
                             Deferred.unit ) ) ;
               let s =

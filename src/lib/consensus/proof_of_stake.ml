@@ -295,7 +295,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ()
             | Ledger_db ledger ->
                 Mina_ledger.Ledger.Db.close ledger ;
-                File_system.rmrf location
+                Mina_stdlib.File_system.rmrf location
 
           let ledger_subset keys ledger =
             let open Mina_ledger in
@@ -518,8 +518,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; ("staking", `String staking_ledger_location)
                   ; ("next", `String next_ledger_location)
                   ] ;
-              File_system.rmrf staking_ledger_location ;
-              File_system.rmrf next_ledger_location ;
+              Mina_stdlib.File_system.rmrf staking_ledger_location ;
+              Mina_stdlib.File_system.rmrf next_ledger_location ;
               create_new_uuids () )
           else create_new_uuids ()
         in
