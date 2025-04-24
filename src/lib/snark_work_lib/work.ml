@@ -6,8 +6,6 @@ module Single = struct
   module Spec = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('witness, 'ledger_proof) t =
           | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -15,7 +13,7 @@ module Single = struct
               Transaction_snark.Statement.Stable.V2.t
               * 'ledger_proof
               * 'ledger_proof
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson]
       end
     end]
 
@@ -61,14 +59,12 @@ end
 module Spec = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         }
-      [@@deriving fields, sexp, to_yojson]
+      [@@deriving fields, sexp, yojson]
 
       let to_latest single_latest { instances; fee } =
         { instances = One_or_two.Stable.V1.to_latest single_latest instances
