@@ -2,7 +2,14 @@
  (name work_partitioner)
  (public_name work_partitioner)
  (library_flags -linkall)
- (libraries core_kernel)
+ (libraries 
+   ; OPAM libraries
+   core_kernel 
+   ; local libraries
+   snark_work_lib
+   ledger_proof
+   signature_lib
+   currency)
  (preprocess
   (pps
    ppx_let))
