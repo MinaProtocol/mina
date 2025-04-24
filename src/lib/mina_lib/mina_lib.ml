@@ -193,7 +193,7 @@ module Snark_worker = struct
       Process.create_exn () ~prog:our_binary ?env
         ~args:
           ( "internal" :: Snark_worker.Entry.command_name
-          :: Snark_worker.arguments ~proof_level
+          :: Snark_worker.Entry.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
@@ -876,7 +876,8 @@ let request_work t =
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_worker_lib.Work.Result.t) =
+let add_work t (work : Snark_work_lib.Selector.Result.t) =
+  let module Work = Snark_work_lib in
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -901,9 +902,14 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
+  let work_materialized =
+    work
+    |> Work.Work.Result.map ~f_spec:Fn.id
+         ~f_single:Ledger_proof.Cached.read_proof_from_disk
+  in
   Network_pool.Snark_pool.(
     Local_sink.push t.pipes.snark_local_sink
-      (Resource_pool.Diff.of_result work, cb))
+      (Resource_pool.Diff.of_result work_materialized, cb))
   |> Deferred.don't_wait_for
 
 let add_work_graphql t diff =
