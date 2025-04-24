@@ -1,4 +1,20 @@
-module Prod = Prod
-module Intf = Intf
-module Inputs = Prod.Inputs
+(* NOTE: These documentation might be helpful
+   - https://docs.minaprotocol.com/mina-protocol/snark-workers
+*)
+
+(* module interacting with CLIs *)
 module Entry = Entry
+
+(* module providing versioned RPCs *)
+module Rpcs = struct
+  module Get_work = Rpc_get_work
+  module Submit_work = Rpc_submit_work
+  module Failed_to_generate_snark = Rpc_failed_to_generate_snark
+end
+
+(* module providing Single Workers *)
+module Single_worker = struct
+  module Debug : Intf.Single_worker = Debug.Impl
+
+  module Prod : Intf.Single_worker = Prod.Impl
+end
