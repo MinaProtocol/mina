@@ -2,7 +2,7 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
+module Bignum_bigint = Snarky_backendless.Backend_intf.Bignum_bigint
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
 let tests_enabled = true

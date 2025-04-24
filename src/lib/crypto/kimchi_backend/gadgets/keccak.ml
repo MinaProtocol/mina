@@ -1,5 +1,5 @@
 open Core_kernel
-module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
+module Bignum_bigint = Snarky_backendless.Backend_intf.Bignum_bigint
 module Snark_intf = Snarky_backendless.Snark_intf
 module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 

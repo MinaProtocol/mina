@@ -1,4 +1,4 @@
-module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
+module Bignum_bigint = Snarky_backendless.Backend_intf.Bignum_bigint
 
 let pubkey_hex_to_point (hex : string) : Bignum_bigint.t * Bignum_bigint.t =
   assert (132 = String.length hex) ;

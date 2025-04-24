@@ -1,4 +1,4 @@
-module Setup_test (Backend : Snarky_backendless.Backend_extended.Input_intf) = struct
+module Setup_test (Backend : Snarky_backendless.Backend_intf.Input_intf) = struct
   module Impl = Snarky_backendless.Snark.Run.Make (Backend)
   open Impl
 

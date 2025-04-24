@@ -1,6 +1,6 @@
 open Intf
 open Core_kernel
-module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
+module Bignum_bigint = Snarky_backendless.Backend_intf.Bignum_bigint
 
 module type Input_intf = sig
   type t
