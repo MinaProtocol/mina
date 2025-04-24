@@ -18,3 +18,6 @@ module Single_worker = struct
 
   module Prod : Intf.Single_worker = Prod.Impl
 end
+
+(* module providing all structured log events *)
+module Events = Events
