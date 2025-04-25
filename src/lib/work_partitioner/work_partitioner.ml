@@ -185,3 +185,11 @@ let consume_job_from_selector ~(partitioner : t) ~(spec : Work.Selector.Spec.t)
       partitioner.tmp_slot <- Some (spec1, pairing1, fee_of_full) ;
       convert_single_work_from_selector ~partitioner ~single_spec:spec2
         ~pairing:pairing2 ~fee_of_full
+
+(* Logics for work submitting *)
+
+type submit_result =
+  | SchemeUnmatched
+  | Slashed
+  | Processed of Work.Selector.Result.t option
+(* If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
