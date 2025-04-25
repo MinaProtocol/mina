@@ -8,6 +8,11 @@ module type Monadic2 = sig
 
   val map : 'a t -> f:('a -> ('b, 'e) m) -> ('b t, 'e) m
 
+  (** [map_biased t ~f] would map on all element inside a One_or_two, but the caller
+      could discriminate on each element based on their position in the One_or_two.
+      If t is `One a, this will return `One (f `One a);
+      If t is `Two (a, b), this would return `Two (f `First a, f `Second b);
+   *)
   val map_biased :
     'a t -> f:([ `One | `First | `Second ] -> 'a -> ('b, 'e) m) -> ('b t, 'e) m
 
