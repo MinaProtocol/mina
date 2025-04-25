@@ -27,7 +27,6 @@
   pickles_types
   random_oracle_input
   genesis_constants
-  bash_colors
   integration_test_lib
   signature_lib
   mina_signature_kind

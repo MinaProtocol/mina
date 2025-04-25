@@ -66,7 +66,7 @@
   transition_frontier
   transition_frontier_base
   transition_frontier_extensions
-  truth
+  mina_stdlib
   unix_timestamp
   unsigned_extended
   vrf_evaluator

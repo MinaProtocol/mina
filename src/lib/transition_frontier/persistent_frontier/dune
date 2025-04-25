@@ -17,7 +17,7 @@
   o1trace
   mina_metrics
   trust_system
-  truth
+  mina_stdlib
   staged_ledger
   precomputed_values
   data_hash_lib
@@ -40,7 +40,6 @@
   verifier
   with_hash
   debug_assert
-  mina_stdlib
   ppx_version.runtime
   pickles.backend
   snark_params

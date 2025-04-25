@@ -39,16 +39,16 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
     With_hash.map genesis_state ~f:(Fn.const block)
   in
   let validation =
-    ( (`Time_received, Truth.True ())
-    , (`Genesis_state, Truth.True ())
-    , (`Proof, Truth.True ())
+    ( (`Time_received, Mina_stdlib.Truth.True ())
+    , (`Genesis_state, Mina_stdlib.Truth.True ())
+    , (`Proof, Mina_stdlib.Truth.True ())
     , ( `Delta_block_chain
-      , Truth.True
+      , Mina_stdlib.Truth.True
           ( Mina_stdlib.Nonempty_list.singleton
           @@ Protocol_state.previous_state_hash protocol_state ) )
-    , (`Frontier_dependencies, Truth.True ())
-    , (`Staged_ledger_diff, Truth.True ())
-    , (`Protocol_versions, Truth.True ()) )
+    , (`Frontier_dependencies, Mina_stdlib.Truth.True ())
+    , (`Staged_ledger_diff, Mina_stdlib.Truth.True ())
+    , (`Protocol_versions, Mina_stdlib.Truth.True ()) )
   in
   (block_with_hash, validation)
 

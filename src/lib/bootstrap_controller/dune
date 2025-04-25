@@ -26,7 +26,6 @@
   data_hash_lib
   error_json
   fake_network
-  gadt_lib
   genesis_constants
   kimchi_backend
   kimchi_pasta
@@ -63,6 +62,5 @@
   transition_frontier_persistent_frontier
   transition_frontier_persistent_root
   trust_system
-  truth
   verifier
   with_hash))

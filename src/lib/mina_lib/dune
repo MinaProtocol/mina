@@ -84,7 +84,6 @@
   prover
   verifier
   snark_work_lib
-  truth
   ledger_catchup
   genesis_ledger_helper
   coda_genesis_proof
