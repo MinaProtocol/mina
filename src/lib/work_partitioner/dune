@@ -5,7 +5,7 @@
  (libraries 
    ;; OPAM Libraries
    async 
-   core_kernel
+   core
    ;; Local Libraries
    mina_base
    snark_work_lib
