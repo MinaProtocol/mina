@@ -140,6 +140,7 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing
                   ; merge_remaining
                   ; spec = work
                   ; elapsed = Time.Span.zero
+                  ; fee_of_full
                   }
               in
               let pairing =

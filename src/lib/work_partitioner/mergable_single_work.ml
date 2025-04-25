@@ -10,7 +10,7 @@ type t =
   ; metric : Core.Time.Span.t * [ `Merge | `Transition ]
   ; spec : Selector_work.Single.Spec.t
   ; prover : Signature_lib.Public_key.Compressed.t
-  ; fee : Currency.Fee.t
+  ; fee_of_full : Currency.Fee.t
   }
 
 let merge_to_one_result_exn (left : t) (right : t) : Selector_work.Result.t =
@@ -19,11 +19,11 @@ let merge_to_one_result_exn (left : t) (right : t) : Selector_work.Result.t =
       [ phys_equal left.which_half `First
       ; phys_equal right.which_half `Second
       ; Signature_lib.Public_key.Compressed.equal left.prover right.prover
-      ; Currency.Fee.equal left.fee right.fee
+      ; Currency.Fee.equal left.fee_of_full right.fee_of_full
       ] ) ;
   let metrics = `Two (left.metric, right.metric) in
   { proofs = `Two (left.proof, right.proof)
   ; metrics
-  ; spec = { instances = `Two (left.spec, right.spec); fee = left.fee }
+  ; spec = { instances = `Two (left.spec, right.spec); fee = left.fee_of_full }
   ; prover = left.prover
   }

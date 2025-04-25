@@ -13,6 +13,7 @@ type t =
   ; unscheduled_segments : Work.Partitioned.Zkapp_command_job.Spec.t Queue.t
         (* we may need to insert proofs to merge back to the queue, hence a Deque *)
   ; pending_mergable_proofs : Ledger_proof.Cached.t Deque.t
+  ; fee_of_full : Currency.Fee.t
   ; mutable elapsed : Time.Stable.Span.V1.t
   ; mutable merge_remaining : int
   }
