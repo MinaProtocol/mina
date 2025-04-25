@@ -114,7 +114,7 @@ module Zkapp_command_job = struct
     module V1 = struct
       type t =
         { spec : Spec.Stable.V1.t
-        ; pairing_id : Pairing.Stable.V1.t
+        ; pairing : Pairing.Stable.V1.t
         ; job_id : ID.Stable.V1.t
         }
       [@@deriving sexp, yojson]
@@ -123,14 +123,14 @@ module Zkapp_command_job = struct
     end
   end]
 
-  type t = { spec : Spec.t; pairing_id : Pairing.Stable.V1.t; job_id : ID.t }
+  type t = { spec : Spec.t; pairing : Pairing.Stable.V1.t; job_id : ID.t }
 
-  let materialize ({ spec; pairing_id; job_id } : t) : Stable.Latest.t =
-    { spec = Spec.materialize spec; pairing_id; job_id }
+  let materialize ({ spec; pairing; job_id } : t) : Stable.Latest.t =
+    { spec = Spec.materialize spec; pairing; job_id }
 
   let cache ~(proof_cache_db : Proof_cache_tag.cache_db)
-      ({ spec; pairing_id; job_id } : Stable.Latest.t) : t =
-    { spec = Spec.cache ~proof_cache_db spec; pairing_id; job_id }
+      ({ spec; pairing; job_id } : Stable.Latest.t) : t =
+    { spec = Spec.cache ~proof_cache_db spec; pairing; job_id }
 end
 
 (* this is the actual work passed over network between coordinator and worker *)
