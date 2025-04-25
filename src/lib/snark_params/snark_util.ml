@@ -224,30 +224,5 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
         f 4 [ true; true; true; true; false ] ;
         f 3 [ true; false; true; false; false ] ;
         f 5 [ true; false; true; false; true ]
-
-      (*let%test_unit "num_bits_upper_bound" =
-        let max_length = Field.size_in_bits - 1 in
-        let test x =
-          let handle_with resp =
-            handle
-              (num_bits_upper_bound ~max_length (Field.Var.constant x))
-              (fun (With {request; respond}) ->
-                match request with
-                | Num_bits_upper_bound -> respond (Field.of_int resp)
-                | _ -> unhandled)
-          in
-          let true_answer = num_bits_upper_bound_unchecked x in
-          for i = 0 to true_answer - 1 do
-            if check (handle_with i) ()
-            then begin
-              let n = Bigint.of_field x in
-              failwithf !"Shouldn't have passed: x=%s, i=%d"
-                (String.init max_length ~f:(fun j -> if Bigint.test_bit n j then '1' else '0'))
-                i ();
-            end;
-          done;
-          assert (check (handle_with true_answer) ())
-        in
-        test (random_n_bit_field_elt max_length)*)
     end )
 end
