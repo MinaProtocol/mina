@@ -8,6 +8,7 @@
    core_kernel
    ;; Local Libraries
    mina_base
+   snark_work_lib
    transaction_snark)
    
  (preprocess
