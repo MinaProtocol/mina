@@ -42,8 +42,8 @@ let generate_job_spec (t : t) : Work.Partitioned.Zkapp_command_job.Spec.t option
     =
   List.find_map ~f:(fun f -> f ()) [ generate_merge ~t; generate_segment ~t ]
 
-let submit_proof (t : t) ~(p : Ledger_proof.Cached.t)
+let submit_proof (t : t) ~(proof : Ledger_proof.Cached.t)
     ~(elapsed : Time.Stable.Span.V1.t) =
-  Deque.enqueue_back t.pending_mergable_proofs p ;
+  Deque.enqueue_back t.pending_mergable_proofs proof ;
   t.merge_remaining <- t.merge_remaining - 1 ;
   t.elapsed <- Time.Span.(t.elapsed + elapsed)
