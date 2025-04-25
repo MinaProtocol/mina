@@ -222,7 +222,6 @@
 (package (name user_command_input))
 (package (name validate_keypair))
 (package (name verifier))
-(package (name visualization))
 (package (name vrf_evaluator))
 (package (name vrf_lib))
 (package (name vrf_lib_tests))
