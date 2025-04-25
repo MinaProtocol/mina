@@ -281,6 +281,27 @@ module Proof_with_metric = struct
     { proof; elapsed }
 end
 
+let construct_selector_result
+    ~(instances : (Selector.Single.Spec.t * Proof_with_metric.t) One_or_two.t)
+    ~fee ~prover =
+  let proofs = One_or_two.map ~f:(fun (_, { proof; _ }) -> proof) instances in
+  let metrics =
+    One_or_two.map
+      ~f:(fun (single, { elapsed; _ }) ->
+        let tag =
+          match single with
+          | Work.Single.Spec.Transition (_, _) ->
+              `Transition
+          | Work.Single.Spec.Merge (_, _, _) ->
+              `Merge
+        in
+        (elapsed, tag) )
+      instances
+  in
+
+  let instances = One_or_two.map ~f:(fun (single, _) -> single) instances in
+  ({ proofs; metrics; spec = { instances; fee }; prover } : Selector.Result.t)
+
 module Result = struct
   [%%versioned
   module Stable = struct
@@ -337,27 +358,7 @@ module Result = struct
   let to_selector_result ({ data; prover } : t) : Selector.Result.t option =
     match data with
     | Old { instances; fee } ->
-        let proofs =
-          One_or_two.map ~f:(fun (_, { proof; _ }) -> proof) instances
-        in
-        let metrics =
-          One_or_two.map
-            ~f:(fun (single, { elapsed; _ }) ->
-              let tag =
-                match single with
-                | Work.Single.Spec.Transition (_, _) ->
-                    `Transition
-                | Work.Single.Spec.Merge (_, _, _) ->
-                    `Merge
-              in
-              (elapsed, tag) )
-            instances
-        in
-
-        let instances =
-          One_or_two.map ~f:(fun (single, _) -> single) instances
-        in
-        Some { proofs; metrics; spec = { instances; fee }; prover }
+        Some (construct_selector_result ~instances ~fee ~prover)
     | _ ->
         None
 end
