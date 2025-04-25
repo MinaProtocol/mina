@@ -2,12 +2,12 @@ open Core_kernel
 
 (* A `Pairing.t` identifies a single work in Work_selector's perspective *)
 module Pairing = struct
-  module UUID = struct
+  module ID = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
         (* this identifies a One_or_two work from Work_selector's perspective *)
-        type t = Pairing_UUID of int
+        type t = Pairing_ID of int
         [@@deriving compare, hash, sexp, yojson, equal]
 
         let to_latest = Fn.id
@@ -22,7 +22,7 @@ module Pairing = struct
          might be left in pool of half completion. *)
       type t =
         { one_or_two : [ `First | `Second | `One ]
-        ; pair_uuid : UUID.Stable.V1.t option
+        ; pair_id : ID.Stable.V1.t option
         }
       [@@deriving compare, hash, sexp, yojson, equal]
 
@@ -33,11 +33,11 @@ end
 
 module Zkapp_command_job = struct
   (* This identifies a single `Zkapp_command_job.t` *)
-  module UUID = struct
+  module ID = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Job_UUID of int [@@deriving compare, hash, sexp, yojson]
+        type t = Job_ID of int [@@deriving compare, hash, sexp, yojson]
 
         let to_latest = Fn.id
       end
@@ -115,7 +115,7 @@ module Zkapp_command_job = struct
       type t =
         { spec : Spec.Stable.V1.t
         ; pairing_id : Pairing.Stable.V1.t
-        ; job_uuid : UUID.Stable.V1.t
+        ; job_id : ID.Stable.V1.t
         }
       [@@deriving sexp, yojson]
 
@@ -123,15 +123,14 @@ module Zkapp_command_job = struct
     end
   end]
 
-  type t =
-    { spec : Spec.t; pairing_id : Pairing.Stable.V1.t; job_uuid : UUID.t }
+  type t = { spec : Spec.t; pairing_id : Pairing.Stable.V1.t; job_id : ID.t }
 
-  let materialize ({ spec; pairing_id; job_uuid } : t) : Stable.Latest.t =
-    { spec = Spec.materialize spec; pairing_id; job_uuid }
+  let materialize ({ spec; pairing_id; job_id } : t) : Stable.Latest.t =
+    { spec = Spec.materialize spec; pairing_id; job_id }
 
   let cache ~(proof_cache_db : Proof_cache_tag.cache_db)
-      ({ spec; pairing_id; job_uuid } : Stable.Latest.t) : t =
-    { spec = Spec.cache ~proof_cache_db spec; pairing_id; job_uuid }
+      ({ spec; pairing_id; job_id } : Stable.Latest.t) : t =
+    { spec = Spec.cache ~proof_cache_db spec; pairing_id; job_id }
 end
 
 (* this is the actual work passed over network between coordinator and worker *)
@@ -233,7 +232,7 @@ module Spec = struct
 
   let of_selector_spec : Selector.Spec.t -> t =
     Work.Spec.map_biased ~f_single:(fun ~one_or_two instance ->
-        Single.Spec.Regular (instance, { one_or_two; pair_uuid = None }) )
+        Single.Spec.Regular (instance, { one_or_two; pair_id = None }) )
 
   let to_selector_spec : t -> Selector.Spec.t option =
     Work.Spec.map_opt ~f_single:Single.Spec.regular_opt
@@ -313,10 +312,10 @@ module Result = struct
     let open Option.Let_syntax in
     let%bind () =
       match spec.instances with
-      | `One (Regular (_, { one_or_two = `One; pair_uuid = None }))
+      | `One (Regular (_, { one_or_two = `One; pair_id = None }))
       | `Two
-          ( Regular (_, { one_or_two = `First; pair_uuid = None })
-          , Regular (_, { one_or_two = `Second; pair_uuid = None }) ) ->
+          ( Regular (_, { one_or_two = `First; pair_id = None })
+          , Regular (_, { one_or_two = `Second; pair_id = None }) ) ->
           (* We indeed have an old spec *)
           Some ()
       | _ ->
