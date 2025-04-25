@@ -1,0 +1,9 @@
+(tests
+ (names test_snark_params)
+ (libraries
+  alcotest
+  core_kernel
+  group_map
+  snark_params)
+ (preprocess
+  (pps ppx_let ppx_snarky)))

@@ -2,8 +2,6 @@
  (name snark_params)
  (public_name snark_params)
  (library_flags -linkall)
- (inline_tests
-  (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
   base.base_internalhash_types
@@ -43,7 +41,6 @@
    ppx_sexp_conv
    ppx_bin_prot
    ppx_custom_printf
-   ppx_inline_test
    ppx_snarky))
  (instrumentation
   (backend bisect_ppx))
