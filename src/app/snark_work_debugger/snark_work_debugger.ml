@@ -25,7 +25,9 @@ let main (spec_path : string) ~constraint_constants ~proof_level =
     Reader.load_sexp_exn spec_path
       Work.Selector.Single.Spec.Stable.Latest.t_of_sexp
   in
-  let spec = Work.Selector.Single.Spec.cache ~proof_cache_db spec in
+  let spec =
+    Work.Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db spec
+  in
   let%bind worker =
     Single_worker.Worker_state.create ~constraint_constants ~proof_level ()
   in

@@ -147,7 +147,8 @@ let command =
        in
        let spec =
          One_or_two.map
-           ~f:(Work.Selector.Single.Spec.cache ~proof_cache_db)
+           ~f:
+             (Work.Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
            spec
        in
        let public_key =

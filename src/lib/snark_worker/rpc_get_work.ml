@@ -46,14 +46,16 @@ module Stable = struct
         | None ->
             None
         | Some (spec, key) ->
-            Some (Work.Selector.Spec.materialize spec, key)
+            Some (Work.Selector.Spec.read_all_proofs_from_disk spec, key)
 
       let caller_model_of_response : response -> Master.Caller.response =
         function
         | None ->
             None
         | Some (spec, key) ->
-            Some (Work.Selector.Spec.cache ~proof_cache_db spec, key)
+            Some
+              ( Work.Selector.Spec.write_all_proofs_to_disk ~proof_cache_db spec
+              , key )
     end
 
     include T

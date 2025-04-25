@@ -87,8 +87,8 @@ module Impl : Intf.Single_worker = struct
             | Error e ->
                 let sexp_string_of_single_spec =
                   Work.Selector.Single.Spec.(
-                    materialize single |> Stable.Latest.sexp_of_t
-                    |> Sexp.to_string)
+                    read_all_proofs_from_disk single
+                    |> Stable.Latest.sexp_of_t |> Sexp.to_string)
                 in
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:

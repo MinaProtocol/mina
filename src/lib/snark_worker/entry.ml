@@ -1,6 +1,5 @@
 open Core
 open Async
-
 open Events
 open Worker_proof_cache
 
@@ -214,7 +213,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         (* Pause to wait for stdout to flush *)
         match%bind
           perform state public_key
-            (Work.Selector.Spec.cache ~proof_cache_db work)
+            (Work.Selector.Spec.write_all_proofs_to_disk ~proof_cache_db work)
         with
         | Error e ->
             let%bind () =
@@ -244,7 +243,9 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
                          ~f:Work.Work.Single.Spec.statement ) )
                 ] ;
             let rec submit_work () =
-              let result = Work.Selector.Result.materialize result in
+              let result =
+                Work.Selector.Result.read_all_proofs_from_disk result
+              in
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
                   shutdown_on_disconnect result daemon_address

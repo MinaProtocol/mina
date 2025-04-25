@@ -43,11 +43,13 @@ module Stable = struct
 
       let query_of_caller_model ((err, spec, key) : Master.Caller.query) : query
           =
-        (err, Work.Selector.Spec.materialize spec, key)
+        (err, Work.Selector.Spec.read_all_proofs_from_disk spec, key)
 
       let callee_model_of_query ((err, spec, key) : query) : Master.Callee.query
           =
-        (err, Work.Selector.Spec.cache ~proof_cache_db spec, key)
+        ( err
+        , Work.Selector.Spec.write_all_proofs_to_disk ~proof_cache_db spec
+        , key )
 
       let response_of_callee_model = Fn.id
 

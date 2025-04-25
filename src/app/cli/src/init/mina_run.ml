@@ -460,7 +460,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 , Work.Selector.Spec.Stable.Latest.to_yojson wire_result.spec )
               ] ;
           let result =
-            Work.Selector.Result.cache
+            Work.Selector.Result.write_all_proofs_to_disk
               ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
               wire_result
           in

@@ -29,7 +29,8 @@ module Worker_state = struct
              Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
            let single_spec =
-             Work.Selector.Single.Spec.cache ~proof_cache_db single_spec
+             Work.Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
+               single_spec
            in
            Prod.perform_single worker_state ~message single_spec
        end in

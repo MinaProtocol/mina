@@ -35,10 +35,10 @@ module Stable = struct
       type response = unit
 
       let query_of_caller_model : Master.Caller.query -> query =
-        Work.Selector.Result.materialize
+        Work.Selector.Result.read_all_proofs_from_disk
 
       let callee_model_of_query : query -> Master.Callee.query =
-        Work.Selector.Result.cache ~proof_cache_db
+        Work.Selector.Result.write_all_proofs_to_disk ~proof_cache_db
 
       let response_of_callee_model = Fn.id
 

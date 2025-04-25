@@ -97,9 +97,8 @@ module Monadic2 (M : Monad.S2) :
     | `One a ->
         M.map ~f:(fun x -> `One x) (f `One a)
     | `Two (a, b) ->
-        let open M.Let_syntax in
-        let%bind a' = f `First a in
-        let%map b' = f `Second b in
+        let%bind.M a' = f `First a in
+        let%map.M b' = f `Second b in
         `Two (a', b')
 
   let fold :
@@ -125,6 +124,8 @@ module Option = Monadic (Option)
 module Or_error = Monadic (Or_error)
 
 let map = Ident.map
+
+let map_biased = Ident.map_biased
 
 let fold = Ident.fold
 

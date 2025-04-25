@@ -1751,7 +1751,7 @@ let internal_commands logger ~itn_features =
                   sexp
               in
               match%map
-                Snark_work_lib.Selector.Single.Spec.cache
+                Snark_work_lib.Selector.Single.Spec.write_all_proofs_to_disk
                   ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
                   spec
                 |> Single_worker.perform_single worker_state
