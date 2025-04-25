@@ -135,66 +135,112 @@ module Zkapp_command_job = struct
 end
 
 module Spec = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type 'metric t =
+          | Regular of
+              { single_spec : Selector.Single.Spec.Stable.V1.t
+              ; pairing : Pairing.Stable.V1.t
+              ; metric : 'metric
+              }
+          | Sub_zkapp_command of
+              { spec : Zkapp_command_job.Stable.V1.t; metric : 'metric }
+          | Old of
+              (Selector.Single.Spec.Stable.V1.t * 'metric) Work.Spec.Stable.V1.t
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type 'metric t =
+      | Regular of
+          { single_spec : Selector.Single.Spec.t
+          ; pairing : Pairing.t
+          ; metric : 'metric
+          }
+      | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
+      | Old of (Selector.Single.Spec.t * 'metric) Work.Spec.t
+
+    let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
+      function
+      | Regular { single_spec; pairing; metric } ->
+          let single_spec =
+            Selector.Single.Spec.read_all_proofs_from_disk single_spec
+          in
+          Regular { single_spec; pairing; metric }
+      | Old spec ->
+          Old
+            (Work.Spec.map
+               ~f:
+                 (Tuple2.map_fst
+                    ~f:Selector.Single.Spec.read_all_proofs_from_disk )
+               spec )
+      | Sub_zkapp_command { spec; metric } ->
+          let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
+          Sub_zkapp_command { spec; metric }
+
+    let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
+        'metric Stable.Latest.t -> 'metric t = function
+      | Regular { single_spec; pairing; metric } ->
+          let single_spec =
+            Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
+              single_spec
+          in
+          Regular { single_spec; pairing; metric }
+      | Old spec ->
+          Old
+            (Work.Spec.map
+               ~f:
+                 (Tuple2.map_fst
+                    ~f:
+                      (Selector.Single.Spec.write_all_proofs_to_disk
+                         ~proof_cache_db ) )
+               spec )
+      | Sub_zkapp_command { spec; metric } ->
+          let spec =
+            Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec
+          in
+          Sub_zkapp_command { spec; metric }
+
+    let transaction = function
+      | Regular { single_spec; _ } ->
+          let txn = Selector.Single.Spec.transaction single_spec in
+          `Regular txn
+      | Sub_zkapp_command _ ->
+          `Sub_zkapp_command
+      | Old spec ->
+          `Old
+            (One_or_two.map spec.instances ~f:(fun (single, ()) ->
+                 Selector.Single.Spec.transaction single ) )
+  end
+
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t =
-        | Regular of (Selector.Single.Spec.Stable.V1.t * Pairing.Stable.V1.t)
-        | Sub_zkapp_command of Zkapp_command_job.Stable.V1.t
-        | Old of Selector.Single.Spec.Stable.V1.t Work.Spec.Stable.V1.t
-      [@@deriving sexp, yojson]
+      type t = unit Poly.Stable.V1.t [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t =
-    | Regular of (Selector.Single.Spec.t * Pairing.t)
-    | Sub_zkapp_command of Zkapp_command_job.t
-    | Old of Selector.Single.Spec.t Work.Spec.t
+  type t = unit Poly.t
 
-  let read_all_proofs_from_disk : t -> Stable.Latest.t = function
-    | Regular (spec, pairing) ->
-        Regular (Selector.Single.Spec.read_all_proofs_from_disk spec, pairing)
-    | Old spec ->
-        Old
-          (Work.Spec.map ~f:Selector.Single.Spec.read_all_proofs_from_disk spec)
-    | Sub_zkapp_command spec ->
-        Sub_zkapp_command (Zkapp_command_job.read_all_proofs_from_disk spec)
-
-  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-      Stable.Latest.t -> t = function
-    | Regular (spec, pairing) ->
-        Regular
-          ( Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db spec
-          , pairing )
-    | Old spec ->
-        Old
-          (Work.Spec.map
-             ~f:(Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
-             spec )
-    | Sub_zkapp_command spec ->
-        Sub_zkapp_command
-          (Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec)
-
-  let of_selector_spec (spec : Selector.Spec.t) : t = Old spec
+  let of_selector_spec (spec : Selector.Spec.t) : t =
+    Old (Work.Spec.map ~f:(fun spec -> (spec, ())) spec)
 
   let to_selector_spec : t -> Selector.Spec.t option = function
     | Old spec ->
+        let spec = Work.Spec.map ~f:(fun (spec, ()) -> spec) spec in
         Some spec
     | _ ->
         None
-
-  let transaction = function
-    | Regular (single, _) ->
-        let txn = Selector.Single.Spec.transaction single in
-        `Regular txn
-    | Sub_zkapp_command _ ->
-        `Sub_zkapp_command
-    | Old spec ->
-        `Old (One_or_two.map spec.instances ~f:Selector.Single.Spec.transaction)
 end
 
 module Result = struct
