@@ -76,7 +76,7 @@ module Zkapp_command_job = struct
       | Merge of
           { proof1 : Ledger_proof.Cached.t; proof2 : Ledger_proof.Cached.t }
 
-    let materialize : t -> Stable.Latest.t = function
+    let read_all_proofs_from_disk : t -> Stable.Latest.t = function
       | Segment { statement; witness; spec } ->
           let witness =
             Transaction_snark.Zkapp_command_segment.Witness
@@ -89,7 +89,7 @@ module Zkapp_command_job = struct
           let proof2 = Ledger_proof.Cached.read_proof_from_disk proof2 in
           Merge { proof1; proof2 }
 
-    let cache ~(proof_cache_db : Proof_cache_tag.cache_db) :
+    let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         Stable.Latest.t -> t = function
       | Segment { statement; witness; spec } ->
           let witness =
@@ -125,12 +125,16 @@ module Zkapp_command_job = struct
 
   type t = { spec : Spec.t; pairing : Pairing.Stable.V1.t; job_id : ID.t }
 
-  let materialize ({ spec; pairing; job_id } : t) : Stable.Latest.t =
-    { spec = Spec.materialize spec; pairing; job_id }
+  let read_all_proofs_from_disk ({ spec; pairing; job_id } : t) :
+      Stable.Latest.t =
+    { spec = Spec.read_all_proofs_from_disk spec; pairing; job_id }
 
-  let cache ~(proof_cache_db : Proof_cache_tag.cache_db)
+  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db)
       ({ spec; pairing; job_id } : Stable.Latest.t) : t =
-    { spec = Spec.cache ~proof_cache_db spec; pairing; job_id }
+    { spec = Spec.write_all_proofs_to_disk ~proof_cache_db spec
+    ; pairing
+    ; job_id
+    }
 end
 
 (* this is the actual work passed over network between coordinator and worker *)
@@ -154,18 +158,21 @@ module Single = struct
       | Regular of (Selector.Single.Spec.t * Pairing.t)
       | Sub_zkapp_command of Zkapp_command_job.t
 
-    let materialize : t -> Stable.Latest.t = function
+    let read_all_proofs_from_disk : t -> Stable.Latest.t = function
       | Regular (work, pairing) ->
-          Regular (Selector.Single.Spec.materialize work, pairing)
+          Regular (Selector.Single.Spec.read_all_proofs_from_disk work, pairing)
       | Sub_zkapp_command job ->
-          Sub_zkapp_command (Zkapp_command_job.materialize job)
+          Sub_zkapp_command (Zkapp_command_job.read_all_proofs_from_disk job)
 
-    let cache ~(proof_cache_db : Proof_cache_tag.cache_db) :
+    let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         Stable.Latest.t -> t = function
       | Regular (work, pairing) ->
-          Regular (Selector.Single.Spec.cache ~proof_cache_db work, pairing)
+          Regular
+            ( Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db work
+            , pairing )
       | Sub_zkapp_command job ->
-          Sub_zkapp_command (Zkapp_command_job.cache ~proof_cache_db job)
+          Sub_zkapp_command
+            (Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db job)
 
     let regular_opt (work : t) : Selector.Single.Spec.t option =
       match work with Regular (w, _) -> Some w | _ -> None
@@ -224,14 +231,14 @@ module Spec = struct
 
   type t = Single.Spec.t Work.Spec.t
 
-  let materialize : t -> Stable.Latest.t =
-    Work.Spec.map ~f:Single.Spec.materialize
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
+    Work.Spec.map ~f:Single.Spec.read_all_proofs_from_disk
 
-  let cache ~(proof_cache_db : Proof_cache_tag.cache_db) =
-    Work.Spec.map ~f:(Single.Spec.cache ~proof_cache_db)
+  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) =
+    Work.Spec.map ~f:(Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
 
   let of_selector_spec : Selector.Spec.t -> t =
-    Work.Spec.map_biased ~f_single:(fun ~one_or_two instance ->
+    Work.Spec.map_biased ~f_single:(fun one_or_two instance ->
         Single.Spec.Regular (instance, { one_or_two; pair_id = None }) )
 
   let to_selector_spec : t -> Selector.Spec.t option =
@@ -271,21 +278,22 @@ module Result = struct
     ; prover : Signature_lib.Public_key.Compressed.t
     }
 
-  let materialize ({ proofs; metrics; spec; prover } : t) : Stable.Latest.t =
+  let read_all_proofs_from_disk ({ proofs; metrics; spec; prover } : t) :
+      Stable.Latest.t =
     { proofs = One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk proofs
     ; metrics
-    ; spec = Spec.materialize spec
+    ; spec = Spec.read_all_proofs_from_disk spec
     ; prover
     }
 
-  let cache ~proof_cache_db ({ proofs; metrics; spec; prover } : Stable.Latest.t)
-      : t =
+  let write_all_proofs_to_disk ~proof_cache_db
+      ({ proofs; metrics; spec; prover } : Stable.Latest.t) : t =
     { proofs =
         One_or_two.map
           ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
           proofs
     ; metrics
-    ; spec = Spec.cache ~proof_cache_db spec
+    ; spec = Spec.write_all_proofs_to_disk ~proof_cache_db spec
     ; prover
     }
 
