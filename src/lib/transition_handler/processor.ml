@@ -221,7 +221,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             | ( _
               , _
               , _
-              , (`Delta_block_chain, Truth.True delta_state_hashes)
+              , (`Delta_block_chain, Mina_stdlib.Truth.True delta_state_hashes)
               , _
               , _
               , _ ) ->

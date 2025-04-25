@@ -1,5 +1,5 @@
 open Core
-open Gadt_lib
+open Mina_stdlib.Gadt
 module Sync_ledger = Mina_ledger.Sync_ledger
 
 module type CONTEXT = sig
