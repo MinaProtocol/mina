@@ -26,7 +26,6 @@
   data_hash_lib
   error_json
   fake_network
-  gadt_lib
   genesis_constants
   kimchi_backend
   kimchi_pasta
