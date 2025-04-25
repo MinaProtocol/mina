@@ -29,7 +29,8 @@ type t =
         (* WARN: we're assuming everything in this queue is sorted in time from old to new.
            So queue head is the oldest task.
         *)
-  ; mutable first_in_pair : Work.Selector.Single.Spec.t option
+  ; mutable tmp_slot :
+      (Work.Selector.Single.Spec.t * Work.Partitioned.Pairing.t) option
         (* When receving a `Two works from the underlying Work_selector, store one of them here,
            so we could issue them to another worker.
         *)
@@ -48,7 +49,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   ; zkapp_command_jobs = Zkapp_command_job_pool.create ()
   ; reassignment_timeout
   ; jobs_sent_by_partitioner = Sent_job_pool.create ()
-  ; first_in_pair = None
+  ; tmp_slot = None
   }
 
 (* Logics for work requesting *)
@@ -92,3 +93,74 @@ let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
 
   let spec = job_with_status.job in
   Work.Partitioned.Spec.Poly.Sub_zkapp_command { spec; metric = () }
+
+let rec issue_from_tmp_slot ~(partitioner : t) () =
+  match partitioner.tmp_slot with
+  | Some spec ->
+      partitioner.tmp_slot <- None ;
+      Some (convert_single_work_from_selector ~partitioner ~spec)
+  | None ->
+      None
+
+(* try to issue a single work received from the underlying Work_selector
+   `one_or_two` tracks which task is it inside a `One_or_two`*)
+and convert_single_work_from_selector ~(partitioner : t)
+    ~spec:(single_spec, pairing) : Work.Partitioned.Spec.t =
+  match single_spec with
+  | Transition (input, witness) as work -> (
+      (* WARN: a smilar copy of this exists in `Snark_worker.Worker_impl_prod` *)
+      match witness.transaction with
+      | Command (Zkapp_command zkapp_command) -> (
+          match
+            Async.Thread_safe.block_on_async (fun () ->
+                Snark_worker_shared.extract_zkapp_segment_works
+                  ~m:partitioner.transaction_snark ~input ~witness
+                  ~zkapp_command )
+          with
+          | Ok (Ok (_ :: _ as all)) ->
+              let unscheduled_segments =
+                all
+                |> List.map ~f:(fun (witness, spec, statement) ->
+                       Work.Partitioned.Zkapp_command_job.Spec.Segment
+                         { statement; witness; spec } )
+                |> Queue.of_list
+              in
+              let pending_mergable_proofs = Deque.create () in
+              let merge_remaining = Queue.length unscheduled_segments - 1 in
+              let pending_zkapp_command =
+                Pending_zkapp_command.
+                  { unscheduled_segments
+                  ; pending_mergable_proofs
+                  ; merge_remaining
+                  ; spec = work
+                  ; elapsed = Time.Span.zero
+                  }
+              in
+              assert (
+                phys_equal `Ok
+                  (Zkapp_command_job_pool.attempt_add ~key:pairing
+                     ~job:pending_zkapp_command partitioner.zkapp_command_jobs ) ) ;
+              issue_job_from_partitioner ~partitioner ()
+              |> Option.value_exn
+                   ~message:
+                     "FATAL: we already inserted work into partitioner so this \
+                      shouldn't happen"
+          | Ok (Ok []) ->
+              failwith "No witness generated"
+          | Ok (Error e) ->
+              failwith (Error.to_string_hum e)
+          | Error e ->
+              failwith (Exn.to_string e) )
+      | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
+          Single { single_spec; pairing; metric = () } )
+  | Merge _ ->
+      Single { single_spec; pairing; metric = () }
+
+and issue_job_from_partitioner ~(partitioner : t) () :
+    Work.Partitioned.Spec.t option =
+  List.find_map
+    ~f:(fun f -> f ())
+    [ reissue_old_task ~partitioner
+    ; issue_from_tmp_slot ~partitioner
+    ; issue_from_zkapp_command_work_pool ~partitioner
+    ]
