@@ -142,7 +142,7 @@ module Spec = struct
 
       module V1 = struct
         type 'metric t =
-          | Regular of
+          | Single of
               { single_spec : Selector.Single.Spec.Stable.V1.t
               ; pairing : Pairing.Stable.V1.t
               ; metric : 'metric
@@ -158,7 +158,7 @@ module Spec = struct
     end]
 
     type 'metric t =
-      | Regular of
+      | Single of
           { single_spec : Selector.Single.Spec.t
           ; pairing : Pairing.t
           ; metric : 'metric
@@ -168,8 +168,8 @@ module Spec = struct
 
     let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
       match t with
-      | Regular { single_spec; pairing; metric } ->
-          Regular { single_spec; pairing; metric = f metric }
+      | Single { single_spec; pairing; metric } ->
+          Single { single_spec; pairing; metric = f metric }
       | Old spec ->
           Old (Work.Spec.map ~f:(Tuple2.map_snd ~f) spec)
       | Sub_zkapp_command { spec; metric } ->
@@ -177,11 +177,11 @@ module Spec = struct
 
     let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
       function
-      | Regular { single_spec; pairing; metric } ->
+      | Single { single_spec; pairing; metric } ->
           let single_spec =
             Selector.Single.Spec.read_all_proofs_from_disk single_spec
           in
-          Regular { single_spec; pairing; metric }
+          Single { single_spec; pairing; metric }
       | Sub_zkapp_command { spec; metric } ->
           let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
           Sub_zkapp_command { spec; metric }
@@ -195,12 +195,12 @@ module Spec = struct
 
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         'metric Stable.Latest.t -> 'metric t = function
-      | Regular { single_spec; pairing; metric } ->
+      | Single { single_spec; pairing; metric } ->
           let single_spec =
             Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
               single_spec
           in
-          Regular { single_spec; pairing; metric }
+          Single { single_spec; pairing; metric }
       | Sub_zkapp_command { spec; metric } ->
           let spec =
             Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec
@@ -217,9 +217,9 @@ module Spec = struct
                spec )
 
     let transaction = function
-      | Regular { single_spec; _ } ->
+      | Single { single_spec; _ } ->
           let txn = Selector.Single.Spec.transaction single_spec in
-          `Regular txn
+          `Single txn
       | Sub_zkapp_command _ ->
           `Sub_zkapp_command
       | Old spec ->
