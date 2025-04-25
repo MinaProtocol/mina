@@ -25,12 +25,11 @@
   mina_net2
   mina_base
   mina_transaction
-  truth
+  mina_stdlib
   transition_chain_verifier
   staged_ledger
   data_hash_lib
   block_time
-  mina_stdlib
   with_hash
   signature_lib
   genesis_constants

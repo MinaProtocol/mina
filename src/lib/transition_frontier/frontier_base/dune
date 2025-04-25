@@ -20,7 +20,7 @@
   one_or_two
   mina_base.import
   currency
-  truth
+  mina_stdlib
   allocation_functor
   genesis_constants
   transaction_snark_work
@@ -46,7 +46,6 @@
   protocol_version
   mina_net2
   transaction_snark
-  mina_stdlib
   coda_genesis_proof
   ppx_version.runtime
   pickles.backend

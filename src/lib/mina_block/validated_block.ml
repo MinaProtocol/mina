@@ -28,7 +28,7 @@ let to_yojson (block_with_hashes, _) =
 
 let lift (b, v) =
   match v with
-  | _, _, _, (`Delta_block_chain, Truth.True delta_block_chain_proof), _, _, _
+  | _, _, _, (`Delta_block_chain, Mina_stdlib.Truth.True delta_block_chain_proof), _, _, _
     ->
       (b, delta_block_chain_proof)
 
@@ -36,13 +36,13 @@ let forget (b, _) = b
 
 let remember (b, delta_block_chain_proof) =
   ( b
-  , ( (`Time_received, Truth.True ())
-    , (`Genesis_state, Truth.True ())
-    , (`Proof, Truth.True ())
-    , (`Delta_block_chain, Truth.True delta_block_chain_proof)
-    , (`Frontier_dependencies, Truth.True ())
-    , (`Staged_ledger_diff, Truth.True ())
-    , (`Protocol_versions, Truth.True ()) ) )
+  , ( (`Time_received, Mina_stdlib.Truth.True ())
+    , (`Genesis_state, Mina_stdlib.Truth.True ())
+    , (`Proof, Mina_stdlib.Truth.True ())
+    , (`Delta_block_chain, Mina_stdlib.Truth.True delta_block_chain_proof)
+    , (`Frontier_dependencies, Mina_stdlib.Truth.True ())
+    , (`Staged_ledger_diff, Mina_stdlib.Truth.True ())
+    , (`Protocol_versions, Mina_stdlib.Truth.True ()) ) )
 
 let delta_block_chain_proof (_, d) = d
 
