@@ -1,7 +1,7 @@
 open Async
 open Core
 module Sync_ledger = Mina_ledger.Sync_ledger
-open Gadt_lib
+open Mina_stdlib.Gadt
 open Signature_lib
 open Network_peer
 module Gossip_net = Mina_networking.Gossip_net
@@ -314,7 +314,7 @@ module Generator = struct
 
   let gen ?(logger = Logger.null ()) ~precomputed_values ~verifier
       ~max_frontier_length ~use_super_catchup ~ledger_sync_config
-      (configs : (peer_config, 'n num_peers) Gadt_lib.Vect.t) =
+      (configs : (peer_config, 'n num_peers) Vect.t) =
     (* TODO: Pass in *)
     let module Context = struct
       let logger = logger

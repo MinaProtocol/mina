@@ -67,7 +67,6 @@
   transition_frontier
   transition_frontier_base
   transition_frontier_extensions
-  truth
   unsigned_extended
   vrf_evaluator
   with_hash)
