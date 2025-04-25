@@ -125,6 +125,8 @@ module Or_error = Monadic (Or_error)
 
 let map = Ident.map
 
+let map_biased = Ident.map_biased
+
 let fold = Ident.fold
 
 let iter t ~f = match t with `One a -> f a | `Two (a, b) -> f a ; f b
