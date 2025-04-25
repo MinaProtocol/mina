@@ -1360,7 +1360,7 @@ let import_key =
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Importing to local directory %s%s\n"
-                 Bash_colors.orange conf_dir Bash_colors.none ;
+                 Mina_stdlib.Bash_colors.orange conf_dir Mina_stdlib.Bash_colors.none ;
                let%map res = do_local conf_dir in
                print_result res ) )
 
@@ -1530,7 +1530,7 @@ let list_accounts =
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Listing from local directory %s%s\n"
-                 Bash_colors.orange conf_dir Bash_colors.none ;
+                 Mina_stdlib.Bash_colors.orange conf_dir Mina_stdlib.Bash_colors.none ;
                do_local conf_dir ) )
 
 let create_account =
