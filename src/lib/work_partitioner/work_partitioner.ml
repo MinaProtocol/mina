@@ -52,3 +52,27 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   ; jobs_sent_by_partitioner = Sent_job_pool.create ()
   ; tmp_slot = None
   }
+
+(* Logics for work requesting *)
+let reissue_old_task ~(partitioner : t) () : Work.Partitioned.Spec.t option =
+  let job_is_old (job : Work.Partitioned.Zkapp_command_job.t) : bool =
+    let issued = Time.of_span_since_epoch job.common.issued_since_unix_epoch in
+    let delta = Time.(diff (now ()) issued) in
+    Time.Span.( > ) delta partitioner.reassignment_timeout
+  in
+  match
+    Sent_job_pool.take_first_ready ~pred:job_is_old
+      partitioner.jobs_sent_by_partitioner
+  with
+  | None ->
+      None
+  | Some (id, job_with_status) ->
+      let issued_since_unix_epoch = Time.(now () |> to_span_since_epoch) in
+      let reissued =
+        { job_with_status with
+          common = { job_with_status.common with issued_since_unix_epoch }
+        }
+      in
+      Sent_job_pool.replace ~id ~job:reissued
+        partitioner.jobs_sent_by_partitioner ;
+      Some (Sub_zkapp_command { spec = reissued; metric = () })
