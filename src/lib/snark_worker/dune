@@ -47,7 +47,8 @@
   mina_state
   transaction_protocol_state
   ppx_version.runtime
-  proof_cache_tag)
+  proof_cache_tag
+  work_partitioner)
   
  (preprocess
   (pps

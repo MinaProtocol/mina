@@ -2,10 +2,17 @@
  (name work_partitioner)
  (public_name work_partitioner)
  (library_flags -linkall)
- (libraries core_kernel)
+ (libraries 
+   ;; OPAM Libraries
+   async 
+   core_kernel
+   ;; Local Libraries
+   mina_base
+   transaction_snark)
+   
  (preprocess
   (pps
-   ppx_let))
+   ppx_custom_printf))
    
  (instrumentation
   (backend bisect_ppx))
