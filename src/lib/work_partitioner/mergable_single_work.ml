@@ -21,18 +21,7 @@ let merge_to_one_result_exn (left : t) (right : t) : Selector_work.Result.t =
       ; Signature_lib.Public_key.Compressed.equal left.prover right.prover
       ; Currency.Fee.equal left.fee right.fee
       ] ) ;
-  let unwrap_metric_as_old (metric_time, metric_ty) =
-    match metric_ty with
-    | `Merge ->
-        (metric_time, `Merge)
-    | `Transition ->
-        (metric_time, `Transition)
-    | _ ->
-        failwith "Trying to merge 2 `Sub_zkapp_command into single work result"
-  in
-  let metrics =
-    `Two (left.metric, right.metric) |> One_or_two.map ~f:unwrap_metric_as_old
-  in
+  let metrics = `Two (left.metric, right.metric) in
   { proofs = `Two (left.proof, right.proof)
   ; metrics
   ; spec = { instances = `Two (left.spec, right.spec); fee = left.fee }
