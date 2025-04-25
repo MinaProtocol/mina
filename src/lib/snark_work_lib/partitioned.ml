@@ -20,10 +20,7 @@ module Pairing = struct
     module V1 = struct
       (* Case `One` indicate no need to pair. This is needed because zkapp command
          might be left in pool of half completion. *)
-      type t =
-        { one_or_two : [ `First | `Second | `One ]
-        ; pair_id : ID.Stable.V1.t option
-        }
+      type t = [ `First of ID.Stable.V1.t | `Second of ID.Stable.V1.t | `One ]
       [@@deriving compare, hash, sexp, yojson, equal]
 
       let to_latest = Fn.id
