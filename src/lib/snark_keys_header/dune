@@ -2,21 +2,20 @@
  (name snark_keys_header)
  (public_name snark_keys_header)
  (libraries
-  ;; opam libraries
-  sexplib0
   base
+  base.caml
   core_kernel
   integers
-  base.caml
   result
+  sexplib0
   stdio)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_version
-   ppx_deriving_yojson
-   ppx_sexp_conv
-   ppx_let
+   ppx_compare
    ppx_deriving.ord
-   ppx_compare)))
+   ppx_deriving_yojson
+   ppx_let
+   ppx_sexp_conv
+   ppx_version)))
