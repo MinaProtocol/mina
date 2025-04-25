@@ -9,16 +9,11 @@
   bitstring_lib
   core_kernel
   crypto_params
-  digestif
-  fold_lib
   group_map
   kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
-  mina_wire_types
   pickles
-  pickles.backend
-  ppx_inline_test.config
   sexplib0
   snark_bits
   snarky.backendless
@@ -29,13 +24,6 @@
   sponge)
  (preprocess
   (pps
-   ppx_assert
-   ppx_base
-   ppx_bench
-   ppx_bin_prot
-   ppx_custom_printf
-   ppx_deriving.std
-   ppx_deriving_yojson
    ppx_let
    ppx_sexp_conv
    ppx_snarky
