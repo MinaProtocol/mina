@@ -213,7 +213,6 @@
 (package (name transition_handler))
 (package (name transition_router))
 (package (name trust_system))
-(package (name unix_timestamp))
 (package (name unsigned_extended))
 (package (name uptime_service))
 (package (name user_command_input))
