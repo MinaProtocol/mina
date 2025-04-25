@@ -146,6 +146,7 @@ module Spec = struct
               { single_spec : Selector.Single.Spec.Stable.V1.t
               ; pairing : Pairing.Stable.V1.t
               ; metric : 'metric
+              ; fee_of_full : Currency.Fee.Stable.V1.t
               }
           | Sub_zkapp_command of
               { spec : Zkapp_command_job.Stable.V1.t; metric : 'metric }
@@ -162,14 +163,15 @@ module Spec = struct
           { single_spec : Selector.Single.Spec.t
           ; pairing : Pairing.t
           ; metric : 'metric
+          ; fee_of_full : Currency.Fee.t
           }
       | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
       | Old of (Selector.Single.Spec.t * 'metric) Work.Spec.t
 
     let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
       match t with
-      | Single { single_spec; pairing; metric } ->
-          Single { single_spec; pairing; metric = f metric }
+      | Single { single_spec; pairing; metric; fee_of_full } ->
+          Single { single_spec; pairing; metric = f metric; fee_of_full }
       | Old spec ->
           Old (Work.Spec.map ~f:(Tuple2.map_snd ~f) spec)
       | Sub_zkapp_command { spec; metric } ->
@@ -177,11 +179,11 @@ module Spec = struct
 
     let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
       function
-      | Single { single_spec; pairing; metric } ->
+      | Single { single_spec; pairing; metric; fee_of_full } ->
           let single_spec =
             Selector.Single.Spec.read_all_proofs_from_disk single_spec
           in
-          Single { single_spec; pairing; metric }
+          Single { single_spec; pairing; metric; fee_of_full }
       | Sub_zkapp_command { spec; metric } ->
           let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
           Sub_zkapp_command { spec; metric }
@@ -195,12 +197,12 @@ module Spec = struct
 
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         'metric Stable.Latest.t -> 'metric t = function
-      | Single { single_spec; pairing; metric } ->
+      | Single { single_spec; pairing; metric; fee_of_full } ->
           let single_spec =
             Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
               single_spec
           in
-          Single { single_spec; pairing; metric }
+          Single { single_spec; pairing; metric; fee_of_full }
       | Sub_zkapp_command { spec; metric } ->
           let spec =
             Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec

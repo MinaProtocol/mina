@@ -30,7 +30,8 @@ type t =
            So queue head is the oldest task.
         *)
   ; mutable tmp_slot :
-      (Work.Selector.Single.Spec.t * Work.Partitioned.Pairing.t) option
+      (Work.Selector.Single.Spec.t * Work.Partitioned.Pairing.t * Currency.Fee.t)
+      option
         (* When receving a `Two works from the underlying Work_selector, store one of them here,
            so we could issue them to another worker.
         *)
@@ -105,7 +106,7 @@ let rec issue_from_tmp_slot ~(partitioner : t) () =
 (* try to issue a single work received from the underlying Work_selector
    `one_or_two` tracks which task is it inside a `One_or_two`*)
 and convert_single_work_from_selector ~(partitioner : t)
-    ~spec:(single_spec, pairing) : Work.Partitioned.Spec.t =
+    ~spec:(single_spec, pairing, fee_of_full) : Work.Partitioned.Spec.t =
   match single_spec with
   | Transition (input, witness) as work -> (
       (* WARN: a smilar copy of this exists in `Snark_worker.Worker_impl_prod` *)
@@ -152,9 +153,9 @@ and convert_single_work_from_selector ~(partitioner : t)
           | Error e ->
               failwith (Exn.to_string e) )
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
-          Single { single_spec; pairing; metric = () } )
+          Single { single_spec; pairing; fee_of_full; metric = () } )
   | Merge _ ->
-      Single { single_spec; pairing; metric = () }
+      Single { single_spec; pairing; fee_of_full; metric = () }
 
 and issue_job_from_partitioner ~(partitioner : t) () :
     Work.Partitioned.Spec.t option =
