@@ -166,6 +166,15 @@ module Spec = struct
       | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
       | Old of (Selector.Single.Spec.t * 'metric) Work.Spec.t
 
+    let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
+      match t with
+      | Regular { single_spec; pairing; metric } ->
+          Regular { single_spec; pairing; metric = f metric }
+      | Old spec ->
+          Old (Work.Spec.map ~f:(Tuple2.map_snd ~f) spec)
+      | Sub_zkapp_command { spec; metric } ->
+          Sub_zkapp_command { spec; metric = f metric }
+
     let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
       function
       | Regular { single_spec; pairing; metric } ->
@@ -173,6 +182,9 @@ module Spec = struct
             Selector.Single.Spec.read_all_proofs_from_disk single_spec
           in
           Regular { single_spec; pairing; metric }
+      | Sub_zkapp_command { spec; metric } ->
+          let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
+          Sub_zkapp_command { spec; metric }
       | Old spec ->
           Old
             (Work.Spec.map
@@ -180,9 +192,6 @@ module Spec = struct
                  (Tuple2.map_fst
                     ~f:Selector.Single.Spec.read_all_proofs_from_disk )
                spec )
-      | Sub_zkapp_command { spec; metric } ->
-          let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
-          Sub_zkapp_command { spec; metric }
 
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         'metric Stable.Latest.t -> 'metric t = function
@@ -192,6 +201,11 @@ module Spec = struct
               single_spec
           in
           Regular { single_spec; pairing; metric }
+      | Sub_zkapp_command { spec; metric } ->
+          let spec =
+            Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec
+          in
+          Sub_zkapp_command { spec; metric }
       | Old spec ->
           Old
             (Work.Spec.map
@@ -201,11 +215,6 @@ module Spec = struct
                       (Selector.Single.Spec.write_all_proofs_to_disk
                          ~proof_cache_db ) )
                spec )
-      | Sub_zkapp_command { spec; metric } ->
-          let spec =
-            Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec
-          in
-          Sub_zkapp_command { spec; metric }
 
     let transaction = function
       | Regular { single_spec; _ } ->
@@ -243,6 +252,33 @@ module Spec = struct
         None
 end
 
+module Proof_with_metric = struct
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t =
+        { proof : Ledger_proof.Stable.V2.t
+        ; elapsed : Core.Time.Stable.Span.V1.t
+        }
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = { proof : Ledger_proof.Cached.t; elapsed : Core.Time.Span.t }
+
+  let read_all_proofs_from_disk ({ proof; elapsed } : t) : Stable.Latest.t =
+    let proof = Ledger_proof.Cached.read_proof_from_disk proof in
+    { proof; elapsed }
+
+  let write_all_proofs_to_disk ~proof_cache_db
+      ({ proof; elapsed } : Stable.Latest.t) : t =
+    let proof = Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof in
+    { proof; elapsed }
+end
+
 module Result = struct
   [%%versioned
   module Stable = struct
@@ -250,14 +286,8 @@ module Result = struct
 
     module V1 = struct
       type t =
-        { proofs : Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
-        ; metrics :
-            ( Core.Time.Stable.Span.V1.t
-            * [ `Transition
-              | `Merge
-              | `Sub_zkapp_command of [ `Segment | `Merge ] ] )
-            One_or_two.Stable.V1.t
-        ; spec : Spec.Stable.V1.t
+        { (* Throw everything inside the spec to ensure proofs, metrics have correct shape *)
+          data : Proof_with_metric.Stable.V1.t Spec.Poly.Stable.V1.t
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
         }
 
@@ -266,56 +296,66 @@ module Result = struct
   end]
 
   type t =
-    { proofs : Ledger_proof.Cached.t One_or_two.t
-    ; metrics :
-        ( Core.Time.Span.t
-        * [ `Transition | `Merge | `Sub_zkapp_command of [ `Segment | `Merge ] ]
-        )
-        One_or_two.t
-    ; spec : Spec.t
+    { data : Proof_with_metric.t Spec.Poly.t
     ; prover : Signature_lib.Public_key.Compressed.t
     }
 
-  let read_all_proofs_from_disk ({ proofs; metrics; spec; prover } : t) :
-      Stable.Latest.t =
-    { proofs = One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk proofs
-    ; metrics
-    ; spec = Spec.read_all_proofs_from_disk spec
-    ; prover
-    }
+  let read_all_proofs_from_disk ({ data; prover } : t) : Stable.Latest.t =
+    let data =
+      Spec.Poly.(
+        map_metric ~f:Proof_with_metric.read_all_proofs_from_disk data
+        |> read_all_proofs_from_disk)
+    in
+
+    { data; prover }
 
   let write_all_proofs_to_disk ~proof_cache_db
-      ({ proofs; metrics; spec; prover } : Stable.Latest.t) : t =
-    { proofs =
-        One_or_two.map
-          ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
-          proofs
-    ; metrics
-    ; spec = Spec.write_all_proofs_to_disk ~proof_cache_db spec
-    ; prover
-    }
+      ({ data; prover } : Stable.Latest.t) : t =
+    let data =
+      Spec.Poly.(
+        write_all_proofs_to_disk ~proof_cache_db data
+        |> map_metric
+             ~f:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db))
+    in
+    { data; prover }
 
-  let of_selector_result ({ proofs; metrics; spec; prover } : Selector.Result.t)
-      : t =
-    let spec = Spec.of_selector_spec spec in
-    let fix_metric_tag tag =
-      match tag with `Transition -> `Transition | `Merge -> `Merge
-    in
-    let metrics =
-      One_or_two.map ~f:(Tuple2.map_snd ~f:fix_metric_tag) metrics
-    in
-    { proofs; metrics; spec; prover }
+  let of_selector_result
+      ({ proofs; metrics; spec = { instances; fee }; prover } :
+        Selector.Result.t ) : t Or_error.t =
+    let%bind.Result zipped = One_or_two.zip proofs metrics in
+    let%map.Result zipped = One_or_two.zip zipped instances in
 
-  let to_selector_result ({ proofs; metrics; spec; prover } : t) :
-      Selector.Result.t option =
-    let fix_metric_tag (span, tag) =
-      match tag with
-      | (`Transition | `Merge) as tag ->
-          Some (span, tag)
-      | `Sub_zkapp_command _ ->
-          None
+    let with_metric ((proof, (elapsed, _)), single_spec) =
+      (single_spec, Proof_with_metric.{ proof; elapsed })
     in
-    let%bind.Option spec = Spec.to_selector_spec spec in
-    let%map.Option metrics = One_or_two.Option.map ~f:fix_metric_tag metrics in
-    ({ proofs; metrics; spec; prover } : Selector.Result.t)
+    let instances = One_or_two.map ~f:with_metric zipped in
+    let data = Spec.Poly.Old { instances; fee } in
+    { data; prover }
+
+  let to_selector_result ({ data; prover } : t) : Selector.Result.t option =
+    match data with
+    | Old { instances; fee } ->
+        let proofs =
+          One_or_two.map ~f:(fun (_, { proof; _ }) -> proof) instances
+        in
+        let metrics =
+          One_or_two.map
+            ~f:(fun (single, { elapsed; _ }) ->
+              let tag =
+                match single with
+                | Work.Single.Spec.Transition (_, _) ->
+                    `Transition
+                | Work.Single.Spec.Merge (_, _, _) ->
+                    `Merge
+              in
+              (elapsed, tag) )
+            instances
+        in
+
+        let instances =
+          One_or_two.map ~f:(fun (single, _) -> single) instances
+        in
+        Some { proofs; metrics; spec = { instances; fee }; prover }
+    | _ ->
+        None
 end
