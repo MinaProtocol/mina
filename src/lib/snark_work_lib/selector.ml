@@ -1,3 +1,15 @@
+(*
+   This file tracks the Work distributed by Selector, hence the name.
+   Originally, these types are defined around the codebase, and versioning them
+   is a mess. Also, some helpers that could be reused are redefined in different
+   modules. We put it here, so it's easier to either extend/verision them.
+
+   Some functions here might be moved to `Snark_work_lib.Work`, but we could do
+   the move fairly easily when needed since they're all tracked together.
+
+   All types are versioned, because Works distributed by the Selector would need
+   to be passed around the network between Coordinater and Snark Worker.
+ *)
 open Core_kernel
 
 module Single = struct

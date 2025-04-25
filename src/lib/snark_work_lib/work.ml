@@ -1,3 +1,7 @@
+(*
+  The better name for this file should really be poly.ml, because the types here
+  are polymorphic, and we really need the concretized version in selector.ml
+ *)
 open Core_kernel
 
 module Single = struct
