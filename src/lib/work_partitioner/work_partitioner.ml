@@ -109,14 +109,17 @@ let rec issue_from_tmp_slot ~(partitioner : t) () =
   match partitioner.tmp_slot with
   | Some spec ->
       partitioner.tmp_slot <- None ;
-      Some (convert_single_work_from_selector ~partitioner ~spec)
+      let single_spec, pairing, fee_of_full = spec in
+      Some
+        (convert_single_work_from_selector ~partitioner ~single_spec ~pairing
+           ~fee_of_full )
   | None ->
       None
 
 (* try to issue a single work received from the underlying Work_selector
    `one_or_two` tracks which task is it inside a `One_or_two`*)
-and convert_single_work_from_selector ~(partitioner : t)
-    ~spec:(single_spec, pairing, fee_of_full) : Work.Partitioned.Spec.t =
+and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing
+    ~fee_of_full : Work.Partitioned.Spec.t =
   match single_spec with
   | Transition (input, witness) as work -> (
       (* WARN: a smilar copy of this exists in `Snark_worker.Worker_impl_prod` *)
@@ -196,3 +199,24 @@ and issue_job_from_partitioner ~(partitioner : t) () :
     ; issue_from_tmp_slot ~partitioner
     ; issue_from_zkapp_command_work_pool ~partitioner
     ]
+
+(* WARN: this should only be called if partitioner.first_in_pair is None *)
+let consume_job_from_selector ~(partitioner : t) ~(spec : Work.Selector.Spec.t)
+    () : Work.Partitioned.Spec.t =
+  let fee_of_full = spec.fee in
+  match spec.instances with
+  | `One single_spec ->
+      convert_single_work_from_selector ~partitioner ~single_spec ~pairing:`One
+        ~fee_of_full
+  | `Two (spec1, spec2) ->
+      assert (phys_equal None partitioner.tmp_slot) ;
+      let id = Id_generator.next_id partitioner.id_generator in
+      let pairing1 : Work.Partitioned.Pairing.Single.t =
+        `First (Pairing_ID id)
+      in
+      let pairing2 : Work.Partitioned.Pairing.Single.t =
+        `Second (Pairing_ID id)
+      in
+      partitioner.tmp_slot <- Some (spec1, pairing1, fee_of_full) ;
+      convert_single_work_from_selector ~partitioner ~single_spec:spec2
+        ~pairing:pairing2 ~fee_of_full
