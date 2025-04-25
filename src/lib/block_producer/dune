@@ -40,6 +40,7 @@
   mina_numbers
   mina_runtime_config
   mina_state
+  mina_stdlib
   mina_transaction
   mina_transaction_logic
   mina_wire_types
@@ -67,7 +68,6 @@
   transition_frontier_base
   transition_frontier_extensions
   truth
-  unix_timestamp
   unsigned_extended
   vrf_evaluator
   with_hash)
