@@ -31,12 +31,12 @@ module Single = struct
 
     type t = (Transaction_witness.t, Ledger_proof.Cached.t) Work.Single.Spec.t
 
-    let materialize : t -> Stable.Latest.t =
+    let read_all_proofs_from_disk : t -> Stable.Latest.t =
       Work.Single.Spec.map
         ~f_witness:Transaction_witness.read_all_proofs_from_disk
         ~f_proof:Ledger_proof.Cached.read_proof_from_disk
 
-    let cache ~(proof_cache_db : Proof_cache_tag.cache_db) :
+    let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         Stable.Latest.t -> t =
       Work.Single.Spec.map
         ~f_witness:Transaction_witness.write_all_proofs_to_disk
@@ -59,12 +59,12 @@ module Spec = struct
 
   type t = Single.Spec.t Work.Spec.t
 
-  let materialize : t -> Stable.Latest.t =
-    Work.Spec.map ~f:Single.Spec.materialize
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
+    Work.Spec.map ~f:Single.Spec.read_all_proofs_from_disk
 
-  let cache ~(proof_cache_db : Proof_cache_tag.cache_db) : Stable.Latest.t -> t
-      =
-    Work.Spec.map ~f:(Single.Spec.cache ~proof_cache_db)
+  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
+      Stable.Latest.t -> t =
+    Work.Spec.map ~f:(Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
 end
 
 module Result = struct
@@ -82,13 +82,13 @@ module Result = struct
 
   type t = (Spec.t, Ledger_proof.Cached.t) Work.Result.Stable.V1.t
 
-  let materialize : t -> Stable.Latest.t =
-    Work.Result.map ~f_spec:Spec.materialize
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
+    Work.Result.map ~f_spec:Spec.read_all_proofs_from_disk
       ~f_single:Ledger_proof.Cached.read_proof_from_disk
 
-  let cache ~(proof_cache_db : Proof_cache_tag.cache_db) : Stable.Latest.t -> t
-      =
+  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
+      Stable.Latest.t -> t =
     Work.Result.map
-      ~f_spec:(Spec.cache ~proof_cache_db)
+      ~f_spec:(Spec.write_all_proofs_to_disk ~proof_cache_db)
       ~f_single:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
 end
