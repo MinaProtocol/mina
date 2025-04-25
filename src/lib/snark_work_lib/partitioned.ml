@@ -134,112 +134,67 @@ module Zkapp_command_job = struct
     }
 end
 
-(* this is the actual work passed over network between coordinator and worker *)
-module Single = struct
-  module Spec = struct
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
-
-      module V2 = struct
-        type t =
-          | Regular of (Selector.Single.Spec.Stable.V1.t * Pairing.Stable.V1.t)
-          | Sub_zkapp_command of Zkapp_command_job.Stable.V1.t
-        [@@deriving sexp, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    type t =
-      | Regular of (Selector.Single.Spec.t * Pairing.t)
-      | Sub_zkapp_command of Zkapp_command_job.t
-
-    let read_all_proofs_from_disk : t -> Stable.Latest.t = function
-      | Regular (work, pairing) ->
-          Regular (Selector.Single.Spec.read_all_proofs_from_disk work, pairing)
-      | Sub_zkapp_command job ->
-          Sub_zkapp_command (Zkapp_command_job.read_all_proofs_from_disk job)
-
-    let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-        Stable.Latest.t -> t = function
-      | Regular (work, pairing) ->
-          Regular
-            ( Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db work
-            , pairing )
-      | Sub_zkapp_command job ->
-          Sub_zkapp_command
-            (Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db job)
-
-    let regular_opt (work : t) : Selector.Single.Spec.t option =
-      match work with Regular (w, _) -> Some w | _ -> None
-
-    let map_regular_witness ~f = function
-      | Regular (work, pairing) ->
-          Regular
-            (Work.Single.Spec.map ~f_witness:f ~f_proof:Fn.id work, pairing)
-      | Sub_zkapp_command seg ->
-          Sub_zkapp_command seg
-
-    let statement : t -> Transaction_snark.Statement.t = function
-      | Regular (regular, _) ->
-          Work.Single.Spec.statement regular
-      | Sub_zkapp_command
-          { spec = Zkapp_command_job.Spec.Segment { statement; _ }; _ } ->
-          Mina_state.Snarked_ledger_state.With_sok.drop_sok statement
-      | Sub_zkapp_command
-          { spec = Zkapp_command_job.Spec.Merge { proof1; proof2 }; _ } -> (
-          let module Statement = Mina_state.Snarked_ledger_state in
-          let { Proof_carrying_data.data = t1; _ } = proof1 in
-          let { Proof_carrying_data.data = t2; _ } = proof2 in
-          let statement =
-            Statement.merge
-              ({ t1 with sok_digest = () } : Statement.t)
-              { t2 with sok_digest = () }
-          in
-          match statement with
-          | Ok statement ->
-              statement
-          | Error _ ->
-              failwith
-                "Failed to construct a statement from  zkapp merge command" )
-
-    let transaction : t -> Mina_transaction.Transaction.t option = function
-      | Regular (work, _) ->
-          work |> Work.Single.Spec.witness
-          |> Option.map ~f:(fun w -> w.Transaction_witness.transaction)
-      | Sub_zkapp_command _ ->
-          None
-  end
-end
-
 module Spec = struct
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
+      type t =
+        | Regular of (Selector.Single.Spec.Stable.V1.t * Pairing.Stable.V1.t)
+        | Sub_zkapp_command of Zkapp_command_job.Stable.V1.t
+        | Old of Selector.Single.Spec.Stable.V1.t Work.Spec.Stable.V1.t
       [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Single.Spec.t Work.Spec.t
+  type t =
+    | Regular of (Selector.Single.Spec.t * Pairing.t)
+    | Sub_zkapp_command of Zkapp_command_job.t
+    | Old of Selector.Single.Spec.t Work.Spec.t
 
-  let read_all_proofs_from_disk : t -> Stable.Latest.t =
-    Work.Spec.map ~f:Single.Spec.read_all_proofs_from_disk
+  let read_all_proofs_from_disk : t -> Stable.Latest.t = function
+    | Regular (spec, pairing) ->
+        Regular (Selector.Single.Spec.read_all_proofs_from_disk spec, pairing)
+    | Old spec ->
+        Old
+          (Work.Spec.map ~f:Selector.Single.Spec.read_all_proofs_from_disk spec)
+    | Sub_zkapp_command spec ->
+        Sub_zkapp_command (Zkapp_command_job.read_all_proofs_from_disk spec)
 
-  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) =
-    Work.Spec.map ~f:(Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
+  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
+      Stable.Latest.t -> t = function
+    | Regular (spec, pairing) ->
+        Regular
+          ( Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db spec
+          , pairing )
+    | Old spec ->
+        Old
+          (Work.Spec.map
+             ~f:(Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
+             spec )
+    | Sub_zkapp_command spec ->
+        Sub_zkapp_command
+          (Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec)
 
-  let of_selector_spec : Selector.Spec.t -> t =
-    Work.Spec.map_biased ~f_single:(fun one_or_two instance ->
-        Single.Spec.Regular (instance, { one_or_two; pair_id = None }) )
+  let of_selector_spec (spec : Selector.Spec.t) : t = Old spec
 
-  let to_selector_spec : t -> Selector.Spec.t option =
-    Work.Spec.map_opt ~f_single:Single.Spec.regular_opt
+  let to_selector_spec : t -> Selector.Spec.t option = function
+    | Old spec ->
+        Some spec
+    | _ ->
+        None
+
+  let transaction = function
+    | Regular (single, _) ->
+        let txn = Selector.Single.Spec.transaction single in
+        `Regular txn
+    | Sub_zkapp_command _ ->
+        `Sub_zkapp_command
+    | Old spec ->
+        `Old (One_or_two.map spec.instances ~f:Selector.Single.Spec.transaction)
 end
 
 module Result = struct
@@ -314,22 +269,7 @@ module Result = struct
       | `Sub_zkapp_command _ ->
           None
     in
-    let open Option.Let_syntax in
-    let%bind () =
-      match spec.instances with
-      | `One (Regular (_, { one_or_two = `One; pair_id = None }))
-      | `Two
-          ( Regular (_, { one_or_two = `First; pair_id = None })
-          , Regular (_, { one_or_two = `Second; pair_id = None }) ) ->
-          (* We indeed have an old spec *)
-          Some ()
-      | _ ->
-          None
-    in
-    let%bind metrics = One_or_two.Option.map ~f:fix_metric_tag metrics in
-    let%map spec = Work.Spec.map_opt ~f_single:Single.Spec.regular_opt spec in
+    let%bind.Option spec = Spec.to_selector_spec spec in
+    let%map.Option metrics = One_or_two.Option.map ~f:fix_metric_tag metrics in
     ({ proofs; metrics; spec; prover } : Selector.Result.t)
-
-  let transactions (t : t) =
-    One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
 end
