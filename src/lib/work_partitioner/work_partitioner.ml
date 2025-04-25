@@ -175,8 +175,8 @@ let consume_job_from_selector ~(partitioner : t) ~(spec : Work.Selector.Spec.t)
   let fee_of_full = spec.fee in
   match spec.instances with
   | `One single_spec ->
-      convert_single_work_from_selector ~partitioner ~single_spec ~pairing:`One
-        ~fee_of_full
+      convert_single_work_from_selector ~partitioner ~single_spec
+        ~pairing:(`One None) ~fee_of_full
   | `Two (spec1, spec2) ->
       assert (phys_equal None partitioner.tmp_slot) ;
       let id = Id_generator.next_id partitioner.id_generator in
