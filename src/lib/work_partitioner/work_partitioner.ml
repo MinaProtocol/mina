@@ -313,3 +313,69 @@ let submit_into_pending_zkapp_command ~partitioner
   Sent_job_pool.change ~id:job_id ~f:slash_or_process
     partitioner.jobs_sent_by_partitioner ;
   !returns
+
+let submit_partitioned_work ~(result : Work.Partitioned.Result.t)
+    ~(callback : Work.Selector.Result.t -> unit) ~(partitioner : t) =
+  let submit_result =
+    match result with
+    | { data = Work.Partitioned.Spec.Poly.Old { instances; fee }; prover } ->
+        let to_submit =
+          Work.Partitioned.construct_selector_result ~instances ~fee ~prover
+        in
+        Processed (Some to_submit)
+    | { data =
+          Work.Partitioned.Spec.Poly.Single
+            { single_spec; pairing = `One; metric; fee_of_full }
+      ; prover
+      } ->
+        let instances = `One (single_spec, metric) in
+        let to_submit =
+          Work.Partitioned.construct_selector_result ~instances ~fee:fee_of_full
+            ~prover
+        in
+        Processed (Some to_submit)
+    | { data =
+          Work.Partitioned.Spec.Poly.Single
+            { single_spec
+            ; pairing = (`First id | `Second id) as first_or_second
+            ; metric = { proof; elapsed }
+            ; fee_of_full
+            }
+      ; prover
+      } ->
+        let which_half =
+          match first_or_second with `First _ -> `First | `Second _ -> `Second
+        in
+
+        let metric =
+          match single_spec with
+          | Work.Work.Single.Spec.Transition (_, _) ->
+              (elapsed, `Transition)
+          | Work.Work.Single.Spec.Merge (_, _, _) ->
+              (elapsed, `Merge)
+        in
+        let this_single =
+          Mergable_single_work.
+            { which_half
+            ; proof
+            ; metric
+            ; spec = single_spec
+            ; prover
+            ; fee_of_full
+            }
+        in
+        submit_single ~partitioner ~this_single ~id
+    | { data = Work.Partitioned.Spec.Poly.Sub_zkapp_command { spec; metric }
+      ; prover
+      } ->
+        submit_into_pending_zkapp_command ~partitioner ~spec ~metric ~prover
+  in
+  match submit_result with
+  | SchemeUnmatched ->
+      `SchemeUnmatched
+  | Slashed ->
+      `Slashed
+  | Processed (Some result) ->
+      callback result ; `Ok
+  | Processed None ->
+      `Ok
