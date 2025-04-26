@@ -53,15 +53,29 @@ module Make (ID : Hashtbl.Key) (Job : T) = struct
         job_item := None ;
         result
 
-  let replace ~(id : ID.t) ~(job : Job.t) (t : t) =
-    let data = ref (Some job) in
-    Hashtbl.change t.index id ~f:(function
+  let change ~(id : ID.t) ~(f : Job.t option -> Job.t option) (t : t) =
+    let process (current : job_item option) =
+      let output =
+        match current with
+        | None ->
+            f None
+        | Some job_already ->
+            let tmp = f !job_already in
+            job_already := None ;
+            tmp
+      in
+      match output with
       | None ->
-          Some data
-      | Some job_already ->
-          job_already := None ;
-          Some data ) ;
-    Deque.enqueue_back t.timeline (id, data)
+          None
+      | Some data ->
+          let new_item = ref (Some data) in
+          Deque.enqueue_back t.timeline (id, new_item) ;
+          Some new_item
+    in
+
+    Hashtbl.change t.index id ~f:process
+
+  let replace ~(id : ID.t) ~(job : Job.t) = change ~id ~f:(const (Some job))
 
   let find (t : t) (id : ID.t) =
     match Hashtbl.find t.index id with
