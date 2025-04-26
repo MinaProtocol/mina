@@ -254,3 +254,35 @@ type submit_result =
   | Slashed
   | Processed of Work.Selector.Result.t option
 (* If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
+
+let submit_single ~partitioner ~this_single ~id =
+  let Mergable_single_work.{ which_half; common; _ } = this_single in
+  let issued = Time.of_span_since_epoch common.issued_since_unix_epoch in
+  let delta = Time.(diff (now ()) issued) in
+  if Time.Span.( > ) delta partitioner.reassignment_timeout then
+    (* This is how we guarantee there's no ID being repeated. We should remove
+       logic on slashing old work submitted in Work Selector though, as they're
+       now redundant.
+    *)
+    Slashed
+  else
+    let result = ref None in
+    Hashtbl.change partitioner.pairing_pool id ~f:(function
+      | Some other_single ->
+          let work =
+            match which_half with
+            | `First ->
+                Mergable_single_work.merge_to_one_result_exn this_single
+                  other_single
+            | `Second ->
+                Mergable_single_work.merge_to_one_result_exn other_single
+                  this_single
+          in
+
+          let (Pairing_ID id) = id in
+          Id_generator.recycle_id partitioner.id_generator id ;
+          result := Some work ;
+          None
+      | None ->
+          Some this_single ) ;
+    Processed !result
