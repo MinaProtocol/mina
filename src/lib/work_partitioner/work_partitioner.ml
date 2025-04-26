@@ -233,3 +233,83 @@ let submit_single ~partitioner ~this_single ~id =
     | None ->
         Some this_single ) ;
   Processed !result
+
+let submit_into_pending_zkapp_command ~partitioner
+    ~spec:({ pairing; job_id; _ } : Work.Partitioned.Zkapp_command_job.t)
+    ~metric:({ proof; elapsed } : Work.Partitioned.Proof_with_metric.t)
+    ~(prover : Signature_lib.Public_key.Compressed.t) =
+  let returns = ref SchemeUnmatched in
+  let process pending =
+    Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
+    if 0 = pending.merge_remaining then
+      let final_proof =
+        Deque.dequeue_front_exn pending.pending_mergable_proofs
+      in
+      let Work.Partitioned.Pairing.Sub_zkapp.{ which_one; id } = pairing in
+      let metric = (pending.elapsed, `Transition) in
+
+      match which_one with
+      | `One ->
+          let result : Work.Selector.Result.t =
+            { proofs = `One final_proof
+            ; metrics = `One (pending.elapsed, `Transition)
+            ; spec =
+                { instances = `One pending.spec; fee = pending.fee_of_full }
+            ; prover
+            }
+          in
+
+          returns := Processed (Some result)
+      | (`First | `Second) as which_half ->
+          let this_single =
+            Mergable_single_work.
+              { which_half
+              ; proof
+              ; metric
+              ; spec = pending.spec
+              ; prover
+              ; fee_of_full = pending.fee_of_full
+              }
+          in
+
+          returns := submit_single ~partitioner ~this_single ~id
+    else returns := Processed None
+  in
+  let slash_or_process :
+         Zkapp_command_job_with_status.t option
+      -> Zkapp_command_job_with_status.t option = function
+    | None ->
+        printf
+          "Worker submit a work that's already slashed from sent job pool, \
+           ignoring" ;
+        returns := Slashed ;
+        None
+    | Some job_with_status -> (
+        if
+          Zkapp_command_job_with_status.is_old ~now:(Time.now ())
+            ~limit:partitioner.reassignment_timeout job_with_status
+        then (
+          returns := Slashed ;
+          printf "Job submitted is too old, remove the spec and reissuing" ;
+
+          let job =
+            job_with_status.job |> Zkapp_command_job_with_status.issue_now
+          in
+          Some job )
+        else
+          match
+            Zkapp_command_job_pool.find partitioner.zkapp_command_jobs pairing
+          with
+          | None ->
+              printf
+                "Worker submit a work that's already slashed from pending \
+                 zkapp command pool, ignoring " ;
+              returns := Slashed ;
+              None
+          | Some pending ->
+              process pending ; None )
+  in
+
+  Sent_job_pool.change ~id:job_id ~f:slash_or_process
+    partitioner.jobs_sent_by_partitioner ;
+  !returns
