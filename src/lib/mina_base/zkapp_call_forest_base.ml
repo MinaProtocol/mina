@@ -316,11 +316,12 @@ module Digest =
     (Make_digest_sig)
     (Make_digest_str)
 
-let fold = Tree.fold_forest
+let fold : ('a, 'b, 'c) t -> init:'d -> f:('d -> 'a -> 'd) -> 'd = Tree.fold_forest
 
-let iteri t ~(f : int -> 'a -> unit) : unit =
-  let (_ : int) = fold t ~init:0 ~f:(fun acc x -> f acc x ; acc + 1) in
-  ()
+let iteri : ('a, 'b, 'c) t -> f:(int -> 'a -> unit) -> unit = 
+  fun t ~f ->
+    let (_ : int) = fold t ~init:0 ~f:(fun acc x -> f acc x ; acc + 1) in
+    ()
 
 [%%versioned
 module Stable = struct
@@ -350,7 +351,7 @@ module Shape = struct
   type t = Node of (I.t * t) list [@@deriving quickcheck]
 end
 
-let rec shape (t : _ t) : Shape.t =
+let rec shape (t : ('a, 'b, 'c) t) : Shape.t =
   Node (List.mapi t ~f:(fun i { elt; stack_hash = _ } -> (i, shape elt.calls)))
 
 let match_up (type a b) (xs : a list) (ys : (int * b) list) : (a * b) list =
@@ -377,133 +378,150 @@ let rec mask (t : ('p, 'h1, unit) t) (Node shape : Shape.t) : ('p, 'h1, unit) t
       ; stack_hash = ()
       } )
 
-let rec of_account_updates_map ~(f : 'p1 -> 'p2)
-    ~(account_update_depth : 'p1 -> int) (account_updates : 'p1 list) :
-    ('p2, unit, unit) t =
-  match account_updates with
-  | [] ->
-      []
-  | p :: ps ->
-      let depth = account_update_depth p in
-      let children, siblings =
-        List.split_while ps ~f:(fun p' -> account_update_depth p' > depth)
-      in
-      { With_stack_hash.elt =
-          { Tree.account_update = f p
-          ; account_update_digest = ()
-          ; calls = of_account_updates_map ~f ~account_update_depth children
-          }
-      ; stack_hash = ()
-      }
-      :: of_account_updates_map ~f ~account_update_depth siblings
+let rec of_account_updates_map : 
+  f:('p1 -> 'p2) -> account_update_depth:('p1 -> int) -> 'p1 list -> ('p2, unit, unit) t = 
+  fun ~f ~account_update_depth account_updates ->
+    match account_updates with
+    | [] ->
+        []
+    | p :: ps ->
+        let depth = account_update_depth p in
+        let children, siblings =
+          List.split_while ps ~f:(fun p' -> account_update_depth p' > depth)
+        in
+        { With_stack_hash.elt =
+            { Tree.account_update = f p
+            ; account_update_digest = ()
+            ; calls = of_account_updates_map ~f ~account_update_depth children
+            }
+        ; stack_hash = ()
+        }
+        :: of_account_updates_map ~f ~account_update_depth siblings
 
-let of_account_updates ~account_update_depth account_updates =
-  of_account_updates_map ~f:Fn.id ~account_update_depth account_updates
+let of_account_updates : account_update_depth:('a -> int) -> 'a list -> ('a, unit, unit) t =
+  fun ~account_update_depth account_updates ->
+    of_account_updates_map ~f:Fn.id ~account_update_depth account_updates
 
-let to_account_updates_map ~f (xs : _ t) =
-  let rec collect depth (xs : _ t) acc =
+let to_account_updates_map : f:(depth:int -> 'a -> 'b) -> ('a, 'c, 'd) t -> 'b list =
+  fun ~f xs ->
+    let rec collect depth (xs : ('a, 'c, 'd) t) acc =
+      match xs with
+      | [] ->
+          acc
+      | { elt = { account_update; calls; account_update_digest = _ }
+        ; stack_hash = _
+        }
+        :: xs ->
+          f ~depth account_update :: acc
+          |> collect (depth + 1) calls
+          |> collect depth xs
+    in
+    List.rev (collect 0 xs [])
+
+let to_account_updates : ('a, 'b, 'c) t -> 'a list =
+  fun xs ->
+    to_account_updates_map ~f:(fun ~depth:_ account_update -> account_update) xs
+
+let hd_account_update : ('a, 'b, 'c) t -> 'a option =
+  fun xs ->
     match xs with
     | [] ->
-        acc
+        None
+    | { elt = { account_update; calls = _; account_update_digest = _ }
+      ; stack_hash = _
+      }
+      :: _ ->
+        Some account_update
+
+let map : f:('a -> 'b) -> ('a, 'c, 'd) t -> ('b, 'c, 'd) t = Tree.map_forest
+
+let mapi : f:(int -> 'a -> 'b) -> ('a, 'c, 'd) t -> ('b, 'c, 'd) t = Tree.mapi_forest
+
+let mapi_with_trees : f:(int -> 'a -> ('a, 'b, 'c) tree -> 'd) -> ('a, 'b, 'c) t -> ('d, 'b, 'c) t = Tree.mapi_forest_with_trees
+
+let deferred_mapi : f:(int -> 'a -> 'b Async_kernel.Deferred.t) -> ('a, 'c, 'd) t -> ('b, 'c, 'd) t Async_kernel.Deferred.t = Tree.deferred_mapi_forest
+
+let to_zkapp_command_with_hashes_list : ('a, 'b, 'c) t -> ('a * 'c) list =
+  fun xs ->
+    let rec collect (xs : ('a, 'b, 'c) t) acc =
+      match xs with
+      | [] ->
+          acc
+      | { elt = { account_update; calls; account_update_digest = _ }; stack_hash }
+        :: xs ->
+          (account_update, stack_hash) :: acc |> collect calls |> collect xs
+    in
+    List.rev (collect xs [])
+
+let hash_cons : 'a -> 'a -> 'a = 
+  fun hash h_tl ->
+    Random_oracle.hash ~init:Hash_prefix_states.account_update_cons
+      [| hash; h_tl |]
+
+let hash : ('a, 'b, 'c) t -> 'c =
+  function
+    | [] ->
+        Digest.Forest.empty
+    | x :: _ ->
+        With_stack_hash.stack_hash x
+
+let cons_tree : ('a, 'b, 'c) tree -> ('a, 'b, 'c) t -> ('a, 'b, 'c) t =
+  fun tree forest ->
+    { elt = tree
+    ; stack_hash = Digest.Forest.cons (Digest.Tree.create tree) (hash forest)
+    }
+    :: forest
+
+let cons_aux : 
+  type p. digest_account_update:(p -> 'b) -> ?calls:('p, 'b, 'c) t -> p -> ('p, 'b, 'c) t -> ('p, 'b, 'c) t =
+  fun ~digest_account_update ?calls account_update xs ->
+    let account_update_digest = digest_account_update account_update in
+    let tree : _ Tree.t = { account_update; account_update_digest; calls = Option.value calls ~default:[] } in
+    cons_tree tree xs
+
+let cons : 
+  ?calls:(Account_update.t, Digest.Account_update.t, Digest.Forest.t) t ->
+  Account_update.t -> (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t -> 
+  (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
+  fun ?calls account_update xs ->
+    cons_aux ~digest_account_update:Digest.Account_update.create ?calls account_update xs
+
+let rec accumulate_hashes : 
+  hash_account_update:('a -> 'b) -> ('a, 'c, 'd) t -> ('a, 'b, Digest.Forest.t) t =
+  fun ~hash_account_update xs ->
+    let go = accumulate_hashes ~hash_account_update in
+    match xs with
+    | [] ->
+        []
     | { elt = { account_update; calls; account_update_digest = _ }
       ; stack_hash = _
       }
       :: xs ->
-        f ~depth account_update :: acc
-        |> collect (depth + 1) calls
-        |> collect depth xs
-  in
-  List.rev (collect 0 xs [])
+        let calls = go calls in
+        let xs = go xs in
+        let node =
+          { Tree.account_update
+          ; calls
+          ; account_update_digest = hash_account_update account_update
+          }
+        in
+        let node_hash = Digest.Tree.create node in
+        { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) } :: xs
 
-let to_account_updates xs =
-  to_account_updates_map ~f:(fun ~depth:_ account_update -> account_update) xs
+let accumulate_hashes' : 
+  (Account_update.t, 'a, 'b) t -> (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
+  fun xs ->
+    let hash_account_update (p : Account_update.t) =
+      Digest.Account_update.create p
+    in
+    accumulate_hashes ~hash_account_update xs
 
-let hd_account_update (xs : _ t) =
-  match xs with
-  | [] ->
-      None
-  | { elt = { account_update; calls = _; account_update_digest = _ }
-    ; stack_hash = _
-    }
-    :: _ ->
-      Some account_update
+let accumulate_hashes_predicated : 
+  (Account_update.t, 'a, 'b) t -> (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
+  fun xs ->
+    accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
-let map = Tree.map_forest
-
-let mapi = Tree.mapi_forest
-
-let mapi_with_trees = Tree.mapi_forest_with_trees
-
-let deferred_mapi = Tree.deferred_mapi_forest
-
-let to_zkapp_command_with_hashes_list (xs : _ t) =
-  let rec collect (xs : _ t) acc =
-    match xs with
-    | [] ->
-        acc
-    | { elt = { account_update; calls; account_update_digest = _ }; stack_hash }
-      :: xs ->
-        (account_update, stack_hash) :: acc |> collect calls |> collect xs
-  in
-  List.rev (collect xs [])
-
-let hash_cons hash h_tl =
-  Random_oracle.hash ~init:Hash_prefix_states.account_update_cons
-    [| hash; h_tl |]
-
-let hash = function
-  | [] ->
-      Digest.Forest.empty
-  | x :: _ ->
-      With_stack_hash.stack_hash x
-
-let cons_tree tree (forest : _ t) : _ t =
-  { elt = tree
-  ; stack_hash = Digest.Forest.cons (Digest.Tree.create tree) (hash forest)
-  }
-  :: forest
-
-let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
-    (account_update : p) (xs : _ t) : _ t =
-  let account_update_digest = digest_account_update account_update in
-  let tree : _ Tree.t = { account_update; account_update_digest; calls } in
-  cons_tree tree xs
-
-let cons ?calls (account_update : Account_update.t) xs =
-  cons_aux ~digest_account_update:Digest.Account_update.create ?calls
-    account_update xs
-
-let rec accumulate_hashes ~hash_account_update (xs : _ t) =
-  let go = accumulate_hashes ~hash_account_update in
-  match xs with
-  | [] ->
-      []
-  | { elt = { account_update; calls; account_update_digest = _ }
-    ; stack_hash = _
-    }
-    :: xs ->
-      let calls = go calls in
-      let xs = go xs in
-      let node =
-        { Tree.account_update
-        ; calls
-        ; account_update_digest = hash_account_update account_update
-        }
-      in
-      let node_hash = Digest.Tree.create node in
-      { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) } :: xs
-
-let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
-    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
-  let hash_account_update (p : Account_update.t) =
-    Digest.Account_update.create p
-  in
-  accumulate_hashes ~hash_account_update xs
-
-let accumulate_hashes_predicated xs =
-  accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
-
-let forget_hashes =
+let forget_hashes : ('a, 'b, 'c) t -> ('a, unit, unit) t =
   let rec impl = List.map ~f:forget_digest
   and forget_digest = function
     | { With_stack_hash.stack_hash = _
@@ -625,12 +643,14 @@ module With_hashes = struct
     List.map ~f:(fun x -> x) xs |> account_updates_hash'
 end
 
-let is_empty : _ t -> bool = List.is_empty
+let is_empty : ('a, 'b, 'c) t -> bool = List.is_empty
 
-let to_list (type p) (t : (p, _, _) t) : p list =
-  List.rev @@ fold t ~init:[] ~f:(fun acc p -> p :: acc)
+let to_list : ('p, 'a, 'b) t -> 'p list =
+  fun t ->
+    List.rev @@ fold t ~init:[] ~f:(fun acc p -> p :: acc)
 
-let exists (type p) (t : (p, _, _) t) ~(f : p -> bool) : bool =
-  with_return (fun { return } ->
-      fold t ~init:() ~f:(fun () p -> if f p then return true else ()) ;
-      false )
+let exists : ('p, 'a, 'b) t -> f:('p -> bool) -> bool =
+  fun t ~f ->
+    with_return (fun { return } ->
+        fold t ~init:() ~f:(fun () p -> if f p then return true else ()) ;
+        false )
