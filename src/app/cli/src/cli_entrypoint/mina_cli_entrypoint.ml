@@ -1714,7 +1714,7 @@ let internal_commands logger ~itn_features =
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
                  failwith "early EOF while reading sexp" ) ) )
-  ; ( "run-snark-worker-single"
+  ; ( "run-snark-worker"
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
         (let open Command.Let_syntax in
@@ -1736,26 +1736,26 @@ let internal_commands logger ~itn_features =
                 Reader.read_sexp reader )
           with
           | `Ok sexp -> (
-              let module Single_worker = Snark_worker.Single_worker.Prod in
+              let module Single_worker = Snark_worker.Impl.Prod in
+              let proof_cache_db = Proof_cache_tag.create_identity_db () in
               let%bind worker_state =
                 Single_worker.Worker_state.create ~proof_level
                   ~constraint_constants ()
               in
               let sok_message =
-                { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
+                { Sok_message.fee = Currency.Fee.of_mina_int_exn 0
                 ; prover = Quickcheck.random_value Public_key.Compressed.gen
                 }
               in
+              let sok_digest = Sok_message.digest sok_message in
               let spec =
-                [%of_sexp: Snark_work_lib.Selector.Single.Spec.Stable.Latest.t]
-                  sexp
+                [%of_sexp: Snark_work_lib.Partitioned.Spec.Stable.Latest.t] sexp
+                |> Snark_work_lib.Partitioned.Spec.Poly.write_all_proofs_to_disk
+                     ~proof_cache_db
               in
+
               match%map
-                Snark_work_lib.Selector.Single.Spec.write_all_proofs_to_disk
-                  ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
-                  spec
-                |> Single_worker.perform_single worker_state
-                     ~message:sok_message
+                Single_worker.perform ~state:worker_state ~sok_digest ~spec
               with
               | Ok _ ->
                   [%log info] "Successfully worked"
