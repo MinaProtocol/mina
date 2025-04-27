@@ -1,6 +1,5 @@
 open Core
 open Async
-open Events
 open Worker_proof_cache
 
 let command_name = "snark-worker"
@@ -42,108 +41,6 @@ let dispatch rpc shutdown_on_disconnect query address =
           @@ Exn.to_string_mach exn )
   | Ok res ->
       res
-
-(* WARN: This is largely identical to Init.Mina_run.log_snark_work_metrics, we should refactor this out *)
-let emit_proof_metrics_single ~(single_spec : Work.Selector.Single.Spec.t)
-    ~(metric : Work.Partitioned.Proof_with_metric.t) ~logger =
-  let time = metric.elapsed in
-  match single_spec with
-  | Work.Work.Single.Spec.Merge (_, _, _) ->
-      (* WARN: This statement is just noop, not sure why it's here *)
-      Mina_metrics.(
-        Cryptography.Snark_work_histogram.observe
-          Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
-      [%str_log info] (Merge_snark_generated { time })
-  | Work.Work.Single.Spec.Transition (_, { transaction; _ }) ->
-      let transaction_type, zkapp_command_count, proof_zkapp_command_count =
-        match transaction with
-        | Mina_transaction.Transaction.Command
-            (Mina_base.User_command.Zkapp_command zkapp_command) ->
-            (* WARN: now this is dead code, if we're using new
-                           protocol between snark coordinator and workers *)
-            let init =
-              match
-                (Mina_base.Account_update.of_fee_payer
-                   zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
-                  .authorization
-              with
-              | Proof _ ->
-                  (1, 1)
-              | _ ->
-                  (1, 0)
-            in
-            let c, p =
-              Mina_base.Zkapp_command.Call_forest.fold
-                zkapp_command.account_updates ~init
-                ~f:(fun (count, proof_updates_count) account_update ->
-                  ( count + 1
-                  , if
-                      Mina_base.Control.(
-                        Tag.equal Proof
-                          (tag
-                             account_update
-                               .Mina_base.Account_update.Poly.authorization ))
-                    then proof_updates_count + 1
-                    else proof_updates_count ) )
-            in
-            Mina_metrics.(
-              Cryptography.(
-                Counter.inc snark_work_zkapp_base_time_sec
-                  (Time.Span.to_sec time) ;
-                Counter.inc_one snark_work_zkapp_base_submissions ;
-                Counter.inc zkapp_transaction_length (Float.of_int c) ;
-                Counter.inc zkapp_proof_updates (Float.of_int p))) ;
-            ("zkapp_command", c, p)
-        | Mina_transaction.Transaction.Command
-            (Mina_base.User_command.Signed_command _) ->
-            Mina_metrics.(
-              Counter.inc Cryptography.snark_work_base_time_sec
-                (Time.Span.to_sec time)) ;
-            ("signed command", 1, 0)
-        | Mina_transaction.Transaction.Coinbase _ ->
-            Mina_metrics.(
-              Counter.inc Cryptography.snark_work_base_time_sec
-                (Time.Span.to_sec time)) ;
-            ("coinbase", 1, 0)
-        | Mina_transaction.Transaction.Fee_transfer _ ->
-            Mina_metrics.(
-              Counter.inc Cryptography.snark_work_base_time_sec
-                (Time.Span.to_sec time)) ;
-            ("fee_transfer", 1, 0)
-      in
-      [%str_log info]
-        (Base_snark_generated
-           { time
-           ; transaction_type
-           ; zkapp_command_count
-           ; proof_zkapp_command_count
-           } )
-
-let emit_proof_metrics ~data ~logger =
-  match data with
-  | Work.Partitioned.Spec.Poly.Single { single_spec; metric; _ } ->
-      emit_proof_metrics_single ~single_spec ~metric ~logger
-  | Work.Partitioned.Spec.Poly.Sub_zkapp_command
-      { spec = { spec = Work.Partitioned.Zkapp_command_job.Spec.Segment _; _ }
-      ; metric
-      } ->
-      (* WARN:
-         I don't know if this is the desired behavior, we need CI engineers to decide
-      *)
-      Perf_histograms.add_span
-        ~name:"snark_worker_sub_zkapp_command_segment_time" metric.elapsed
-  | Work.Partitioned.Spec.Poly.Sub_zkapp_command
-      { spec = { spec = Work.Partitioned.Zkapp_command_job.Spec.Merge _; _ }
-      ; metric
-      } ->
-      (* WARN:
-         I don't know if this is the desired behavior, we need CI engineers to decide
-      *)
-      Perf_histograms.add_span ~name:"snark_worker_sub_zkapp_command_merge_time"
-        metric.elapsed
-  | Work.Partitioned.Spec.Poly.Old { instances; _ } ->
-      One_or_two.iter instances ~f:(fun (single_spec, metric) ->
-          emit_proof_metrics_single ~single_spec ~metric ~logger )
 
 let main ~logger ~proof_level ~constraint_constants daemon_address
     shutdown_on_disconnect =
@@ -241,7 +138,10 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok data ->
-            emit_proof_metrics ~data ~logger ;
+            Work.Metrics.emit_proof_metrics ~data
+            |> One_or_two.iter ~f:(fun generated ->
+                   [%str_log info]
+                     (Events.event_of_snark_work_generated generated) ) ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", address_json); ("work_ids", work_ids_json) ] ;
