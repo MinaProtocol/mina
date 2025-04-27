@@ -11,15 +11,13 @@ type snark_work_generated =
       }
   | Sub_zkapp_command of { kind : [ `Merge | `Segment ]; elapsed : Time.Span.t }
 
-(* WARN: This is largely identical to Init.Mina_run.log_snark_work_metrics, we
-   should refactor this out *)
 let collect_single ~(single_spec : Selector.Single.Spec.t)
     ~metric:({ elapsed; _ } : Partitioned.Proof_with_metric.t) =
   match single_spec with
   | Work.Single.Spec.Merge (_, _, _) ->
-      (* WARN: This statement is just noop, not sure why it's here *)
       Perf_histograms.add_span ~name:"snark_worker_merge_time" elapsed ;
 
+      (* WARN: This `observe` is just noop, not sure why it's here *)
       Mina_metrics.(
         Cryptography.Snark_work_histogram.observe
           Cryptography.snark_work_merge_time_sec (Time.Span.to_sec elapsed)) ;
