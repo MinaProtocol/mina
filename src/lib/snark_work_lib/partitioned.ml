@@ -128,6 +128,26 @@ module Zkapp_command_job = struct
             Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof2
           in
           Merge { proof1; proof2 }
+
+    let statement : t -> Transaction_snark.Statement.t = function
+      | Segment { statement; _ } ->
+          Mina_state.Snarked_ledger_state.With_sok.drop_sok statement
+      | Merge { proof1; proof2; _ } -> (
+          let module Statement = Mina_state.Snarked_ledger_state in
+          let { Proof_carrying_data.data = t1; _ } = proof1 in
+          let { Proof_carrying_data.data = t2; _ } = proof2 in
+          let stmt =
+            Statement.merge
+              ({ t1 with sok_digest = () } : Statement.t)
+              { t2 with sok_digest = () }
+          in
+          match stmt with
+          | Ok stmt ->
+              stmt
+          | Error e ->
+              failwithf
+                "Failed to construct a statement from  zkapp merge command %s"
+                (Error.to_string_hum e) () )
   end
 
   [%%versioned
@@ -195,15 +215,6 @@ module Spec = struct
       | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
       | Old of (Selector.Single.Spec.t * 'metric) Work.Spec.t
 
-    let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
-      match t with
-      | Single { single_spec; pairing; metric; fee_of_full } ->
-          Single { single_spec; pairing; metric = f metric; fee_of_full }
-      | Old spec ->
-          Old (Work.Spec.map ~f:(Tuple2.map_snd ~f) spec)
-      | Sub_zkapp_command { spec; metric } ->
-          Sub_zkapp_command { spec; metric = f metric }
-
     let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
       function
       | Single { single_spec; pairing; metric; fee_of_full } ->
@@ -245,41 +256,45 @@ module Spec = struct
                          ~proof_cache_db ) )
                spec )
 
-    let statement : 'metric t -> Transaction_snark.Statement.t One_or_two.t =
+    let statements : 'metric t -> Transaction_snark.Statement.t One_or_two.t =
       function
       | Single { single_spec; _ } ->
           let stmt = Work.Single.Spec.statement single_spec in
           `One stmt
-      | Sub_zkapp_command
-          { spec = { spec = Zkapp_command_job.Spec.Segment { statement; _ }; _ }
-          ; _
-          } ->
-          let stmt =
-            Mina_state.Snarked_ledger_state.With_sok.drop_sok statement
-          in
-          `One stmt
-      | Sub_zkapp_command
-          { spec = { spec = Zkapp_command_job.Spec.Merge { proof1; proof2 }; _ }
-          ; _
-          } -> (
-          let module Statement = Mina_state.Snarked_ledger_state in
-          let { Proof_carrying_data.data = t1; _ } = proof1 in
-          let { Proof_carrying_data.data = t2; _ } = proof2 in
-          let stmt =
-            Statement.merge
-              ({ t1 with sok_digest = () } : Statement.t)
-              { t2 with sok_digest = () }
-          in
-          match stmt with
-          | Ok stmt ->
-              `One stmt
-          | Error _ ->
-              failwith
-                "Failed to construct a statement from  zkapp merge command" )
+      | Sub_zkapp_command { spec = { spec; _ }; _ } ->
+          `One (Zkapp_command_job.Spec.statement spec)
       | Old { instances; _ } ->
           One_or_two.map
             ~f:(fun (i, _) -> Work.Single.Spec.statement i)
             instances
+
+    let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
+      match t with
+      | Single { single_spec; pairing; metric; fee_of_full } ->
+          Single { single_spec; pairing; metric = f metric; fee_of_full }
+      | Old spec ->
+          Old (Work.Spec.map ~f:(Tuple2.map_snd ~f) spec)
+      | Sub_zkapp_command { spec; metric } ->
+          Sub_zkapp_command { spec; metric = f metric }
+
+    let map_metric_with_statement (t : 'm t)
+        ~(f : Transaction_snark.Statement.t -> 'm -> 'n) : 'n t =
+      match t with
+      | Single { single_spec; pairing; metric; fee_of_full } ->
+          let stmt = Work.Single.Spec.statement single_spec in
+          Single { single_spec; pairing; metric = f stmt metric; fee_of_full }
+      | Old spec ->
+          Old
+            (Work.Spec.map
+               ~f:(fun (single_spec, metric) ->
+                 let stmt = Work.Single.Spec.statement single_spec in
+                 (single_spec, f stmt metric) )
+               spec )
+      | Sub_zkapp_command { spec = { spec; _ } as job_spec; metric } ->
+          Sub_zkapp_command
+            { spec = job_spec
+            ; metric = f (Zkapp_command_job.Spec.statement spec) metric
+            }
 
     let transaction = function
       | Single { single_spec; _ } ->
