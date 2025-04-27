@@ -128,7 +128,7 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing
                 all
                 |> List.map ~f:(fun (witness, spec, statement) ->
                        Work.Partitioned.Zkapp_command_job.Spec.Segment
-                         { statement; witness; spec } )
+                         { statement; witness; spec; fee_of_full } )
                 |> Queue.of_list
               in
               let pending_mergable_proofs = Deque.create () in
