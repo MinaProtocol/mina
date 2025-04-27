@@ -121,7 +121,8 @@ module Impl : Intf.Worker = struct
             (* NOTE: we only go down this path if coordinator is
                V2, still this is preserved for compatibility. *)
             let zkapp_command =
-              Zkapp_command.write_all_proofs_to_disk zkapp_command
+              Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+                zkapp_command
             in
             let%bind witnesses_specs_stmts =
               Shared.extract_zkapp_segment_works

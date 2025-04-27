@@ -34,9 +34,10 @@ module Zkapp_command_inputs = struct
     * Statement.With_sok.t )
     list
 
-  let write_all_proofs_to_disk : Stable.V1.t -> t =
+  let write_all_proofs_to_disk ~proof_cache_db : Stable.V1.t -> t =
     List.map ~f:(fun (witness, segment, stmt) ->
-        ( Zkapp_command_segment.Witness.write_all_proofs_to_disk witness
+        ( Zkapp_command_segment.Witness.write_all_proofs_to_disk ~proof_cache_db
+            witness
         , segment
         , stmt ) )
 
