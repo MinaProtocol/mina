@@ -32,6 +32,32 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 
 [%%versioned_rpc
 module Stable = struct
+  module V3 = struct
+    module T = struct
+      type query =
+        Bounded_types.Wrapped_error.Stable.V1.t
+        * Work.Partitioned.Spec.Stable.V1.t
+        * Public_key.Compressed.Stable.V1.t
+
+      type response = unit
+
+      let query_of_caller_model : Master.Caller.query -> query =
+        Tuple3.map_snd ~f:Work.Partitioned.Spec.Poly.read_all_proofs_from_disk
+
+      let callee_model_of_query : query -> Master.Callee.query =
+        Tuple3.map_snd
+          ~f:
+            (Work.Partitioned.Spec.Poly.write_all_proofs_to_disk ~proof_cache_db)
+
+      let response_of_callee_model = Fn.id
+
+      let caller_model_of_response = Fn.id
+    end
+
+    include T
+    include Register (T)
+  end
+
   module V2 = struct
     module T = struct
       type query =
@@ -69,5 +95,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]
