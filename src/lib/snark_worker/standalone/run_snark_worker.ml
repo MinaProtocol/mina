@@ -1,6 +1,6 @@
 open Core_kernel
 open Async
-module Single_worker = Snark_worker.Single_worker.Prod
+module Single_worker = Snark_worker.Impl.Prod
 module Work = Snark_work_lib
 
 module Graphql_client = Graphql_lib.Client.Make (struct
@@ -35,27 +35,6 @@ let submit_graphql input graphql_endpoint =
       exit 1
 
 let proof_cache_db = Proof_cache_tag.create_identity_db ()
-
-let perform (s : Single_worker.Worker_state.t) ~fee ~public_key
-    (instances : Work.Selector.Single.Spec.t One_or_two.t) =
-  One_or_two.Deferred_result.map instances ~f:(fun w ->
-      let open Deferred.Or_error.Let_syntax in
-      let%map proof, time =
-        Single_worker.perform_single s
-          ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-          w
-      in
-      ( proof
-      , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
-  |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
-         { Snark_work_lib.Work.Result_without_metrics.proofs =
-             One_or_two.map proofs_and_time ~f:fst
-         ; statements =
-             One_or_two.map instances
-               ~f:Snark_work_lib.Work.Single.Spec.statement
-         ; prover = public_key
-         ; fee
-         } )
 
 let command =
   let open Command.Let_syntax in
@@ -138,35 +117,65 @@ let command =
                  match spec_sexp with
                  | Some spec ->
                      One_or_two.t_of_sexp
-                       (Snark_work_lib.Work.Single.Spec.t_of_sexp
+                       (Work.Work.Single.Spec.t_of_sexp
                           Transaction_witness.Stable.Latest.t_of_sexp
                           Ledger_proof.t_of_sexp )
                        (Sexp.of_string spec)
                  | None ->
                      failwith "Provide a spec either in json or sexp format" ) )
        in
+       let fee =
+         Option.value
+           ~default:(Currency.Fee.of_nanomina_int_exn 10)
+           snark_work_fee
+       in
        let spec =
-         One_or_two.map
-           ~f:
-             (Work.Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
-           spec
+         Work.Partitioned.Spec.Poly.Old
+           { instances =
+               One_or_two.map
+                 ~f:(fun i ->
+                   ( Work.Selector.Single.Spec.write_all_proofs_to_disk
+                       ~proof_cache_db i
+                   , () ) )
+                 spec
+           ; fee
+           }
        in
        let public_key =
          Option.value
            ~default:(fst Key_gen.Sample_keypairs.genesis_winner)
            snark_worker_key
        in
-       let fee =
-         Option.value
-           ~default:(Currency.Fee.of_nanomina_int_exn 10)
-           snark_work_fee
-       in
-       match%bind perform worker_state ~fee ~public_key spec with
-       | Ok result -> (
+
+       let message = Mina_base.Sok_message.create ~fee ~prover:public_key in
+       let sok_digest = Mina_base.Sok_message.digest message in
+       match%bind
+         Snark_worker.Impl.Prod.perform ~state:worker_state ~sok_digest ~spec
+       with
+       | Ok (Work.Partitioned.Spec.Poly.Single _)
+       | Ok (Work.Partitioned.Spec.Poly.Sub_zkapp_command _) ->
+           Caml.Format.printf !"Result type is not old, unexpected" ;
+           exit 1
+       | Ok (Work.Partitioned.Spec.Poly.Old { instances; fee }) -> (
+           let extract_proof (_, Work.Partitioned.Proof_with_metric.{ proof; _ })
+               =
+             Ledger_proof.Cached.read_proof_from_disk proof
+           in
+           let extract_statement ((spec : Work.Selector.Single.Spec.t), _) =
+             Work.Work.Single.Spec.statement spec
+           in
+           let result =
+             Work.Work.Result_without_metrics.
+               { proofs = One_or_two.map ~f:extract_proof instances
+               ; statements = One_or_two.map ~f:extract_statement instances
+               ; prover = public_key
+               ; fee
+               }
+           in
            Caml.Format.printf
              !"@[<v>Successfully proved. Result: \n\
               \               %{sexp: Ledger_proof.t \
-               Snark_work_lib.Work.Result_without_metrics.t}@]@."
+               Work.Work.Result_without_metrics.t}@]@."
              result ;
            match proof_submission_graphql_endpoint with
            | Some endpoint ->
