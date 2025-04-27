@@ -16,9 +16,9 @@ module Master = struct
   let name = "get_work"
 
   module T = struct
-    type query = unit
+    type query = [ `V2 | `V3 ]
 
-    type response = (Work.Selector.Spec.t * Public_key.Compressed.t) option
+    type response = (Work.Partitioned.Spec.t * Public_key.Compressed.t) option
   end
 
   module Caller = T
@@ -37,25 +37,36 @@ module Stable = struct
         (Work.Selector.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
         option
 
-      let query_of_caller_model = Fn.id
+      let query_of_caller_model = const ()
 
-      let callee_model_of_query = Fn.id
+      let callee_model_of_query = const `V2
 
-      let response_of_callee_model : Master.Callee.response -> response =
-        function
+      let response_of_callee_model (resp : Master.Callee.response) : response =
+        match resp with
+        | Some (spec, key) -> (
+            match Work.Partitioned.Spec.to_selector_spec spec with
+            | None ->
+                (* WARN: we'd better report to the coordinator we failed rather *)
+                (*          than ignoring the work*)
+                printf
+                  "WARN: V2 Worker receving work `Zkapp_command_segment`, \
+                   which is out of its capability, work dropped" ;
+                None
+            | Some spec ->
+                Some (Work.Selector.Spec.read_all_proofs_from_disk spec, key) )
         | None ->
             None
-        | Some (spec, key) ->
-            Some (Work.Selector.Spec.read_all_proofs_from_disk spec, key)
 
       let caller_model_of_response : response -> Master.Caller.response =
         function
+        | Some (spec, key) ->
+            let spec =
+              Work.Selector.Spec.write_all_proofs_to_disk ~proof_cache_db spec
+              |> Work.Partitioned.Spec.of_selector_spec
+            in
+            Some (spec, key)
         | None ->
             None
-        | Some (spec, key) ->
-            Some
-              ( Work.Selector.Spec.write_all_proofs_to_disk ~proof_cache_db spec
-              , key )
     end
 
     include T
