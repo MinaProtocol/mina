@@ -13,7 +13,6 @@
   coda_genesis_proof
   consensus
   data_hash_lib
-  gadt_lib
   genesis_constants
   kimchi_bindings
   kimchi_pasta

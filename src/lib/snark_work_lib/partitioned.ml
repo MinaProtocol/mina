@@ -123,7 +123,7 @@ module Zkapp_command_job = struct
       | Segment { statement; witness; spec; fee_of_full } ->
           let witness =
             Transaction_snark.Zkapp_command_segment.Witness
-            .write_all_proofs_to_disk witness
+            .write_all_proofs_to_disk ~proof_cache_db witness
           in
           Segment { statement; witness; spec; fee_of_full }
       | Merge { proof1; proof2; fee_of_full } ->

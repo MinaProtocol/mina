@@ -2048,7 +2048,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
-              ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db
+              ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db ~proof_cache_db
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =

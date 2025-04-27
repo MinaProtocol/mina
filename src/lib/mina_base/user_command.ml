@@ -90,11 +90,11 @@ end]
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
 [@@deriving sexp_of, to_yojson]
 
-let write_all_proofs_to_disk : Stable.Latest.t -> t = function
+let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t = function
   | Signed_command sc ->
       Signed_command sc
   | Zkapp_command zc ->
-      Zkapp_command (Zkapp_command.write_all_proofs_to_disk zc)
+      Zkapp_command (Zkapp_command.write_all_proofs_to_disk ~proof_cache_db zc)
 
 let read_all_proofs_from_disk : t -> Stable.Latest.t = function
   | Signed_command sc ->
@@ -185,12 +185,13 @@ module Verifiable = struct
     | Zkapp_command cmd ->
         Zkapp_command (Zkapp_command.Verifiable.to_serializable cmd)
 
-  let of_serializable (t : Serializable.t) : t =
+  let of_serializable ~proof_cache_db (t : Serializable.t) : t =
     match t with
     | Signed_command c ->
         Signed_command c
     | Zkapp_command cmd ->
-        Zkapp_command (Zkapp_command.Verifiable.of_serializable cmd)
+        Zkapp_command
+          (Zkapp_command.Verifiable.of_serializable ~proof_cache_db cmd)
 end
 
 let to_verifiable (t : t) ~failed ~find_vk : Verifiable.t Or_error.t =

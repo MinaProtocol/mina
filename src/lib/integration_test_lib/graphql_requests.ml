@@ -9,11 +9,7 @@ open Mina_transaction
 let node_password = "naughty blue worm"
 
 module Graphql = struct
-  module Client = Graphql_lib.Client.Make (struct
-    let preprocess_variables_string = Fn.id
-
-    let headers = String.Map.empty
-  end)
+  module Client = Graphql_lib.Client
 
   (* graphql_ppx uses Stdlib symbols instead of Base *)
   open Stdlib

@@ -3,11 +3,7 @@ open Async
 module Single_worker = Snark_worker.Impl.Prod
 module Work = Snark_work_lib
 
-module Graphql_client = Graphql_lib.Client.Make (struct
-  let preprocess_variables_string = Fn.id
-
-  let headers = String.Map.empty
-end)
+module Graphql_client = Graphql_lib.Client
 
 module Encoders = Mina_graphql.Types.Input
 module Scalars = Graphql_lib.Scalars

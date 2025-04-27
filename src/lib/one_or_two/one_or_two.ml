@@ -88,19 +88,6 @@ module Monadic2 (M : Monad.S2) :
         let%map b' = f b in
         `Two (a', b')
 
-  let map_biased :
-         'a t
-      -> f:([ `One | `First | `Second ] -> 'a -> ('b, 'e) M.t)
-      -> ('b t, 'e) M.t =
-   fun t ~f ->
-    match t with
-    | `One a ->
-        M.map ~f:(fun x -> `One x) (f `One a)
-    | `Two (a, b) ->
-        let%bind.M a' = f `First a in
-        let%map.M b' = f `Second b in
-        `Two (a', b')
-
   let fold :
          'a t
       -> init:'accum
@@ -124,8 +111,6 @@ module Option = Monadic (Option)
 module Or_error = Monadic (Or_error)
 
 let map = Ident.map
-
-let map_biased = Ident.map_biased
 
 let fold = Ident.fold
 
