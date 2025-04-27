@@ -17,7 +17,7 @@ let format_timestamp ~timezone time =
     (Time.Ofday.to_string of_day)
 
 let level_color =
-  let open Bash_colors in
+  let open Mina_stdlib.Bash_colors in
   let open Logger.Level in
   function
   | Spam | Trace | Internal ->
@@ -45,7 +45,7 @@ let format_msg ~interpolation_config ~timezone msg =
     | Ok x ->
         x
     | Error err ->
-        let open Bash_colors in
+        let open Mina_stdlib.Bash_colors in
         printf
           !"%s===== Error interpolating message: %s%s\n%!"
           bright_red err none ;
@@ -55,11 +55,11 @@ let format_msg ~interpolation_config ~timezone msg =
   | Some source ->
       printf !"%s[%s]%s: %s%s\n" (level_color msg.level)
         (format_timestamp ~timezone msg.timestamp)
-        source.module_ message Bash_colors.none
+        source.module_ message Mina_stdlib.Bash_colors.none
   | None ->
       printf !"%s[%s]: %s%s\n" (level_color msg.level)
         (format_timestamp ~timezone msg.timestamp)
-        message Bash_colors.none ) ;
+        message Mina_stdlib.Bash_colors.none ) ;
   List.iter extra ~f:(fun (k, v) -> printf !"$%s = %s\n" k v) ;
   Out_channel.(flush stdout)
 

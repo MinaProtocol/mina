@@ -13,7 +13,8 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.Prod.t
 
 module Processor = struct
-  let verify_commands (cs : User_command.Verifiable.t With_status.t list) =
+  let verify_commands
+      (cs : User_command.Verifiable.Serializable.t With_status.t list) =
     let results = List.map cs ~f:Common.check in
     let to_verify =
       List.concat_map
@@ -42,7 +43,7 @@ module Worker_state = struct
       (Protocol_state.Value.t * Proof.t) list -> unit Or_error.t Deferred.t
 
     val verify_commands :
-         User_command.Verifiable.t With_status.t list
+         User_command.Verifiable.Serializable.t With_status.t list
       -> [ `Valid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
@@ -181,7 +182,7 @@ module Worker = struct
           ('w, (Transaction_snark.t * Sok_message.t) list, unit Or_error.t) F.t
       ; verify_commands :
           ( 'w
-          , User_command.Verifiable.t With_status.t list
+          , User_command.Verifiable.Serializable.t With_status.t list
           , [ `Valid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
@@ -633,8 +634,12 @@ let verify_commands_impl { worker; logger } commands =
   @@ fun () ->
   with_retry ~logger (fun () ->
       let%bind { connection; _ } = Ivar.read !worker in
+      let commands_serialized =
+        List.map commands
+          ~f:(With_status.map ~f:User_command.Verifiable.to_serializable)
+      in
       Worker.Connection.run connection ~f:Worker.functions.verify_commands
-        ~arg:commands
+        ~arg:commands_serialized
       |> Deferred.Or_error.map ~f:(fun results ->
              let results = finalize_verification_results commands results in
              `Continue results ) )

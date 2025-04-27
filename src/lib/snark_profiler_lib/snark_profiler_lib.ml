@@ -185,6 +185,7 @@ end
 let transaction_combinations = Transaction_key.Table.create ()
 
 let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
+    ~(proof_cache_db : Proof_cache_tag.cache_db)
     ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~max_num_updates () :
@@ -392,7 +393,8 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
         |> Async.Deferred.List.filter_mapi ~how:`Sequential
              ~f:(fun i (account_updates : Account_update.Simple.t list) ->
                let p =
-                 Zkapp_command.of_simple { simple_parties with account_updates }
+                 Zkapp_command.of_simple ~proof_cache_db
+                   { simple_parties with account_updates }
                in
                let combination =
                  Transaction_key.of_zkapp_command ~constraint_constants ~ledger
