@@ -12,7 +12,7 @@ module Rpcs = struct
   module Failed_to_generate_snark = Rpc_failed_to_generate_snark
 end
 
-(* module providing Single Workers *)
+(* module providing different implementation of Workers *)
 module Impl = struct
   module Debug : Intf.Worker = Debug.Impl
 
