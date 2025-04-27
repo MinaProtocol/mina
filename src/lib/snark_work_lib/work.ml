@@ -92,10 +92,6 @@ module Spec = struct
   let map_opt ~f_single { instances; fee } =
     let%map.Option instances = One_or_two.Option.map ~f:f_single instances in
     { instances; fee }
-
-  let map_biased ~f_single { instances; fee } =
-    let instances = One_or_two.map_biased ~f:f_single instances in
-    { instances; fee }
 end
 
 module Result = struct

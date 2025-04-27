@@ -39,7 +39,8 @@ module Single = struct
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         Stable.Latest.t -> t =
       Work.Single.Spec.map
-        ~f_witness:Transaction_witness.write_all_proofs_to_disk
+        ~f_witness:
+          (Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
         ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
   end
 end
