@@ -15,7 +15,7 @@ function image_tag {
     IMAGE_TAG="$SHA-bullseye-berkeley"
 }
 
-function download-docker {
+function download_docker {
    SHA=$1
    image_tag $SHA
    docker pull gcr.io/o1labs-192920/mina-daemon:$IMAGE_TAG
