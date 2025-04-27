@@ -77,7 +77,8 @@ module Zkapp_command_segment_witness : sig
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
 
-  val write_all_proofs_to_disk : Stable.Latest.t -> t
+  val write_all_proofs_to_disk :
+    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 end
 
 [%%versioned:
