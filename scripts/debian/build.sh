@@ -9,7 +9,7 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 # In case of running this script on detached head, script has difficulties in finding out
 # what is the current branch.
 if [[ -n "${BRANCH_NAME}" ]]; then
-  BRANCH_NAME="${BRANCH_NAME}" source "${SCRIPTPATH}"/../export-git-env-vars.sh
+  source "${SCRIPTPATH}"/../export-git-env-vars.sh
 else
   source "${SCRIPTPATH}"/../export-git-env-vars.sh
 fi
@@ -37,8 +37,7 @@ if [ $# -eq 0 ]
 
   else
     for i in "$@"; do
-      if [[ $(type -t "build_${i}_deb") == function ]]
-      then
+      if declare -f "build_${i}_deb" > /dev/null; then
           echo "Building $i debian package"
           "build_${i}_deb"
       else
