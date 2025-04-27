@@ -29,6 +29,38 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 
 [%%versioned_rpc
 module Stable = struct
+  module V3 = struct
+    module T = struct
+      type query = [ `V2 | `V3 ]
+
+      type response =
+        (Work.Partitioned.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
+        option
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model (resp : Master.Callee.response) : response =
+        let open Option.Let_syntax in
+        let%map spec, key = resp in
+        let spec = Work.Partitioned.Spec.Poly.read_all_proofs_from_disk spec in
+        (spec, key)
+
+      let caller_model_of_response (resp : response) : Master.Caller.response =
+        let open Option.Let_syntax in
+        let%map spec, key = resp in
+        let spec =
+          Work.Partitioned.Spec.Poly.write_all_proofs_to_disk ~proof_cache_db
+            spec
+        in
+        (spec, key)
+    end
+
+    include T
+    include Register (T)
+  end
+
   module V2 = struct
     module T = struct
       type query = unit
@@ -73,5 +105,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]
