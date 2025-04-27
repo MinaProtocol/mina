@@ -3,7 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
-module Prod = Snark_worker.Single_worker.Prod
+module Prod = Snark_worker.Impl.Prod
 module Work = Snark_work_lib
 
 let proof_cache_db = Proof_cache_tag.create_identity_db ()
@@ -25,14 +25,30 @@ module Worker_state = struct
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
-           let%bind (worker_state : Prod.Worker_state.t) =
+           let%bind (state : Prod.Worker_state.t) =
              Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
            let single_spec =
              Work.Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
                single_spec
            in
-           Prod.perform_single worker_state ~message single_spec
+
+           let sok_digest = Mina_base.Sok_message.digest message in
+           let spec : Work.Partitioned.Spec.t =
+             Old { instances = `One (single_spec, ()); fee = message.fee }
+           in
+           let%map.Deferred.Or_error data =
+             Prod.perform ~state ~spec ~sok_digest
+           in
+           match data with
+           | Work.Partitioned.Spec.Poly.Single _
+           | Work.Partitioned.Spec.Poly.Sub_zkapp_command _
+           | Work.Partitioned.Spec.Poly.Old { instances = `Two _; _ } ->
+               failwith "Unexpcted result of Prod.perform"
+           | Work.Partitioned.Spec.Poly.Old
+               { instances = `One (_, { proof; elapsed }); _ } ->
+               let proof = Ledger_proof.Cached.read_proof_from_disk proof in
+               (proof, elapsed)
        end in
       (module M : S) )
 
@@ -147,5 +163,5 @@ let create ~logger ~constraint_constants ~pids : t Deferred.t =
               ~metadata:[ ("stderr", `String stderr) ] ) ;
   { connection; process; logger }
 
-let perform_single { connection; _ } ((_message, _single_spec) as arg) =
+let perform_single { connection; _ } arg =
   Worker.Connection.run connection ~f:Worker.functions.perform_single ~arg
