@@ -6,36 +6,10 @@ open Worker_proof_cache
 let command_name = "snark-worker"
 
 (* NOTE: could swap with Debug.Impl, untested though *)
-module Impl : Intf.Single_worker = Prod.Impl
+module Impl : Intf.Worker = Prod.Impl
 
 include Impl
 module Work = Snark_work_lib
-
-let perform (s : Worker_state.t) public_key
-    ({ instances; fee } as spec : Work.Selector.Spec.t) :
-    Work.Selector.Result.t Deferred.Or_error.t =
-  One_or_two.Deferred_result.map instances ~f:(fun w ->
-      let open Deferred.Or_error.Let_syntax in
-      let%map proof, time =
-        perform_single s
-          ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-          w
-      in
-      ( Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
-      , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
-  |> Deferred.Or_error.map ~f:(function
-       | `One (proof1, metrics1) ->
-           { Snark_work_lib.Work.Result.proofs = `One proof1
-           ; metrics = `One metrics1
-           ; spec
-           ; prover = public_key
-           }
-       | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-           { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
-           ; metrics = `Two (metrics1, metrics2)
-           ; spec
-           ; prover = public_key
-           } )
 
 let dispatch rpc shutdown_on_disconnect query address =
   let%map res =
@@ -69,77 +43,108 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
-let emit_proof_metrics metrics instances logger =
-  One_or_two.iter (One_or_two.zip_exn metrics instances)
-    ~f:(fun ((time, tag), single) ->
-      match tag with
-      | `Merge ->
-          Mina_metrics.(
-            Cryptography.Snark_work_histogram.observe
-              Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
-          [%str_log info] (Merge_snark_generated { time })
-      | `Transition ->
-          let transaction_type, zkapp_command_count, proof_zkapp_command_count =
-            (*should be Some in the case of `Transition*)
-            match Option.value_exn single with
-            | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Zkapp_command zkapp_command) ->
-                let init =
-                  match
-                    (Mina_base.Account_update.of_fee_payer
-                       zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
-                      .authorization
-                  with
-                  | Proof _ ->
-                      (1, 1)
-                  | _ ->
-                      (1, 0)
-                in
-                let c, p =
-                  Mina_base.Zkapp_command.Call_forest.fold
-                    zkapp_command.account_updates ~init
-                    ~f:(fun (count, proof_updates_count) account_update ->
-                      ( count + 1
-                      , if
-                          Mina_base.Control.(
-                            Tag.equal Proof
-                              (tag
-                                 account_update
-                                   .Mina_base.Account_update.Poly.authorization ))
-                        then proof_updates_count + 1
-                        else proof_updates_count ) )
-                in
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc snark_work_zkapp_base_time_sec
-                      (Time.Span.to_sec time) ;
-                    Counter.inc_one snark_work_zkapp_base_submissions ;
-                    Counter.inc zkapp_transaction_length (Float.of_int c) ;
-                    Counter.inc zkapp_proof_updates (Float.of_int p))) ;
-                ("zkapp_command", c, p)
-            | Command (Signed_command _) ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("signed command", 1, 0)
-            | Coinbase _ ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("coinbase", 1, 0)
-            | Fee_transfer _ ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("fee_transfer", 1, 0)
-          in
-          [%str_log info]
-            (Base_snark_generated
-               { time
-               ; transaction_type
-               ; zkapp_command_count
-               ; proof_zkapp_command_count
-               } ) )
+(* WARN: This is largely identical to Init.Mina_run.log_snark_work_metrics, we should refactor this out *)
+let emit_proof_metrics_single ~(single_spec : Work.Selector.Single.Spec.t)
+    ~(metric : Work.Partitioned.Proof_with_metric.t) ~logger =
+  let time = metric.elapsed in
+  match single_spec with
+  | Work.Work.Single.Spec.Merge (_, _, _) ->
+      (* WARN: This statement is just noop, not sure why it's here *)
+      Mina_metrics.(
+        Cryptography.Snark_work_histogram.observe
+          Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
+      [%str_log info] (Merge_snark_generated { time })
+  | Work.Work.Single.Spec.Transition (_, { transaction; _ }) ->
+      let transaction_type, zkapp_command_count, proof_zkapp_command_count =
+        match transaction with
+        | Mina_transaction.Transaction.Command
+            (Mina_base.User_command.Zkapp_command zkapp_command) ->
+            (* WARN: now this is dead code, if we're using new
+                           protocol between snark coordinator and workers *)
+            let init =
+              match
+                (Mina_base.Account_update.of_fee_payer
+                   zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
+                  .authorization
+              with
+              | Proof _ ->
+                  (1, 1)
+              | _ ->
+                  (1, 0)
+            in
+            let c, p =
+              Mina_base.Zkapp_command.Call_forest.fold
+                zkapp_command.account_updates ~init
+                ~f:(fun (count, proof_updates_count) account_update ->
+                  ( count + 1
+                  , if
+                      Mina_base.Control.(
+                        Tag.equal Proof
+                          (tag
+                             account_update
+                               .Mina_base.Account_update.Poly.authorization ))
+                    then proof_updates_count + 1
+                    else proof_updates_count ) )
+            in
+            Mina_metrics.(
+              Cryptography.(
+                Counter.inc snark_work_zkapp_base_time_sec
+                  (Time.Span.to_sec time) ;
+                Counter.inc_one snark_work_zkapp_base_submissions ;
+                Counter.inc zkapp_transaction_length (Float.of_int c) ;
+                Counter.inc zkapp_proof_updates (Float.of_int p))) ;
+            ("zkapp_command", c, p)
+        | Mina_transaction.Transaction.Command
+            (Mina_base.User_command.Signed_command _) ->
+            Mina_metrics.(
+              Counter.inc Cryptography.snark_work_base_time_sec
+                (Time.Span.to_sec time)) ;
+            ("signed command", 1, 0)
+        | Mina_transaction.Transaction.Coinbase _ ->
+            Mina_metrics.(
+              Counter.inc Cryptography.snark_work_base_time_sec
+                (Time.Span.to_sec time)) ;
+            ("coinbase", 1, 0)
+        | Mina_transaction.Transaction.Fee_transfer _ ->
+            Mina_metrics.(
+              Counter.inc Cryptography.snark_work_base_time_sec
+                (Time.Span.to_sec time)) ;
+            ("fee_transfer", 1, 0)
+      in
+      [%str_log info]
+        (Base_snark_generated
+           { time
+           ; transaction_type
+           ; zkapp_command_count
+           ; proof_zkapp_command_count
+           } )
+
+let emit_proof_metrics ~result:({ data; _ } : Work.Partitioned.Result.t) ~logger
+    =
+  match data with
+  | Work.Partitioned.Spec.Poly.Single { single_spec; metric; _ } ->
+      emit_proof_metrics_single ~single_spec ~metric ~logger
+  | Work.Partitioned.Spec.Poly.Sub_zkapp_command
+      { spec = { spec = Work.Partitioned.Zkapp_command_job.Spec.Segment _; _ }
+      ; metric
+      } ->
+      (* WARN:
+         I don't know if this is the desired behavior, we need CI engineers to decide
+      *)
+      Perf_histograms.add_span
+        ~name:"snark_worker_sub_zkapp_command_segment_time" metric.elapsed
+  | Work.Partitioned.Spec.Poly.Sub_zkapp_command
+      { spec = { spec = Work.Partitioned.Zkapp_command_job.Spec.Merge _; _ }
+      ; metric
+      } ->
+      (* WARN:
+         I don't know if this is the desired behavior, we need CI engineers to decide
+      *)
+      Perf_histograms.add_span ~name:"snark_worker_sub_zkapp_command_merge_time"
+        metric.elapsed
+  | Work.Partitioned.Spec.Poly.Old { instances; _ } ->
+      One_or_two.iter instances ~f:(fun (single_spec, metric) ->
+          emit_proof_metrics_single ~single_spec ~metric ~logger )
 
 let main ~logger ~proof_level ~constraint_constants daemon_address
     shutdown_on_disconnect =
@@ -182,7 +187,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
+      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect `V3
         daemon_address
     with
     | Error e ->
@@ -197,29 +202,34 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           ~metadata:[ ("time", `Float random_delay) ] ;
         let%bind () = wait ~sec:random_delay () in
         go ()
-    | Ok (Some (work, public_key)) -> (
+    | Ok (Some (work_spec, public_key)) -> (
+        let address_json = `String (Host_and_port.to_string daemon_address) in
+        let work_ids_json =
+          Transaction_snark_work.Statement.compact_json
+            Work.Partitioned.Spec.Poly.(
+              work_spec
+              |> write_all_proofs_to_disk ~proof_cache_db
+              |> statements)
+        in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
-          ~metadata:
-            [ ("address", `String (Host_and_port.to_string daemon_address))
-            ; ( "work_ids"
-              , Transaction_snark_work.Statement.compact_json
-                  (One_or_two.map
-                     (Work.Work.Spec.instances work)
-                     ~f:Work.Work.Single.Spec.statement ) )
-            ] ;
+          ~metadata:[ ("address", address_json); ("work_ids", work_ids_json) ] ;
         let%bind () = wait () in
+
         (* Pause to wait for stdout to flush *)
         match%bind
-          perform state public_key
-            (Work.Selector.Spec.write_all_proofs_to_disk ~proof_cache_db work)
+          perform ~state ~prover:public_key
+            ~spec:
+              (Work.Partitioned.Spec.Poly.write_all_proofs_to_disk
+                 ~proof_cache_db work_spec )
         with
         | Error e ->
             let%bind () =
               match%map
                 dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
-                  shutdown_on_disconnect (e, work, public_key) daemon_address
+                  shutdown_on_disconnect (e, work_spec, public_key)
+                  daemon_address
               with
               | Error e ->
                   [%log error]
@@ -230,21 +240,13 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
-            emit_proof_metrics result.metrics
-              (Work.Selector.Result.transactions result)
-              logger ;
+            emit_proof_metrics ~result ~logger ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
-                [ ("address", `String (Host_and_port.to_string daemon_address))
-                ; ( "work_ids"
-                  , Transaction_snark_work.Statement.compact_json
-                      (One_or_two.map
-                         (Work.Work.Spec.instances work)
-                         ~f:Work.Work.Single.Spec.statement ) )
-                ] ;
+                [ ("address", address_json); ("work_ids", work_ids_json) ] ;
             let rec submit_work () =
               let result =
-                Work.Selector.Result.read_all_proofs_from_disk result
+                Work.Partitioned.Result.read_all_proofs_from_disk result
               in
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
@@ -253,7 +255,24 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
               | Error e ->
                   log_and_retry "submitting work" e (retry_pause 10.)
                     submit_work
-              | Ok () ->
+              | Ok result ->
+                  ( match result with
+                  | `Ok ->
+                      ()
+                  | `Slashed ->
+                      [%log info] "Result $work_ids slashed by $address"
+                        ~metadata:
+                          [ ("address", address_json)
+                          ; ("work_ids", work_ids_json)
+                          ]
+                  | `SchemeUnmatched ->
+                      [%log info]
+                        "Result $work_ids rejected by $address since it has \
+                         wrong shape"
+                        ~metadata:
+                          [ ("address", address_json)
+                          ; ("work_ids", work_ids_json)
+                          ] ) ;
                   go ()
             in
             submit_work () )

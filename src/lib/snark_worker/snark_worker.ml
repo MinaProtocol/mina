@@ -13,10 +13,10 @@ module Rpcs = struct
 end
 
 (* module providing Single Workers *)
-module Single_worker = struct
-  module Debug : Intf.Single_worker = Debug.Impl
+module Impl = struct
+  module Debug : Intf.Worker = Debug.Impl
 
-  module Prod : Intf.Single_worker = Prod.Impl
+  module Prod : Intf.Worker = Prod.Impl
 end
 
 (* module providing all structured log events *)
