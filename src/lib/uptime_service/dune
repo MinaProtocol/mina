@@ -50,7 +50,7 @@
   transition_frontier_base
   random_oracle
   interruptible
-  truth
+  mina_stdlib
   one_or_two
   transaction_snark
   pickles.backend

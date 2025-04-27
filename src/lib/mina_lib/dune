@@ -55,7 +55,6 @@
   mina_networking
   consensus
   o1trace
-  unix_timestamp
   filtered_external_transition
   pipe_lib
   user_command_input
@@ -84,7 +83,6 @@
   prover
   verifier
   snark_work_lib
-  truth
   ledger_catchup
   genesis_ledger_helper
   coda_genesis_proof
