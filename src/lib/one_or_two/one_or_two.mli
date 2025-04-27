@@ -34,8 +34,6 @@ val zip_exn : 'a t -> 'b t -> ('a * 'b) t
 
 val map : 'a t -> f:('a -> 'b) -> 'b t
 
-val map_biased : 'a t -> f:([ `One | `First | `Second ] -> 'a -> 'b) -> 'b t
-
 val iter : 'a t -> f:('a -> unit) -> unit
 
 val fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum
