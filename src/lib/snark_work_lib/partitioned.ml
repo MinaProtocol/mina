@@ -442,6 +442,19 @@ module Result = struct
     in
     { data; prover }
 
+  let to_spec ({ data; _ } : t) : Spec.t =
+    match data with
+    | Spec.Poly.Single { single_spec; pairing; fee_of_full; _ } ->
+        Spec.Poly.Single { single_spec; pairing; fee_of_full; metric = () }
+    | Spec.Poly.Sub_zkapp_command { spec; _ } ->
+        Spec.Poly.Sub_zkapp_command { spec; metric = () }
+    | Spec.Poly.Old { instances; fee } ->
+        Spec.Poly.Old
+          { instances =
+              One_or_two.map ~f:(fun (spec, _) -> (spec, ())) instances
+          ; fee
+          }
+
   let of_selector_result
       ({ proofs; metrics; spec = { instances; fee }; prover } :
         Selector.Result.t ) : t Or_error.t =

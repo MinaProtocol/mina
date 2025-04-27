@@ -368,104 +368,51 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_work_lib.Selector.Result.t) =
-    Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
-    One_or_two.iter
-      (One_or_two.zip_exn work.metrics
-         (Snark_work_lib.Selector.Result.transactions work) )
-      ~f:(fun ((total, tag), transaction_opt) ->
-        ( match tag with
-        | `Merge ->
-            Perf_histograms.add_span ~name:"snark_worker_merge_time" total ;
-            Mina_metrics.(
-              Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total))
-        | `Transition -> (
-            (*should be Some in the case of `Transition*)
-            match Option.value_exn transaction_opt with
-            | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Zkapp_command parties) ->
-                let init =
-                  match
-                    (Mina_base.Account_update.of_fee_payer parties.fee_payer)
-                      .authorization
-                  with
-                  | Proof _ ->
-                      (1, 1)
-                  | _ ->
-                      (1, 0)
-                in
-                let parties_count, proof_parties_count =
-                  Mina_base.Zkapp_command.Call_forest.fold
-                    parties.account_updates ~init
-                    ~f:(fun (count, proof_parties_count) party ->
-                      ( count + 1
-                      , if
-                          Mina_base.Control.(
-                            Tag.equal Proof
-                              (tag
-                                 (Mina_base.Account_update.Poly.authorization
-                                    party ) ))
-                        then proof_parties_count + 1
-                        else proof_parties_count ) )
-                in
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc snark_work_zkapp_base_time_sec
-                      (Time.Span.to_sec total) ;
-                    Counter.inc_one snark_work_zkapp_base_submissions ;
-                    Counter.inc zkapp_transaction_length
-                      (Float.of_int parties_count) ;
-                    Counter.inc zkapp_proof_updates
-                      (Float.of_int proof_parties_count)))
-            | _ ->
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc_one snark_work_base_submissions ;
-                    Counter.inc snark_work_base_time_sec
-                      (Time.Span.to_sec total))) ) ) ;
-        Perf_histograms.add_span ~name:"snark_worker_transition_time" total )
-  in
   let snark_worker_impls =
     let module Work = Snark_work_lib in
-    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc (fun () () ->
-          Deferred.return
-            (let open Option.Let_syntax in
-            let%bind key =
-              Option.merge
-                (Mina_lib.snark_worker_key mina)
-                (Mina_lib.snark_coordinator_key mina)
-                ~f:Fn.const
-            in
-            let%map work = Mina_lib.request_work mina in
-            let work =
-              Snark_work_lib.Work.Spec.map work
-                ~f:
-                  (Snark_work_lib.Work.Single.Spec.map
-                     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-                     ~f_witness:Transaction_witness.read_all_proofs_from_disk )
-            in
-            [%log trace]
-              ~metadata:
-                [ ("work_spec", Work.Selector.Spec.Stable.Latest.to_yojson work)
-                ]
-              "responding to a Get_work request with some new work" ;
-            Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (work, key)) )
+    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc
+        (fun () capability ->
+          (let open Option.Let_syntax in
+          let%bind key =
+            Option.merge
+              (Mina_lib.snark_worker_key mina)
+              (Mina_lib.snark_coordinator_key mina)
+              ~f:Fn.const
+          in
+          let%map work = Mina_lib.request_work ~capability mina in
+          let work_wire : Work.Partitioned.Spec.Stable.Latest.t =
+            Work.Partitioned.Spec.Poly.read_all_proofs_from_disk work
+          in
+          [%log trace]
+            ~metadata:
+              [ ( "work_spec"
+                , Work.Partitioned.Spec.Stable.Latest.to_yojson work_wire )
+              ]
+            "responding to a Get_work request with some new work" ;
+          Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
+          (work_wire, key))
+          |> Deferred.return )
     ; implement Snark_worker.Rpcs.Submit_work.Stable.Latest.rpc
-        (fun () (wire_result : Work.Selector.Result.Stable.Latest.t) ->
+        (fun () wire_result ->
+          let proof_cache_db = Proof_cache_tag.create_identity_db () in
           [%log trace] "received completed work from a snark worker"
             ~metadata:
               [ ( "work_spec"
-                , Work.Selector.Spec.Stable.Latest.to_yojson wire_result.spec )
+                , Work.Partitioned.(
+                    wire_result
+                    |> Result.write_all_proofs_to_disk ~proof_cache_db
+                    |> Result.to_spec |> Spec.Poly.read_all_proofs_from_disk
+                    |> Spec.Stable.Latest.to_yojson) )
               ] ;
           let result =
-            Work.Selector.Result.write_all_proofs_to_disk
+            Work.Partitioned.Result.write_all_proofs_to_disk
               ~proof_cache_db:(Proof_cache_tag.create_identity_db ())
               wire_result
           in
-          log_snark_work_metrics result ;
-          Deferred.return @@ Mina_lib.add_work mina result )
+          ignore
+            ( Work.Metrics.emit_proof_metrics ~data:result.data
+              : Work.Metrics.snark_work_generated One_or_two.t ) ;
+          Deferred.return @@ Mina_lib.add_work ~result mina )
     ; implement Snark_worker.Rpcs.Failed_to_generate_snark.Stable.Latest.rpc
         (fun () (error, _work_spec, _prover_public_key) ->
           [%str_log error]
