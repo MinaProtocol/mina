@@ -18,7 +18,7 @@ module Master = struct
   module T = struct
     type query =
       Bounded_types.Wrapped_error.t
-      * Work.Selector.Spec.t
+      * Work.Partitioned.Spec.t
       * Public_key.Compressed.t
 
     type response = unit
@@ -41,15 +41,24 @@ module Stable = struct
 
       type response = unit
 
-      let query_of_caller_model ((err, spec, key) : Master.Caller.query) : query
-          =
-        (err, Work.Selector.Spec.read_all_proofs_from_disk spec, key)
+      let query_of_caller_model (query : Master.Caller.query) : query =
+        let err, spec, key = query in
+        let spec =
+          Work.Partitioned.Spec.to_selector_spec spec
+          |> Option.value_exn
+               ~message:
+                 "FATAL: V2 Worker failed on a `Zkapp_command_segment` job \
+                  where the coordinator can't aggregate, this shouldn't happen \
+                  as the work is issued by the coordinator"
+          |> Work.Selector.Spec.read_all_proofs_from_disk
+        in
+        (err, spec, key)
 
-      let callee_model_of_query ((err, spec, key) : query) : Master.Callee.query
-          =
-        ( err
-        , Work.Selector.Spec.write_all_proofs_to_disk ~proof_cache_db spec
-        , key )
+      let callee_model_of_query : query -> Master.Callee.query =
+        Tuple3.map_snd
+          ~f:
+            (Fn.compose Work.Partitioned.Spec.of_selector_spec
+               (Work.Selector.Spec.write_all_proofs_to_disk ~proof_cache_db) )
 
       let response_of_callee_model = Fn.id
 
