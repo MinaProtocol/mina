@@ -17,7 +17,7 @@ module Master = struct
   module T = struct
     type query = Work.Partitioned.Result.t
 
-    (* NOTE: this `Slashed case is suppoed to track all duplicated case,
+    (* NOTE: this `Slashed case is supposed to track all duplicated case,
        but since we didn't touch on Work_selector, this is not true.
        We should get back to Work_partitioner implementation to fix this. *)
     type response = [ `Ok | `Slashed | `SchemeUnmatched ]
