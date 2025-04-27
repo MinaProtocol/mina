@@ -1,5 +1,5 @@
 open Async
-module Work = Snark_work_lib
+open Snark_work_lib.Partitioned
 
 module type Worker = sig
   module Worker_state : sig
@@ -16,7 +16,7 @@ module type Worker = sig
 
   val perform :
        state:Worker_state.t
-    -> spec:Work.Partitioned.Spec.t
-    -> prover:Signature_lib.Public_key.Compressed.t
-    -> Work.Partitioned.Result.t Deferred.Or_error.t
+    -> spec:Spec.t
+    -> sok_digest:Mina_base.Sok_message.Digest.t
+    -> Proof_with_metric.t Spec.Poly.t Deferred.Or_error.t
 end

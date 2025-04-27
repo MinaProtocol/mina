@@ -18,12 +18,8 @@ module Impl : Intf.Worker = struct
     let worker_wait_time = 0.5
   end
 
-  let perform ~state:() ~spec ~prover =
+  let perform ~state:() ~spec ~sok_digest =
     let open Work.Partitioned in
-    let fee = Spec.Poly.fee_of_full spec in
-    let message = Mina_base.Sok_message.create ~fee ~prover in
-    let sok_digest = Mina_base.Sok_message.digest message in
-
     let elapsed = Time.Span.zero in
     let data =
       Spec.Poly.map_metric_with_statement
@@ -38,5 +34,5 @@ module Impl : Intf.Worker = struct
             } )
         spec
     in
-    Deferred.Or_error.return Result.{ data; prover }
+    Deferred.Or_error.return data
 end

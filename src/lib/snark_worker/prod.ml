@@ -248,13 +248,11 @@ module Impl : Intf.Worker = struct
 
   let perform ~state:({ m_with_proof_level; cache; logger } : Worker_state.t)
       ~(spec : Work.Partitioned.Spec.t)
-      ~(prover : Signature_lib.Public_key.Compressed.t) :
-      Work.Partitioned.Result.t Deferred.Or_error.t =
+      ~(sok_digest : Mina_base.Sok_message.Digest.t) :
+      Work.Partitioned.Proof_with_metric.t Work.Partitioned.Spec.Poly.t
+      Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
     let open Work.Partitioned in
-    let fee = Spec.Poly.fee_of_full spec in
-    let message = Mina_base.Sok_message.create ~fee ~prover in
-    let sok_digest = Mina_base.Sok_message.digest message in
     match m_with_proof_level with
     | Worker_state.Check | Worker_state.No_check ->
         let elapsed = Time.Span.zero in
@@ -271,7 +269,7 @@ module Impl : Intf.Worker = struct
                 } )
             spec
         in
-        Deferred.Or_error.return Result.{ data; prover }
+        Deferred.Or_error.return data
     | Worker_state.Full ((module M) as m) -> (
         match spec with
         | Spec.Poly.Single { single_spec; pairing; metric = (); fee_of_full } ->
@@ -283,15 +281,12 @@ module Impl : Intf.Worker = struct
             let proof =
               Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
             in
-            let data =
-              Spec.Poly.Single
-                { single_spec
-                ; pairing
-                ; metric = Proof_with_metric.{ proof; elapsed }
-                ; fee_of_full
-                }
-            in
-            Result.{ data; prover }
+            Spec.Poly.Single
+              { single_spec
+              ; pairing
+              ; metric = Proof_with_metric.{ proof; elapsed }
+              ; fee_of_full
+              }
         | Spec.Poly.Sub_zkapp_command
             { spec =
                 { spec =
@@ -313,13 +308,10 @@ module Impl : Intf.Worker = struct
             let proof =
               Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
             in
-            let data =
-              Spec.Poly.Sub_zkapp_command
-                { spec = sub_zkapp_job
-                ; metric = Proof_with_metric.{ proof; elapsed }
-                }
-            in
-            Result.{ data; prover }
+            Spec.Poly.Sub_zkapp_command
+              { spec = sub_zkapp_job
+              ; metric = Proof_with_metric.{ proof; elapsed }
+              }
         | Spec.Poly.Sub_zkapp_command
             { spec =
                 { spec = Zkapp_command_job.Spec.Merge { proof1; proof2; _ }; _ }
@@ -339,13 +331,10 @@ module Impl : Intf.Worker = struct
             let proof =
               Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof
             in
-            let data =
-              Spec.Poly.Sub_zkapp_command
-                { spec = sub_zkapp_job
-                ; metric = Proof_with_metric.{ proof; elapsed }
-                }
-            in
-            Result.{ data; prover }
+            Spec.Poly.Sub_zkapp_command
+              { spec = sub_zkapp_job
+              ; metric = Proof_with_metric.{ proof; elapsed }
+              }
         | Spec.Poly.Old { instances; fee } ->
             let process ~(single_spec : Work.Selector.Single.Spec.t) =
               let statement = Work.Work.Single.Spec.statement single_spec in
@@ -370,5 +359,5 @@ module Impl : Intf.Worker = struct
                   `Two ((spec1, metric1), (spec2, metric2))
             in
 
-            Result.{ data = Spec.Poly.Old { instances; fee }; prover } )
+            Spec.Poly.Old { instances; fee } )
 end

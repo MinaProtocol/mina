@@ -119,8 +119,7 @@ let emit_proof_metrics_single ~(single_spec : Work.Selector.Single.Spec.t)
            ; proof_zkapp_command_count
            } )
 
-let emit_proof_metrics ~result:({ data; _ } : Work.Partitioned.Result.t) ~logger
-    =
+let emit_proof_metrics ~data ~logger =
   match data with
   | Work.Partitioned.Spec.Poly.Single { single_spec; metric; _ } ->
       emit_proof_metrics_single ~single_spec ~metric ~logger
@@ -218,12 +217,14 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         let%bind () = wait () in
 
         (* Pause to wait for stdout to flush *)
-        match%bind
-          perform ~state ~prover:public_key
-            ~spec:
-              (Work.Partitioned.Spec.Poly.write_all_proofs_to_disk
-                 ~proof_cache_db work_spec )
-        with
+        let spec =
+          Work.Partitioned.Spec.Poly.write_all_proofs_to_disk ~proof_cache_db
+            work_spec
+        in
+        let fee = Work.Partitioned.Spec.Poly.fee_of_full spec in
+        let message = Mina_base.Sok_message.create ~fee ~prover:public_key in
+        let sok_digest = Mina_base.Sok_message.digest message in
+        match%bind perform ~state ~sok_digest ~spec with
         | Error e ->
             let%bind () =
               match%map
@@ -239,14 +240,15 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
                   ()
             in
             log_and_retry "performing work" e (retry_pause 10.) go
-        | Ok result ->
-            emit_proof_metrics ~result ~logger ;
+        | Ok data ->
+            emit_proof_metrics ~data ~logger ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", address_json); ("work_ids", work_ids_json) ] ;
             let rec submit_work () =
               let result =
-                Work.Partitioned.Result.read_all_proofs_from_disk result
+                Work.Partitioned.Result.read_all_proofs_from_disk
+                  { data; prover = public_key }
               in
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
