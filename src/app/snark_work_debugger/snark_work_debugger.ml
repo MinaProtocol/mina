@@ -20,15 +20,14 @@ module Work = Snark_work_lib
 let proof_cache_db = Proof_cache_tag.create_identity_db ()
 
 let main (spec_path : string) ~constraint_constants ~proof_level =
-  let module Single_worker = Snark_worker.Single_worker.Prod in
+  let module Single_worker = Snark_worker.Impl.Prod in
   let%bind spec =
-    Reader.load_sexp_exn spec_path
-      Work.Selector.Single.Spec.Stable.Latest.t_of_sexp
+    Reader.load_sexp_exn spec_path Work.Partitioned.Spec.Stable.Latest.t_of_sexp
   in
   let spec =
-    Work.Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db spec
+    Work.Partitioned.Spec.Poly.write_all_proofs_to_disk ~proof_cache_db spec
   in
-  let%bind worker =
+  let%bind state =
     Single_worker.Worker_state.create ~constraint_constants ~proof_level ()
   in
   let message =
@@ -38,7 +37,9 @@ let main (spec_path : string) ~constraint_constants ~proof_level =
           Public_key.compress
             (Public_key.of_private_key_exn (Private_key.create ())))
   in
-  Single_worker.perform_single worker ~message spec >>| ignore
+
+  let sok_digest = Mina_base.Sok_message.digest message in
+  Single_worker.perform ~state ~sok_digest ~spec >>| ignore
 
 let cmd =
   Command.async ~summary:"Run a snark worker on a single work spec"
