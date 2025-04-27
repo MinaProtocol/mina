@@ -1,10 +1,6 @@
 open Async
 module Work = Snark_work_lib
 
-(* A worker that would only deal with one single work a time. This exists solely
-   to pay off the tech debt introduced due to work partitioner distributing a
-   One_or_two work.
-*)
 module type Worker = sig
   module Worker_state : sig
     type t
