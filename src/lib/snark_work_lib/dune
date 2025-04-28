@@ -6,18 +6,17 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  bin_prot.shape
-  core_kernel
   base.caml
-  sexplib0
+  bin_prot.shape
   core
-  ;; local libraries
-  transaction_snark
-  mina_state
-  signature_lib
-  mina_stdlib
+  core_kernel
+  sexplib0
   currency
-  ppx_version.runtime)
+  ledger_proof
+  mina_state
+  ppx_version.runtime
+  signature_lib
+  transaction_snark)
  (preprocess
   (pps ppx_jane ppx_deriving_yojson ppx_version))
  (instrumentation
