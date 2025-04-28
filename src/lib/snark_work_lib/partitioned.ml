@@ -7,7 +7,7 @@ module Pairing = struct
       module V1 = struct
         (* this identifies a One_or_two work from Work_selector's perspective *)
         type t = Pairing_ID of int
-        [@@deriving compare, hash, sexp, yojson, equal]
+        [@@deriving compare, hash, sexp, to_yojson, equal]
 
         let to_latest = Fn.id
       end
@@ -22,7 +22,7 @@ module Pairing = struct
         (* Case `One` indicate no need to pair. This is needed because zkapp command
            might be left in pool of half completion. *)
         type t = [ `First of ID.Stable.V1.t | `Second of ID.Stable.V1.t | `One ]
-        [@@deriving compare, hash, sexp, yojson, equal]
+        [@@deriving compare, hash, sexp, to_yojson, equal]
 
         let to_latest = Fn.id
       end
@@ -38,7 +38,7 @@ module Pairing = struct
            might be left in pool of half completion. *)
         type t =
           { which_one : [ `First | `Second | `One ]; id : ID.Stable.V1.t }
-        [@@deriving compare, hash, sexp, yojson, equal]
+        [@@deriving compare, hash, sexp, to_yojson, equal]
 
         let to_latest = Fn.id
       end
@@ -60,7 +60,7 @@ module Zkapp_command_job = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Job_ID of int [@@deriving compare, hash, sexp, yojson]
+        type t = Job_ID of int [@@deriving compare, hash, sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -86,7 +86,7 @@ module Zkapp_command_job = struct
               ; proof2 : Ledger_proof.Stable.V2.t
               ; fee_of_full : Currency.Fee.Stable.V1.t
               }
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -166,7 +166,7 @@ module Zkapp_command_job = struct
         ; pairing : Pairing.Sub_zkapp.Stable.V1.t
         ; job_id : ID.Stable.V1.t
         }
-      [@@deriving sexp, yojson]
+      [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
@@ -205,7 +205,7 @@ module Spec = struct
               { spec : Zkapp_command_job.Stable.V1.t; metric : 'metric }
           | Old of
               (Selector.Single.Spec.Stable.V1.t * 'metric) Work.Spec.Stable.V1.t
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -335,7 +335,7 @@ module Spec = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = unit Poly.Stable.V1.t [@@deriving sexp, yojson]
+      type t = unit Poly.Stable.V1.t [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
