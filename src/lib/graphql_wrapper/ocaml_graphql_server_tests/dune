@@ -6,8 +6,7 @@
   test_common
   test_schema
   custom_error_test
-  abstract_test
-  directives_test)
+  abstract_test)
  (libraries
   graphql
   yojson
@@ -129,5 +128,27 @@
 (rule
  (alias runtest)
  (deps introspection_test.exe)
+ (action
+  (run %{deps})))
+
+(executable
+ (name directives_test)
+ (modules directives_test)
+ (libraries
+  alcotest
+  core
+  graphql
+  graphql_parser
+  graphql_wrapper
+  ocaml_graphql_server_tests
+  yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
+
+(rule
+ (alias runtest)
+ (deps directives_test.exe)
  (action
   (run %{deps})))
