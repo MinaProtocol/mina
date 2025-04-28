@@ -141,7 +141,7 @@ let command =
        flag "--min-num-updates" ~aliases:[ "-min-num-updates" ]
          ~doc:
            "Minimum number of account updates per transaction (excluding the \
-            fee payer). Minimum: 1 Default: 1 "
+            fee payer). Minimum: 0 Default: 0 "
          (optional int)
      in
      let num_transactions =
