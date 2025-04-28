@@ -159,8 +159,6 @@ module type Full = sig
     end
   end]
 
-  type regular_snarked_ledger_state = t
-
   type var =
     ( Frozen_ledger_hash.var
     , Currency.Amount.Signed.var
@@ -228,8 +226,6 @@ module type Full = sig
     val typ : (var, t) Tick.Typ.t
 
     val to_field_elements : t -> Tick.Field.t array
-
-    val drop_sok : t -> regular_snarked_ledger_state
   end
 
   val gen : t Quickcheck.Generator.t
