@@ -16,9 +16,25 @@
  (preprocess
   (pps ppx_inline_test ppx_assert ppx_version)))
 
-(executable
- (name error_test)
- (modules error_test)
+(tests
+ (names
+  abstract_test
+  argument_test
+  custom_error_test
+  directives_test
+  error_test
+  introspection_test
+  variable_test
+  schema_test)
+ (modules
+  abstract_test
+  argument_test
+  custom_error_test
+  directives_test
+  error_test
+  introspection_test
+  variable_test
+  schema_test)
  (libraries
   alcotest
   core
@@ -31,163 +47,3 @@
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version)))
-
-(executable
- (name argument_test)
- (modules argument_test)
- (libraries
-  alcotest
-  core
-  graphql
-  graphql_parser
-  graphql_wrapper
-  ocaml_graphql_server_tests
-  yojson)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
-
-(rule
- (alias runtest)
- (deps error_test.exe)
- (action
-  (run %{deps})))
-
-(rule
- (alias runtest)
- (deps argument_test.exe)
- (action
-  (run %{deps})))
-
-(executable
- (name variable_test)
- (modules variable_test)
- (libraries
-  alcotest
-  core
-  graphql
-  graphql_parser
-  graphql_wrapper
-  ocaml_graphql_server_tests
-  yojson)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
-
-(rule
- (alias runtest)
- (deps variable_test.exe)
- (action
-  (run %{deps})))
-
-(executable
- (name schema_test)
- (modules schema_test)
- (libraries
-  alcotest
-  core
-  graphql
-  graphql_parser
-  graphql_wrapper
-  ocaml_graphql_server_tests
-  yojson)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
-
-(rule
- (alias runtest)
- (deps schema_test.exe)
- (action
-  (run %{deps})))
-
-(executable
- (name introspection_test)
- (modules introspection_test)
- (libraries
-  alcotest
-  core
-  graphql
-  graphql_parser
-  graphql_wrapper
-  ocaml_graphql_server_tests
-  yojson)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
-
-(rule
- (alias runtest)
- (deps introspection_test.exe)
- (action
-  (run %{deps})))
-
-(executable
- (name directives_test)
- (modules directives_test)
- (libraries
-  alcotest
-  core
-  graphql
-  graphql_parser
-  graphql_wrapper
-  ocaml_graphql_server_tests
-  yojson)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
-
-(rule
- (alias runtest)
- (deps directives_test.exe)
- (action
-  (run %{deps})))
-
-(executable
- (name custom_error_test)
- (modules custom_error_test)
- (libraries
-  alcotest
-  core
-  graphql
-  graphql_parser
-  graphql_wrapper
-  ocaml_graphql_server_tests
-  yojson)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
-
-(rule
- (alias runtest)
- (deps custom_error_test.exe)
- (action
-  (run %{deps})))
-
-(executable
- (name abstract_test)
- (modules abstract_test)
- (libraries
-  alcotest
-  core
-  graphql
-  graphql_parser
-  graphql_wrapper
-  ocaml_graphql_server_tests
-  yojson)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_version)))
-
-(rule
- (alias runtest)
- (deps abstract_test.exe)
- (action
-  (run %{deps})))
