@@ -18,13 +18,13 @@ let submit_graphql input graphql_endpoint =
   let obj = Send_proof_mutation.(make @@ makeVariables ~input ()) in
   match%bind Graphql_client.query obj graphql_endpoint with
   | Ok _s ->
-      Caml.Format.printf "Successfully generated proof bundle mutation.\n" ;
+      Format.printf "Successfully generated proof bundle mutation.\n" ;
       exit 0
   | Error (`Failed_request s) ->
-      Caml.Format.printf !"Request failed:  %s\n" s ;
+      Format.printf "Request failed:  %s\n" s ;
       exit 1
   | Error (`Graphql_error s) ->
-      Caml.Format.printf "Graphql error: %s\n" s ;
+      Format.printf "Graphql error: %s\n" s ;
       exit 1
 
 let perform (s : Prod.Worker_state.t) ~fee ~public_key
