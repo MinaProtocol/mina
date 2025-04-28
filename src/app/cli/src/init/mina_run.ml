@@ -213,6 +213,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
   let compile_config = (Mina_lib.config mina).compile_config in
+  let itn_features = (Mina_lib.config mina).itn_features in
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -403,7 +404,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                           Mina_base.Control.(
                             Tag.equal Proof
                               (tag
-                                 (Mina_base.Account_update.authorization party) ))
+                                 (Mina_base.Account_update.Poly.authorization
+                                    party ) ))
                         then proof_parties_count + 1
                         else proof_parties_count ) )
                 in
@@ -434,12 +436,19 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 (Mina_lib.snark_coordinator_key mina)
                 ~f:Fn.const
             in
-            let%map r = Mina_lib.request_work mina in
+            let%map work = Mina_lib.request_work mina in
+            let work =
+              Snark_work_lib.Work.Spec.map work
+                ~f:
+                  (Snark_work_lib.Work.Single.Spec.map
+                     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                     ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+            in
             [%log trace]
-              ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson r) ]
+              ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson work) ]
               "responding to a Get_work request with some new work" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (r, key)) )
+            (work, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           [%log trace] "received completed work from a snark worker"
@@ -552,7 +561,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
-  if compile_config.itn_features then
+  if itn_features then
     (* Third graphql server with ITN-particular queries exposed *)
     Option.iter itn_graphql_port ~f:(fun rest_server_port ->
         O1trace.background_thread "serve_itn_graphql" (fun () ->

@@ -262,7 +262,7 @@
     } // utils.lib.eachDefaultSystem (system:
       let
         rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isDarwin then {
+          if prev.stdenv.isAarch64 || prev.stdenv.isDarwin then {
             rocksdb-mina = pkgs.rocksdb;
           } else {
             rocksdb-mina = pkgs.rocksdb511;
@@ -303,6 +303,9 @@
           nodejs
           binaryen
           zip
+          libiconv 
+          cargo           
+          curl
           (pkgs.python3.withPackages (python-pkgs: [
               python-pkgs.click
               python-pkgs.requests

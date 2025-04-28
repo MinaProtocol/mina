@@ -129,7 +129,6 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           let tag, _, (module P), Pickles.Provers.[ ringsig_prover ] =
             Pickles.compile () ~cache:Cache_dir.cache ~proof_cache
               ~public_input:(Input Zkapp_statement.typ) ~auxiliary_typ:Typ.unit
-              ~branches:(module Nat.N1)
               ~max_proofs_verified:(module Nat.N0)
               ~name:"ringsig"
               ~choices:(fun ~self:_ -> [ ring_sig_rule ring_member_pks ])
@@ -300,7 +299,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             }
           in
           let zkapp_command : Zkapp_command.t =
-            Zkapp_command.of_simple
+            Zkapp_command.of_simple ~proof_cache_db
               { fee_payer
               ; account_updates =
                   [ sender

@@ -19,6 +19,10 @@ module type S = sig
 
   (** Read from the cache, crashing if the value cannot be found. *)
   val get : t -> id -> Data.t
+end
+
+module type S_with_count = sig
+  include S
 
   (** Count elements in the cache. *)
   val count : t -> int
@@ -28,10 +32,17 @@ module type F = functor (Data : Binable.S) -> sig
   include S with module Data := Data
 end
 
+module type F_with_count = functor (Data : Binable.S) -> sig
+  include S_with_count with module Data := Data
+end
+
 module type F_extended = functor (Data : Binable.S) -> sig
-  include S with module Data := Data
+  include S_with_count with module Data := Data
 
   val iteri : t -> f:(int -> Data.t -> [< `Continue ]) -> unit
 
   val int_of_id : id -> int
+
+  (** Count elements in the cache. *)
+  val count : t -> int
 end

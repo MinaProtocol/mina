@@ -15,7 +15,7 @@ function image_tag {
     IMAGE_TAG="$SHA-bullseye-berkeley"
 }
 
-function download-docker {
+function download_docker {
    SHA=$1
    image_tag $SHA
    docker pull gcr.io/o1labs-192920/mina-daemon:$IMAGE_TAG
@@ -24,17 +24,25 @@ function download-docker {
 function try_docker_shas {
     DOCKER_SHAS=$1
     GOT_DOCKER=0
-
     for sha in $DOCKER_SHAS; do
-	download-docker $sha
-	if [ $? -eq 0 ] ; then
-	    GOT_DOCKER=1
-	    image_tag $sha
-	    break
-	else
-	    echo "No docker available for SHA=$sha"
-	fi
+
+        set +e
+        download_docker $sha
+
+        if [ $? -eq 0 ] ; then
+            GOT_DOCKER=1
+            image_tag $sha
+            break
+        else
+            echo "No docker available for SHA=$sha"
+        fi
+        set -e
     done
+
+    if [[ $GOT_DOCKER == 0 ]]; then
+        echo "docker cannot be found for given shas: $DOCKER_SHAS"
+        exit 1
+    fi
 }
 
 function image_id {

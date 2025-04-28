@@ -6,23 +6,14 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
-  async_kernel
-  base.base_internalhash_types
-  bin_prot.shape
   async
-  sexplib0
   bignum
   core
-  core_kernel
-  base.md5
-  base.caml
   async_unix
   splittable_random
   ;; local libraries
   bounded_types
   mina_wire_types
-  mina_base.import
   mina_transaction
   mina_transaction_logic
   hash_prefix_states
