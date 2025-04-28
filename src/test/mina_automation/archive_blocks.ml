@@ -18,7 +18,7 @@ let default = Executor.default
 
 type format = Precomputed | Extensional
 
-let path = Executor.PathFinder.standalone_path_exn
+let path = Executor.PathFinder.standalone_path_exn Paths.official_name
 
 let format_to_string format =
   match format with

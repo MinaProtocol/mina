@@ -8,6 +8,4 @@ module Paths = struct
   let official_name = "mina-missing-blocks-auditor"
 end
 
-module PathFinder = Executor.Make_PathFinder (Paths)
-
-let path = PathFinder.standalone_path_exn
+let path = Executor.PathFinder.standalone_path_exn Paths.official_name

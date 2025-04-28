@@ -14,22 +14,21 @@ end
 (* application ran inside docker container *)
 
 module type AppPaths = sig
+  (** The name of the application as it appears in the dune file. *)
   val dune_name : string
 
+  (** The name of the application as it appears in the debian package or docker image. *)
   val official_name : string
 end
 
 let logger = Logger.create ()
 
-module Make_PathFinder (P : AppPaths) = struct
-  let app_name_under_dune = P.dune_name
-
-  let official_name = P.official_name
-
+module PathFinder = struct
   let paths =
     Option.value_map ~f:(String.split ~on:':') ~default:[] (Sys.getenv "PATH")
 
-  let built_name = Printf.sprintf "_build/default/%s" app_name_under_dune
+  let built_name app_name_under_dune =
+    Printf.sprintf "_build/default/%s" app_name_under_dune
 
   let exists_at_path path prefix =
     match%bind Sys.file_exists (prefix ^ "/" ^ path) with
@@ -38,10 +37,10 @@ module Make_PathFinder (P : AppPaths) = struct
     | _ ->
         Deferred.return None
 
-  let standalone_path =
-    match%bind Sys.file_exists built_name with
+  let standalone_path official_name =
+    match%bind Sys.file_exists (built_name official_name) with
     | `Yes ->
-        Deferred.return (Some built_name)
+        Deferred.return (Some (built_name official_name))
     | _ -> (
         match%bind
           Deferred.List.find_map ~f:(exists_at_path official_name) paths
@@ -51,8 +50,8 @@ module Make_PathFinder (P : AppPaths) = struct
         | _ ->
             Deferred.return None )
 
-  let standalone_path_exn =
-    Deferred.map standalone_path ~f:(fun opt ->
+  let standalone_path_exn official_name =
+    Deferred.map (standalone_path official_name) ~f:(fun opt ->
         Option.value_exn opt
           ~message:
             "Could not find standalone path. App is not executable outside the \
@@ -67,7 +66,8 @@ module Make (P : AppPaths) = struct
     | Docker of DockerContext.t
     | AutoDetect
 
-  module PathFinder = Make_PathFinder (P)
+  module P = P
+  module PathFinder = PathFinder
 
   let default = AutoDetect
 
@@ -77,32 +77,31 @@ module Make (P : AppPaths) = struct
 
   let run_from_debian ?(prefix = "") ~(args : string list) ?env () =
     let full_path =
-      if String.is_empty prefix then PathFinder.official_name
-      else prefix ^ "/" ^ PathFinder.official_name
+      if String.is_empty prefix then P.official_name
+      else prefix ^ "/" ^ P.official_name
     in
     log_executed_command full_path ;
     Util.run_cmd_exn ?env "." full_path args
 
   let run_from_dune ~(args : string list) ?env () =
-    log_executed_command PathFinder.app_name_under_dune ;
-    Util.run_cmd_exn ?env "." "dune"
-      ([ "exec"; PathFinder.app_name_under_dune; "--" ] @ args)
+    log_executed_command P.dune_name ;
+    Util.run_cmd_exn ?env "." "dune" ([ "exec"; P.dune_name; "--" ] @ args)
 
   let run_from_local ~(args : string list) ?env () =
-    log_executed_command PathFinder.built_name ;
-    Util.run_cmd_exn ?env "." PathFinder.built_name args
+    log_executed_command (PathFinder.built_name P.official_name) ;
+    Util.run_cmd_exn ?env "." (PathFinder.built_name P.official_name) args
 
   let run t ~(args : string list) ?env () =
     let open Deferred.Let_syntax in
     match t with
     | AutoDetect -> (
-        match%bind Sys.file_exists PathFinder.built_name with
+        match%bind Sys.file_exists (PathFinder.built_name P.official_name) with
         | `Yes ->
             run_from_local ~args ?env ()
         | _ -> (
             match%bind
               Deferred.List.find_map
-                ~f:(PathFinder.exists_at_path PathFinder.official_name)
+                ~f:(PathFinder.exists_at_path P.official_name)
                 PathFinder.paths
             with
             | Some prefix ->
