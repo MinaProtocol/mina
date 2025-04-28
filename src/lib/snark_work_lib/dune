@@ -14,7 +14,6 @@
   ;; local libraries
   currency
   ledger_proof
-  mina_state
   one_or_two
   ppx_version.runtime
   signature_lib
