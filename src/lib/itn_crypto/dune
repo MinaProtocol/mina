@@ -11,6 +11,7 @@
   mirage-crypto-ec
   mirage-crypto-rng
   mirage-crypto-rng-async
+  ppx_inline_test.config
   ;; local libraries
   codable)
  (instrumentation

@@ -15,6 +15,7 @@
   async_kernel
   sexplib0
   bin_prot.shape
+  ppx_inline_test.config
   ; local libraries
   ppx_version.runtime)
  (instrumentation

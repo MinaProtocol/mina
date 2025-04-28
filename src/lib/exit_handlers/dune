@@ -2,7 +2,7 @@
  (name exit_handlers)
  (public_name exit_handlers)
  (library_flags -linkall)
- (libraries async_kernel async_unix core_kernel logger)
+ (libraries async_kernel async_unix core_kernel core logger yojson base)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

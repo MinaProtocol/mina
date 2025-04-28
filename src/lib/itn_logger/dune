@@ -6,6 +6,7 @@
   async
   async.async_rpc
   core
+  core_kernel.bin_prot
   yojson
   ;; local libraries
   mina_node_config.unconfigurable_constants)

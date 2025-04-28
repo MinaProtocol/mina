@@ -22,4 +22,6 @@
   key_cache
   hex
   sponge
-  snarky.intf))
+  snarky.intf
+  snarky_backendless
+))

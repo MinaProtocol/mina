@@ -1,6 +1,7 @@
-open Core_kernel
 
 module Annotations = struct
+  open Core_kernel
+
   module Utils = struct
     let find xs key =
       List.find ~f:(fun (k', _) -> String.equal key k') xs |> Option.map ~f:snd
@@ -15,6 +16,8 @@ module Annotations = struct
   end
 
   module Top = struct
+    open Core
+
     (** Top comment *)
     type t = { name : string; doc : string option }
     [@@deriving annot, sexp, compare, equal]
@@ -72,6 +75,7 @@ end
 
 (** Rewrites underscore_case to camelCase. Note: Keeps leading underscores. *)
 let under_to_camel s =
+  let open Core_kernel in
   (* take all the underscores *)
   let prefix_us =
     String.take_while s ~f:(function '_' -> true | _ -> false)

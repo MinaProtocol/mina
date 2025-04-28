@@ -1,6 +1,7 @@
 (library
  (name mina_signature_kind_mainnet)
  (public_name mina_signature_kind.mainnet)
+ (libraries mina_signature_kind_type)
  (preprocess
   (pps ppx_version))
  (instrumentation
