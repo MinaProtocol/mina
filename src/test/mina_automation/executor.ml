@@ -63,8 +63,8 @@ module Make (P : AppPaths) = struct
     | Dune (* application ran from dune exec command *)
     | Local (* application ran from _build/default folder*)
     | Debian (* application installed from mina debian package *)
-    | Docker of DockerContext.t
-    | AutoDetect
+    | Docker of DockerContext.t (* application ran inside docker container *)
+    | AutoDetect (* application ran from any of the above *)
 
   module P = P
   module PathFinder = PathFinder
