@@ -139,9 +139,8 @@ branches, or otherwise changing the dependency tree of Mina.
 
 ##### Visual Studio Code / vscodium
 
-You have to install the "OCaml Platform" extension, either from
-[official marketplace](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
-or [openvsix](https://open-vsx.org/extension/ocamllabs/ocaml-platform).
+You have to install the "OCaml Platform" extension from
+[official marketplace](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform).
 
 After installing it, run `code` (or `codium`) from within the `nix develop mina#with-lsp` shell,
 click "Select Sandbox" in the extension menu, and then pick "Global Sandbox". From then on, it should just work.
