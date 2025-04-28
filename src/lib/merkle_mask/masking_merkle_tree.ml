@@ -11,7 +11,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   module Location = Location
   module Addr = Location.Addr
 
-  (** Invariant is that parent is None in unattached mask and `Some` in the
+  (** Invariant is that parent is `Error _` in unattached mask and `Ok _` in the
       attached one. We can capture this with a GADT but there's some annoying
       issues with bin_io to do so *)
   module Parent = struct
