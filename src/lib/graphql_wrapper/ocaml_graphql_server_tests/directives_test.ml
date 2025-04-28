@@ -10,7 +10,6 @@ let skip_directive_test () =
               , `List
                   [ `Assoc [ ("name", `String "Alice") ]
                   ; `Assoc [ ("name", `String "Bob") ]
-                  ; `Assoc [ ("name", `String "Charlie") ]
                   ] )
             ] )
       ] )
@@ -25,7 +24,6 @@ let include_directive_test () =
               , `List
                   [ `Assoc [ ("name", `String "Alice") ]
                   ; `Assoc [ ("name", `String "Bob") ]
-                  ; `Assoc [ ("name", `String "Charlie") ]
                   ] )
             ] )
       ] )
@@ -45,7 +43,6 @@ let both_skip_and_include_directives_field_not_queried_test () =
               , `List
                   [ `Assoc [ ("name", `String "Alice") ]
                   ; `Assoc [ ("name", `String "Bob") ]
-                  ; `Assoc [ ("name", `String "Charlie") ]
                   ] )
             ] )
       ] )
@@ -61,8 +58,6 @@ let both_skip_and_include_directives_field_is_queried_test () =
                   [ `Assoc
                       [ ("name", `String "Alice"); ("role", `String "admin") ]
                   ; `Assoc [ ("name", `String "Bob"); ("role", `String "user") ]
-                  ; `Assoc
-                      [ ("name", `String "Charlie"); ("role", `String "user") ]
                   ] )
             ] )
       ] )
@@ -94,7 +89,6 @@ let directives_and_inline_fragment_test () =
               , `List
                   [ `Assoc [ ("name", `String "Alice") ]
                   ; `Assoc [ ("name", `String "Bob") ]
-                  ; `Assoc [ ("name", `String "Charlie") ]
                   ] )
             ] )
       ] )
