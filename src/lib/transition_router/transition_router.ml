@@ -127,7 +127,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~collected_transitions ~cache_exceptions ?transition_writer_ref ~frontier_w
-    frontier =
+    frontier ?transaction_pool_proxy =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -174,6 +174,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
       ~frontier ~get_completed_work
       ~network_transition_reader:transition_frontier_controller_reader
       ~producer_transition_reader ~clear_reader ~cache_exceptions
+      ?transaction_pool_proxy
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -445,7 +446,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~get_completed_work ~frontier_w ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~cache_exceptions
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+    ~consensus_local_state ~catchup_mode ~notify_online ?transaction_pool_proxy
+    =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -568,7 +570,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
-        ?transition_writer_ref:None ~frontier_w frontier
+        ?transition_writer_ref:None ~frontier_w frontier ?transaction_pool_proxy
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -619,7 +621,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~get_current_frontier ~frontier_broadcast_writer:frontier_w
     ~network_transition_reader ~producer_transition_reader
     ~get_most_recent_valid_block ~most_recent_valid_block_writer
-    ~get_completed_work ~catchup_mode ~notify_online () =
+    ~get_completed_work ~catchup_mode ~notify_online ?transaction_pool_proxy ()
+    =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -699,7 +702,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~get_completed_work ~frontier_w ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~most_recent_valid_block_writer
-          ~consensus_local_state ~notify_online
+          ~consensus_local_state ~notify_online ?transaction_pool_proxy
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
 
