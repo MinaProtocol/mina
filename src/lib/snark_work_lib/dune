@@ -16,11 +16,11 @@
   ledger_proof
   mina_state
   one_or_two
+  ppx_version.runtime
   signature_lib
-  transaction_snark
-  ppx_version.runtime)
+  transaction_snark)
  (preprocess
-  (pps ppx_jane ppx_deriving_yojson ppx_version))
+  (pps ppx_deriving_yojson ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Snark work types"))
