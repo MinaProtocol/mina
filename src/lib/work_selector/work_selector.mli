@@ -1,16 +1,9 @@
 module State :
   Intf.State_intf with type transition_frontier := Transition_frontier.t
 
-type work =
-  ( Transaction_witness.t
-  , Ledger_proof.Cached.t )
-  Snark_work_lib.Work.Single.Spec.t
+type work = Snark_work_lib.Selector.Single.Spec.t
 
-type in_memory_work =
-  ( Transaction_witness.Stable.Latest.t
-  , Ledger_proof.t )
-  Snark_work_lib.Work.Single.Spec.t
-[@@deriving yojson]
+type in_memory_work = Snark_work_lib.Selector.Single.Spec.Stable.Latest.t
 
 type snark_pool = Network_pool.Snark_pool.t
 
