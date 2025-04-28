@@ -19,7 +19,6 @@
   signature_lib
   transaction_snark
   ppx_version.runtime)
-  
  (preprocess
   (pps ppx_jane ppx_deriving_yojson ppx_version))
  (instrumentation
