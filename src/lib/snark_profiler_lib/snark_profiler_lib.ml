@@ -185,6 +185,186 @@ end
 
 let transaction_combinations = Transaction_key.Table.create ()
 
+(** Definitions related to constitutions of transactions.
+
+    The constitution of a single zkApp transaction (Zkapp_command) in isolation
+    is determined as follows. Take the list of account updates and group the
+    non-proof updates together into runs, separated by one or more individual
+    proof updates. (Proof updates have the authorization kind Control.Proof;
+    non-proof updates are either Control.Signature or Control.None_given). Take
+    the runs of non-proof updates and group adjacent updates into pairs (pair
+    segments); there will be one single update left over (a single segment) for
+    odd-length runs. Count the number of segments in each category: the
+    resulting triple of totals is the constitution. "In isolation" is important
+    here, because sequences of commands can have this process done to them, and
+    the last update of a command can be paired with the first update of the
+    next if both are non-proof. See
+    Account_group.group_by_zkapp_command_rev. *)
+module Constitution (Inputs : sig
+  val genesis_constants : Genesis_constants.t
+end) =
+struct
+  type t =
+    { proof_segments : int
+    ; signed_single_segments : int
+    ; signed_pair_segments : int
+    }
+
+  let cost_limit = Inputs.genesis_constants.zkapp_transaction_cost_limit
+
+  (* A strict bound on the maximum number of segments of each type *)
+  let max_num_segments = 7
+
+  (* The number of proof updates required for a command to have this
+     constitution *)
+  let num_proof_updates constitution = constitution.proof_segments
+
+  (* The number of payment-like updates required for a command to have this
+     constitution *)
+  let num_paymentlike_updates constitution =
+    constitution.signed_single_segments + (2 * constitution.signed_pair_segments)
+
+  (* The total number of updates required for a command to have this
+     constition. *)
+  let num_updates_needed constitution =
+    num_proof_updates constitution + num_paymentlike_updates constitution
+
+  let cost { proof_segments; signed_single_segments; signed_pair_segments } =
+    Zkapp_command.zkapp_cost ~proof_segments ~signed_single_segments
+      ~signed_pair_segments ~genesis_constants:Inputs.genesis_constants ()
+
+  (* A Constition.t is valid if it can be represented as the constitution of a
+     valid transaction *)
+  let is_valid t =
+    Float.(cost t <. cost_limit)
+    (* Pigeonhole principle - there cannot be more odd-length runs of
+       payment-like updates than there are spaces around the proof updates *)
+    && t.signed_single_segments <= t.proof_segments + 1
+    (* A zkApp transaction will always have an implicit fee payer update in
+       it *)
+    && num_paymentlike_updates t > 0
+
+  let all_valid_constitutions =
+    let constitutions_with_bound bound =
+      let values = List.init bound ~f:Fn.id in
+      let%bind.List proof_segments = values in
+      let%bind.List signed_single_segments = values in
+      let%bind.List signed_pair_segments = values in
+      let constitution =
+        { proof_segments; signed_single_segments; signed_pair_segments }
+      in
+      if is_valid constitution then [ constitution ] else []
+    in
+    let constitutions = constitutions_with_bound max_num_segments in
+    (* Make sure our max_num_segments isn't too small *)
+    assert (
+      List.length constitutions
+      = List.length (constitutions_with_bound @@ (max_num_segments + 1)) ) ;
+    constitutions
+
+  (* Arrange the account_updates of a Zkapp_command so that the resulting
+     transaction has the given constitution. The constitution is assumed to be
+     valid, and it is assumed that there are an appropriate number of updates
+     of each kind to satisfy the constitution. The orderings of proof_updates
+     and paymentlike_updates are both preserved in the resulting list.
+
+     Also important to note is the fact that a Zkapp_command must always have
+     a single implicit payment-like update at the start. This update is the
+     fee payer's update, and is not included in account_updates and should not
+     be given to this function. *)
+  let rearrange_updates
+      { proof_segments = p
+      ; signed_pair_segments = e
+      ; signed_single_segments = o
+      } proof_updates paymentlike_updates =
+    (* In the final command we will have p proof updates and (2 * e + o)
+       payment-like updates (including the implicit fee-payer update at the
+       beginning). We want to divide up those updates into p+1 segments, then
+       insert the p proofs between these segments. Exactly o of these segments
+       must have odd length, and the first segment must be non-empty. We'll
+       get these segments by generating a partition of the number (2 * e + o)
+       with certain properties. These will be the lengths of the segments; we
+       can then grab the segments from the paymentlike_updates in one go at
+       the end. We assume that we have been given p proof_updates and (2 * e +
+       o - 1) paymentlike_updates. *)
+
+    (* Decide which o segments of the p + 1 will be made odd in the final
+       command *)
+    let odds_adjustment =
+      if e = 0 then
+        (* If the command has exactly o payment-like updates, all payment-like
+           updates will be in single segments. Since the first update is the
+           implicit fee-payer update, the first segment must necessarily be
+           made odd. *)
+        List.init (o - 1) ~f:(Fn.const 1)
+        @ List.init (p + 1 - o) ~f:(Fn.const 0)
+        |> List.gen_permutations |> Quickcheck.random_value |> List.cons 1
+      else
+        (* Otherwise we have the freedom to make the first segment even if we
+           like. *)
+        List.init o ~f:(Fn.const 1) @ List.init (p + 1 - o) ~f:(Fn.const 0)
+        |> List.gen_permutations |> Quickcheck.random_value
+    in
+    (* We have to guarantee that the first segment has non-zero length. If it
+       will be made odd then there is no problem, but otherwise we have to
+       ensure it has length at least 2. *)
+    let first_segment_is_odd =
+      match odds_adjustment with 1 :: _ -> true | _ -> false
+    in
+    (* Partition the number 2 * e into p + 1 parts, all of which are even *)
+    let e_partition =
+      let minimum_cut = if first_segment_is_odd then 0 else 1 in
+      (* Non-decreasing sequence in the range [minimum_cut, e] *)
+      let sequence =
+        List.gen_with_length p (Int.gen_uniform_incl minimum_cut e)
+        |> Quickcheck.random_value |> List.sort ~compare
+      in
+      (* Successive differences starting at 0 and ending at e, then doubling,
+         for the required partition. *)
+      let successive_diffs start finish l =
+        List.map2_exn (start :: l) (l @ [ finish ]) ~f:(fun x y -> y - x)
+      in
+      sequence |> successive_diffs 0 e |> List.map ~f:(fun x -> 2 * x)
+    in
+    (* Now we can compute the lengths of the segments in our partition of the
+       command updates. *)
+    let segment_lengths =
+      List.map2_exn e_partition odds_adjustment ~f:(fun x y -> x + y)
+    in
+    assert (List.sum (module Int) segment_lengths ~f:Fn.id = (2 * e) + o) ;
+    (* Remember that we haven't been given the fee-payer update, so we should
+       take one less update for the first segment. *)
+    let segment_lengths =
+      match segment_lengths with
+      | segment_length :: segment_lengths ->
+          (segment_length - 1) :: segment_lengths
+      | _ ->
+          failwith "Invariant - must have at least one segment"
+    in
+    let from_segment_lengths lengths l =
+      let rec from_partition lengths l acc =
+        match lengths with
+        | [] ->
+            assert (List.is_empty l) ;
+            List.rev acc
+        | segment_length :: lengths ->
+            let part, l = List.split_n l segment_length in
+            from_partition lengths l (part :: acc)
+      in
+      from_partition lengths l []
+    in
+    let partitioned_payments =
+      from_segment_lengths segment_lengths paymentlike_updates
+    in
+    (* Put one marker between each element of ls *)
+    let interpose markers ls =
+      let markers = [] :: List.map markers ~f:(fun x -> [ x ]) in
+      List.zip_exn markers ls
+      |> List.concat_map ~f:(fun (marker, l) -> marker @ l)
+    in
+    interpose proof_updates partitioned_payments
+end
+
 (** Create a sequence of zkApp transactions and a ledger corresponding to those
     transactions. Exactly one transaction will be generated for every possible
     transaction constitution.
@@ -205,181 +385,9 @@ let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
   in
   let zkapp_prover_and_vk = (prover, verification_key) in
   let%bind.Async.Deferred verification_key = verification_key in
-  (* The constitution of a single zkApp transaction (Zkapp_command) in isolation
-     is determined as follows. Take the list of account updates and group the
-     non-proof updates together into runs, separated by one or more individual
-     proof updates. (Proof updates have the authorization kind Control.Proof;
-     non-proof updates are either Control.Signature or Control.None_given). Take
-     the runs of non-proof updates and group adjacent updates into pairs (pair
-     segments); there will be one single update left over (a single segment) for
-     odd-length runs. Count the number of segments in each category: the
-     resulting triple of totals is the constitution. "In isolation" is important
-     here, because sequences of commands can have this process done to them, and
-     the last update of a command can be paired with the first update of the
-     next if both are non-proof. See
-     Account_group.group_by_zkapp_command_rev. *)
-  let module Constitution = struct
-    type t =
-      { proof_segments : int
-      ; signed_single_segments : int
-      ; signed_pair_segments : int
-      }
-
-    let cost_limit = genesis_constants.zkapp_transaction_cost_limit
-
-    (* A strict bound on the maximum number of segments of each type *)
-    let max_num_segments = 7
-
-    (* The number of proof updates required for a command to have this
-       constitution *)
-    let num_proof_updates constitution = constitution.proof_segments
-
-    (* The number of payment-like updates required for a command to have this
-       constitution *)
-    let num_paymentlike_updates constitution =
-      constitution.signed_single_segments
-      + (2 * constitution.signed_pair_segments)
-
-    (* The total number of updates required for a command to have this
-       constition. *)
-    let num_updates_needed constitution =
-      num_proof_updates constitution + num_paymentlike_updates constitution
-
-    let cost { proof_segments; signed_single_segments; signed_pair_segments } =
-      Zkapp_command.zkapp_cost ~proof_segments ~signed_single_segments
-        ~signed_pair_segments ~genesis_constants ()
-
-    (* A Constition.t is valid if it can be represented as the constitution of a
-       valid transaction *)
-    let is_valid t =
-      Float.(cost t <. cost_limit)
-      (* Pigeonhole principle - there cannot be more odd-length runs of
-         payment-like updates than there are spaces around the proof updates *)
-      && t.signed_single_segments <= t.proof_segments + 1
-      (* A zkApp transaction will always have an implicit fee payer update in
-         it *)
-      && num_paymentlike_updates t > 0
-
-    let all_valid_constitutions =
-      let constitutions_with_bound bound =
-        let values = List.init bound ~f:Fn.id in
-        let%bind.List proof_segments = values in
-        let%bind.List signed_single_segments = values in
-        let%bind.List signed_pair_segments = values in
-        let constitution =
-          { proof_segments; signed_single_segments; signed_pair_segments }
-        in
-        if is_valid constitution then [ constitution ] else []
-      in
-      let constitutions = constitutions_with_bound max_num_segments in
-      (* Make sure our max_num_segments isn't too small *)
-      assert (
-        List.length constitutions
-        = List.length (constitutions_with_bound @@ (max_num_segments + 1)) ) ;
-      constitutions
-
-    (* Arrange the account_updates of a Zkapp_command so that the resulting
-       transaction has the given constitution. The constitution is assumed to be
-       valid, and it is assumed that there are an appropriate number of updates
-       of each kind to satisfy the constitution. The orderings of proof_updates
-       and paymentlike_updates are both preserved in the resulting list.
-
-       Also important to note is the fact that a Zkapp_command must always have
-       a single implicit payment-like update at the start. This update is the
-       fee payer's update, and is not included in account_updates and should not
-       be given to this function. *)
-    let rearrange_updates
-        { proof_segments = p
-        ; signed_pair_segments = e
-        ; signed_single_segments = o
-        } proof_updates paymentlike_updates =
-      (* In the final command we will have p proof updates and (2 * e + o)
-         payment-like updates (including the implicit fee-payer update at the
-         beginning). We want to divide up those updates into p+1 segments, then
-         insert the p proofs between these segments. Exactly o of these segments
-         must have odd length, and the first segment must be non-empty. We'll
-         get these segments by generating a partition of the number (2 * e + o)
-         with certain properties. These will be the lengths of the segments; we
-         can then grab the segments from the paymentlike_updates in one go at
-         the end. We assume that we have been given p proof_updates and (2 * e +
-         o - 1) paymentlike_updates. *)
-
-      (* Decide which o segments of the p + 1 will be made odd in the final
-         command *)
-      let odds_adjustment =
-        if e = 0 then
-          (* If the command has exactly o payment-like updates, all payment-like
-             updates will be in single segments. Since the first update is the
-             implicit fee-payer update, the first segment must necessarily be
-             made odd. *)
-          List.init (o - 1) ~f:(Fn.const 1)
-          @ List.init (p + 1 - o) ~f:(Fn.const 0)
-          |> List.gen_permutations |> Quickcheck.random_value |> List.cons 1
-        else
-          (* Otherwise we have the freedom to make the first segment even if we
-             like. *)
-          List.init o ~f:(Fn.const 1) @ List.init (p + 1 - o) ~f:(Fn.const 0)
-          |> List.gen_permutations |> Quickcheck.random_value
-      in
-      (* We have to guarantee that the first segment has non-zero length. If it
-         will be made odd then there is no problem, but otherwise we have to
-         ensure it has length at least 2. *)
-      let first_segment_is_odd =
-        match odds_adjustment with 1 :: _ -> true | _ -> false
-      in
-      (* Partition the number 2 * e into p + 1 parts, all of which are even *)
-      let e_partition =
-        let minimum_cut = if first_segment_is_odd then 0 else 1 in
-        (* Non-decreasing sequence in the range [minimum_cut, e] *)
-        let sequence =
-          List.gen_with_length p (Int.gen_uniform_incl minimum_cut e)
-          |> Quickcheck.random_value |> List.sort ~compare
-        in
-        (* Successive differences starting at 0 and ending at e, then doubling,
-           for the required partition. *)
-        let successive_diffs start finish l =
-          List.map2_exn (start :: l) (l @ [ finish ]) ~f:(fun x y -> y - x)
-        in
-        sequence |> successive_diffs 0 e |> List.map ~f:(fun x -> 2 * x)
-      in
-      (* Now we can compute the lengths of the segments in our partition of the
-         command updates. *)
-      let segment_lengths =
-        List.map2_exn e_partition odds_adjustment ~f:(fun x y -> x + y)
-      in
-      assert (List.sum (module Int) segment_lengths ~f:Fn.id = (2 * e) + o) ;
-      (* Remember that we haven't been given the fee-payer update, so we should
-         take one less update for the first segment. *)
-      let segment_lengths =
-        match segment_lengths with
-        | segment_length :: segment_lengths ->
-            (segment_length - 1) :: segment_lengths
-        | _ ->
-            failwith "Invariant - must have at least one segment"
-      in
-      let from_segment_lengths lengths l =
-        let rec from_partition lengths l acc =
-          match lengths with
-          | [] ->
-              assert (List.is_empty l) ;
-              List.rev acc
-          | segment_length :: lengths ->
-              let part, l = List.split_n l segment_length in
-              from_partition lengths l (part :: acc)
-        in
-        from_partition lengths l []
-      in
-      let partitioned_payments =
-        from_segment_lengths segment_lengths paymentlike_updates
-      in
-      (* Put one marker between each element of ls *)
-      let interpose markers ls =
-        let markers = [] :: List.map markers ~f:(fun x -> [ x ]) in
-        List.zip_exn markers ls
-        |> List.concat_map ~f:(fun (marker, l) -> marker @ l)
-      in
-      interpose proof_updates partitioned_payments
-  end in
+  let module Constitution = Constitution (struct
+    let genesis_constants = genesis_constants
+  end) in
   (* Only consider constitutions that fit the given update bounds *)
   let all_constitutions =
     Constitution.all_valid_constitutions
