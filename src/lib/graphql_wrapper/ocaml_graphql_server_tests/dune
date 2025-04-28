@@ -5,7 +5,6 @@
   echo_schema
   test_common
   test_schema
-  introspection_test
   custom_error_test
   abstract_test
   directives_test)
@@ -108,5 +107,27 @@
 (rule
  (alias runtest)
  (deps schema_test.exe)
+ (action
+  (run %{deps})))
+
+(executable
+ (name introspection_test)
+ (modules introspection_test)
+ (libraries
+  alcotest
+  core
+  graphql
+  graphql_parser
+  graphql_wrapper
+  ocaml_graphql_server_tests
+  yojson)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
+
+(rule
+ (alias runtest)
+ (deps introspection_test.exe)
  (action
   (run %{deps})))
