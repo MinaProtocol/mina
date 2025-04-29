@@ -64,6 +64,10 @@ let json_serialization_roundtrips_from_file () =
   json_serialization_roundtrips_impl
   @@ In_channel.read_all large_precomputed_json_file
 
+let field_element_decimal_deserialization () =
+  json_serialization_is_stable_impl
+  @@ Field_element_decimal_block.sample_block_json
+
 let () =
   run "Precomputed block serialization tests"
     [ ( "sexp"
@@ -81,6 +85,10 @@ let () =
             json_serialization_is_stable_from_file
         ; test_case "serialization roundtrips from file" `Quick
             json_serialization_roundtrips_from_file
+        ] )
+    ; ( "field element represented by decimal"
+      , [ test_case "block is deserializable" `Quick
+            field_element_decimal_deserialization
         ] )
     ; ( "memory caching"
       , [ test_case "caching works" `Quick (fun () ->
