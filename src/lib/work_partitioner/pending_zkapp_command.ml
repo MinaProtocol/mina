@@ -32,7 +32,8 @@ let generate_merge ~(t : t) () =
   in
   let open Option.Let_syntax in
   let%map proof1, proof2 = try_take2 t.pending_mergable_proofs in
-  Work.Partitioned.Zkapp_command_job.Spec.Merge { proof1; proof2 }
+  Work.Partitioned.Zkapp_command_job.Spec.Merge
+    { proof1; proof2; fee_of_full = t.fee_of_full }
 
 let generate_segment ~(t : t) () =
   let open Option.Let_syntax in
