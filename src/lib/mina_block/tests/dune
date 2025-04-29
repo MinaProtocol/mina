@@ -27,8 +27,6 @@
 
 (test
  (name main)
- (flags
-  (:standard -warn-error +a))
  (libraries alcotest async mina_block disk_cache.lmdb)
  (deps
   hetzner-itn-1-1795.json
