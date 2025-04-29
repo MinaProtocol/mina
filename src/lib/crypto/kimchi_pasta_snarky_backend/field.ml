@@ -205,8 +205,7 @@ module Make (F : Input_intf) :
         match j with
         | `String s ->
             let parsed_bigint =
-              if Char.equal s.[0] '0' && Char.equal s.[1] 'x' then
-                Bigint.of_hex_string s
+              if String.is_prefix ~prefix:"0x" s then Bigint.of_hex_string s
               else
                 (* NOTE: we're dealing with a older precomputed block *)
                 Bigint.of_decimal_string s
