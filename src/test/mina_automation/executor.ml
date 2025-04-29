@@ -11,8 +11,6 @@ module DockerContext = struct
     { image : string; workdir : string; volume : string; network : string }
 end
 
-(* application ran inside docker container *)
-
 module type AppPaths = sig
   (** The name of the application as it appears in the dune file. *)
   val dune_name : string
