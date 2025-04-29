@@ -3,6 +3,7 @@ Module to run archive_blocks utility for the given list of block files and an ar
 *)
 
 open Core
+open Async
 
 module Paths = struct
   let dune_name = "src/app/archive_blocks/archive_blocks.exe"
@@ -18,7 +19,12 @@ let default = Executor.default
 
 type format = Precomputed | Extensional
 
-let path = Executor.PathFinder.standalone_path_exn Paths.official_name
+let path =
+  Deferred.map Executor.PathFinder.standalone_path ~f:(fun opt ->
+      Option.value_exn opt
+        ~message:
+          "Could not find standalone path. App is not executable outside the \
+           dune" )
 
 let format_to_string format =
   match format with
