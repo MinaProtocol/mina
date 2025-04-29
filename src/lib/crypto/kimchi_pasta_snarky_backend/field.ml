@@ -203,8 +203,15 @@ module Make (F : Input_intf) :
 
       let of_yojson j =
         match j with
-        | `String h ->
-            Ok (of_bigint (Bigint.of_hex_string h))
+        | `String s ->
+            let parsed_bigint =
+              if Char.equal s.[0] '0' && Char.equal s.[1] 'x' then
+                Bigint.of_hex_string s
+              else
+                (* NOTE: we're dealing with a older precomputed block *)
+                Bigint.of_decimal_string s
+            in
+            Ok (of_bigint parsed_bigint)
         | _ ->
             Error "expected hex string"
     end
