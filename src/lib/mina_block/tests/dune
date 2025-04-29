@@ -27,7 +27,7 @@
 
 (test
  (name main)
- (libraries alcotest async mina_block disk_cache.lmdb)
+ (libraries alcotest async core_kernel disk_cache.lmdb mina_block yojson)
  (deps
   hetzner-itn-1-1795.json
   regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json)
