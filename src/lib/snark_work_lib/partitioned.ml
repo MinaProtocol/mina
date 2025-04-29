@@ -53,10 +53,12 @@ module Zkapp_command_job = struct
               ; witness :
                   Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
               ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
+              ; fee_of_full : Currency.Fee.Stable.V1.t
               }
           | Merge of
               { proof1 : Ledger_proof.Stable.V2.t
               ; proof2 : Ledger_proof.Stable.V2.t
+              ; fee_of_full : Currency.Fee.Stable.V1.t
               }
         [@@deriving sexp, yojson]
 
@@ -69,39 +71,43 @@ module Zkapp_command_job = struct
           { statement : Transaction_snark.Statement.With_sok.t
           ; witness : Transaction_snark.Zkapp_command_segment.Witness.t
           ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
+          ; fee_of_full : Currency.Fee.t
           }
       | Merge of
-          { proof1 : Ledger_proof.Cached.t; proof2 : Ledger_proof.Cached.t }
+          { proof1 : Ledger_proof.Cached.t
+          ; proof2 : Ledger_proof.Cached.t
+          ; fee_of_full : Currency.Fee.t
+          }
 
     let read_all_proofs_from_disk : t -> Stable.Latest.t = function
-      | Segment { statement; witness; spec } ->
+      | Segment { statement; witness; spec; fee_of_full } ->
           let witness =
             Transaction_snark.Zkapp_command_segment.Witness
             .read_all_proofs_from_disk witness
           in
 
-          Segment { statement; witness; spec }
-      | Merge { proof1; proof2 } ->
+          Segment { statement; witness; spec; fee_of_full }
+      | Merge { proof1; proof2; fee_of_full } ->
           let proof1 = Ledger_proof.Cached.read_proof_from_disk proof1 in
           let proof2 = Ledger_proof.Cached.read_proof_from_disk proof2 in
-          Merge { proof1; proof2 }
+          Merge { proof1; proof2; fee_of_full }
 
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         Stable.Latest.t -> t = function
-      | Segment { statement; witness; spec } ->
+      | Segment { statement; witness; spec; fee_of_full } ->
           let witness =
             Transaction_snark.Zkapp_command_segment.Witness
             .write_all_proofs_to_disk ~proof_cache_db witness
           in
-          Segment { statement; witness; spec }
-      | Merge { proof1; proof2 } ->
+          Segment { statement; witness; spec; fee_of_full }
+      | Merge { proof1; proof2; fee_of_full } ->
           let proof1 =
             Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof1
           in
           let proof2 =
             Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof2
           in
-          Merge { proof1; proof2 }
+          Merge { proof1; proof2; fee_of_full }
   end
 
   [%%versioned
@@ -146,6 +152,7 @@ module Spec = struct
               { single_spec : Selector.Single.Spec.Stable.V1.t
               ; pairing : Pairing.Stable.V1.t
               ; metric : 'metric
+              ; fee_of_full : Currency.Fee.Stable.V1.t
               }
           | Sub_zkapp_command of
               { spec : Zkapp_command_job.Stable.V1.t; metric : 'metric }
@@ -162,14 +169,15 @@ module Spec = struct
           { single_spec : Selector.Single.Spec.t
           ; pairing : Pairing.t
           ; metric : 'metric
+          ; fee_of_full : Currency.Fee.t
           }
       | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
       | Old of (Selector.Single.Spec.t * 'metric) Work.Spec.t
 
     let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
       match t with
-      | Single { single_spec; pairing; metric } ->
-          Single { single_spec; pairing; metric = f metric }
+      | Single { single_spec; pairing; metric; fee_of_full } ->
+          Single { single_spec; pairing; metric = f metric; fee_of_full }
       | Old spec ->
           Old (Work.Spec.map ~f:(Tuple2.map_snd ~f) spec)
       | Sub_zkapp_command { spec; metric } ->
@@ -177,11 +185,11 @@ module Spec = struct
 
     let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
       function
-      | Single { single_spec; pairing; metric } ->
+      | Single { single_spec; pairing; metric; fee_of_full } ->
           let single_spec =
             Selector.Single.Spec.read_all_proofs_from_disk single_spec
           in
-          Single { single_spec; pairing; metric }
+          Single { single_spec; pairing; metric; fee_of_full }
       | Sub_zkapp_command { spec; metric } ->
           let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
           Sub_zkapp_command { spec; metric }
@@ -195,12 +203,12 @@ module Spec = struct
 
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         'metric Stable.Latest.t -> 'metric t = function
-      | Single { single_spec; pairing; metric } ->
+      | Single { single_spec; pairing; metric; fee_of_full } ->
           let single_spec =
             Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
               single_spec
           in
-          Single { single_spec; pairing; metric }
+          Single { single_spec; pairing; metric; fee_of_full }
       | Sub_zkapp_command { spec; metric } ->
           let spec =
             Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec
