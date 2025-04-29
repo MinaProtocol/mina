@@ -206,13 +206,11 @@ module Make (F : Input_intf) :
         | `String s ->
             let parsed_bigint =
               if String.is_prefix ~prefix:"0x" s then Bigint.of_hex_string s
-              else
-                (* NOTE: we're dealing with a older precomputed block *)
-                Bigint.of_decimal_string s
+              else Bigint.of_decimal_string s
             in
             Ok (of_bigint parsed_bigint)
         | _ ->
-            Error "expected a hex string or a decimal string(for old PCBs)"
+            Error "Expected a hex string or a decimal string"
     end
   end]
 
