@@ -90,6 +90,26 @@ module Make (Field : Kimchi_pasta_snarky_backend.Field.S_with_version) = struct
           (Field.equal result (Field.of_int 42))
     | Error msg ->
         Alcotest.fail (Printf.sprintf "Failed to parse 42 as decimal: %s" msg)
+
+  let test_field_of_yojson_modulus_decimal () =
+    (* Test parsing the modulus as decimal string *)
+    let modulus = Field.size in
+    let modulus_str = Field.Bigint.to_string modulus in
+    try
+      (* Attempt to parse the modulus as decimal string *)
+      match Field.of_yojson (`String modulus_str) with
+      | Ok _result ->
+          Alcotest.(fail "Parsing modulus as decimal should fail")
+      | Error _msg ->
+          Alcotest.(check bool)
+            "Parsing modulus as decimal should fail" true true
+    with
+    | Failure _ ->
+        (* If an exception is raised, it means the parsing failed as expected *)
+        (* for the pasta curves, an exception Failure is raised *)
+        Alcotest.(check bool) "Parsing modulus as decimal should fail" true true
+    | _ ->
+        Alcotest.(fail "Unexpected exception")
 end
 
 module Pallas = Make (Kimchi_pasta_snarky_backend.Pallas_based_plonk.Field)
@@ -115,6 +135,8 @@ let () =
             Pallas.test_field_of_yojson_one_decimal
         ; test_case "of_yojson 42 decimal" `Quick
             Pallas.test_field_of_yojson_42_decimal
+        ; test_case "of_yojson modulus decimal" `Quick
+            Pallas.test_field_of_yojson_modulus_decimal
         ] )
     ; ( "Vesta"
       , [ test_case "sexp round trip" `Quick Vesta.test_field_sexp_round_trip
@@ -133,5 +155,7 @@ let () =
             Vesta.test_field_of_yojson_one_decimal
         ; test_case "of_yojson 42 decimal" `Quick
             Vesta.test_field_of_yojson_42_decimal
+        ; test_case "of_yojson modulus decimal" `Quick
+            Vesta.test_field_of_yojson_modulus_decimal
         ] )
     ]
