@@ -24,7 +24,19 @@ module Authorization_kind = struct
       type t =
             Mina_wire_types.Mina_base.Account_update.Authorization_kind.V1.t =
         | Signature
-        | Proof of (Field.t[@version_asserted])
+        | Proof of
+            (Field.t
+            [@version_asserted]
+            [@to_yojson fun t -> `String (Snark_params.Tick.Field.to_string t)]
+            [@of_yojson
+              function
+              | `String s ->
+                  let field = Snark_params.Tick.Field.of_string s in
+                  let s' = Snark_params.Tick.Field.to_string field in
+                  if String.equal s s' then Ok field
+                  else Error "Invalid JSON for field"
+              | _ ->
+                  Error "expected JSON string"] )
         | None_given
       [@@deriving sexp, equal, yojson, hash, compare]
 
