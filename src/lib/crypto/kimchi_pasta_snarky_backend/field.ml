@@ -145,6 +145,8 @@ module type S_with_version = sig
 
           Both formats do not allow values higher than the field modulus.
           An exception [Failure] is raised if it happens.
+          The values are interpreted as unsigned integers in the decimal
+          representation (not Montgomery).
 
           Errors:
           - Returns Error if [j] is not a string (e.g., it's an int, bool,
