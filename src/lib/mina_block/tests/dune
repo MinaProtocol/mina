@@ -31,8 +31,6 @@
  (deps
   hetzner-itn-1-1795.json
   regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json)
- (action
-  (run %{test}))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
