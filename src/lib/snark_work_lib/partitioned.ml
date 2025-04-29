@@ -234,6 +234,22 @@ module Spec = struct
           `Old
             (One_or_two.map spec.instances ~f:(fun (single, ()) ->
                  Selector.Single.Spec.transaction single ) )
+
+    let fee_of_full : 'm t -> Currency.Fee.t = function
+      | Single { fee_of_full; _ } ->
+          fee_of_full
+      | Sub_zkapp_command
+          { spec =
+              { spec =
+                  Zkapp_command_job.Spec.(
+                    Segment { fee_of_full; _ } | Merge { fee_of_full; _ })
+              ; _
+              }
+          ; _
+          } ->
+          fee_of_full
+      | Old { fee; _ } ->
+          fee
   end
 
   [%%versioned
