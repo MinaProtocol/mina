@@ -130,7 +130,28 @@ module type S_with_version = sig
     module V1 : sig
       [@@@with_all_version_tags]
 
-      type t [@@deriving version, sexp, bin_io, compare, yojson, hash, equal]
+      type t [@@deriving version, sexp, bin_io, compare, hash, equal]
+
+      (** [to_yojson t] converts a field element to JSON.
+          Returns a string in hexadecimal format with "0x" prefix. *)
+      val to_yojson : t -> Yojson.Safe.t
+
+      (** [of_yojson j] converts JSON to a field element.
+
+          Accepted input formats:
+          - `String with "0x" prefix: Interpreted as a hexadecimal
+            representation
+          - `String without "0x" prefix: Interpreted as a decimal representation
+
+          Both formats do not allow values higher than the field modulus.
+          An exception [Failure] is raised if it happens.
+
+          Errors:
+          - Returns Error if [j] is not a string (e.g., it's an int, bool,
+            array, etc.)
+          - Returns Error if the string cannot be parsed as a valid number in
+            the given format *)
+      val of_yojson : Yojson.Safe.t -> (t, string) Result.t
     end
   end]
 
