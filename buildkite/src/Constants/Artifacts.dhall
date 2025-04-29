@@ -19,7 +19,6 @@ let Artifact
       | ZkappTestTransaction
       | FunctionalTestSuite
       | Toolchain
-      | ItnOrchestrator
       >
 
 let AllButTests =
@@ -31,7 +30,6 @@ let AllButTests =
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       , Artifact.Toolchain
-      , Artifact.ItnOrchestrator
       ]
 
 let Main =
@@ -51,7 +49,6 @@ let capitalName =
             , ZkappTestTransaction = "ZkappTestTransaction"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
-            , ItnOrchestrator = "ItnOrchestrator"
             }
             artifact
 
@@ -67,7 +64,6 @@ let lowerName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = "toolchain"
-            , ItnOrchestrator = "itn_orchestrator"
             }
             artifact
 
@@ -83,7 +79,6 @@ let dockerName =
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
-            , ItnOrchestrator = "itn-orchestrator"
             }
             artifact
 
@@ -100,41 +95,27 @@ let toDebianName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
-            , ItnOrchestrator = ""
             }
             artifact
 
 let toDebianNames =
           \(artifacts : List Artifact)
-      ->  \(networks : List Network.Type)
+      ->  \(network : Network.Type)
       ->  let list_of_list_of_debians =
                 Prelude.List.map
                   Artifact
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon =
-                              Prelude.List.map
-                                Network.Type
-                                Text
-                                (\(n : Network.Type) -> toDebianName a n)
-                                networks
+                          { Daemon = [ toDebianName a network ]
                           , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta =
-                              Prelude.List.map
-                                Network.Type
-                                Text
-                                (     \(n : Network.Type)
-                                  ->  "rosetta_${Network.lowerName n}"
-                                )
-                                networks
+                          , Rosetta = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , Toolchain = [] : List Text
-                          , ItnOrchestrator = [] : List Text
                           }
                           a
                   )
@@ -180,7 +161,6 @@ let dockerTag =
                 , ZkappTestTransaction = "${version_and_codename}"
                 , FunctionalTestSuite = "${version_and_codename}"
                 , Toolchain = "${version_and_codename}"
-                , ItnOrchestrator = "${version_and_codename}"
                 }
                 artifact
 

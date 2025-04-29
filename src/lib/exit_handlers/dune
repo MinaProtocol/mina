@@ -2,7 +2,9 @@
  (name exit_handlers)
  (public_name exit_handlers)
  (library_flags -linkall)
- (libraries core_kernel async_kernel async_unix logger core base base.caml)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_here ppx_let))
+ (libraries async_kernel async_unix core_kernel logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_here ppx_let ppx_mina ppx_version))
  (synopsis "Exit handlers"))

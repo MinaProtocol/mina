@@ -114,6 +114,8 @@ let%test_module "Protocol state precondition tests" =
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
@@ -312,7 +314,7 @@ let%test_module "Protocol state precondition tests" =
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
-                    ; authorization = Control.Signature Signature.dummy
+                    ; authorization = Control.Poly.Signature Signature.dummy
                     }
                   in
                   let snapp_account_update : Account_update.Simple.t =
@@ -345,7 +347,7 @@ let%test_module "Protocol state precondition tests" =
                         ; authorization_kind = Signature
                         }
                     ; authorization =
-                        Control.Signature Signature.dummy
+                        Control.Poly.Signature Signature.dummy
                         (*To be updated later*)
                     }
                   in
@@ -383,7 +385,7 @@ let%test_module "Protocol state precondition tests" =
                         (Random_oracle.Input.Chunked.field commitment)
                     in
                     { sender_account_update with
-                      authorization = Control.Signature signature_auth
+                      authorization = Control.Poly.Signature signature_auth
                     }
                   in
                   let snapp_account_update =
@@ -392,7 +394,7 @@ let%test_module "Protocol state precondition tests" =
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
                     { snapp_account_update with
-                      authorization = Control.Signature signature_auth
+                      authorization = Control.Poly.Signature signature_auth
                     }
                   in
                   let zkapp_command_with_valid_fee_payer =
@@ -401,7 +403,7 @@ let%test_module "Protocol state precondition tests" =
                     ; account_updates =
                         [ sender_account_update; snapp_account_update ]
                     }
-                    |> Zkapp_command.of_simple
+                    |> Zkapp_command.of_simple ~proof_cache_db
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
@@ -422,6 +424,8 @@ let%test_module "Account precondition tests" =
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
+
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     let zkapp_prover_and_vk = (zkapp_prover, vk)
 
@@ -908,7 +912,7 @@ let%test_module "Account precondition tests" =
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
-                ; authorization = Control.Signature Signature.dummy
+                ; authorization = Control.Poly.Signature Signature.dummy
                 }
               in
               let snapp_account_update : Account_update.Simple.t =
@@ -939,7 +943,8 @@ let%test_module "Account precondition tests" =
                     ; authorization_kind = Signature
                     }
                 ; authorization =
-                    Control.Signature Signature.dummy (*To be updated later*)
+                    Control.Poly.Signature Signature.dummy
+                    (*To be updated later*)
                 }
               in
               let ps =
@@ -974,7 +979,7 @@ let%test_module "Account precondition tests" =
                     (Random_oracle.Input.Chunked.field commitment)
                 in
                 { sender_account_update with
-                  authorization = Control.Signature signature_auth
+                  authorization = Control.Poly.Signature signature_auth
                 }
               in
               let snapp_account_update =
@@ -983,11 +988,11 @@ let%test_module "Account precondition tests" =
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
                 { snapp_account_update with
-                  authorization = Control.Signature signature_auth
+                  authorization = Control.Poly.Signature signature_auth
                 }
               in
               let zkapp_command_with_invalid_fee_payer =
-                Zkapp_command.of_simple
+                Zkapp_command.of_simple ~proof_cache_db
                   { fee_payer
                   ; memo
                   ; account_updates =

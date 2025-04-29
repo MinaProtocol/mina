@@ -18,7 +18,17 @@ let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
 
-let dependsOn = [ { name = "MinaArtifactBullseye", key = "build-deb-pkg" } ]
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Network = ../../Constants/Network.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
+let dependsOn =
+      DebianVersions.dependsOn
+        DebianVersions.DebVersion.Bullseye
+        Network.Type.Berkeley
+        Profiles.Type.Standard
 
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type

@@ -2,14 +2,14 @@
  (name proof_cache_tag)
  (public_name proof_cache_tag)
  (libraries
-   ;; opam libraries
-   core_kernel
-   async
-   ;; local libraries
-   mina_base
-   logger
-   disk_cache
-   )
+  ;; opam libraries
+  core_kernel
+  async_kernel
+  ;; local libraries
+  logger
+  disk_cache
+  pickles)
  (preprocess
-  (pps ppx_mina ppx_version))
- (instrumentation (backend bisect_ppx)))
+  (pps ppx_mina ppx_version ppx_jane))
+ (instrumentation
+  (backend bisect_ppx)))

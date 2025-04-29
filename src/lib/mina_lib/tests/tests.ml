@@ -211,6 +211,7 @@ let%test_module "Epoch ledger sync tests" =
             ~pool_max_size:precomputed_values.genesis_constants.txpool_max_size
             ~genesis_constants:precomputed_values.genesis_constants
             ~slot_tx_end:None
+            ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
             ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
@@ -226,6 +227,7 @@ let%test_module "Epoch ledger sync tests" =
           Network_pool.Snark_pool.Resource_pool.make_config ~verifier
             ~trust_system
             ~disk_location:(make_dirname "snark_pool_config")
+            ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
         in
         let snark_pool, snark_remote_sink, _snark_local_sink =
           Network_pool.Snark_pool.create ~config ~constraint_constants
@@ -357,7 +359,7 @@ let%test_module "Epoch ledger sync tests" =
           ~get_completed_work:(Fn.const None) ~catchup_mode:`Normal
           ~network_transition_reader:block_reader ~producer_transition_reader
           ~get_most_recent_valid_block ~most_recent_valid_block_writer
-          ~notify_online ()
+          ~notify_online ?transaction_pool_proxy:None ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
       let tr_tm1 = Unix.gettimeofday () in

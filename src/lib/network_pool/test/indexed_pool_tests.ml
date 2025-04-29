@@ -48,14 +48,16 @@ let singleton_properties () =
             assert_pool_consistency pool' ;
             assert (Sequence.is_empty dropped) ;
             [%test_eq: int] (size pool') 1 ;
-            [%test_eq:
-              Transaction_hash.User_command_with_valid_signature.t option]
-              (get_highest_fee pool') (Some cmd) ;
+            assert (
+              [%equal:
+                Transaction_hash.User_command_with_valid_signature.t option]
+                (get_highest_fee pool') (Some cmd) ) ;
             let dropped', pool'' = remove_lowest_fee pool' in
-            [%test_eq:
-              Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-              dropped' (Sequence.singleton cmd) ;
-            [%test_eq: t] ~equal pool pool''
+            assert (
+              [%equal:
+                Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+                dropped' (Sequence.singleton cmd) ) ;
+            assert (equal pool pool'')
         | _ ->
             failwith "should've succeeded" )
 
@@ -110,9 +112,7 @@ let sequential_adds_all_valid () =
             in
             match add_res with
             | Ok (_, pool', dropped) ->
-                [%test_eq:
-                  Transaction_hash.User_command_with_valid_signature.t
-                  Sequence.t] dropped Sequence.empty ;
+                assert (Sequence.is_empty dropped) ;
                 assert_pool_consistency pool' ;
                 pool := pool' ;
                 go rest
@@ -257,9 +257,7 @@ let replacement () =
             match add_from_gossip_exn t cmd init_nonce init_balance with
             | Ok (_, t', removed) ->
                 assert_pool_consistency t' ;
-                [%test_eq:
-                  Transaction_hash.User_command_with_valid_signature.t
-                  Sequence.t] removed Sequence.empty ;
+                assert (Sequence.is_empty removed) ;
                 t'
             | _ ->
                 failwith
@@ -332,10 +330,11 @@ let remove_lowest_fee () =
       (User_command.fee_per_wu @@ command cmd0)
       (User_command.fee_per_wu @@ command cmd1)
   in
+  let module Set = Transaction_hash.User_command_with_valid_signature.Set in
   let cmds_sorted_by_fee_per_wu = List.sort ~compare cmds in
   let cmd_lowest_fee, commands_to_keep =
     ( List.hd_exn cmds_sorted_by_fee_per_wu
-    , List.tl_exn cmds_sorted_by_fee_per_wu )
+    , List.map ~f:Set.singleton @@ List.tl_exn cmds_sorted_by_fee_per_wu )
   in
   let insert_cmd pool cmd =
     add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
@@ -347,21 +346,19 @@ let remove_lowest_fee () =
     List.fold_left cmds ~init:empty ~f:insert_cmd |> remove_lowest_fee
   in
   (* check that the lowest fee per wu command is returned *)
-  assert (Sequence.(equal cmd_equal removed @@ return cmd_lowest_fee))
+  assert (Sequence.(equal cmd_equal removed @@ singleton cmd_lowest_fee))
   |> fun () ->
   (* check that the lowest fee per wu command is removed from
      applicable_by_fee *)
   applicable_by_fee pool |> Map.data
-  |> List.concat_map ~f:Set.to_list
   |> fun applicable_by_fee_cmds ->
-  assert (List.(equal cmd_equal applicable_by_fee_cmds commands_to_keep))
+  assert (List.equal Set.equal applicable_by_fee_cmds commands_to_keep)
   |> fun () ->
   (* check that the lowest fee per wu command is removed from
      all_by_fee *)
   applicable_by_fee pool |> Map.data
-  |> List.concat_map ~f:Set.to_list
   |> fun all_by_fee_cmds ->
-  assert (List.(equal cmd_equal all_by_fee_cmds commands_to_keep))
+  assert (List.equal Set.equal all_by_fee_cmds commands_to_keep)
 
 let insert_cmd pool cmd =
   add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
@@ -387,9 +384,10 @@ let pick_highest_fee_for_application () =
           (User_command.fee_per_wu @@ command cmd1)
       in
       let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-      [%test_eq: Transaction_hash.User_command_with_valid_signature.t option]
-        (get_highest_fee pool)
-        (List.max_elt ~compare cmds) )
+      assert (
+        [%equal: Transaction_hash.User_command_with_valid_signature.t option]
+          (get_highest_fee pool)
+          (List.max_elt ~compare cmds) ) )
 
 let command_nonce (txn : Transaction_hash.User_command_with_valid_signature.t) =
   let open Transaction_hash.User_command_with_valid_signature in
@@ -426,8 +424,7 @@ let add_to_pool ~nonce ~balance pool cmd =
     |> Result.map_error ~f:(Fn.compose Sexp.to_string Command_error.sexp_of_t)
     |> Result.ok_or_failwith
   in
-  [%test_eq: Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-    dropped Sequence.empty ;
+  assert (Sequence.is_empty dropped) ;
   assert_pool_consistency pool' ;
   pool'
 
@@ -494,7 +491,8 @@ let commit_to_pool ledger pool cmd expected_drops =
               (Mina_ledger.Ledger.get ledger loc) )
   in
   let lower =
-    List.map ~f:Transaction_hash.User_command_with_valid_signature.hash
+    List.map
+      ~f:Transaction_hash.User_command_with_valid_signature.transaction_hash
   in
   [%test_eq: Transaction_hash.t list]
     (lower (Sequence.to_list dropped))
@@ -502,12 +500,14 @@ let commit_to_pool ledger pool cmd expected_drops =
   assert_pool_consistency pool ;
   pool
 
+let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
 let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ~double_increment_sender ~increment_receiver ~amount ~fee nonce_int =
   let nonce = Account.Nonce.of_int nonce_int in
   let sender_pk = Public_key.compress sender.public_key in
   let receiver_pk = Public_key.compress receiver.public_key in
-  let zkapp_command_wire : Zkapp_command.Stable.Latest.Wire.t =
+  let zkapp_command_wire : Zkapp_command.Stable.Latest.t =
     { fee_payer =
         { Account_update.Fee_payer.body =
             { public_key = sender_pk; fee; nonce; valid_until = None }
@@ -517,8 +517,8 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ; account_updates =
         Zkapp_command.Call_forest.of_account_updates
           ~account_update_depth:(Fn.const 0)
-          [ { Account_update.body =
-                { public_key = sender_pk
+          [ { Account_update.Poly.body =
+                { Account_update.Body.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(negate @@ of_unsigned amount)
@@ -537,11 +537,12 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; may_use_token = No
                 ; use_full_commitment = not double_increment_sender
                 ; implicit_account_creation_fee = false
-                ; authorization_kind = None_given
+                ; authorization_kind =
+                    Account_update.Authorization_kind.None_given
                 }
-            ; authorization = None_given
+            ; authorization = Control.Poly.None_given
             }
-          ; { Account_update.body =
+          ; { Account_update.Poly.body =
                 { public_key = receiver_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
@@ -567,7 +568,9 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ; memo = Signed_command_memo.empty
     }
   in
-  let zkapp_command = Zkapp_command.of_wire zkapp_command_wire in
+  let zkapp_command =
+    Zkapp_command.write_all_proofs_to_disk ~proof_cache_db zkapp_command_wire
+  in
   (* We skip signing the commitment and updating the authorization as it is not necessary to have a valid transaction for these tests. *)
   let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
     User_command.to_valid_unsafe (User_command.Zkapp_command zkapp_command)
@@ -742,16 +745,15 @@ let revalidation_drops_nothing_unless_ledger_changed () =
             Public_key.Compressed.Map.find_exn account_map
               (Account_id.public_key aid) )
       in
-      [%test_eq:
-        Transaction_hash.User_command_with_valid_signature.t Sequence.t] dropped
-        Sequence.empty ;
-      [%test_eq: Indexed_pool.t] pool pool' ;
+      assert (Sequence.is_empty dropped) ;
+      assert (Indexed_pool.equal pool pool') ;
       let to_apply = Indexed_pool.transactions ~logger pool in
       let to_apply' = Indexed_pool.transactions ~logger pool' in
       assert_pool_consistency pool ;
-      [%test_eq:
-        Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-        to_apply to_apply' )
+      assert (
+        [%equal:
+          Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+          to_apply to_apply' ) )
 
 let apply_transactions txns accounts =
   List.fold txns ~init:accounts ~f:(fun m t ->
@@ -772,7 +774,8 @@ let apply_transactions txns accounts =
             in
             { a with nonce; balance } ) )
 
-let txn_hash = Transaction_hash.User_command_with_valid_signature.hash
+let txn_hash =
+  Transaction_hash.User_command_with_valid_signature.transaction_hash
 
 let application_invalidates_applied_transactions () =
   Quickcheck.test ~trials:1000
