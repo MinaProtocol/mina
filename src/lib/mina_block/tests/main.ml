@@ -65,8 +65,11 @@ let json_serialization_roundtrips_from_file () =
   @@ In_channel.read_all large_precomputed_json_file
 
 let field_element_decimal_deserialization () =
-  json_serialization_is_stable_impl
-  @@ Field_element_decimal_block.sample_block_json
+  let filename =
+    "regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json"
+  in
+  let json = Yojson.Safe.from_file filename in
+  json_serialization_is_stable_impl @@ Yojson.Safe.to_string json
 
 let () =
   run "Precomputed block serialization tests"
