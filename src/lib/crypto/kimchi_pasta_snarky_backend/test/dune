@@ -1,0 +1,7 @@
+(test
+ (name test_bigint)
+ (libraries
+  alcotest
+  core_kernel
+  kimchi_pasta_snarky_backend
+  hex))
