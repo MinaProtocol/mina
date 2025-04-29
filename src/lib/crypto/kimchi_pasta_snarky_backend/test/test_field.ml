@@ -60,6 +60,36 @@ module Make (Field : Kimchi_pasta_snarky_backend.Field.S_with_version) = struct
     | Error _ ->
         Alcotest.(check bool)
           "of_yojson should fail with non-string JSON" true true
+
+  let test_field_of_yojson_zero_decimal () =
+    (* Test parsing "0" as decimal string *)
+    match Field.of_yojson (`String "0") with
+    | Ok result ->
+        Alcotest.(check bool)
+          "Decimal 0 should equal Field.zero" true
+          (Field.equal result Field.zero)
+    | Error msg ->
+        Alcotest.fail (Printf.sprintf "Failed to parse 0 as decimal: %s" msg)
+
+  let test_field_of_yojson_one_decimal () =
+    (* Test parsing "1" as decimal string *)
+    match Field.of_yojson (`String "1") with
+    | Ok result ->
+        Alcotest.(check bool)
+          "Decimal 1 should equal Field.one" true
+          (Field.equal result Field.one)
+    | Error msg ->
+        Alcotest.fail (Printf.sprintf "Failed to parse 1 as decimal: %s" msg)
+
+  let test_field_of_yojson_42_decimal () =
+    (* Test parsing "42" as decimal string *)
+    match Field.of_yojson (`String "42") with
+    | Ok result ->
+        Alcotest.(check bool)
+          "Decimal 1 should equal Field.one" true
+          (Field.equal result (Field.of_int 42))
+    | Error msg ->
+        Alcotest.fail (Printf.sprintf "Failed to parse 42 as decimal: %s" msg)
 end
 
 module Pallas = Make (Kimchi_pasta_snarky_backend.Pallas_based_plonk.Field)
@@ -79,6 +109,12 @@ let () =
             Pallas.test_field_of_yojson_decimal
         ; test_case "of_yojson invalid type" `Quick
             Pallas.test_field_of_yojson_invalid_type
+        ; test_case "of_yojson zero decimal" `Quick
+            Pallas.test_field_of_yojson_zero_decimal
+        ; test_case "of_yojson one decimal" `Quick
+            Pallas.test_field_of_yojson_one_decimal
+        ; test_case "of_yojson 42 decimal" `Quick
+            Pallas.test_field_of_yojson_42_decimal
         ] )
     ; ( "Vesta"
       , [ test_case "sexp round trip" `Quick Vesta.test_field_sexp_round_trip
@@ -91,5 +127,11 @@ let () =
             Vesta.test_field_of_yojson_decimal
         ; test_case "of_yojson invalid type" `Quick
             Vesta.test_field_of_yojson_invalid_type
+        ; test_case "of_yojson zero decimal" `Quick
+            Vesta.test_field_of_yojson_zero_decimal
+        ; test_case "of_yojson one decimal" `Quick
+            Vesta.test_field_of_yojson_one_decimal
+        ; test_case "of_yojson 42 decimal" `Quick
+            Vesta.test_field_of_yojson_42_decimal
         ] )
     ]
