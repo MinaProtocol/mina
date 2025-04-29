@@ -99,4 +99,7 @@ module Result = struct
     Work.Result.map
       ~f_spec:(Spec.write_all_proofs_to_disk ~proof_cache_db)
       ~f_single:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
+
+  let transactions (t : t) =
+    One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
 end
