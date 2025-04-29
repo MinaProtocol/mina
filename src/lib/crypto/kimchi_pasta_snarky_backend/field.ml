@@ -213,7 +213,7 @@ module Make (F : Input_intf) :
             in
             Ok (of_bigint parsed_bigint)
         | _ ->
-            Error "expected hex string"
+            Error "expected a hex string or a decimal string(for old PCBs)"
     end
   end]
 
