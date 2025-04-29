@@ -1,7 +1,11 @@
-(test
- (name test_bigint)
+(tests
+ (names test_bigint test_field)
  (libraries
   alcotest
+  bin_prot.shape
   core_kernel
   kimchi_pasta_snarky_backend
-  hex))
+  hex
+  sexplib0)
+ (preprocess
+  (pps ppx_jane ppx_version)))

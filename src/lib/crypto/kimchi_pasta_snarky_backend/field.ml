@@ -240,17 +240,6 @@ module Make (F : Input_intf) :
         let acc = add acc acc in
         if b then add acc one else acc )
 
-  let%test_unit "sexp round trip" =
-    let t = random () in
-    assert (equal t (t_of_sexp (sexp_of_t t)))
-
-  let%test_unit "bin_io round trip" =
-    let t = random () in
-    [%test_eq: Stable.Latest.t] t
-      (Binable.of_string
-         (module Stable.Latest)
-         (Binable.to_string (module Stable.Latest) t) )
-
   let ( + ) = add
 
   let ( - ) = sub
@@ -278,16 +267,4 @@ module Make (F : Input_intf) :
   let ( *= ) = op Mutable.mul
 
   let ( -= ) = op Mutable.sub
-
-  let%test "of_bits to_bits" =
-    let x = random () in
-    equal x (of_bits (to_bits x))
-
-  let%test_unit "to_bits of_bits" =
-    Quickcheck.test
-      (Quickcheck.Generator.list_with_length
-         Int.(size_in_bits - 1)
-         Bool.quickcheck_generator )
-      ~f:(fun bs ->
-        [%test_eq: bool list] (bs @ [ false ]) (to_bits (of_bits bs)) )
 end
