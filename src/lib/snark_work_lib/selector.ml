@@ -26,6 +26,12 @@ module Single = struct
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
+
+        let transaction (spec : t) :
+            Mina_transaction.Transaction.Stable.Latest.t option =
+          spec |> Work.Single.Spec.witness
+          |> Option.map ~f:(fun spec ->
+                 spec.Transaction_witness.Stable.Latest.transaction )
       end
     end]
 
@@ -59,6 +65,9 @@ module Spec = struct
       [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
+
+      let transactions (t : t) =
+        One_or_two.map t.instances ~f:Single.Spec.Stable.Latest.transaction
     end
   end]
 
@@ -99,7 +108,4 @@ module Result = struct
     Work.Result.map
       ~f_spec:(Spec.write_all_proofs_to_disk ~proof_cache_db)
       ~f_single:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
-
-  let transactions (t : t) =
-    One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
 end
