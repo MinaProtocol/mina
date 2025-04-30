@@ -368,11 +368,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
+  let module Work = Snark_work_lib in
+  let log_snark_work_metrics (work : Work.Selector.Result.Stable.Latest.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
       (One_or_two.zip_exn work.metrics
-         (Snark_worker.Work.Result.transactions work) )
+         (Work.Selector.Spec.Stable.Latest.transactions work.spec) )
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with
         | `Merge ->
@@ -427,7 +428,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
         Perf_histograms.add_span ~name:"snark_worker_transition_time" total )
   in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
+    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc (fun () () ->
           Deferred.return
             (let open Option.Let_syntax in
             let%bind key =
@@ -445,27 +446,36 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                      ~f_witness:Transaction_witness.read_all_proofs_from_disk )
             in
             [%log trace]
-              ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson work) ]
+              ~metadata:
+                [ ("work_spec", Work.Selector.Spec.Stable.Latest.to_yojson work)
+                ]
               "responding to a Get_work request with some new work" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (work, key)) )
-    ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
-        (fun () (work : Snark_worker.Work.Result.t) ->
+    ; implement Snark_worker.Rpcs.Submit_work.Stable.Latest.rpc
+        (fun () (result : Work.Selector.Result.Stable.Latest.t) ->
           [%log trace] "received completed work from a snark worker"
             ~metadata:
-              [ ("work_spec", Snark_worker.Work.Spec.to_yojson work.spec) ] ;
-          log_snark_work_metrics work ;
-          Deferred.return @@ Mina_lib.add_work mina work )
-    ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
+              [ ( "work_spec"
+                , Work.Selector.Spec.Stable.Latest.to_yojson result.spec )
+              ] ;
+          log_snark_work_metrics result ;
+          (* TODO: plug in the correct cache DB here *)
+          let proof_cache_db = Proof_cache_tag.create_identity_db () in
+          let result_cached =
+            Work.Selector.Result.write_all_proofs_to_disk ~proof_cache_db result
+          in
+          Deferred.return @@ Mina_lib.add_work mina result_cached )
+    ; implement Snark_worker.Rpcs.Failed_to_generate_snark.Stable.Latest.rpc
         (fun
           ()
           ((error, _work_spec, _prover_public_key) :
             Error.t
-            * Snark_worker.Work.Spec.t
+            * Work.Selector.Spec.Stable.Latest.t
             * Signature_lib.Public_key.Compressed.t )
         ->
           [%str_log error]
-            (Snark_worker.Generating_snark_work_failed
+            (Snark_worker.Events.Generating_snark_work_failed
                { error = Error_json.error_to_yojson error } ) ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
           Deferred.unit )
