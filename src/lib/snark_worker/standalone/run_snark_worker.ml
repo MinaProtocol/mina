@@ -1,9 +1,8 @@
 open Core_kernel
 open Async
-module Prod = Snark_worker__Prod.Inputs
-
+open Mina_base
+module Prod = Snark_worker.Worker.Prod
 module Graphql_client = Graphql_lib.Client
-
 module Encoders = Mina_graphql.Types.Input
 module Scalars = Graphql_lib.Scalars
 
@@ -29,29 +28,22 @@ let submit_graphql input graphql_endpoint =
       Caml.Format.printf "Graphql error: %s\n" s ;
       exit 1
 
-let perform (s : Prod.Worker_state.t) ~fee ~public_key
-    (spec :
-      ( Transaction_witness.Stable.Latest.t
-      , Ledger_proof.t )
-      Snark_work_lib.Work.Single.Spec.t
-      One_or_two.t ) =
-  One_or_two.Deferred_result.map spec ~f:(fun w ->
-      let open Deferred.Or_error.Let_syntax in
-      let%map proof, time =
-        Prod.perform_single s
-          ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-          w
-      in
-      ( proof
-      , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
-  |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
-         { Snark_work_lib.Work.Result_without_metrics.proofs =
-             One_or_two.map proofs_and_time ~f:fst
-         ; statements =
-             One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
-         ; prover = public_key
-         ; fee
-         } )
+module Work = Snark_work_lib
+
+let perform (state : Prod.Worker_state.t) ~fee ~public_key instances =
+  let spec : Work.Selector.Spec.Stable.Latest.t =
+    { instances; fee = Currency.Fee.zero }
+  in
+  let open Deferred.Or_error.Let_syntax in
+  let sok_digest = Sok_message.(create ~fee ~prover:public_key |> digest) in
+  let%map result = Prod.perform ~state ~sok_digest ~spec in
+  let proofs = One_or_two.map ~f:Tuple3.get1 result in
+  { Work.Work.Result_without_metrics.proofs
+  ; statements =
+      One_or_two.map spec.instances ~f:Snark_work_lib.Work.Single.Spec.statement
+  ; prover = public_key
+  ; fee
+  }
 
 let command =
   let open Command.Let_syntax in
