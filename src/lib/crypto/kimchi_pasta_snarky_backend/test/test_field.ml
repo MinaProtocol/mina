@@ -97,7 +97,7 @@ module Make (Field : Kimchi_pasta_snarky_backend.Field.S_with_version) = struct
     match Field.of_yojson (`String "42") with
     | Ok result ->
         Alcotest.(check bool)
-          "Decimal 1 should equal Field.one" true
+          "Decimal 42 should equal Field.one" true
           (Field.equal result (Field.of_int 42))
     | Error msg ->
         Alcotest.fail (Printf.sprintf "Failed to parse 42 as decimal: %s" msg)
