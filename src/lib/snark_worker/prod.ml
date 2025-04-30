@@ -112,11 +112,33 @@ module Impl : Intf.Worker = struct
             ] ;
         Error e
 
+  let log_zkapp_cmd_merge_snark ~m:(module M : Worker_state.S) ~logger
+      ~sok_digest prev curr ~all_inputs =
+    match%map.Deferred M.merge ~sok_digest prev curr with
+    | Ok p ->
+        Ok p
+    | Error e ->
+        [%log fatal]
+          "Merge snark failed for $stmt1 $stmt2. All inputs: $inputs. Error:  \
+           $error"
+          ~metadata:
+            [ ( "stmt1"
+              , Transaction_snark.Statement.to_yojson
+                  (Ledger_proof.statement prev) )
+            ; ( "stmt2"
+              , Transaction_snark.Statement.to_yojson
+                  (Ledger_proof.statement curr) )
+            ; ("error", `String (Error.to_string_hum e))
+            ; ("inputs", zkapp_command_inputs_to_yojson all_inputs)
+            ] ;
+        Error e
+
   let perform_single ~(logger : Logger.t) ~(cache : Cache.t)
-      ~m:(module M : Worker_state.S)
+      ~(m : (module Worker_state.S))
       ~(proof_cache_db : Proof_cache_tag.cache_db) ~sok_digest
       ~(single : Work.Selector.Single.Spec.Stable.Latest.t) =
     let open Deferred.Or_error.Let_syntax in
+    let (module M) = m in
     let statement = Work.Work.Single.Spec.statement single in
     let tag = get_tag single in
     let process k =
@@ -185,27 +207,6 @@ module Impl : Intf.Worker = struct
                                (Error.to_string_hum e) )
                       |> Deferred.return
                     in
-                    let log_merge_snark ~sok_digest prev curr ~all_inputs =
-                      match%map.Deferred M.merge ~sok_digest prev curr with
-                      | Ok p ->
-                          Ok p
-                      | Error e ->
-                          [%log fatal]
-                            "Merge snark failed for $stmt1 $stmt2. All inputs: \
-                             $inputs. Error:  $error"
-                            ~metadata:
-                              [ ( "stmt1"
-                                , Transaction_snark.Statement.to_yojson
-                                    (Ledger_proof.statement prev) )
-                              ; ( "stmt2"
-                                , Transaction_snark.Statement.to_yojson
-                                    (Ledger_proof.statement curr) )
-                              ; ("error", `String (Error.to_string_hum e))
-                              ; ( "inputs"
-                                , zkapp_command_inputs_to_yojson all_inputs )
-                              ] ;
-                          Error e
-                    in
                     match witnesses_specs_stmts with
                     | [] ->
                         Deferred.Or_error.error_string "no witnesses generated"
@@ -229,8 +230,8 @@ module Impl : Intf.Worker = struct
                                   ~all_inputs:inputs
                                   (M.of_zkapp_command_segment_exn ~witness)
                               in
-                              log_merge_snark ~sok_digest prev curr
-                                ~all_inputs:inputs )
+                              log_zkapp_cmd_merge_snark ~m ~logger ~sok_digest
+                                prev curr ~all_inputs:inputs )
                         in
                         if
                           Transaction_snark.Statement.equal
