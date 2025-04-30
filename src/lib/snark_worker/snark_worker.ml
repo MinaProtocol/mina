@@ -5,11 +5,6 @@ module Inputs = Prod.Inputs
 module Worker = struct
   include Functor.Make (Inputs)
 
-  type Structured_log_events.t +=
-    | Generating_snark_work_failed of { error : Yojson.Safe.t }
-    [@@deriving
-      register_event { msg = "Failed to generate SNARK work: $error" }]
-
   module Rpcs_versioned = struct
     open Core_kernel
     open Signature_lib
