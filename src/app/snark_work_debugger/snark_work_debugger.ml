@@ -15,12 +15,15 @@ let rec sexp_to_sexp : Sexp.t -> Sexplib0.Sexp.t = function
 
 let () = ignore sexp_to_sexp
 
+module Work = Snark_work_lib
+
 let main (spec_path : string) ~constraint_constants ~proof_level =
-  let module Inputs = Snark_worker.Prod.Inputs in
-  let%bind spec = Reader.load_sexp_exn spec_path Inputs.single_spec_of_sexp in
-  let%bind worker =
-    Inputs.Worker_state.create ~constraint_constants ~proof_level ()
+  let open Snark_worker.Worker.Prod in
+  let%bind single_spec =
+    Reader.load_sexp_exn spec_path
+      Work.Selector.Single.Spec.Stable.Latest.t_of_sexp
   in
+  let%bind state = Worker_state.create ~constraint_constants ~proof_level () in
   let message =
     Mina_base.Sok_message.create ~fee:Currency.Fee.zero
       ~prover:
@@ -28,7 +31,13 @@ let main (spec_path : string) ~constraint_constants ~proof_level =
           Public_key.compress
             (Public_key.of_private_key_exn (Private_key.create ())))
   in
-  Inputs.perform_single worker ~message spec >>| ignore
+
+  let sok_digest = Mina_base.Sok_message.digest message in
+
+  let spec : Work.Selector.Spec.Stable.Latest.t =
+    { instances = `One single_spec; fee = Currency.Fee.zero }
+  in
+  perform ~state ~sok_digest ~spec >>| ignore
 
 let cmd =
   Command.async ~summary:"Run a snark worker on a single work spec"
