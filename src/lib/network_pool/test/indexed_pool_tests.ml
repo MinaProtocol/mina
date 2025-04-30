@@ -513,6 +513,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
             { public_key = sender_pk; fee; nonce; valid_until = None }
             (* Real signature added in below *)
         ; authorization = Signature.dummy
+        ; aux = ()
         }
     ; account_updates =
         Zkapp_command.Call_forest.of_account_updates
@@ -541,6 +542,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                     Account_update.Authorization_kind.None_given
                 }
             ; authorization = Control.Poly.None_given
+            ; aux = ()
             }
           ; { Account_update.Poly.body =
                 { public_key = receiver_pk
@@ -563,6 +565,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; authorization_kind = None_given
                 }
             ; authorization = None_given
+            ; aux = ()
             }
           ]
     ; memo = Signed_command_memo.empty

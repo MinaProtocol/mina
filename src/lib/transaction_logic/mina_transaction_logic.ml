@@ -2456,6 +2456,7 @@ module For_tests = struct
               }
               (* Real signature added in below *)
           ; authorization = Signature.dummy
+          ; aux = ()
           }
       ; account_updates =
           [ { body =
@@ -2484,6 +2485,7 @@ module For_tests = struct
             ; authorization =
                 ( if use_full_commitment then Signature Signature.dummy
                 else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
+            ; aux = ()
             }
           ; { body =
                 { public_key = receiver
@@ -2507,6 +2509,7 @@ module For_tests = struct
                 ; authorization_kind = None_given
                 }
             ; authorization = None_given
+            ; aux = ()
             }
           ]
       ; memo = Signed_command_memo.empty
@@ -2529,7 +2532,8 @@ module For_tests = struct
     let account_updates =
       Zkapp_command.Call_forest.map zkapp_command.account_updates
         ~f:(fun
-             (account_update : (Account_update.Body.t, _) Account_update.Poly.t)
+             (account_update :
+               (Account_update.Body.t, _, _) Account_update.Poly.t )
            ->
           match account_update.body.authorization_kind with
           | Signature ->

@@ -4284,6 +4284,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; nonce
             }
         ; authorization = Signature.dummy
+        ; aux = ()
         }
       in
       let sender_is_the_same_as_fee_payer =
@@ -4344,6 +4345,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ( { body = sender_account_update_body
             ; authorization =
                 Control.Poly.Signature Signature.dummy (*To be updated later*)
+            ; aux = ()
             }
             : Account_update.Simple.t )
       in
@@ -4408,6 +4410,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                   }
               ; authorization =
                   Control.Poly.Signature Signature.dummy (*To be updated later*)
+              ; aux = ()
               }
               : Account_update.Simple.t ) )
       in
@@ -4455,6 +4458,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ; authorization_kind
                 }
             ; authorization = receiver_auth
+            ; aux = ()
             } )
       in
       let account_updates_data =
@@ -4497,7 +4501,10 @@ module Make_str (A : Wire_types.Concrete) = struct
               Signature_lib.Schnorr.Chunked.sign sender.private_key
                 (Random_oracle.Input.Chunked.field commitment)
             in
-            { body = s.body; authorization = Signature sender_signature_auth } )
+            { body = s.body
+            ; authorization = Signature sender_signature_auth
+            ; aux = ()
+            } )
       in
       let other_receivers =
         List.map2_exn other_receivers receivers ~f:(fun s (receiver, _amt) ->
@@ -4522,6 +4529,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 { Account_update.Poly.body = s.body
                 ; authorization = Control.Poly.Signature receiver_signature_auth
+                ; aux = ()
                 }
             | Control.Poly.Proof _ ->
                 failwith ""
@@ -4630,6 +4638,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             if no_auth then
               ( { body = snapp_account_update.body
                 ; authorization = Control.Poly.None_given
+                ; aux = ()
                 }
                 : Account_update.Simple.t )
             else
@@ -4644,6 +4653,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               in
               ( { body = snapp_account_update.body
                 ; authorization = Signature signature
+                ; aux = ()
                 }
                 : Account_update.Simple.t ) )
       in
@@ -4738,6 +4748,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               }
           ; authorization =
               Control.Poly.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)
+          ; aux = ()
           }
       in
       let account_update_digest_with_selected_chain =
@@ -4910,6 +4921,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 ( { body = simple_snapp_account_update.body
                   ; authorization = Proof pi
+                  ; aux = ()
                   }
                   : Account_update.Simple.t )
             | Signature ->
@@ -4925,12 +4937,14 @@ module Make_str (A : Wire_types.Concrete) = struct
                 Async.Deferred.return
                   ( { body = simple_snapp_account_update.body
                     ; authorization = Signature signature
+                    ; aux = ()
                     }
                     : Account_update.Simple.t )
             | None ->
                 Async.Deferred.return
                   ( { body = simple_snapp_account_update.body
                     ; authorization = Control.Poly.None_given
+                    ; aux = ()
                     }
                     : Account_update.Simple.t )
             | _ ->
@@ -5091,6 +5105,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
             (* Real signature added in below *)
         ; authorization = Signature.dummy
+        ; aux = ()
         }
       in
       let sender_account_update_data : Account_update.Simple.t =
@@ -5117,6 +5132,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; authorization_kind = Signature
             }
         ; authorization = Signature Signature.dummy
+        ; aux = ()
         }
       in
       let snapp_account_update_data : Account_update.Simple.t =
@@ -5141,6 +5157,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; authorization_kind = Proof (With_hash.hash vk)
             }
         ; authorization = Proof (Lazy.force Mina_base.Proof.transaction_dummy)
+        ; aux = ()
         }
       in
       let memo = Signed_command_memo.empty in
@@ -5197,7 +5214,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let account_updates =
         [ sender
-        ; { body = snapp_account_update_data.body; authorization = Proof pi }
+        ; { body = snapp_account_update_data.body
+          ; authorization = Proof pi
+          ; aux = ()
+          }
         ]
       in
       Zkapp_command.of_simple ~proof_cache_db

@@ -50,11 +50,12 @@ module Checked = struct
         * Zkapp_command.Digest.Account_update.typ)
       |> Typ.transport
            ~back:(fun ((body, authorization), hash) ->
-             { With_hash.data = { Account_update.Poly.body; authorization }
+             { With_hash.data =
+                 { Account_update.Poly.body; authorization; aux = () }
              ; hash
              } )
            ~there:(fun { With_hash.data =
-                           { Account_update.Poly.body; authorization }
+                           { Account_update.Poly.body; authorization; aux = () }
                        ; hash
                        } -> ((body, authorization), hash) )
       |> Typ.transport_var
@@ -229,7 +230,10 @@ module Checked = struct
               in
               let authorization = V.get auth in
               let tl = V.get tl_data in
-              let account_update : Account_update.t = { body; authorization } in
+              let aux = () in
+              let account_update : Account_update.t =
+                { body; authorization; aux }
+              in
               let calls = V.get calls in
               let res =
                 Zkapp_command.Call_forest.cons ~calls account_update tl

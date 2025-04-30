@@ -15,6 +15,7 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
             }
         }
     ; authorization = Control.Poly.Signature Signature.dummy
+    ; aux = ()
     }
   in
   let fee_payer : Account_update.Fee_payer.t =
@@ -23,6 +24,7 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
           fee = Currency.Fee.of_mina_int_exn 100
         }
     ; authorization = Signature.dummy
+    ; aux = ()
     }
   in
   { fee_payer

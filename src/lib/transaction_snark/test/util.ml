@@ -696,6 +696,7 @@ let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
         ; fee
         }
     ; authorization = Signature.dummy
+    ; aux = ()
     }
   in
   let zkapp_command : Zkapp_command.t =

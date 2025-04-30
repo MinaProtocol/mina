@@ -54,6 +54,7 @@ let%test_module "Zkapp payments tests" =
                 ; nonce = acct1.account.nonce
                 }
             ; authorization = Signature.dummy
+            ; aux = ()
             }
         ; account_updates =
             [ { body =
@@ -90,6 +91,7 @@ let%test_module "Zkapp payments tests" =
                   ; authorization_kind = Signature
                   }
               ; authorization = Signature Signature.dummy
+              ; aux = ()
               }
             ; { body =
                   { public_key = acct2.account.public_key
@@ -113,6 +115,7 @@ let%test_module "Zkapp payments tests" =
                   ; authorization_kind = None_given
                   }
               ; authorization = None_given
+              ; aux = ()
               }
             ]
         ; memo

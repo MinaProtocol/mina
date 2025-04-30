@@ -286,6 +286,7 @@ let%test_module "Protocol state precondition tests" =
                         }
                         (*To be updated later*)
                     ; authorization = Signature.dummy
+                    ; aux = ()
                     }
                   in
                   let sender_account_update : Account_update.Simple.t =
@@ -315,6 +316,7 @@ let%test_module "Protocol state precondition tests" =
                         }
                         (*To be updated later*)
                     ; authorization = Control.Poly.Signature Signature.dummy
+                    ; aux = ()
                     }
                   in
                   let snapp_account_update : Account_update.Simple.t =
@@ -349,6 +351,7 @@ let%test_module "Protocol state precondition tests" =
                     ; authorization =
                         Control.Poly.Signature Signature.dummy
                         (*To be updated later*)
+                    ; aux = ()
                     }
                   in
                   let ps =
@@ -884,6 +887,7 @@ let%test_module "Account precondition tests" =
                     }
                     (*To be updated later*)
                 ; authorization = Signature.dummy
+                ; aux = ()
                 }
               in
               let sender_account_update : Account_update.Simple.t =
@@ -913,6 +917,7 @@ let%test_module "Account precondition tests" =
                     }
                     (*To be updated later*)
                 ; authorization = Control.Poly.Signature Signature.dummy
+                ; aux = ()
                 }
               in
               let snapp_account_update : Account_update.Simple.t =
@@ -945,6 +950,7 @@ let%test_module "Account precondition tests" =
                 ; authorization =
                     Control.Poly.Signature Signature.dummy
                     (*To be updated later*)
+                ; aux = ()
                 }
               in
               let ps =

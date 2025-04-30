@@ -184,6 +184,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 }
                 (* Real signature added in below *)
             ; authorization = Signature.dummy
+            ; aux = ()
             }
           in
           let sender_account_update_data : Account_update.Simple.t =
@@ -211,6 +212,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ; authorization_kind = Signature
                 }
             ; authorization = Signature Signature.dummy
+            ; aux = ()
             }
           in
           let snapp_account_update_data : Account_update.Simple.t =
@@ -237,6 +239,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 }
             ; authorization =
                 Proof (Lazy.force Mina_base.Proof.transaction_dummy)
+            ; aux = ()
             }
           in
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
@@ -296,6 +299,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             in
             { body = sender_account_update_data.body
             ; authorization = Signature sender_signature
+            ; aux = ()
             }
           in
           let zkapp_command : Zkapp_command.t =
@@ -305,6 +309,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                   [ sender
                   ; { body = snapp_account_update_data.body
                     ; authorization = Proof pi
+                    ; aux = ()
                     }
                   ]
               ; memo

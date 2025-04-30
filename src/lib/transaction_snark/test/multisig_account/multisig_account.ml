@@ -325,6 +325,7 @@ let%test_module "multisig_account" =
                     }
                     (* Real signature added in below *)
                 ; authorization = Signature.dummy
+                ; aux = ()
                 }
               in
               let sender_account_update_data : Account_update.Simple.t =
@@ -353,6 +354,7 @@ let%test_module "multisig_account" =
                     ; authorization_kind = Signature
                     }
                 ; authorization = Signature Signature.dummy
+                ; aux = ()
                 }
               in
               let snapp_account_update_data : Account_update.Simple.t =
@@ -380,6 +382,7 @@ let%test_module "multisig_account" =
                     }
                 ; authorization =
                     Proof (Lazy.force Mina_base.Proof.transaction_dummy)
+                ; aux = ()
                 }
               in
               let memo = Signed_command_memo.empty in
@@ -454,6 +457,7 @@ let%test_module "multisig_account" =
                     Signature
                       (Signature_lib.Schnorr.Chunked.sign sender.private_key
                          (Random_oracle.Input.Chunked.field transaction) )
+                ; aux = ()
                 }
               in
               let zkapp_command : Zkapp_command.t =
@@ -463,6 +467,7 @@ let%test_module "multisig_account" =
                       [ sender
                       ; { body = snapp_account_update_data.body
                         ; authorization = Proof pi
+                        ; aux = ()
                         }
                       ]
                   ; memo

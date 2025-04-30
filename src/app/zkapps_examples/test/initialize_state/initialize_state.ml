@@ -87,6 +87,7 @@ let%test_module "Initialize state test" =
         (* TODO: This is a pain. *)
         { body = account_update_body
         ; authorization = Signature Signature.dummy
+        ; aux = ()
         }
     end
 
@@ -120,6 +121,7 @@ let%test_module "Initialize state test" =
             ; fee = Currency.Fee.(of_nanomina_int_exn 100)
             }
         ; authorization = Signature.dummy
+        ; aux = ()
         }
       in
       let memo_hash = Signed_command_memo.hash memo in
@@ -148,6 +150,7 @@ let%test_module "Initialize state test" =
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = ()
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->

@@ -52,6 +52,7 @@ let%test_module "Access permission tests" =
         | Account_update.Authorization_kind.Proof _ ->
             { body = { account_update.body with authorization_kind = auth_kind }
             ; authorization = account_update.authorization
+            ; aux = ()
             }
         | Account_update.Authorization_kind.Signature ->
             { body =
@@ -67,10 +68,12 @@ let%test_module "Access permission tests" =
                     }
                 }
             ; authorization = Signature Signature.dummy
+            ; aux = ()
             }
         | Account_update.Authorization_kind.None_given ->
             { body = { account_update.body with authorization_kind = auth_kind }
             ; authorization = None_given
+            ; aux = ()
             }
       in
       let deploy_account_update_body : Account_update.Body.t =
@@ -98,6 +101,7 @@ let%test_module "Access permission tests" =
         (* TODO: This is a pain. *)
         { body = deploy_account_update_body
         ; authorization = Signature Signature.dummy
+        ; aux = ()
         }
       in
       let account_updates =
@@ -120,6 +124,7 @@ let%test_module "Access permission tests" =
             ; fee = Currency.Fee.of_nanomina_int_exn 100
             }
         ; authorization = Signature.dummy
+        ; aux = ()
         }
       in
       let full_commitment =
@@ -150,6 +155,7 @@ let%test_module "Access permission tests" =
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = ()
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
@@ -171,7 +177,10 @@ let%test_module "Access permission tests" =
       let zkapp_command : Zkapp_command.t =
         sign_all
           { fee_payer =
-              { body = fee_payer.body; authorization = Signature.dummy }
+              { body = fee_payer.body
+              ; authorization = Signature.dummy
+              ; aux = ()
+              }
           ; account_updates
           ; memo
           }

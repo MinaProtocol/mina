@@ -53,6 +53,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
         ; nonce = fee_payer_nonce
         }
     ; authorization = Signature.dummy
+    ; aux = ()
     }
   in
   let memo =
@@ -78,6 +79,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
             in
             { Account_update.Poly.body = Account_update.Body.of_simple body
             ; authorization
+            ; aux = ()
             } )
     }
 
@@ -111,7 +113,11 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
   let open Async_kernel.Deferred.Let_syntax in
   let%map account_updates_with_valid_authorizations =
     Zkapp_command.Call_forest.deferred_mapi zkapp_command.account_updates
-      ~f:(fun _ndx ({ body; authorization } : _ Account_update.Poly.t) tree ->
+      ~f:(fun
+           _ndx
+           ({ body; authorization; aux = () } : _ Account_update.Poly.t)
+           tree
+         ->
         let%map valid_authorization =
           match authorization with
           | Control.Poly.Signature _dummy ->
@@ -149,7 +155,10 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
           | None_given ->
               return authorization
         in
-        { Account_update.Poly.body; authorization = valid_authorization } )
+        { Account_update.Poly.body
+        ; authorization = valid_authorization
+        ; aux = ()
+        } )
   in
   { zkapp_command with
     fee_payer = fee_payer_with_valid_signature

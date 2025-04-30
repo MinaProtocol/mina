@@ -326,6 +326,7 @@ module Values (S : Sample) = struct
         ; authorization_kind = Proof (field ())
         }
     ; authorization = Proof side_loaded_proof
+    ; aux = ()
     }
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
@@ -337,6 +338,7 @@ module Values (S : Sample) = struct
             ; nonce = account_nonce ()
             }
         ; authorization = (field (), private_key ())
+        ; aux = ()
         }
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())

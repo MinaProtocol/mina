@@ -75,6 +75,7 @@ let%test_module "Actions test" =
       let account_update : Account_update.t =
         { body = account_update_body
         ; authorization = Signature Signature.dummy
+        ; aux = ()
         }
     end
 
@@ -113,6 +114,7 @@ let%test_module "Actions test" =
             ; nonce = Account.Nonce.of_int fee_payer_nonce
             }
         ; authorization = Signature.dummy
+        ; aux = ()
         }
       in
       let memo_hash = Signed_command_memo.hash memo in
@@ -141,6 +143,7 @@ let%test_module "Actions test" =
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = ()
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->

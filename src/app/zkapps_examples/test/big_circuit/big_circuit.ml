@@ -38,6 +38,7 @@ let account_update : Account_update.t =
   in
   { body = { account_update.body with authorization_kind = Proof vk_hash }
   ; authorization = account_update.authorization
+  ; aux = ()
   }
 
 let deploy_account_update_body : Account_update.Body.t =
@@ -61,6 +62,7 @@ let deploy_account_update_body : Account_update.Body.t =
 let deploy_account_update : Account_update.t =
   { body = deploy_account_update_body
   ; authorization = Signature Signature.dummy
+  ; aux = ()
   }
 
 let account_updates =
@@ -81,6 +83,7 @@ let fee_payer =
       ; fee = Currency.Fee.(of_nanomina_int_exn 100)
       }
   ; authorization = Signature.dummy
+  ; aux = ()
   }
 
 let full_commitment =
@@ -108,6 +111,7 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
     Zkapp_command.Call_forest.map account_updates ~f:(function
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
+         ; aux = ()
          } as account_update :
           Account_update.t )
         when Public_key.Compressed.equal public_key pk_compressed ->
@@ -128,7 +132,8 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
 
 let zkapp_command : Zkapp_command.t =
   sign_all
-    { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
+    { fee_payer =
+        { body = fee_payer.body; authorization = Signature.dummy; aux = () }
     ; account_updates
     ; memo
     }

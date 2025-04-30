@@ -329,6 +329,7 @@ module Rules = struct
         { account_update =
             { Account_update.Poly.body = dummy_account_update_body.data
             ; authorization = Control.Poly.None_given
+            ; aux = ()
             }
         ; account_update_digest = dummy_account_update_body.hash
         ; calls = []

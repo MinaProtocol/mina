@@ -699,6 +699,7 @@ let compile :
                   Proof
                     ( Proof_cache_tag.write_proof_to_disk proof_cache_db
                     @@ Pickles.Side_loaded.Proof.of_proof proof )
+              ; aux = ()
               }
             in
             ( { Zkapp_command.Call_forest.Tree.account_update
@@ -787,6 +788,7 @@ module Deploy_account_update = struct
     (* TODO: This is a pain. *)
     { body = body ?balance_change ?access public_key token_id vk
     ; authorization = Signature Signature.dummy
+    ; aux = ()
     }
 end
 
@@ -821,6 +823,7 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Call_forest.map account_updates ~f:(function
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
+         ; aux = ()
          } as account_update :
           Account_update.t )
         when Public_key.Compressed.equal public_key pk_compressed ->

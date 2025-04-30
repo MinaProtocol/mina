@@ -144,7 +144,7 @@ module type Digest_intf = sig
 
     val create :
          ?chain:Mina_signature_kind.t
-      -> (Account_update.Body.t, _) Account_update.Poly.t
+      -> (Account_update.Body.t, _, _) Account_update.Poly.t
       -> t
 
     val create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
@@ -259,7 +259,7 @@ module Make_digest_str
 
     let create :
            ?chain:Mina_signature_kind.t
-        -> (Account_update.Body.t, _) Account_update.Poly.t
+        -> (Account_update.Body.t, _, _) Account_update.Poly.t
         -> t =
       Account_update.digest
 
