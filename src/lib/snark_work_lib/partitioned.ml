@@ -1,6 +1,5 @@
 open Core_kernel
 
-(* A `Pairing.t` identifies a single work in Work_selector's perspective *)
 module Pairing = struct
   module ID = struct
     [%%versioned
@@ -15,17 +14,43 @@ module Pairing = struct
     end]
   end
 
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      (* Case `One` indicate no need to pair. This is needed because zkapp command
-         might be left in pool of half completion. *)
-      type t = [ `First of ID.Stable.V1.t | `Second of ID.Stable.V1.t | `One ]
-      [@@deriving compare, hash, sexp, yojson, equal]
+  (* A Pairing.Single.t identifies one part of a One_or_two work *)
+  module Single = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        (* Case `One` indicate no need to pair. *)
+        type t = [ `First of ID.Stable.V1.t | `Second of ID.Stable.V1.t | `One ]
+        [@@deriving compare, hash, sexp, yojson, equal]
 
-      let to_latest = Fn.id
-    end
-  end]
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  (* A Pairing.Sub_zkapp.t identifies a sub-zkapp level work *)
+  module Sub_zkapp = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        (* Case `One` indicate no need to pair. ID is still needed because zkapp command
+           might be left in pool of half completion. *)
+        type t =
+          { which_one : [ `First | `Second | `One ]; id : ID.Stable.V1.t }
+        [@@deriving compare, hash, sexp, yojson, equal]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let of_single (id_gen : unit -> ID.t) : Single.t -> t = function
+      | `First id ->
+          { which_one = `First; id }
+      | `Second id ->
+          { which_one = `Second; id }
+      | `One ->
+          { which_one = `One; id = id_gen () }
+  end
 end
 
 module Zkapp_command_job = struct
@@ -117,7 +142,7 @@ module Zkapp_command_job = struct
     module V1 = struct
       type t =
         { spec : Spec.Stable.V1.t
-        ; pairing : Pairing.Stable.V1.t
+        ; pairing : Pairing.Sub_zkapp.Stable.V1.t
         ; job_id : ID.Stable.V1.t
         }
       [@@deriving sexp, yojson]
@@ -126,7 +151,7 @@ module Zkapp_command_job = struct
     end
   end]
 
-  type t = { spec : Spec.t; pairing : Pairing.Stable.V1.t; job_id : ID.t }
+  type t = { spec : Spec.t; pairing : Pairing.Sub_zkapp.t; job_id : ID.t }
 
   let read_all_proofs_from_disk ({ spec; pairing; job_id } : t) :
       Stable.Latest.t =
@@ -150,7 +175,7 @@ module Spec = struct
         type 'metric t =
           | Single of
               { single_spec : Selector.Single.Spec.Stable.V1.t
-              ; pairing : Pairing.Stable.V1.t
+              ; pairing : Pairing.Single.Stable.V1.t
               ; metric : 'metric
               ; fee_of_full : Currency.Fee.Stable.V1.t
               }
@@ -167,7 +192,7 @@ module Spec = struct
     type 'metric t =
       | Single of
           { single_spec : Selector.Single.Spec.t
-          ; pairing : Pairing.t
+          ; pairing : Pairing.Single.t
           ; metric : 'metric
           ; fee_of_full : Currency.Fee.t
           }
