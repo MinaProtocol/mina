@@ -48,8 +48,9 @@ type ('a, 'b, 'c) with_forest = ('a, 'b, 'c) User_command.with_forest Poly.t
 let read_all_proofs_from_disk : t -> Stable.Latest.t =
   Poly.Stable.Latest.map ~f:User_command.read_all_proofs_from_disk
 
-let write_all_proofs_to_disk : Stable.Latest.t -> t =
-  Poly.Stable.Latest.map ~f:User_command.write_all_proofs_to_disk
+let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+  Poly.Stable.Latest.map
+    ~f:(User_command.write_all_proofs_to_disk ~proof_cache_db)
 
 type 'command t_ = 'command Poly.t =
   | Command of 'command

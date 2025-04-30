@@ -183,11 +183,11 @@ let setup_and_submit_zkapp_command t
       Error err
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
-  type proof_elem = User_command.t
+  type proof_elem = User_command.Stable.Latest.t
 
   type hash = Receipt.Chain_hash.t [@@deriving equal]
 
-  let hash parent_hash (proof_elem : User_command.t) =
+  let hash parent_hash (proof_elem : User_command.Stable.Latest.t) =
     match proof_elem with
     | Signed_command cmd ->
         let elt =
@@ -231,11 +231,7 @@ let chain_id_inputs (t : Mina_lib.t) =
   , protocol_network_version )
 
 let verify_payment t (addr : Account_id.t)
-    (verifying_txn : User_command.Stable.Latest.t)
-    (init_receipt, proof_unwrapped) =
-  let proof =
-    List.map ~f:User_command.write_all_proofs_to_disk proof_unwrapped
-  in
+    (verifying_txn : User_command.Stable.Latest.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -247,7 +243,7 @@ let verify_payment t (addr : Account_id.t)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
   in
   if
-    List.exists proof_unwrapped ~f:(fun txn ->
+    List.exists proof ~f:(fun txn ->
         User_command.Stable.Latest.equal verifying_txn txn )
   then Ok ()
   else

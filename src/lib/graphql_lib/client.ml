@@ -1,12 +1,6 @@
 open Core
 open Async
 
-module type Config_intf = sig
-  val headers : string String.Map.t
-
-  val preprocess_variables_string : string -> string
-end
-
 let make_local_uri port address =
   Uri.of_string ("http://localhost:" ^ string_of_int port ^/ address)
 
@@ -65,12 +59,9 @@ module Connection_error = struct
         Error.createf !"Graphql error: %s" e
 end
 
-module Make (Config : Config_intf) = struct
   (* basic version *)
   let query_json' query_obj uri =
-    let variables_string =
-      Config.preprocess_variables_string
-      @@ Yojson.Basic.to_string query_obj#variables
+    let variables_string = Yojson.Basic.to_string query_obj#variables
     in
     let body_string =
       Printf.sprintf {|{"query": "%s", "variables": %s}|} query_obj#query
@@ -79,9 +70,8 @@ module Make (Config : Config_intf) = struct
     let open Deferred.Result.Let_syntax in
     let headers =
       List.fold ~init:(Cohttp.Header.init ())
-        ( ("Accept", "application/json")
-        :: ("Content-Type", "application/json")
-        :: Map.to_alist Config.headers ) ~f:(fun header (key, value) ->
+        ( [("Accept", "application/json") ;
+         ("Content-Type", "application/json")] ) ~f:(fun header (key, value) ->
           Cohttp.Header.add header key value )
     in
     let%bind response, body =
@@ -145,4 +135,4 @@ module Make (Config : Config_intf) = struct
   let query_exn query_obj port = query_exn' ~f:query query_obj port
 
   let query_json_exn query_obj port = query_exn' ~f:query_json query_obj port
-end
+

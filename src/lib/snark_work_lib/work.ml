@@ -1,13 +1,13 @@
-(* TODO: remove type generalizations #2594 *)
-
+(*
+  The better name for this file should really be poly.ml, because the types here
+  are polymorphic, and we really need the concretized version in selector.ml
+ *)
 open Core_kernel
 
 module Single = struct
   module Spec = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V2 = struct
         type ('witness, 'ledger_proof) t =
           | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
@@ -15,7 +15,7 @@ module Single = struct
               Transaction_snark.Statement.Stable.V2.t
               * 'ledger_proof
               * 'ledger_proof
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson]
       end
     end]
 
@@ -61,14 +61,12 @@ end
 module Spec = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type 'single t =
         { instances : 'single One_or_two.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
         }
-      [@@deriving fields, sexp, to_yojson]
+      [@@deriving fields, sexp, yojson]
 
       let to_latest single_latest { instances; fee } =
         { instances = One_or_two.Stable.V1.to_latest single_latest instances
@@ -90,6 +88,10 @@ module Spec = struct
 
   let map ~f { instances; fee } =
     { instances = One_or_two.map ~f instances; fee }
+
+  let map_opt ~f_single { instances; fee } =
+    let%map.Option instances = One_or_two.Option.map ~f:f_single instances in
+    { instances; fee }
 end
 
 module Result = struct
@@ -107,6 +109,13 @@ module Result = struct
       [@@deriving fields]
     end
   end]
+
+  let map ~f_spec ~f_single { proofs; metrics; spec; prover } =
+    { proofs = One_or_two.map ~f:f_single proofs
+    ; metrics
+    ; spec = f_spec spec
+    ; prover
+    }
 end
 
 module Result_without_metrics = struct
@@ -117,4 +126,7 @@ module Result_without_metrics = struct
     ; fee : Currency.Fee.t
     }
   [@@deriving yojson, sexp]
+
+  let map ~f_proof { proofs; statements; prover; fee } =
+    { proofs = One_or_two.map ~f:f_proof proofs; statements; prover; fee }
 end
