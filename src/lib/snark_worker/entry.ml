@@ -1,6 +1,8 @@
 open Core
 open Async
 
+let command_name = "snark-worker"
+
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
