@@ -1,3 +1,20 @@
+(** This module implements data structures and utilities for managing
+    partitioned SNARK work.
+
+    This module provides infrastructure for:
+    - Managing work pairing identifiers for organizing one-or-two part SNARK work
+    - Defining specifications for individual SNARK job components
+    - Supporting zkApp command segments and merge operations
+    - Handling proofs and their associated metrics
+    - Converting between "partitioned" work representations and selector-based work
+
+    The module enables efficient work scheduling and coordination in the SNARK pool by:
+    - Tracking when work specs were issued using timestamps
+    - Maintaining fee information for prioritization
+    - Supporting proof serialization for disk caching
+    - Facilitating zkApp command specific SNARK work processing
+*)
+
 open Core_kernel
 
 module Pairing = struct
