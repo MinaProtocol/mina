@@ -76,3 +76,31 @@ let reissue_old_task ~(partitioner : t) () : Work.Partitioned.Spec.t option =
       Sent_job_pool.replace ~id ~job:reissued
         partitioner.jobs_sent_by_partitioner ;
       Some (Sub_zkapp_command { spec = reissued; metric = () })
+
+let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
+    Work.Partitioned.Spec.t option =
+  let open Option.Let_syntax in
+  let%bind pairing, pending_zkapp_command =
+    Zkapp_command_job_pool.peek partitioner.zkapp_command_jobs
+  in
+  let%map spec =
+    Pending_zkapp_command.generate_job_spec pending_zkapp_command
+  in
+  let job_id =
+    Work.Partitioned.Zkapp_command_job.ID.Job_ID
+      (Id_generator.next_id partitioner.id_generator)
+  in
+  let fee_of_full = pending_zkapp_command.fee_of_full in
+  let issued_since_unix_epoch = Time.(now () |> to_span_since_epoch) in
+  let spec =
+    Work.Partitioned.Zkapp_command_job.Poly.
+      { spec
+      ; pairing
+      ; job_id
+      ; common = { fee_of_full; issued_since_unix_epoch }
+      }
+  in
+  Sent_job_pool.replace ~id:job_id ~job:spec
+    partitioner.jobs_sent_by_partitioner ;
+
+  Work.Partitioned.Spec.Poly.Sub_zkapp_command { spec; metric = () }
