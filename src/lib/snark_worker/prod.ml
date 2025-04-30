@@ -64,13 +64,6 @@ module Impl : Intf.Worker = struct
     let worker_wait_time = 5.
   end
 
-  (* bin_io is for uptime service SNARK worker *)
-  type single_spec =
-    ( Transaction_witness.Stable.Latest.t
-    , Transaction_snark.Stable.Latest.t )
-    Snark_work_lib.Work.Single.Spec.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp]
-
   let zkapp_command_inputs_to_yojson =
     let convert =
       List.map
@@ -102,7 +95,7 @@ module Impl : Intf.Worker = struct
   let perform_single ~(logger : Logger.t) ~(cache : Cache.t)
       ~m:(module M : Worker_state.S)
       ~(proof_cache_db : Proof_cache_tag.cache_db) ~sok_digest
-      ~(single : single_spec) =
+      ~(single : Work.Selector.Single.Spec.Stable.Latest.t) =
     let open Deferred.Or_error.Let_syntax in
     let statement = Work.Work.Single.Spec.statement single in
     let tag = get_tag single in
@@ -119,7 +112,10 @@ module Impl : Intf.Worker = struct
                   (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
                      so we use the less-desirable sexp here
                   *)
-                , `String (Sexp.to_string (sexp_of_single_spec single)) )
+                , `String
+                    (Sexp.to_string
+                       (Work.Selector.Single.Spec.Stable.Latest.sexp_of_t single) )
+                )
               ] ;
           Error e
       | Ok res ->
