@@ -47,7 +47,7 @@ let dispatch rpc shutdown_on_disconnect query address =
 let emit_proof_metrics
     (metrics :
       ( Ledger_proof.Stable.Latest.t
-      * Time_span_with_json.t
+      * Mina_stdlib.Time.Span.t
       * [ `Merge | `Transition ] )
       One_or_two.t ) txns logger =
   One_or_two.iter (One_or_two.zip_exn metrics txns)

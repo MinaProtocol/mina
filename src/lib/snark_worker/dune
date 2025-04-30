@@ -45,6 +45,7 @@
   error_json
   mina_node_config.unconfigurable_constants
   mina_state
+  mina_stdlib
   transaction_protocol_state
   ppx_version.runtime)
  (preprocess

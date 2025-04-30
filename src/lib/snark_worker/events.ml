@@ -1,17 +1,5 @@
 open Core
 
-module Time_span_with_json = struct
-  type t = Time.Span.t
-
-  let to_yojson total = `String (Time.Span.to_string_hum total)
-
-  let of_yojson = function
-    | `String time ->
-        Ok (Time.Span.of_string time)
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse timespan"
-end
-
 (*FIX: register_event fails when adding base types to the constructors*)
 module String_with_json = struct
   type t = string
@@ -38,12 +26,12 @@ module Int_with_json = struct
 end
 
 type Structured_log_events.t +=
-  | Merge_snark_generated of { time : Time_span_with_json.t }
+  | Merge_snark_generated of { time : Mina_stdlib.Time.Span.t }
   [@@deriving register_event { msg = "Merge SNARK generated in $time" }]
 
 type Structured_log_events.t +=
   | Base_snark_generated of
-      { time : Time_span_with_json.t
+      { time : Mina_stdlib.Time.Span.t
       ; transaction_type : String_with_json.t
       ; zkapp_command_count : Int_with_json.t
       ; proof_zkapp_command_count : Int_with_json.t
