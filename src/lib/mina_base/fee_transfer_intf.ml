@@ -53,7 +53,7 @@ module type Full = sig
 
   module Stable : sig
     module V2 : sig
-      type t = private Single.Stable.V2.t One_or_two.Stable.V1.t
+      type t = private Single.Stable.V2.t Mina_stdlib.One_or_two.Stable.V1.t
       [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
     end
 
@@ -79,15 +79,15 @@ module type Full = sig
     -> fee_token:Token_id.t
     -> t
 
-  val to_singles : t -> Single.t One_or_two.t
+  val to_singles : t -> Single.t Mina_stdlib.One_or_two.t
 
-  val of_singles : Single.t One_or_two.t -> t Or_error.t
+  val of_singles : Single.t Mina_stdlib.One_or_two.t -> t Or_error.t
 
   val fee_excess : t -> Fee_excess.t Or_error.t
 
   val fee_token : single -> Token_id.t
 
-  val fee_tokens : t -> Token_id.t One_or_two.t
+  val fee_tokens : t -> Token_id.t Mina_stdlib.One_or_two.t
 
   val receiver_pks : t -> Public_key.Compressed.t list
 
@@ -95,7 +95,7 @@ module type Full = sig
 
   val fee_payer_pk : t -> Public_key.Compressed.t
 
-  val map : t -> f:(Single.t -> 'b) -> 'b One_or_two.t
+  val map : t -> f:(Single.t -> 'b) -> 'b Mina_stdlib.One_or_two.t
 
   val fold : t -> init:'acc -> f:('acc -> Single.t -> 'acc) -> 'acc
 

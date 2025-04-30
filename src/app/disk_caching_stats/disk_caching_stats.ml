@@ -205,13 +205,13 @@ module Values (S : Sample) = struct
                  Mina_base.Ledger_hash.empty_hash ) ) )
 
   let one_priced_proof () :
-      Ledger_proof.t One_or_two.t Network_pool.Priced_proof.t =
+      Ledger_proof.t Mina_stdlib.One_or_two.t Network_pool.Priced_proof.t =
     { proof = `One (ledger_proof ())
     ; fee = { prover = public_key (); fee = fee () }
     }
 
   let two_priced_proofs () :
-      Ledger_proof.t One_or_two.t Network_pool.Priced_proof.t =
+      Ledger_proof.t Mina_stdlib.One_or_two.t Network_pool.Priced_proof.t =
     { proof = `Two (ledger_proof (), ledger_proof ())
     ; fee = { prover = public_key (); fee = fee () }
     }

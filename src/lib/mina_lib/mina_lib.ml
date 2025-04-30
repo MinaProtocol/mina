@@ -891,7 +891,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec =
-    One_or_two.map work.spec.instances
+    Mina_stdlib.One_or_two.map work.spec.instances
       ~f:Snark_work_lib.Work.Single.Spec.statement
   in
   let cb _ =

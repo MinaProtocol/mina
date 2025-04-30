@@ -283,7 +283,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
               ~state_hash ~produced:false block_data
         | Ok job_one_or_twos -> (
             let transitions =
-              List.concat_map job_one_or_twos ~f:One_or_two.to_list
+              List.concat_map job_one_or_twos ~f:Mina_stdlib.One_or_two.to_list
               |> List.filter ~f:(function
                    | Snark_work_lib.Work.Single.Spec.Transition _ ->
                        true

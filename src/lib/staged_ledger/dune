@@ -41,7 +41,6 @@
   mina_transaction_logic
   mina_wire_types
   o1trace
-  one_or_two
   pickles
   pickles.backend
   pickles_types

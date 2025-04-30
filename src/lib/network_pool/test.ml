@@ -48,7 +48,7 @@ let%test_module "network pool test" =
       in
       let priced_proof =
         { Priced_proof.proof =
-            One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
+            Mina_stdlib.One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
         ; fee =
             { fee = Currency.Fee.zero
             ; prover = Signature_lib.Public_key.Compressed.empty
@@ -67,7 +67,7 @@ let%test_module "network pool test" =
             Mocks.Transition_frontier.refer_statements tf [ work ]
           in
           let read_proofs =
-            One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
+            Mina_stdlib.One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
           in
           let command =
             Mock_snark_pool.Resource_pool.Diff.Cached.write_all_proofs_to_disk
@@ -84,7 +84,7 @@ let%test_module "network pool test" =
           match Mock_snark_pool.Resource_pool.request_proof pool work with
           | Some { proof; fee = _ } ->
               assert (
-                [%equal: Ledger_proof.t One_or_two.t] (read_proofs proof)
+                [%equal: Ledger_proof.t Mina_stdlib.One_or_two.t] (read_proofs proof)
                   priced_proof.proof )
           | None ->
               failwith "There should have been a proof here" )
@@ -105,7 +105,7 @@ let%test_module "network pool test" =
           ( work
           , Priced_proof.
               { proof =
-                  One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
+                  Mina_stdlib.One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
               ; fee =
                   { fee = Currency.Fee.zero
                   ; prover = Signature_lib.Public_key.Compressed.empty

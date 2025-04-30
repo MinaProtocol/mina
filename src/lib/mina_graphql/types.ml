@@ -507,7 +507,7 @@ let completed_work =
           ~typ:(non_null @@ list @@ non_null int)
           ~args:Arg.[]
           ~resolve:(fun _ { Transaction_snark_work.Info.work_ids; _ } ->
-            One_or_two.to_list work_ids )
+            Mina_stdlib.One_or_two.to_list work_ids )
       ] )
 
 let sign =
@@ -619,12 +619,12 @@ let pending_work =
           ~args:Arg.[]
           ~doc:"Work bundle with one or two snark work"
           ~typ:(non_null @@ list @@ non_null work_statement)
-          ~resolve:(fun _ w -> One_or_two.to_list w)
+          ~resolve:(fun _ w -> Mina_stdlib.One_or_two.to_list w)
       ] )
 
 module Snark_work_bundle = struct
   type t =
-    { spec : Work_selector.in_memory_work One_or_two.t
+    { spec : Work_selector.in_memory_work Mina_stdlib.One_or_two.t
     ; fee_prover : (Currency.Fee.t * Public_key.Compressed.t) option
     }
 
@@ -638,8 +638,8 @@ module Snark_work_bundle = struct
             ~doc:"Snark work specification in json format"
             ~args:Arg.[]
             ~resolve:(fun _ { spec; _ } ->
-              One_or_two.to_yojson
-                Snark_work_lib.Selector.Single.Spec.Stable.Latest.to_yojson spec
+              (Mina_stdlib.One_or_two.to_yojson
+                Snark_work_lib.Selector.Single.Spec.Stable.Latest.to_yojson spec)
               |> Yojson.Safe.to_string )
         ; field "snarkFee" ~typ:fee
             ~doc:"Fee if proof for the spec exists in snark pool"
@@ -653,10 +653,10 @@ module Snark_work_bundle = struct
             ~typ:(non_null (list (non_null int)))
             ~args:Arg.[]
             ~resolve:(fun _ { spec; _ } ->
-              One_or_two.map spec ~f:(fun w ->
+              Mina_stdlib.One_or_two.map spec ~f:(fun w ->
                   Transaction_snark.Statement.hash
                     (Snark_work_lib.Work.Single.Spec.statement w) )
-              |> One_or_two.to_list )
+              |> Mina_stdlib.One_or_two.to_list )
         ] )
 end
 

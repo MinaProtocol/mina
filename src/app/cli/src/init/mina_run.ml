@@ -370,8 +370,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   in
   let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
-    One_or_two.iter
-      (One_or_two.zip_exn work.metrics
+    Mina_stdlib.One_or_two.iter
+      (Mina_stdlib.One_or_two.zip_exn work.metrics
          (Snark_worker.Work.Result.transactions work) )
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with

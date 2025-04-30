@@ -565,7 +565,7 @@ module Verify_work_batcher = struct
       ~logger:(Logger.extend logger [ ("name", `String "verify_work_batcher") ])
       ~weight:(fun (x : input) ->
         List.fold ~init:0 (works x) ~f:(fun acc { proofs; _ } ->
-            acc + One_or_two.length proofs ) )
+            acc + Mina_stdlib.One_or_two.length proofs ) )
       ~max_weight_per_call:1000 ~how_to_add:`Insert
       ~compare_init:(fun e1 e2 ->
         let len (x : input) =
@@ -585,8 +585,8 @@ module Verify_work_batcher = struct
             works (input x)
             |> List.concat_map ~f:(fun { fee; prover; proofs } ->
                    let msg = Sok_message.create ~fee ~prover in
-                   One_or_two.to_list
-                     (One_or_two.map proofs ~f:(fun p ->
+                   Mina_stdlib.One_or_two.to_list
+                     (Mina_stdlib.One_or_two.map proofs ~f:(fun p ->
                           (Ledger_proof.Cached.read_proof_from_disk p, msg) ) ) ) )
         |> Verifier.verify_transaction_snarks verifier
         >>| function

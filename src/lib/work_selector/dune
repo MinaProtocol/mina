@@ -33,7 +33,7 @@
   staged_ledger
   logger
   currency
-  one_or_two
+  mina_stdlib
   transaction_snark
   pipe_lib
   transition_frontier

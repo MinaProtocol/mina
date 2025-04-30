@@ -33,7 +33,7 @@
   transaction_snark_tests
   test_util
   consensus
-  one_or_two
+  mina_stdlib
   coda_genesis_ledger
   sexplib0
   quickcheck_lib

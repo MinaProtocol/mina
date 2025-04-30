@@ -2386,7 +2386,7 @@ module Queries = struct
         let to_bundle_specs =
           List.map ~f:(fun (spec, fee_prover) ->
               let spec =
-                One_or_two.map spec
+                Mina_stdlib.One_or_two.map spec
                   ~f:
                     (Snark_work_lib.Work.Single.Spec.map
                        ~f_proof:Ledger_proof.Cached.read_proof_from_disk

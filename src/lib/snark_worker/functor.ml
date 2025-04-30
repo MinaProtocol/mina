@@ -91,13 +91,13 @@ module Make (Inputs : Intf.Inputs_intf) :
       type t = (Spec.t, Ledger_proof.t) Work.Result.t
 
       let transactions (t : t) =
-        One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
+        Mina_stdlib.One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
     end
   end
 
   let perform (s : Worker_state.t) public_key
       ({ instances; fee } as spec : Work.Spec.t) =
-    One_or_two.Deferred_result.map instances ~f:(fun w ->
+    Mina_stdlib.One_or_two.Deferred_result.map instances ~f:(fun w ->
         let open Deferred.Or_error.Let_syntax in
         let%map proof, time =
           perform_single s
@@ -156,7 +156,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         res
 
   let emit_proof_metrics metrics instances logger =
-    One_or_two.iter (One_or_two.zip_exn metrics instances)
+    Mina_stdlib.One_or_two.iter (Mina_stdlib.One_or_two.zip_exn metrics instances)
       ~f:(fun ((time, tag), single) ->
         match tag with
         | `Merge ->
@@ -297,7 +297,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               [ ("address", `String (Host_and_port.to_string daemon_address))
               ; ( "work_ids"
                 , Transaction_snark_work.Statement.compact_json
-                    (One_or_two.map (Work.Spec.instances work)
+                    (Mina_stdlib.One_or_two.map (Work.Spec.instances work)
                        ~f:Work.Single.Spec.statement ) )
               ] ;
           let%bind () = wait () in
@@ -326,7 +326,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   [ ("address", `String (Host_and_port.to_string daemon_address))
                   ; ( "work_ids"
                     , Transaction_snark_work.Statement.compact_json
-                        (One_or_two.map (Work.Spec.instances work)
+                        (Mina_stdlib.One_or_two.map (Work.Spec.instances work)
                            ~f:Work.Single.Spec.statement ) )
                   ] ;
               let rec submit_work () =

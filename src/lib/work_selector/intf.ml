@@ -46,7 +46,7 @@ module type Inputs_intf = sig
     include Transaction_snark_work_intf
 
     module Statement : sig
-      type t = Transaction_snark.Statement.t One_or_two.t
+      type t = Transaction_snark.Statement.t Mina_stdlib.One_or_two.t
     end
 
     module Checked : Transaction_snark_work_intf
@@ -57,7 +57,7 @@ module type Inputs_intf = sig
 
     val get_completed_work :
          t
-      -> Transaction_snark.Statement.t One_or_two.t
+      -> Transaction_snark.Statement.t Mina_stdlib.One_or_two.t
       -> Transaction_snark_work.Checked.t option
   end
 
@@ -75,7 +75,7 @@ module type Inputs_intf = sig
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
+         Mina_stdlib.One_or_two.t
          list
          Or_error.t
   end
@@ -124,17 +124,17 @@ module type Lib_intf = sig
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
+         Mina_stdlib.One_or_two.t
          list
 
-    val remove : t -> Transaction_snark.Statement.t One_or_two.t -> unit
+    val remove : t -> Transaction_snark.Statement.t Mina_stdlib.One_or_two.t -> unit
 
     val set :
          t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
+         Mina_stdlib.One_or_two.t
       -> unit
   end
 
@@ -144,12 +144,12 @@ module type Lib_intf = sig
     -> ( Transaction_witness.t
        , Ledger_proof.Cached.t )
        Snark_work_lib.Work.Single.Spec.t
-       One_or_two.t
+       Mina_stdlib.One_or_two.t
        list
     -> ( Transaction_witness.t
        , Ledger_proof.Cached.t )
        Snark_work_lib.Work.Single.Spec.t
-       One_or_two.t
+       Mina_stdlib.One_or_two.t
        list
 
   (**jobs that are not in the snark pool yet*)
@@ -157,7 +157,7 @@ module type Lib_intf = sig
        snark_pool:Snark_pool.t
     -> fee_opt:Fee.t option
     -> State.t
-    -> Transaction_snark.Statement.t One_or_two.t list
+    -> Transaction_snark.Statement.t Mina_stdlib.One_or_two.t list
 
   module For_tests : sig
     val does_not_have_better_fee :
@@ -184,7 +184,7 @@ module type Selection_method_intf = sig
     -> fee:Currency.Fee.t
     -> logger:Logger.t
     -> State.t
-    -> work One_or_two.t option
+    -> work Mina_stdlib.One_or_two.t option
 end
 
 module type Make_selection_method_intf = functor (Lib : Lib_intf) ->

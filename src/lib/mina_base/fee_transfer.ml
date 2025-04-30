@@ -66,7 +66,7 @@ module Make_str (A : Wire_types.Concrete) = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = Single.Stable.V2.t One_or_two.Stable.V1.t
+      type t = Single.Stable.V2.t Mina_stdlib.One_or_two.Stable.V1.t
       [@@deriving sexp, compare, equal, yojson, hash]
 
       let to_latest = Fn.id
@@ -109,14 +109,14 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let fee_excess ft =
     ft
-    |> One_or_two.map ~f:(fun { fee_token; fee; _ } ->
+    |> Mina_stdlib.One_or_two.map ~f:(fun { fee_token; fee; _ } ->
            (fee_token, Currency.Fee.Signed.(negate (of_unsigned fee))) )
     |> Fee_excess.of_one_or_two
 
   let receiver_pks t =
-    One_or_two.to_list (One_or_two.map ~f:Single.receiver_pk t)
+    Mina_stdlib.One_or_two.to_list (Mina_stdlib.One_or_two.map ~f:Single.receiver_pk t)
 
-  let receivers t = One_or_two.to_list (One_or_two.map ~f:Single.receiver t)
+  let receivers t = Mina_stdlib.One_or_two.to_list (Mina_stdlib.One_or_two.map ~f:Single.receiver t)
 
   (* This must match [Transaction_union].
      TODO: enforce this.
@@ -130,15 +130,15 @@ module Make_str (A : Wire_types.Concrete) = struct
 
   let fee_token = Single.fee_token
 
-  let fee_tokens = One_or_two.map ~f:Single.fee_token
+  let fee_tokens = Mina_stdlib.One_or_two.map ~f:Single.fee_token
 
-  let map = One_or_two.map
+  let map = Mina_stdlib.One_or_two.map
 
-  let fold = One_or_two.fold
+  let fold = Mina_stdlib.One_or_two.fold
 
-  let to_list = One_or_two.to_list
+  let to_list = Mina_stdlib.One_or_two.to_list
 
-  let to_numbered_list = One_or_two.to_numbered_list
+  let to_numbered_list = Mina_stdlib.One_or_two.to_numbered_list
 end
 
 include Wire_types.Make (Make_sig) (Make_str)

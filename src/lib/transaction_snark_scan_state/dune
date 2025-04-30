@@ -18,7 +18,6 @@
   bin_prot.shape
   async_unix
   ;; local libraries
-  mina_stdlib
   mina_base.import
   data_hash_lib
   mina_state
@@ -29,7 +28,7 @@
   mina_transaction
   mina_transaction_logic
   snark_work_lib
-  one_or_two
+  mina_stdlib
   mina_ledger
   merkle_ledger
   currency

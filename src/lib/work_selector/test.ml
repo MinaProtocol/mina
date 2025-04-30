@@ -61,7 +61,7 @@ struct
         | None ->
             all_work
         | Some work ->
-            go (One_or_two.to_list work @ all_work)
+            go (Mina_stdlib.One_or_two.to_list work @ all_work)
       in
       go []
     in
@@ -77,7 +77,7 @@ struct
             let work_sent_again = send_work work_state in
             assert (List.length work_sent = List.length work_sent_again) ) )
 
-  let gen_snark_pool (works : ('a, 'b) Lib.Work_spec.t One_or_two.t list) fee =
+  let gen_snark_pool (works : ('a, 'b) Lib.Work_spec.t Mina_stdlib.One_or_two.t list) fee =
     let open Quickcheck.Generator.Let_syntax in
     let cheap_work_fee = Option.value_exn Fee.(sub fee one) in
     let expensive_work_fee = Option.value_exn Fee.(add fee one) in
@@ -93,7 +93,7 @@ struct
           add_works rest
     in
     let%map () =
-      add_works (List.map ~f:(One_or_two.map ~f:Lib.Work_spec.statement) works)
+      add_works (List.map ~f:(Mina_stdlib.One_or_two.map ~f:Lib.Work_spec.statement) works)
     in
     snark_pool
 
@@ -139,7 +139,7 @@ struct
                     ~message:"Should not get any cheap jobs" ~expect:true
                     (Lib.For_tests.does_not_have_better_fee ~snark_pool
                        ~fee:my_fee
-                       (One_or_two.map job ~f:Lib.Work_spec.statement) ) ;
+                       (Mina_stdlib.One_or_two.map job ~f:Lib.Work_spec.statement) ) ;
                   go (i + 1)
             in
             go 0 ) )

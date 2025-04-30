@@ -24,7 +24,7 @@
   bin_prot.shape
   ;; local libraries
   bounded_types
-  one_or_two
+  mina_stdlib
   mina_metrics
   logger
   signature_lib

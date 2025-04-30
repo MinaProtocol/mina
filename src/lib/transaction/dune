@@ -22,7 +22,7 @@
   mina_base
   mina_base.import
   mina_numbers
-  one_or_two
+  mina_stdlib
   pickles
   random_oracle
   signature_lib

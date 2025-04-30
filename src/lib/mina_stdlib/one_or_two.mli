@@ -1,3 +1,5 @@
+module Intfs: module type of One_or_two_intfs
+
 (** Simple container of one of two values of a given type. *)
 open Core_kernel
 

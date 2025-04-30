@@ -1,3 +1,5 @@
+module Intfs = One_or_two_intfs
+
 open Core_kernel
 open Async_kernel
 

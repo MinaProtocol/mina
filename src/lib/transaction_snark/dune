@@ -21,7 +21,7 @@
   kimchi_backend
   with_hash
   bitstring_lib
-  one_or_two
+  mina_stdlib
   snarky_integer
   pickles.backend
   signature_lib

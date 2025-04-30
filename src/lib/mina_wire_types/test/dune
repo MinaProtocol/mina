@@ -11,7 +11,7 @@
   mina_base.import
   mina_numbers
   block_time
-  one_or_two
+  mina_stdlib
   mina_transaction
   mina_state
   mina_transaction_logic

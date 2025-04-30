@@ -3,7 +3,7 @@ open Currency
 open Signature_lib
 
 module Statement : sig
-  type t = Transaction_snark.Statement.t One_or_two.t
+  type t = Transaction_snark.Statement.t Mina_stdlib.One_or_two.t
   [@@deriving compare, sexp, yojson, equal]
 
   include Comparable.S with type t := t
@@ -25,13 +25,13 @@ module Statement : sig
 
   val compact_json : t -> Yojson.Safe.t
 
-  val work_ids : t -> int One_or_two.t
+  val work_ids : t -> int Mina_stdlib.One_or_two.t
 end
 
 module Info : sig
   type t =
     { statements : Statement.Stable.V2.t
-    ; work_ids : int One_or_two.Stable.V1.t
+    ; work_ids : int Mina_stdlib.One_or_two.Stable.V1.t
     ; fee : Fee.Stable.V1.t
     ; prover : Public_key.Compressed.Stable.V1.t
     }
@@ -61,7 +61,7 @@ end
 
 type t =
   { fee : Currency.Fee.t
-  ; proofs : Ledger_proof.Cached.t One_or_two.t
+  ; proofs : Ledger_proof.Cached.t Mina_stdlib.One_or_two.t
   ; prover : Public_key.Compressed.t
   }
 
@@ -71,7 +71,7 @@ val info : t -> Info.t
 
 val statement : t -> Statement.t
 
-val proofs : t -> Ledger_proof.Cached.t One_or_two.t
+val proofs : t -> Ledger_proof.Cached.t Mina_stdlib.One_or_two.t
 
 module Stable : sig
   module V2 : sig
@@ -83,7 +83,7 @@ module Stable : sig
 
     val prover : t -> Public_key.Compressed.Stable.V1.t
 
-    val proofs : t -> Ledger_proof.t One_or_two.t
+    val proofs : t -> Ledger_proof.t Mina_stdlib.One_or_two.t
 
     val to_latest : t -> t
   end
@@ -101,7 +101,7 @@ module Checked : sig
 
   val statement : t -> Statement.t
 
-  val proofs : t -> Ledger_proof.Cached.t One_or_two.t
+  val proofs : t -> Ledger_proof.Cached.t Mina_stdlib.One_or_two.t
 end
 
 val forget : Checked.t -> t

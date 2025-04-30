@@ -35,13 +35,13 @@
   mina_net2
   mina_numbers
   mina_signature_kind
+  mina_stdlib
   mina_state
   mina_transaction
   mina_transaction_logic
   mina_wire_types
   network_peer
   o1trace
-  one_or_two
   pickles
   pickles.backend
   pickles_types

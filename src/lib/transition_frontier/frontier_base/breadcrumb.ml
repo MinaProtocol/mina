@@ -375,7 +375,7 @@ module For_tests = struct
           (Transaction_snark_work.Checked.create_unsafe
              { fee = Fee.of_nanomina_int_exn 1
              ; proofs =
-                 One_or_two.map stmts ~f:(fun statement ->
+                 Mina_stdlib.One_or_two.map stmts ~f:(fun statement ->
                      Ledger_proof.Cached.create ~statement
                        ~sok_digest:Sok_message.Digest.default
                        ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )

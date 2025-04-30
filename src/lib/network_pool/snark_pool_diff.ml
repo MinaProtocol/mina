@@ -26,20 +26,20 @@ module Make
               with type transition_frontier := Transition_frontier.t) :
   Intf.Snark_pool_diff_intf with type resource_pool := Pool.t = struct
   type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
-    | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
+    | Add_solved_work of Work.t * Ledger_proof.t Mina_stdlib.One_or_two.t Priced_proof.t
     | Empty
 
   module Cached = struct
     type t =
       | Add_solved_work of
           Transaction_snark_work.Statement.t
-          * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+          * Ledger_proof.Cached.t Mina_stdlib.One_or_two.t Priced_proof.t
       | Empty
 
     let read_all_proofs_from_disk =
       let map_proofs =
         Priced_proof.map
-          ~f:(One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk)
+          ~f:(Mina_stdlib.One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk)
       in
       function
       | Add_solved_work (work, proofs) ->
@@ -53,7 +53,7 @@ module Make
       let map_proofs =
         Priced_proof.map
           ~f:
-            (One_or_two.map
+            (Mina_stdlib.One_or_two.map
                ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db) )
       in
       function
@@ -75,7 +75,7 @@ module Make
   let reject_overloaded_diff _ = ()
 
   type compact =
-    { work_ids : int One_or_two.t
+    { work_ids : int Mina_stdlib.One_or_two.t
     ; fee : Currency.Fee.t
     ; prover : Signature_lib.Public_key.Compressed.t
     }
@@ -100,7 +100,7 @@ module Make
 
   let score = function
     | Add_solved_work (_w, p) ->
-        One_or_two.length p.proof
+        Mina_stdlib.One_or_two.length p.proof
     | Empty ->
         1
 
@@ -124,7 +124,7 @@ module Make
         , Ledger_proof.t )
         Snark_work_lib.Work.Result.t ) =
     Add_solved_work
-      ( One_or_two.map res.spec.instances
+      ( Mina_stdlib.One_or_two.map res.spec.instances
           ~f:Snark_work_lib.Work.Single.Spec.statement
       , { proof = res.proofs
         ; fee = { fee = res.spec.fee; prover = res.prover }

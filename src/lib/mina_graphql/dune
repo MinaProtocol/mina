@@ -76,7 +76,7 @@
   daemon_rpcs
   mina_numbers
   perf_histograms
-  one_or_two
+  mina_stdlib
   transaction_snark
   transition_frontier_base
   participating_state

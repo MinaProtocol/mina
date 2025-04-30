@@ -224,17 +224,17 @@ val snark_job_list_json : t -> string
 
 (** All the proof bundles *)
 val all_work_statements_exn :
-  t -> Transaction_snark.Statement.t One_or_two.t list
+  t -> Transaction_snark.Statement.t Mina_stdlib.One_or_two.t list
 
 (** Required proof bundles for a certain number of slots *)
-val required_work_pairs : t -> slots:int -> Available_job.t One_or_two.t list
+val required_work_pairs : t -> slots:int -> Available_job.t Mina_stdlib.One_or_two.t list
 
 (**K proof bundles*)
-val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t One_or_two.t list
+val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t Mina_stdlib.One_or_two.t list
 
 (** All the proof bundles for 2**transaction_capacity_log2 slots that can be used up in one diff *)
 val work_statements_for_new_diff :
-  t -> Transaction_snark.Statement.t One_or_two.t list
+  t -> Transaction_snark.Statement.t Mina_stdlib.One_or_two.t list
 
 (** True if the latest tree is full and transactions would be added on to a new tree *)
 val next_on_new_tree : t -> bool
@@ -260,7 +260,7 @@ val all_work_pairs :
   -> ( Transaction_witness.t
      , Ledger_proof.Cached.t )
      Snark_work_lib.Work.Single.Spec.t
-     One_or_two.t
+     Mina_stdlib.One_or_two.t
      list
      Or_error.t
 

@@ -6,10 +6,10 @@ open Network_peer
 module Snark_tables = struct
   type t =
     { all :
-        Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+        Ledger_proof.Cached.t Mina_stdlib.One_or_two.t Priced_proof.t
         Transaction_snark_work.Statement.Map.t
     ; rebroadcastable :
-        (Ledger_proof.Cached.t One_or_two.t Priced_proof.t * Core.Time.t)
+        (Ledger_proof.Cached.t Mina_stdlib.One_or_two.t Priced_proof.t * Core.Time.t)
         Transaction_snark_work.Statement.Map.t
     }
 end
@@ -277,7 +277,7 @@ struct
       let request_proof t = Map.find !(t.snark_tables).all
 
       let add_snark ?(is_local = false) t ~work
-          ~(proof : Ledger_proof.Cached.t One_or_two.t) ~fee =
+          ~(proof : Ledger_proof.Cached.t Mina_stdlib.One_or_two.t) ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
             Diff.unsafe_apply which calls this function*)
@@ -311,7 +311,7 @@ struct
             "Rejecting %s snark work $stmt, statement not referenced" origin
             ~metadata:
               [ ( "stmt"
-                , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                , Mina_stdlib.One_or_two.to_yojson Transaction_snark.Statement.to_yojson
                     work )
               ] ;
           `Statement_not_referenced
@@ -352,7 +352,7 @@ struct
         let verify proofs =
           let open Deferred.Let_syntax in
           let statement_check () =
-            One_or_two.Deferred_result.map proofs ~f:(fun (p, s) ->
+            Mina_stdlib.One_or_two.Deferred_result.map proofs ~f:(fun (p, s) ->
                 let proof_statement = Ledger_proof.statement p in
                 if Transaction_snark.Statement.( = ) proof_statement s then
                   Deferred.Result.return ()
@@ -367,7 +367,7 @@ struct
                   let%map () = log_and_punish s e in
                   Error (Invalid e) )
           in
-          let work = One_or_two.map proofs ~f:snd in
+          let work = Mina_stdlib.One_or_two.map proofs ~f:snd in
           let account_opt =
             let open Mina_base in
             let open Option.Let_syntax in
@@ -425,12 +425,12 @@ struct
           else
             let%bind.Deferred.Result _ = statement_check () in
             let log ?punish e =
-              Deferred.List.iter (One_or_two.to_list proofs) ~f:(fun (_, s) ->
+              Deferred.List.iter (Mina_stdlib.One_or_two.to_list proofs) ~f:(fun (_, s) ->
                   log_and_punish ?punish s e )
             in
             let proof_env =
               Envelope.Incoming.wrap
-                ~data:(One_or_two.map ~f:fst proofs, message)
+                ~data:(Mina_stdlib.One_or_two.map ~f:fst proofs, message)
                 ~sender
             in
             match Signature_lib.Public_key.decompress prover with
@@ -458,7 +458,7 @@ struct
                     let%map () = log ~punish:false e in
                     Error (Failure e) )
         in
-        match One_or_two.zip proofs statements with
+        match Mina_stdlib.One_or_two.zip proofs statements with
         | Ok pairs ->
             verify pairs
         | Error e ->
@@ -549,7 +549,7 @@ module Diff_versioned = struct
       type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t
-            * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
+            * Ledger_proof.Stable.V2.t Mina_stdlib.One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
       [@@deriving equal]
@@ -561,7 +561,7 @@ module Diff_versioned = struct
   type t = Resource_pool.Diff.Cached.t =
     | Add_solved_work of
         Transaction_snark_work.Statement.t
-        * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+        * Ledger_proof.Cached.t Mina_stdlib.One_or_two.t Priced_proof.t
     | Empty
 end
 
@@ -604,7 +604,7 @@ let%test_module "random set test" =
     let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     let apply_diff resource_pool work
-        ?(proof = One_or_two.map ~f:mk_dummy_proof)
+        ?(proof = Mina_stdlib.One_or_two.map ~f:mk_dummy_proof)
         ?(sender = Envelope.Sender.Local) fee =
       let diff =
         Mock_snark_pool.Resource_pool.Diff.Add_solved_work
@@ -679,7 +679,7 @@ let%test_module "random set test" =
                   digest @@ create ~prover:some_other_pk ~fee:fee.fee)
               in
               ( work
-              , One_or_two.map work ~f:(fun statement ->
+              , Mina_stdlib.One_or_two.map work ~f:(fun statement ->
                     Ledger_proof.create ~statement
                       ~sok_digest:invalid_sok_digest
                       ~proof:(Lazy.force Proof.transaction_dummy) )
@@ -817,10 +817,10 @@ let%test_module "random set test" =
                    with
                  | Some { proof; fee = _ } ->
                      assert (
-                       [%equal: Ledger_proof.t One_or_two.t]
-                         (One_or_two.map
+                       [%equal: Ledger_proof.t Mina_stdlib.One_or_two.t]
+                         (Mina_stdlib.One_or_two.map
                             ~f:Ledger_proof.Cached.read_proof_from_disk proof )
-                         (One_or_two.map
+                         (Mina_stdlib.One_or_two.map
                             ~f:Ledger_proof.Cached.read_proof_from_disk
                             priced_proof.proof ) )
                  | None ->
@@ -848,7 +848,7 @@ let%test_module "random set test" =
             Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               ( work
               , Priced_proof.
-                  { proof = One_or_two.map ~f:mk_dummy_proof work
+                  { proof = Mina_stdlib.One_or_two.map ~f:mk_dummy_proof work
                   ; fee =
                       { fee = Currency.Fee.zero
                       ; prover = Signature_lib.Public_key.Compressed.empty
@@ -895,7 +895,7 @@ let%test_module "random set test" =
                    assert (
                      List.mem works work
                        ~equal:
-                         [%equal: Transaction_snark.Statement.t One_or_two.t] ) ;
+                         [%equal: Transaction_snark.Statement.t Mina_stdlib.One_or_two.t] ) ;
                    Deferred.unit ) ;
             Deferred.unit
           in
@@ -987,7 +987,7 @@ let%test_module "random set test" =
           in
           check_work ~got:rebroadcastable1 ~expected:[] ;
           let%bind res2 = apply_diff resource_pool stmt2 fee2 in
-          let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
+          let proof2 = Mina_stdlib.One_or_two.map ~f:mk_dummy_proof stmt2 in
           ignore
             ( ok_exn res2
               : [ `Accept | `Reject ]
@@ -1001,7 +1001,7 @@ let%test_module "random set test" =
             ~expected:
               [ Add_solved_work (stmt2, { proof = proof2; fee = fee2 }) ] ;
           let%bind res3 = apply_diff resource_pool stmt3 fee3 in
-          let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
+          let proof3 = Mina_stdlib.One_or_two.map ~f:mk_dummy_proof stmt3 in
           ignore
             ( ok_exn res3
               : [ `Accept | `Reject ]
@@ -1029,7 +1029,7 @@ let%test_module "random set test" =
               ; Add_solved_work (stmt3, { proof = proof3; fee = fee3 })
               ] ;
           let%bind res6 = apply_diff resource_pool stmt4 fee4 in
-          let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
+          let proof4 = Mina_stdlib.One_or_two.map ~f:mk_dummy_proof stmt4 in
           ignore
             ( ok_exn res6
               : [ `Accept | `Reject ]

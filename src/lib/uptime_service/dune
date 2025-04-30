@@ -19,6 +19,7 @@
   cohttp
   uri
   ;; local libraries
+  mina_stdlib
   kimchi_bindings
   kimchi_types
   pasta_bindings
@@ -50,8 +51,6 @@
   transition_frontier_base
   random_oracle
   interruptible
-  mina_stdlib
-  one_or_two
   transaction_snark
   pickles.backend
   consensus
