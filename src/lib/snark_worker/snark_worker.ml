@@ -16,36 +16,6 @@ module Worker = struct
     end
 
     [%%versioned_rpc
-    module Submit_work = struct
-      module V2 = struct
-        module T = struct
-          type query =
-            ( ( Transaction_witness.Stable.V2.t
-              , Ledger_proof.Stable.V2.t )
-              Snark_work_lib.Work.Single.Spec.Stable.V2.t
-              Snark_work_lib.Work.Spec.Stable.V1.t
-            , Ledger_proof.Stable.V2.t )
-            Snark_work_lib.Work.Result.Stable.V1.t
-
-          type response = unit
-
-          let query_of_caller_model = Fn.id
-
-          let callee_model_of_query = Fn.id
-
-          let response_of_callee_model = Fn.id
-
-          let caller_model_of_response = Fn.id
-        end
-
-        include T
-        include Rpcs.Submit_work.Register (T)
-      end
-
-      module Latest = V2
-    end]
-
-    [%%versioned_rpc
     module Failed_to_generate_snark = struct
       module V2 = struct
         module T = struct
