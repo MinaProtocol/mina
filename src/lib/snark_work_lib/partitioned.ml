@@ -53,7 +53,7 @@ module Pairing = struct
   end
 end
 
-module SpecCommon = struct
+module Spec_common = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -175,7 +175,7 @@ module Zkapp_command_job = struct
         { spec : Spec.Stable.V1.t
         ; pairing : Pairing.Sub_zkapp.Stable.V1.t
         ; job_id : ID.Stable.V1.t
-        ; common : SpecCommon.Stable.V1.t
+        ; common : Spec_common.Stable.V1.t
         }
       [@@deriving sexp, yojson]
 
@@ -187,7 +187,7 @@ module Zkapp_command_job = struct
     { spec : Spec.t
     ; pairing : Pairing.Sub_zkapp.t
     ; job_id : ID.t
-    ; common : SpecCommon.t
+    ; common : Spec_common.t
     }
 
   let read_all_proofs_from_disk ({ spec; pairing; job_id; common } : t) :
@@ -215,7 +215,7 @@ module Spec = struct
               { single_spec : Selector.Single.Spec.Stable.V1.t
               ; pairing : Pairing.Single.Stable.V1.t
               ; metric : 'metric
-              ; common : SpecCommon.Stable.V1.t
+              ; common : Spec_common.Stable.V1.t
               }
           | Sub_zkapp_command of
               { spec : Zkapp_command_job.Stable.V1.t; metric : 'metric }
@@ -223,7 +223,7 @@ module Spec = struct
               { instances :
                   (Selector.Single.Spec.Stable.V1.t * 'metric)
                   One_or_two.Stable.V1.t
-              ; common : SpecCommon.Stable.V1.t
+              ; common : Spec_common.Stable.V1.t
               }
         [@@deriving sexp, yojson]
 
@@ -236,12 +236,12 @@ module Spec = struct
           { single_spec : Selector.Single.Spec.t
           ; pairing : Pairing.Single.t
           ; metric : 'metric
-          ; common : SpecCommon.Stable.V1.t
+          ; common : Spec_common.Stable.V1.t
           }
       | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
       | Old of
           { instances : (Selector.Single.Spec.t * 'metric) One_or_two.t
-          ; common : SpecCommon.t
+          ; common : Spec_common.t
           }
 
     let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
