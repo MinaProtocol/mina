@@ -18,6 +18,9 @@
 
 (** Module for CLI and process entry points *)
 module Entry : sig
+  (** The command name *)
+  val command_name : string
+
   (** Main entry point for the SNARK worker process *)
   val main :
        logger:Logger.t
