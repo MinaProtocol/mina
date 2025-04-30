@@ -133,6 +133,34 @@ module Impl : Intf.Worker = struct
             ] ;
         Error e
 
+  let cache_and_time ~logger ~cache ~tag ~statement
+      ~(spec : Work.Selector.Single.Spec.Stable.Latest.t) k =
+    match (Cache.find cache) statement with
+    | Some proof ->
+        Deferred.Or_error.return (proof, Time.Span.zero, tag)
+    | None -> (
+        let start = Time.now () in
+        match%map.Async.Deferred
+          Monitor.try_with_join_or_error ~here:[%here] k
+        with
+        | Error e ->
+            [%log error] "SNARK worker failed: $error"
+              ~metadata:
+                [ ("error", Error_json.error_to_yojson e)
+                ; ( "spec"
+                    (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
+                       so we use the less-desirable sexp here
+                    *)
+                  , `String
+                      ( Work.Selector.Single.Spec.Stable.Latest.sexp_of_t spec
+                      |> Sexp.to_string ) )
+                ] ;
+            Error e
+        | Ok res ->
+            Cache.add cache ~statement ~proof:res ;
+            let elapsed = Time.abs_diff (Time.now ()) start in
+            Ok (res, elapsed, tag) )
+
   let perform_single ~(logger : Logger.t) ~(cache : Cache.t)
       ~(m : (module Worker_state.S))
       ~(proof_cache_db : Proof_cache_tag.cache_db) ~sok_digest
@@ -141,153 +169,120 @@ module Impl : Intf.Worker = struct
     let (module M) = m in
     let statement = Work.Work.Single.Spec.statement single in
     let tag = get_tag single in
-    let process k =
-      let start = Time.now () in
-      match%map.Async.Deferred
-        Monitor.try_with_join_or_error ~here:[%here] k
-      with
-      | Error e ->
-          [%log error] "SNARK worker failed: $error"
-            ~metadata:
-              [ ("error", Error_json.error_to_yojson e)
-              ; ( "spec"
-                  (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
-                     so we use the less-desirable sexp here
-                  *)
-                , `String
-                    (Sexp.to_string
-                       (Work.Selector.Single.Spec.Stable.Latest.sexp_of_t single) )
-                )
-              ] ;
-          Error e
-      | Ok res ->
-          Cache.add cache ~statement ~proof:res ;
-          let elapsed = Time.abs_diff (Time.now ()) start in
-          Ok (res, elapsed, tag)
-    in
-    match Cache.find cache statement with
-    | Some proof ->
-        Deferred.Or_error.return (proof, Time.Span.zero, tag)
-    | None -> (
-        match single with
-        | Transition (input, (w : Transaction_witness.Stable.Latest.t)) ->
-            process (fun () ->
-                match w.transaction with
-                | Command (Zkapp_command zkapp_command) -> (
-                    let%bind witnesses_specs_stmts =
-                      Or_error.try_with (fun () ->
-                          Transaction_snark.zkapp_command_witnesses_exn
-                            ~constraint_constants:M.constraint_constants
-                            ~global_slot:w.block_global_slot
-                            ~state_body:w.protocol_state_body
-                            ~fee_excess:Currency.Amount.Signed.zero
-                            [ ( `Pending_coinbase_init_stack w.init_stack
-                              , `Pending_coinbase_of_statement
-                                  { Transaction_snark
-                                    .Pending_coinbase_stack_state
-                                    .source =
-                                      input.source.pending_coinbase_stack
-                                  ; target = input.target.pending_coinbase_stack
-                                  }
-                              , `Sparse_ledger w.first_pass_ledger
-                              , `Sparse_ledger w.second_pass_ledger
-                              , `Connecting_ledger_hash
-                                  input.connecting_ledger_left
-                              , Zkapp_command.write_all_proofs_to_disk
-                                  ~proof_cache_db zkapp_command )
-                            ]
-                          |> List.rev )
-                      |> Result.map_error ~f:(fun e ->
-                             Error.createf
-                               !"Failed to generate inputs for zkapp_command : \
-                                 %s: %s"
-                               ( Zkapp_command.Stable.Latest.to_yojson
-                                   zkapp_command
-                               |> Yojson.Safe.to_string )
-                               (Error.to_string_hum e) )
-                      |> Deferred.return
-                    in
-                    match witnesses_specs_stmts with
-                    | [] ->
-                        Deferred.Or_error.error_string "no witnesses generated"
-                    | (witness, spec, stmt) :: rest as inputs ->
-                        let%bind (p1 : Ledger_proof.t) =
+    let k () =
+      match single with
+      | Transition (input, (w : Transaction_witness.Stable.Latest.t)) -> (
+          match w.transaction with
+          | Command (Zkapp_command zkapp_command) -> (
+              let%bind witnesses_specs_stmts =
+                Or_error.try_with (fun () ->
+                    Transaction_snark.zkapp_command_witnesses_exn
+                      ~constraint_constants:M.constraint_constants
+                      ~global_slot:w.block_global_slot
+                      ~state_body:w.protocol_state_body
+                      ~fee_excess:Currency.Amount.Signed.zero
+                      [ ( `Pending_coinbase_init_stack w.init_stack
+                        , `Pending_coinbase_of_statement
+                            { Transaction_snark.Pending_coinbase_stack_state
+                              .source = input.source.pending_coinbase_stack
+                            ; target = input.target.pending_coinbase_stack
+                            }
+                        , `Sparse_ledger w.first_pass_ledger
+                        , `Sparse_ledger w.second_pass_ledger
+                        , `Connecting_ledger_hash input.connecting_ledger_left
+                        , Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+                            zkapp_command )
+                      ]
+                    |> List.rev )
+                |> Result.map_error ~f:(fun e ->
+                       Error.createf
+                         !"Failed to generate inputs for zkapp_command : %s: %s"
+                         ( Zkapp_command.Stable.Latest.to_yojson zkapp_command
+                         |> Yojson.Safe.to_string )
+                         (Error.to_string_hum e) )
+                |> Deferred.return
+              in
+              match witnesses_specs_stmts with
+              | [] ->
+                  Deferred.Or_error.error_string "no witnesses generated"
+              | (witness, spec, stmt) :: rest as inputs ->
+                  let%bind (p1 : Ledger_proof.t) =
+                    log_zkapp_cmd_base_snark ~logger
+                      ~statement:{ stmt with sok_digest } ~spec
+                      ~all_inputs:inputs
+                      (M.of_zkapp_command_segment_exn ~witness)
+                  in
+
+                  let%bind (p : Ledger_proof.t) =
+                    Deferred.List.fold ~init:(Ok p1) rest
+                      ~f:(fun acc (witness, spec, stmt) ->
+                        let%bind (prev : Ledger_proof.t) =
+                          Deferred.return acc
+                        in
+                        let%bind (curr : Ledger_proof.t) =
                           log_zkapp_cmd_base_snark ~logger
                             ~statement:{ stmt with sok_digest } ~spec
                             ~all_inputs:inputs
                             (M.of_zkapp_command_segment_exn ~witness)
                         in
-
-                        let%bind (p : Ledger_proof.t) =
-                          Deferred.List.fold ~init:(Ok p1) rest
-                            ~f:(fun acc (witness, spec, stmt) ->
-                              let%bind (prev : Ledger_proof.t) =
-                                Deferred.return acc
-                              in
-                              let%bind (curr : Ledger_proof.t) =
-                                log_zkapp_cmd_base_snark ~logger
-                                  ~statement:{ stmt with sok_digest } ~spec
-                                  ~all_inputs:inputs
-                                  (M.of_zkapp_command_segment_exn ~witness)
-                              in
-                              log_zkapp_cmd_merge_snark ~m ~logger ~sok_digest
-                                prev curr ~all_inputs:inputs )
-                        in
-                        if
-                          Transaction_snark.Statement.equal
-                            (Ledger_proof.statement p) input
-                        then Deferred.return (Ok p)
-                        else (
-                          [%log fatal]
-                            "Zkapp_command transaction final statement \
-                             mismatch Expected $expected Got $got. All inputs: \
-                             $inputs"
-                            ~metadata:
-                              [ ( "got"
-                                , Transaction_snark.Statement.to_yojson
-                                    (Ledger_proof.statement p) )
-                              ; ( "expected"
-                                , Transaction_snark.Statement.to_yojson input )
-                              ; ("inputs", zkapp_command_inputs_to_yojson inputs)
-                              ] ;
-                          Deferred.return
-                            (Or_error.error_string
-                               "Zkapp_command transaction final statement \
-                                mismatch" ) ) )
-                | _ ->
-                    let%bind t =
-                      Deferred.return
-                      @@
-                      (* Validate the received transaction *)
-                      match w.transaction with
-                      | Command (Signed_command cmd) -> (
-                          match Signed_command.check cmd with
-                          | Some cmd ->
-                              ( Ok (Command (Signed_command cmd))
-                                : Transaction.Valid.t Or_error.t )
-                          | None ->
-                              Or_error.errorf "Command has an invalid signature"
-                          )
-                      | Command (Zkapp_command _) ->
-                          assert false
-                      | Fee_transfer ft ->
-                          Ok (Fee_transfer ft)
-                      | Coinbase cb ->
-                          Ok (Coinbase cb)
-                    in
-                    Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                        M.of_non_zkapp_command_transaction
-                          ~statement:{ input with sok_digest }
-                          { Transaction_protocol_state.Poly.transaction = t
-                          ; block_data = w.protocol_state_body
-                          ; global_slot = w.block_global_slot
-                          }
-                          ~init_stack:w.init_stack
-                          (unstage
-                             (Mina_ledger.Sparse_ledger.handler
-                                w.first_pass_ledger ) ) ) )
-        | Merge (_, proof1, proof2) ->
-            process (fun () -> M.merge ~sok_digest proof1 proof2) )
+                        log_zkapp_cmd_merge_snark ~m ~logger ~sok_digest prev
+                          curr ~all_inputs:inputs )
+                  in
+                  if
+                    Transaction_snark.Statement.equal (Ledger_proof.statement p)
+                      input
+                  then Deferred.return (Ok p)
+                  else (
+                    [%log fatal]
+                      "Zkapp_command transaction final statement mismatch \
+                       Expected $expected Got $got. All inputs: $inputs"
+                      ~metadata:
+                        [ ( "got"
+                          , Transaction_snark.Statement.to_yojson
+                              (Ledger_proof.statement p) )
+                        ; ( "expected"
+                          , Transaction_snark.Statement.to_yojson input )
+                        ; ("inputs", zkapp_command_inputs_to_yojson inputs)
+                        ] ;
+                    Deferred.return
+                      (Or_error.error_string
+                         "Zkapp_command transaction final statement mismatch" )
+                    ) )
+          | _ ->
+              let%bind t =
+                Deferred.return
+                @@
+                (* Validate the received transaction *)
+                match w.transaction with
+                | Command (Signed_command cmd) -> (
+                    match Signed_command.check cmd with
+                    | Some cmd ->
+                        ( Ok (Command (Signed_command cmd))
+                          : Transaction.Valid.t Or_error.t )
+                    | None ->
+                        Or_error.errorf "Command has an invalid signature" )
+                | Command (Zkapp_command _) ->
+                    assert false
+                | Fee_transfer ft ->
+                    Ok (Fee_transfer ft)
+                | Coinbase cb ->
+                    Ok (Coinbase cb)
+              in
+              Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                  M.of_non_zkapp_command_transaction
+                    ~statement:{ input with sok_digest }
+                    { Transaction_protocol_state.Poly.transaction = t
+                    ; block_data = w.protocol_state_body
+                    ; global_slot = w.block_global_slot
+                    }
+                    ~init_stack:w.init_stack
+                    (unstage
+                       (Mina_ledger.Sparse_ledger.handler w.first_pass_ledger) ) )
+          )
+      | Merge (_, proof1, proof2) ->
+          M.merge ~sok_digest proof1 proof2
+    in
+    cache_and_time ~logger ~cache ~tag ~statement ~spec:single k
 
   let perform
       ~state:
