@@ -246,3 +246,11 @@ let request_partitioned_work
     ; request_from_selector_and_consume_by_partitioner ~partitioner
         ~selection_method ~selector ~logger ~fee ~snark_pool
     ]
+
+(* Logics for work submitting *)
+
+type submit_result =
+  | SchemeUnmatched
+  | Slashed
+  | Processed of Work.Selector.Result.t option
+(* If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
