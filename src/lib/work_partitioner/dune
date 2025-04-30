@@ -10,7 +10,8 @@
    mina_base
    snark_work_lib
    transaction_snark
-   transaction_witness)
+   transaction_witness
+   work_selector)
    
  (preprocess
   (pps
