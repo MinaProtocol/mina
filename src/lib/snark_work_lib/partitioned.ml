@@ -53,6 +53,23 @@ module Pairing = struct
   end
 end
 
+module SpecCommon = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { (* When is this spec issued? *)
+          issued_since_unix_epoch : Mina_stdlib.Time.Span.Stable.V3.t
+              (* The fee of the full command, even if we're issuing a sub_zkapp level spec *)
+        ; fee_of_full : Currency.Fee.Stable.V1.t
+        }
+      [@@deriving sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module Zkapp_command_job = struct
   (* This identifies a single `Zkapp_command_job.t` *)
   module ID = struct
@@ -78,12 +95,10 @@ module Zkapp_command_job = struct
               ; witness :
                   Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
               ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
-              ; fee_of_full : Currency.Fee.Stable.V1.t
               }
           | Merge of
               { proof1 : Ledger_proof.Stable.V2.t
               ; proof2 : Ledger_proof.Stable.V2.t
-              ; fee_of_full : Currency.Fee.Stable.V1.t
               }
         [@@deriving sexp, yojson]
 
@@ -96,43 +111,39 @@ module Zkapp_command_job = struct
           { statement : Transaction_snark.Statement.With_sok.t
           ; witness : Transaction_snark.Zkapp_command_segment.Witness.t
           ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
-          ; fee_of_full : Currency.Fee.t
           }
       | Merge of
-          { proof1 : Ledger_proof.Cached.t
-          ; proof2 : Ledger_proof.Cached.t
-          ; fee_of_full : Currency.Fee.t
-          }
+          { proof1 : Ledger_proof.Cached.t; proof2 : Ledger_proof.Cached.t }
 
     let read_all_proofs_from_disk : t -> Stable.Latest.t = function
-      | Segment { statement; witness; spec; fee_of_full } ->
+      | Segment { statement; witness; spec } ->
           let witness =
             Transaction_snark.Zkapp_command_segment.Witness
             .read_all_proofs_from_disk witness
           in
 
-          Segment { statement; witness; spec; fee_of_full }
-      | Merge { proof1; proof2; fee_of_full } ->
+          Segment { statement; witness; spec }
+      | Merge { proof1; proof2 } ->
           let proof1 = Ledger_proof.Cached.read_proof_from_disk proof1 in
           let proof2 = Ledger_proof.Cached.read_proof_from_disk proof2 in
-          Merge { proof1; proof2; fee_of_full }
+          Merge { proof1; proof2 }
 
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         Stable.Latest.t -> t = function
-      | Segment { statement; witness; spec; fee_of_full } ->
+      | Segment { statement; witness; spec } ->
           let witness =
             Transaction_snark.Zkapp_command_segment.Witness
             .write_all_proofs_to_disk ~proof_cache_db witness
           in
-          Segment { statement; witness; spec; fee_of_full }
-      | Merge { proof1; proof2; fee_of_full } ->
+          Segment { statement; witness; spec }
+      | Merge { proof1; proof2 } ->
           let proof1 =
             Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof1
           in
           let proof2 =
             Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof2
           in
-          Merge { proof1; proof2; fee_of_full }
+          Merge { proof1; proof2 }
 
     let statement : t -> Transaction_snark.Statement.t = function
       | Segment { statement; _ } ->
@@ -164,6 +175,7 @@ module Zkapp_command_job = struct
         { spec : Spec.Stable.V1.t
         ; pairing : Pairing.Sub_zkapp.Stable.V1.t
         ; job_id : ID.Stable.V1.t
+        ; common : SpecCommon.Stable.V1.t
         }
       [@@deriving sexp, yojson]
 
@@ -171,17 +183,23 @@ module Zkapp_command_job = struct
     end
   end]
 
-  type t = { spec : Spec.t; pairing : Pairing.Sub_zkapp.t; job_id : ID.t }
+  type t =
+    { spec : Spec.t
+    ; pairing : Pairing.Sub_zkapp.t
+    ; job_id : ID.t
+    ; common : SpecCommon.t
+    }
 
-  let read_all_proofs_from_disk ({ spec; pairing; job_id } : t) :
+  let read_all_proofs_from_disk ({ spec; pairing; job_id; common } : t) :
       Stable.Latest.t =
-    { spec = Spec.read_all_proofs_from_disk spec; pairing; job_id }
+    { spec = Spec.read_all_proofs_from_disk spec; pairing; job_id; common }
 
   let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db)
-      ({ spec; pairing; job_id } : Stable.Latest.t) : t =
+      ({ spec; pairing; job_id; common } : Stable.Latest.t) : t =
     { spec = Spec.write_all_proofs_to_disk ~proof_cache_db spec
     ; pairing
     ; job_id
+    ; common
     }
 end
 
@@ -197,12 +215,16 @@ module Spec = struct
               { single_spec : Selector.Single.Spec.Stable.V1.t
               ; pairing : Pairing.Single.Stable.V1.t
               ; metric : 'metric
-              ; fee_of_full : Currency.Fee.Stable.V1.t
+              ; common : SpecCommon.Stable.V1.t
               }
           | Sub_zkapp_command of
               { spec : Zkapp_command_job.Stable.V1.t; metric : 'metric }
           | Old of
-              (Selector.Single.Spec.Stable.V1.t * 'metric) Work.Spec.Stable.V1.t
+              { instances :
+                  (Selector.Single.Spec.Stable.V1.t * 'metric)
+                  One_or_two.Stable.V1.t
+              ; common : SpecCommon.Stable.V1.t
+              }
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
@@ -214,17 +236,23 @@ module Spec = struct
           { single_spec : Selector.Single.Spec.t
           ; pairing : Pairing.Single.t
           ; metric : 'metric
-          ; fee_of_full : Currency.Fee.t
+          ; common : SpecCommon.Stable.V1.t
           }
       | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
-      | Old of (Selector.Single.Spec.t * 'metric) Work.Spec.t
+      | Old of
+          { instances : (Selector.Single.Spec.t * 'metric) One_or_two.t
+          ; common : SpecCommon.t
+          }
 
     let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
       match t with
-      | Single { single_spec; pairing; metric; fee_of_full } ->
-          Single { single_spec; pairing; metric = f metric; fee_of_full }
-      | Old spec ->
-          Old (Work.Spec.map ~f:(Tuple2.map_snd ~f) spec)
+      | Single { single_spec; pairing; metric; common } ->
+          Single { single_spec; pairing; metric = f metric; common }
+      | Old { instances; common } ->
+          Old
+            { instances = One_or_two.map ~f:(Tuple2.map_snd ~f) instances
+            ; common
+            }
       | Sub_zkapp_command { spec; metric } ->
           Sub_zkapp_command { spec; metric = f metric }
 
@@ -243,16 +271,19 @@ module Spec = struct
     let map_metric_with_statement (t : 'm t)
         ~(f : Transaction_snark.Statement.t -> 'm -> 'n) : 'n t =
       match t with
-      | Single { single_spec; pairing; metric; fee_of_full } ->
+      | Single { single_spec; pairing; metric; common } ->
           let stmt = Work.Single.Spec.statement single_spec in
-          Single { single_spec; pairing; metric = f stmt metric; fee_of_full }
-      | Old spec ->
+          Single { single_spec; pairing; metric = f stmt metric; common }
+      | Old { instances; common } ->
           Old
-            (Work.Spec.map
-               ~f:(fun (single_spec, metric) ->
-                 let stmt = Work.Single.Spec.statement single_spec in
-                 (single_spec, f stmt metric) )
-               spec )
+            { instances =
+                One_or_two.map
+                  ~f:(fun (single_spec, metric) ->
+                    let stmt = Work.Single.Spec.statement single_spec in
+                    (single_spec, f stmt metric) )
+                  instances
+            ; common
+            }
       | Sub_zkapp_command { spec = { spec; _ } as job_spec; metric } ->
           Sub_zkapp_command
             { spec = job_spec
@@ -261,44 +292,50 @@ module Spec = struct
 
     let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
       function
-      | Single { single_spec; pairing; metric; fee_of_full } ->
+      | Single { single_spec; pairing; metric; common } ->
           let single_spec =
             Selector.Single.Spec.read_all_proofs_from_disk single_spec
           in
-          Single { single_spec; pairing; metric; fee_of_full }
+          Single { single_spec; pairing; metric; common }
       | Sub_zkapp_command { spec; metric } ->
           let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
           Sub_zkapp_command { spec; metric }
-      | Old spec ->
+      | Old { instances; common } ->
           Old
-            (Work.Spec.map
-               ~f:
-                 (Tuple2.map_fst
-                    ~f:Selector.Single.Spec.read_all_proofs_from_disk )
-               spec )
+            { instances =
+                One_or_two.map
+                  ~f:
+                    (Tuple2.map_fst
+                       ~f:Selector.Single.Spec.read_all_proofs_from_disk )
+                  instances
+            ; common
+            }
 
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         'metric Stable.Latest.t -> 'metric t = function
-      | Single { single_spec; pairing; metric; fee_of_full } ->
+      | Single { single_spec; pairing; metric; common } ->
           let single_spec =
             Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
               single_spec
           in
-          Single { single_spec; pairing; metric; fee_of_full }
+          Single { single_spec; pairing; metric; common }
       | Sub_zkapp_command { spec; metric } ->
           let spec =
             Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec
           in
           Sub_zkapp_command { spec; metric }
-      | Old spec ->
+      | Old { instances; common } ->
           Old
-            (Work.Spec.map
-               ~f:
-                 (Tuple2.map_fst
-                    ~f:
-                      (Selector.Single.Spec.write_all_proofs_to_disk
-                         ~proof_cache_db ) )
-               spec )
+            { instances =
+                One_or_two.map
+                  ~f:
+                    (Tuple2.map_fst
+                       ~f:
+                         (Selector.Single.Spec.write_all_proofs_to_disk
+                            ~proof_cache_db ) )
+                  instances
+            ; common
+            }
 
     let transaction = function
       | Single { single_spec; _ } ->
@@ -312,20 +349,10 @@ module Spec = struct
                  Selector.Single.Spec.transaction single ) )
 
     let fee_of_full : 'm t -> Currency.Fee.t = function
-      | Single { fee_of_full; _ } ->
-          fee_of_full
-      | Sub_zkapp_command
-          { spec =
-              { spec =
-                  Zkapp_command_job.Spec.(
-                    Segment { fee_of_full; _ } | Merge { fee_of_full; _ })
-              ; _
-              }
-          ; _
-          } ->
-          fee_of_full
-      | Old { fee; _ } ->
-          fee
+      | Single { common; _ }
+      | Sub_zkapp_command { spec = { common; _ }; _ }
+      | Old { common; _ } ->
+          common.fee_of_full
   end
 
   [%%versioned
@@ -341,13 +368,30 @@ module Spec = struct
 
   type t = unit Poly.t
 
-  let of_selector_spec (spec : Selector.Spec.t) : t =
-    Old (Work.Spec.map ~f:(fun spec -> (spec, ())) spec)
+  let of_selector_spec ?issued_since_unix_epoch (spec : Selector.Spec.t) : t =
+    let issued_since_unix_epoch =
+      match issued_since_unix_epoch with
+      | None ->
+          let spec_str =
+            Selector.Spec.read_all_proofs_from_disk spec
+            |> Selector.Spec.Stable.V1.to_yojson |> Yojson.Safe.to_string
+          in
+          printf "No issued time provided, assuming now for %s" spec_str ;
+          Time.now () |> Time.to_span_since_epoch
+      | Some t ->
+          t
+    in
+    Old
+      { instances = One_or_two.map ~f:(fun spec -> (spec, ())) spec.instances
+      ; common = { fee_of_full = spec.fee; issued_since_unix_epoch }
+      }
 
   let to_selector_spec : t -> Selector.Spec.t option = function
     | Old spec ->
-        let spec = Work.Spec.map ~f:(fun (spec, ()) -> spec) spec in
-        Some spec
+        let instances =
+          One_or_two.map ~f:(fun (spec, ()) -> spec) spec.instances
+        in
+        Some { instances; fee = spec.common.fee_of_full }
     | _ ->
         None
 end
@@ -442,20 +486,32 @@ module Result = struct
 
   let to_spec ({ data; _ } : t) : Spec.t =
     match data with
-    | Spec.Poly.Single { single_spec; pairing; fee_of_full; _ } ->
-        Spec.Poly.Single { single_spec; pairing; fee_of_full; metric = () }
+    | Spec.Poly.Single { single_spec; pairing; common; _ } ->
+        Spec.Poly.Single { single_spec; pairing; common; metric = () }
     | Spec.Poly.Sub_zkapp_command { spec; _ } ->
         Spec.Poly.Sub_zkapp_command { spec; metric = () }
-    | Spec.Poly.Old { instances; fee } ->
+    | Spec.Poly.Old { instances; common } ->
         Spec.Poly.Old
           { instances =
               One_or_two.map ~f:(fun (spec, _) -> (spec, ())) instances
-          ; fee
+          ; common
           }
 
-  let of_selector_result
-      ({ proofs; metrics; spec = { instances; fee }; prover } :
+  let of_selector_result ~issued_since_unix_epoch
+      ({ proofs; metrics; spec = { instances; fee } as spec; prover } :
         Selector.Result.t ) : t Or_error.t =
+    let issued_since_unix_epoch =
+      match issued_since_unix_epoch with
+      | None ->
+          let spec_str =
+            Selector.Spec.read_all_proofs_from_disk spec
+            |> Selector.Spec.Stable.V1.to_yojson |> Yojson.Safe.to_string
+          in
+          printf "No issued time provided, assuming now for %s" spec_str ;
+          Time.now () |> Time.to_span_since_epoch
+      | Some t ->
+          t
+    in
     let%bind.Result zipped = One_or_two.zip proofs metrics in
     let%map.Result zipped = One_or_two.zip zipped instances in
 
@@ -463,12 +519,15 @@ module Result = struct
       (single_spec, Proof_with_metric.{ proof; elapsed })
     in
     let instances = One_or_two.map ~f:with_metric zipped in
-    let data = Spec.Poly.Old { instances; fee } in
+    let data =
+      Spec.Poly.Old
+        { instances; common = { issued_since_unix_epoch; fee_of_full = fee } }
+    in
     { data; prover }
 
   let to_selector_result ({ data; prover } : t) : Selector.Result.t option =
     match data with
-    | Old { instances; fee } ->
+    | Old { instances; common = { fee_of_full = fee; _ } } ->
         Some (construct_selector_result ~instances ~fee ~prover)
     | _ ->
         None
