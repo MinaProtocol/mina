@@ -21,26 +21,30 @@ end
 
 module Wrap = struct
   module Proof_state = struct
-    (** This module contains structures which contain the scalar-field elements that
-        are required to finalize the verification of a proof that is partially verified inside
-        a circuit.
+    (** This module contains structures which contain the scalar-field elements
+        that are required to finalize the verification of a proof that is
+        partially verified inside a circuit.
 
-        Each verifier circuit starts by verifying the parts of a proof involving group operations.
-        At the end, there is a sequence of scalar-field computations it must perform. Instead of
-        performing them directly, it exposes the values needed for those computations as a part of
-        its own public-input, so that the next circuit can do them (since it will use the other curve on the cycle,
-        and hence can efficiently perform computations in that scalar field). *)
+        Each verifier circuit starts by verifying the parts of a proof involving
+        group operations. At the end, there is a sequence of scalar-field
+        computations it must perform. Instead of performing them directly, it
+        exposes the values needed for those computations as a part of its own
+        public-input, so that the next circuit can do them (since it will use
+        the other curve on the cycle, and hence can efficiently perform
+        computations in that scalar field). *)
     module Deferred_values = struct
       module Plonk = struct
         module Minimal = struct
           [%%versioned
           module Stable = struct
             module V1 = struct
-              (** Challenges from the PLONK IOP. These, plus the evaluations that are already in the proof, are
-                  all that's needed to derive all the values in the [In_circuit] version below.
+              (** Challenges from the PLONK IOP. These, plus the evaluations
+                  that are already in the proof, are all that's needed to derive
+                  all the values in the [In_circuit] version below.
 
-                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the computation of the [In_circuit] value
-                  from the [Minimal] value.
+                  See src/lib/pickles/plonk_checks/plonk_checks.ml for the
+                  computation of the [In_circuit] value from the [Minimal]
+                  value.
               *)
               type ('challenge, 'scalar_challenge, 'bool) t =
                     ( 'challenge

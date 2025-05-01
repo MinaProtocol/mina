@@ -18,8 +18,8 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
   { app_state : 'app_state
         (** The user-level statement corresponding to this proof. *)
   ; wrap_proof : Wrap_proof.Checked.t
-        (** The polynomial commitments, polynomial evaluations, and opening proof corresponding to
-      this latest wrap proof.
+        (** The polynomial commitments, polynomial evaluations, and opening
+            proof corresponding to this latest wrap proof.
   *)
   ; proof_state :
       ( challenge
@@ -37,12 +37,13 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       , Import.Branch_data.Checked.Step.t )
       Import.Types.Wrap.Proof_state.In_circuit.t
         (** The accumulator state corresponding to the above proof. Contains
-      - `deferred_values`: The values necessary for finishing the deferred "scalar field" computations.
-      That is, computations which are over the "step" circuit's internal field that the
-      previous "wrap" circuit was unable to verify directly, due to its internal field
-      being different.
-      - `sponge_digest_before_evaluations`: the sponge state: TODO
-      - `messages_for_next_wrap_proof`
+            - `deferred_values`: The values necessary for finishing the deferred
+            "scalar field" computations. That is, computations which are over
+            the "step" circuit's internal field that the previous "wrap" circuit
+            was unable to verify directly, due to its internal field
+            being different.
+            - `sponge_digest_before_evaluations`: the sponge state: TODO
+            - `messages_for_next_wrap_proof`
   *)
   ; prev_proof_evals :
       ( Impl.Field.t
@@ -59,8 +60,9 @@ type ('app_state, 'max_proofs_verified, 'num_branches) t =
       ( Step_main_inputs.Inner_curve.t
       , 'max_proofs_verified )
       Pickles_types.Vector.t
-        (** The commitments to the "challenge polynomials" \prod_{i = 0}^k (1 + c_{k - 1 - i} x^{2^i})
-      corresponding to each of the "prev_challenges".
+        (** The commitments to the "challenge polynomials"
+            π_{i = 0}^k (1 + c_{k - 1 - i} x^{2^i})
+            corresponding to each of the "prev_challenges".
   *)
   }
 [@@deriving hlist]
