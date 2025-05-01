@@ -1,5 +1,8 @@
 open Core_kernel
 
+type ('accum, 'final) fold_action =
+  { action : [ `Continue of 'accum | `Stop of 'final ]; slashed : bool }
+
 (* NOTE: Maybe this is reusable with Work Selector as they also have reissue mechanism *)
 module Make (ID : Hashtbl.Key) (Job : T) = struct
   type job_item = Job.t option ref
@@ -22,18 +25,30 @@ module Make (ID : Hashtbl.Key) (Job : T) = struct
         Deque.enqueue_front t.timeline item ;
         Some (id, pending)
 
-  let rec take_first_ready ~(pred : Job.t -> bool) (t : t) =
-    match Deque.dequeue_front t.timeline with
-    | None ->
-        None
-    | Some (_, { contents = None }) ->
-        (* Job done *)
-        take_first_ready ~pred t
-    | Some ((id, { contents = Some pending }) as item) ->
-        if pred pending then Some (id, pending)
-        else (
-          Deque.enqueue_front t.timeline item ;
-          None )
+  let fold_until ~(init : 'accum)
+      ~(f : 'accum -> ID.t * Job.t -> ('accum, 'final) fold_action)
+      ~(finish : 'accum -> 'final) t : 'final =
+    let stack = ref [] in
+    let acc = ref init in
+    let result = ref None in
+    while Option.is_none !result do
+      match Deque.dequeue_front t.timeline with
+      | None ->
+          result := finish !acc
+      | Some (_, { contents = None }) ->
+          (* Job done *)
+          ()
+      | Some ((id, { contents = Some job }) as item) -> (
+          let { action; slashed } = f init (id, job) in
+          if not slashed then stack := item :: !stack ;
+          match action with
+          | `Continue new_acc ->
+              acc := new_acc
+          | `Stop final ->
+              result := final )
+    done ;
+    List.iter ~f:(fun item -> Deque.enqueue_front t.timeline item) !stack ;
+    !result
 
   let attempt_add ~(key : ID.t) ~(job : Job.t) (t : t) =
     let data = ref (Some job) in

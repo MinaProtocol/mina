@@ -63,8 +63,11 @@ let reissue_old_task ~(partitioner : t) () : Work.Partitioned.Spec.t option =
     Time.Span.( > ) delta partitioner.reassignment_timeout
   in
   match
-    Sent_job_pool.take_first_ready ~pred:job_is_old
-      partitioner.jobs_sent_by_partitioner
+    Sent_job_pool.fold_until ~init:None
+      ~f:(fun _ ((_, job) as item) ->
+        if job_is_old job then { slashed = true; action = `Stop (Some item) }
+        else { slashed = false; action = `Continue None } )
+      ~finish:Fn.id partitioner.jobs_sent_by_partitioner
   with
   | None ->
       None
