@@ -1830,16 +1830,16 @@ module T = struct
   module Aux_data = struct
     type t =
       { actions_hash : Field.t
-            (** The cached hash of the actions in an account update body - currently not updated. *)
+            (** The cached hash of the actions in an account update body *)
       }
 
     let to_yojson : _ -> Yojson.Safe.t = Nothing.unreachable_code
 
     let sexp_of_t : _ -> Ppx_sexp_conv_lib.Sexp.t = Nothing.unreachable_code
 
-    (* TODO: actually compute the actions_hash from the body of an account
-       update *)
-    let of_without_aux : t = { actions_hash = Field.zero }
+    let of_body ~body : t =
+      let actions = Zkapp_account.Actions.of_event_list body.Body.actions in
+      { actions_hash = actions.hash }
   end
 
   type t = (Body.t, Control.t, Aux_data.t) Poly.t
@@ -1857,7 +1857,7 @@ module T = struct
     { body; authorization; aux = () }
 
   let with_aux ~body ~authorization : _ Poly.t =
-    { body; authorization; aux = Aux_data.of_without_aux }
+    { body; authorization; aux = Aux_data.of_body ~body }
 
   let gen : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in

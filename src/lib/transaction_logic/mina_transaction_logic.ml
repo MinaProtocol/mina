@@ -1422,7 +1422,10 @@ module Make (L : Ledger_intf.S) :
           Zkapp_basic.Set_or_keep.map ~f:Option.some
             account_update.body.update.verification_key
 
-        let actions (account_update : t) = account_update.body.actions
+        let actions (account_update : t) =
+          { Zkapp_account.Actions.actions = account_update.body.actions
+          ; hash = account_update.aux.actions_hash
+          }
 
         let zkapp_uri (account_update : t) =
           account_update.body.update.zkapp_uri
