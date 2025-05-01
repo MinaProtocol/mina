@@ -1639,19 +1639,100 @@ module Body = struct
     }
 end
 
+module No_aux = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = unit [@@deriving equal, hash, compare]
+
+      let to_latest = Fn.id
+
+      let to_yojson : _ -> Yojson.Safe.t = Nothing.unreachable_code
+
+      let of_yojson : Base.Nothing.t -> t Ppx_deriving_yojson_runtime.error_or =
+        Fn.const (Ppx_deriving_yojson_runtime.Result.Ok ())
+
+      let sexp_of_t : _ -> Ppx_sexp_conv_lib.Sexp.t = Nothing.unreachable_code
+
+      let t_of_sexp : Base.Nothing.t -> _ = Fn.const ()
+    end
+  end]
+
+  let to_yojson = Stable.Latest.to_yojson
+
+  let of_yojson = Stable.Latest.of_yojson
+
+  let sexp_of_t = Stable.Latest.sexp_of_t
+
+  let t_of_sexp = Stable.Latest.t_of_sexp
+end
+
 module Poly = struct
+  module Without_aux = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('body, 'authorization) t =
+          { body : 'body; authorization : 'authorization }
+        [@@deriving yojson, sexp]
+
+        let to_yojson_via (type a) ~without_aux f g (_h : a -> Yojson.Safe.t) t
+            =
+          to_yojson f g @@ without_aux t
+
+        let of_yojson_via (type a) ~with_no_aux f g
+            (_h : a -> No_aux.t Ppx_deriving_yojson_runtime.error_or) t =
+          Ppx_deriving_yojson_runtime.(of_yojson f g t >|= with_no_aux)
+
+        let sexp_of_t_via (type a) ~without_aux f g
+            (_h : a -> Ppx_sexp_conv_lib.Sexp.t) t =
+          sexp_of_t f g @@ without_aux t
+
+        let t_of_sexp_via (type a) ~with_no_aux f g (_h : a -> No_aux.t) t =
+          with_no_aux @@ t_of_sexp f g t
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
       (** An account update in a zkApp transaction *)
-      type ('body, 'authorization) t =
+      type ('body, 'authorization, 'aux) t =
             ( 'body
-            , 'authorization )
+            , 'authorization
+            , 'aux )
             Mina_wire_types.Mina_base.Account_update.Poly.V1.t =
-        { body : 'body; authorization : 'authorization }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+        { body : 'body; authorization : 'authorization; aux : 'aux }
+      [@@deriving annot, equal, hash, compare, fields]
+
+      let without_aux (t : _ t) : _ Without_aux.Stable.V1.t =
+        { body = t.body; authorization = t.authorization }
+
+      let with_no_aux (t : _ Without_aux.Stable.V1.t) : (_, _, No_aux.t) t =
+        { body = t.body; authorization = t.authorization; aux = () }
+
+      let to_yojson f g h t =
+        Without_aux.Stable.V1.to_yojson_via ~without_aux f g h t
+
+      let of_yojson f g h t =
+        Without_aux.Stable.V1.of_yojson_via ~with_no_aux f g h t
+
+      let sexp_of_t f g h t =
+        Without_aux.Stable.V1.sexp_of_t_via ~without_aux f g h t
+
+      let t_of_sexp f g h t =
+        Without_aux.Stable.V1.t_of_sexp_via ~with_no_aux f g h t
     end
   end]
+
+  let to_yojson = Stable.Latest.to_yojson
+
+  let of_yojson = Stable.Latest.of_yojson
+
+  let sexp_of_t = Stable.Latest.sexp_of_t
+
+  let t_of_sexp = Stable.Latest.t_of_sexp
 end
 
 module T = struct
@@ -1660,7 +1741,10 @@ module T = struct
     module Stable = struct
       module V1 = struct
         type t =
-          (Body.Graphql_repr.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
+          ( Body.Graphql_repr.Stable.V1.t
+          , Control.Stable.V2.t
+          , No_aux.Stable.V1.t )
+          Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1670,10 +1754,11 @@ module T = struct
     let deriver obj =
       let open Poly in
       let open Fields_derivers_zkapps.Derivers in
-      let ( !. ) = ( !. ) ~t_fields_annots in
+      let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
       Fields.make_creator obj
         ~body:!.Body.Graphql_repr.deriver
         ~authorization:!.Control.deriver
+        ~aux:(( !. ) ~skip_data:() skip)
       |> finish "ZkappAccountUpdate" ~t_toplevel_annots
   end
 
@@ -1681,7 +1766,11 @@ module T = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = (Body.Simple.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
+        type t =
+          ( Body.Simple.Stable.V1.t
+          , Control.Stable.V2.t
+          , No_aux.Stable.V1.t )
+          Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1695,33 +1784,40 @@ module T = struct
 
     module V1 = struct
       (** A account_update to a zkApp transaction *)
-      type t = (Body.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
+      type t =
+        ( Body.Stable.V1.t
+        , Control.Stable.V2.t
+        , No_aux.Stable.V1.t )
+        Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = (Body.t, Control.t) Poly.t [@@deriving sexp_of, to_yojson]
+  type t = (Body.t, Control.t, No_aux.t) Poly.t [@@deriving sexp_of, to_yojson]
 
-  let of_graphql_repr ({ Poly.body; authorization } : Graphql_repr.t) :
-      Stable.Latest.t =
-    { authorization; body = Body.of_graphql_repr body }
+  let of_graphql_repr ({ Poly.body; authorization; aux = () } : Graphql_repr.t)
+      : Stable.Latest.t =
+    { authorization; body = Body.of_graphql_repr body; aux = () }
 
-  let to_graphql_repr ({ body; authorization } : Stable.Latest.t) ~call_depth :
-      Graphql_repr.t =
-    { authorization; body = Body.to_graphql_repr ~call_depth body }
+  let to_graphql_repr ({ body; authorization; aux = () } : Stable.Latest.t)
+      ~call_depth : Graphql_repr.t =
+    { authorization; body = Body.to_graphql_repr ~call_depth body; aux = () }
+
+  let with_no_aux ~body ~authorization : _ Poly.t =
+    { body; authorization; aux = () }
 
   let gen : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
-    { Poly.body; authorization }
+    { Poly.body; authorization; aux = () }
 
   let gen_with_events_and_actions : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen_with_events_and_actions
     and authorization = Control.gen_with_dummies in
-    { Poly.body; authorization }
+    { Poly.body; authorization; aux = () }
 
   let quickcheck_generator : Stable.Latest.t Quickcheck.Generator.t = gen
 
@@ -1732,7 +1828,7 @@ module T = struct
     Quickcheck.Shrinker.empty ()
 
   let of_simple (p : Simple.t) : Stable.Latest.t =
-    { body = Body.of_simple p.body; authorization = p.authorization }
+    { body = Body.of_simple p.body; authorization = p.authorization; aux = () }
 
   let digest ~signature_kind t = Body.digest ~signature_kind t.Poly.body
 
@@ -1752,9 +1848,14 @@ let map_proofs ~f p =
     | None_given ->
         None_given
   in
-  { Poly.authorization = map_auth p.Poly.authorization; body = p.Poly.body }
+  { Poly.authorization = map_auth p.Poly.authorization
+  ; body = p.Poly.body
+  ; aux = p.Poly.aux
+  }
 
 let forget_proofs p = map_proofs ~f:(const ()) p
+
+let forget_aux (p : _ Poly.t) = { p with aux = () }
 
 module Fee_payer = struct
   [%%versioned
@@ -1763,18 +1864,55 @@ module Fee_payer = struct
       type t = Mina_wire_types.Mina_base.Account_update.Fee_payer.V1.t =
         { body : Body.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
+        ; aux : No_aux.Stable.V1.t
         }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+      [@@deriving annot, equal, hash, compare, fields]
 
       let to_latest = Fn.id
+
+      let without_aux (t : t) : _ Poly.Without_aux.Stable.V1.t =
+        { body = t.body; authorization = t.authorization }
+
+      let with_no_aux (t : _ Poly.Without_aux.Stable.V1.t) : t =
+        { body = t.body; authorization = t.authorization; aux = () }
+
+      let to_yojson t =
+        Poly.Without_aux.Stable.V1.to_yojson_via ~without_aux
+          Body.Fee_payer.Stable.V1.to_yojson Signature.Stable.V1.to_yojson
+          No_aux.Stable.V1.to_yojson t
+
+      let of_yojson t =
+        Poly.Without_aux.Stable.V1.of_yojson_via ~with_no_aux
+          Body.Fee_payer.Stable.V1.of_yojson Signature.Stable.V1.of_yojson
+          No_aux.Stable.V1.of_yojson t
+
+      let sexp_of_t t =
+        Poly.Without_aux.Stable.V1.sexp_of_t_via ~without_aux
+          Body.Fee_payer.Stable.V1.sexp_of_t Signature.Stable.V1.sexp_of_t
+          No_aux.Stable.V1.sexp_of_t t
+
+      let t_of_sexp t =
+        Poly.Without_aux.Stable.V1.t_of_sexp_via ~with_no_aux
+          Body.Fee_payer.Stable.V1.t_of_sexp Signature.Stable.V1.t_of_sexp
+          No_aux.Stable.V1.t_of_sexp t
     end
   end]
+
+  let to_yojson = Stable.Latest.to_yojson
+
+  let of_yojson = Stable.Latest.of_yojson
+
+  let sexp_of_t = Stable.Latest.sexp_of_t
+
+  let t_of_sexp = Stable.Latest.t_of_sexp
+
+  let with_no_aux ~body ~authorization : t = { body; authorization; aux = () }
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%map body = Body.Fee_payer.gen in
     let authorization = Signature.dummy in
-    { body; authorization }
+    with_no_aux ~body ~authorization
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
 
@@ -1788,15 +1926,15 @@ module Fee_payer = struct
     Account_id.create t.body.public_key Token_id.default
 
   let to_account_update (t : t) : T.t =
-    { authorization = Control.Poly.Signature t.authorization
-    ; body = Body.of_fee_payer t.body
-    }
+    T.with_no_aux ~body:(Body.of_fee_payer t.body)
+      ~authorization:(Control.Poly.Signature t.authorization)
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
+      ~aux:!.skip
     |> finish "ZkappFeePayer" ~t_toplevel_annots
 end
 
@@ -1808,16 +1946,16 @@ let read_all_proofs_from_disk (p : t) : Stable.Latest.t =
 let write_all_proofs_to_disk ~proof_cache_db (p : Stable.Latest.t) : t =
   map_proofs ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) p
 
-let account_id (t : (Body.t, _) Poly.t) : Account_id.t =
+let account_id (t : (Body.t, _, _) Poly.t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
 
-let verification_key_update_to_option (t : (Body.t, _) Poly.t) :
+let verification_key_update_to_option (t : (Body.t, _, _) Poly.t) :
     Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
   Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
-let check_authorization (type proof)
-    (p : (Body.t, (proof, Signature.t) Control.Poly.t) Poly.t) : unit Or_error.t
-    =
+let check_authorization (type proof aux)
+    (p : (Body.t, (proof, Signature.t) Control.Poly.t, aux) Poly.t) :
+    unit Or_error.t =
   match (p.authorization, p.body.authorization_kind) with
   | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
       Ok ()
@@ -1833,9 +1971,10 @@ let check_authorization (type proof)
       in
       Error err
 
-let of_fee_payer ({ body; authorization } : Fee_payer.t) :
-    (Body.t, (_, Signature.t) Control.Poly.t) Poly.t =
-  { authorization = Signature authorization; body = Body.of_fee_payer body }
+let of_fee_payer ({ body; authorization; aux = () } : Fee_payer.t) :
+    (Body.t, (_, Signature.t) Control.Poly.t, _) Poly.t =
+  with_no_aux ~body:(Body.of_fee_payer body)
+    ~authorization:(Control.Poly.Signature authorization)
 
 (** The change in balance to apply to the target account of this account_update.
       When this is negative, the amount will be withdrawn from the account and

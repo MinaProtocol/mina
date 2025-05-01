@@ -364,6 +364,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         fee_payer =
           { body = { p.fee_payer.body with nonce = Account.Nonce.of_int 2 }
           ; authorization = Signature.dummy
+          ; aux = p.fee_payer.aux
           }
       }
     in

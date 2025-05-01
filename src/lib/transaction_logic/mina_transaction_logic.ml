@@ -2449,18 +2449,19 @@ module For_tests = struct
     in
     let zkapp_command : Zkapp_command.Simple.t =
       { fee_payer =
-          { Account_update.Fee_payer.body =
+          (* Real signature added in below *)
+          Account_update.Fee_payer.with_no_aux
+            ~body:
               { public_key = sender_pk
               ; fee
               ; valid_until = None
               ; nonce = actual_nonce
               }
-              (* Real signature added in below *)
-          ; authorization = Signature.dummy
-          }
+            ~authorization:Signature.dummy
       ; account_updates =
-          [ { body =
-                { public_key = sender_pk
+          [ Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.Simple.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(negate (of_unsigned amount))
@@ -2482,12 +2483,13 @@ module For_tests = struct
                     ( if use_full_commitment then Signature
                     else Proof Zkapp_basic.F.zero )
                 }
-            ; authorization =
-                ( if use_full_commitment then Signature Signature.dummy
+              ~authorization:
+                ( if use_full_commitment then
+                  Control.Poly.Signature Signature.dummy
                 else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
-            }
-          ; { body =
-                { public_key = receiver
+          ; Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.Simple.public_key = receiver
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.of_unsigned amount
@@ -2507,8 +2509,7 @@ module For_tests = struct
                 ; implicit_account_creation_fee = true
                 ; authorization_kind = None_given
                 }
-            ; authorization = None_given
-            }
+              ~authorization:Control.Poly.None_given
           ]
       ; memo = Signed_command_memo.empty
       }
@@ -2530,7 +2531,8 @@ module For_tests = struct
     let account_updates =
       Zkapp_command.Call_forest.map zkapp_command.account_updates
         ~f:(fun
-             (account_update : (Account_update.Body.t, _) Account_update.Poly.t)
+             (account_update :
+               (Account_update.Body.t, _, _) Account_update.Poly.t )
            ->
           match account_update.body.authorization_kind with
           | Signature ->

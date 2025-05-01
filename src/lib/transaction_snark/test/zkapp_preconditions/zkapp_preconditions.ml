@@ -279,19 +279,20 @@ let%test_module "Protocol state precondition tests" =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
                   let fee_payer =
-                    { Account_update.Fee_payer.body =
+                    Account_update.Fee_payer.with_no_aux
+                      ~body:
                         { public_key = sender_pk
                         ; fee
                         ; valid_until = None
                         ; nonce = sender_nonce
                         }
                         (*To be updated later*)
-                    ; authorization = Signature.dummy
-                    }
+                      ~authorization:Signature.dummy
                   in
                   let sender_account_update : Account_update.Simple.t =
-                    { body =
-                        { public_key = sender_pk
+                    Account_update.with_no_aux
+                      ~body:
+                        { Account_update.Body.Simple.public_key = sender_pk
                         ; update = Account_update.Update.noop
                         ; token_id = Token_id.default
                         ; balance_change =
@@ -315,12 +316,12 @@ let%test_module "Protocol state precondition tests" =
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
-                    ; authorization = Control.Poly.Signature Signature.dummy
-                    }
+                      ~authorization:(Control.Poly.Signature Signature.dummy)
                   in
                   let snapp_account_update : Account_update.Simple.t =
-                    { body =
-                        { public_key = snapp_pk
+                    Account_update.with_no_aux
+                      ~body:
+                        { Account_update.Body.Simple.public_key = snapp_pk
                         ; update = snapp_update
                         ; token_id = Token_id.default
                         ; balance_change =
@@ -347,10 +348,8 @@ let%test_module "Protocol state precondition tests" =
                         ; may_use_token = No
                         ; authorization_kind = Signature
                         }
-                    ; authorization =
-                        Control.Poly.Signature Signature.dummy
                         (*To be updated later*)
-                    }
+                      ~authorization:(Control.Poly.Signature Signature.dummy)
                   in
                   let ps =
                     Zkapp_command.Call_forest.With_hashes
@@ -883,19 +882,20 @@ let%test_module "Account precondition tests" =
                 Signature_lib.Public_key.compress new_kp.public_key
               in
               let fee_payer =
-                { Account_update.Fee_payer.body =
+                Account_update.Fee_payer.with_no_aux
+                  ~body:
                     { public_key = sender_pk
                     ; fee
                     ; valid_until = None
                     ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
                     }
                     (*To be updated later*)
-                ; authorization = Signature.dummy
-                }
+                  ~authorization:Signature.dummy
               in
               let sender_account_update : Account_update.Simple.t =
-                { body =
-                    { public_key = sender_pk
+                Account_update.with_no_aux
+                  ~body:
+                    { Account_update.Body.Simple.public_key = sender_pk
                     ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -919,12 +919,12 @@ let%test_module "Account precondition tests" =
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
-                ; authorization = Control.Poly.Signature Signature.dummy
-                }
+                  ~authorization:(Control.Poly.Signature Signature.dummy)
               in
               let snapp_account_update : Account_update.Simple.t =
-                { body =
-                    { public_key = snapp_pk
+                Account_update.with_no_aux
+                  ~body:
+                    { Account_update.Body.Simple.public_key = snapp_pk
                     ; update = snapp_update
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -949,10 +949,8 @@ let%test_module "Account precondition tests" =
                     ; may_use_token = No
                     ; authorization_kind = Signature
                     }
-                ; authorization =
-                    Control.Poly.Signature Signature.dummy
                     (*To be updated later*)
-                }
+                  ~authorization:(Control.Poly.Signature Signature.dummy)
               in
               let ps =
                 Zkapp_command.Call_forest.With_hashes

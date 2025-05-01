@@ -52,12 +52,7 @@ type ('account_update, 'account_update_digest, 'forest_digest) with_forest =
 
 module T = struct
   type t =
-    ( ( Account_update.Body.t
-      , (Proof_cache_tag.t, Signature.t) Control.Poly.t )
-      Account_update.Poly.t
-    , Digest.Account_update.t
-    , Digest.Forest.t )
-    with_forest
+    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) with_forest
   [@@deriving sexp_of, to_yojson]
 
   [%%versioned
@@ -163,8 +158,9 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
 
 let forget_digests_and_proofs
     ({ fee_payer; memo; account_updates } :
-      ((_, (_, _) Control.Poly.t) Account_update.Poly.t, _, _) with_forest ) :
-    ( (_, (unit, _) Control.Poly.t) Account_update.Poly.t
+      ((_, (_, _) Control.Poly.t, _) Account_update.Poly.t, _, _) with_forest )
+    :
+    ( (_, (unit, _) Control.Poly.t, _) Account_update.Poly.t
     , unit
     , unit )
     with_forest =
@@ -199,7 +195,8 @@ let to_simple (t : t) : Simple.t =
       Call_forest.map ~f:Account_update.read_all_proofs_from_disk
         t.account_updates
       |> Call_forest.to_account_updates_map
-           ~f:(fun ~depth { Account_update.Poly.body = b; authorization } ->
+           ~f:(fun ~depth { Account_update.Poly.body = b; authorization; aux }
+              ->
              { Account_update.Poly.authorization
              ; body =
                  { Account_update.Body.Simple.public_key =
@@ -219,6 +216,7 @@ let to_simple (t : t) : Simple.t =
                  ; call_depth = depth
                  ; authorization_kind = b.authorization_kind
                  }
+             ; aux
              } )
   }
 
@@ -226,9 +224,11 @@ let all_account_updates t : _ Call_forest.t =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let p = t.Poly.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
+  let aux = p.aux in
   let account_update =
     { Account_update.Poly.authorization = Control.Poly.Signature p.authorization
     ; body
+    ; aux
     }
   in
   let fee_payer_digest : Digest.Account_update.t =
@@ -247,8 +247,8 @@ let applicable_at_nonce (t : (_, _, _) with_forest) : Account.Nonce.t =
   t.fee_payer.body.nonce
 
 let target_nonce_on_success
-    (t : ((Account_update.Body.t, _) Account_update.Poly.t, _, _) with_forest) :
-    Account.Nonce.t =
+    (t : ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest)
+    : Account.Nonce.t =
   let base_nonce = Account.Nonce.succ (applicable_at_nonce t) in
   let fee_payer_pubkey = t.fee_payer.body.public_key in
   let fee_payer_account_update_increments =
@@ -260,8 +260,8 @@ let target_nonce_on_success
     (Account.Nonce.of_int fee_payer_account_update_increments)
 
 let nonce_increments
-    (t : ((Account_update.Body.t, _) Account_update.Poly.t, _, _) with_forest) :
-    int Public_key.Compressed.Map.t =
+    (t : ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest)
+    : int Public_key.Compressed.Map.t =
   let base_increments =
     Public_key.Compressed.Map.of_alist_exn [ (t.fee_payer.body.public_key, 1) ]
   in
@@ -389,9 +389,7 @@ end
 
 module Verifiable : sig
   type t =
-    ( ( Account_update.Body.t
-      , (Proof_cache_tag.t, Signature.t) Control.Poly.t )
-      Account_update.Poly.t
+    ( Account_update.t
     , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
@@ -451,7 +449,8 @@ module Verifiable : sig
   module Serializable : sig
     type t =
       ( ( Account_update.Body.Stable.Latest.t
-        , (Proof.t, Signature.Stable.Latest.t) Control.Poly.Stable.Latest.t )
+        , (Proof.t, Signature.Stable.Latest.t) Control.Poly.Stable.Latest.t
+        , Account_update.No_aux.Stable.Latest.t )
         Account_update.Poly.Stable.Latest.t
       , ( Side_loaded_verification_key.Stable.Latest.t
         , Zkapp_basic.F.Stable.Latest.t )
@@ -471,7 +470,8 @@ end = struct
     ( ( Account_update.Body.Stable.Latest.t
       , ( Proof_cache_tag.t
         , Signature.Stable.Latest.t )
-        Control.Poly.Stable.Latest.t )
+        Control.Poly.Stable.Latest.t
+      , Account_update.No_aux.Stable.Latest.t )
       Account_update.Poly.Stable.Latest.t
     , ( Side_loaded_verification_key.Stable.Latest.t
       , Zkapp_basic.F.Stable.Latest.t )
@@ -486,7 +486,8 @@ end = struct
       ( ( Account_update.Body.Stable.Latest.t
         , ( Proof.Stable.Latest.t
           , Signature.Stable.Latest.t )
-          Control.Poly.Stable.Latest.t )
+          Control.Poly.Stable.Latest.t
+        , Account_update.No_aux.Stable.Latest.t )
         Account_update.Poly.Stable.Latest.t
       , ( Side_loaded_verification_key.Stable.Latest.t
         , Zkapp_basic.F.Stable.Latest.t )
@@ -941,14 +942,13 @@ let dummy =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   lazy
     (let account_update =
-       { Account_update.Poly.body = Account_update.Body.dummy
-       ; authorization = Control.Poly.Signature Signature.dummy
-       }
+       Account_update.with_no_aux ~body:Account_update.Body.dummy
+         ~authorization:(Control.Poly.Signature Signature.dummy)
      in
      let fee_payer : Account_update.Fee_payer.t =
-       { body = Account_update.Body.Fee_payer.dummy
-       ; authorization = Signature.dummy
-       }
+       Account_update.Fee_payer.with_no_aux
+         ~body:Account_update.Body.Fee_payer.dummy
+         ~authorization:Signature.dummy
      in
      { Poly.fee_payer
      ; account_updates = Call_forest.cons ~signature_kind account_update []
@@ -980,7 +980,8 @@ end) : sig
 
   val group_by_zkapp_command_rev :
        ( ( Account_update.Body.t
-         , (_, Signature.t) Control.Poly.t )
+         , (_, Signature.t) Control.Poly.t
+         , Account_update.No_aux.t )
          Account_update.Poly.t
        , _
        , _ )
@@ -1329,8 +1330,8 @@ let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
    - in incoming blocks
 *)
 let valid_size ~(genesis_constants : Genesis_constants.t)
-    (t : ((Account_update.Body.t, _) Account_update.Poly.t, _, _) with_forest) :
-    unit Or_error.t =
+    (t : ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest)
+    : unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
@@ -1408,7 +1409,10 @@ let valid_size ~(genesis_constants : Genesis_constants.t)
 
 let has_zero_vesting_period
     (t :
-      ((Account_update.Body.t, 'p) Account_update.Poly.t, _, _) Call_forest.t
+      ( (Account_update.Body.t, 'p, 'aux) Account_update.Poly.t
+      , _
+      , _ )
+      Call_forest.t
       Poly.t ) =
   Call_forest.exists t.account_updates ~f:(fun p ->
       match p.body.update.timing with
@@ -1419,7 +1423,10 @@ let has_zero_vesting_period
 
 let is_incompatible_version
     (t :
-      ((Account_update.Body.t, 'p) Account_update.Poly.t, _, _) Call_forest.t
+      ( (Account_update.Body.t, 'p, 'aux) Account_update.Poly.t
+      , _
+      , _ )
+      Call_forest.t
       Poly.t ) =
   Call_forest.exists t.account_updates ~f:(fun p ->
       match p.body.update.permissions with
@@ -1449,7 +1456,7 @@ let inner_query =
        Fields_derivers_zkapps.(inner_query (deriver @@ Derivers.o ())) )
 
 module For_tests = struct
-  let replace_vk vk (p : (Account_update.Body.t, _) Account_update.Poly.t) =
+  let replace_vk vk (p : (Account_update.Body.t, _, _) Account_update.Poly.t) =
     { p with
       body =
         { p.body with

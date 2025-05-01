@@ -147,7 +147,7 @@ module type Digest_intf = sig
 
     val create :
          signature_kind:Mina_signature_kind.t
-      -> (Account_update.Body.t, _) Account_update.Poly.t
+      -> (Account_update.Body.t, _, _) Account_update.Poly.t
       -> t
 
     val create_body :
@@ -262,7 +262,7 @@ module Make_digest_str
     end
 
     let create ~signature_kind :
-        (Account_update.Body.t, _) Account_update.Poly.t -> t =
+        (Account_update.Body.t, _, _) Account_update.Poly.t -> t =
       Account_update.digest ~signature_kind
 
     let create_body ~signature_kind : Account_update.Body.t -> t =

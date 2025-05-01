@@ -297,8 +297,9 @@ module Values (S : Sample) = struct
     Mina_base.User_command.Signed_command (signed_command' ())
 
   let zkapp_account_update () : Mina_base.Account_update.t =
-    { body =
-        { public_key = public_key ()
+    Mina_base.Account_update.with_no_aux
+      ~body:
+        { Mina_base.Account_update.Body.public_key = public_key ()
         ; token_id = token_id ()
         ; update =
             { app_state =
@@ -325,20 +326,19 @@ module Values (S : Sample) = struct
         ; may_use_token = No
         ; authorization_kind = Proof (field ())
         }
-    ; authorization = Proof side_loaded_proof
-    }
+      ~authorization:(Mina_base.Control.Poly.Proof side_loaded_proof)
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
     let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer =
-        { body =
+        Mina_base.Account_update.Fee_payer.with_no_aux
+          ~body:
             { public_key = public_key ()
             ; fee = fee ()
             ; valid_until = Some (global_slot_since_genesis ())
             ; nonce = account_nonce ()
             }
-        ; authorization = (field (), private_key ())
-        }
+          ~authorization:(field (), private_key ())
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())
         |> List.fold_left ~init:[] ~f:(fun acc () ->

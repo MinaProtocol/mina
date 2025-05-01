@@ -73,9 +73,8 @@ let%test_module "Actions test" =
         }
 
       let account_update : Account_update.t =
-        { body = account_update_body
-        ; authorization = Signature Signature.dummy
-        }
+        Account_update.with_no_aux ~body:account_update_body
+          ~authorization:(Control.Poly.Signature Signature.dummy)
     end
 
     module Initialize_account_update = struct
@@ -106,14 +105,14 @@ let%test_module "Actions test" =
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
       in
       let fee_payer : Account_update.Fee_payer.t =
-        { body =
+        Account_update.Fee_payer.with_no_aux
+          ~body:
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.(of_nanomina_int_exn 50)
             ; nonce = Account.Nonce.of_int fee_payer_nonce
             }
-        ; authorization = Signature.dummy
-        }
+          ~authorization:Signature.dummy
       in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
@@ -142,6 +141,7 @@ let%test_module "Actions test" =
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = _
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
