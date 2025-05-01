@@ -374,19 +374,7 @@ module Spec = struct
 
   type t = unit Poly.t
 
-  let of_selector_spec ?issued_since_unix_epoch (spec : Selector.Spec.t) : t =
-    let issued_since_unix_epoch =
-      match issued_since_unix_epoch with
-      | None ->
-          let spec_str =
-            Selector.Spec.read_all_proofs_from_disk spec
-            |> Selector.Spec.Stable.V1.to_yojson |> Yojson.Safe.to_string
-          in
-          printf "No issued time provided, assuming now for %s" spec_str ;
-          Time.now () |> Time.to_span_since_epoch
-      | Some t ->
-          t
-    in
+  let of_selector_spec ~issued_since_unix_epoch (spec : Selector.Spec.t) : t =
     Old
       { instances = One_or_two.map ~f:(fun spec -> (spec, ())) spec.instances
       ; common = { fee_of_full = spec.fee; issued_since_unix_epoch }
@@ -503,21 +491,9 @@ module Result = struct
           ; common
           }
 
-  let of_selector_result ?issued_since_unix_epoch
-      ({ proofs; metrics; spec = { instances; fee } as spec; prover } :
+  let of_selector_result ~issued_since_unix_epoch
+      ({ proofs; metrics; spec = { instances; fee }; prover } :
         Selector.Result.t ) : t Or_error.t =
-    let issued_since_unix_epoch =
-      match issued_since_unix_epoch with
-      | None ->
-          let spec_str =
-            Selector.Spec.read_all_proofs_from_disk spec
-            |> Selector.Spec.Stable.V1.to_yojson |> Yojson.Safe.to_string
-          in
-          printf "No issued time provided, assuming now for %s" spec_str ;
-          Time.now () |> Time.to_span_since_epoch
-      | Some t ->
-          t
-    in
     let%bind.Result zipped = One_or_two.zip proofs metrics in
     let%map.Result zipped = One_or_two.zip zipped instances in
 
