@@ -3,18 +3,18 @@
   (flags -verbose -show-counts))
  (name pickles)
  (public_name pickles)
- (modules_without_implementation full_signature type intf pickles_intf)
+ (modules_without_implementation full_signature intf pickles_intf type)
  (flags -open Core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
+   h_list.ppx
    ppx_compare
+   ppx_jane
+   ppx_mina
    ppx_deriving_yojson
-   h_list.ppx))
+   ppx_version))
  (libraries
   ;; opam libraries
   stdio
