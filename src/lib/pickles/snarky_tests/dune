@@ -6,66 +6,66 @@
   (source_tree examples))
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
+   h_list.ppx
    ppx_compare
    ppx_deriving_yojson
-   h_list.ppx))
+   ppx_jane
+   ppx_mina
+   ppx_version))
  (libraries
   ;; opam libraries
   alcotest
-  stdio
-  integers
-  result
-  base.caml
-  bignum.bigint
-  core_kernel
-  base64
-  digestif
-  ppx_inline_test.config
-  sexplib0
-  base
   async_kernel
+  base
+  base.caml
+  base64
+  bignum.bigint
   bin_prot.shape
+  core
+  core_kernel
+  digestif
+  integers
+  ppx_inline_test.config
+  result
+  sexplib0
+  stdio
   ;; local libraries
-  mina_wire_types
-  kimchi_bindings
-  kimchi_types
-  pasta_bindings
+  base58_check
+  bitstring_lib
+  blockchain_snark
+  codable
+  genesis_constants
+  group_map
+  key_cache
   kimchi_backend
+  kimchi_backend_common
+  kimchi_bindings
   kimchi_pasta
   kimchi_pasta.basic
   kimchi_pasta.constraint_system
-  bitstring_lib
-  snarky.intf
-  pickles.backend
-  pickles_types
-  snarky.backendless
-  snarky_group_map
-  sponge
+  kimchi_types
+  mina_wire_types
+  pasta_bindings
   pickles
-  pickles.pseudo
-  pickles.limb_vector
-  pickles_base
-  base58_check
-  codable
-  random_oracle_input
+  pickles.backend
   pickles.composition_types
+  pickles.limb_vector
   pickles.plonk_checks
+  pickles.pseudo
+  pickles_base
   pickles_base.one_hot_vector
-  snarky_log
-  group_map
-  snarky_curve
-  key_cache
-  snark_keys_header
-  tuple_lib
-  promise
-  kimchi_backend_common
+  pickles_types
   ppx_version.runtime
-  qcheck-core
+  promise
   qcheck-alcotest
-  blockchain_snark
+  qcheck-core
+  random_oracle_input
+  snarky.backendless
+  snarky.intf
+  snarky_curve
+  snarky_group_map
+  snarky_log
+  snark_keys_header
+  sponge
   transaction_snark
-  genesis_constants
-  core))
+  tuple_lib))
