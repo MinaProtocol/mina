@@ -503,7 +503,7 @@ module Result = struct
           ; common
           }
 
-  let of_selector_result ~issued_since_unix_epoch
+  let of_selector_result ?issued_since_unix_epoch
       ({ proofs; metrics; spec = { instances; fee } as spec; prover } :
         Selector.Result.t ) : t Or_error.t =
     let issued_since_unix_epoch =
