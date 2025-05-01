@@ -484,7 +484,8 @@ let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
   let tree : _ Tree.t = { account_update; account_update_digest; calls } in
   cons_tree tree xs
 
-let cons ?calls (account_update : Account_update.t) xs =
+let cons (type aux) ?calls (account_update : (_, _, aux) Account_update.Poly.t)
+    xs =
   cons_aux ~digest_account_update:Digest.Account_update.create ?calls
     account_update xs
 
@@ -527,8 +528,8 @@ let forget_hashes =
   in
   impl
 
-let forget_hashes_and_proofs p =
-  forget_hashes @@ map ~f:Account_update.forget_proofs p
+let forget_hashes_and_proofs_and_aux p =
+  forget_hashes @@ map ~f:Account_update.forget_proofs_and_aux p
 
 module With_hashes_and_data = struct
   [%%versioned

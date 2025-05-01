@@ -297,7 +297,7 @@ module Values (S : Sample) = struct
     Mina_base.User_command.Signed_command (signed_command' ())
 
   let zkapp_account_update () : Mina_base.Account_update.t =
-    Mina_base.Account_update.with_no_aux
+    Mina_base.Account_update.with_aux
       ~body:
         { Mina_base.Account_update.Body.public_key = public_key ()
         ; token_id = token_id ()

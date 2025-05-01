@@ -5,7 +5,7 @@ let different_version = Mina_numbers.Txn_version.(succ current)
 
 let update_vk_perm_to_be ~auth : Zkapp_command.t =
   let account_update : Account_update.t =
-    Account_update.with_no_aux
+    Account_update.with_aux
       ~body:
         { Account_update.Body.dummy with
           update =
