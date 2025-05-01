@@ -21,8 +21,6 @@ module Cache = struct
 end
 
 module Impl : Intf.Worker = struct
-  module Ledger_proof = Ledger_proof.Prod
-
   module Worker_state = struct
     module type S = Transaction_snark.S
 
