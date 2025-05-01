@@ -1795,7 +1795,23 @@ module T = struct
     end
   end]
 
-  type t = (Body.t, Control.t, No_aux.t) Poly.t [@@deriving sexp_of, to_yojson]
+  module Aux_data = struct
+    type t =
+      { actions_hash : Field.t
+            (** The cached hash of the actions in an account update body - currently not updated. *)
+      }
+
+    let to_yojson : _ -> Yojson.Safe.t = Nothing.unreachable_code
+
+    let sexp_of_t : _ -> Ppx_sexp_conv_lib.Sexp.t = Nothing.unreachable_code
+
+    (* TODO: actually compute the actions_hash from the body of an account
+       update *)
+    let of_without_aux : t = { actions_hash = Field.zero }
+  end
+
+  type t = (Body.t, Control.t, Aux_data.t) Poly.t
+  [@@deriving sexp_of, to_yojson]
 
   let of_graphql_repr ({ Poly.body; authorization; aux = () } : Graphql_repr.t)
       : Stable.Latest.t =
@@ -1807,6 +1823,9 @@ module T = struct
 
   let with_no_aux ~body ~authorization : _ Poly.t =
     { body; authorization; aux = () }
+
+  let with_aux ~body ~authorization : _ Poly.t =
+    { body; authorization; aux = Aux_data.of_without_aux }
 
   let gen : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -1855,7 +1874,12 @@ let map_proofs ~f p =
 
 let forget_proofs p = map_proofs ~f:(const ()) p
 
+let reset_aux (p : _ Poly.t) =
+  T.with_aux ~body:p.body ~authorization:p.authorization
+
 let forget_aux (p : _ Poly.t) = { p with aux = () }
+
+let forget_proofs_and_aux p = forget_proofs @@ forget_aux p
 
 module Fee_payer = struct
   [%%versioned
@@ -1926,7 +1950,7 @@ module Fee_payer = struct
     Account_id.create t.body.public_key Token_id.default
 
   let to_account_update (t : t) : T.t =
-    T.with_no_aux ~body:(Body.of_fee_payer t.body)
+    T.with_aux ~body:(Body.of_fee_payer t.body)
       ~authorization:(Control.Poly.Signature t.authorization)
 
   let deriver obj =
@@ -1941,10 +1965,11 @@ end
 include T
 
 let read_all_proofs_from_disk (p : t) : Stable.Latest.t =
-  map_proofs ~f:Proof_cache_tag.read_proof_from_disk p
+  forget_aux @@ map_proofs ~f:Proof_cache_tag.read_proof_from_disk p
 
 let write_all_proofs_to_disk ~proof_cache_db (p : Stable.Latest.t) : t =
-  map_proofs ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) p
+  reset_aux
+  @@ map_proofs ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) p
 
 let account_id (t : (Body.t, _, _) Poly.t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
@@ -1971,10 +1996,12 @@ let check_authorization (type proof aux)
       in
       Error err
 
-let of_fee_payer ({ body; authorization; aux = () } : Fee_payer.t) :
+let of_fee_payer_no_aux ({ body; authorization; aux = () } : Fee_payer.t) :
     (Body.t, (_, Signature.t) Control.Poly.t, _) Poly.t =
   with_no_aux ~body:(Body.of_fee_payer body)
     ~authorization:(Control.Poly.Signature authorization)
+
+let of_fee_payer t = reset_aux @@ of_fee_payer_no_aux t
 
 (** The change in balance to apply to the target account of this account_update.
       When this is negative, the amount will be withdrawn from the account and

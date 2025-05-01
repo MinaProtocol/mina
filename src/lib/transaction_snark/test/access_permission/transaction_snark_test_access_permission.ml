@@ -99,7 +99,7 @@ let%test_module "Access permission tests" =
       in
       let deploy_account_update : Account_update.t =
         (* TODO: This is a pain. *)
-        Account_update.with_no_aux ~body:deploy_account_update_body
+        Account_update.with_aux ~body:deploy_account_update_body
           ~authorization:(Control.Poly.Signature Signature.dummy)
       in
       let account_updates =

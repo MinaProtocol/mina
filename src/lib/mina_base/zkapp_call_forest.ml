@@ -51,7 +51,7 @@ module Checked = struct
         * Zkapp_command.Digest.Account_update.typ)
       |> Typ.transport
            ~back:(fun ((body, authorization), hash) ->
-             { With_hash.data = Account_update.with_no_aux ~body ~authorization
+             { With_hash.data = Account_update.with_aux ~body ~authorization
              ; hash
              } )
            ~there:(fun { With_hash.data =
@@ -238,7 +238,7 @@ module Checked = struct
               let authorization = V.get auth in
               let tl = V.get tl_data in
               let account_update : Account_update.t =
-                Account_update.with_no_aux ~body ~authorization
+                Account_update.with_aux ~body ~authorization
               in
               let calls = V.get calls in
               let res =

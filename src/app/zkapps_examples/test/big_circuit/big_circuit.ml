@@ -36,7 +36,7 @@ let account_update : Account_update.t =
   let ({ account_update; _ } : _ Zkapp_command.Call_forest.tree), () =
     Async.Thread_safe.block_on_async_exn prover
   in
-  Account_update.with_no_aux
+  Account_update.with_aux
     ~body:{ account_update.body with authorization_kind = Proof vk_hash }
     ~authorization:account_update.authorization
 
@@ -59,7 +59,7 @@ let deploy_account_update_body : Account_update.Body.t =
   }
 
 let deploy_account_update : Account_update.t =
-  Account_update.with_no_aux ~body:deploy_account_update_body
+  Account_update.with_aux ~body:deploy_account_update_body
     ~authorization:(Control.Poly.Signature Signature.dummy)
 
 let account_updates =

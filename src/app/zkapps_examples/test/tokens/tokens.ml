@@ -125,7 +125,7 @@ let%test_module "Tokens test" =
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true ~balance_change:(int_to_amount 1)
@@ -148,14 +148,14 @@ let%test_module "Tokens test" =
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true ~balance_change:(int_to_amount 1)
                      ~token_id:owned_token_id ~may_use_token:Parents_own_token )
                 ~authorization:(Control.Poly.Signature Signature.dummy)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -181,7 +181,7 @@ let%test_module "Tokens test" =
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true ~balance_change:(int_to_amount 1)
@@ -189,7 +189,7 @@ let%test_module "Tokens test" =
                 ~authorization:(Control.Poly.Signature Signature.dummy)
         (* This account update should be ignored by the token zkApp. *)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -197,7 +197,7 @@ let%test_module "Tokens test" =
                      ~token_id:Token_id.default ~may_use_token:Parents_own_token )
                 ~authorization:(Control.Poly.Signature Signature.dummy)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -211,7 +211,7 @@ let%test_module "Tokens test" =
            counteracting the effect of the ignored update above.
         *)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -235,7 +235,7 @@ let%test_module "Tokens test" =
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
-             (Account_update.with_no_aux
+             (Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true ~balance_change:(int_to_amount 5)
@@ -245,7 +245,7 @@ let%test_module "Tokens test" =
                ( []
                (* Delegate call, should be checked. *)
                |> Zkapp_command.Call_forest.cons ~signature_kind
-                    (Account_update.with_no_aux
+                    (Account_update.with_aux
                        ~body:
                          (Zkapps_examples.mk_update_body (fst mint_to_keys)
                             ~use_full_commitment:true
@@ -257,7 +257,7 @@ let%test_module "Tokens test" =
                       ( []
                       (* Delegate call, should be checked. *)
                       |> Zkapp_command.Call_forest.cons ~signature_kind
-                         @@ Account_update.with_no_aux
+                         @@ Account_update.with_aux
                               ~body:
                                 (Zkapps_examples.mk_update_body
                                    (fst mint_to_keys) ~use_full_commitment:true
@@ -268,7 +268,7 @@ let%test_module "Tokens test" =
                                 (Control.Poly.Signature Signature.dummy)
                       (* Parents_own_token, should be skipped. *)
                       |> Zkapp_command.Call_forest.cons ~signature_kind
-                         @@ Account_update.with_no_aux
+                         @@ Account_update.with_aux
                               ~body:
                                 (Zkapps_examples.mk_update_body
                                    (fst mint_to_keys) ~use_full_commitment:true
@@ -278,7 +278,7 @@ let%test_module "Tokens test" =
                                 (Control.Poly.Signature Signature.dummy)
                       (* Blind call, should be skipped. *)
                       |> Zkapp_command.Call_forest.cons ~signature_kind
-                         @@ Account_update.with_no_aux
+                         @@ Account_update.with_aux
                               ~body:
                                 (Zkapps_examples.mk_update_body
                                    (fst mint_to_keys) ~use_full_commitment:true
@@ -288,7 +288,7 @@ let%test_module "Tokens test" =
                                 (Control.Poly.Signature Signature.dummy)
                       (* Blind call, should be skipped. *)
                       |> Zkapp_command.Call_forest.cons ~signature_kind
-                         @@ Account_update.with_no_aux
+                         @@ Account_update.with_aux
                               ~body:
                                 (Zkapps_examples.mk_update_body
                                    (fst mint_to_keys) ~use_full_commitment:true
@@ -318,7 +318,7 @@ let%test_module "Tokens test" =
                )
         (* This account update should be ignored by the token zkApp. *)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -326,7 +326,7 @@ let%test_module "Tokens test" =
                      ~may_use_token:Inherit_from_parent )
                 ~authorization:(Control.Poly.Signature Signature.dummy)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -340,7 +340,7 @@ let%test_module "Tokens test" =
            counteracting the effect of the ignored update above.
         *)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -363,7 +363,7 @@ let%test_module "Tokens test" =
       let subtree =
         []
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true ~balance_change:(int_to_amount 1)
@@ -371,7 +371,7 @@ let%test_module "Tokens test" =
                 ~authorization:(Control.Poly.Signature Signature.dummy)
         (* This account update should be ignored by the token zkApp. *)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -379,7 +379,7 @@ let%test_module "Tokens test" =
                      ~may_use_token:Inherit_from_parent )
                 ~authorization:(Control.Poly.Signature Signature.dummy)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
@@ -393,14 +393,14 @@ let%test_module "Tokens test" =
            counteracting the effect of the ignored update above.
         *)
         |> Zkapp_command.Call_forest.cons ~signature_kind
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body (fst mint_to_keys)
                      ~use_full_commitment:true
                      ~balance_change:(int_to_amount (-30)) ~may_use_token:No )
                 ~authorization:(Control.Poly.Signature Signature.dummy)
         |> Zkapp_command.Call_forest.cons ~signature_kind ~calls:subtree
-           @@ Account_update.with_no_aux
+           @@ Account_update.with_aux
                 ~body:
                   (Zkapps_examples.mk_update_body pk
                      ~authorization_kind:None_given )

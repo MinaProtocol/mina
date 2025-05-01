@@ -695,7 +695,7 @@ let compile :
               prover ?handler ()
             in
             let account_update : Account_update.t =
-              Account_update.with_no_aux ~body:account_update
+              Account_update.with_aux ~body:account_update
                 ~authorization:
                   (Control.Poly.Proof
                      ( Proof_cache_tag.write_proof_to_disk proof_cache_db
@@ -785,7 +785,7 @@ module Deploy_account_update = struct
 
   let full ?balance_change ?access public_key token_id vk : Account_update.t =
     (* TODO: This is a pain. *)
-    Account_update.with_no_aux
+    Account_update.with_aux
       ~body:(body ?balance_change ?access public_key token_id vk)
       ~authorization:(Control.Poly.Signature Signature.dummy)
 end

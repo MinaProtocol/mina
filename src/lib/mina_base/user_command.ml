@@ -107,7 +107,7 @@ type ('u, 'a, 'b) with_forest =
   (Signed_command.t, ('u, 'a, 'b) Zkapp_command.with_forest) Poly.t
 [@@deriving equal]
 
-let forget_digests_and_proofs (t : (_, _, _) with_forest) :
+let forget_digests_and_proofs_and_aux (t : (_, _, _) with_forest) :
     ( (_, (unit, _) Control.Poly.t, _) Account_update.Poly.t
     , unit
     , unit )
@@ -116,16 +116,16 @@ let forget_digests_and_proofs (t : (_, _, _) with_forest) :
   | Signed_command sc ->
       Signed_command sc
   | Zkapp_command zc ->
-      Zkapp_command (Zkapp_command.forget_digests_and_proofs zc)
+      Zkapp_command (Zkapp_command.forget_digests_and_proofs_and_aux zc)
 
-let equal_ignoring_proofs_and_hashes
+let equal_ignoring_proofs_and_hashes_and_aux
     (type account_update_digest_l forest_digest_l account_update_digest_r
     forest_digest_r )
     (t1 : (_, account_update_digest_l, forest_digest_l) with_forest)
     (t2 : (_, account_update_digest_r, forest_digest_r) with_forest) =
   let ignore2 _ _ = true in
-  let t1' = forget_digests_and_proofs t1 in
-  let t2' = forget_digests_and_proofs t2 in
+  let t1' = forget_digests_and_proofs_and_aux t1 in
+  let t2' = forget_digests_and_proofs_and_aux t2 in
   equal_with_forest ignore2 ignore2 ignore2 t1' t2'
 
 let to_base64 : Stable.Latest.t -> string = function
@@ -461,8 +461,9 @@ module Well_formedness_error = struct
         "Transaction type disabled"
 end
 
-let check_well_formedness ~(genesis_constants : Genesis_constants.t)
-    (t : (_, _, _) with_forest) : (unit, Well_formedness_error.t list) result =
+let check_well_formedness (type aux) ~(genesis_constants : Genesis_constants.t)
+    (t : ((_, _, aux) Account_update.Poly.t, _, _) with_forest) :
+    (unit, Well_formedness_error.t list) result =
   let preds =
     let open Well_formedness_error in
     [ ( has_insufficient_fee

@@ -187,7 +187,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       (* TODO: This is a pain. *)
-      Account_update.with_no_aux ~body:(body vk)
+      Account_update.with_aux ~body:(body vk)
         ~authorization:(Control.Poly.Signature Signature.dummy)
     in
     let%bind zkapp_command_create_accounts =

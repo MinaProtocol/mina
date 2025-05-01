@@ -15,11 +15,13 @@ module Helper = struct
          Zkapp_command.Digest.Forest.to_yojson )
       tx
 
-  let of_yojson ~proof_of_yojson =
-    let update_of_yojson =
-      Account_update.Poly.of_yojson Account_update.Body.of_yojson
-        (Control.Poly.of_yojson proof_of_yojson Signature.of_yojson)
-        Account_update.No_aux.of_yojson
+  let of_yojson ~proof_of_yojson ~reset_aux =
+    let update_of_yojson t =
+      Ppx_deriving_yojson_runtime.(
+        Account_update.Poly.of_yojson Account_update.Body.of_yojson
+          (Control.Poly.of_yojson proof_of_yojson Signature.of_yojson)
+          Account_update.No_aux.of_yojson t
+        >|= reset_aux)
     in
     User_command.Poly.of_yojson Signed_command.of_yojson
     @@ Zkapp_command.with_forest_of_yojson update_of_yojson
@@ -57,7 +59,10 @@ module User_command = struct
                  } )
 
       let of_yojson json =
-        match Helper.of_yojson ~proof_of_yojson:Proof.of_yojson json with
+        match
+          Helper.of_yojson ~proof_of_yojson:Proof.of_yojson ~reset_aux:Fn.id
+            json
+        with
         | Ok (Signed_command tx) ->
             Ppx_deriving_yojson_runtime.Result.Ok
               (User_command.Poly.Signed_command tx)
@@ -93,7 +98,8 @@ module User_command = struct
 
   let to_yojson = Helper.to_yojson ~proof_to_yojson
 
-  let of_yojson = Helper.of_yojson ~proof_of_yojson
+  let of_yojson =
+    Helper.of_yojson ~proof_of_yojson ~reset_aux:Account_update.reset_aux
 end
 
 module Staged_ledger_diff = struct

@@ -156,7 +156,7 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
       @@ Call_forest.forget_hashes t.account_updates
   }
 
-let forget_digests_and_proofs
+let forget_digests_and_proofs_and_aux
     ({ fee_payer; memo; account_updates } :
       ((_, (_, _) Control.Poly.t, _) Account_update.Poly.t, _, _) with_forest )
     :
@@ -166,7 +166,8 @@ let forget_digests_and_proofs
     with_forest =
   { Poly.fee_payer
   ; memo
-  ; account_updates = Call_forest.forget_hashes_and_proofs account_updates
+  ; account_updates =
+      Call_forest.forget_hashes_and_proofs_and_aux account_updates
   }
 
 [%%define_locally Stable.Latest.(gen)]
@@ -224,12 +225,9 @@ let all_account_updates t : _ Call_forest.t =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let p = t.Poly.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
-  let aux = p.aux in
   let account_update =
-    { Account_update.Poly.authorization = Control.Poly.Signature p.authorization
-    ; body
-    ; aux
-    }
+    Account_update.with_aux ~body
+      ~authorization:(Control.Poly.Signature p.authorization)
   in
   let fee_payer_digest : Digest.Account_update.t =
     Digest.Account_update.create ~signature_kind account_update
@@ -290,12 +288,17 @@ let account_updates_list (t : (_, _, _) with_forest) :
     _ Account_update.Poly.t list =
   Call_forest.fold t.account_updates ~init:[] ~f:(Fn.flip List.cons) |> List.rev
 
+let all_account_updates_list' ~of_fee_payer ~of_account_update
+    (t : (_, _, _) with_forest) : _ list =
+  Call_forest.fold t.account_updates
+    ~init:[ of_fee_payer (fee_payer_account_update t) ]
+    ~f:(Fn.flip (Fn.compose List.cons of_account_update))
+  |> List.rev
+
 let all_account_updates_list (t : (_, _, _) with_forest) :
     _ Account_update.Poly.t list =
-  Call_forest.fold t.account_updates
-    ~init:[ Account_update.of_fee_payer (fee_payer_account_update t) ]
-    ~f:(Fn.flip List.cons)
-  |> List.rev
+  all_account_updates_list' ~of_fee_payer:Account_update.of_fee_payer
+    ~of_account_update:Fn.id t
 
 let fee_excess (t : (_, _, _) with_forest) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
@@ -389,7 +392,10 @@ end
 
 module Verifiable : sig
   type t =
-    ( Account_update.t
+    ( ( Account_update.Body.t
+      , (Proof_cache_tag.t, Signature.t) Control.Poly.t
+      , Account_update.Aux_data.t )
+      Account_update.Poly.t
     , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
@@ -471,7 +477,7 @@ end = struct
       , ( Proof_cache_tag.t
         , Signature.Stable.Latest.t )
         Control.Poly.Stable.Latest.t
-      , Account_update.No_aux.Stable.Latest.t )
+      , Account_update.Aux_data.t )
       Account_update.Poly.Stable.Latest.t
     , ( Side_loaded_verification_key.Stable.Latest.t
       , Zkapp_basic.F.Stable.Latest.t )
@@ -942,7 +948,7 @@ let dummy =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   lazy
     (let account_update =
-       Account_update.with_no_aux ~body:Account_update.Body.dummy
+       Account_update.with_aux ~body:Account_update.Body.dummy
          ~authorization:(Control.Poly.Signature Signature.dummy)
      in
      let fee_payer : Account_update.Fee_payer.t =
@@ -981,7 +987,7 @@ end) : sig
   val group_by_zkapp_command_rev :
        ( ( Account_update.Body.t
          , (_, Signature.t) Control.Poly.t
-         , Account_update.No_aux.t )
+         , 'aux )
          Account_update.Poly.t
        , _
        , _ )
@@ -1027,7 +1033,16 @@ end = struct
       will need to be passed as part of the snark witness while applying that
       pair.
   *)
-  let group_by_zkapp_command_rev zkapp_commands
+  let group_by_zkapp_command_rev (type aux)
+      (zkapp_commands :
+        ( ( Account_update.Body.t
+          , (_, Signature.t) Control.Poly.t
+          , aux )
+          Account_update.Poly.t
+        , _
+        , _ )
+        with_forest
+        list )
       (stmtss : (global_state * local_state * connecting_ledger_hash) list list)
       : Zkapp_command_intermediate_state.t list =
     let intermediate_state ~kind ~spec ~before ~after =
@@ -1043,7 +1058,9 @@ end = struct
     let zkapp_account_updatess =
       []
       :: List.map zkapp_commands ~f:(fun zkapp_command ->
-             all_account_updates_list zkapp_command )
+             all_account_updates_list'
+               ~of_fee_payer:Account_update.of_fee_payer_no_aux
+               ~of_account_update:Account_update.forget_aux zkapp_command )
     in
     let rec group_by_zkapp_command_rev (zkapp_commands : _ list list) stmtss acc
         =
@@ -1329,15 +1346,17 @@ let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
    - when adding to the transaction pool
    - in incoming blocks
 *)
-let valid_size ~(genesis_constants : Genesis_constants.t)
-    (t : ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest)
-    : unit Or_error.t =
+let valid_size (type aux) ~(genesis_constants : Genesis_constants.t)
+    (t :
+      ((Account_update.Body.t, _, aux) Account_update.Poly.t, _, _) with_forest
+      ) : unit Or_error.t =
   let events_elements events =
     List.fold events ~init:0 ~f:(fun acc event -> acc + Array.length event)
   in
-  let all_updates, num_event_elements, num_action_elements =
+  let statement_tuple = ((), (), ()) in
+  let statements, num_event_elements, num_action_elements =
     Call_forest.fold t.account_updates
-      ~init:([ Account_update.of_fee_payer (fee_payer_account_update t) ], 0, 0)
+      ~init:([ statement_tuple ], 0, 0)
       ~f:(fun (acc, num_event_elements, num_action_elements) account_update ->
         let account_update_evs_elements =
           events_elements account_update.body.events
@@ -1345,15 +1364,13 @@ let valid_size ~(genesis_constants : Genesis_constants.t)
         let account_update_seq_evs_elements =
           events_elements account_update.body.actions
         in
-        ( account_update :: acc
+        ( statement_tuple :: acc
         , num_event_elements + account_update_evs_elements
         , num_action_elements + account_update_seq_evs_elements ) )
-    |> fun (updates, ev, sev) -> (List.rev updates, ev, sev)
   in
   let groups =
     Update_group.group_by_zkapp_command_rev [ t ]
-      ( [ ((), (), ()) ]
-      :: [ ((), (), ()) :: List.map all_updates ~f:(fun _ -> ((), (), ())) ] )
+      ([ ((), (), ()) ] :: [ ((), (), ()) :: statements ])
   in
   let proof_segments, signed_single_segments, signed_pair_segments =
     List.fold ~init:(0, 0, 0) groups
