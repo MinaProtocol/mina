@@ -4,14 +4,7 @@
  (libraries
   ;; opam libraries
   integers
-  core_kernel
-  async_kernel
-  bin_prot.shape
-  base.caml
-  sexplib0
   base64
-  result
-  base
   core
   ;; local libraries
   mina_ledger
@@ -21,7 +14,6 @@
   ledger_proof
   logger
   blockchain_snark
-  unix_timestamp
   allocation_functor
   verifier
   staged_ledger_diff
@@ -32,12 +24,11 @@
   mina_net2
   mina_base
   mina_transaction
-  truth
+  mina_stdlib
   transition_chain_verifier
   staged_ledger
   data_hash_lib
   block_time
-  mina_stdlib
   with_hash
   signature_lib
   genesis_constants

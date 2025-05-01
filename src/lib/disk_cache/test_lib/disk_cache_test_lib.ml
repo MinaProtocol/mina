@@ -32,7 +32,7 @@ module type S_extended = sig
   val simple_write_with_iteration : unit -> unit
 end
 
-module Make_impl (Cache : Disk_cache_intf.S with module Data := Mock) :
+module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock) :
   S with module Cache := Cache = struct
   let () =
     Core.Backtrace.elide := false ;
@@ -161,7 +161,7 @@ module Make_impl (Cache : Disk_cache_intf.S with module Data := Mock) :
       ~f:initialization_special_cases_impl
 end
 
-module Make (Disk_cache : Disk_cache_intf.F) :
+module Make (Disk_cache : Disk_cache_intf.F_with_count) :
   S with module Cache := Disk_cache(Mock) = struct
   include Make_impl (Disk_cache (Mock))
 end

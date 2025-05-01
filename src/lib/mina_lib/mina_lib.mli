@@ -138,7 +138,7 @@ val add_transactions :
 
 val add_full_transactions :
      t
-  -> User_command.t list
+  -> User_command.Stable.Latest.t list
   -> ( [ `Broadcasted | `Not_broadcasted ]
      * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
@@ -146,7 +146,7 @@ val add_full_transactions :
 
 val add_zkapp_transactions :
      t
-  -> Zkapp_command.t list
+  -> Zkapp_command.Stable.Latest.t list
   -> ( [ `Broadcasted | `Not_broadcasted ]
      * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
@@ -258,3 +258,5 @@ val best_chain_block_by_state_hash :
   t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
 
 val zkapp_cmd_limit : t -> int option ref
+
+val proof_cache_db : t -> Proof_cache_tag.cache_db

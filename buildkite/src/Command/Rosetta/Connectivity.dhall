@@ -37,11 +37,11 @@ let Spec =
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
-          , network = Network.Type.Berkeley
+          , network = Network.Type.Devnet
           , mode = PipelineMode.Type.Stable
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
-          , timeout = 900
+          , timeout = 1000
           }
       }
 
@@ -67,10 +67,9 @@ let command
             , target = Size.XLarge
             , soft_fail = Some spec.softFail
             , depends_on =
-                Dockers.dependsOnStep
+                Dockers.dependsOn
                   spec.dockerType
-                  "MinaArtifactMainnet"
-                  (Some spec.network)
+                  spec.network
                   Profiles.Type.Standard
                   Artifacts.Type.Rosetta
             }

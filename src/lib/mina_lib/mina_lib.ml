@@ -71,7 +71,7 @@ type components =
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
   | Signed_command_inputs of User_command_input.t list
-  | Zkapp_command_command_inputs of Zkapp_command.t list
+  | Zkapp_command_command_inputs of Zkapp_command.Stable.Latest.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -973,7 +973,8 @@ let add_full_transactions t user_commands =
       in
       Deferred.Result.fail error
 
-let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
+let add_zkapp_transactions t
+    (zkapp_commands : Zkapp_command.Stable.Latest.t list) =
   let add_all_txns () =
     let result_ivar = Ivar.create () in
     let cmd_inputs = Zkapp_command_command_inputs zkapp_commands in
@@ -1614,7 +1615,9 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
       let%bind () =
         Deferred.List.iter completed_works ~f:(fun work ->
             (* proofs should be verified in apply and broadcast *)
-            let statement = Transaction_snark_work.statement work in
+            let statement =
+              Transaction_snark_work.Stable.Latest.statement work
+            in
             let snark =
               Network_pool.Priced_proof.
                 { proof = work.proofs
@@ -1697,7 +1700,7 @@ let create ~commit_id ?wallets (config : Config.t) =
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
-        if config.compile_config.itn_features then
+        if config.itn_features then
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in
@@ -2018,7 +2021,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
-              ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db
+              ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db ~proof_cache_db
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -2149,6 +2152,17 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_most_recent_valid_block () =
             Broadcast_pipe.Reader.peek most_recent_valid_block_reader
           in
+
+          let transaction_resource_pool =
+            Network_pool.Transaction_pool.resource_pool transaction_pool
+          in
+          let transaction_pool_proxy : Staged_ledger.transaction_pool_proxy =
+            { find_by_hash =
+                Network_pool.Transaction_pool.Resource_pool.find_by_hash
+                  transaction_resource_pool
+            }
+          in
+
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2165,7 +2179,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ()
+              ~notify_online ~transaction_pool_proxy ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2583,3 +2597,5 @@ let best_chain_block_by_state_hash (t : t) hash =
             (State_hash.to_base58_check hash) )
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
+
+let proof_cache_db t = t.proof_cache_db

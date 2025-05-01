@@ -49,7 +49,7 @@ let opt_time_to_yojson = function
   | None ->
       `Null
 
-(** An auxiliary data structure for collecting various metrics for boostrap controller. *)
+(** An auxiliary data structure for collecting various metrics for bootstrap controller. *)
 type bootstrap_cycle_stats =
   { cycle_result : string
   ; sync_ledger_time : time
@@ -174,13 +174,22 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
             $error" ;
         Deferred.return `Ignored
     | Ok peer_root_with_proof -> (
+        let pcd =
+          peer_root_with_proof.data
+          |> Proof_carrying_data.map
+               ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+          |> Proof_carrying_data.map_proof
+               ~f:
+                 (Tuple2.map_snd
+                    ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) )
+        in
         match%bind
           Mina_block.verify_on_header
             ~verify:
               (Sync_handler.Root.verify
                  ~context:(module Context)
                  ~verifier:t.verifier candidate_consensus_state )
-            peer_root_with_proof.data
+            pcd
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -245,7 +254,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
   in
   Comparable.lift
     (fun existing candidate ->
-      (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
+      (* To prevent the logger to spam a lot of messages, the logger input is set to null *)
       if
         State_hash.equal
           (State_hash.With_state_hashes.state_hash existing)
@@ -609,7 +618,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                       (State_hash.With_state_hashes.state_hash
                          precomputed_values.protocol_state_with_hashes )
                 in
-                (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
+                (* TODO: lazy load db in persistent root to avoid unnecessary opens like this *)
                 Transition_frontier.Persistent_root.(
                   with_instance_exn persistent_root ~f:(fun instance ->
                       Instance.set_root_state_hash instance

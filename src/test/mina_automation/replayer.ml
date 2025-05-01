@@ -2,7 +2,6 @@
 Module for running replayer which checks datbase integrity of given database
 *)
 
-open Executor
 open Core
 
 module Output = struct
@@ -64,11 +63,17 @@ module InputConfig = struct
     }
 end
 
-include Executor
+module Paths = struct
+  let dune_name = "src/app/replayer/replayer.exe"
 
-let of_context context =
-  Executor.of_context ~context ~dune_name:"src/app/replayer/replayer.exe"
-    ~official_name:"mina-replayer"
+  let official_name = "mina-replayer"
+end
+
+module Executor = Executor.Make (Paths)
+
+let default = Executor.AutoDetect
+
+type t = Executor.t
 
 let run t ~archive_uri ~input_config ~interval_checkpoint
     ?checkpoint_output_folder ?checkpoint_file_prefix ~output_ledger =
@@ -99,4 +104,4 @@ let run t ~archive_uri ~input_config ~interval_checkpoint
     @ checkpoint_output_folder @ checkpoint_file_prefix
   in
 
-  run t ~args
+  Executor.run t ~args

@@ -13,7 +13,7 @@ elif [ -n "${TAG}" ]; then
   git ls-files
 else
   COMMIT=$(git log -1 --pretty=format:%H)
-  BASE_COMMIT=$(git log "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" -1 --pretty=format:%H)
+  BASE_COMMIT=$(git log "origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" -1 --pretty=format:%H)
   echo "Diffing current commit: ${COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2 
-  git diff "${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" --name-only
+  git diff "origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" --name-only
 fi

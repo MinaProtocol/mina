@@ -1,0 +1,14 @@
+(library
+ (name disk_cache_utils)
+ (public_name disk_cache.utils)
+ (libraries
+  ;; opam libraries
+  core
+  async
+  ;; local libraries
+  file_system
+  logger)
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane))
+ (instrumentation
+  (backend bisect_ppx)))
