@@ -1,3 +1,9 @@
+(*
+   This file tracks the Work distributed by Work Partitioner, hence the name.
+   Work Partitioner is a layer above the Work Selector, so types defined in this
+   module should be superset of types defined in Work Selector.
+ *)
+
 open Core_kernel
 
 module Pairing = struct
