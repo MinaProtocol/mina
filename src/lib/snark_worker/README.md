@@ -23,29 +23,6 @@ creating an economic incentive for proof generation in the Mina network.
 - `rpcs.ml` - RPC definitions for communication between daemon and worker
 - `debug.ml` - Debugging utilities
 
-### RPCs
-
-The SNARK worker communicates with the daemon through three main RPCs defined in
-`rpcs.ml`:
-
-1. **Get_work**
-   - Request work from the daemon
-   - Query: `unit` (no input needed)
-   - Response: Optional tuple containing work specification and public key
-   - Used by workers to request SNARK work to process
-
-2. **Submit_work**
-   - Submit completed SNARK work to the daemon
-   - Query: Work result containing the completed proof
-   - Response: `unit` (success acknowledgment)
-   - Used by workers to return completed proofs to the daemon
-
-3. **Failed_to_generate_snark**
-   - Report failure in SNARK generation
-   - Query: Error information, work specification, and public key
-   - Response: `unit` (acknowledgment)
-   - Used by workers to report errors during proof generation
-
 ## Standalone Worker
 
 For information about the standalone SNARK worker executable, see the
