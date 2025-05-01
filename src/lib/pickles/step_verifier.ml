@@ -1158,11 +1158,6 @@ struct
           | `Opt sponge ->
               Opt_sponge.squeeze sponge ) )
 
-  let _accumulation_verifier
-      (_accumulator_verification_key : _ Types_map.For_step.t)
-      _prev_accumulators _proof _new_accumulator : Boolean.var =
-    Boolean.false_
-
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
       ~lookup_parameters ~feature_flags ~(proof : Wrap_proof.Checked.t) ~srs
       ~wrap_domain ~wrap_verification_key statement
