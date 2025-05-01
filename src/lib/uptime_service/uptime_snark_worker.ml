@@ -38,7 +38,7 @@ module Worker_state = struct
            | `One (proof, elapsed, _) ->
                Deferred.Or_error.return (proof, elapsed)
            | `Two _ ->
-               failwith
+               Deferred.Or_error.error_string
                  "This is a bug, submitted one work into Snark worker, getting \
                   2 results"
        end in
