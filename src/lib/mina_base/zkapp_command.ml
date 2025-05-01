@@ -914,9 +914,9 @@ let zkapp_command_to_json x =
 let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
-let dummy =
+let dummy : Stable.V1.t lazy_t =
   lazy
-    (let account_update =
+    (let account_update : Account_update.Stable.V1.t  =
        { Account_update.Poly.body = Account_update.Body.dummy
        ; authorization = Control.Poly.Signature Signature.dummy
        }
@@ -927,7 +927,7 @@ let dummy =
        }
      in
      { Poly.fee_payer
-     ; account_updates = Call_forest.cons account_update []
+     ; account_updates = Call_forest.forget_hashes @@ Call_forest.cons account_update []
      ; memo = Signed_command_memo.empty
      } )
 
