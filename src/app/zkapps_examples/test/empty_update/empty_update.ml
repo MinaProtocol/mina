@@ -59,7 +59,7 @@ let deploy_account_update_body : Account_update.Body.t =
 
 let deploy_account_update : Account_update.t =
   (* TODO: This is a pain. *)
-  Account_update.with_no_aux ~body:deploy_account_update_body
+  Account_update.with_aux ~body:deploy_account_update_body
     ~authorization:(Control.Poly.Signature Signature.dummy)
 
 let account_updates =

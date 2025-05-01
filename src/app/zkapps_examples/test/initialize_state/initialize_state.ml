@@ -85,7 +85,7 @@ let%test_module "Initialize state test" =
 
       let account_update : Account_update.t =
         (* TODO: This is a pain. *)
-        Account_update.with_no_aux ~body:account_update_body
+        Account_update.with_aux ~body:account_update_body
           ~authorization:(Control.Poly.Signature Signature.dummy)
     end
 
