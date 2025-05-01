@@ -211,8 +211,8 @@ and issue_job_from_partitioner ~(partitioner : t) () :
   List.find_map
     ~f:(fun f -> f ())
     [ reissue_old_task ~partitioner
-    ; issue_from_tmp_slot ~partitioner
     ; issue_from_zkapp_command_work_pool ~partitioner
+    ; issue_from_tmp_slot ~partitioner
     ]
 
 (* WARN: this should only be called if partitioner.first_in_pair is None *)
