@@ -4,13 +4,17 @@ module Span = struct
   [%%versioned
   module Stable = struct
     module V3 = struct
+      (* This span could track time in seconds with float under the hood.
+         Hence we use that as well, so no actual conversion is happening.
+         Accuracy is lost only when float has accuracy loss.
+      *)
       type t = Core_kernel.Time.Stable.Span.V3.t [@@deriving sexp]
 
-      let to_yojson total = `String (Time.Span.to_string_hum total)
+      let to_yojson span = `Float (Time.Span.to_sec span)
 
       let of_yojson = function
-        | `String time ->
-            Ok (Time.Span.of_string time)
+        | `Float span ->
+            Ok (Time.Span.of_sec span)
         | _ ->
             Error "Mina_stdlib.Time.Span: Could not parse"
 

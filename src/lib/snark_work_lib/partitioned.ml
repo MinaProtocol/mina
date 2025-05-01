@@ -1,3 +1,9 @@
+(*
+   This file tracks the Work distributed by Work Partitioner, hence the name.
+   Work Partitioner is a layer above the Work Selector, so types defined in this
+   module should be superset of types defined in Work Selector.
+ *)
+
 open Core_kernel
 
 module Pairing = struct
@@ -244,7 +250,7 @@ module Spec = struct
           ; common : Spec_common.t
           }
 
-    let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
+    let map (t : 'm t) ~(f : 'm -> 'n) : 'n t =
       match t with
       | Single { single_spec; pairing; metric; common } ->
           Single { single_spec; pairing; metric = f metric; common }
@@ -268,7 +274,7 @@ module Spec = struct
             ~f:(fun (i, _) -> Work.Single.Spec.statement i)
             instances
 
-    let map_metric_with_statement (t : 'm t)
+    let map_with_statement (t : 'm t)
         ~(f : Transaction_snark.Statement.t -> 'm -> 'n) : 'n t =
       match t with
       | Single { single_spec; pairing; metric; common } ->
@@ -368,19 +374,7 @@ module Spec = struct
 
   type t = unit Poly.t
 
-  let of_selector_spec ?issued_since_unix_epoch (spec : Selector.Spec.t) : t =
-    let issued_since_unix_epoch =
-      match issued_since_unix_epoch with
-      | None ->
-          let spec_str =
-            Selector.Spec.read_all_proofs_from_disk spec
-            |> Selector.Spec.Stable.V1.to_yojson |> Yojson.Safe.to_string
-          in
-          printf "No issued time provided, assuming now for %s" spec_str ;
-          Time.now () |> Time.to_span_since_epoch
-      | Some t ->
-          t
-    in
+  let of_selector_spec ~issued_since_unix_epoch (spec : Selector.Spec.t) : t =
     Old
       { instances = One_or_two.map ~f:(fun spec -> (spec, ())) spec.instances
       ; common = { fee_of_full = spec.fee; issued_since_unix_epoch }
@@ -468,7 +462,7 @@ module Result = struct
   let read_all_proofs_from_disk ({ data; prover } : t) : Stable.Latest.t =
     let data =
       Spec.Poly.(
-        map_metric ~f:Proof_with_metric.read_all_proofs_from_disk data
+        map ~f:Proof_with_metric.read_all_proofs_from_disk data
         |> read_all_proofs_from_disk)
     in
 
@@ -479,8 +473,7 @@ module Result = struct
     let data =
       Spec.Poly.(
         write_all_proofs_to_disk ~proof_cache_db data
-        |> map_metric
-             ~f:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db))
+        |> map ~f:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db))
     in
     { data; prover }
 
@@ -498,20 +491,8 @@ module Result = struct
           }
 
   let of_selector_result ~issued_since_unix_epoch
-      ({ proofs; metrics; spec = { instances; fee } as spec; prover } :
+      ({ proofs; metrics; spec = { instances; fee }; prover } :
         Selector.Result.t ) : t Or_error.t =
-    let issued_since_unix_epoch =
-      match issued_since_unix_epoch with
-      | None ->
-          let spec_str =
-            Selector.Spec.read_all_proofs_from_disk spec
-            |> Selector.Spec.Stable.V1.to_yojson |> Yojson.Safe.to_string
-          in
-          printf "No issued time provided, assuming now for %s" spec_str ;
-          Time.now () |> Time.to_span_since_epoch
-      | Some t ->
-          t
-    in
     let%bind.Result zipped = One_or_two.zip proofs metrics in
     let%map.Result zipped = One_or_two.zip zipped instances in
 
