@@ -250,7 +250,7 @@ module Spec = struct
           ; common : Spec_common.t
           }
 
-    let map_metric (t : 'm t) ~(f : 'm -> 'n) : 'n t =
+    let map (t : 'm t) ~(f : 'm -> 'n) : 'n t =
       match t with
       | Single { single_spec; pairing; metric; common } ->
           Single { single_spec; pairing; metric = f metric; common }
@@ -274,7 +274,7 @@ module Spec = struct
             ~f:(fun (i, _) -> Work.Single.Spec.statement i)
             instances
 
-    let map_metric_with_statement (t : 'm t)
+    let map_with_statement (t : 'm t)
         ~(f : Transaction_snark.Statement.t -> 'm -> 'n) : 'n t =
       match t with
       | Single { single_spec; pairing; metric; common } ->
@@ -462,7 +462,7 @@ module Result = struct
   let read_all_proofs_from_disk ({ data; prover } : t) : Stable.Latest.t =
     let data =
       Spec.Poly.(
-        map_metric ~f:Proof_with_metric.read_all_proofs_from_disk data
+        map ~f:Proof_with_metric.read_all_proofs_from_disk data
         |> read_all_proofs_from_disk)
     in
 
@@ -473,8 +473,7 @@ module Result = struct
     let data =
       Spec.Poly.(
         write_all_proofs_to_disk ~proof_cache_db data
-        |> map_metric
-             ~f:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db))
+        |> map ~f:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db))
     in
     { data; prover }
 
