@@ -80,33 +80,45 @@ let reissue_old_task ~(partitioner : t) () : Work.Partitioned.Spec.t option =
         partitioner.jobs_sent_by_partitioner ;
       Some (Sub_zkapp_command { spec = reissued; metric = () })
 
+(* let fold_until ~(init : 'accum) *)
+(*     ~(f : 'accum -> ID.t * Job.t -> ('accum, 'final) fold_action) *)
+(*     ~(finish : 'accum -> 'final) t : 'final = *)
+
 let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     Work.Partitioned.Spec.t option =
   let open Option.Let_syntax in
-  let%bind pairing, pending_zkapp_command =
-    Zkapp_command_job_pool.peek partitioner.zkapp_command_jobs
-  in
-  let%map spec =
-    Pending_zkapp_command.generate_job_spec pending_zkapp_command
-  in
-  let job_id =
-    Work.Partitioned.Zkapp_command_job.ID.Job_ID
-      (Id_generator.next_id partitioner.id_generator)
-  in
-  let fee_of_full = pending_zkapp_command.fee_of_full in
-  let issued_since_unix_epoch = epoch_now () in
-  let spec =
-    Work.Partitioned.Zkapp_command_job.Poly.
-      { spec
-      ; pairing
-      ; job_id
-      ; common = { fee_of_full; issued_since_unix_epoch }
-      }
-  in
-  Sent_job_pool.replace ~id:job_id ~job:spec
-    partitioner.jobs_sent_by_partitioner ;
+  let attempt_issue_from_pending
+      (pairing : Work.Partitioned.Pairing.Sub_zkapp.t)
+      (pending : Pending_zkapp_command.t) =
+    let%map spec = Pending_zkapp_command.generate_job_spec pending in
+    let job_id =
+      Work.Partitioned.Zkapp_command_job.ID.Job_ID
+        (Id_generator.next_id partitioner.id_generator)
+    in
+    let fee_of_full = pending.fee_of_full in
+    let issued_since_unix_epoch = epoch_now () in
+    let spec =
+      Work.Partitioned.Zkapp_command_job.Poly.
+        { spec
+        ; pairing
+        ; job_id
+        ; common = { fee_of_full; issued_since_unix_epoch }
+        }
+    in
+    Sent_job_pool.replace ~id:job_id ~job:spec
+      partitioner.jobs_sent_by_partitioner ;
 
-  Work.Partitioned.Spec.Poly.Sub_zkapp_command { spec; metric = () }
+    Work.Partitioned.Spec.Poly.Sub_zkapp_command { spec; metric = () }
+  in
+
+  Zkapp_command_job_pool.fold_until ~init:None
+    ~f:(fun _ (pairing, pending) ->
+      match attempt_issue_from_pending pairing pending with
+      | None ->
+          { slashed = false; action = `Continue None }
+      | Some spec ->
+          { slashed = false; action = `Stop (Some spec) } )
+    ~finish:Fn.id partitioner.zkapp_command_jobs
 
 let rec issue_from_tmp_slot ~(partitioner : t) () =
   match partitioner.tmp_slot with
