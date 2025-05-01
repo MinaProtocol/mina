@@ -52,6 +52,7 @@ let%test_module "Access permission tests" =
         | Account_update.Authorization_kind.Proof _ ->
             { body = { account_update.body with authorization_kind = auth_kind }
             ; authorization = account_update.authorization
+            ; aux = account_update.aux
             }
         | Account_update.Authorization_kind.Signature ->
             { body =
@@ -67,10 +68,12 @@ let%test_module "Access permission tests" =
                     }
                 }
             ; authorization = Signature Signature.dummy
+            ; aux = account_update.aux
             }
         | Account_update.Authorization_kind.None_given ->
             { body = { account_update.body with authorization_kind = auth_kind }
             ; authorization = None_given
+            ; aux = account_update.aux
             }
       in
       let deploy_account_update_body : Account_update.Body.t =
@@ -96,9 +99,8 @@ let%test_module "Access permission tests" =
       in
       let deploy_account_update : Account_update.t =
         (* TODO: This is a pain. *)
-        { body = deploy_account_update_body
-        ; authorization = Signature Signature.dummy
-        }
+        Account_update.with_no_aux ~body:deploy_account_update_body
+          ~authorization:(Control.Poly.Signature Signature.dummy)
       in
       let account_updates =
         []
@@ -114,13 +116,13 @@ let%test_module "Access permission tests" =
       in
       let fee_payer =
         (* TODO: This is a pain. *)
-        { Account_update.Fee_payer.body =
+        Account_update.Fee_payer.with_no_aux
+          ~body:
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.of_nanomina_int_exn 100
             }
-        ; authorization = Signature.dummy
-        }
+          ~authorization:Signature.dummy
       in
       let full_commitment =
         (* TODO: This is a pain. *)
@@ -150,6 +152,7 @@ let%test_module "Access permission tests" =
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = _
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
@@ -171,7 +174,10 @@ let%test_module "Access permission tests" =
       let zkapp_command : Zkapp_command.t =
         sign_all
           { fee_payer =
-              { body = fee_payer.body; authorization = Signature.dummy }
+              { body = fee_payer.body
+              ; authorization = Signature.dummy
+              ; aux = fee_payer.aux
+              }
           ; account_updates
           ; memo
           }

@@ -107,7 +107,7 @@ type ('u, 'a, 'b) with_forest =
 [@@deriving equal]
 
 let forget_digests_and_proofs (t : (_, _, _) with_forest) :
-    ( (_, (unit, _) Control.Poly.t) Account_update.Poly.t
+    ( (_, (unit, _) Control.Poly.t, _) Account_update.Poly.t
     , unit
     , unit )
     with_forest =
@@ -421,8 +421,8 @@ let is_incompatible_version = function
       Zkapp_command.is_incompatible_version p
 
 let has_invalid_call_forest :
-    ((Account_update.Body.t, _) Account_update.Poly.t, _, _) with_forest -> bool
-    = function
+       ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest
+    -> bool = function
   | Signed_command _ ->
       false
   | Zkapp_command cmd ->

@@ -47,17 +47,19 @@ let%test_module "Zkapp payments tests" =
       in
       Zkapp_command.of_simple ~proof_cache_db
         { fee_payer =
-            { body =
+            Account_update.Fee_payer.with_no_aux
+              ~body:
                 { public_key = acct1.account.public_key
                 ; fee = Fee.of_nanomina_int_exn full_amount
                 ; valid_until = None
                 ; nonce = acct1.account.nonce
                 }
-            ; authorization = Signature.dummy
-            }
+              ~authorization:Signature.dummy
         ; account_updates =
-            [ { body =
-                  { public_key = acct1.account.public_key
+            [ Account_update.with_no_aux
+                ~body:
+                  { Account_update.Body.Simple.public_key =
+                      acct1.account.public_key
                   ; update =
                       { app_state =
                           Pickles_types.Vector.map new_state ~f:(fun x ->
@@ -89,10 +91,11 @@ let%test_module "Zkapp payments tests" =
                   ; may_use_token = No
                   ; authorization_kind = Signature
                   }
-              ; authorization = Signature Signature.dummy
-              }
-            ; { body =
-                  { public_key = acct2.account.public_key
+                ~authorization:(Control.Poly.Signature Signature.dummy)
+            ; Account_update.with_no_aux
+                ~body:
+                  { Account_update.Body.Simple.public_key =
+                      acct2.account.public_key
                   ; update = Account_update.Update.noop
                   ; token_id = Token_id.default
                   ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
@@ -112,8 +115,7 @@ let%test_module "Zkapp payments tests" =
                   ; may_use_token = No
                   ; authorization_kind = None_given
                   }
-              ; authorization = None_given
-              }
+                ~authorization:Control.Poly.None_given
             ]
         ; memo
         }
