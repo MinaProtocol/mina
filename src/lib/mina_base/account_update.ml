@@ -1639,6 +1639,11 @@ module Body = struct
     }
 end
 
+(** The [No_aux.t] type is a unit type that is not intended for serialization;
+    it has special yojson/sexp instances designed to work with the helper module
+    [Account_update.Poly.Without_aux.t] below, so that types of the form [(_, _,
+    No_aux.t) Account_update.Poly.t] can still have [@@deriving yojson, sexp]
+    applied to them. *)
 module No_aux = struct
   [%%versioned
   module Stable = struct
@@ -1647,13 +1652,19 @@ module No_aux = struct
 
       let to_latest = Fn.id
 
+      (** A to_yojson function that cannot be called *)
       let to_yojson : _ -> Yojson.Safe.t = Nothing.unreachable_code
 
+      (** An of_yojson function that cannot be used for parsing, and which only
+          returns [No_aux.t] *)
       let of_yojson : Base.Nothing.t -> t Ppx_deriving_yojson_runtime.error_or =
         Fn.const (Ppx_deriving_yojson_runtime.Result.Ok ())
 
+      (** A sexp_of_t function that cannot be called *)
       let sexp_of_t : _ -> Ppx_sexp_conv_lib.Sexp.t = Nothing.unreachable_code
 
+      (** A t_of_sexp function that cannot be used for parsing, and which only
+          returns [No_aux.t] *)
       let t_of_sexp : Base.Nothing.t -> _ = Fn.const ()
     end
   end]
@@ -1668,6 +1679,22 @@ module No_aux = struct
 end
 
 module Poly = struct
+  (** This is a helper module to make writing the sexp/yojson instances of types
+      in this module easier. By going through this, the aux field of the
+      Account_update types is properly ignored when serializing and
+      deserializing.
+
+      The *_via functions in this module take three function paramaters because
+      they need to be compatible with ppx-generated code for types that look
+      like [{body; authorization; aux}]; the third, unused function is for the
+      aux field. This third function is constrained in type so that it must be a
+      constant function. In the [of_yojson_via] and [t_of_sexp_via] functions it
+      is also constrained so that it can only return [No_aux.t].
+
+      The to_yojson and sexp_of_t functions created with this module will ignore
+      the aux field entirely when writing their respective formats. The
+      of_yojson and t_of_sexp functions will expect the aux field to be absent
+      when parsing. *)
   module Without_aux = struct
     [%%versioned
     module Stable = struct
@@ -1795,6 +1822,11 @@ module T = struct
     end
   end]
 
+  (** Auxiliary data in an [Account_update.t], not intended for serialization.
+      The [to_yojson] and [sexp_of_t] instances here are written to be
+      compatible with [Account_update.Poly.Without_aux.t], so that types of the
+      form [(_, _, Aux_data.t) Account_update.Poly.t] can still have [@@deriving
+      sexp_of, to_yojson] applied to them. *)
   module Aux_data = struct
     type t =
       { actions_hash : Field.t
