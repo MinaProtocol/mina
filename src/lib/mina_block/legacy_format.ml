@@ -6,7 +6,8 @@ module Helper = struct
   let to_yojson ~proof_to_yojson tx =
     let update_to_yojson =
       Account_update.Poly.to_yojson Account_update.Body.to_yojson
-      @@ Control.Poly.to_yojson proof_to_yojson Signature.to_yojson
+        (Control.Poly.to_yojson proof_to_yojson Signature.to_yojson)
+        Account_update.No_aux.to_yojson
     in
     User_command.Poly.to_yojson Signed_command.to_yojson
       (Zkapp_command.with_forest_to_yojson update_to_yojson
@@ -17,7 +18,8 @@ module Helper = struct
   let of_yojson ~proof_of_yojson =
     let update_of_yojson =
       Account_update.Poly.of_yojson Account_update.Body.of_yojson
-      @@ Control.Poly.of_yojson proof_of_yojson Signature.of_yojson
+        (Control.Poly.of_yojson proof_of_yojson Signature.of_yojson)
+        Account_update.No_aux.of_yojson
     in
     User_command.Poly.of_yojson Signed_command.of_yojson
     @@ Zkapp_command.with_forest_of_yojson update_of_yojson
