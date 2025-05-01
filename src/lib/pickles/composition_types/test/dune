@@ -1,0 +1,13 @@
+(executable
+ (name test_composition_types)
+ (modules test_composition_types)
+ (libraries
+  core_kernel
+  alcotest
+  pickles.composition_types
+  limb_vector
+  kimchi_backend_common
+  pickles_base
+  kimchi_pasta_snarky_backend)
+ (preprocess
+  (pps ppx_jane)))
