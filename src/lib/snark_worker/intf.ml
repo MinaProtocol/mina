@@ -23,7 +23,7 @@ module type Worker = sig
   val perform :
        state:Worker_state.t
     -> spec:Spec.Stable.Latest.t
-    -> sok_digest:Mina_base.Sok_message.Digest.t
+    -> sok_digest:Mina_base.Sok_message.Digest.Stable.Latest.t
     -> ( Ledger_proof.Stable.Latest.t
        * Time.Stable.Span.V1.t
        * [ `Transition | `Merge ] )

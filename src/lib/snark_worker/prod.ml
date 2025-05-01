@@ -283,7 +283,7 @@ module Impl : Intf.Worker = struct
       ~state:
         ({ m_with_proof_level; cache; proof_cache_db; logger } : Worker_state.t)
       ~(spec : Work.Selector.Spec.Stable.Latest.t)
-      ~(sok_digest : Sok_message.Digest.t) =
+      ~(sok_digest : Sok_message.Digest.Stable.Latest.t) =
     let Work.Work.Spec.{ instances; _ } = spec in
     match m_with_proof_level with
     | Full ((module M) as m) -> (
