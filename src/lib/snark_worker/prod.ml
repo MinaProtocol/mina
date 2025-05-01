@@ -1,8 +1,5 @@
-(* OPAM libraries *)
 open Async
 open Core
-
-(* Local libraries *)
 open Mina_base
 open Mina_transaction
 module Work = Snark_work_lib

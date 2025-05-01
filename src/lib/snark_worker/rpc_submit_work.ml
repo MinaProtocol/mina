@@ -1,8 +1,5 @@
-(* OPAM libraries *)
 open Async
 open Core
-
-(* Local libraries *)
 module Work = Snark_work_lib
 
 (* For versioning of the types here, see:

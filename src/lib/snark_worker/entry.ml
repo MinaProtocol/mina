@@ -1,8 +1,5 @@
-(* OPAM libraries *)
 open Core
 open Async
-
-(* Local libraries *)
 open Events
 
 let command_name = "snark-worker"

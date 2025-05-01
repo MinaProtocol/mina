@@ -1,8 +1,5 @@
-(* OPAM libraries *)
 open Async
 open Core
-
-(* Local libraries *)
 open Signature_lib
 module Work = Snark_work_lib
 
