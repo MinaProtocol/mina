@@ -258,12 +258,6 @@ module T = struct
   let pending_coinbase_collection { pending_coinbase_collection; _ } =
     pending_coinbase_collection
 
-  let _get_target ((proof, _), _) =
-    let { Transaction_snark.Statement.Poly.target; _ } =
-      Ledger_proof.statement proof
-    in
-    target
-
   let verify_scan_state_after_apply ~constraint_constants
       ~pending_coinbase_stack ~first_pass_ledger_end ~second_pass_ledger_end
       (scan_state : Scan_state.t) =
@@ -487,23 +481,6 @@ module T = struct
       Currency.Amount.scale constraint_constants.coinbase_amount
         constraint_constants.supercharged_coinbase_factor
     else Some constraint_constants.coinbase_amount
-
-  let _coinbase_amount_or_error ~supercharge_coinbase
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
-    if supercharge_coinbase then
-      Option.value_map
-        ~default:
-          (Error
-             (Pre_diff_info.Error.Coinbase_error
-                (sprintf
-                   !"Overflow when calculating coinbase amount: Supercharged \
-                     coinbase factor (%d) x coinbase amount (%{sexp: \
-                     Currency.Amount.t})"
-                   constraint_constants.supercharged_coinbase_factor
-                   constraint_constants.coinbase_amount ) ) )
-        (coinbase_amount ~supercharge_coinbase ~constraint_constants)
-        ~f:(fun x -> Ok x)
-    else Ok constraint_constants.coinbase_amount
 
   let apply_single_transaction_first_pass ~constraint_constants ~global_slot
       ledger (pending_coinbase_stack_state : Stack_state_with_init_stack.t)
