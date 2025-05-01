@@ -410,8 +410,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
          ; joint_combiner
          ; feature_flags = actual_feature_flags
          } :
-          _ Minimal.t )
-        (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) ->
+          _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) ->
       let open Plonk_types.Evals.In_circuit in
       let e1 field = snd (field e) in
       let zkp = env.zk_polynomial in

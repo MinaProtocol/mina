@@ -140,7 +140,7 @@ val wrap :
      Promise.t
 
 val combined_inner_product :
-     env:Backend.Tick.Field.t Plonk_checks.Scalars.Env.t
+     env:Backend.Tick.Field.t Kimchi_checks.Scalars.Env.t
   -> domain:< shifts : Backend.Tick.Field.t array ; .. >
   -> ft_eval1:Backend.Tick.Field.t
   -> actual_proofs_verified:
@@ -169,9 +169,9 @@ val challenge_polynomial :
 
 module Type1 :
     module type of
-      Plonk_checks.Make
+      Kimchi_checks.Make
         (Pickles_types.Shifted_value.Type1)
-        (Plonk_checks.Scalars.Tick)
+        (Kimchi_checks.Scalars.Tick)
 
 module For_tests_only : sig
   type shifted_tick_field =

@@ -1,6 +1,6 @@
 (library
- (name plonk_checks)
- (public_name pickles.plonk_checks)
+ (name kimchi_checks)
+ (public_name pickles.kimchi_checks)
  (instrumentation
   (backend bisect_ppx))
  (flags

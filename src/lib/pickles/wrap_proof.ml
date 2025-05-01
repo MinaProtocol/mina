@@ -38,7 +38,7 @@ let typ : (Checked.t, Constant.t) Typ.t =
         ~dummy:Inner_curve.Params.one
         ~commitment_lengths:
           (Commitment_lengths.default
-             ~num_chunks:Plonk_checks.num_chunks_by_default )
+             ~num_chunks:Kimchi_checks.num_chunks_by_default )
     ; Types.Step.Bulletproof.typ ~length:(Nat.to_int Tock.Rounds.n)
         ( Typ.transport Other_field.typ
             ~there:(fun x ->

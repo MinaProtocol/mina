@@ -111,7 +111,7 @@ module Domains = struct
     let open Impls.Step in
     let dom =
       Typ.transport Typ.field
-        ~there:(fun (Plonk_checks.Domain.Pow_2_roots_of_unity n) ->
+        ~there:(fun (Kimchi_checks.Domain.Pow_2_roots_of_unity n) ->
           Field.Constant.of_int n )
         ~back:(fun _ -> assert false)
       |> Typ.transport_var
@@ -229,7 +229,7 @@ module Stable = struct
                    } )
               ; shifts = Common.tock_shifts ~log2_size
               ; lookup_index = None
-              ; zk_rows = Plonk_checks.zk_rows_by_default
+              ; zk_rows = Kimchi_checks.zk_rows_by_default
               } )
         in
         { Poly.max_proofs_verified

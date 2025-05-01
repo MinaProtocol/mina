@@ -53,7 +53,7 @@
   pickles.backend
   pickles.composition_types
   pickles.limb_vector
-  pickles.plonk_checks
+  pickles.kimchi_checks
   pickles.pseudo
   pickles_base
   pickles_base.one_hot_vector

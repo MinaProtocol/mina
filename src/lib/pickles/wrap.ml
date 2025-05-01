@@ -13,12 +13,12 @@ let challenge_polynomial =
   Wrap_verifier.challenge_polynomial (module Backend.Tick.Field)
 
 module Type1 =
-  Plonk_checks.Make
+  Kimchi_checks.Make
     (Shifted_value.Type1)
     (struct
-      let constant_term = Plonk_checks.Scalars.Tick.constant_term
+      let constant_term = Kimchi_checks.Scalars.Tick.constant_term
 
-      let index_terms = Plonk_checks.Scalars.Tick.index_terms
+      let index_terms = Kimchi_checks.Scalars.Tick.index_terms
     end)
 
 let _vector_of_list (type a t)
@@ -37,7 +37,7 @@ let combined_inner_product (type actual_proofs_verified) ~env ~domain ~ft_eval1
     ~(old_bulletproof_challenges : (_, actual_proofs_verified) Vector.t) ~r
     ~plonk ~xi ~zeta ~zetaw =
   let combined_evals =
-    Plonk_checks.evals_of_split_evals ~zeta ~zetaw
+    Kimchi_checks.evals_of_split_evals ~zeta ~zetaw
       (module Tick.Field)
       ~rounds:tick_rounds e.evals
   in
@@ -167,14 +167,14 @@ module For_tests_only = struct
       }
     in
     let tick_combined_evals =
-      Plonk_checks.evals_of_split_evals
+      Kimchi_checks.evals_of_split_evals
         (module Tick.Field)
         proof.proof.openings.evals ~rounds:(Nat.to_int Tick.Rounds.n)
         ~zeta:As_field.zeta ~zetaw
       |> Plonk_types.Evals.to_in_circuit
     in
     let tick_domain =
-      Plonk_checks.domain
+      Kimchi_checks.domain
         (module Tick.Field)
         domain ~shifts:Common.tick_shifts
         ~domain_generator:Backend.Tick.Field.domain_generator
@@ -200,7 +200,7 @@ module For_tests_only = struct
 
         let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
       end in
-      Plonk_checks.scalars_env
+      Kimchi_checks.scalars_env
         (module Env_bool)
         (module Env_field)
         ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
