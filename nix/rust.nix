@@ -107,7 +107,7 @@ in {
         fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
     };
     buildPhase = ''
-      cargo build -p kimchi-stubs --release --lib --all-features
+      cargo build -p kimchi-stubs --release --lib
     '';
     installPhase = ''
         mkdir -p $out/lib
@@ -153,10 +153,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-0u9bl+FkXEK2b54n7/l9JOCtKo+pb42GF9E1EnAUQa0=";
+        sha256 = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
       };
 
-      cargoSha256 = "sha256-AsZBtE2qHJqQtuCt/wCAgOoxYMfvDh8IzBPAOkYSYko=";
+      cargoSha256 = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -205,9 +205,9 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./plonk-wasm -- --features nodejs
-      wasm-pack build --mode no-install --target web --out-dir $out/web ./plonk-wasm
+      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';

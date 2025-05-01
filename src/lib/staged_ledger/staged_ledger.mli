@@ -158,7 +158,7 @@ module Staged_ledger_error : sig
     | Invalid_public_key of Public_key.Compressed.t
     | ZkApps_exceed_limit of int * int
     | Unexpected of Error.t
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 
   val to_string : t -> string
 
@@ -196,7 +196,6 @@ type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
 val apply :
      ?skip_verification:[ `Proofs | `All ]
-  -> proof_cache_db:Proof_cache_tag.cache_db
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> get_completed_work:
@@ -227,8 +226,7 @@ val apply :
      Deferred.Result.t
 
 val apply_diff_unchecked :
-     proof_cache_db:Proof_cache_tag.cache_db
-  -> constraint_constants:Genesis_constants.Constraint_constants.t
+     constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t

@@ -20,7 +20,7 @@ BASE_PATH=""
 CHANGELOG_FILE=""
 # List of users who can bypass the changelog check by commenting !ci-bypass-changelog
 # separated by space
-GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie mrmr1993 deepthiskumar Trivo25 45930 SanabriaRusso nicc georgeee"
+GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie mrmr1993 deepthiskumar Trivo25 45930 SanabriaRusso nicc georgeee dannywillems"
 
 BYPASS_PHRASE="!ci-bypass-changelog"
 
@@ -93,7 +93,7 @@ else
     exit 1
 fi
 
-REMOTE_BRANCH="${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+REMOTE_BRANCH="origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
 
 BASE_COMMIT=$(git log "${REMOTE_BRANCH}" -1 --pretty=format:%H)
 echo "Diffing current commit: ${BUILDKITE_COMMIT} against branch: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} (${BASE_COMMIT})" >&2

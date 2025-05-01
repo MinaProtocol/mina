@@ -258,7 +258,9 @@ struct
                 }
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
-          ; batcher = Batcher.Snark_pool.create ~logger config.verifier
+          ; batcher =
+              Batcher.Snark_pool.create ~proof_cache_db:config.proof_cache_db
+                ~logger config.verifier
           ; logger
           ; config
           ; account_creation_fee =
@@ -508,13 +510,9 @@ struct
   let get_completed_work t statement =
     Option.map
       (Resource_pool.request_proof (resource_pool t) statement)
-      ~f:(fun Priced_proof.{ proof; fee = { fee; prover } } ->
+      ~f:(fun Priced_proof.{ proof = proofs; fee = { fee; prover } } ->
         Transaction_snark_work.Checked.create_unsafe
-          { Transaction_snark_work.fee
-          ; proofs =
-              One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk proof
-          ; prover
-          } )
+          { Transaction_snark_work.fee; proofs; prover } )
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)

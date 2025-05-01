@@ -229,7 +229,7 @@ struct
     with_label __LOC__ (fun () ->
         Ops.scale_fast2 p s ~num_bits:Field.size_in_bits )
 
-  let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~xi
+  let check_bulletproof ~(sponge : Sponge.t) ~xi
       ~(* Corresponds to y in figure 7 of WTS *)
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       (advice : _ Bulletproof.Advice.t)
@@ -252,7 +252,7 @@ struct
         let open Inner_curve in
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           with_label "combined_polynomial" (fun () ->
-              Pcs_batch.combine_split_commitments pcs_batch
+              Pcs_batch.combine_split_commitments
                 ~reduce_without_degree_bound:Array.to_list
                 ~reduce_with_degree_bound:(fun { Plonk_types.Poly_comm
                                                  .With_degree_bound
@@ -604,13 +604,8 @@ struct
                     num_commitments_without_degree_bound ) )
           in
           with_label "check_bulletproof" (fun () ->
-              check_bulletproof
-                ~pcs_batch:
-                  (Common.dlog_pcs_batch
-                     (Wrap_hack.Padded_length.add
-                        num_commitments_without_degree_bound ) )
-                ~sponge:sponge_before_evaluations ~xi ~advice ~opening
-                ~polynomials:(without_degree_bound, []) )
+              check_bulletproof ~sponge:sponge_before_evaluations ~xi ~advice
+                ~opening ~polynomials:(without_degree_bound, []) )
         in
         let joint_combiner = None in
         assert_eq_deferred_values
@@ -1121,7 +1116,7 @@ struct
     let after_index = sponge_after_index index in
     ( after_index
     , (* TODO: Just get rid of the proofs verified mask and always absorb in full *)
-      stage (fun t ~widths:_ ~max_width:_ ~proofs_verified_mask ->
+      stage (fun t ~proofs_verified_mask ->
           let sponge = Sponge.copy after_index in
           let t =
             { t with

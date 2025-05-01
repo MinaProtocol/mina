@@ -7,6 +7,7 @@ module Validation = Validation
 module Validated = Validated_block
 module Precomputed = Precomputed_block
 module Internal_transition = Internal_transition
+module Legacy_format = Legacy_format
 
 type fully_invalid_block = Validation.fully_invalid_with_block
 
@@ -38,16 +39,16 @@ let genesis ~precomputed_values : Block.with_hash * Validation.fully_valid =
     With_hash.map genesis_state ~f:(Fn.const block)
   in
   let validation =
-    ( (`Time_received, Truth.True ())
-    , (`Genesis_state, Truth.True ())
-    , (`Proof, Truth.True ())
+    ( (`Time_received, Mina_stdlib.Truth.True ())
+    , (`Genesis_state, Mina_stdlib.Truth.True ())
+    , (`Proof, Mina_stdlib.Truth.True ())
     , ( `Delta_block_chain
-      , Truth.True
+      , Mina_stdlib.Truth.True
           ( Mina_stdlib.Nonempty_list.singleton
           @@ Protocol_state.previous_state_hash protocol_state ) )
-    , (`Frontier_dependencies, Truth.True ())
-    , (`Staged_ledger_diff, Truth.True ())
-    , (`Protocol_versions, Truth.True ()) )
+    , (`Frontier_dependencies, Mina_stdlib.Truth.True ())
+    , (`Staged_ledger_diff, Mina_stdlib.Truth.True ())
+    , (`Protocol_versions, Mina_stdlib.Truth.True ()) )
   in
   (block_with_hash, validation)
 
@@ -73,16 +74,23 @@ let consensus_state =
 
 include Block
 
+module Proof_carrying = struct
+  let to_header_data ~to_header
+      { Proof_carrying_data.proof = merkle_list, root_unverified
+      ; data = best_tip_unverified
+      } =
+    { Proof_carrying_data.proof = (merkle_list, to_header root_unverified)
+    ; data = to_header best_tip_unverified
+    }
+end
+
 let verify_on_header ~verify
-    { Proof_carrying_data.proof = merkle_list, root_unverified
-    ; data = best_tip_unverified
-    } =
+    ( { Proof_carrying_data.proof = _, root_unverified
+      ; data = best_tip_unverified
+      } as pcd ) =
   let%map.Async_kernel.Deferred.Or_error ( `Root root_header
                                          , `Best_tip best_tip_header ) =
-    verify
-      { Proof_carrying_data.proof = (merkle_list, header root_unverified)
-      ; data = header best_tip_unverified
-      }
+    verify (Proof_carrying.to_header_data ~to_header:header pcd)
   in
   let root = Validation.with_body root_header (body root_unverified) in
   let best_tip =

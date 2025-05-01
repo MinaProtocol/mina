@@ -11,11 +11,14 @@ open Common
 (* This contains the "step" prover *)
 
 module Make
+    (Inductive_rule : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
     (A : T0) (A_value : sig
       type t
     end)
     (Max_proofs_verified : Nat.Add.Intf_transparent) =
 struct
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule)
+
   let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct
@@ -123,7 +126,7 @@ struct
            Impls.Wrap.Verification_key.t
         -> _ array Plonk_verification_key_evals.t
         -> value
-        -> (local_max_proofs_verified, local_max_proofs_verified) Proof.t
+        -> local_max_proofs_verified Proof.t
         -> (var, value, local_max_proofs_verified) Types_map.Basic.t
         -> must_verify:bool
         -> [ `Sg of Tock.Curve.Affine.t ]
@@ -582,7 +585,7 @@ struct
                  , ns
                  , ms )
                  H3.T(Per_proof_witness.Constant.No_app_state).t
-               * (ns, ns) H2.T(Proof).t
+               * ns H1.T(Proof).t
                * (int, k) Vector.t =
          fun ts datas prev_proof_stmts l ->
           match (ts, datas, prev_proof_stmts, l) with
@@ -648,7 +651,7 @@ struct
         (module Extract : Extract.S with type res = res) =
       let rec go :
           type vars values ns ms len.
-             (ns, ns) H2.T(Proof).t
+             ns H1.T(Proof).t
           -> (values, vars, ns, ms) H4.T(Tag).t
           -> (vars, len) Length.t
           -> (res, len) Vector.t =
@@ -863,7 +866,7 @@ struct
     let messages_for_next_wrap_proof =
       let rec go :
           type a.
-             (a, a) H2.T(Proof).t
+             a H1.T(Proof).t
           -> a H1.T(Proof.Base.Messages_for_next_proof_over_same_field.Wrap).t =
         function
         | [] ->

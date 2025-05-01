@@ -34,7 +34,7 @@ let wrap t : fully_invalid_with_block = (t, fully_invalid)
 
 module Unsafe = struct
   let set_valid_time_received :
-         ( [ `Time_received ] * unit Truth.false_t
+         ( [ `Time_received ] * unit Mina_stdlib.Truth.false_t
          , 'genesis_state
          , 'proof
          , 'delta_block_chain
@@ -42,7 +42,7 @@ module Unsafe = struct
          , 'staged_ledger_diff
          , 'protocol_versions )
          t
-      -> ( [ `Time_received ] * unit Truth.true_t
+      -> ( [ `Time_received ] * unit Mina_stdlib.Truth.true_t
          , 'genesis_state
          , 'proof
          , 'delta_block_chain
@@ -50,14 +50,14 @@ module Unsafe = struct
          , 'staged_ledger_diff
          , 'protocol_versions )
          t = function
-    | ( (`Time_received, Truth.False)
+    | ( (`Time_received, Mina_stdlib.Truth.False)
       , genesis_state
       , proof
       , delta_block_chain
       , frontier_dependencies
       , staged_ledger_diff
       , protocol_versions ) ->
-        ( (`Time_received, Truth.True ())
+        ( (`Time_received, Mina_stdlib.Truth.True ())
         , genesis_state
         , proof
         , delta_block_chain
@@ -68,7 +68,7 @@ module Unsafe = struct
   let set_valid_proof :
          ( 'time_received
          , 'genesis_state
-         , [ `Proof ] * unit Truth.false_t
+         , [ `Proof ] * unit Mina_stdlib.Truth.false_t
          , 'delta_block_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
@@ -76,7 +76,7 @@ module Unsafe = struct
          t
       -> ( 'time_received
          , 'genesis_state
-         , [ `Proof ] * unit Truth.true_t
+         , [ `Proof ] * unit Mina_stdlib.Truth.true_t
          , 'delta_block_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
@@ -84,14 +84,14 @@ module Unsafe = struct
          t = function
     | ( time_received
       , genesis_state
-      , (`Proof, Truth.False)
+      , (`Proof, Mina_stdlib.Truth.False)
       , delta_block_chain
       , frontier_dependencies
       , staged_ledger_diff
       , protocol_versions ) ->
         ( time_received
         , genesis_state
-        , (`Proof, Truth.True ())
+        , (`Proof, Mina_stdlib.Truth.True ())
         , delta_block_chain
         , frontier_dependencies
         , staged_ledger_diff
@@ -99,7 +99,7 @@ module Unsafe = struct
 
   let set_valid_genesis_state :
          ( 'time_received
-         , [ `Genesis_state ] * unit Truth.false_t
+         , [ `Genesis_state ] * unit Mina_stdlib.Truth.false_t
          , 'proof
          , 'delta_block_chain
          , 'frontier_dependencies
@@ -107,7 +107,7 @@ module Unsafe = struct
          , 'protocol_versions )
          t
       -> ( 'time_received
-         , [ `Genesis_state ] * unit Truth.true_t
+         , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
          , 'proof
          , 'delta_block_chain
          , 'frontier_dependencies
@@ -115,14 +115,14 @@ module Unsafe = struct
          , 'protocol_versions )
          t = function
     | ( time_received
-      , (`Genesis_state, Truth.False)
+      , (`Genesis_state, Mina_stdlib.Truth.False)
       , proof
       , delta_block_chain
       , frontier_dependencies
       , staged_ledger_diff
       , protocol_versions ) ->
         ( time_received
-        , (`Genesis_state, Truth.True ())
+        , (`Genesis_state, Mina_stdlib.Truth.True ())
         , proof
         , delta_block_chain
         , frontier_dependencies
@@ -134,7 +134,7 @@ module Unsafe = struct
          , 'genesis_state
          , 'proof
          , [ `Delta_block_chain ]
-           * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
+           * State_hash.t Mina_stdlib.Nonempty_list.t Mina_stdlib.Truth.false_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
          , 'protocol_versions )
@@ -144,7 +144,7 @@ module Unsafe = struct
          , 'genesis_state
          , 'proof
          , [ `Delta_block_chain ]
-           * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
+           * State_hash.t Mina_stdlib.Nonempty_list.t Mina_stdlib.Truth.true_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
          , 'protocol_versions )
@@ -154,14 +154,14 @@ module Unsafe = struct
     | ( time_received
       , genesis_state
       , proof
-      , (`Delta_block_chain, Truth.False)
+      , (`Delta_block_chain, Mina_stdlib.Truth.False)
       , frontier_dependencies
       , staged_ledger_diff
       , protocol_versions ) ->
         ( time_received
         , genesis_state
         , proof
-        , (`Delta_block_chain, Truth.True hashes)
+        , (`Delta_block_chain, Mina_stdlib.Truth.True hashes)
         , frontier_dependencies
         , staged_ledger_diff
         , protocol_versions )
@@ -171,7 +171,7 @@ module Unsafe = struct
          , 'genesis_state
          , 'proof
          , 'delta_block_chain
-         , [ `Frontier_dependencies ] * unit Truth.false_t
+         , [ `Frontier_dependencies ] * unit Mina_stdlib.Truth.false_t
          , 'staged_ledger_diff
          , 'protocol_versions )
          t
@@ -179,7 +179,7 @@ module Unsafe = struct
          , 'genesis_state
          , 'proof
          , 'delta_block_chain
-         , [ `Frontier_dependencies ] * unit Truth.true_t
+         , [ `Frontier_dependencies ] * unit Mina_stdlib.Truth.true_t
          , 'staged_ledger_diff
          , 'protocol_versions )
          t = function
@@ -187,14 +187,14 @@ module Unsafe = struct
       , genesis_state
       , proof
       , delta_block_chain
-      , (`Frontier_dependencies, Truth.False)
+      , (`Frontier_dependencies, Mina_stdlib.Truth.False)
       , staged_ledger_diff
       , protocol_versions ) ->
         ( time_received
         , genesis_state
         , proof
         , delta_block_chain
-        , (`Frontier_dependencies, Truth.True ())
+        , (`Frontier_dependencies, Mina_stdlib.Truth.True ())
         , staged_ledger_diff
         , protocol_versions )
 
@@ -204,7 +204,7 @@ module Unsafe = struct
          , 'proof
          , 'delta_block_chain
          , 'frontier_dependencies
-         , [ `Staged_ledger_diff ] * unit Truth.false_t
+         , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t
          , 'protocol_versions )
          t
       -> ( 'time_received
@@ -212,7 +212,7 @@ module Unsafe = struct
          , 'proof
          , 'delta_block_chain
          , 'frontier_dependencies
-         , [ `Staged_ledger_diff ] * unit Truth.true_t
+         , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.true_t
          , 'protocol_versions )
          t = function
     | ( time_received
@@ -220,14 +220,14 @@ module Unsafe = struct
       , proof
       , delta_block_chain
       , frontier_dependencies
-      , (`Staged_ledger_diff, Truth.False)
+      , (`Staged_ledger_diff, Mina_stdlib.Truth.False)
       , protocol_versions ) ->
         ( time_received
         , genesis_state
         , proof
         , delta_block_chain
         , frontier_dependencies
-        , (`Staged_ledger_diff, Truth.True ())
+        , (`Staged_ledger_diff, Mina_stdlib.Truth.True ())
         , protocol_versions )
 
   let set_valid_protocol_versions :
@@ -237,7 +237,7 @@ module Unsafe = struct
          , 'delta_block_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , [ `Protocol_versions ] * unit Truth.false_t )
+         , [ `Protocol_versions ] * unit Mina_stdlib.Truth.false_t )
          t
       -> ( 'time_received
          , 'genesis_state
@@ -245,7 +245,7 @@ module Unsafe = struct
          , 'delta_block_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , [ `Protocol_versions ] * unit Truth.true_t )
+         , [ `Protocol_versions ] * unit Mina_stdlib.Truth.true_t )
          t = function
     | ( time_received
       , genesis_state
@@ -253,14 +253,14 @@ module Unsafe = struct
       , delta_block_chain
       , frontier_dependencies
       , staged_ledger_diff
-      , (`Protocol_versions, Truth.False) ) ->
+      , (`Protocol_versions, Mina_stdlib.Truth.False) ) ->
         ( time_received
         , genesis_state
         , proof
         , delta_block_chain
         , frontier_dependencies
         , staged_ledger_diff
-        , (`Protocol_versions, Truth.True ()) )
+        , (`Protocol_versions, Mina_stdlib.Truth.True ()) )
 end
 
 let validate_time_received ~(precomputed_values : Precomputed_values.t)
@@ -302,7 +302,7 @@ let skip_genesis_protocol_state_validation `This_block_was_generated_internally
 let reset_genesis_protocol_state_validation (block_with_hash, validation) =
   match validation with
   | ( time_received
-    , (`Genesis_state, Truth.True ())
+    , (`Genesis_state, Mina_stdlib.Truth.True ())
     , proof
     , delta_block_chain
     , frontier_dependencies
@@ -310,7 +310,7 @@ let reset_genesis_protocol_state_validation (block_with_hash, validation) =
     , protocol_versions ) ->
       ( block_with_hash
       , ( time_received
-        , (`Genesis_state, Truth.False)
+        , (`Genesis_state, Mina_stdlib.Truth.False)
         , proof
         , delta_block_chain
         , frontier_dependencies
@@ -364,7 +364,7 @@ let skip_proof_validation `This_block_was_generated_internally (t, validation) =
   (t, Unsafe.set_valid_proof validation)
 
 let extract_delta_block_chain_witness = function
-  | _, _, _, (`Delta_block_chain, Truth.True delta_block_chain_witness), _, _, _
+  | _, _, _, (`Delta_block_chain, Mina_stdlib.Truth.True delta_block_chain_witness), _, _, _
     ->
       delta_block_chain_witness
   | _ ->
@@ -456,7 +456,7 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
     , genesis_state
     , proof
     , delta_block_chain
-    , (`Frontier_dependencies, Truth.True ())
+    , (`Frontier_dependencies, Mina_stdlib.Truth.True ())
     , staged_ledger_diff
     , protocol_versions ) ->
       ( transition_with_hash
@@ -464,16 +464,15 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
         , genesis_state
         , proof
         , delta_block_chain
-        , (`Frontier_dependencies, Truth.False)
+        , (`Frontier_dependencies, Mina_stdlib.Truth.False)
         , staged_ledger_diff
         , protocol_versions ) )
   | _ ->
       failwith "why can't this be refuted?"
 
-let validate_staged_ledger_diff ?skip_staged_ledger_verification ~proof_cache_db
-    ~logger ~get_completed_work ~precomputed_values ~verifier
-    ~parent_staged_ledger ~parent_protocol_state ?transaction_pool_proxy
-    (t, validation) =
+let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
+    ~get_completed_work ~precomputed_values ~verifier ~parent_staged_ledger
+    ~parent_protocol_state ?transaction_pool_proxy (t, validation) =
   [%log internal] "Validate_staged_ledger_diff" ;
   let block = With_hash.data t in
   let header = Block.header block in
@@ -487,7 +486,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~proof_cache_db
   let body_ref_computed =
     Staged_ledger_diff.Body.compute_reference
       ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-      body
+    @@ Staged_ledger_diff.Body.read_all_proofs_from_disk body
   in
   let%bind.Deferred.Result () =
     if Blake2.equal body_ref_computed body_ref_from_header then
@@ -498,8 +497,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~proof_cache_db
                            , `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
                            , `Pending_coinbase_update _ ) =
-    Staged_ledger.apply ~proof_cache_db
-      ?skip_verification:skip_staged_ledger_verification ~get_completed_work
+    Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
+      ~get_completed_work
       ~constraint_constants:
         precomputed_values.Precomputed_values.constraint_constants ~global_slot
       ~logger ~verifier parent_staged_ledger
@@ -587,7 +586,7 @@ let reset_staged_ledger_diff_validation (transition_with_hash, validation) =
     , proof
     , delta_block_chain
     , frontier_dependencies
-    , (`Staged_ledger_diff, Truth.True ())
+    , (`Staged_ledger_diff, Mina_stdlib.Truth.True ())
     , protocol_versions ) ->
       ( transition_with_hash
       , ( time_received
@@ -595,7 +594,7 @@ let reset_staged_ledger_diff_validation (transition_with_hash, validation) =
         , proof
         , delta_block_chain
         , frontier_dependencies
-        , (`Staged_ledger_diff, Truth.False)
+        , (`Staged_ledger_diff, Mina_stdlib.Truth.False)
         , protocol_versions ) )
   | _ ->
       failwith "why can't this be refuted?"

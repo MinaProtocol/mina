@@ -104,7 +104,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~collected_transitions ~cache_exceptions ?transition_writer_ref ~frontier_w
-    frontier =
+    frontier ?transaction_pool_proxy =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -151,6 +151,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
       ~frontier ~get_completed_work
       ~network_transition_reader:transition_frontier_controller_reader
       ~producer_transition_reader ~clear_reader ~cache_exceptions
+      ?transaction_pool_proxy
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -249,16 +250,16 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ( "length"
                   , Length.to_yojson
-                      (Mina_block.blockchain_length peer_best_tip.data) )
+                      ( Mina_block.Stable.Latest.header peer_best_tip.data
+                      |> Mina_block.Header.blockchain_length ) )
                 ]
               "Successfully downloaded best tip with $length from $peer" ;
             (* TODO: Use batch verification instead *)
             match%bind
-              Mina_block.verify_on_header
-                ~verify:
-                  (Best_tip_prover.verify ~verifier ~genesis_constants
-                     ~precomputed_values )
-                peer_best_tip
+              Best_tip_prover.verify ~verifier ~genesis_constants
+                ~precomputed_values
+              @@ Mina_block.Proof_carrying.to_header_data
+                   ~to_header:Mina_block.Stable.Latest.header peer_best_tip
             with
             | Error e ->
                 [%log warn]
@@ -280,10 +281,20 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 [%log debug]
                   ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ]
                   "Successfully verified best tip from $peer" ;
+                let body =
+                  Mina_block.Stable.Latest.body peer_best_tip.data
+                  |> Staged_ledger_diff.Body.write_all_proofs_to_disk
+                       ~proof_cache_db
+                in
                 return
                   (Some
                      (Envelope.Incoming.wrap_peer
-                        ~data:{ peer_best_tip with data = candidate_best_tip }
+                        ~data:
+                          { peer_best_tip with
+                            data =
+                              Mina_block.Validation.with_body candidate_best_tip
+                                body
+                          }
                         ~sender:peer ) ) ) )
   in
   [%log debug]
@@ -329,7 +340,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
              { Proof_carrying_data.data =
                  Mina_block.Validation.block_with_hash data
                  |> Mina_base.State_hash.With_state_hashes.state_hash
-             ; proof = (path, Mina_block.header root)
+             ; proof = (path, Mina_block.Stable.Latest.header root)
              } ;
            data ) )
 
@@ -406,7 +417,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~get_completed_work ~frontier_w ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~cache_exceptions
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+    ~consensus_local_state ~catchup_mode ~notify_online ?transaction_pool_proxy
+    =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -431,7 +443,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
       [%log info] "Unable to load frontier; starting bootstrap" ;
       let%map initial_root_transition =
         Persistent_frontier.(
-          with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
+          with_instance_exn persistent_frontier
+            ~f:(Instance.get_root_transition ~proof_cache_db))
         >>| Result.ok_or_failwith
       in
       start_bootstrap_controller
@@ -528,7 +541,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
-        ?transition_writer_ref:None ~frontier_w frontier
+        ?transition_writer_ref:None ~frontier_w frontier ?transaction_pool_proxy
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -579,7 +592,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~get_current_frontier ~frontier_broadcast_writer:frontier_w
     ~network_transition_reader ~producer_transition_reader
     ~get_most_recent_valid_block ~most_recent_valid_block_writer
-    ~get_completed_work ~catchup_mode ~notify_online () =
+    ~get_completed_work ~catchup_mode ~notify_online ?transaction_pool_proxy ()
+    =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -628,8 +642,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       let () =
         let initial_validate =
           unstage
-            (Initial_validator.validate ~logger ~trust_system ~verifier
-               ~initialization_finish_signal ~precomputed_values )
+            (Initial_validator.validate ~proof_cache_db ~logger ~trust_system
+               ~verifier ~initialization_finish_signal ~precomputed_values )
         in
         O1trace.background_thread "initially_validate_blocks" (fun () ->
             Pipe_lib.Strict_pipe.Reader.iter network_transition_reader
@@ -659,7 +673,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~get_completed_work ~frontier_w ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~most_recent_valid_block_writer
-          ~consensus_local_state ~notify_online
+          ~consensus_local_state ~notify_online ?transaction_pool_proxy
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
 

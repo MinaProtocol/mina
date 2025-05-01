@@ -2,27 +2,27 @@
  (name run_snark_worker)
  (libraries
   ;; opam libraries 
-  base.caml
-  base
   async
-  core_kernel
-  core
   async.async_command
-  async_unix
   async_kernel
+  async_unix
+  base
+  base.caml
+  core
+  core_kernel
   sexplib0
   uri
   ;; local libraries
-  mina_base
   currency
-  key_gen
-  snark_worker
-  mina_base.import
   genesis_constants
-  signature_lib
-  transaction_snark
   graphql_lib
-  mina_graphql)
+  key_gen
+  mina_base
+  mina_base.import
+  mina_graphql
+  signature_lib
+  snark_worker
+  transaction_snark)
  (instrumentation
   (backend bisect_ppx))
  (preprocessor_deps

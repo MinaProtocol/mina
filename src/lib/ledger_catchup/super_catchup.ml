@@ -510,8 +510,8 @@ module Initial_validate_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~logger ~verifier ~precomputed_values : _ t =
-    create
+  let create ~proof_cache_db ~logger ~verifier ~precomputed_values : _ t =
+    create ~proof_cache_db
       ~logger:
         (Logger.extend logger [ ("name", `String "initial_validate_batcher") ])
       ~how_to_add:`Insert ~max_weight_per_call:1000
@@ -555,13 +555,13 @@ module Verify_work_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~logger ~verifier : _ t =
+  let create ~proof_cache_db ~logger ~verifier : _ t =
     let works (x : input) =
       let wh, _ = x.data in
       Mina_block.Body.staged_ledger_diff (Mina_block.body wh.data)
       |> Staged_ledger_diff.completed_works
     in
-    create
+    create ~proof_cache_db
       ~logger:(Logger.extend logger [ ("name", `String "verify_work_batcher") ])
       ~weight:(fun (x : input) ->
         List.fold ~init:0 (works x) ~f:(fun acc { proofs; _ } ->
@@ -586,7 +586,8 @@ module Verify_work_batcher = struct
             |> List.concat_map ~f:(fun { fee; prover; proofs } ->
                    let msg = Sok_message.create ~fee ~prover in
                    One_or_two.to_list
-                     (One_or_two.map proofs ~f:(fun p -> (p, msg))) ) )
+                     (One_or_two.map proofs ~f:(fun p ->
+                          (Ledger_proof.Cached.read_proof_from_disk p, msg) ) ) ) )
         |> Verifier.verify_transaction_snarks verifier
         >>| function
         | Ok (Ok ()) ->
@@ -804,9 +805,12 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   let open Context in
   (* setup_state_machine_runner returns a fully configured lambda function, which is the state machine runner *)
   let initial_validation_batcher =
-    Initial_validate_batcher.create ~logger ~verifier ~precomputed_values
+    Initial_validate_batcher.create ~proof_cache_db ~logger ~verifier
+      ~precomputed_values
   in
-  let verify_work_batcher = Verify_work_batcher.create ~logger ~verifier in
+  let verify_work_batcher =
+    Verify_work_batcher.create ~proof_cache_db ~logger ~verifier
+  in
   let set_state t node s =
     set_state t node s ;
     try check_invariant ~downloader t
@@ -1166,7 +1170,11 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
         in
         Mina_networking.get_transition_chain
           ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
-          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst) )
+          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
+        |> Deferred.Or_error.map
+             ~f:
+               (List.map
+                  ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) ) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
@@ -1413,7 +1421,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
-             ~proof_cache_db:Context.proof_cache_db
              ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)

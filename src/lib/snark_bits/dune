@@ -14,8 +14,7 @@
   snarky.backendless
   tuple_lib
   bitstring_lib
-  snarky.intf
-  mina_stdlib)
+  snarky.intf)
  (preprocess
   (pps ppx_version ppx_snarky ppx_let ppx_inline_test ppx_compare))
  (instrumentation

@@ -9,11 +9,7 @@ open Mina_transaction
 let node_password = "naughty blue worm"
 
 module Graphql = struct
-  module Client = Graphql_lib.Client.Make (struct
-    let preprocess_variables_string = Fn.id
-
-    let headers = String.Map.empty
-  end)
+  module Client = Graphql_lib.Client
 
   (* graphql_ppx uses Stdlib symbols instead of Base *)
   open Stdlib
@@ -748,7 +744,8 @@ let send_zkapp_batch ~logger node_uri
   let open Deferred.Or_error.Let_syntax in
   let zkapp_commands_json =
     List.map zkapp_commands ~f:(fun zkapp_command ->
-        Mina_base.Zkapp_command.to_json zkapp_command |> Yojson.Safe.to_basic )
+        Zkapp_command.read_all_proofs_from_disk zkapp_command
+        |> Mina_base.Zkapp_command.to_json |> Yojson.Safe.to_basic )
     |> Array.of_list
   in
   let send_zkapp_graphql () =

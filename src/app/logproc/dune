@@ -15,7 +15,7 @@
   logger
   logproc_lib
   bounded_types
-  bash_colors
+  mina_stdlib
   interpolator_lib)
  (instrumentation
   (backend bisect_ppx))

@@ -35,6 +35,7 @@ let ReleaseSpec =
           , branch : Text
           , repo : Text
           , no_cache : Bool
+          , no_debian : Bool
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
@@ -57,9 +58,10 @@ let ReleaseSpec =
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
+          , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
-          , deb_repo = DebianRepo.Type.PackagesO1Test
           , no_cache = False
+          , no_debian = False
           , step_key_suffix = "-docker-image"
           , if = None B/If
           }
@@ -87,6 +89,21 @@ let generateStep =
                                               spec.deb_codename}"
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
+
+          let maybeStartDebianRepo =
+                      if spec.no_debian
+
+                then  " && echo Skipping local debian repo setup "
+
+                else      " && apt update && apt install -y aptly"
+                      ++  " && ./buildkite/scripts/debian/start_local_repo.sh"
+
+          let maybeStopDebianRepo =
+                      if spec.no_debian
+
+                then  " && echo Skipping local debian repo teardown "
+
+                else  " && ./scripts/debian/aptly.sh stop"
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
@@ -138,21 +155,19 @@ let generateStep =
 
           let commands =
                 merge
-                  { PackagesO1Test = remoteRepoCmds
-                  , Unstable = remoteRepoCmds
+                  { Unstable = remoteRepoCmds
                   , Nightly = remoteRepoCmds
                   , Stable = remoteRepoCmds
                   , Local =
                     [ Cmd.run
                         (     exportMinaDebCmd
-                          ++  " && apt update && apt install -y aptly"
-                          ++  " && ./buildkite/scripts/debian/start_local_repo.sh"
+                          ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
                           ++  " && "
                           ++  releaseDockerCmd
-                          ++  " && ./scripts/debian/aptly.sh stop"
+                          ++  maybeStopDebianRepo
                         )
                     ]
                   }
