@@ -296,7 +296,7 @@ let%test_module "Transaction hashes" =
 
 
       let txn : Zkapp_command.Stable.V1.t = let txn : Zkapp_command.Stable.V1.t =
-        (Lazy.force Mina_base.Zkapp_command.dummy) in
+        (Lazy.force Mina_base.Zkapp_command.stable_dummy) in
         {txn with account_updates =
           Mina_base.Zkapp_command.Call_forest.map
             txn.account_updates
