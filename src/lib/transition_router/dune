@@ -19,7 +19,7 @@
   transition_handler
   o1trace
   bounded_types
-  truth
+  mina_stdlib
   mina_net2
   consensus
   logger
@@ -51,4 +51,5 @@
   ledger_catchup
   data_hash_lib
   mina_wire_types
-  internal_tracing))
+  internal_tracing
+  staged_ledger))
