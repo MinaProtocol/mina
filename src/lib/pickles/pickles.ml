@@ -318,7 +318,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
       ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
-      ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
+      ?disk_keys ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
