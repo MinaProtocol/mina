@@ -14,6 +14,7 @@ ocaml-gen = "1.0.0"
 # proof-systems
 kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
 kimchi-stubs = { path = "../../proof-systems/kimchi-stubs" }
+saffron = { path = "../../proof-systems/saffron", features = ["ocaml_types"] }
 
 [[bin]]
 name = "wires_15_stubs"
