@@ -180,16 +180,41 @@ module Ledger_inner = struct
 
   type maskable_ledger = t
 
+  module Converting_ledger =
+    Converting_merkle_tree.Make
+      (struct
+          include Inputs
+          type converted_account = Account.t
+          let convert = Fn.id
+      end)
+      (Db)
+      (Db)
+
   let of_database db =
     let casted = Any_ledger.cast (module Db) db in
     let mask = Mask.create ~depth:(Db.depth db) () in
     Maskable.register_mask casted mask
 
+  type converting_ledger_cfg = {
+    directory_name: string Option.t
+  }
+
   (* Mask.Attached.create () fails, can't create an attached mask directly
      shadow create in order to create an attached mask
   *)
-  let create ?directory_name ~depth () =
-    of_database (Db.create ?directory_name ~depth ())
+  let create ?directory_name ?converting_ledger_cfg ~depth () =
+    let db1 = Db.create ?directory_name ~depth ()
+    in
+    let db2_opt = Option.map converting_ledger_cfg ~f:(fun cfg ->
+        let dir = Option.first_some cfg.directory_name @@
+              Option.map directory_name ~f:(fun dir_name -> dir_name ^ "-converting")
+        in Db.create ?directory_name:dir ~depth ()
+            )
+    in
+    let casted = Any_ledger.cast (module Converting_ledger) (Converting_ledger.create db1 db2_opt)
+    in
+    let mask = Mask.create ~depth ()
+    in Maskable.register_mask casted mask
 
   let create_ephemeral_with_base ~depth () =
     let maskable = Null.create ~depth () in
