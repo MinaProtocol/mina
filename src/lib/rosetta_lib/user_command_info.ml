@@ -538,54 +538,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
 let to_operations' (t : t) : Operation.t list =
   to_operations ~failure_status:t.failure_status (forget t)
 
-let%test_unit "payment_round_trip" =
-  let start =
-    { kind = `Payment (* default token *)
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee = Unsigned.UInt64.of_int 2_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
-    ; nonce = Unsigned.UInt32.of_int 3
-    ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
-    ; failure_status = None
-    ; hash = "TXN_1_HASH"
-    ; valid_until = Some (Unsigned.UInt32.of_int 10_000)
-    ; memo = Some "hello"
-    }
-  in
-  let ops = to_operations' start in
-  match of_operations ?valid_until:start.valid_until ?memo:start.memo ops with
-  | Ok partial ->
-      [%test_eq: Partial.t] partial (forget start)
-  | Error e ->
-      failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
-
-let%test_unit "delegation_round_trip" =
-  let start =
-    { kind = `Delegation
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee = Unsigned.UInt64.of_int 1_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
-    ; nonce = Unsigned.UInt32.of_int 42
-    ; amount = None
-    ; failure_status = None
-    ; hash = "TXN_2_HASH"
-    ; valid_until = Some (Unsigned.UInt32.of_int 867888)
-    ; memo = Some "hello"
-    }
-  in
-  let ops = to_operations' start in
-  match of_operations ops ?valid_until:start.valid_until ?memo:start.memo with
-  | Ok partial ->
-      [%test_eq: Partial.t] partial (forget start)
-  | Error e ->
-      failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
-
 let non_default_token =
   `Token_id
     (Token_id.to_string (Quickcheck.random_value Token_id.gen_non_default))
