@@ -213,7 +213,8 @@ let remember ~nonce ~hash t =
 let of_operations ?memo ?valid_until (ops : Operation.t list) :
     (Partial.t, Partial.Reason.t) Validation.t =
   (* TODO: If we care about DoS attacks, break early if length too large *)
-  (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
+  (* Note: It's better to have nice errors with the validation than
+     micro-optimize searching through a small list a minimal number of times. *)
   let find_kind k (ops : Operation.t list) =
     let name = Operation_types.name k in
     List.find ops ~f:(fun op -> String.equal op.Operation._type name)
@@ -420,7 +421,8 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
     @
     match t.kind with
     | `Payment -> (
-        (* When amount is not none, we move the amount from source to receiver -- unless it's a failure, we will capture that below *)
+        (* When amount is not none, we move the amount from source to receiver
+           -- unless it's a failure, we will capture that below *)
         match t.amount with
         | Some amount ->
             [ { Op.label = `Payment_source_dec amount; related_to = None }
