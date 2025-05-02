@@ -195,21 +195,31 @@ module Ledger_inner = struct
     let mask = Mask.create ~depth:(Db.depth db) () in
     Maskable.register_mask casted mask
 
-  type converting_ledger_cfg = {
-    directory_name: string Option.t
-  }
+  type config =
+    | SimpleLedger of { directory_name : string option }
+    | WithConvertingLedger of
+        { primary_directory_name : string option
+        ; converting_directory_name : string option
+        }
+
+  let default_converting_directory_name primary_directory_name =
+    primary_directory_name ^ "_converting"
 
   (* Mask.Attached.create () fails, can't create an attached mask directly
      shadow create in order to create an attached mask
   *)
-  let create ?directory_name ?converting_ledger_cfg ~depth () =
-    let db1 = Db.create ?directory_name ~depth ()
-    in
-    let db2_opt = Option.map converting_ledger_cfg ~f:(fun cfg ->
-        let dir = Option.first_some cfg.directory_name @@
-              Option.map directory_name ~f:(fun dir_name -> dir_name ^ "-converting")
-        in Db.create ?directory_name:dir ~depth ()
-            )
+  let create ?(cfg = SimpleLedger { directory_name = None}) ~depth () =
+    let (db1, db2_opt) = match cfg with
+      | SimpleLedger { directory_name } ->
+          let db1 = Db.create ?directory_name ~depth () in
+          (db1, None)
+      | WithConvertingLedger { primary_directory_name; converting_directory_name } ->
+          let db1 = Db.create ?directory_name:primary_directory_name ~depth () in
+          let db2 =
+            let directory_name = Option.first_some converting_directory_name @@
+                  Option.map (Db.get_directory db1) ~f:default_converting_directory_name
+             in Db.create ?directory_name  ~depth ()
+          in (db1, Some db2)
     in
     let casted = Any_ledger.cast (module Converting_ledger) (Converting_ledger.create db1 db2_opt)
     in

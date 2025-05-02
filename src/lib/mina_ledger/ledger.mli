@@ -93,11 +93,16 @@ val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 
 val with_ephemeral_ledger : depth:int -> f:(t -> 'a) -> 'a
 
-type converting_ledger_cfg = {
-  directory_name: string Option.t
-}
+type config =
+  | SimpleLedger of { directory_name : string option }
+  | WithConvertingLedger of
+      { primary_directory_name : string option
+      ; converting_directory_name : string option
+      }
 
-val create : ?directory_name:string -> ?converting_ledger_cfg:converting_ledger_cfg -> depth:int -> unit -> t
+val default_converting_directory_name : string -> string
+
+val create : ?cfg:config -> depth:int -> unit -> t
 
 val create_ephemeral : depth:int -> unit -> t
 
