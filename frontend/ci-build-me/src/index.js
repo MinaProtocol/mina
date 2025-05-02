@@ -76,9 +76,10 @@ const handler = async (event, req) => {
     ) {
       // TODO #7711: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
       if (
-        req.body.sender.login == "aneesharaines" ||
         req.body.sender.login == "bkase" ||
+        req.body.sender.login == "dannywillems" ||
         req.body.sender.login == "deepthiskumar" ||
+        req.body.sender.login == "georgeee" ||
         req.body.sender.login == "mrmr1993" ||
         req.body.sender.login == "nholland94"
       ) {
