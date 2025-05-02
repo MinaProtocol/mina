@@ -157,13 +157,7 @@ let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   }
 
 let forget_digests_and_proofs_and_aux
-    ({ fee_payer; memo; account_updates } :
-      ((_, (_, _) Control.Poly.t, _) Account_update.Poly.t, _, _) with_forest )
-    :
-    ( (_, (unit, _) Control.Poly.t, _) Account_update.Poly.t
-    , unit
-    , unit )
-    with_forest =
+    ({ fee_payer; memo; account_updates } : _ with_forest) =
   { Poly.fee_payer
   ; memo
   ; account_updates =
