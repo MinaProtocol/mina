@@ -132,11 +132,7 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
 
 let zkapp_command : Zkapp_command.t =
   sign_all
-    { fee_payer =
-        { body = fee_payer.body
-        ; authorization = Signature.dummy
-        ; aux = fee_payer.aux
-        }
+    { fee_payer = { body = fee_payer.body; authorization = Signature.dummy }
     ; account_updates
     ; memo
     }
