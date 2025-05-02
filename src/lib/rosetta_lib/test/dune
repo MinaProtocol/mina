@@ -6,12 +6,11 @@
  (modules test_encodings)
  (libraries
   ;; opam libraries
-  core_kernel
-  base
+  alcotest
   ;; local libraries
-  signature_lib
+  rosetta_coding
   rosetta_lib
-  rosetta_coding)
+  signature_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
