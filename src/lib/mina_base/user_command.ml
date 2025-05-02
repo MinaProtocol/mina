@@ -331,7 +331,7 @@ let valid_until (t : (_, _, _) with_forest) =
   | Signed_command x ->
       Signed_command.valid_until x
   | Zkapp_command { fee_payer; _ } -> (
-      match fee_payer.Account_update.Fee_payer.body.valid_until with
+      match fee_payer.body.valid_until with
       | Some valid_until ->
           valid_until
       | None ->

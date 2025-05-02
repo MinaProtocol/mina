@@ -492,9 +492,8 @@ end = struct
       ( ( Account_update.Body.Stable.Latest.t
         , ( Proof.Stable.Latest.t
           , Signature.Stable.Latest.t )
-          Control.Poly.Stable.Latest.t
-        , Account_update.No_aux.Stable.Latest.t )
-        Account_update.Poly.Stable.Latest.t
+          Control.Poly.Stable.Latest.t )
+        Account_update.Without_aux.Stable.Latest.t
       , ( Side_loaded_verification_key.Stable.Latest.t
         , Zkapp_basic.F.Stable.Latest.t )
         With_hash.Stable.Latest.t

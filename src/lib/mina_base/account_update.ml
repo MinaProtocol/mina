@@ -1679,9 +1679,9 @@ module No_aux = struct
 end
 
 module Poly = struct
-  (** This is a helper module to make writing the sexp/yojson instances of types
-      in this module easier. By going through this, the aux field of the
-      Account_update types is properly ignored when serializing and
+  (** This is a helper module to make writing the sexp/yojson/binable instances
+      of types in this module easier. By going through this, the aux field of
+      the Account_update types is properly ignored when serializing and
       deserializing.
 
       The *_via functions in this module take three function paramaters because
@@ -1695,7 +1695,7 @@ module Poly = struct
       the aux field entirely when writing their respective formats. The
       of_yojson and t_of_sexp functions will expect the aux field to be absent
       when parsing. *)
-  module Without_aux = struct
+  module Wire = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
@@ -1703,25 +1703,25 @@ module Poly = struct
           { body : 'body; authorization : 'authorization }
         [@@deriving yojson, sexp]
 
-        let to_yojson_via (type a) ~without_aux f g (_h : a -> Yojson.Safe.t) t
+        let to_yojson_via ~to_wire f g (_h : Nothing.t -> Yojson.Safe.t) t =
+          to_yojson f g @@ to_wire t
+
+        let of_yojson_via ~of_wire f g
+            (_h : Nothing.t -> No_aux.t Ppx_deriving_yojson_runtime.error_or) t
             =
-          to_yojson f g @@ without_aux t
+          Ppx_deriving_yojson_runtime.(of_yojson f g t >|= of_wire)
 
-        let of_yojson_via (type a) ~with_no_aux f g
-            (_h : a -> No_aux.t Ppx_deriving_yojson_runtime.error_or) t =
-          Ppx_deriving_yojson_runtime.(of_yojson f g t >|= with_no_aux)
+        let sexp_of_t_via ~to_wire f g
+            (_h : Nothing.t -> Ppx_sexp_conv_lib.Sexp.t) t =
+          sexp_of_t f g @@ to_wire t
 
-        let sexp_of_t_via (type a) ~without_aux f g
-            (_h : a -> Ppx_sexp_conv_lib.Sexp.t) t =
-          sexp_of_t f g @@ without_aux t
-
-        let t_of_sexp_via (type a) ~with_no_aux f g (_h : a -> No_aux.t) t =
-          with_no_aux @@ t_of_sexp f g t
+        let t_of_sexp_via ~of_wire f g (_h : Nothing.t -> No_aux.t) t =
+          of_wire @@ t_of_sexp f g t
       end
     end]
   end
 
-  [%%versioned
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
       (** An account update in a zkApp transaction *)
@@ -1733,23 +1733,19 @@ module Poly = struct
         { body : 'body; authorization : 'authorization; aux : 'aux }
       [@@deriving annot, equal, hash, compare, fields]
 
-      let without_aux (t : _ t) : _ Without_aux.Stable.V1.t =
+      let of_wire (w : _ Wire.Stable.V1.t) : (_, _, No_aux.t) t =
+        { body = w.body; authorization = w.authorization; aux = () }
+
+      let to_wire (t : _ t) : _ Wire.Stable.V1.t =
         { body = t.body; authorization = t.authorization }
 
-      let with_no_aux (t : _ Without_aux.Stable.V1.t) : (_, _, No_aux.t) t =
-        { body = t.body; authorization = t.authorization; aux = () }
+      let to_yojson f g h t = Wire.Stable.V1.to_yojson_via ~to_wire f g h t
 
-      let to_yojson f g h t =
-        Without_aux.Stable.V1.to_yojson_via ~without_aux f g h t
+      let of_yojson f g h t = Wire.Stable.V1.of_yojson_via ~of_wire f g h t
 
-      let of_yojson f g h t =
-        Without_aux.Stable.V1.of_yojson_via ~with_no_aux f g h t
+      let sexp_of_t f g h t = Wire.Stable.V1.sexp_of_t_via ~to_wire f g h t
 
-      let sexp_of_t f g h t =
-        Without_aux.Stable.V1.sexp_of_t_via ~without_aux f g h t
-
-      let t_of_sexp f g h t =
-        Without_aux.Stable.V1.t_of_sexp_via ~with_no_aux f g h t
+      let t_of_sexp f g h t = Wire.Stable.V1.t_of_sexp_via ~of_wire f g h t
     end
   end]
 
@@ -1763,15 +1759,40 @@ module Poly = struct
 end
 
 module T = struct
+  module Without_aux = struct
+    [%%versioned_binable
+    module Stable = struct
+      module V1 = struct
+        type ('body, 'authorization) t =
+          ('body, 'authorization, No_aux.t) Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let of_wire = Poly.Stable.V1.of_wire
+
+        let to_wire = Poly.Stable.V1.to_wire
+
+        include
+          Binable.Of_binable2_without_uuid
+            (Poly.Wire.Stable.V1)
+            (struct
+              type nonrec ('x, 'y) t = ('x, 'y) t
+
+              let of_binable t = of_wire t
+
+              let to_binable = to_wire
+            end)
+      end
+    end]
+  end
+
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t =
           ( Body.Graphql_repr.Stable.V1.t
-          , Control.Stable.V2.t
-          , No_aux.Stable.V1.t )
-          Poly.Stable.V1.t
+          , Control.Stable.V2.t )
+          Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1794,10 +1815,7 @@ module T = struct
     module Stable = struct
       module V1 = struct
         type t =
-          ( Body.Simple.Stable.V1.t
-          , Control.Stable.V2.t
-          , No_aux.Stable.V1.t )
-          Poly.Stable.V1.t
+          (Body.Simple.Stable.V1.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1811,11 +1829,7 @@ module T = struct
 
     module V1 = struct
       (** A account_update to a zkApp transaction *)
-      type t =
-        ( Body.Stable.V1.t
-        , Control.Stable.V2.t
-        , No_aux.Stable.V1.t )
-        Poly.Stable.V1.t
+      type t = (Body.Stable.V1.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -1842,8 +1856,12 @@ module T = struct
       { actions_hash = actions.hash }
   end
 
-  type t = (Body.t, Control.t, Aux_data.t) Poly.t
-  [@@deriving sexp_of, to_yojson]
+  module With_aux = struct
+    type ('body, 'authorization) t = ('body, 'authorization, Aux_data.t) Poly.t
+    [@@deriving sexp_of, to_yojson]
+  end
+
+  type t = (Body.t, Control.t) With_aux.t [@@deriving sexp_of, to_yojson]
 
   let of_graphql_repr ({ Poly.body; authorization; aux = () } : Graphql_repr.t)
       : Stable.Latest.t =
@@ -1920,49 +1938,14 @@ module Fee_payer = struct
       type t = Mina_wire_types.Mina_base.Account_update.Fee_payer.V1.t =
         { body : Body.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
-        ; aux : No_aux.Stable.V1.t
         }
-      [@@deriving annot, equal, hash, compare, fields]
+      [@@deriving sexp, annot, equal, hash, compare, fields, yojson]
 
       let to_latest = Fn.id
-
-      let without_aux (t : t) : _ Poly.Without_aux.Stable.V1.t =
-        { body = t.body; authorization = t.authorization }
-
-      let with_no_aux (t : _ Poly.Without_aux.Stable.V1.t) : t =
-        { body = t.body; authorization = t.authorization; aux = () }
-
-      let to_yojson t =
-        Poly.Without_aux.Stable.V1.to_yojson_via ~without_aux
-          Body.Fee_payer.Stable.V1.to_yojson Signature.Stable.V1.to_yojson
-          No_aux.Stable.V1.to_yojson t
-
-      let of_yojson t =
-        Poly.Without_aux.Stable.V1.of_yojson_via ~with_no_aux
-          Body.Fee_payer.Stable.V1.of_yojson Signature.Stable.V1.of_yojson
-          No_aux.Stable.V1.of_yojson t
-
-      let sexp_of_t t =
-        Poly.Without_aux.Stable.V1.sexp_of_t_via ~without_aux
-          Body.Fee_payer.Stable.V1.sexp_of_t Signature.Stable.V1.sexp_of_t
-          No_aux.Stable.V1.sexp_of_t t
-
-      let t_of_sexp t =
-        Poly.Without_aux.Stable.V1.t_of_sexp_via ~with_no_aux
-          Body.Fee_payer.Stable.V1.t_of_sexp Signature.Stable.V1.t_of_sexp
-          No_aux.Stable.V1.t_of_sexp t
     end
   end]
 
-  let to_yojson = Stable.Latest.to_yojson
-
-  let of_yojson = Stable.Latest.of_yojson
-
-  let sexp_of_t = Stable.Latest.sexp_of_t
-
-  let t_of_sexp = Stable.Latest.t_of_sexp
-
-  let with_no_aux ~body ~authorization : t = { body; authorization; aux = () }
+  let with_no_aux ~body ~authorization : t = { body; authorization }
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
@@ -1990,7 +1973,6 @@ module Fee_payer = struct
     let ( !. ) = ( !. ) ~t_fields_annots in
     Fields.make_creator obj ~body:!.Body.Fee_payer.deriver
       ~authorization:!.Control.signature_deriver
-      ~aux:!.skip
     |> finish "ZkappFeePayer" ~t_toplevel_annots
 end
 
@@ -2028,7 +2010,7 @@ let check_authorization (type proof aux)
       in
       Error err
 
-let of_fee_payer_no_aux ({ body; authorization; aux = () } : Fee_payer.t) :
+let of_fee_payer_no_aux ({ body; authorization } : Fee_payer.t) :
     (Body.t, (_, Signature.t) Control.Poly.t, _) Poly.t =
   with_no_aux ~body:(Body.of_fee_payer body)
     ~authorization:(Control.Poly.Signature authorization)

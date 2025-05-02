@@ -174,10 +174,7 @@ let%test_module "Access permission tests" =
       let zkapp_command : Zkapp_command.t =
         sign_all
           { fee_payer =
-              { body = fee_payer.body
-              ; authorization = Signature.dummy
-              ; aux = fee_payer.aux
-              }
+              { body = fee_payer.body; authorization = Signature.dummy }
           ; account_updates
           ; memo
           }
