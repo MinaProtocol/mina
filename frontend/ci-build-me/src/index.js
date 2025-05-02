@@ -74,7 +74,7 @@ const handler = async (event, req) => {
       // and the comment contents is exactly the slug we are looking for
       req.body.comment.body == "!approved-for-mainnet"
     ) {
-      // TODO #7711: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
+      // TODO: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
       if (
         req.body.sender.login == "aneesharaines" ||
         req.body.sender.login == "bkase" ||
