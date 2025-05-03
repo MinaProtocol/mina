@@ -183,6 +183,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
+
+    let drop_sok (t : _ t) = { t with sok_digest = () }
   end
 
   [%%versioned
@@ -201,8 +203,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let to_latest = Fn.id
     end
   end]
-
-  type regular_snarked_ledger_state = t
 
   type var =
     ( Frozen_ledger_hash.var
@@ -389,25 +389,6 @@ module Make_str (A : Wire_types.Concrete) = struct
     let to_field_elements =
       let (Typ { value_to_fields; _ }) = typ in
       Fn.compose fst value_to_fields
-
-    let drop_sok
-        ({ source
-         ; target
-         ; connecting_ledger_left
-         ; connecting_ledger_right
-         ; supply_increase
-         ; fee_excess
-         ; sok_digest = _
-         } :
-          t ) : regular_snarked_ledger_state =
-      { source
-      ; target
-      ; connecting_ledger_left
-      ; connecting_ledger_right
-      ; supply_increase
-      ; fee_excess
-      ; sok_digest = ()
-      }
   end
 
   let option lab =

@@ -110,6 +110,8 @@ module type Full = sig
          , 'sok_digest
          , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t )
          t
+
+    val drop_sok : ('a, 'b, 'c, 'd, 'e, 'f) t -> ('a, 'b, 'c, 'd, unit, 'f) t
   end
 
   module Statement_ledgers : sig
@@ -158,8 +160,6 @@ module type Full = sig
       [@@deriving compare, equal, hash, sexp, yojson]
     end
   end]
-
-  type regular_snarked_ledger_state = t
 
   type var =
     ( Frozen_ledger_hash.var
@@ -228,8 +228,6 @@ module type Full = sig
     val typ : (var, t) Tick.Typ.t
 
     val to_field_elements : t -> Tick.Field.t array
-
-    val drop_sok : t -> regular_snarked_ledger_state
   end
 
   val gen : t Quickcheck.Generator.t

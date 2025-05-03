@@ -153,7 +153,7 @@ module Zkapp_command_job = struct
 
     let statement : t -> Transaction_snark.Statement.t = function
       | Segment { statement; _ } ->
-          Mina_state.Snarked_ledger_state.With_sok.drop_sok statement
+          Mina_state.Snarked_ledger_state.Poly.drop_sok statement
       | Merge { proof1; proof2; _ } -> (
           let module Statement = Mina_state.Snarked_ledger_state in
           let { Proof_carrying_data.data = t1; _ } = proof1 in
