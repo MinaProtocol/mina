@@ -13,7 +13,7 @@ module Master = struct
 
   module T = struct
     type query =
-      Error.t * Work.Selector.Spec.Stable.Latest.t * Public_key.Compressed.t
+      Error.t * Work.Partitioned.Spec.Stable.Latest.t * Public_key.Compressed.t
 
     type response = unit
   end
@@ -35,9 +35,28 @@ module Stable = struct
 
       type response = unit
 
-      let query_of_caller_model = Fn.id
+      let query_of_caller_model (query : Master.Caller.query) : query =
+        let err, spec, key = query in
+        let spec =
+          Work.Partitioned.Spec.Poly.to_selector_spec spec
+          |> Option.value_exn
+               ~message:
+                 "FATAL: V2 Worker failed on a `Zkapp_command_segment` job \
+                  where the coordinator can't aggregate, this shouldn't happen \
+                  as the work is issued by the coordinator"
+        in
+        (err, spec, key)
 
-      let callee_model_of_query = Fn.id
+      let callee_model_of_query (query : query) : Master.Callee.query =
+        (* Old worker can't tell when it received the job,
+           so just assume it's taking 0s
+        *)
+        let issued_since_unix_epoch = Time.(now () |> to_span_since_epoch) in
+        Tuple3.map_snd
+          ~f:
+            (Work.Partitioned.Spec.Poly.of_selector_spec
+               ~issued_since_unix_epoch )
+          query
 
       let response_of_callee_model = Fn.id
 
