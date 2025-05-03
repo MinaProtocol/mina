@@ -350,7 +350,8 @@ module Spec = struct
       , map_with_statement
       , transaction
       , of_selector_spec
-      , to_selector_spec )]
+      , to_selector_spec
+      , fee_of_full )]
   end
 
   [%%versioned
