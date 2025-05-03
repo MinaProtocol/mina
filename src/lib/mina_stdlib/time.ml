@@ -3,7 +3,7 @@ open Core_kernel
 module Span = struct
   [%%versioned
   module Stable = struct
-    module V3 = struct
+    module V1 = struct
       (* This span could track time in seconds with float under the hood.
          Hence we use that as well, so no actual conversion is happening.
          Accuracy is lost only when float has accuracy loss.

@@ -65,7 +65,7 @@ module Spec_common = struct
     module V1 = struct
       type t =
         { (* When is this spec issued? *)
-          issued_since_unix_epoch : Mina_stdlib.Time.Span.Stable.V3.t
+          issued_since_unix_epoch : Mina_stdlib.Time.Span.Stable.V1.t
               (* The fee of the full command, even if we're issuing a sub_zkapp level spec *)
         ; fee_of_full : Currency.Fee.Stable.V1.t
         }
