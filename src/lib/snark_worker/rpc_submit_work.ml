@@ -24,6 +24,25 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 
 [%%versioned_rpc
 module Stable = struct
+  module V3 = struct
+    module T = struct
+      type query = Work.Partitioned.Result.Stable.V1.t
+
+      type response = [ `Ok | `Slashed | `SchemeUnmatched ]
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model = Fn.id
+
+      let caller_model_of_response = Fn.id
+    end
+
+    include T
+    include Register (T)
+  end
+
   module V2 = struct
     module T = struct
       type query = Work.Selector.Result.Stable.V1.t
@@ -73,5 +92,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]
