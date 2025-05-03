@@ -542,11 +542,19 @@ module Result = struct
               Some (construct_selector_result ~instances ~fee ~prover)
           | _ ->
               None
+
+        let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_metric
+            ({ data; prover } : _ t) =
+          { data =
+              Spec.Poly.map ~f_witness ~f_zkapp_command_segment_witness ~f_proof
+                ~f_metric data
+          ; prover
+          }
       end
     end]
 
     [%%define_locally
-    Stable.Latest.(to_spec, of_selector_result, to_selector_result)]
+    Stable.Latest.(to_spec, of_selector_result, to_selector_result, map)]
   end
 
   [%%versioned
@@ -555,53 +563,37 @@ module Result = struct
 
     module V1 = struct
       type t =
-        { data :
-            ( Transaction_witness.Stable.V2.t
-            , Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
-            , Ledger_proof.Stable.V2.t
-            , Proof_with_metric.Stable.V1.t )
-            Spec.Poly.Stable.V1.t
-        ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
-        }
+        ( Transaction_witness.Stable.V2.t
+        , Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
+        , Ledger_proof.Stable.V2.t
+        , Proof_with_metric.Stable.V1.t )
+        Poly.Stable.V1.t
 
       let to_latest = Fn.id
     end
   end]
 
   type t =
-    { data :
-        ( Transaction_witness.t
-        , Transaction_snark.Zkapp_command_segment.Witness.t
-        , Ledger_proof.Cached.t
-        , Proof_with_metric.t )
-        Spec.Poly.t
-    ; prover : Signature_lib.Public_key.Compressed.t
-    }
+    ( Transaction_witness.t
+    , Transaction_snark.Zkapp_command_segment.Witness.t
+    , Ledger_proof.Cached.t
+    , Proof_with_metric.t )
+    Poly.t
 
-  let read_all_proofs_from_disk ({ data; prover } : t) : Stable.Latest.t =
-    let data =
-      Spec.Poly.map ~f_witness:Transaction_witness.read_all_proofs_from_disk
-        ~f_zkapp_command_segment_witness:
-          Transaction_witness.Zkapp_command_segment_witness
-          .read_all_proofs_from_disk
-        ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-        ~f_metric:Proof_with_metric.read_all_proofs_from_disk data
-    in
+  let read_all_proofs_from_disk =
+    Poly.map ~f_witness:Transaction_witness.read_all_proofs_from_disk
+      ~f_zkapp_command_segment_witness:
+        Transaction_witness.Zkapp_command_segment_witness
+        .read_all_proofs_from_disk
+      ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+      ~f_metric:Proof_with_metric.read_all_proofs_from_disk
 
-    { data; prover }
-
-  let write_all_proofs_to_disk ~proof_cache_db
-      ({ data; prover } : Stable.Latest.t) : t =
-    let data =
-      Spec.Poly.map
-        ~f_witness:
-          (Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
-        ~f_zkapp_command_segment_witness:
-          (Transaction_witness.Zkapp_command_segment_witness
-           .write_all_proofs_to_disk ~proof_cache_db )
-        ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
-        ~f_metric:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db)
-        data
-    in
-    { data; prover }
+  let write_all_proofs_to_disk ~proof_cache_db =
+    Poly.map
+      ~f_witness:(Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
+      ~f_zkapp_command_segment_witness:
+        (Transaction_witness.Zkapp_command_segment_witness
+         .write_all_proofs_to_disk ~proof_cache_db )
+      ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
+      ~f_metric:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db)
 end
