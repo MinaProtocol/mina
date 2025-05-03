@@ -1333,7 +1333,8 @@ let all_work_pairs t
             | Merge ->
                 Or_error.error_string "init_stack was Merge"
           in
-          { Transaction_witness.first_pass_ledger = first_pass_ledger_witness
+          { Transaction_witness.Poly.first_pass_ledger =
+              first_pass_ledger_witness
           ; second_pass_ledger = second_pass_ledger_witness
           ; transaction
           ; protocol_state_body

@@ -30,7 +30,7 @@ module Single = struct
             Mina_transaction.Transaction.Stable.Latest.t option =
           spec |> Work.Single.Spec.witness
           |> Option.map ~f:(fun spec ->
-                 spec.Transaction_witness.Stable.Latest.transaction )
+                 spec.Transaction_witness.Poly.transaction )
       end
     end]
 
@@ -50,7 +50,7 @@ module Single = struct
 
     let transaction (spec : t) : Mina_transaction.Transaction.t option =
       spec |> Work.Single.Spec.witness
-      |> Option.map ~f:(fun spec -> spec.Transaction_witness.transaction)
+      |> Option.map ~f:(fun spec -> spec.Transaction_witness.Poly.transaction)
   end
 end
 
