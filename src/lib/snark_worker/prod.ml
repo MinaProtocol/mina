@@ -20,6 +20,9 @@ module Cache = struct
   let find (t : t) statement = Option.map ~f:snd (T.find t statement)
 end
 
+module Zkapp_command_inputs =
+  Work_partitioner.Snark_worker_shared.Zkapp_command_inputs
+
 module Impl : Intf.Worker = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
@@ -59,35 +62,14 @@ module Impl : Intf.Worker = struct
     let worker_wait_time = 5.
   end
 
-  let zkapp_command_inputs_to_yojson =
-    let convert =
-      List.map
-        ~f:(fun
-             ( (witness : Transaction_witness.Zkapp_command_segment_witness.t)
-             , segment
-             , statement )
-           ->
-          ( Transaction_witness.Zkapp_command_segment_witness
-            .read_all_proofs_from_disk witness
-          , segment
-          , statement ) )
-    in
-    let impl =
-      [%to_yojson:
-        ( Transaction_witness.Zkapp_command_segment_witness.Stable.Latest.t
-        * Transaction_snark.Zkapp_command_segment.Basic.t
-        * Transaction_snark.Statement.With_sok.t )
-        list]
-    in
-    Fn.compose impl convert
-
   let get_tag = function
     | Work.Work.Single.Spec.Transition _ ->
         `Transition
     | Work.Work.Single.Spec.Merge _ ->
         `Merge
 
-  let log_zkapp_cmd_base_snark ~logger ~statement ~spec ~all_inputs f =
+  let log_zkapp_cmd_base_snark ~logger ~statement ~spec
+      ~(all_inputs : Zkapp_command_inputs.t) f =
     match%map.Deferred
       Deferred.Or_error.try_with ~here:[%here] (fun () -> f ~statement ~spec)
     with
@@ -103,7 +85,10 @@ module Impl : Intf.Worker = struct
             ; ( "statement"
               , Transaction_snark.Statement.With_sok.to_yojson statement )
             ; ("error", `String (Error.to_string_hum e))
-            ; ("inputs", zkapp_command_inputs_to_yojson all_inputs)
+            ; ( "inputs"
+              , Zkapp_command_inputs.(
+                  read_all_proofs_from_disk all_inputs
+                  |> Stable.Latest.to_yojson) )
             ] ;
         Error e
 
@@ -124,7 +109,10 @@ module Impl : Intf.Worker = struct
               , Transaction_snark.Statement.to_yojson
                   (Ledger_proof.statement curr) )
             ; ("error", `String (Error.to_string_hum e))
-            ; ("inputs", zkapp_command_inputs_to_yojson all_inputs)
+            ; ( "inputs"
+              , Zkapp_command_inputs.(
+                  read_all_proofs_from_disk all_inputs
+                  |> Stable.Latest.to_yojson) )
             ] ;
         Error e
 
@@ -175,10 +163,10 @@ module Impl : Intf.Worker = struct
             match witnesses_specs_stmts with
             | [] ->
                 Deferred.Or_error.error_string "no witnesses generated"
-            | (witness, spec, stmt) :: rest as inputs ->
+            | (witness, spec, stmt) :: rest as all_inputs ->
                 let%bind (p1 : Ledger_proof.t) =
                   log_zkapp_cmd_base_snark ~logger
-                    ~statement:{ stmt with sok_digest } ~spec ~all_inputs:inputs
+                    ~statement:{ stmt with sok_digest } ~spec ~all_inputs
                     (M.of_zkapp_command_segment_exn ~witness)
                 in
 
@@ -188,12 +176,11 @@ module Impl : Intf.Worker = struct
                       let%bind (prev : Ledger_proof.t) = Deferred.return acc in
                       let%bind (curr : Ledger_proof.t) =
                         log_zkapp_cmd_base_snark ~logger
-                          ~statement:{ stmt with sok_digest } ~spec
-                          ~all_inputs:inputs
+                          ~statement:{ stmt with sok_digest } ~spec ~all_inputs
                           (M.of_zkapp_command_segment_exn ~witness)
                       in
                       log_zkapp_cmd_merge_snark ~m ~logger ~sok_digest prev curr
-                        ~all_inputs:inputs )
+                        ~all_inputs )
                 in
                 if
                   Transaction_snark.Statement.equal (Ledger_proof.statement p)
@@ -208,7 +195,10 @@ module Impl : Intf.Worker = struct
                         , Transaction_snark.Statement.to_yojson
                             (Ledger_proof.statement p) )
                       ; ("expected", Transaction_snark.Statement.to_yojson input)
-                      ; ("inputs", zkapp_command_inputs_to_yojson inputs)
+                      ; ( "inputs"
+                        , Zkapp_command_inputs.(
+                            read_all_proofs_from_disk all_inputs
+                            |> Stable.Latest.to_yojson) )
                       ] ;
                   Deferred.return
                     (Or_error.error_string
