@@ -458,8 +458,9 @@ module Proof_with_metric = struct
 end
 
 let construct_selector_result
-    ~(instances : (Selector.Single.Spec.t * Proof_with_metric.t) One_or_two.t)
-    ~fee ~prover =
+    ~(instances :
+       (_ Work.Single.Spec.t * _ Proof_with_metric.Poly.t) One_or_two.t ) ~fee
+    ~prover =
   let proofs = One_or_two.map ~f:(fun (_, { proof; _ }) -> proof) instances in
   let metrics =
     One_or_two.map
@@ -476,7 +477,8 @@ let construct_selector_result
   in
 
   let instances = One_or_two.map ~f:(fun (single, _) -> single) instances in
-  ({ proofs; metrics; spec = { instances; fee }; prover } : Selector.Result.t)
+  ( { proofs; metrics; spec = ({ instances; fee } : _ Work.Spec.t); prover }
+    : _ Work.Result.t )
 
 module Result = struct
   module Poly = struct
