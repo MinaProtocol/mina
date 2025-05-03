@@ -62,14 +62,7 @@ module Impl : Intf.Worker = struct
     let worker_wait_time = 5.
   end
 
-  let get_tag = function
-    | Work.Work.Single.Spec.Transition _ ->
-        `Transition
-    | Work.Work.Single.Spec.Merge _ ->
-        `Merge
-
-  let log_zkapp_cmd_base_snark ~logger ~statement ~spec
-      ~(all_inputs : Zkapp_command_inputs.t) f =
+  let log_zkapp_cmd_base_snark ~logger ~statement ~spec f () =
     match%map.Deferred
       Deferred.Or_error.try_with ~here:[%here] (fun () -> f ~statement ~spec)
     with
@@ -85,15 +78,11 @@ module Impl : Intf.Worker = struct
             ; ( "statement"
               , Transaction_snark.Statement.With_sok.to_yojson statement )
             ; ("error", `String (Error.to_string_hum e))
-            ; ( "inputs"
-              , Zkapp_command_inputs.(
-                  read_all_proofs_from_disk all_inputs
-                  |> Stable.Latest.to_yojson) )
             ] ;
         Error e
 
   let log_zkapp_cmd_merge_snark ~m:(module M : Worker_state.S) ~logger
-      ~sok_digest prev curr ~all_inputs =
+      ~sok_digest prev curr () =
     match%map.Deferred M.merge ~sok_digest prev curr with
     | Ok p ->
         Ok p
@@ -109,18 +98,14 @@ module Impl : Intf.Worker = struct
               , Transaction_snark.Statement.to_yojson
                   (Ledger_proof.statement curr) )
             ; ("error", `String (Error.to_string_hum e))
-            ; ( "inputs"
-              , Zkapp_command_inputs.(
-                  read_all_proofs_from_disk all_inputs
-                  |> Stable.Latest.to_yojson) )
             ] ;
         Error e
 
-  let cache_and_time ~logger ~cache ~tag ~statement
-      ~(spec : Work.Selector.Single.Spec.Stable.Latest.t) k =
+  let cache_and_time ~logger ~cache ~statement
+      ~(full_spec : Work.Partitioned.Spec.Stable.Latest.t) k =
     match (Cache.find cache) statement with
     | Some proof ->
-        Deferred.Or_error.return (proof, Time.Span.zero, tag)
+        Deferred.Or_error.return (proof, Time.Span.zero)
     | None -> (
         let start = Time.now () in
         match%map.Async.Deferred
@@ -135,14 +120,14 @@ module Impl : Intf.Worker = struct
                        so we use the less-desirable sexp here
                     *)
                   , `String
-                      ( Work.Selector.Single.Spec.Stable.Latest.sexp_of_t spec
+                      ( Work.Partitioned.Spec.Stable.Latest.sexp_of_t full_spec
                       |> Sexp.to_string ) )
                 ] ;
             Error e
         | Ok res ->
             Cache.add cache ~statement ~proof:res ;
             let elapsed = Time.abs_diff (Time.now ()) start in
-            Ok (res, elapsed, tag) )
+            Ok (res, elapsed) )
 
   let perform_single_raw ~logger ~(m : (module Worker_state.S)) ~proof_cache_db
       ~(single : Work.Selector.Single.Spec.Stable.Latest.t) ~sok_digest () =
@@ -166,8 +151,9 @@ module Impl : Intf.Worker = struct
             | (witness, spec, stmt) :: rest as all_inputs ->
                 let%bind (p1 : Ledger_proof.t) =
                   log_zkapp_cmd_base_snark ~logger
-                    ~statement:{ stmt with sok_digest } ~spec ~all_inputs
+                    ~statement:{ stmt with sok_digest } ~spec
                     (M.of_zkapp_command_segment_exn ~witness)
+                    ()
                 in
 
                 let%bind (p : Ledger_proof.t) =
@@ -176,11 +162,12 @@ module Impl : Intf.Worker = struct
                       let%bind (prev : Ledger_proof.t) = Deferred.return acc in
                       let%bind (curr : Ledger_proof.t) =
                         log_zkapp_cmd_base_snark ~logger
-                          ~statement:{ stmt with sok_digest } ~spec ~all_inputs
+                          ~statement:{ stmt with sok_digest } ~spec
                           (M.of_zkapp_command_segment_exn ~witness)
+                          ()
                       in
                       log_zkapp_cmd_merge_snark ~m ~logger ~sok_digest prev curr
-                        ~all_inputs )
+                        () )
                 in
                 if
                   Transaction_snark.Statement.equal (Ledger_proof.statement p)
@@ -238,45 +225,119 @@ module Impl : Intf.Worker = struct
     | Merge (_, proof1, proof2) ->
         M.merge ~sok_digest proof1 proof2
 
-  let perform_single ~(logger : Logger.t) ~(cache : Cache.t)
+  let perform_single_cached ~(logger : Logger.t) ~(cache : Cache.t)
       ~(m : (module Worker_state.S))
-      ~(proof_cache_db : Proof_cache_tag.cache_db) ~sok_digest
-      ~(single : Work.Selector.Single.Spec.Stable.Latest.t) =
+      ~(proof_cache_db : Proof_cache_tag.cache_db) ~sok_digest ~full_spec
+      ~(single : Work.Selector.Single.Spec.Stable.Latest.t) () =
     let statement = Work.Work.Single.Spec.statement single in
-    let tag = get_tag single in
-    cache_and_time ~logger ~cache ~tag ~statement ~spec:single
+    cache_and_time ~logger ~cache ~statement ~full_spec
       (perform_single_raw ~logger ~m ~proof_cache_db ~single ~sok_digest)
 
   let perform
       ~state:
         ({ m_with_proof_level; cache; proof_cache_db; logger } : Worker_state.t)
-      ~(spec : Work.Selector.Spec.Stable.Latest.t)
+      ~(spec : Work.Partitioned.Spec.Stable.Latest.t)
       ~(sok_digest : Sok_message.Digest.Stable.Latest.t) =
-    let Work.Work.Spec.{ instances; _ } = spec in
+    let open Deferred.Or_error.Let_syntax in
+    let open Work.Partitioned in
     match m_with_proof_level with
-    | Full ((module M) as m) -> (
-        let perform_single =
-          perform_single ~logger ~cache ~m ~proof_cache_db ~sok_digest
+    | Worker_state.Full ((module M) as m) -> (
+        match spec with
+        | Spec.Poly.Single { single_spec; pairing; metric = (); common } ->
+            let%map proof, elapsed =
+              perform_single_cached ~logger ~cache ~m ~proof_cache_db
+                ~sok_digest ~single:single_spec ~full_spec:spec ()
+            in
+            Spec.Poly.Single
+              { single_spec
+              ; pairing
+              ; metric = ({ proof; elapsed } : _ Proof_with_metric.Poly.t)
+              ; common
+              }
+        | Spec.Poly.Sub_zkapp_command
+            { spec =
+                { spec =
+                    Zkapp_command_job.Spec.Poly.Segment
+                      { statement; witness; spec = segment_spec; _ } as
+                    sub_zkapp_spec
+                ; _
+                } as sub_zkapp_job
+            ; metric = ()
+            } ->
+            let witness =
+              Transaction_witness.Zkapp_command_segment_witness
+              .write_all_proofs_to_disk ~proof_cache_db witness
+            in
+
+            let statement_without_sok =
+              Zkapp_command_job.Spec.Poly.statement sub_zkapp_spec
+            in
+
+            let%map proof, elapsed =
+              log_zkapp_cmd_base_snark ~logger ~statement ~spec:segment_spec
+                (M.of_zkapp_command_segment_exn ~witness)
+              |> cache_and_time ~logger ~cache ~statement:statement_without_sok
+                   ~full_spec:spec
+            in
+            Spec.Poly.Sub_zkapp_command
+              { spec = sub_zkapp_job
+              ; metric = ({ proof; elapsed } : _ Proof_with_metric.Poly.t)
+              }
+        | Spec.Poly.Sub_zkapp_command
+            { spec =
+                { spec = Zkapp_command_job.Spec.Poly.Merge { proof1; proof2; _ }
+                ; _
+                } as sub_zkapp_job
+            ; metric = ()
+            } ->
+            let statement_without_sok =
+              Zkapp_command_job.Spec.Poly.statement sub_zkapp_job.spec
+            in
+
+            let%map proof, elapsed =
+              log_zkapp_cmd_merge_snark ~m ~logger ~sok_digest proof1 proof2
+              |> cache_and_time ~logger ~cache ~statement:statement_without_sok
+                   ~full_spec:spec
+            in
+            Spec.Poly.Sub_zkapp_command
+              { spec = sub_zkapp_job
+              ; metric = ({ proof; elapsed } : _ Proof_with_metric.Poly.t)
+              }
+        | Spec.Poly.Old { instances; common } ->
+            let process
+                ~(single_spec : Work.Selector.Single.Spec.Stable.Latest.t) =
+              let%map proof, elapsed =
+                perform_single_cached ~logger ~cache ~m ~proof_cache_db
+                  ~sok_digest ~single:single_spec ~full_spec:spec ()
+              in
+              ({ proof; elapsed } : _ Proof_with_metric.Poly.t)
+            in
+            let%map instances =
+              match instances with
+              | `One (single_spec, ()) ->
+                  let%map metric = process ~single_spec in
+                  `One (single_spec, metric)
+              | `Two ((spec1, ()), (spec2, ())) ->
+                  let%bind metric1 = process ~single_spec:spec1 in
+                  let%map metric2 = process ~single_spec:spec2 in
+                  `Two ((spec1, metric1), (spec2, metric2))
+            in
+
+            Spec.Poly.Old { instances; common } )
+    | Worker_state.Check | Worker_state.No_check ->
+        let elapsed = Time.Span.zero in
+        let data =
+          Spec.Poly.map_with_statement
+            ~f:(fun statement () ->
+              Proof_with_metric.Poly.
+                { proof =
+                    (* NOTE: use a dummy proof *)
+                    Transaction_snark.create
+                      ~statement:{ statement with sok_digest }
+                      ~proof:(Lazy.force Proof.transaction_dummy)
+                ; elapsed
+                } )
+            spec
         in
-        let open Deferred.Or_error.Let_syntax in
-        match instances with
-        | `One single ->
-            let%map result = perform_single ~single in
-            `One result
-        | `Two (i1, i2) ->
-            let%bind r1 = perform_single ~single:i1 in
-            let%map r2 = perform_single ~single:i2 in
-            `Two (r1, r2) )
-    | Check | No_check ->
-        let process (single_spec : Work.Selector.Single.Spec.Stable.Latest.t) =
-          let statement = Work.Work.Single.Spec.statement single_spec in
-          (* NOTE: use a dummy proof *)
-          let proof =
-            Transaction_snark.create
-              ~statement:{ statement with sok_digest }
-              ~proof:(Lazy.force Proof.transaction_dummy)
-          in
-          (proof, Time.Span.zero, get_tag single_spec)
-        in
-        One_or_two.map ~f:process instances |> Deferred.Or_error.return
+        Deferred.Or_error.return data
 end
