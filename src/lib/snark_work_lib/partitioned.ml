@@ -542,6 +542,9 @@ module Result = struct
               None
       end
     end]
+
+    [%%define_locally
+    Stable.Latest.(to_spec, of_selector_result, to_selector_result)]
   end
 
   [%%versioned
