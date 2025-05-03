@@ -104,6 +104,12 @@ module Zkapp_command_job = struct
             | Merge of { proof1 : 'proof; proof2 : 'proof }
           [@@deriving sexp, yojson]
 
+          let map ~f_witness ~f_proof = function
+            | Segment { statement; witness; spec } ->
+                Segment { statement; witness = f_witness witness; spec }
+            | Merge { proof1; proof2 } ->
+                Merge { proof1 = f_proof proof1; proof2 = f_proof proof2 }
+
           let statement : _ t -> Transaction_snark.Statement.t = function
             | Segment { statement; _ } ->
                 Mina_state.Snarked_ledger_state.Poly.drop_sok statement
@@ -124,7 +130,7 @@ module Zkapp_command_job = struct
       end]
 
       [%%define_locally
-      Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson, statement)]
+      Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson, map, statement)]
     end
 
     [%%versioned
@@ -149,35 +155,20 @@ module Zkapp_command_job = struct
       , Ledger_proof.Cached.t )
       Poly.t
 
-    let read_all_proofs_from_disk : t -> Stable.Latest.t = function
-      | Segment { statement; witness; spec } ->
-          let witness =
-            Transaction_snark.Zkapp_command_segment.Witness
-            .read_all_proofs_from_disk witness
-          in
-
-          Segment { statement; witness; spec }
-      | Merge { proof1; proof2 } ->
-          let proof1 = Ledger_proof.Cached.read_proof_from_disk proof1 in
-          let proof2 = Ledger_proof.Cached.read_proof_from_disk proof2 in
-          Merge { proof1; proof2 }
+    let read_all_proofs_from_disk : t -> Stable.Latest.t =
+      Poly.map
+        ~f_witness:
+          Transaction_snark.Zkapp_command_segment.Witness
+          .read_all_proofs_from_disk
+        ~f_proof:Ledger_proof.Cached.read_proof_from_disk
 
     let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-        Stable.Latest.t -> t = function
-      | Segment { statement; witness; spec } ->
-          let witness =
-            Transaction_snark.Zkapp_command_segment.Witness
-            .write_all_proofs_to_disk ~proof_cache_db witness
-          in
-          Segment { statement; witness; spec }
-      | Merge { proof1; proof2 } ->
-          let proof1 =
-            Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof1
-          in
-          let proof2 =
-            Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof2
-          in
-          Merge { proof1; proof2 }
+        Stable.Latest.t -> t =
+      Poly.map
+        ~f_witness:
+          (Transaction_snark.Zkapp_command_segment.Witness
+           .write_all_proofs_to_disk ~proof_cache_db )
+        ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
   end
 
   module Poly = struct
@@ -226,152 +217,142 @@ module Spec = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      [@@@no_toplevel_latest_type]
-
       module V1 = struct
-        type 'metric t =
+        type ( 'witness
+             , 'zkapp_command_segment_witness
+             , 'ledger_proof
+             , 'metric )
+             t =
           | Single of
-              { single_spec : Selector.Single.Spec.Stable.V1.t
+              { single_spec :
+                  ('witness, 'ledger_proof) Work.Single.Spec.Stable.V2.t
               ; pairing : Pairing.Single.Stable.V1.t
               ; metric : 'metric
               ; common : Spec_common.Stable.V1.t
               }
           | Sub_zkapp_command of
-              { spec : Zkapp_command_job.Stable.V1.t; metric : 'metric }
+              { spec :
+                  ( 'zkapp_command_segment_witness
+                  , 'ledger_proof )
+                  Zkapp_command_job.Spec.Poly.Stable.V1.t
+                  Zkapp_command_job.Poly.Stable.V1.t
+              ; metric : 'metric
+              }
           | Old of
               { instances :
-                  (Selector.Single.Spec.Stable.V1.t * 'metric)
+                  ( ('witness, 'ledger_proof) Work.Single.Spec.Stable.V2.t
+                  * 'metric )
                   One_or_two.Stable.V1.t
               ; common : Spec_common.Stable.V1.t
               }
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
+
+        let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_metric =
+          function
+          | Single { single_spec; pairing; metric; common } ->
+              Single
+                { single_spec =
+                    Work.Single.Spec.map ~f_witness ~f_proof single_spec
+                ; pairing
+                ; metric = f_metric metric
+                ; common
+                }
+          | Sub_zkapp_command { spec; metric } ->
+              Sub_zkapp_command
+                { spec =
+                    Zkapp_command_job.Poly.map
+                      ~f_spec:
+                        (Zkapp_command_job.Spec.Poly.map
+                           ~f_witness:f_zkapp_command_segment_witness ~f_proof )
+                      spec
+                ; metric = f_metric metric
+                }
+          | Old { instances; common } ->
+              let f_instance (single_spec, metric) =
+                ( Work.Single.Spec.map ~f_witness ~f_proof single_spec
+                , f_metric metric )
+              in
+              Old { instances = One_or_two.map ~f:f_instance instances; common }
+
+        let statements : _ t -> Transaction_snark.Statement.t One_or_two.t =
+          function
+          | Single { single_spec; _ } ->
+              let stmt = Work.Single.Spec.statement single_spec in
+              `One stmt
+          | Sub_zkapp_command { spec = { spec; _ }; _ } ->
+              `One (Zkapp_command_job.Spec.Poly.statement spec)
+          | Old { instances; _ } ->
+              One_or_two.map
+                ~f:(fun (i, _) -> Work.Single.Spec.statement i)
+                instances
+
+        let map_with_statement (t : _ t) ~f : _ t =
+          match t with
+          | Single { single_spec; pairing; metric; common } ->
+              let stmt = Work.Single.Spec.statement single_spec in
+              Single { single_spec; pairing; metric = f stmt metric; common }
+          | Old { instances; common } ->
+              Old
+                { instances =
+                    One_or_two.map
+                      ~f:(fun (single_spec, metric) ->
+                        let stmt = Work.Single.Spec.statement single_spec in
+                        (single_spec, f stmt metric) )
+                      instances
+                ; common
+                }
+          | Sub_zkapp_command { spec = { spec; _ } as job_spec; metric } ->
+              Sub_zkapp_command
+                { spec = job_spec
+                ; metric = f (Zkapp_command_job.Spec.Poly.statement spec) metric
+                }
+
+        let transaction = function
+          | Single { single_spec; _ } ->
+              let txn = Work.Single.Spec.transaction single_spec in
+              `Single txn
+          | Sub_zkapp_command _ ->
+              `Sub_zkapp_command
+          | Old spec ->
+              `Old
+                (One_or_two.map spec.instances ~f:(fun (single, ()) ->
+                     Work.Single.Spec.transaction single ) )
+
+        let fee_of_full : _ t -> Currency.Fee.t = function
+          | Single { common; _ }
+          | Sub_zkapp_command { spec = { common; _ }; _ }
+          | Old { common; _ } ->
+              common.fee_of_full
+
+        let of_selector_spec ~issued_since_unix_epoch (spec : _ Work.Spec.t) :
+            _ t =
+          Old
+            { instances =
+                One_or_two.map ~f:(fun spec -> (spec, ())) spec.instances
+            ; common = { fee_of_full = spec.fee; issued_since_unix_epoch }
+            }
+
+        let to_selector_spec : _ t -> _ Work.Spec.t option = function
+          | Old spec ->
+              let instances =
+                One_or_two.map ~f:(fun (spec, ()) -> spec) spec.instances
+              in
+              Some { instances; fee = spec.common.fee_of_full }
+          | _ ->
+              None
       end
     end]
 
-    type 'metric t =
-      | Single of
-          { single_spec : Selector.Single.Spec.t
-          ; pairing : Pairing.Single.t
-          ; metric : 'metric
-          ; common : Spec_common.t
-          }
-      | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
-      | Old of
-          { instances : (Selector.Single.Spec.t * 'metric) One_or_two.t
-          ; common : Spec_common.t
-          }
-
-    let map (t : 'm t) ~(f : 'm -> 'n) : 'n t =
-      match t with
-      | Single { single_spec; pairing; metric; common } ->
-          Single { single_spec; pairing; metric = f metric; common }
-      | Old { instances; common } ->
-          Old
-            { instances = One_or_two.map ~f:(Tuple2.map_snd ~f) instances
-            ; common
-            }
-      | Sub_zkapp_command { spec; metric } ->
-          Sub_zkapp_command { spec; metric = f metric }
-
-    let statements : 'metric t -> Transaction_snark.Statement.t One_or_two.t =
-      function
-      | Single { single_spec; _ } ->
-          let stmt = Work.Single.Spec.statement single_spec in
-          `One stmt
-      | Sub_zkapp_command { spec = { spec; _ }; _ } ->
-          `One (Zkapp_command_job.Spec.Poly.statement spec)
-      | Old { instances; _ } ->
-          One_or_two.map
-            ~f:(fun (i, _) -> Work.Single.Spec.statement i)
-            instances
-
-    let map_with_statement (t : 'm t)
-        ~(f : Transaction_snark.Statement.t -> 'm -> 'n) : 'n t =
-      match t with
-      | Single { single_spec; pairing; metric; common } ->
-          let stmt = Work.Single.Spec.statement single_spec in
-          Single { single_spec; pairing; metric = f stmt metric; common }
-      | Old { instances; common } ->
-          Old
-            { instances =
-                One_or_two.map
-                  ~f:(fun (single_spec, metric) ->
-                    let stmt = Work.Single.Spec.statement single_spec in
-                    (single_spec, f stmt metric) )
-                  instances
-            ; common
-            }
-      | Sub_zkapp_command { spec = { spec; _ } as job_spec; metric } ->
-          Sub_zkapp_command
-            { spec = job_spec
-            ; metric = f (Zkapp_command_job.Spec.Poly.statement spec) metric
-            }
-
-    let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
-      function
-      | Single { single_spec; pairing; metric; common } ->
-          let single_spec =
-            Selector.Single.Spec.read_all_proofs_from_disk single_spec
-          in
-          Single { single_spec; pairing; metric; common }
-      | Sub_zkapp_command { spec; metric } ->
-          let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
-          Sub_zkapp_command { spec; metric }
-      | Old { instances; common } ->
-          Old
-            { instances =
-                One_or_two.map
-                  ~f:
-                    (Tuple2.map_fst
-                       ~f:Selector.Single.Spec.read_all_proofs_from_disk )
-                  instances
-            ; common
-            }
-
-    let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-        'metric Stable.Latest.t -> 'metric t = function
-      | Single { single_spec; pairing; metric; common } ->
-          let single_spec =
-            Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
-              single_spec
-          in
-          Single { single_spec; pairing; metric; common }
-      | Sub_zkapp_command { spec; metric } ->
-          let spec =
-            Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec
-          in
-          Sub_zkapp_command { spec; metric }
-      | Old { instances; common } ->
-          Old
-            { instances =
-                One_or_two.map
-                  ~f:
-                    (Tuple2.map_fst
-                       ~f:
-                         (Selector.Single.Spec.write_all_proofs_to_disk
-                            ~proof_cache_db ) )
-                  instances
-            ; common
-            }
-
-    let transaction = function
-      | Single { single_spec; _ } ->
-          let txn = Work.Single.Spec.transaction single_spec in
-          `Single txn
-      | Sub_zkapp_command _ ->
-          `Sub_zkapp_command
-      | Old spec ->
-          `Old
-            (One_or_two.map spec.instances ~f:(fun (single, ()) ->
-                 Work.Single.Spec.transaction single ) )
-
-    let fee_of_full : 'm t -> Currency.Fee.t = function
-      | Single { common; _ }
-      | Sub_zkapp_command { spec = { common; _ }; _ }
-      | Old { common; _ } ->
-          common.fee_of_full
+    [%%define_locally
+    Stable.Latest.
+      ( map
+      , statements
+      , map_with_statement
+      , transaction
+      , of_selector_spec
+      , to_selector_spec )]
   end
 
   [%%versioned
@@ -379,28 +360,70 @@ module Spec = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = unit Poly.Stable.V1.t [@@deriving sexp, yojson]
+      type t =
+        ( Transaction_witness.Stable.V2.t
+        , Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
+        , Ledger_proof.Stable.V2.t
+        , unit )
+        Poly.Stable.V1.t
+      [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = unit Poly.t
+  type t =
+    ( Transaction_witness.t
+    , Transaction_snark.Zkapp_command_segment.Witness.t
+    , Ledger_proof.Cached.t
+    , unit )
+    Poly.t
 
-  let of_selector_spec ~issued_since_unix_epoch (spec : Selector.Spec.t) : t =
-    Old
-      { instances = One_or_two.map ~f:(fun spec -> (spec, ())) spec.instances
-      ; common = { fee_of_full = spec.fee; issued_since_unix_epoch }
-      }
-
-  let to_selector_spec : t -> Selector.Spec.t option = function
-    | Old spec ->
-        let instances =
-          One_or_two.map ~f:(fun (spec, ()) -> spec) spec.instances
+  let read_all_proofs_from_disk : t -> Stable.Latest.t = function
+    | Single { single_spec; pairing; metric; common } ->
+        let single_spec =
+          Selector.Single.Spec.read_all_proofs_from_disk single_spec
         in
-        Some { instances; fee = spec.common.fee_of_full }
-    | _ ->
-        None
+        Single { single_spec; pairing; metric; common }
+    | Sub_zkapp_command { spec; metric } ->
+        let spec = Zkapp_command_job.read_all_proofs_from_disk spec in
+        Sub_zkapp_command { spec; metric }
+    | Old { instances; common } ->
+        Old
+          { instances =
+              One_or_two.map
+                ~f:
+                  (Tuple2.map_fst
+                     ~f:Selector.Single.Spec.read_all_proofs_from_disk )
+                instances
+          ; common
+          }
+
+  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
+      Stable.Latest.t -> t = function
+    | Single { single_spec; pairing; metric; common } ->
+        let single_spec =
+          Selector.Single.Spec.write_all_proofs_to_disk ~proof_cache_db
+            single_spec
+        in
+        Single { single_spec; pairing; metric; common }
+    | Sub_zkapp_command { spec; metric } ->
+        let spec =
+          Zkapp_command_job.write_all_proofs_to_disk ~proof_cache_db spec
+        in
+        Sub_zkapp_command { spec; metric }
+    | Old { instances; common } ->
+        Old
+          { instances =
+              One_or_two.map
+                ~f:
+                  (Tuple2.map_fst
+                     ~f:
+                       (Selector.Single.Spec.write_all_proofs_to_disk
+                          ~proof_cache_db ) )
+                instances
+          ; common
+          }
 end
 
 module Proof_with_metric = struct
@@ -459,7 +482,12 @@ module Result = struct
     module V1 = struct
       type t =
         { (* Throw everything inside the spec to ensure proofs, metrics have correct shape *)
-          data : Proof_with_metric.Stable.V1.t Spec.Poly.Stable.V1.t
+          data :
+            ( Transaction_witness.Stable.V2.t
+            , Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
+            , Ledger_proof.Stable.V2.t
+            , Proof_with_metric.Stable.V1.t )
+            Spec.Poly.Stable.V1.t
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
         }
 
@@ -468,15 +496,23 @@ module Result = struct
   end]
 
   type t =
-    { data : Proof_with_metric.t Spec.Poly.t
+    { data :
+        ( Transaction_witness.t
+        , Transaction_snark.Zkapp_command_segment.Witness.t
+        , Ledger_proof.Cached.t
+        , Proof_with_metric.t )
+        Spec.Poly.t
     ; prover : Signature_lib.Public_key.Compressed.t
     }
 
   let read_all_proofs_from_disk ({ data; prover } : t) : Stable.Latest.t =
     let data =
-      Spec.Poly.(
-        map ~f:Proof_with_metric.read_all_proofs_from_disk data
-        |> read_all_proofs_from_disk)
+      Spec.Poly.map ~f_witness:Transaction_witness.read_all_proofs_from_disk
+        ~f_zkapp_command_segment_witness:
+          Transaction_witness.Zkapp_command_segment_witness
+          .read_all_proofs_from_disk
+        ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+        ~f_metric:Proof_with_metric.read_all_proofs_from_disk data
     in
 
     { data; prover }
@@ -484,9 +520,15 @@ module Result = struct
   let write_all_proofs_to_disk ~proof_cache_db
       ({ data; prover } : Stable.Latest.t) : t =
     let data =
-      Spec.Poly.(
-        write_all_proofs_to_disk ~proof_cache_db data
-        |> map ~f:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db))
+      Spec.Poly.map
+        ~f_witness:
+          (Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
+        ~f_zkapp_command_segment_witness:
+          (Transaction_witness.Zkapp_command_segment_witness
+           .write_all_proofs_to_disk ~proof_cache_db )
+        ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
+        ~f_metric:(Proof_with_metric.write_all_proofs_to_disk ~proof_cache_db)
+        data
     in
     { data; prover }
 
