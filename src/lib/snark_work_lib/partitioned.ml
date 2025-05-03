@@ -90,36 +90,64 @@ module Zkapp_command_job = struct
   end
 
   module Spec = struct
+    module Poly = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ('witness, 'proof) t =
+            | Segment of
+                { statement : Transaction_snark.Statement.With_sok.Stable.V2.t
+                ; witness : 'witness
+                ; spec :
+                    Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
+                }
+            | Merge of { proof1 : 'proof; proof2 : 'proof }
+          [@@deriving sexp, yojson]
+
+          let statement : _ t -> Transaction_snark.Statement.t = function
+            | Segment { statement; _ } ->
+                Mina_state.Snarked_ledger_state.Poly.drop_sok statement
+            | Merge { proof1; proof2; _ } -> (
+                let module Statement = Mina_state.Snarked_ledger_state in
+                let stmt1 = Ledger_proof.Poly.statement proof1 in
+                let stmt2 = Ledger_proof.Poly.statement proof2 in
+                let stmt = Statement.merge stmt1 stmt2 in
+                match stmt with
+                | Ok stmt ->
+                    stmt
+                | Error e ->
+                    failwithf
+                      "Failed to construct a statement from  zkapp merge \
+                       command %s"
+                      (Error.to_string_hum e) () )
+        end
+      end]
+
+      [%%define_locally
+      Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson, statement)]
+    end
+
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
 
       module V1 = struct
         type t =
-          | Segment of
-              { statement : Transaction_snark.Statement.With_sok.Stable.V2.t
-              ; witness :
-                  Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
-              ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
-              }
-          | Merge of
-              { proof1 : Ledger_proof.Stable.V2.t
-              ; proof2 : Ledger_proof.Stable.V2.t
-              }
+          ( Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
+          , Ledger_proof.Stable.V2.t )
+          Poly.Stable.V1.t
         [@@deriving sexp, yojson]
+
+        let statement : t -> Transaction_snark.Statement.t = Poly.statement
 
         let to_latest = Fn.id
       end
     end]
 
     type t =
-      | Segment of
-          { statement : Transaction_snark.Statement.With_sok.t
-          ; witness : Transaction_snark.Zkapp_command_segment.Witness.t
-          ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
-          }
-      | Merge of
-          { proof1 : Ledger_proof.Cached.t; proof2 : Ledger_proof.Cached.t }
+      ( Transaction_snark.Zkapp_command_segment.Witness.t
+      , Ledger_proof.Cached.t )
+      Poly.t
 
     let read_all_proofs_from_disk : t -> Stable.Latest.t = function
       | Segment { statement; witness; spec } ->
@@ -150,26 +178,6 @@ module Zkapp_command_job = struct
             Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof2
           in
           Merge { proof1; proof2 }
-
-    let statement : t -> Transaction_snark.Statement.t = function
-      | Segment { statement; _ } ->
-          Mina_state.Snarked_ledger_state.Poly.drop_sok statement
-      | Merge { proof1; proof2; _ } -> (
-          let module Statement = Mina_state.Snarked_ledger_state in
-          let { Proof_carrying_data.data = t1; _ } = proof1 in
-          let { Proof_carrying_data.data = t2; _ } = proof2 in
-          let stmt =
-            Statement.merge
-              ({ t1 with sok_digest = () } : Statement.t)
-              { t2 with sok_digest = () }
-          in
-          match stmt with
-          | Ok stmt ->
-              stmt
-          | Error e ->
-              failwithf
-                "Failed to construct a statement from  zkapp merge command %s"
-                (Error.to_string_hum e) () )
   end
 
   [%%versioned
@@ -242,7 +250,7 @@ module Spec = struct
           { single_spec : Selector.Single.Spec.t
           ; pairing : Pairing.Single.t
           ; metric : 'metric
-          ; common : Spec_common.Stable.V1.t
+          ; common : Spec_common.t
           }
       | Sub_zkapp_command of { spec : Zkapp_command_job.t; metric : 'metric }
       | Old of
@@ -268,7 +276,7 @@ module Spec = struct
           let stmt = Work.Single.Spec.statement single_spec in
           `One stmt
       | Sub_zkapp_command { spec = { spec; _ }; _ } ->
-          `One (Zkapp_command_job.Spec.statement spec)
+          `One (Zkapp_command_job.Spec.Poly.statement spec)
       | Old { instances; _ } ->
           One_or_two.map
             ~f:(fun (i, _) -> Work.Single.Spec.statement i)
@@ -293,7 +301,7 @@ module Spec = struct
       | Sub_zkapp_command { spec = { spec; _ } as job_spec; metric } ->
           Sub_zkapp_command
             { spec = job_spec
-            ; metric = f (Zkapp_command_job.Spec.statement spec) metric
+            ; metric = f (Zkapp_command_job.Spec.Poly.statement spec) metric
             }
 
     let read_all_proofs_from_disk : 'metric t -> 'metric Stable.Latest.t =
