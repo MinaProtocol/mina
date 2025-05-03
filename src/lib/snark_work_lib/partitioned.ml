@@ -180,41 +180,46 @@ module Zkapp_command_job = struct
           Merge { proof1; proof2 }
   end
 
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'spec t =
+          { spec : 'spec
+          ; pairing : Pairing.Sub_zkapp.Stable.V1.t
+          ; job_id : ID.Stable.V1.t
+          ; common : Spec_common.Stable.V1.t
+          }
+        [@@deriving sexp, yojson]
+
+        let map ~(f_spec : 'a -> 'b) (t : 'a t) : 'b t =
+          { t with spec = f_spec t.spec }
+      end
+    end]
+
+    [%%define_locally
+    Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson, map)]
+  end
+
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t =
-        { spec : Spec.Stable.V1.t
-        ; pairing : Pairing.Sub_zkapp.Stable.V1.t
-        ; job_id : ID.Stable.V1.t
-        ; common : Spec_common.Stable.V1.t
-        }
-      [@@deriving sexp, yojson]
+      type t = Spec.Stable.V1.t Poly.Stable.V1.t [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t =
-    { spec : Spec.t
-    ; pairing : Pairing.Sub_zkapp.t
-    ; job_id : ID.t
-    ; common : Spec_common.t
-    }
+  type t = Spec.t Poly.t
 
-  let read_all_proofs_from_disk ({ spec; pairing; job_id; common } : t) :
-      Stable.Latest.t =
-    { spec = Spec.read_all_proofs_from_disk spec; pairing; job_id; common }
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
+    Poly.map ~f_spec:Spec.read_all_proofs_from_disk
 
-  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db)
-      ({ spec; pairing; job_id; common } : Stable.Latest.t) : t =
-    { spec = Spec.write_all_proofs_to_disk ~proof_cache_db spec
-    ; pairing
-    ; job_id
-    ; common
-    }
+  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
+      Stable.Latest.t -> t =
+    Poly.map ~f_spec:(Spec.write_all_proofs_to_disk ~proof_cache_db)
 end
 
 module Spec = struct
