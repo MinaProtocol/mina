@@ -247,8 +247,6 @@ module Spec = struct
               }
         [@@deriving sexp, yojson]
 
-        let to_latest = Fn.id
-
         let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_metric =
           function
           | Single { single_spec; pairing; metric; common } ->
@@ -427,21 +425,27 @@ module Spec = struct
 end
 
 module Proof_with_metric = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'proof t = { proof : 'proof; elapsed : Core.Time.Stable.Span.V1.t }
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t =
-        { proof : Ledger_proof.Stable.V2.t
-        ; elapsed : Core.Time.Stable.Span.V1.t
-        }
+      type t = Ledger_proof.Stable.V2.t Poly.Stable.V1.t
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = { proof : Ledger_proof.Cached.t; elapsed : Core.Time.Span.t }
+  type t = Ledger_proof.Cached.t Poly.t
 
   let read_all_proofs_from_disk ({ proof; elapsed } : t) : Stable.Latest.t =
     let proof = Ledger_proof.Cached.read_proof_from_disk proof in
@@ -475,14 +479,78 @@ let construct_selector_result
   ({ proofs; metrics; spec = { instances; fee }; prover } : Selector.Result.t)
 
 module Result = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ( 'witness
+             , 'zkapp_command_segment_witness
+             , 'ledger_proof
+             , 'metric )
+             t =
+          { (* Throw everything inside the spec to ensure proofs, metrics have correct shape *)
+            data :
+              ( 'witness
+              , 'zkapp_command_segment_witness
+              , 'ledger_proof
+              , 'metric )
+              Spec.Poly.Stable.V1.t
+          ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
+          }
+
+        let to_spec ({ data; _ } : _ t) : _ Spec.Poly.t =
+          match data with
+          | Spec.Poly.Single { single_spec; pairing; common; _ } ->
+              Spec.Poly.Single { single_spec; pairing; common; metric = () }
+          | Spec.Poly.Sub_zkapp_command { spec; _ } ->
+              Spec.Poly.Sub_zkapp_command { spec; metric = () }
+          | Spec.Poly.Old { instances; common } ->
+              Spec.Poly.Old
+                { instances =
+                    One_or_two.map ~f:(fun (spec, _) -> (spec, ())) instances
+                ; common
+                }
+
+        let of_selector_result ~issued_since_unix_epoch
+            ({ proofs; metrics; spec = { instances; fee }; prover } :
+              ( ('witness, 'ledger_proof) Work.Single.Spec.t Work.Spec.t
+              , 'ledger_proof )
+              Work.Result.t ) :
+            ('witness, 'zkapp_command_segment_witness, 'ledger_proof, 'metric) t
+            Or_error.t =
+          let%bind.Result zipped = One_or_two.zip proofs metrics in
+          let%map.Result zipped = One_or_two.zip zipped instances in
+
+          let with_metric ((proof, (elapsed, _)), single_spec) :
+              _ * _ Proof_with_metric.Poly.t =
+            (single_spec, { proof; elapsed })
+          in
+          let instances = One_or_two.map ~f:with_metric zipped in
+          let data =
+            Spec.Poly.Old
+              { instances
+              ; common = { issued_since_unix_epoch; fee_of_full = fee }
+              }
+          in
+          { data; prover }
+
+        let to_selector_result ({ data; prover } : _ t) =
+          match data with
+          | Old { instances; common = { fee_of_full = fee; _ } } ->
+              Some (construct_selector_result ~instances ~fee ~prover)
+          | _ ->
+              None
+      end
+    end]
+  end
+
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
       type t =
-        { (* Throw everything inside the spec to ensure proofs, metrics have correct shape *)
-          data :
+        { data :
             ( Transaction_witness.Stable.V2.t
             , Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
             , Ledger_proof.Stable.V2.t
@@ -531,40 +599,4 @@ module Result = struct
         data
     in
     { data; prover }
-
-  let to_spec ({ data; _ } : t) : Spec.t =
-    match data with
-    | Spec.Poly.Single { single_spec; pairing; common; _ } ->
-        Spec.Poly.Single { single_spec; pairing; common; metric = () }
-    | Spec.Poly.Sub_zkapp_command { spec; _ } ->
-        Spec.Poly.Sub_zkapp_command { spec; metric = () }
-    | Spec.Poly.Old { instances; common } ->
-        Spec.Poly.Old
-          { instances =
-              One_or_two.map ~f:(fun (spec, _) -> (spec, ())) instances
-          ; common
-          }
-
-  let of_selector_result ~issued_since_unix_epoch
-      ({ proofs; metrics; spec = { instances; fee }; prover } :
-        Selector.Result.t ) : t Or_error.t =
-    let%bind.Result zipped = One_or_two.zip proofs metrics in
-    let%map.Result zipped = One_or_two.zip zipped instances in
-
-    let with_metric ((proof, (elapsed, _)), single_spec) =
-      (single_spec, Proof_with_metric.{ proof; elapsed })
-    in
-    let instances = One_or_two.map ~f:with_metric zipped in
-    let data =
-      Spec.Poly.Old
-        { instances; common = { issued_since_unix_epoch; fee_of_full = fee } }
-    in
-    { data; prover }
-
-  let to_selector_result ({ data; prover } : t) : Selector.Result.t option =
-    match data with
-    | Old { instances; common = { fee_of_full = fee; _ } } ->
-        Some (construct_selector_result ~instances ~fee ~prover)
-    | _ ->
-        None
 end
