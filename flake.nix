@@ -303,18 +303,19 @@
           nodejs
           binaryen
           zip
-          libiconv 
-          cargo           
+          libiconv
+          cargo
           curl
           (pkgs.python3.withPackages (python-pkgs: [
               python-pkgs.click
               python-pkgs.requests
             ]))
           jq
+          rocksdb.tools
         ];
       in {
         inherit ocamlPackages;
-        
+
         # Main user-facing binaries.
         packages = rec {
           inherit (ocamlPackages)
@@ -371,9 +372,7 @@
           shellHook = ''
             export MINA_BRANCH=$()
           '';
-          buildInputs = [
-            self.packages.${system}.test_executive
-          ];
+          buildInputs = [ self.packages.${system}.test_executive ];
         };
         packages.impure-shell =
           (import ./nix/impure-shell.nix pkgs).inputDerivation;
