@@ -353,14 +353,14 @@ module Spec = struct
 
     let transaction = function
       | Single { single_spec; _ } ->
-          let txn = Selector.Single.Spec.transaction single_spec in
+          let txn = Work.Single.Spec.transaction single_spec in
           `Single txn
       | Sub_zkapp_command _ ->
           `Sub_zkapp_command
       | Old spec ->
           `Old
             (One_or_two.map spec.instances ~f:(fun (single, ()) ->
-                 Selector.Single.Spec.transaction single ) )
+                 Work.Single.Spec.transaction single ) )
 
     let fee_of_full : 'm t -> Currency.Fee.t = function
       | Single { common; _ }
