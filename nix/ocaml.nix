@@ -19,21 +19,27 @@ let
     builtins.removeAttrs (opam-nix.opamListToQuery export.installed)
     [ "check_opam_switch" ];
 
-  # Extra packages which are not in opam.export but useful for development, such as an LSP server.
+  # Extra packages which are not in opam.export but useful for development, such
+  # as an LSP server.
   extra-packages = with implicit-deps; {
-    dune-rpc = "3.5.0";
-    dyn = "3.5.0";
     fiber = "3.5.0";
-    chrome-trace = "3.5.0";
+    # must follow dune version in opam.export (from ocaml/dune)
+    dune-rpc = "3.18.2";
+    # must follow dune version in opam.export (from ocaml/dune)
+    dyn = "3.18.2";
+    # must follow dune version in opam.export (from ocaml/dune)
+    chrome-trace = "3.18.2";
     ocaml-lsp-server = "1.15.1-4.14";
-    ocamlc-loc = "3.5.0";
+    # must follow dune version in opam.export (from ocaml/dune)
+    ocamlc-loc = "3.18.2";
     ocaml-system = ocaml;
     ocamlformat-rpc-lib = "0.22.4";
     omd = "1.3.2";
-    ordering = "3.5.0";
+    # must follow dune version in opam.export (from ocaml/dune)
+    ordering = "3.18.2";
     pp = "1.1.2";
     ppx_yojson_conv_lib = "v0.15.0";
-    stdune = "3.5.0";
+    stdune = "3.18.2"; # must follow dune version in opam.eport
     xdg = dune;
   };
 
