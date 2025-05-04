@@ -75,7 +75,8 @@ let report_test_errors ~log_error_set ~internal_error_set =
   let open Test_error in
   let open Test_error.Set in
   let color_eprintf color =
-    Printf.ksprintf (fun s -> Print.eprintf "%s%s%s" color s Mina_stdlib.Bash_colors.none)
+    Printf.ksprintf (fun s ->
+        Print.eprintf "%s%s%s" color s Mina_stdlib.Bash_colors.none )
   in
   let color_of_severity = function
     | `None ->
@@ -197,7 +198,8 @@ let report_test_errors ~log_error_set ~internal_error_set =
       let%bind () = Writer.(flushed (Lazy.force stderr)) in
       return exit_code
 
-(* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
+(* TODO: refactor cleanup system (smells like a monad for composing linear
+   resources would help a lot) *)
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
@@ -449,7 +451,7 @@ let test_arg =
 
 let mina_image_arg =
   let doc = "Identifier of the Mina docker image to test." in
-  let env = Arg.env_var "MINA_IMAGE" ~doc in
+  let env = Cmd.Env.info "MINA_IMAGE" ~doc in
   Arg.(
     required
     & opt (some string) None
@@ -457,7 +459,7 @@ let mina_image_arg =
 
 let archive_image_arg =
   let doc = "Identifier of the archive node docker image to test." in
-  let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
+  let env = Cmd.Env.info "ARCHIVE_IMAGE" ~doc in
   Arg.(
     value
       ( opt (some string) None
@@ -475,7 +477,7 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
     let doc = "Run mina integration test(s) on engine." in
-    Term.info engine_name ~doc ~exits:Term.default_exits
+    Cmd.info engine_name ~doc ~exits:Cmd.Exit.defaults
   in
   let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
@@ -497,15 +499,22 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
 
 let help_cmd =
   let doc = "Print out test executive documentation." in
-  let info = Term.info "help" ~doc ~exits:Term.default_exits in
+  let info = Cmd.info "help" ~doc ~exits:Cmd.Exit.defaults in
   (help_term, info)
 
 let default_cmd =
   let doc = "Run mina integration test(s)." in
-  let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
+  let info = Cmd.info "test_executive" ~doc in
   (help_term, info)
 
-(* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
-let () =
+(* TODO: move required args to positions instead of flags, or provide reasonable
+   defaults to make them optional *)
+
+let main () =
   let engine_cmds = List.map engines ~f:engine_cmd in
-  Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))
+  let cmds = help_cmd :: engine_cmds in
+  let cmds = List.map cmds ~f:(fun (term, info) -> Cmd.v info term) in
+  let default_term, info = default_cmd in
+  Cmd.eval (Cmd.group ~default:default_term info cmds)
+
+let () = if !Sys.interactive then () else Stdlib.exit (main ())
