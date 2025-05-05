@@ -179,7 +179,6 @@
 (package (name snark_keys_header))
 (package (name snark_params))
 (package (name snark_profiler_lib))
-(package (name snark_work_debugger))
 (package (name snark_worker))
 (package (name snark_work_lib))
 (package (name snarky_blake2))
