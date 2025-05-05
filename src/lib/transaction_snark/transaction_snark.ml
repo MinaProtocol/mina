@@ -3798,7 +3798,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                    , `Pending_coinbase_of_statement
                        pending_coinbase_stack_state2
                    , zkapp_command2 )
-                :: rest ->
+                   :: rest ->
                   let commitment', full_commitment' =
                     mk_next_commitments zkapp_command2.account_updates
                   in
@@ -5058,8 +5058,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let sender_account_update = Option.value_exn sender_account_update in
         Zkapp_command.Call_forest.cons
           ( Account_update.of_simple sender_account_update
-            |> Account_update.map_proofs
-              ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+          |> Account_update.map_proofs
+               ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
           zkapp_command.account_updates
       in
       { zkapp_command with account_updates }

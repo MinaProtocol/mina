@@ -364,8 +364,13 @@ let skip_proof_validation `This_block_was_generated_internally (t, validation) =
   (t, Unsafe.set_valid_proof validation)
 
 let extract_delta_block_chain_witness = function
-  | _, _, _, (`Delta_block_chain, Mina_stdlib.Truth.True delta_block_chain_witness), _, _, _
-    ->
+  | ( _
+    , _
+    , _
+    , (`Delta_block_chain, Mina_stdlib.Truth.True delta_block_chain_witness)
+    , _
+    , _
+    , _ ) ->
       delta_block_chain_witness
   | _ ->
       failwith "why can't this be refuted?"
