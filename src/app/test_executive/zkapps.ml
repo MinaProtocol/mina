@@ -377,7 +377,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                     { other_p with
                       authorization =
                         Control.Poly.Proof
-                          (Lazy.force Mina_base.Proof.blockchain_dummy)
+                          (Lazy.force
+                             Mina_base.Proof.For_tests.blockchain_dummy_tag )
                     }
                 | _ ->
                     other_p )

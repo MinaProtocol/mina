@@ -579,6 +579,8 @@ let wrap_main ~public_key ?token_id ?may_use_token f
   ; auxiliary_output
   }
 
+let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
 let compile :
     type auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:
@@ -744,7 +746,10 @@ let compile :
             in
             let account_update : Account_update.t =
               { body = account_update
-              ; authorization = Proof (Pickles.Side_loaded.Proof.of_proof proof)
+              ; authorization =
+                  Proof
+                    ( Proof_cache_tag.write_proof_to_disk proof_cache_db
+                    @@ Pickles.Side_loaded.Proof.of_proof proof )
               }
             in
             ( { Zkapp_command.Call_forest.Tree.account_update
