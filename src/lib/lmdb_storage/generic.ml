@@ -269,39 +269,43 @@ let%test_module "Lmdb storage tests" =
       Base_quickcheck.Generator.int_uniform_inclusive 0
         Int32.(to_int_exn max_value)
 
-    let%test_unit "Put many keys to reach mmap resize" =
-      let n = 300 in
-      test_with_dir
-      @@ fun dir ->
+    let init_random_db ?(n = 300) ?(length = 100) dir ~f =
       let env, db = Rw.create dir in
       Quickcheck.test
         (Quickcheck.Generator.both uint32
-           (String.gen_with_length 100000
+           (String.gen_with_length length
               Base_quickcheck.quickcheck_generator_char ) )
         ~trials:n
-        ~f:(fun (k, v) -> Rw.set ~env db k (Bigstring.of_string v)) ;
-      Deferred.unit
+        ~f:(fun (k, v_str) -> f env db k v_str) ;
+      (env, db)
+
+    let%test_unit "Put many keys to reach mmap resize" =
+      test_with_dir
+      @@ fun dir ->
+      let env, _ =
+        init_random_db dir ~f:(fun env db k v_str ->
+            let v = Bigstring.of_string v_str in
+            Rw.set ~env db k v )
+      in
+      Rw.close env ; Deferred.unit
 
     let%test_unit "Iterations with removal and re-opening of database" =
-      let n = 300 in
       let hm = Hashtbl.create (module Int) in
       let odd_cnt = ref 0 in
       test_with_dir
       @@ fun dir ->
-      let env, db = Rw.create dir in
-      Quickcheck.test
-        (Quickcheck.Generator.both uint32
-           (String.gen_with_length 100 Base_quickcheck.quickcheck_generator_char) )
-        ~trials:n
-        ~f:(fun (k, v_str) ->
-          let v = Bigstring.of_string v_str in
-          Hashtbl.add ~key:k ~data:v hm
-          |> function
-          | `Duplicate ->
-              ()
-          | `Ok ->
-              if k % 2 = 1 then odd_cnt := !odd_cnt + 1 ;
-              Rw.set ~env db k v ) ;
+      let env, db =
+        init_random_db dir ~length:100000 ~f:(fun env db k v_str ->
+            let v = Bigstring.of_string v_str in
+            Hashtbl.add ~key:k ~data:v hm
+            |> function
+            | `Duplicate ->
+                ()
+            | `Ok ->
+                if k % 2 = 1 then odd_cnt := !odd_cnt + 1 ;
+                Rw.set ~env db k v )
+      in
+
       Hashtbl.iteri hm ~f:(fun ~key ~data ->
           [%test_eq: Bigstring.t option] (Some data) (Rw.get ~env db key) ) ;
       let cnt = ref 0 in
@@ -332,23 +336,18 @@ let%test_module "Lmdb storage tests" =
       Deferred.unit
 
     let%test_unit "Ro: Get and Iter operation within with_txn scope" =
-      let n = 300 in
       let hm = Hashtbl.create (module Int) in
       test_with_dir
       @@ fun dir ->
-      let env, db = Rw.create dir in
-      Quickcheck.test
-        (Quickcheck.Generator.both uint32
-           (String.gen_with_length 100 Base_quickcheck.quickcheck_generator_char) )
-        ~trials:n
-        ~f:(fun (k, v_str) ->
-          let v = Bigstring.of_string v_str in
-          Hashtbl.add ~key:k ~data:v hm
-          |> function `Duplicate -> () | `Ok -> Rw.set ~env db k v ) ;
-
+      let (_ : Ro.t * Rw.holder) =
+        init_random_db dir ~f:(fun env db k v_str ->
+            let v = Bigstring.of_string v_str in
+            Hashtbl.add ~key:k ~data:v hm
+            |> function `Duplicate -> () | `Ok -> Rw.set ~env db k v )
+      in
       let ro_env, ro_db = Ro.create dir in
       let hm_from_iter = Hashtbl.create (module Int) in
-      let (_ : Bigstring.t option) =
+      let (_ : Bigstring.t) =
         Ro.with_txn
           ~f:(fun getter ->
             getter.iter_ro
@@ -370,6 +369,7 @@ let%test_module "Lmdb storage tests" =
             |> Option.value_exn
                  ~message:"cannot fetch first key from hm after iter" )
           ro_env
+        |> Option.value_exn ~message:"cannot fetch first key from hm after iter"
       in
 
       [%test_eq: (int * Bigstring.t) List.t] (Hashtbl.to_alist hm)
@@ -377,51 +377,43 @@ let%test_module "Lmdb storage tests" =
       Deferred.unit
 
     let%test_unit "Rw: Get, Set and Iter operation within with_txn scope" =
-      let n = 300 in
       let hm = Hashtbl.create (module Int) in
       test_with_dir
       @@ fun dir ->
-      let env, db = Rw.create dir in
-      Quickcheck.test
-        (Quickcheck.Generator.both uint32
-           (String.gen_with_length 100 Base_quickcheck.quickcheck_generator_char) )
-        ~trials:n
-        ~f:(fun (k, v_str) ->
-          let v = Bigstring.of_string v_str in
-          Hashtbl.add ~key:k ~data:v hm
-          |> function `Duplicate -> () | `Ok -> Rw.set ~env db k v ) ;
-
-      let (_ : unit option) =
-        Rw.with_txn
-          ~f:(fun getter setter ->
-            let replacement = Bigstring.of_string "A" in
-            setter.iter_rw
-              ~f:(fun _key _data -> `Update_continue replacement)
-              db ;
-
-            getter.iter_ro
-              ~f:(fun _key data ->
-                [%test_eq: Bigstring.t] data replacement ;
-                `Continue )
-              db ;
-
-            let first_key, _ =
-              Hashtbl.choose hm |> Option.value_exn ~message:"empty hash table"
-            in
-
-            let new_replacement = Bigstring.of_string "B" in
-
-            setter.set db first_key new_replacement ;
-
-            let data =
-              getter.get db first_key
-              |> Option.value_exn
-                   ~message:"cannot fetch first key from hm after iter"
-            in
-
-            [%test_eq: Bigstring.t] data new_replacement )
-          env
+      let env, db =
+        init_random_db dir ~f:(fun env db k v_str ->
+            let v = Bigstring.of_string v_str in
+            Hashtbl.add ~key:k ~data:v hm
+            |> function `Duplicate -> () | `Ok -> Rw.set ~env db k v )
       in
+      Rw.with_txn
+        ~f:(fun getter setter ->
+          let replacement = Bigstring.of_string "A" in
+          setter.iter_rw ~f:(fun _key _data -> `Update_continue replacement) db ;
+
+          getter.iter_ro
+            ~f:(fun _key data ->
+              [%test_eq: Bigstring.t] data replacement ;
+              `Continue )
+            db ;
+
+          let first_key, _ =
+            Hashtbl.choose hm |> Option.value_exn ~message:"empty hash table"
+          in
+
+          let new_replacement = Bigstring.of_string "B" in
+
+          setter.set db first_key new_replacement ;
+
+          let data =
+            getter.get db first_key
+            |> Option.value_exn
+                 ~message:"cannot fetch first key from hm after iter"
+          in
+
+          [%test_eq: Bigstring.t] data new_replacement )
+        env
+      |> Option.value_exn ~message:"cannot fetch first key from hm after iter" ;
 
       Deferred.unit
 
