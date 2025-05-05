@@ -115,7 +115,10 @@ val request_work :
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_work_lib.Selector.Result.t -> unit
+val add_work :
+     result:Snark_work_lib.Partitioned.Result.t
+  -> t
+  -> Snark_worker.Rpcs.Submit_work.Master.Callee.response
 
 val add_work_graphql :
      t
