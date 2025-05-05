@@ -39,6 +39,22 @@ module Ledger_inner = struct
       [@@deriving sexp, compare, hash, bin_io_unversioned]
     end
 
+    module type Intf = sig
+      type t [@@deriving sexp, of_sexp, bin_io, hash, equal, compare, yojson]
+
+      type account
+
+      include module type of Hashable.Make_binable (Arg)
+
+      val to_base58_check : t -> string
+
+      val merge : height:int -> t -> t -> t
+
+      val hash_account : account -> t
+
+      val empty_account : t
+    end
+
     [%%versioned
     module Stable = struct
       module V1 = struct
@@ -64,6 +80,15 @@ module Ledger_inner = struct
   end
 
   module Account = struct
+
+    module type Intf = sig
+      type t [@@deriving sexp, of_sexp, bin_io, equal, compare]
+      val balance : t -> Currency.Balance.t
+      val empty : t
+      val identifier : t -> Account_id.t
+      val token : t -> Token_id.t
+    end
+
     [%%versioned
     module Stable = struct
       module V2 = struct
@@ -86,7 +111,9 @@ module Ledger_inner = struct
     let initialize = Account.initialize
   end
 
-  module Inputs = struct
+  module Make_inputs
+      (Account : Account.Intf)
+      (Hash : Hash.Intf with type account := Account.t) = struct
     module Key = Public_key.Compressed
     module Token_id = Token_id
     module Account_id = Account_id
@@ -97,15 +124,15 @@ module Ledger_inner = struct
       let to_int = to_nanomina_int
     end
 
-    module Account = Account.Stable.Latest
-    module Hash = Hash.Stable.Latest
+    module Account = Account
+    module Hash = Hash
     module Kvdb = Kvdb
     module Location = Location_at_depth
     module Location_binable = Location_binable
     module Storage_locations = Storage_locations
   end
 
-  module Db :
+  module type Account_Db =
     Merkle_ledger.Intf.Ledger.DATABASE
       with module Location = Location_at_depth
       with module Addr = Location_at_depth.Addr
@@ -114,9 +141,13 @@ module Ledger_inner = struct
        and type key := Public_key.Compressed.t
        and type token_id := Token_id.t
        and type token_id_set := Token_id.Set.t
-       and type account := Account.t
        and type account_id_set := Account_id.Set.t
-       and type account_id := Account_id.t =
+       and type account_id := Account_id.t
+
+  module Inputs = Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
+
+  module Db : Account_Db
+    with type account := Account.t =
     Database.Make (Inputs)
 
   module Null = Null_ledger.Make (Inputs)
@@ -218,7 +249,7 @@ module Ledger_inner = struct
           let db2 =
             let directory_name = Option.first_some converting_directory_name @@
                   Option.map (Db.get_directory db1) ~f:default_converting_directory_name
-             in Db.create ?directory_name  ~depth ()
+            in Db.create ?directory_name  ~depth ()
           in (db1, Some db2)
     in
     let casted = Any_ledger.cast (module Converting_ledger) (Converting_ledger.create db1 db2_opt)
