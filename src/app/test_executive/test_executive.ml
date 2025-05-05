@@ -1,3 +1,63 @@
+(** Test Executive
+
+    This executable provides a framework for integration testing Mina networks
+    with various configurations. The test executive creates a test network with
+    configurable nodes and runs specified test scenarios.
+
+    Command-line options:
+    - TEST (positional arg): The name of the test to execute
+      Available tests:
+      - block-prod-prio
+      - block-reward
+      - chain-reliability
+      - epoch-ledger
+      - gossip-consis
+      - hard-fork
+      - medium-bootstrap
+      - peers-reliability
+      - payments
+      - slot-end
+      - verification-key
+      - zkapps
+      - zkapps-timing
+      - zkapps-nonce
+    - --mina-image MINA_IMAGE: Identifier of the Mina docker image to test
+        (required)
+    - --archive-image ARCHIVE_IMAGE: Identifier of the archive node docker image
+        (optional)
+    - --debug, -d: Enable debug mode. On failure, the test executive will pause
+        for user input
+
+    Environment variables:
+    - MINA_IMAGE: Can be used instead of the --mina-image flag
+    - ARCHIVE_IMAGE: Can be used instead of the --archive-image flag
+
+    Example:
+    ```
+    # The Mina daemon and archive images must be set to the correct value
+    dune exec src/app/test_executive/test_executive.exe -- \
+      local \
+      --mina-image=gcr.io/o1labs-192920/mina-daemon:latest \
+      --archive-image=gcr.io/o1labs-192920/mina-archive:latest \
+      medium-bootstrap
+    ```
+
+    A docker stack will be created with the specified images, and the test will run
+    against the network. The test executive will clean up the network after the
+    test is completed or if an error occurs. The test results will be printed to
+    the console, and any errors will be logged.
+
+    You can see the docker stack created using:
+    ```
+    docker stack ls
+    ```
+    and inspect the stack using:
+    ```
+    docker stack ps <stack_name>
+    ```
+    where `<stack_name>` is the name of the stack created by the test executive.
+*)
+
 open Core
 open Async
 open Cmdliner
