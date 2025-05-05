@@ -430,7 +430,8 @@ let start inputs =
     (Async.Scheduler.go_main ~main:(fun () -> don't_wait_for (main inputs)) ())
 
 let test_arg =
-  (* we nest the tests in a redundant index so that we still get the name back after cmdliner evaluates the argument *)
+  (* we nest the tests in a redundant index so that we still get the name back
+     after cmdliner evaluates the argument *)
   let indexed_tests =
     List.map tests ~f:(fun (name, test) -> (name, (name, test)))
   in
@@ -495,7 +496,8 @@ let default_cmd =
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 
-(* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
+(* TODO: move required args to positions instead of flags, or provide reasonable
+   defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
   Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))
