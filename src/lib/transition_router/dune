@@ -51,5 +51,4 @@
   ledger_catchup
   data_hash_lib
   mina_wire_types
-  internal_tracing
-  staged_ledger))
+  internal_tracing))

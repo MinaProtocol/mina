@@ -105,8 +105,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~get_completed_work ~frontier ~catchup_scheduler
-    ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
-    ?transaction_pool_proxy =
+    ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb =
   let is_block_in_frontier =
     Fn.compose Option.is_some @@ Transition_frontier.find frontier
   in
@@ -250,7 +249,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               ~verifier ~get_completed_work ~trust_system
               ~transition_receipt_time ~sender:(Some sender)
               ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-              ?transaction_pool_proxy (* TODO: Can we skip here? *) () )
+              (* TODO: Can we skip here? *) () )
           ~transform_result:(function
             | Error (`Invalid_staged_ledger_hash error)
             | Error (`Invalid_staged_ledger_diff error) ->
@@ -316,7 +315,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t ) ~processed_transition_writer ?transaction_pool_proxy =
+       Writer.t ) ~processed_transition_writer =
   let open Context in
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
@@ -459,8 +458,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       Transition_frontier_controller.transitions_being_processed)
               | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb)
                 ->
-                  process_transition ~block_or_header ~valid_cb
-                    ?transaction_pool_proxy ) ) )
+                  process_transition ~block_or_header ~valid_cb ) ) )
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
@@ -565,7 +563,7 @@ let%test_module "Transition_handler.Processor tests" =
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer ?transaction_pool_proxy:None ;
+                  ~processed_transition_writer ;
                 List.iter branch ~f:(fun breadcrumb ->
                     let b =
                       downcast_breadcrumb breadcrumb
