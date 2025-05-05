@@ -199,7 +199,6 @@ installed: [
   "ppx_deriving_yojson.3.6.1"
   "ppx_enumerate.v0.14.0"
   "ppx_expect.v0.14.2"
-  "ppx_fail.v0.14.0"
   "ppx_fields_conv.v0.14.2"
   "ppx_fixed_literal.v0.14.0"
   "ppx_hash.v0.14.0"
