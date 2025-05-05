@@ -29,18 +29,24 @@ module Worker_state = struct
              Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
            let sok_digest = Mina_base.Sok_message.digest message in
-           let spec : Work.Selector.Spec.Stable.Latest.t =
+           let spec : Work.Partitioned.Spec.Stable.Latest.t =
              { instances = `One single_spec; fee = Currency.Fee.zero }
+             |> Work.Partitioned.Spec.Poly.of_selector_spec
+                  ~issued_since_unix_epoch:Time.(now () |> to_span_since_epoch)
            in
            match%bind.Deferred.Or_error
              Prod.perform ~state ~sok_digest ~spec
            with
-           | `One (proof, elapsed, _) ->
+           | Old { instances = `One (_, { proof; elapsed }); _ } ->
                Deferred.Or_error.return (proof, elapsed)
-           | `Two _ ->
+           | Old { instances = `Two _; _ } ->
                Deferred.Or_error.error_string
-                 "This is a bug, submitted one work into Snark worker, getting \
-                  2 results"
+                 "This is a bug, submitted one work with old selector spec \
+                  into Snark worker, got an old result with 2 proofs"
+           | _ ->
+               Deferred.Or_error.error_string
+                 "This is a bug, submitted one work with old selector spec \
+                  into Snark worker, got non-old result"
        end in
       (module M : S) )
 
