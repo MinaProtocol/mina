@@ -1,6 +1,5 @@
 open Core
 open Async
-open Events
 
 let command_name = "snark-worker"
 
@@ -82,7 +81,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
+      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect `V3
         daemon_address
     with
     | Error e ->
@@ -98,20 +97,18 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         let%bind () = wait ~sec:random_delay () in
         go ()
     | Ok (Some (spec, public_key)) -> (
+        let address_json = `String (Host_and_port.to_string daemon_address) in
+        let work_ids_json =
+          Work.Partitioned.Spec.Poly.statements spec
+          |> Transaction_snark_work.Statement.compact_json
+        in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
-          ~metadata:
-            [ ("address", `String (Host_and_port.to_string daemon_address))
-            ; ( "work_ids"
-              , Transaction_snark_work.Statement.compact_json
-                  (One_or_two.map
-                     (Work.Work.Spec.instances spec)
-                     ~f:Work.Work.Single.Spec.statement ) )
-            ] ;
+          ~metadata:[ ("address", address_json); ("work_ids", work_ids_json) ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
-        let fee = spec.fee in
+        let fee = Work.Partitioned.Spec.Poly.fee_of_full spec in
         let message = Mina_base.Sok_message.create ~fee ~prover:public_key in
         let sok_digest = Mina_base.Sok_message.digest message in
 
@@ -130,29 +127,17 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
                   ()
             in
             log_and_retry "performing work" e (retry_pause 10.) go
-        | Ok proofs_with_metrics ->
-            Work.Metrics.emit_proof_metrics ~data:proofs_with_metrics
+        | Ok data ->
+            Work.Metrics.emit_proof_metrics ~data
             |> One_or_two.iter ~f:(fun generated ->
                    [%str_log info]
                      (Events.event_of_snark_work_generated generated) ) ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
-                [ ("address", `String (Host_and_port.to_string daemon_address))
-                ; ( "work_ids"
-                  , Transaction_snark_work.Statement.compact_json
-                      (One_or_two.map spec.instances
-                         ~f:Work.Work.Single.Spec.statement ) )
-                ] ;
+                [ ("address", address_json); ("work_ids", work_ids_json) ] ;
             let rec submit_work () =
-              let proofs, metrics =
-                match proofs_with_metrics with
-                | `One (proof, elapsed, tag) ->
-                    (`One proof, `One (elapsed, tag))
-                | `Two ((p1, e1, t1), (p2, e2, t2)) ->
-                    (`Two (p1, p2), `Two ((e1, t1), (e2, t2)))
-              in
-              let result : Work.Selector.Result.Stable.Latest.t =
-                { proofs; metrics; spec; prover = public_key }
+              let result : _ Work.Partitioned.Result.Poly.t =
+                { data; prover = public_key }
               in
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
@@ -161,7 +146,24 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
               | Error e ->
                   log_and_retry "submitting work" e (retry_pause 10.)
                     submit_work
-              | Ok () ->
+              | Ok result ->
+                  ( match result with
+                  | `Ok ->
+                      ()
+                  | `Slashed ->
+                      [%log info] "Result $work_ids slashed by $address"
+                        ~metadata:
+                          [ ("address", address_json)
+                          ; ("work_ids", work_ids_json)
+                          ]
+                  | `SchemeUnmatched ->
+                      [%log info]
+                        "Result $work_ids rejected by $address since it has \
+                         wrong shape"
+                        ~metadata:
+                          [ ("address", address_json)
+                          ; ("work_ids", work_ids_json)
+                          ] ) ;
                   go ()
             in
             submit_work () )
