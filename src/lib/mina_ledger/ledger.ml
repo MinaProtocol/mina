@@ -40,9 +40,11 @@ module Ledger_inner = struct
     end
 
     module type Intf = sig
-      type t [@@deriving sexp, of_sexp, bin_io, hash, equal, compare, yojson]
+      type t [@@deriving sexp, of_sexp, hash, equal, compare, yojson]
 
       type account
+
+      include Binable.S with type t := t
 
       include module type of Hashable.Make_binable (Arg)
 
@@ -77,12 +79,33 @@ module Ledger_inner = struct
           Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
+
+    module Unstable = struct
+        type t = Ledger_hash.Stable.V1.t
+        [@@deriving sexp, compare, hash, equal, yojson, bin_io_unversioned]
+
+        include Hashable.Make_binable (Arg)
+
+        let to_base58_check = Ledger_hash.to_base58_check
+
+        let merge = Ledger_hash.merge
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Mina_base.Account.Unstable.digest
+
+        let empty_account =
+          Ledger_hash.of_digest (Lazy.force Account.Unstable.empty_digest)
+
+
+    end
   end
 
   module Account = struct
 
     module type Intf = sig
-      type t [@@deriving sexp, of_sexp, bin_io, equal, compare]
+      type t [@@deriving sexp, of_sexp, equal, compare]
+
+      include Binable.S with type t := t
+
       val balance : t -> Currency.Balance.t
       val empty : t
       val identifier : t -> Account_id.t
@@ -109,6 +132,13 @@ module Ledger_inner = struct
     let empty = Stable.Latest.empty
 
     let initialize = Account.initialize
+
+    module Unstable = struct
+      include Mina_base.Account.Unstable
+
+      let token = token_id
+
+    end
   end
 
   module Make_inputs
@@ -146,9 +176,16 @@ module Ledger_inner = struct
 
   module Inputs = Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
 
+  module Unstable_inputs =
+    Make_inputs (Account.Unstable) (Hash.Unstable)
+
   module Db : Account_Db
     with type account := Account.t =
     Database.Make (Inputs)
+
+  module Unstable_db : Account_Db
+    with type account := Account.Unstable.t =
+    Database.Make (Unstable_inputs)
 
   module Null = Null_ledger.Make (Inputs)
 
@@ -214,12 +251,26 @@ module Ledger_inner = struct
   module Converting_ledger =
     Converting_merkle_tree.Make
       (struct
+          type converted_account = Account.Unstable.t
+          let convert (account : Account.Stable.Latest.t) =
+                { Account.Unstable.public_key = account.public_key
+                ; token_id = account.token_id
+                ; token_symbol = account.token_symbol
+                ; balance = account.balance
+                ; nonce = account.nonce
+                ; receipt_chain_hash = account.receipt_chain_hash
+                ; delegate = account.delegate
+                ; voting_for = account.voting_for
+                ; timing = account.timing
+                ; permissions = account.permissions
+                ; zkapp = account.zkapp
+                ; unstable_field = account.nonce
+                }
+
           include Inputs
-          type converted_account = Account.t
-          let convert = Fn.id
       end)
       (Db)
-      (Db)
+      (Unstable_db)
 
   let of_database db =
     let casted = Any_ledger.cast (module Db) db in
@@ -249,7 +300,7 @@ module Ledger_inner = struct
           let db2 =
             let directory_name = Option.first_some converting_directory_name @@
                   Option.map (Db.get_directory db1) ~f:default_converting_directory_name
-            in Db.create ?directory_name  ~depth ()
+            in Unstable_db.create ?directory_name  ~depth ()
           in (db1, Some db2)
     in
     let casted = Any_ledger.cast (module Converting_ledger) (Converting_ledger.create db1 db2_opt)
