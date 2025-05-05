@@ -369,64 +369,6 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ]
   in
   let module Work = Snark_work_lib in
-  let log_snark_work_metrics (work : Work.Selector.Result.Stable.Latest.t) =
-    Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
-    One_or_two.iter
-      (One_or_two.zip_exn work.metrics
-         (Work.Selector.Spec.Stable.Latest.transactions work.spec) )
-      ~f:(fun ((total, tag), transaction_opt) ->
-        ( match tag with
-        | `Merge ->
-            Perf_histograms.add_span ~name:"snark_worker_merge_time" total ;
-            Mina_metrics.(
-              Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total))
-        | `Transition -> (
-            (*should be Some in the case of `Transition*)
-            match Option.value_exn transaction_opt with
-            | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Zkapp_command parties) ->
-                let init =
-                  match
-                    (Mina_base.Account_update.of_fee_payer parties.fee_payer)
-                      .authorization
-                  with
-                  | Proof _ ->
-                      (1, 1)
-                  | _ ->
-                      (1, 0)
-                in
-                let parties_count, proof_parties_count =
-                  Mina_base.Zkapp_command.Call_forest.fold
-                    parties.account_updates ~init
-                    ~f:(fun (count, proof_parties_count) party ->
-                      ( count + 1
-                      , if
-                          Mina_base.Control.(
-                            Tag.equal Proof
-                              (tag
-                                 (Mina_base.Account_update.Poly.authorization
-                                    party ) ))
-                        then proof_parties_count + 1
-                        else proof_parties_count ) )
-                in
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc snark_work_zkapp_base_time_sec
-                      (Time.Span.to_sec total) ;
-                    Counter.inc_one snark_work_zkapp_base_submissions ;
-                    Counter.inc zkapp_transaction_length
-                      (Float.of_int parties_count) ;
-                    Counter.inc zkapp_proof_updates
-                      (Float.of_int proof_parties_count)))
-            | _ ->
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc_one snark_work_base_submissions ;
-                    Counter.inc snark_work_base_time_sec
-                      (Time.Span.to_sec total))) ) ) ;
-        Perf_histograms.add_span ~name:"snark_worker_transition_time" total )
-  in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc (fun () () ->
           Deferred.return
@@ -453,13 +395,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (work, key)) )
     ; implement Snark_worker.Rpcs.Submit_work.Stable.Latest.rpc
-        (fun () (result : Work.Selector.Result.Stable.Latest.t) ->
+        (fun () result ->
           [%log trace] "received completed work from a snark worker"
             ~metadata:
               [ ( "work_spec"
                 , Work.Selector.Spec.Stable.Latest.to_yojson result.spec )
               ] ;
-          log_snark_work_metrics result ;
+          ignore
+            ( Work.Metrics.emit_proof_metrics ~data:result.data
+              : Work.Metrics.snark_work_generated One_or_two.t ) ;
           (* TODO: plug in the correct cache DB here *)
           let proof_cache_db = Proof_cache_tag.create_identity_db () in
           let result_cached =
