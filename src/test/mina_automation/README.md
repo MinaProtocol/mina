@@ -18,7 +18,7 @@ Example of usage:
 ```
   open Mina_automation
 
-  let archive_blocks = Archive_blocks.of_context Executor.AutoDetect in
+  let archive_blocks = Archive_blocks.default in
 
   let%bind _ =
     Archive_blocks.run archive_blocks ~blocks:extensional_files
@@ -80,7 +80,7 @@ Example of usage:
 ```
  open Mina_automation
 
-  let extract_blocks = Extract_blocks.of_context Executor.AutoDetect in
+  let extract_blocks = Extract_blocks.default in
   let config =
     { Extract_blocks.Config.archive_uri = source_db
     ; range = Extract_blocks.Config.AllBlocks
@@ -105,12 +105,9 @@ Missing block guardian fills gaps of archive database
 Example of usage:
 
 ```
-  let%bind missing_blocks_auditor_path =
-    Missing_blocks_auditor.of_context Executor.AutoDetect
-    |> Missing_blocks_auditor.path in
+  let%bind missing_blocks_auditor_path = Missing_blocks_auditor.standalone_path_exn 
 
-  let%bind archive_blocks_path = 
-    Archive_blocks.of_context Executor.AutoDetect |> path archive_blocks in
+  let%bind archive_blocks_path =  Archive_blocks.standalone_path_exn in
 
   let config =
     { Missing_blocks_guardian.Config.archive_uri = Uri.of_string target_db
@@ -123,7 +120,7 @@ Example of usage:
     } in
 
   let missing_blocks_guardian =
-    Missing_blocks_guardian.of_context Executor.AutoDetect
+    Missing_blocks_guardian.default
   in
 
   let%bind _ = Missing_blocks_guardian.run missing_blocks_guardian ~config
@@ -140,7 +137,7 @@ Replayer checks integrity of database against ledger.
 Example of usage:
 
 ```
-  let replayer = Replayer.of_context Executor.AutoDetect in
+  let replayer = Replayer.default in
 
   let%bind _ =
     Replayer.run replayer ~archive_uri:target_db

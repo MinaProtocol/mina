@@ -27,13 +27,11 @@
 
 (test
  (name main)
- (flags
-  (:standard -warn-error +a))
- (libraries alcotest async mina_block disk_cache.lmdb)
- (deps hetzner-itn-1-1795.json)
- (action
-  (run %{test}))
+ (libraries alcotest async core_kernel disk_cache.lmdb mina_block yojson)
+ (deps
+  hetzner-itn-1-1795.json
+  regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane)))
+  (pps ppx_jane ppx_version)))
