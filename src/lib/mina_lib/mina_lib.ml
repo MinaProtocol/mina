@@ -99,6 +99,9 @@ type pipes =
   ; snark_local_sink : Network_pool.Snark_pool.Local_sink.t
   }
 
+type snark_job_state =
+  { selector : Work_selector.State.t; partitioner : Work_partitioner.t }
+
 type t =
   { config : Config.t
   ; processes : processes
@@ -107,7 +110,7 @@ type t =
   ; pipes : pipes
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
-  ; snark_job_state : Work_selector.State.t
+  ; snark_job_state : snark_job_state
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
@@ -869,7 +872,7 @@ let request_work t =
   let fee = snark_work_fee t in
   let instances_opt =
     Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) (snark_job_state t)
+      ~snark_pool:(snark_pool t) (snark_job_state t).selector
   in
   Option.map instances_opt ~f:(fun instances ->
       { Snark_work_lib.Work.Spec.instances; fee } )
@@ -884,7 +887,7 @@ let add_work t (result : Snark_work_lib.Selector.Result.t) =
     in
     let pending_work =
       Work_selector.pending_work_statements ~snark_pool ~fee_opt
-        t.snark_job_state
+        t.snark_job_state.selector
       |> List.length
     in
     Mina_metrics.(
@@ -898,7 +901,7 @@ let add_work t (result : Snark_work_lib.Selector.Result.t) =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selector.remove t.snark_job_state spec
+    Work_selector.remove t.snark_job_state.selector spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   let result =
@@ -2082,11 +2085,19 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; constraint_constants
               }
           in
-          let snark_jobs_state =
-            Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~logger:config.logger
+          let snark_jobs_state : snark_job_state =
+            { selector =
+                Work_selector.State.init
+                  ~reassignment_wait:config.work_reassignment_wait
+                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+                  ~logger:config.logger
+            ; partitioner =
+                Work_partitioner.create
+                  ~reassignment_timeout:
+                    (Time.Span.of_ms
+                       (Float.of_int config.work_reassignment_wait) )
+                  ~logger:config.logger
+            }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
@@ -2097,7 +2108,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   ~get_transition_frontier:(fun () ->
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
                   ~get_snark_pool:(fun () -> Some snark_pool)
-                  ~snark_job_state:(fun () -> Some snark_jobs_state)
+                  ~snark_job_state:(fun () -> Some snark_jobs_state.selector)
                   ~get_node_status )
           in
           (* tie the first knot *)

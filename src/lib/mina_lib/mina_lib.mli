@@ -9,6 +9,9 @@ module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
 
+type snark_job_state =
+  { selector : Work_selector.State.t; partitioner : Work_partitioner.t }
+
 type t
 
 type Structured_log_events.t +=
@@ -121,7 +124,7 @@ val add_work_graphql :
      * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
      Deferred.Or_error.t
 
-val snark_job_state : t -> Work_selector.State.t
+val snark_job_state : t -> snark_job_state
 
 val get_current_nonce :
      t
