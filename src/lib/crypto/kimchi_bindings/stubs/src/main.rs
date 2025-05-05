@@ -39,6 +39,7 @@ use kimchi_stubs::{
     CurrOrNext,
     GateType,
 };
+use saffron;
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
@@ -87,6 +88,19 @@ fn main() {
         write!(w, "{}", header).unwrap();
         decl_module!(w, env, "Kimchi_bindings", {
             generate_kimchi_bindings(&mut w, env);
+        });
+    }
+    if let Some(saffron_types) = args.get(4) {
+        let mut file = File::create(saffron_types).expect("could not create output file");
+        write!(file, "{}", header).unwrap();
+        let _ = env.new_module("Saffron_types");
+        generate_saffron_types(&mut file, env);
+        let _ = env.parent();
+    } else {
+        let mut w = std::io::stdout();
+        write!(w, "{}", header).unwrap();
+        decl_module!(w, env, "Saffron_types", {
+            generate_saffron_types(&mut w, env);
         });
     }
 }
@@ -486,5 +500,13 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_deep_copy => "deep_copy");
             });
         });
+    });
+}
+
+fn generate_saffron_types(mut w: impl std::io::Write, env: &mut Env) {
+    decl_fake_generic!(T1, 0);
+
+    decl_module!(w, env, "Storage", {
+        decl_type!(w, env, saffron::storage::caml::CamlData::<T1> => "t");
     });
 }

@@ -1,7 +1,26 @@
 ;; src/ contains no dune-related files
 ;; kimchi-stubs-vendors contains the vendors for Kimchi stubs
 
-(data_only_dirs src kimchi-stubs-vendors)
+;; See issue https://github.com/ocaml/dune/issues/7811
+;; TL;DR: directories starting with `_` are ignored by dune
+;; and we need to add them manually using subdir.
+;; If you don't add this subdir, you will get an error like:
+;; ```
+;; `failed to calculate checksum of: [..]/_cookbook/[file].
+;; [...]
+;; failed to open file [..]/_cookbook/[file]:
+;;
+;; Caused by:
+;;   No such file or directory
+;; ```
+
+(vendored_dirs kimchi-stubs-vendors)
+
+(subdir
+ kimchi-stubs-vendors/clap/src
+ (dirs _cookbook _derive bin))
+
+(data_only_dirs src)
 
 ;; Ignore target if it exists locally
 
@@ -82,8 +101,9 @@
   (env_var KIMCHI_STUBS_STATIC_LIB))
  (action
   (progn
-   (copy %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a libkimchi_stubs.a)
-   )))
+   (copy
+    %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a
+    libkimchi_stubs.a))))
 
 ;;
 ;; declare the libraries we're going to generate to match the bindings
@@ -150,7 +170,11 @@
 ;; note: to build Mina, nix will set `KIMCHI_STUBS` and ignore this rule
 
 (rule
- (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (targets
+  kimchi_types.ml
+  pasta_bindings.ml
+  kimchi_bindings.ml
+  saffron_types.ml)
  (enabled_if
   (= %{env:KIMCHI_STUBS=n} n))
  (mode promote)
@@ -177,7 +201,11 @@
 ;; this is used by nix
 
 (rule
- (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
+ (targets
+  kimchi_types.ml
+  pasta_bindings.ml
+  kimchi_bindings.ml
+  saffron_types.ml)
  (enabled_if
   (<> %{env:KIMCHI_STUBS=n} n))
  (mode promote)
