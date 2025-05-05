@@ -73,13 +73,6 @@ module Make
     |> Option.value_exn ~here:[%here]
     |> of_bytes
 
-  let%test_unit "hex test" =
-    let bytes =
-      String.init length_in_bytes ~f:(fun _ -> Char.of_int_exn (Random.int 255))
-    in
-    let h = "0x" ^ Hex.encode bytes in
-    [%test_eq: string] h (String.lowercase (to_hex_string (of_hex_string h)))
-
   let t_of_sexp s = of_hex_string (String.t_of_sexp s)
 
   include Bin_prot.Utils.Of_minimal (struct

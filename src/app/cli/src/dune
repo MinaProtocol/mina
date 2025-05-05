@@ -10,8 +10,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
+  (pps ppx_version)))
 
 (executable
  (package cli)
@@ -23,8 +22,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
+  (pps ppx_version)))
 
 (executable
  (package cli)
@@ -36,5 +34,4 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version))
- (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
+  (pps ppx_version)))
