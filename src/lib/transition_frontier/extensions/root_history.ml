@@ -84,8 +84,11 @@ let lookup { history; _ } = Queue.lookup history
 
 let mem { history; _ } = Queue.mem history
 
-let protocol_states_for_scan_state
-    { history; protocol_states_for_root_scan_state; _ } state_hash =
+let protocol_states_for_scan_state t state_hash =
+  let history = t.history in
+  let protocol_states_for_root_scan_state =
+    t.protocol_states_for_root_scan_state
+  in
   let open Option.Let_syntax in
   let open Root_data.Historical in
   let%bind data = Queue.lookup history state_hash in

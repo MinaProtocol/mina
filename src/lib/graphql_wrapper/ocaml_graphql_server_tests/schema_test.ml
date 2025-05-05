@@ -1,6 +1,6 @@
 let test_query = Test_common.test_query Test_schema.schema ()
 
-let%test_unit "query" =
+let query_test () =
   let query = "{ users { id } }" in
   test_query query
     (`Assoc
@@ -12,7 +12,7 @@ let%test_unit "query" =
             ] )
       ] )
 
-let%test_unit "mutation" =
+let mutation_test () =
   let query =
     "mutation { add_user(name: \"Charlie\", role: \"user\") { name } }"
   in
@@ -29,12 +29,12 @@ let%test_unit "mutation" =
             ] )
       ] )
 
-let%test_unit "__typename" =
+let typename_test () =
   let query = "{ __typename }" in
   test_query query
     (`Assoc [ ("data", `Assoc [ ("__typename", `String "query") ]) ])
 
-let%test_unit "select operation (no operations)" =
+let select_operation_no_operations_test () =
   let query = "fragment x on y { z }" in
   test_query query
     (`Assoc
@@ -42,16 +42,16 @@ let%test_unit "select operation (no operations)" =
         , `List [ `Assoc [ ("message", `String "No operation found") ] ] )
       ] )
 
-let%test_unit "select operation (one operation, no operation name)" =
+let select_operation_one_operation_no_operation_name_test () =
   let query = "query a { a: __typename }" in
   test_query query (`Assoc [ ("data", `Assoc [ ("a", `String "query") ]) ])
 
-let%test_unit "select operation (one operation, matching operation name)" =
+let select_operation_one_operation_matching_operation_name_test () =
   let query = "query a { a: __typename }" in
   test_query query ~operation_name:"a"
     (`Assoc [ ("data", `Assoc [ ("a", `String "query") ]) ])
 
-let%test_unit "select operation (one operation, missing operation name)" =
+let select_operation_one_operation_missing_operation_name_test () =
   let query = "query a { a: __typename }" in
   test_query query ~operation_name:"b"
     (`Assoc
@@ -59,7 +59,7 @@ let%test_unit "select operation (one operation, missing operation name)" =
         , `List [ `Assoc [ ("message", `String "Operation not found") ] ] )
       ] )
 
-let%test_unit "select operation (multiple operations, no operation name)" =
+let select_operation_multiple_operations_no_operation_name_test () =
   let query = "query a { a: __typename } query b { b: __typename }" in
   test_query query
     (`Assoc
@@ -67,13 +67,12 @@ let%test_unit "select operation (multiple operations, no operation name)" =
         , `List [ `Assoc [ ("message", `String "Operation name required") ] ] )
       ] )
 
-let%test_unit "select operation (multiple operations, matching operation name)"
-    =
+let select_operation_multiple_operations_matching_operation_name_test () =
   let query = "query a { a: __typename } query b { b: __typename }" in
   test_query query ~operation_name:"b"
     (`Assoc [ ("data", `Assoc [ ("b", `String "query") ]) ])
 
-let%test_unit "select operation (multiple operations, missing operation name)" =
+let select_operation_multiple_operations_missing_operation_name_test () =
   let query = "query a { a: __typename } query b { b: __typename }" in
   test_query query ~operation_name:"c"
     (`Assoc
@@ -81,7 +80,7 @@ let%test_unit "select operation (multiple operations, missing operation name)" =
         , `List [ `Assoc [ ("message", `String "Operation not found") ] ] )
       ] )
 
-let%test_unit "undefined field on query root" =
+let undefined_field_on_query_root_test () =
   let query = "{ foo { bar } }" in
   test_query query
     (`Assoc
@@ -94,7 +93,7 @@ let%test_unit "undefined field on query root" =
             ] )
       ] )
 
-let%test_unit "undefined field on object type" =
+let undefined_field_on_object_type_test () =
   let query = "{ users { id foo } }" in
   test_query query
     (`Assoc
@@ -107,7 +106,7 @@ let%test_unit "undefined field on object type" =
             ] )
       ] )
 
-let%test_unit "fragments cannot form cycles" =
+let fragments_cannot_form_cycles_test () =
   let query =
     "\n\
     \      fragment F1 on Foo {\n\
@@ -133,7 +132,7 @@ let%test_unit "fragments cannot form cycles" =
             ] )
       ] )
 
-let%test_unit "fragments combine nested fields" =
+let fragments_combine_nested_fields_test () =
   let query =
     "\n\
     \      query Q {\n\
@@ -164,7 +163,7 @@ let%test_unit "fragments combine nested fields" =
             ] )
       ] )
 
-let%test "introspection query should be accepted" =
+let introspection_query_test () =
   let query =
     "\n\
     \      query IntrospectionQuery {\n\
@@ -259,15 +258,15 @@ let%test "introspection query should be accepted" =
   in
   match Graphql_parser.parse query with
   | Error err ->
-      failwith err
+      Alcotest.fail err
   | Ok doc -> (
       match Graphql.Schema.execute Test_schema.schema () doc with
       | Ok _ ->
-          true
+          ()
       | Error err ->
-          failwith (Yojson.Basic.pretty_to_string err) )
+          Alcotest.fail (Yojson.Basic.pretty_to_string err) )
 
-let%test_unit "subscription" =
+let subscription_test () =
   let query = "subscription { subscribe_to_user { id name } }" in
   test_query query
     (`List
@@ -280,7 +279,7 @@ let%test_unit "subscription" =
           ]
       ] )
 
-let%test_unit "subscription returns an error" =
+let subscription_returns_an_error_test () =
   let query = "subscription { subscribe_to_user(error: true) { id name } }" in
   test_query query
     (`Assoc
@@ -294,11 +293,11 @@ let%test_unit "subscription returns an error" =
       ; ("data", `Null)
       ] )
 
-let%test_unit "subscriptions: exn inside the stream" =
+let subscriptions_exn_inside_the_stream_test () =
   let query = "subscription { subscribe_to_user(raise: true) { id name } }" in
   test_query query (`String "caught stream exn")
 
-let%test_unit "subscription returns more than one value" =
+let subscription_returns_more_than_one_value_test () =
   let query = "subscription { subscribe_to_user(first: 2) { id name } }" in
   test_query query
     (`List
@@ -317,3 +316,52 @@ let%test_unit "subscription returns more than one value" =
                 ] )
           ]
       ] )
+
+(* Run tests *)
+let () =
+  Alcotest.run "GraphQL Schema Tests"
+    [ ( "schema operations"
+      , [ Alcotest.test_case "query" `Quick query_test
+        ; Alcotest.test_case "mutation" `Quick mutation_test
+        ; Alcotest.test_case "__typename" `Quick typename_test
+        ; Alcotest.test_case "select operation (no operations)" `Quick
+            select_operation_no_operations_test
+        ; Alcotest.test_case
+            "select operation (one operation, no operation name)" `Quick
+            select_operation_one_operation_no_operation_name_test
+        ; Alcotest.test_case
+            "select operation (one operation, matching operation name)" `Quick
+            select_operation_one_operation_matching_operation_name_test
+        ; Alcotest.test_case
+            "select operation (one operation, missing operation name)" `Quick
+            select_operation_one_operation_missing_operation_name_test
+        ; Alcotest.test_case
+            "select operation (multiple operations, no operation name)" `Quick
+            select_operation_multiple_operations_no_operation_name_test
+        ; Alcotest.test_case
+            "select operation (multiple operations, matching operation name)"
+            `Quick
+            select_operation_multiple_operations_matching_operation_name_test
+        ; Alcotest.test_case
+            "select operation (multiple operations, missing operation name)"
+            `Quick
+            select_operation_multiple_operations_missing_operation_name_test
+        ; Alcotest.test_case "undefined field on query root" `Quick
+            undefined_field_on_query_root_test
+        ; Alcotest.test_case "undefined field on object type" `Quick
+            undefined_field_on_object_type_test
+        ; Alcotest.test_case "fragments cannot form cycles" `Quick
+            fragments_cannot_form_cycles_test
+        ; Alcotest.test_case "fragments combine nested fields" `Quick
+            fragments_combine_nested_fields_test
+        ; Alcotest.test_case "introspection query should be accepted" `Quick
+            introspection_query_test
+        ; Alcotest.test_case "subscription" `Quick subscription_test
+        ; Alcotest.test_case "subscription returns an error" `Quick
+            subscription_returns_an_error_test
+        ; Alcotest.test_case "subscriptions: exn inside the stream" `Quick
+            subscriptions_exn_inside_the_stream_test
+        ; Alcotest.test_case "subscription returns more than one value" `Quick
+            subscription_returns_more_than_one_value_test
+        ] )
+    ]
