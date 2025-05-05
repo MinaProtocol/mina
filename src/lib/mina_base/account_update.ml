@@ -1700,6 +1700,9 @@ module Poly = struct
     module Stable = struct
       module V1 = struct
         type ('body, 'authorization) t =
+              ( 'body
+              , 'authorization )
+              Mina_wire_types.Mina_base.Account_update.Poly.V1.t =
           { body : 'body; authorization : 'authorization }
         [@@deriving yojson, sexp]
 
@@ -1726,10 +1729,6 @@ module Poly = struct
     module V1 = struct
       (** An account update in a zkApp transaction *)
       type ('body, 'authorization, 'aux) t =
-            ( 'body
-            , 'authorization
-            , 'aux )
-            Mina_wire_types.Mina_base.Account_update.Poly.V1.t =
         { body : 'body; authorization : 'authorization; aux : 'aux }
       [@@deriving annot, equal, hash, compare, fields]
 
