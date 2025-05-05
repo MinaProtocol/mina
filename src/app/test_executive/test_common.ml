@@ -67,17 +67,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     go n hashlist
 
-  (* let pub_key_of_node node =
-     let open Signature_lib in
-     match Engine.Network.Node.network_keypair node with
-     | Some nk ->
-         Malleable_error.return (nk.keypair.public_key |> Public_key.compress)
-     | None ->
-         Malleable_error.hard_error_format
-           "Node '%s' did not have a network keypair, if node is a block \
-            producer this should not happen"
-           (Engine.Network.Node.id node) *)
-
   let make_get_key ~f node =
     match Engine.Network.Node.network_keypair node with
     | Some nk ->
