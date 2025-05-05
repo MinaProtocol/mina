@@ -30,5 +30,4 @@
   with_hash
   genesis_constants
   consensus
-  bootstrap_controller
-  staged_ledger))
+  bootstrap_controller))

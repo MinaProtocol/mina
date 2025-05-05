@@ -258,12 +258,6 @@ module T = struct
   let pending_coinbase_collection { pending_coinbase_collection; _ } =
     pending_coinbase_collection
 
-  let _get_target ((proof, _), _) =
-    let { Transaction_snark.Statement.Poly.target; _ } =
-      Ledger_proof.statement proof
-    in
-    target
-
   let verify_scan_state_after_apply ~constraint_constants
       ~pending_coinbase_stack ~first_pass_ledger_end ~second_pass_ledger_end
       (scan_state : Scan_state.t) =
@@ -487,23 +481,6 @@ module T = struct
       Currency.Amount.scale constraint_constants.coinbase_amount
         constraint_constants.supercharged_coinbase_factor
     else Some constraint_constants.coinbase_amount
-
-  let _coinbase_amount_or_error ~supercharge_coinbase
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
-    if supercharge_coinbase then
-      Option.value_map
-        ~default:
-          (Error
-             (Pre_diff_info.Error.Coinbase_error
-                (sprintf
-                   !"Overflow when calculating coinbase amount: Supercharged \
-                     coinbase factor (%d) x coinbase amount (%{sexp: \
-                     Currency.Amount.t})"
-                   constraint_constants.supercharged_coinbase_factor
-                   constraint_constants.coinbase_amount ) ) )
-        (coinbase_amount ~supercharge_coinbase ~constraint_constants)
-        ~f:(fun x -> Ok x)
-    else Ok constraint_constants.coinbase_amount
 
   let apply_single_transaction_first_pass ~constraint_constants ~global_slot
       ledger (pending_coinbase_stack_state : Stack_state_with_init_stack.t)
@@ -872,7 +849,9 @@ module T = struct
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
         1. Get the latest stack for coinbase in the first set of transactions
         2. get the first set of scan_state data[data1]
-        3. get a new stack for the second partition because the second set of transactions would start from the begining of the next tree in the scan_state
+        3. get a new stack for the second partition because the second set of
+           transactions would start from the begining of the next tree in the
+           scan_state
         4. Initialize the new stack with the state from the first stack
         5. get the second set of scan_state data[data2]*)
       let txns_for_partition1 = List.take transactions slots in
@@ -897,18 +876,22 @@ module T = struct
         | true, true ->
             ( Pending_coinbase.Update.Action.Update_two_coinbase_in_first
             , `Update_two (updated_stack1, updated_stack2) )
-        (*updated_stack2 does not have coinbase and but has the state from the previous stack*)
+        (* updated_stack2 does not have coinbase and but has the state from the
+           previous stack *)
         | true, false ->
-            (*updated_stack1 has some new coinbase but parition 2 has no
-              data and so we have only one stack to update*)
+            (* updated_stack1 has some new coinbase but parition 2 has no
+               data and so we have only one stack to update *)
             (Update_one, `Update_one updated_stack1)
         | false, true ->
-            (*updated_stack1 just has the new state. [updated stack2] might have coinbase, definitely has some
-              data and therefore will have a non-dummy state.*)
+            (* updated_stack1 just has the new state. [updated stack2] might
+               have coinbase, definitely has some data and therefore will have a
+               non-dummy state. *)
             ( Update_two_coinbase_in_second
             , `Update_two (updated_stack1, updated_stack2) )
         | false, false ->
-            (* a diff consists of only non-coinbase transactions. This is currently not possible because a diff will have a coinbase at the very least, so don't update anything?*)
+            (* a diff consists of only non-coinbase transactions. This is
+               currently not possible because a diff will have a coinbase at the
+               very least, so don't update anything? *)
             (Update_none, `Update_none)
       in
       [%log internal] "Update_coinbase_stack_done"
@@ -948,11 +931,12 @@ module T = struct
            , `Update_none
            , `First_pass_ledger_end (Ledger.merkle_root ledger) ) ) )
 
-  (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
+  (* Update the pending_coinbase tree with the updated/new stack and delete the
+     oldest stack if a proof was emitted *)
   let update_pending_coinbase_collection ~depth pending_coinbase_collection
       stack_update ~is_new_stack ~ledger_proof =
     let open Result.Let_syntax in
-    (*Deleting oldest stack if proof emitted*)
+    (* Deleting oldest stack if proof emitted *)
     let%bind pending_coinbase_collection_updated1 =
       match ledger_proof with
       | Some (proof, _) ->
@@ -979,7 +963,7 @@ module T = struct
       | None ->
           Ok pending_coinbase_collection
     in
-    (*updating the latest stack and/or adding a new one*)
+    (* Updating the latest stack and/or adding a new one *)
     match stack_update with
     | `Update_none ->
         Ok pending_coinbase_collection_updated1
@@ -988,7 +972,8 @@ module T = struct
           pending_coinbase_collection_updated1 stack1 ~is_new_stack
         |> to_staged_ledger_or_error
     | `Update_two (stack1, stack2) ->
-        (*The case when some of the transactions go into the old tree and remaining on to the new tree*)
+        (* The case when some of the transactions go into the old tree and
+           remaining on to the new tree *)
         let%bind update1 =
           Pending_coinbase.update_coinbase_stack ~depth
             pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
@@ -1377,7 +1362,8 @@ module T = struct
         coinbase_amount ~supercharge_coinbase ~constraint_constants
       in
       let%bind budget =
-        (*if the coinbase receiver is new then the account creation fee will be deducted from the reward*)
+        (* if the coinbase receiver is new then the account creation fee will be
+           deducted from the reward *)
         if is_coinbase_receiver_new then
           Currency.Amount.(
             sub coinbase_amount
@@ -1411,13 +1397,13 @@ module T = struct
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w1) ~f:(fun ft ->
                        (ft, coinbase_ft w2) ) )
-                (*Why add work without checking if work constraints are
-                  satisfied? If we reach here then it means that we are trying to
-                  fill the last two slots of the tree with coinbase trnasactions
-                  and if there's any work in [works] then that has to be included,
-                  either in the coinbase or as fee transfers that gets paid by
-                  the transaction fees. So having it as coinbase ft will at least
-                  reduce the slots occupied by fee transfers*)
+                (* Why add work without checking if work constraints are
+                   satisfied? If we reach here then it means that we are trying to
+                   fill the last two slots of the tree with coinbase trnasactions
+                   and if there's any work in [works] then that has to be included,
+                   either in the coinbase or as fee transfers that gets paid by
+                   the transaction fees. So having it as coinbase ft will at least
+                   reduce the slots occupied by fee transfers *)
               in
               (cb, diff works (Sequence.of_list [ stmt w1; stmt w2 ]))
             else if
@@ -1456,9 +1442,10 @@ module T = struct
         | true, Some (ft, rem_cw) ->
             (ft, rem_cw)
         | true, None ->
-            (*Coinbase could not be added because work-fees > coinbase-amount*)
+            (* Coinbase could not be added because work-fees > coinbase-amount *)
             if job_count = 0 || slots - job_count >= 1 then
-              (*Either no jobs are required or there is a free slot that can be filled without having to include any work*)
+              (* Either no jobs are required or there is a free slot that can be
+                 filled without having to include any work *)
               (One None, cw_seq)
             else (Zero, cw_seq)
         | _ ->
@@ -1518,7 +1505,8 @@ module T = struct
       ; max_jobs = job_count
       ; commands_rev =
           uc_seq
-          (*Completed work in reverse order for faster removal of proofs if budget doesn't suffice*)
+          (* Completed work in reverse order for faster removal of proofs if
+             budget doesn't suffice *)
       ; completed_work_rev = seq_rev cw_seq
       ; fee_transfers
       ; add_coinbase
@@ -1558,7 +1546,8 @@ module T = struct
             with
             | None ->
                 (Two None, t.completed_work_rev)
-                (*Check for work constraint will be done in [check_constraints_and_update]*)
+                (* Check for work constraint will be done in
+                   [check_constraints_and_update] *)
             | Some (fts', rem_cw) ->
                 (fts', rem_cw) )
       in
@@ -1576,7 +1565,7 @@ module T = struct
       { t with coinbase; fee_transfers }
 
     let rebudget t =
-      (*get the correct coinbase and calculate the fee transfers*)
+      (* get the correct coinbase and calculate the fee transfers *)
       let open Or_error.Let_syntax in
       let payment_fees =
         sum_fees (Sequence.to_list t.commands_rev) ~f:(fun t ->
@@ -1633,7 +1622,8 @@ module T = struct
     let work_done t =
       let no_of_proof_bundles = Sequence.length t.completed_work_rev in
       let slots = slots_occupied t in
-      (*If more jobs were added in the previous diff then ( t.max_space-t.max_jobs) slots can go for free in this diff*)
+      (* If more jobs were added in the previous diff then (
+         t.max_space-t.max_jobs) slots can go for free in this diff *)
       no_of_proof_bundles = t.max_jobs || slots <= t.max_space - t.max_jobs
 
     let space_constraint_satisfied t =
@@ -1641,13 +1631,13 @@ module T = struct
       occupied <= t.max_space
 
     let work_constraint_satisfied (t : t) =
-      (*Are we doing all the work available? *)
+      (* Are we doing all the work available? *)
       let all_proofs = work_done t in
-      (*enough work*)
+      (* enough work *)
       let slots = slots_occupied t in
       let cw_count = Sequence.length t.completed_work_rev in
       let enough_work = cw_count >= slots in
-      (*if there are no transactions then don't need any proofs*)
+      (* if there are no transactions then don't need any proofs *)
       all_proofs || slots = 0 || enough_work
 
     let available_space t = t.max_space - slots_occupied t
@@ -1674,7 +1664,8 @@ module T = struct
 
     let discard_user_command t =
       let decr_coinbase t =
-        (*When discarding coinbase's fee transfer, add the fee transfer to the fee_transfers map so that budget checks can be done *)
+        (* When discarding coinbase's fee transfer, add the fee transfer to the
+           fee_transfers map so that budget checks can be done *)
         let update_fee_transfers t (ft : Coinbase.Fee_transfer.t) coinbase =
           let updated_fee_transfers =
             Public_key.Compressed.Map.update t.fee_transfers ft.receiver_pk
@@ -1702,7 +1693,8 @@ module T = struct
       in
       match Sequence.next t.commands_rev with
       | None ->
-          (* If we have reached here then it means we couldn't afford a slot for coinbase as well *)
+          (* If we have reached here then it means we couldn't afford a slot for
+             coinbase as well *)
           (decr_coinbase t, None)
       | Some (uc, rem_seq) ->
           let discarded = Discarded.add_user_command t.discarded uc in
@@ -1718,8 +1710,9 @@ module T = struct
           ({ new_t with budget }, Some uc)
 
     let worked_more ~constraint_constants resources =
-      (*Is the work constraint satisfied even after discarding a work bundle?
-         We reach here after having more than enough work*)
+      (* Is the work constraint satisfied even after discarding a work bundle?
+         We reach here after having more than enough work
+      *)
       let more_work t =
         let slots = slots_occupied t in
         let cw_count = Sequence.length t.completed_work_rev in
@@ -1743,7 +1736,8 @@ module T = struct
       let by_one res =
         let res' =
           match Sequence.next res.discarded.completed_work with
-          (*add one from the discarded list to [completed_work_rev] and then select a work from [completed_work_rev] except the one already used*)
+          (* Add one from the discarded list to [completed_work_rev] and then
+             select a work from [completed_work_rev] except the one already used *)
           | Some (w, rem_work) ->
               let%map coinbase = incr res.coinbase in
               let res' =
@@ -1781,12 +1775,12 @@ module T = struct
     if Resources.slots_occupied resources = 0 then (resources, log)
     else if Resources.work_constraint_satisfied resources then
       if
-        (*There's enough work. Check if they satisfy other constraints*)
+        (* There's enough work. Check if they satisfy other constraints *)
         Resources.budget_sufficient resources
       then
         if Resources.space_constraint_satisfied resources then (resources, log)
         else if Resources.worked_more ~constraint_constants resources then
-          (*There are too many fee_transfers(from the proofs) occupying the slots. discard one and check*)
+          (* There are too many fee_transfers(from the proofs) occupying the slots. discard one and check *)
           let resources', work_opt =
             Resources.discard_last_work ~constraint_constants resources
           in
@@ -1795,7 +1789,7 @@ module T = struct
                  Diff_creation_log.discard_completed_work `Extra_work work log )
             )
         else
-          (*Well, there's no space; discard a user command *)
+          (* Well, there's no space; discard a user command *)
           let resources', uc_opt = Resources.discard_user_command resources in
           check_constraints_and_update ~constraint_constants resources'
             (Option.value_map uc_opt ~default:log ~f:(fun uc ->
@@ -1812,7 +1806,8 @@ module T = struct
                Diff_creation_log.discard_completed_work `Insufficient_fees work
                  log ) )
     else
-      (* There isn't enough work for the transactions. Discard a transaction and check again *)
+      (* There isn't enough work for the transactions. Discard a transaction and
+         check again *)
       let resources', uc_opt = Resources.discard_user_command resources in
       check_constraints_and_update ~constraint_constants resources'
         (Option.value_map uc_opt ~default:log ~f:(fun uc ->
@@ -1901,7 +1896,7 @@ module T = struct
     let isEmpty (res : Resources.t) =
       has_no_commands res && Resources.coinbase_added res = 0
     in
-    (*Partitioning explained in PR #687 *)
+    (* Partitioning explained in PR #687 *)
     match partitions.second with
     | None ->
         let res, log =
@@ -1924,7 +1919,9 @@ module T = struct
             Resources.incr_coinbase_part_by ~constraint_constants res count
           in
           if Resources.space_available new_res then
-            (*All slots could not be filled either because of budget constraints or not enough work done. Don't create the second prediff instead recompute first diff with just once coinbase*)
+            (* All slots could not be filled either because of budget
+               constraints or not enough work done. Don't create the second
+               prediff instead recompute first diff with just once coinbase *)
             ( one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
                 partitions.first ~add_coinbase:true logger
                 ~is_coinbase_receiver_new ~supercharge_coinbase `First
@@ -1934,7 +1931,8 @@ module T = struct
               second_pre_diff new_res y ~add_coinbase:false cw_seq_2
             in
             if isEmpty res2 then
-              (*Don't create the second prediff instead recompute first diff with just once coinbase*)
+              (* Don't create the second prediff instead recompute first diff
+                 with just once coinbase *)
               ( one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
                   partitions.first ~add_coinbase:true logger
                   ~is_coinbase_receiver_new ~supercharge_coinbase `First
@@ -1953,17 +1951,24 @@ module T = struct
           else
             match Resources.available_space res with
             | 0 ->
-                (*generate the next prediff with a coinbase at least*)
+                (* generate the next prediff with a coinbase at least *)
                 let res2 = second_pre_diff res y ~add_coinbase:true cw_seq_2 in
                 ((res, log1), Some res2)
             | 1 ->
-                (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
+                (* There's a slot available in the first partition, fill it with
+                   coinbase and create another pre_diff for the slots in the second
+                   partiton with the remaining user commands and work *)
                 incr_coinbase_and_compute res `One
             | 2 ->
-                (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)
+                (* There are two slots which cannot be filled using user
+                   commands, so we split the coinbase into two parts and fill those
+                   two spots *)
                 incr_coinbase_and_compute res `Two
             | _ ->
-                (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
+                (* Too many slots left in the first partition. Either there
+                   wasn't enough work to add transactions or there weren't enough
+                   transactions. Create a new pre_diff for just the first
+                   partition *)
                 let res = try_with_coinbase () in
                 (res, None)
         in
@@ -1975,7 +1980,9 @@ module T = struct
         in
         if coinbase_added > 0 then make_diff res1 res2
         else
-          (*Coinbase takes priority over user-commands. Create a diff in partitions.first with coinbase first and user commands if possible*)
+          (* Coinbase takes priority over user-commands. Create a diff in
+             partitions.first with coinbase first and user commands if
+             possible *)
           let res = try_with_coinbase () in
           make_diff res None
 
@@ -2190,7 +2197,8 @@ module T = struct
                 ~constraint_constants ~global_slot validating_ledger
                 ~txn_state_view:current_state_view
             in
-            (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
+            (* Transactions in reverse order for faster removal if there is no
+               space when creating the diff *)
             let valid_on_this_ledger, invalid_on_this_ledger =
               Sequence.fold_until transactions_by_fee
                 ~init:

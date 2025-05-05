@@ -61,8 +61,10 @@ let test_query schema ctx ?variables ?operation_name query expected =
         | Error err ->
             err
       in
-      result = expected
-(* Alcotest.check yojson "invalid execution result" expected result *)
+      if result <> expected then
+        Alcotest.failf "Expected:\n%s\nGot:\n%s"
+          (Yojson.Basic.pretty_to_string expected)
+          (Yojson.Basic.pretty_to_string result)
 
 let schema =
   CustomErrorsSchema.(
@@ -75,7 +77,7 @@ let schema =
           ~resolve:(fun _ () -> Error (Field_error.Extension ("custom", "json")))
       ])
 
-let%test "message without extensions" =
+let message_without_extensions_test () =
   let query = "{ string_error }" in
   test_query schema () query
     (`Assoc
@@ -89,7 +91,7 @@ let%test "message without extensions" =
       ; ("data", `Assoc [ ("string_error", `Null) ])
       ] )
 
-let%test "message with extensions" =
+let message_with_extensions_test () =
   let query = "{ extensions_error }" in
   test_query schema () query
     (`Assoc
@@ -103,3 +105,13 @@ let%test "message with extensions" =
             ] )
       ; ("data", `Assoc [ ("extensions_error", `Null) ])
       ] )
+
+let () =
+  Alcotest.run "GraphQL Custom Error Tests"
+    [ ( "custom error handling"
+      , [ Alcotest.test_case "message without extensions" `Quick
+            message_without_extensions_test
+        ; Alcotest.test_case "message with extensions" `Quick
+            message_with_extensions_test
+        ] )
+    ]
