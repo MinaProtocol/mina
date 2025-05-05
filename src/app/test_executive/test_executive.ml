@@ -254,16 +254,6 @@ let main inputs =
        and type node = Engine.Network.Node.t
        and type dsl = Dsl.t )
   in
-  (*
-    (module Test (Test_inputs)
-    : Intf.Test.S
-      with type network = Engine.Network.t
-       and type log_engine = Engine.Log_engine.t )
-    *)
-  (* TODO:
-   *   let (module Exec) = (module Execute.Make (Engine)) in
-   *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
-   *)
   let logger = Logger.create () in
   let constants : Test_config.constants =
     let protocol =
