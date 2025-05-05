@@ -42,6 +42,22 @@
       medium-bootstrap
     ```
 
+    This will run the "medium-bootstrap" test using the specified Mina and
+    archive images.
+
+    Logs can be filtered and pretty-printed using:
+    ```
+    dune exec src/app/test_executive/test_executive.exe -- \
+      local \
+      --mina-image=gcr.io/o1labs-192920/mina-daemon:latest \
+      --archive-image=gcr.io/o1labs-192920/mina-archive:latest \
+      medium-bootstrap | \
+      tee test.log | \
+      dune exec src/app/logproc/logproc.exe -- \
+        -i inline \
+        -f '!(.level in ["Debug", "Spam"])'
+    ```
+
     A docker stack will be created with the specified images, and the test will run
     against the network. The test executive will clean up the network after the
     test is completed or if an error occurs. The test results will be printed to
