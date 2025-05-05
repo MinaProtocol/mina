@@ -101,7 +101,9 @@ module type Full = sig
 
     module Stable : sig
       module V2 : sig
-        type t
+        type t =
+          Pre_diff_with_at_most_two_coinbase.Stable.V2.t
+          * Pre_diff_with_at_most_one_coinbase.Stable.V2.t option
 
         val coinbase :
              constraint_constants:Genesis_constants.Constraint_constants.t
@@ -126,7 +128,8 @@ module type Full = sig
 
   module Stable : sig
     module V2 : sig
-      type t [@@deriving bin_io, equal, sexp, version, yojson]
+      type t = { diff : Diff.Stable.V2.t }
+      [@@deriving bin_io, equal, sexp, version, yojson]
 
       val to_latest : t -> t
 

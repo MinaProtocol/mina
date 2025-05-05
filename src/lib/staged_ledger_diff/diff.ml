@@ -14,8 +14,6 @@ module Make_sig (A : Wire_types.Types.S) = struct
        and type ('a, 'b) Pre_diff_one.Stable.V2.t = ('a, 'b) A.Pre_diff_one.V2.t
        and type Pre_diff_with_at_most_one_coinbase.Stable.V2.t =
         A.Pre_diff_with_at_most_one_coinbase.V2.t
-       and type Diff.Stable.V2.t = A.Diff.V2.t
-       and type Stable.V2.t = A.V2.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -292,8 +290,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      type t = A.V2.t = { diff : Diff.Stable.V2.t }
-      [@@deriving equal, sexp, yojson]
+      type t = { diff : Diff.Stable.V2.t } [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
 
