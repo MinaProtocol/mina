@@ -44,14 +44,16 @@ let actual_wrap_domain_size ~log_2_domain_size =
   in
   Pickles_base.Proofs_verified.of_int_exn d
 
-let hash_messages_for_next_step_proof ~app_state
+let hash_message_inputs_for_next_step_proof ~app_state
     (t : _ Types.Step.Proof_state.Messages_for_next_step_proof.t) =
   let g (x, y) = [ x; y ] in
-  Tick_field_sponge.digest Tick_field_sponge.params
-    (Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
-       ~comm:(fun (x : Tock.Curve.Affine.t array) ->
-         Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
-       ~app_state )
+  Types.Step.Proof_state.Messages_for_next_step_proof.to_field_elements t ~g
+    ~comm:(fun (x : Tock.Curve.Affine.t array) ->
+      Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
+    ~app_state
+
+let hash_messages_for_next_step_proof hash_input =
+  Tick_field_sponge.digest Tick_field_sponge.params hash_input
 
 let when_profiling profiling default =
   match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with
