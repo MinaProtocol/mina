@@ -14,7 +14,6 @@
   ledger_proof
   logger
   blockchain_snark
-  unix_timestamp
   allocation_functor
   verifier
   staged_ledger_diff
