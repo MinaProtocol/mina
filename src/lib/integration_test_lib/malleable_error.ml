@@ -14,7 +14,8 @@ module Error_accumulator = Test_error.Error_accumulator
 
 module Hard_fail = struct
   type t =
-    { (* Most of the time, there is only one hard error, but we can have multiple when joining lists of monads (concurrency) *)
+    { (* Most of the time, there is only one hard error, but we can have
+         multiple when joining lists of monads (concurrency) *)
       hard_errors : Test_error.internal_error Error_accumulator.t
     ; soft_errors : Test_error.internal_error Error_accumulator.t
     ; exit_code : int option

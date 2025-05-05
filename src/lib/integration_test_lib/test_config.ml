@@ -122,7 +122,10 @@ let default ~(constants : constants) =
   let { constraint_constants; genesis_constants; _ } = constants in
   { requires_graphql =
       true
-      (* require_graphql maybe should just be phased out, because it always needs to be enable.  Now with the graphql polling engine, everything will definitely fail if graphql is not enabled.  But even before that, most tests relied on some sort of graphql interaction *)
+      (* require_graphql maybe should just be phased out, because it always
+         needs to be enable. Now with the graphql polling engine, everything
+         will definitely fail if graphql is not enabled. But even before that,
+         most tests relied on some sort of graphql interaction *)
   ; genesis_ledger = []
   ; epoch_data = None
   ; block_producers = []
