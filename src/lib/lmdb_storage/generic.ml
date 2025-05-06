@@ -283,7 +283,7 @@ let%test_module "Lmdb storage tests" =
       test_with_dir
       @@ fun dir ->
       let env, _ =
-        init_random_db dir ~f:(fun env db k v_str ->
+        init_random_db dir ~length:100000 ~f:(fun env db k v_str ->
             let v = Bigstring.of_string v_str in
             Rw.set ~env db k v )
       in
@@ -295,7 +295,7 @@ let%test_module "Lmdb storage tests" =
       test_with_dir
       @@ fun dir ->
       let env, db =
-        init_random_db dir ~length:100000 ~f:(fun env db k v_str ->
+        init_random_db dir ~f:(fun env db k v_str ->
             let v = Bigstring.of_string v_str in
             Hashtbl.add ~key:k ~data:v hm
             |> function
