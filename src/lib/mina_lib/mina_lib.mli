@@ -112,11 +112,9 @@ val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
 val request_work :
      capability:[ `V2 | `V3 ]
-  -> selection_method:(module Work_selector.Selection_method_intf)
   -> snark_work_fee:Currency.Fee.t
   -> logger:Logger.t
-  -> selector:Work_selector.State.t
-  -> snark_pool:Work_selector.snark_pool
+  -> work_from_selector:Work_partitioner.work_from_selector
   -> partitioner:Work_partitioner.t
   -> Snark_work_lib.Partitioned.Spec.t option
 

@@ -1,3 +1,3 @@
-open Mock_coordinator_rpc
+open Mock_coordinator
 
 let () = ()

@@ -2,7 +2,7 @@ open Async
 open Core
 module Work = Snark_work_lib
 
-module Job_id = struct
+module Selector_work_id = struct
   type t = Transaction_snark.Statement.t One_or_two.t
   [@@deriving compare, sexp, to_yojson, hash]
 end
@@ -12,43 +12,31 @@ end
 *)
 let mock_coordinator ~partitioner ~snark_work_fee ~key ~logger ~seed ~port
     ~rpc_handshake_timeout ~rpc_heartbeat_send_every ~rpc_heartbeat_timeout =
-  let selector_work_pool : (Job_id.t, Time.t) Hashtbl_intf.Hashtbl.t =
-    Hashtbl.create (module Job_id)
+  let selector_work_pool : (Selector_work_id.t, Time.t) Hashtbl_intf.Hashtbl.t =
+    Hashtbl.create (module Selector_work_id)
   in
-  let selection_method : (module Work_selector.Selection_method_intf) =
-    ( module struct
-      module State = Work_selector.State
+  let work_from_selector ~fee:_ ~logger =
+    let gen = One_or_two.gen (Work.Selector.Single.Spec.gen ()) in
+    let spec = Quickcheck.random_value ~seed gen in
+    let key = One_or_two.map ~f:Work.Work.Single.Spec.statement spec in
+    Hashtbl.add_exn selector_work_pool ~key ~data:(Time.now ()) ;
+    let work_ids_json = key |> Transaction_snark_work.Statement.compact_json in
+    [%log info] "Selector work distributed to partitioner"
+      ~metadata:[ ("work_ids", work_ids_json) ] ;
+    Some spec
+  in
 
-      let work ~snark_pool:_ ~fee:_ ~logger _state =
-        let gen = One_or_two.gen (Work.Selector.Single.Spec.gen ()) in
-        let spec = Quickcheck.random_value ~seed gen in
-        let key = One_or_two.map ~f:Work.Work.Single.Spec.statement spec in
-        Hashtbl.add_exn selector_work_pool ~key ~data:(Time.now ()) ;
-        let work_ids_json =
-          key |> Transaction_snark_work.Statement.compact_json
-        in
-        [%log info] "Selector work distributed to partitioner"
-          ~metadata:[ ("work_ids", work_ids_json) ] ;
-        Some spec
-    end )
-  in
-  let pipe_r, _ = Pipe_lib.Broadcast_pipe.create None in
-  let selector =
-    Work_selector.State.init ~logger ~reassignment_wait:9999999999
-      ~frontier_broadcast_pipe:pipe_r
-  in
   let implement rpc f =
     Rpc.Rpc.implement rpc (fun () input ->
         O1trace.thread ("serve_" ^ Rpc.Rpc.name rpc) (fun () -> f () input) )
   in
 
-  let snark_pool = failwith "TODO" in
   let snark_worker_rpcs_coordinator =
     [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc
         (fun () capability ->
           (let%map.Option work =
-             Mina_lib.request_work ~capability ~selection_method ~snark_work_fee
-               ~logger ~selector ~snark_pool ~partitioner
+             Mina_lib.request_work ~capability ~snark_work_fee ~logger
+               ~work_from_selector ~partitioner
            in
            let work_wire =
              Work.Partitioned.Spec.read_all_proofs_from_disk work

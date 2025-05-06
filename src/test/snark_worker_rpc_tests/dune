@@ -8,6 +8,7 @@
   core
   ;; mina libraries
   mina_lib
+  network_pool
   o1trace
   pipe_lib
   snark_worker

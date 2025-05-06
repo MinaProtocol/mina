@@ -867,31 +867,30 @@ let best_chain ?max_length t =
   | _ ->
       Transition_frontier.root frontier :: best_tip_path
 
-let request_work ~(capability : [ `V2 | `V3 ])
-    ~(selection_method : (module Work_selector.Selection_method_intf))
-    ~snark_work_fee ~logger ~selector ~snark_pool ~partitioner =
-  let (module Work_selection_method) = selection_method in
+let request_work ~(capability : [ `V2 | `V3 ]) ~snark_work_fee ~logger
+    ~(work_from_selector : Work_partitioner.work_from_selector) ~partitioner =
   let module Work = Snark_work_lib in
   let request_regular_work () =
-    let%map.Option instances =
-      Work_selection_method.work ~logger ~fee:snark_work_fee ~snark_pool
-        selector
-    in
+    let%map.Option instances = work_from_selector ~logger ~fee:snark_work_fee in
     ({ instances; fee = snark_work_fee } : _ Work.Work.Spec.t)
     |> Work.Partitioned.Spec.Poly.of_selector_spec
          ~issued_since_unix_epoch:Time.(now () |> to_span_since_epoch)
   in
+
   match capability with
   | `V2 ->
       request_regular_work ()
   | `V3 ->
-      Work_partitioner.request_partitioned_work ~selection_method ~logger
-        ~fee:snark_work_fee ~snark_pool ~selector ~partitioner
+      Work_partitioner.request_partitioned_work ~logger ~fee:snark_work_fee
+        ~work_from_selector ~partitioner
 
 let request_work_t ~(capability : [ `V2 | `V3 ]) t =
-  request_work ~capability ~selection_method:t.config.work_selection_method
-    ~snark_work_fee:(snark_work_fee t) ~logger:t.config.logger
-    ~selector:t.snark_job_state.selector ~snark_pool:(snark_pool t)
+  let (module Work_selection_method) = t.config.work_selection_method in
+  request_work ~capability ~snark_work_fee:(snark_work_fee t)
+    ~logger:t.config.logger
+    ~work_from_selector:(fun ~fee ~logger ->
+      Work_selection_method.work ~snark_pool:(snark_pool t) ~fee ~logger
+        t.snark_job_state.selector )
     ~partitioner:t.snark_job_state.partitioner
 
 let work_selection_method t = t.config.work_selection_method
