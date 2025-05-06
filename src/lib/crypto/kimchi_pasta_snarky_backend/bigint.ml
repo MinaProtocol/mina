@@ -67,7 +67,8 @@ module Make
   let sexp_of_t t = to_hex_string t |> Sexp.of_string
 
   let of_hex_string ?(reverse = true) s =
-    assert (Char.equal s.[0] '0' && Char.equal s.[1] 'x') ;
+    assert (
+      Char.equal s.[0] '0' && (Char.equal s.[1] 'x' || Char.equal s.[1] 'X') ) ;
     let s = String.drop_prefix s 2 in
     Option.try_with (fun () -> Hex.decode ~init:Bytes.init ~reverse s)
     |> Option.value_exn ~here:[%here]
