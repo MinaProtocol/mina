@@ -192,8 +192,8 @@ module Snark_worker = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary ?env
         ~args:
-          ( "internal" :: Snark_worker.Intf.command_name
-          :: Snark_worker.arguments ~proof_level
+          ( "internal" :: Snark_worker.Entry.command_name
+          :: Snark_worker.Entry.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
@@ -876,7 +876,7 @@ let request_work t =
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_worker_lib.Work.Result.t) =
+let add_work t (result : Snark_work_lib.Selector.Result.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -891,7 +891,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   let spec =
-    One_or_two.map work.spec.instances
+    One_or_two.map result.spec.instances
       ~f:Snark_work_lib.Work.Single.Spec.statement
   in
   let cb _ =
@@ -901,9 +901,12 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
+  let result =
+    Snark_work_lib.Selector.Result.read_all_proofs_from_disk result
+  in
   Network_pool.Snark_pool.(
     Local_sink.push t.pipes.snark_local_sink
-      (Resource_pool.Diff.of_result work, cb))
+      (Resource_pool.Diff.of_result result, cb))
   |> Deferred.don't_wait_for
 
 let add_work_graphql t diff =
