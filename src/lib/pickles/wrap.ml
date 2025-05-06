@@ -17,8 +17,6 @@ module Type1 =
     (Shifted_value.Type1)
     (struct
       let constant_term = Plonk_checks.Scalars.Tick.constant_term
-
-      let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
 let _vector_of_list (type a t)

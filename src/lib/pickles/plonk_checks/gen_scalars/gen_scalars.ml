@@ -113,8 +113,6 @@ end
 
 module type S = sig
   val constant_term : 'a Env.t -> 'a
-
-  val index_terms : 'a Env.t -> 'a Lazy.t Column.Table.t
 end
 
 (* The constraints are basically the same, but the literals in them differ. *)
@@ -154,17 +152,7 @@ let fp_constant_term, _fp_index_terms = fp_linearization ()
 
 let () = output_string fp_constant_term
 
-let () =
-  output_string
-    {ocaml|
-
-  let index_terms (type a) (_ : a Env.t) =
-    Column.Table.of_alist_exn
-    [
-|ocaml}
-
 let () = output_string {ocaml|
-      ]
 end
 |ocaml}
 
@@ -207,16 +195,6 @@ let fq_constant_term, _fq_index_terms = fq_linearization ()
 
 let () = output_string fq_constant_term
 
-let () =
-  output_string
-    {ocaml|
-
-  let index_terms (type a) (_ : a Env.t) =
-    Column.Table.of_alist_exn
-    [
-|ocaml}
-
 let () = output_string {ocaml|
-      ]
 end
 |ocaml}
