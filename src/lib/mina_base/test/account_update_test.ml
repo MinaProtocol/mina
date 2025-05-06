@@ -26,7 +26,7 @@ let update_json_roundtrip () =
     let app_state =
       Zkapp_state.V.of_list_exn
         Set_or_keep.
-          [ Set (F.of_int i); Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
+          [ Set (F.of_int i); Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
     in
     let verification_key =
       Set_or_keep.Set
@@ -100,7 +100,10 @@ let precondition_to_json () =
        balance: null,
        nonce: {lower: "34928", upper: "34928"},
        receiptChainHash: null, delegate: null,
-       state: [null,null,null,null,null,null,null,null],
+       state: [null,null,null,null,null,null,null,null,
+       null,null,null,null,null,null,null,null,null,
+       null,null,null,null,null,null,null,null,null,
+       null,null,null,null,null,null],
        actionState: null, provedState: null, isNew: null
        }|json}
     |> Yojson.Safe.from_string |> Yojson.Safe.to_string )
