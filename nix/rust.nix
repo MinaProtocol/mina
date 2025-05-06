@@ -8,8 +8,8 @@ let
       # override stdenv.targetPlatform here, if necessary
     };
   toolchainHashes = {
-    "1.79.0" = "sha256-Ngiz76YP4HTY75GGdH2P+APE/DEIx2R/Dn+BwwOyzZU=";
-    "nightly-2024-06-13" = "sha256-s5nlYcYG9EuO2HK2BU3PkI928DZBKCTJ4U9bz3RX1t4=";
+    "1.81.0" = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
+    "nightly-2024-09-05" = "sha256-s5nlYcYG9EuO2HK2BU3PkI928DZBKCTJ4U9bz3RX1t4=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
