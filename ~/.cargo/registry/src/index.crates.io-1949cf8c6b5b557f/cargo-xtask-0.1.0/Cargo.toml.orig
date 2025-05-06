@@ -1,0 +1,8 @@
+[package]
+name = "cargo-xtask"
+version = "0.1.0"
+authors = ["Aleksey Kladov <aleksey.kladov@gmail.com>"]
+edition = "2018"
+repository = "https://github.com/matklad/cargo-xtask/"
+license = "MIT OR Apache-2.0"
+description = "placeholder for https://github.com/matklad/cargo-xtask"

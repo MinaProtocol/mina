@@ -118,39 +118,39 @@ end
 (* The constraints are basically the same, but the literals in them differ. *)
 module Tick : S = struct
   let constant_term (type a)
-      ({ add = ( + )
+      ({ add = _
        ; sub = ( - )
-       ; mul = ( * )
-       ; square
-       ; mds
-       ; endo_coefficient
-       ; pow
+       ; mul = _
+       ; square = _
+       ; mds = _
+       ; endo_coefficient = _
+       ; pow = _
        ; var
-       ; field
+       ; field = _
        ; cell
-       ; alpha_pow
-       ; double
+       ; alpha_pow = _
+       ; double = _
        ; zk_polynomial = _
        ; omega_to_minus_zk_rows = _
        ; zeta_to_n_minus_1 = _
        ; zeta_to_srs_length = _
        ; srs_length_log2 = _
-       ; vanishes_on_zero_knowledge_and_previous_rows
-       ; joint_combiner
-       ; beta
-       ; gamma
-       ; unnormalized_lagrange_basis
-       ; if_feature
+       ; vanishes_on_zero_knowledge_and_previous_rows = _
+       ; joint_combiner = _
+       ; beta = _
+       ; gamma = _
+       ; unnormalized_lagrange_basis = _
+       ; if_feature = _
        } :
         a Env.t) =
 |ocaml}
 
-external fp_linearization : unit -> string * (string * string) array
-  = "fp_linearization_strings"
-
-let fp_constant_term, _fp_index_terms = fp_linearization ()
-
-let () = output_string fp_constant_term
+let () =
+  output_string
+    {ocaml|
+  let x_0 = cell (var (Witness 0, Curr)) in 
+  x_0 - x_0
+  |ocaml}
 
 let () = output_string {ocaml|
 end
