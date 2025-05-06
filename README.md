@@ -56,7 +56,7 @@ The [Node Developers](https://docs.minaprotocol.com/node-developers) docs contai
 ## Community
 
 - Join the public Mina Protocol [Discord server](https://discord.gg/minaprotocol). Please come by if you need help or have any questions.
-- Participate in our [online communities](https://docs.minaprotocol.com/participate/online-communities).
+- Participate in our [online communities](https://minaprotocol.com/community).
 - Get the latest updates by signing up for the Mina newsletter. Select [SIGN UP FOR NEWSLETTER](https://minaprotocol.com/) on the home page of the Mina Protocol website.
 
 ## License
