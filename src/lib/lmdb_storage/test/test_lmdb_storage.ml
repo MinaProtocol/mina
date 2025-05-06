@@ -108,6 +108,7 @@ let test_iterations_with_removal_and_reopening () =
       cnt := !cnt + 1 ;
       `Continue ) ;
 
+  Rw.close env ;
   Alcotest.(check int) "Read-only iteration count after removal" !odd_cnt !cnt ;
 
   (* We cannot explicitly close the environment, but we can create a new read-only one *)
@@ -142,6 +143,7 @@ let test_iterations_with_removal_and_reopening () =
       cnt := !cnt + 1 ;
       `Continue ) ;
 
+  Ro.close env ;
   Alcotest.(check int) "Iteration count after reopening" !odd_cnt !cnt ;
   Deferred.unit
 
@@ -243,6 +245,7 @@ let test_rw_txn_scope () =
         (Bigstring.equal data new_replacement) )
     env
   |> Option.value_exn ~message:"cannot fetch first key from hm after iter" ;
+  Rw.close env ;
   Deferred.return ()
 
 (* Test for iter operation outcomes *)
@@ -336,6 +339,7 @@ let test_iter_operations () =
 
   counter := 0 ;
   Rw.iter ~env db ~f:(fun _k _ -> incr counter ; `Continue) ;
+  Rw.close env ;
   Alcotest.(check int) "Counter for iter after removing key 5" 3 !counter ;
   Deferred.return ()
 
