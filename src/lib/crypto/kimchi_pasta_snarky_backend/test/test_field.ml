@@ -1,5 +1,16 @@
 open Core_kernel
 
+(* Helper functions for property testing *)
+let check_property name predicate =
+  (* Run property test multiple times with random inputs *)
+  let rec check_n_times n =
+    if n <= 0 then true
+    else if predicate () then check_n_times (n - 1)
+    else false
+  in
+  (* We run the property test 100 times *)
+  Alcotest.(check bool) name true (check_n_times 100)
+
 module Make (Field : Kimchi_pasta_snarky_backend.Field.S_with_version) = struct
   let test_field_sexp_round_trip () =
     let t = Field.random () in
@@ -153,6 +164,87 @@ module Make (Field : Kimchi_pasta_snarky_backend.Field.S_with_version) = struct
         Alcotest.(check bool) "Parsing modulus as decimal should fail" true true
     | _ ->
         Alcotest.(fail "Unexpected exception")
+
+  (* Property-based tests for field operations *)
+
+  (* Addition properties *)
+  let test_field_addition_commutativity () =
+    check_property "Addition commutativity" (fun () ->
+        let a = Field.random () in
+        let b = Field.random () in
+        Field.equal (Field.( + ) a b) (Field.( + ) b a) )
+
+  let test_field_addition_associativity () =
+    check_property "Addition associativity" (fun () ->
+        let a = Field.random () in
+        let b = Field.random () in
+        let c = Field.random () in
+        Field.equal
+          (Field.( + ) (Field.( + ) a b) c)
+          (Field.( + ) a (Field.( + ) b c)) )
+
+  let test_field_addition_identity () =
+    check_property "Addition identity" (fun () ->
+        let a = Field.random () in
+        Field.equal a (Field.( + ) a Field.zero) )
+
+  let test_field_addition_inverse () =
+    check_property "Addition inverse" (fun () ->
+        let a = Field.random () in
+        let neg_a = Field.negate a in
+        Field.equal Field.zero (Field.( + ) a neg_a) )
+
+  (* Multiplication properties *)
+  let test_field_multiplication_commutativity () =
+    check_property "Multiplication commutativity" (fun () ->
+        let a = Field.random () in
+        let b = Field.random () in
+        Field.equal (Field.( * ) a b) (Field.( * ) b a) )
+
+  let test_field_multiplication_associativity () =
+    check_property "Multiplication associativity" (fun () ->
+        let a = Field.random () in
+        let b = Field.random () in
+        let c = Field.random () in
+        Field.equal
+          (Field.( * ) (Field.( * ) a b) c)
+          (Field.( * ) a (Field.( * ) b c)) )
+
+  let test_field_multiplication_identity () =
+    check_property "Multiplication identity" (fun () ->
+        let a = Field.random () in
+        Field.equal a (Field.( * ) a Field.one) )
+
+  let test_field_multiplication_distributivity () =
+    check_property "Multiplication distributivity" (fun () ->
+        let a = Field.random () in
+        let b = Field.random () in
+        let c = Field.random () in
+        Field.equal
+          (Field.( * ) a (Field.( + ) b c))
+          (Field.( + ) (Field.( * ) a b) (Field.( * ) a c)) )
+
+  (* Division and Inverse properties *)
+  let test_field_division_by_self () =
+    check_property "Division by self" (fun () ->
+        let a = Field.random () in
+        if Field.equal a Field.zero then true
+        else Field.equal Field.one (Field.( / ) a a) )
+
+  let test_field_inverse_property () =
+    check_property "Inverse property" (fun () ->
+        let a = Field.random () in
+        if Field.equal a Field.zero then true
+        else
+          let a_inv = Field.inv a in
+          Field.equal Field.one (Field.( * ) a a_inv) )
+
+  (* Field Subtraction properties *)
+  let test_field_subtraction_property () =
+    check_property "Subtraction property" (fun () ->
+        let a = Field.random () in
+        let b = Field.random () in
+        Field.equal (Field.( - ) a b) (Field.( + ) a (Field.negate b)) )
 end
 
 module Pallas = Make (Kimchi_pasta_snarky_backend.Pallas_based_plonk.Field)
@@ -161,7 +253,7 @@ module Vesta = Make (Kimchi_pasta_snarky_backend.Vesta_based_plonk.Field)
 let () =
   let open Alcotest in
   run "Field Tests"
-    [ ( "Pallas"
+    [ ( "Pallas Parsing"
       , [ test_case "sexp round trip" `Quick Pallas.test_field_sexp_round_trip
         ; test_case "bin_io round trip" `Quick
             Pallas.test_field_bin_io_round_trip
@@ -185,7 +277,28 @@ let () =
         ; test_case "of_yojson modulus decimal" `Quick
             Pallas.test_field_of_yojson_modulus_decimal
         ] )
-    ; ( "Vesta"
+    ; ( "Pallas Field Properties"
+      , [ test_case "addition commutativity" `Quick
+            Pallas.test_field_addition_commutativity
+        ; test_case "addition associativity" `Quick
+            Pallas.test_field_addition_associativity
+        ; test_case "addition identity" `Quick
+            Pallas.test_field_addition_identity
+        ; test_case "addition inverse" `Quick Pallas.test_field_addition_inverse
+        ; test_case "multiplication commutativity" `Quick
+            Pallas.test_field_multiplication_commutativity
+        ; test_case "multiplication associativity" `Quick
+            Pallas.test_field_multiplication_associativity
+        ; test_case "multiplication identity" `Quick
+            Pallas.test_field_multiplication_identity
+        ; test_case "multiplication distributivity" `Quick
+            Pallas.test_field_multiplication_distributivity
+        ; test_case "division by self" `Quick Pallas.test_field_division_by_self
+        ; test_case "inverse property" `Quick Pallas.test_field_inverse_property
+        ; test_case "subtraction property" `Quick
+            Pallas.test_field_subtraction_property
+        ] )
+    ; ( "Vesta Parsing"
       , [ test_case "sexp round trip" `Quick Vesta.test_field_sexp_round_trip
         ; test_case "bin_io round trip" `Quick
             Vesta.test_field_bin_io_round_trip
@@ -208,5 +321,26 @@ let () =
             Vesta.test_field_of_yojson_42_decimal
         ; test_case "of_yojson modulus decimal" `Quick
             Vesta.test_field_of_yojson_modulus_decimal
+        ] )
+    ; ( "Vesta Field Properties"
+      , [ test_case "addition commutativity" `Quick
+            Vesta.test_field_addition_commutativity
+        ; test_case "addition associativity" `Quick
+            Vesta.test_field_addition_associativity
+        ; test_case "addition identity" `Quick
+            Vesta.test_field_addition_identity
+        ; test_case "addition inverse" `Quick Vesta.test_field_addition_inverse
+        ; test_case "multiplication commutativity" `Quick
+            Vesta.test_field_multiplication_commutativity
+        ; test_case "multiplication associativity" `Quick
+            Vesta.test_field_multiplication_associativity
+        ; test_case "multiplication identity" `Quick
+            Vesta.test_field_multiplication_identity
+        ; test_case "multiplication distributivity" `Quick
+            Vesta.test_field_multiplication_distributivity
+        ; test_case "division by self" `Quick Vesta.test_field_division_by_self
+        ; test_case "inverse property" `Quick Vesta.test_field_inverse_property
+        ; test_case "subtraction property" `Quick
+            Vesta.test_field_subtraction_property
         ] )
     ]
