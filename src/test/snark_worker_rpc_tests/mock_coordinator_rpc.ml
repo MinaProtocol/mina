@@ -2,15 +2,18 @@ open Async
 open Core
 module Work = Snark_work_lib
 
-module Seen_key = struct
+module Job_id = struct
   type t = Transaction_snark.Statement.t One_or_two.t
   [@@deriving compare, sexp, to_yojson, hash]
 end
 
+(* NOTE:
+   The code here is adapt from Mina_lib/Mina_run.
+*)
 let mock_coordinator ~partitioner ~snark_work_fee ~key ~logger ~seed ~port
     ~rpc_handshake_timeout ~rpc_heartbeat_send_every ~rpc_heartbeat_timeout =
-  let selector_work_pool : (Seen_key.t, Time.t) Hashtbl_intf.Hashtbl.t =
-    Hashtbl.create (module Seen_key)
+  let selector_work_pool : (Job_id.t, Time.t) Hashtbl_intf.Hashtbl.t =
+    Hashtbl.create (module Job_id)
   in
   let selection_method : (module Work_selector.Selection_method_intf) =
     ( module struct
@@ -24,7 +27,7 @@ let mock_coordinator ~partitioner ~snark_work_fee ~key ~logger ~seed ~port
         let work_ids_json =
           key |> Transaction_snark_work.Statement.compact_json
         in
-        [%log info] "Selector work distributed"
+        [%log info] "Selector work distributed to partitioner"
           ~metadata:[ ("work_ids", work_ids_json) ] ;
         Some spec
     end )
