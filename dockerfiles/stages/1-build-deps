@@ -104,11 +104,20 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar 
 # In addition to that, we also install cargo-xtask as it is used to build the
 # WebAssembly artefacts.
 USER opam
-RUN curl --proto '=https' --tlsv1.2 -sSf -o /tmp/rustup-init \
+RUN curl --proto '=https' \
+  --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
-  && /tmp/rustup-init -y --default-toolchain "${RUST_VERSION}" --profile minimal --component rust-src --target wasm32-unknown-unknown \
-  && $HOME/.cargo/bin/rustup toolchain install "nightly-${RUST_NIGHTLY}" --profile minimal --component rust-src --target wasm32-unknown-unknown --no-self-update \
+  && /tmp/rustup-init -y --default-toolchain \
+    "${RUST_VERSION}" \
+    --profile minimal \
+    --component rust-src \
+    --target wasm32-unknown-unknown \
+  && $HOME/.cargo/bin/rustup toolchain install "nightly-${RUST_NIGHTLY}" \
+    --profile minimal \
+    --component rust-src \
+    --target wasm32-unknown-unknown \
+    --no-self-update \
   && cargo install cargo-xtask \
   && $HOME/.cargo/bin/cargo install cargo-xtask \
   && rm /tmp/rustup-init
@@ -159,8 +168,14 @@ RUN git clone \
   https://github.com/ocaml/opam-repository.git \
   --depth 1 \
   /home/opam/opam-repository \
-  && opam init --disable-sandboxing -k git -a ~/opam-repository --bare \
-  && opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git \
+  && opam init --disable-sandboxing \
+    -k git \
+    -a ~/opam-repository \
+    --bare \
+  && opam repository add --yes \
+    --all \
+    --set-default o1-labs \
+    https://github.com/o1-labs/opam-repository.git \
   && opam switch create "${OCAML_VERSION}${OCAML_REVISION}" "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
   && opam switch "${OCAML_VERSION}${OCAML_REVISION}"
 
