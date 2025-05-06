@@ -4,8 +4,11 @@
   ;; opam libraries
   alcotest
   async
+  async.async_rpc
   core
   ;; mina libraries
+  mina_lib
+  o1trace
   pipe_lib
   snark_worker
   transaction_snark
