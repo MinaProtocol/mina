@@ -25,6 +25,8 @@ module Single = struct
         [@@deriving sexp, yojson]
 
         let to_latest = Fn.id
+
+        let gen : t Quickcheck.Generator.t = failwith "TODO"
       end
     end]
 
