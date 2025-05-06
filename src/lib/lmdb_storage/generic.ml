@@ -269,39 +269,43 @@ let%test_module "Lmdb storage tests" =
       Base_quickcheck.Generator.int_uniform_inclusive 0
         Int32.(to_int_exn max_value)
 
-    let%test_unit "Put many keys to reach mmap resize" =
-      let n = 300 in
-      test_with_dir
-      @@ fun dir ->
+    let init_random_db ?(n = 300) ?(length = 100) dir ~f =
       let env, db = Rw.create dir in
       Quickcheck.test
         (Quickcheck.Generator.both uint32
-           (String.gen_with_length 100000
+           (String.gen_with_length length
               Base_quickcheck.quickcheck_generator_char ) )
         ~trials:n
-        ~f:(fun (k, v) -> Rw.set ~env db k (Bigstring.of_string v)) ;
-      Deferred.unit
+        ~f:(fun (k, v_str) -> f env db k v_str) ;
+      (env, db)
+
+    let%test_unit "Put many keys to reach mmap resize" =
+      test_with_dir
+      @@ fun dir ->
+      let env, _ =
+        init_random_db dir ~length:100000 ~f:(fun env db k v_str ->
+            let v = Bigstring.of_string v_str in
+            Rw.set ~env db k v )
+      in
+      Rw.close env ; Deferred.unit
 
     let%test_unit "Iterations with removal and re-opening of database" =
-      let n = 300 in
       let hm = Hashtbl.create (module Int) in
       let odd_cnt = ref 0 in
       test_with_dir
       @@ fun dir ->
-      let env, db = Rw.create dir in
-      Quickcheck.test
-        (Quickcheck.Generator.both uint32
-           (String.gen_with_length 100 Base_quickcheck.quickcheck_generator_char) )
-        ~trials:n
-        ~f:(fun (k, v_str) ->
-          let v = Bigstring.of_string v_str in
-          Hashtbl.add ~key:k ~data:v hm
-          |> function
-          | `Duplicate ->
-              ()
-          | `Ok ->
-              if k % 2 = 1 then odd_cnt := !odd_cnt + 1 ;
-              Rw.set ~env db k v ) ;
+      let env, db =
+        init_random_db dir ~f:(fun env db k v_str ->
+            let v = Bigstring.of_string v_str in
+            Hashtbl.add ~key:k ~data:v hm
+            |> function
+            | `Duplicate ->
+                ()
+            | `Ok ->
+                if k % 2 = 1 then odd_cnt := !odd_cnt + 1 ;
+                Rw.set ~env db k v )
+      in
+
       Hashtbl.iteri hm ~f:(fun ~key ~data ->
           [%test_eq: Bigstring.t option] (Some data) (Rw.get ~env db key) ) ;
       let cnt = ref 0 in
@@ -328,8 +332,171 @@ let%test_module "Lmdb storage tests" =
           cnt := !cnt + 1 ;
           `Continue ) ;
       assert (!cnt = !odd_cnt) ;
+
       Deferred.unit
 
-    (* TODO consider testing get, set and iter from within with_txn *)
-    (* TODO consider testing all "outcomes" within iter's function *)
+    let%test_unit "Ro: Get and Iter operation within with_txn scope" =
+      let hm = Hashtbl.create (module Int) in
+      test_with_dir
+      @@ fun dir ->
+      let (_ : Ro.t * Rw.holder) =
+        init_random_db dir ~f:(fun env db k v_str ->
+            let v = Bigstring.of_string v_str in
+            Hashtbl.add ~key:k ~data:v hm
+            |> function `Duplicate -> () | `Ok -> Rw.set ~env db k v )
+      in
+      let ro_env, ro_db = Ro.create dir in
+      let hm_from_iter = Hashtbl.create (module Int) in
+      let (_ : Bigstring.t) =
+        Ro.with_txn
+          ~f:(fun getter ->
+            getter.iter_ro
+              ~f:(fun key data_from_ro ->
+                let data_from_get =
+                  getter.get ro_db key
+                  |> Option.value_exn
+                       ~message:"cannot find element in get based on iter key"
+                in
+                [%test_eq: Bigstring.t] data_from_ro data_from_get ;
+                Hashtbl.add_exn ~key ~data:data_from_get hm_from_iter ;
+                `Continue )
+              ro_db ;
+            let first_key, _ =
+              Hashtbl.choose hm_from_iter
+              |> Option.value_exn ~message:"empty hash table"
+            in
+            getter.get ro_db first_key
+            |> Option.value_exn
+                 ~message:"cannot fetch first key from hm after iter" )
+          ro_env
+        |> Option.value_exn ~message:"cannot fetch first key from hm after iter"
+      in
+
+      [%test_eq: (int * Bigstring.t) List.t] (Hashtbl.to_alist hm)
+        (Hashtbl.to_alist hm_from_iter) ;
+      Deferred.unit
+
+    let%test_unit "Rw: Get, Set and Iter operation within with_txn scope" =
+      let hm = Hashtbl.create (module Int) in
+      test_with_dir
+      @@ fun dir ->
+      let env, db =
+        init_random_db dir ~f:(fun env db k v_str ->
+            let v = Bigstring.of_string v_str in
+            Hashtbl.add ~key:k ~data:v hm
+            |> function `Duplicate -> () | `Ok -> Rw.set ~env db k v )
+      in
+      Rw.with_txn
+        ~f:(fun getter setter ->
+          let replacement = Bigstring.of_string "A" in
+          setter.iter_rw ~f:(fun _key _data -> `Update_continue replacement) db ;
+
+          getter.iter_ro
+            ~f:(fun _key data ->
+              [%test_eq: Bigstring.t] data replacement ;
+              `Continue )
+            db ;
+
+          let first_key, _ =
+            Hashtbl.choose hm |> Option.value_exn ~message:"empty hash table"
+          in
+
+          let new_replacement = Bigstring.of_string "B" in
+
+          setter.set db first_key new_replacement ;
+
+          let data =
+            getter.get db first_key
+            |> Option.value_exn
+                 ~message:"cannot fetch first key from hm after iter"
+          in
+
+          [%test_eq: Bigstring.t] data new_replacement )
+        env
+      |> Option.value_exn ~message:"cannot fetch first key from hm after iter" ;
+
+      Deferred.unit
+
+    let%test_unit "Ro,Rw: Iter operation outcomes" =
+      test_with_dir
+      @@ fun dir ->
+      let env, db = Rw.create dir in
+
+      List.range 1 7
+      |> List.iter ~f:(fun i ->
+             let data =
+               Char.of_int_exn (64 + i) |> Char.to_string |> Bigstring.of_string
+             in
+             Rw.set ~env db i data ) ;
+
+      (* `Stop and `Continue on read write iter_ro *)
+      let counter = ref 0 in
+      Rw.iter_ro ~env
+        ~f:(fun k _v -> if k = 4 then `Stop else (incr counter ; `Continue))
+        db ;
+      [%test_eq: int] !counter 3
+        ~message:
+          "Unexpected counter for `Stop and `Continue on read write iter_ro" ;
+
+      (* `Stop and `Continue on read only iter *)
+      counter := 0 ;
+      Ro.iter ~env
+        ~f:(fun k _v -> if k = 4 then `Stop else (incr counter ; `Continue))
+        db ;
+      [%test_eq: int] !counter 3
+        ~message:"`Stop and `Continue on read only iter" ;
+
+      (* `Remove_continue and `Update_continue `Remove_stop `Continue on iter *)
+      counter := 0 ;
+      let replacement = Bigstring.of_string "New" in
+      Rw.iter ~env
+        ~f:(fun k _ ->
+          incr counter ;
+          match k with
+          | 1 ->
+              `Remove_continue
+          | 2 ->
+              `Update_continue replacement
+          | 4 ->
+              `Remove_stop
+          | _ ->
+              `Continue )
+        db ;
+
+      [%test_eq: Bigstring.t option] (Rw.get ~env db 1) None ;
+      [%test_eq: Bigstring.t option] (Rw.get ~env db 4) None ;
+      [%test_eq: int] !counter 4
+        ~message:
+          "`Remove_continue and `Update_continue `Remove_stop `Continue on iter" ;
+
+      (* `Update_stop and `Continue on iter *)
+      counter := 0 ;
+      Rw.iter ~env
+        ~f:(fun k _v ->
+          incr counter ;
+          match k with 3 -> `Update_stop replacement | _ -> `Continue )
+        db ;
+
+      [%test_eq: int] !counter 2 ~message:"`Update_stop and `Continue on iter" ;
+      [%test_eq: Bigstring.t option] (Rw.get ~env db 3) (Some replacement) ;
+
+      (* `Stop and `Continue on iter *)
+      let counter = ref 0 in
+      Rw.iter ~env
+        ~f:(fun k _v ->
+          incr counter ;
+          match k with 6 -> `Stop | _ -> `Continue )
+        db ;
+      [%test_eq: int] !counter 4 ~message:"`Stop and `Continue on iter" ;
+
+      Rw.remove ~env db 5 ;
+
+      counter := 0 ;
+      Rw.iter ~env db ~f:(fun k _ ->
+          Printf.printf "%s" (Int.to_string k) ;
+          incr counter ;
+          `Continue ) ;
+      assert (!counter = 3) ;
+
+      Deferred.unit
   end )
