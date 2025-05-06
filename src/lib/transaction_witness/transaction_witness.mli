@@ -81,34 +81,41 @@ module Zkapp_command_segment_witness : sig
     proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 end
 
+module Poly : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type 'transaction t =
+        { transaction : 'transaction
+        ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+        ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+        ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
+        ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; status : Mina_base.Transaction_status.Stable.V2.t
+        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+        }
+      [@@deriving sexp, yojson]
+
+      val to_latest : 'transaction t -> 'transaction t
+
+      val map : f_transaction:('a -> 'b) -> 'a t -> 'b t
+    end
+  end]
+
+  val map : f_transaction:('a -> 'b) -> 'a t -> 'b t
+end
+
 [%%versioned:
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V2 : sig
-    type t =
-      { transaction : Mina_transaction.Transaction.Stable.V2.t
-      ; first_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
-      ; second_pass_ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
-      ; protocol_state_body : Mina_state.Protocol_state.Body.Value.Stable.V2.t
-      ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
-      ; status : Mina_base.Transaction_status.Stable.V2.t
-      ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
-      }
+    type t = Mina_transaction.Transaction.Stable.V2.t Poly.Stable.V1.t
     [@@deriving sexp, yojson]
   end
 end]
 
-type t =
-  { transaction : Mina_transaction.Transaction.t
-  ; first_pass_ledger : Mina_ledger.Sparse_ledger.t
-  ; second_pass_ledger : Mina_ledger.Sparse_ledger.t
-  ; protocol_state_body : Mina_state.Protocol_state.Body.Value.t
-  ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.t
-  ; status : Mina_base.Transaction_status.t
-  ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
-  }
-[@@deriving sexp_of, to_yojson]
+type t = Mina_transaction.Transaction.t Poly.t [@@deriving sexp_of, to_yojson]
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
 

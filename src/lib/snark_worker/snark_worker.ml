@@ -7,8 +7,6 @@ module Rpcs = struct
 end
 
 module Worker = struct
-  module Debug : Intf.Worker = Debug.Impl
-
   module Prod : Intf.Worker = Prod.Impl
 end
 

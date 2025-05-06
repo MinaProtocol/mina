@@ -14,8 +14,6 @@ end
 
 (** module providing workers Implementations *)
 module Worker : sig
-  module Debug : Intf.Worker
-
   module Prod : Intf.Worker
 end
 

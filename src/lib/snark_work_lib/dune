@@ -20,7 +20,7 @@
   signature_lib
   transaction_snark)
  (preprocess
-  (pps ppx_deriving_yojson ppx_jane ppx_version))
+  (pps ppx_deriving_yojson ppx_jane ppx_mina ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Snark work types"))
