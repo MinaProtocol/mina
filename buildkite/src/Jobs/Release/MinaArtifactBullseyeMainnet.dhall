@@ -10,6 +10,8 @@ let PipelineMode = ../../Pipeline/Mode.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -27,6 +29,6 @@ in  Pipeline.build
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
-          , profile = ArtifactPipelines.Profile.Mainnet
+          , profile = Profiles.Type.Mainnet
           }
       )
