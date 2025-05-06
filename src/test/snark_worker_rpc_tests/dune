@@ -1,0 +1,24 @@
+(test
+ (name snark_worker_rpc_tests)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  core
+  ;; mina libraries
+  pipe_lib
+  snark_worker
+  transaction_snark
+  transition_frontier
+  work_selector
+  work_partitioner)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps 
+    ppx_compare
+    ppx_hash
+    ppx_let
+    ppx_mina
+    ppx_sexp_conv)))
+
