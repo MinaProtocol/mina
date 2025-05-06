@@ -161,36 +161,16 @@ module Impl : Intf.Worker = struct
     let open Deferred.Or_error.Let_syntax in
     let (module M) = m in
     match single with
-    | Transition (input, (w : Transaction_witness.Stable.Latest.t)) -> (
-        match w.transaction with
+    | Transition (input, (witness : Transaction_witness.Stable.Latest.t)) -> (
+        match witness.transaction with
         | Command (Zkapp_command zkapp_command) -> (
+            let zkapp_command_cached =
+              Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+                zkapp_command
+            in
             let%bind witnesses_specs_stmts =
-              Or_error.try_with (fun () ->
-                  Transaction_snark.zkapp_command_witnesses_exn
-                    ~constraint_constants:M.constraint_constants
-                    ~global_slot:w.block_global_slot
-                    ~state_body:w.protocol_state_body
-                    ~fee_excess:Currency.Amount.Signed.zero
-                    [ ( `Pending_coinbase_init_stack w.init_stack
-                      , `Pending_coinbase_of_statement
-                          { Transaction_snark.Pending_coinbase_stack_state
-                            .source = input.source.pending_coinbase_stack
-                          ; target = input.target.pending_coinbase_stack
-                          }
-                      , `Sparse_ledger w.first_pass_ledger
-                      , `Sparse_ledger w.second_pass_ledger
-                      , `Connecting_ledger_hash input.connecting_ledger_left
-                      , Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
-                          zkapp_command )
-                    ]
-                  |> List.rev )
-              |> Result.map_error ~f:(fun e ->
-                     Error.createf
-                       !"Failed to generate inputs for zkapp_command : %s: %s"
-                       ( Zkapp_command.Stable.Latest.to_yojson zkapp_command
-                       |> Yojson.Safe.to_string )
-                       (Error.to_string_hum e) )
-              |> Deferred.return
+              Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works
+                ~m ~input ~witness ~zkapp_command:zkapp_command_cached
             in
             match witnesses_specs_stmts with
             | [] ->
@@ -239,7 +219,7 @@ module Impl : Intf.Worker = struct
               Deferred.return
               @@
               (* Validate the received transaction *)
-              match w.transaction with
+              match witness.transaction with
               | Command (Signed_command cmd) -> (
                   match Signed_command.check cmd with
                   | Some cmd ->
@@ -258,13 +238,13 @@ module Impl : Intf.Worker = struct
                 M.of_non_zkapp_command_transaction
                   ~statement:{ input with sok_digest }
                   { Transaction_protocol_state.Poly.transaction = t
-                  ; block_data = w.protocol_state_body
-                  ; global_slot = w.block_global_slot
+                  ; block_data = witness.protocol_state_body
+                  ; global_slot = witness.block_global_slot
                   }
-                  ~init_stack:w.init_stack
+                  ~init_stack:witness.init_stack
                   (unstage
-                     (Mina_ledger.Sparse_ledger.handler w.first_pass_ledger) ) )
-        )
+                     (Mina_ledger.Sparse_ledger.handler
+                        witness.first_pass_ledger ) ) ) )
     | Merge (_, proof1, proof2) ->
         M.merge ~sok_digest proof1 proof2
 
