@@ -379,7 +379,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               (Mina_lib.snark_coordinator_key mina)
               ~f:Fn.const
           in
-          let%map work = Mina_lib.request_work ~capability mina in
+          let%map work = Mina_lib.request_work_t ~capability mina in
           let work_wire : Work.Partitioned.Spec.Stable.Latest.t =
             Work.Partitioned.Spec.read_all_proofs_from_disk work
           in
