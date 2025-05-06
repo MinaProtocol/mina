@@ -150,7 +150,7 @@ module Tick : S = struct
 external fp_linearization : unit -> string * (string * string) array
   = "fp_linearization_strings"
 
-let fp_constant_term, fp_index_terms = fp_linearization ()
+let fp_constant_term, _fp_index_terms = fp_linearization ()
 
 let () = output_string fp_constant_term
 
@@ -162,17 +162,6 @@ let () =
     Column.Table.of_alist_exn
     [
 |ocaml}
-
-let is_first = ref true
-
-let () =
-  Array.iter fp_index_terms ~f:(fun (col, expr) ->
-      if !is_first then is_first := false else output_string " ;\n" ;
-      output_string "(" ;
-      output_string col ;
-      output_string ", lazy (" ;
-      output_string expr ;
-      output_string "))" )
 
 let () = output_string {ocaml|
       ]
@@ -214,7 +203,7 @@ module Tock : S = struct
 external fq_linearization : unit -> string * (string * string) array
   = "fq_linearization_strings"
 
-let fq_constant_term, fq_index_terms = fq_linearization ()
+let fq_constant_term, _fq_index_terms = fq_linearization ()
 
 let () = output_string fq_constant_term
 
@@ -226,17 +215,6 @@ let () =
     Column.Table.of_alist_exn
     [
 |ocaml}
-
-let is_first = ref true
-
-let () =
-  Array.iter fq_index_terms ~f:(fun (col, expr) ->
-      if !is_first then is_first := false else output_string " ;\n" ;
-      output_string "(" ;
-      output_string col ;
-      output_string ", lazy (" ;
-      output_string expr ;
-      output_string "))" )
 
 let () = output_string {ocaml|
       ]
