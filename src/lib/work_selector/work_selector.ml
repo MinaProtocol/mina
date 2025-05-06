@@ -1,5 +1,6 @@
 module Lib = Work_lib.Make (Inputs.Implementation_inputs)
 module State = Lib.State
+module Intf = Intf
 
 type work = Snark_work_lib.Selector.Single.Spec.t
 

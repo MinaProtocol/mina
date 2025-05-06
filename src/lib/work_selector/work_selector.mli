@@ -1,6 +1,8 @@
 module State :
   Intf.State_intf with type transition_frontier := Transition_frontier.t
 
+module Intf : module type of Intf
+
 type work = Snark_work_lib.Selector.Single.Spec.t
 
 type in_memory_work = Snark_work_lib.Selector.Single.Spec.Stable.Latest.t
