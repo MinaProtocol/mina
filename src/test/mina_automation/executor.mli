@@ -20,19 +20,22 @@ end
 (** 
   This module provides a functor [Make_PathFinder] that takes a module of type [AppPaths] 
   and returns a module with the following components:
-
 *)
-module Make_PathFinder (P : AppPaths) : sig
-  module Paths : AppPaths
+
+module type PathFinder = sig
+  module Paths: AppPaths
 
   (** [standalone_path] Path to the executable after installation (outside dune context)
     It returns [Some path] if the path is available, otherwise [None]. *)
-  val standalone_path : string option Deferred.t
+    val standalone_path : string option Deferred.t
 
   (** [standalone_path_exn] Path to the executable after installation (outside dune context)
-    It raises an exception if the path is not available. *)
-  val standalone_path_exn : string Deferred.t
+      It raises an exception if the path is not available. *)
+    val standalone_path_exn : string Deferred.t
+
 end
+
+module Make_PathFinder (P : AppPaths) : PathFinder
 
 module Make (P : AppPaths) : sig
   type t =
@@ -42,24 +45,30 @@ module Make (P : AppPaths) : sig
     | Docker of DockerContext.t (* application ran from docker container *)
     | AutoDetect (* automatically detect the context *)
 
-  module PathFinder : sig
-    module Paths : AppPaths
+  module PathFinder : PathFinder
 
-    val standalone_path : string option Deferred.t
-
-    val standalone_path_exn : string Deferred.t
-  end
-
+  (** [default] is the default context to use when running the application. *)
   val default : t
 
+
+  (** [run t args] runs the application in the given context [t] with the provided arguments [args].
+    It returns a deferred string containing the output of the command. *)
   val run :
        t
     -> args:string list
+    -> ?background:bool
     -> ?env:Core.Unix.env
     -> ?ignore_failure:bool
     -> unit
     -> string Deferred.t
 
-  val run_in_background :
-    t -> args:string list -> ?env:Core.Unix.env -> unit -> Process.t Deferred.t
+  (** [run_in_background t args] runs the application in the given context [t] with the provided arguments [args].
+    It returns a deferred string containing the output of the command. *)
+    val run_in_background :
+    t
+    -> args:string list
+    -> ?env:Core.Unix.env
+    -> unit
+    -> Process.t Deferred.t
+
 end

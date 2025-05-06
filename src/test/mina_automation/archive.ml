@@ -24,10 +24,10 @@ module Config = struct
   let create ~config_file ~postgres_uri ~server_port =
     { config_file; postgres_uri; server_port }
 
-  let of_config_file config_file =
+  let of_config_file config_file ?(postgres_uri="postgres://postgres:postgres@localhost:5432/archive") ?(server_port=3030) =
     { config_file
-    ; postgres_uri = "postgres://postgres:postgres@localhost:5432/archive"
-    ; server_port = 3030
+    ; postgres_uri
+    ; server_port
     }
 end
 
@@ -56,8 +56,7 @@ module Process = struct
     @return A deferred result indicating the success or failure of the operation.
   *)
   let force_kill t =
-    Process.send_signal t.process Core.Signal.kill ;
-    Deferred.map (Process.wait t.process) ~f:Or_error.return
+    Utils.force_kill t.process
 
   (** [start_logging t] starts logging the stdout of the given process [t].
     It creates a logger and asynchronously iterates over the stdout pipe of the process,

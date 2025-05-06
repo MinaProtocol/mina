@@ -130,8 +130,8 @@ module Process = struct
     @return A deferred result indicating the success or failure of the operation.
   *)
   let force_kill t =
-    Process.send_signal t.process Core.Signal.kill ;
-    Deferred.map (Process.wait t.process) ~f:Or_error.return
+    Utils.force_kill t.process
+  
 end
 
 let archive_blocks t ~archive_address ~(format : Archive_blocks.format) blocks =
