@@ -31,19 +31,39 @@ let submit_graphql input graphql_endpoint =
 module Work = Snark_work_lib
 
 let perform (state : Prod.Worker_state.t) ~fee ~public_key instances =
-  let spec : Work.Selector.Spec.Stable.Latest.t =
+  let spec : Work.Partitioned.Spec.Stable.Latest.t =
     { instances; fee = Currency.Fee.zero }
+    |> Work.Partitioned.Spec.Poly.of_selector_spec
+         ~issued_since_unix_epoch:Time.(now () |> to_span_since_epoch)
   in
   let open Deferred.Or_error.Let_syntax in
   let sok_digest = Sok_message.(create ~fee ~prover:public_key |> digest) in
-  let%map result = Prod.perform ~state ~sok_digest ~spec in
-  let proofs = One_or_two.map ~f:Tuple3.get1 result in
-  { Work.Work.Result_without_metrics.proofs
-  ; statements =
-      One_or_two.map spec.instances ~f:Snark_work_lib.Work.Single.Spec.statement
-  ; prover = public_key
-  ; fee
-  }
+  let%bind result = Prod.perform ~state ~sok_digest ~spec in
+  match result with
+  | Old { instances; _ } ->
+      let statements =
+        instances
+        |> One_or_two.map ~f:(fun (spec, _) ->
+               Work.Work.Single.Spec.statement spec )
+      in
+      let proofs =
+        instances
+        |> One_or_two.map
+             ~f:(fun (_, { Work.Partitioned.Proof_with_metric.Poly.proof; _ })
+                -> proof )
+      in
+      Deferred.Or_error.return
+        { Work.Work.Result_without_metrics.proofs
+        ; statements
+        ; prover = public_key
+        ; fee
+        }
+  | _ ->
+      Deferred.Or_error.error_string
+        "This is a bug, submitted one work with old selector spec into Snark \
+         worker, got non-old result"
+
+(* Or_error.error_string "wow" *)
 
 let command =
   let open Command.Let_syntax in
