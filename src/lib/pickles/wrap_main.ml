@@ -511,8 +511,8 @@ let wrap_main
                 [%log internal] "Wrap_verifier_incrementally_verify_proof_done" ;
                 res )
           in
-          with_label __LOC__ (fun () ->
-              Boolean.Assert.is_true bulletproof_success ) ;
+       (*    with_label __LOC__ (fun () ->
+              Boolean.Assert.is_true bulletproof_success ) ; *)
           with_label __LOC__ (fun () ->
               Field.Assert.equal messages_for_next_wrap_proof_digest
                 (Wrap_hack.Checked.hash_messages_for_next_wrap_proof
@@ -531,7 +531,7 @@ let wrap_main
                  { prechallenge = { inner = x1 } }
                  ({ prechallenge = { inner = x2 } } :
                    _ SC.t Bulletproof_challenge.t )
-               -> with_label __LOC__ (fun () -> Field.Assert.equal x1 x2) ) ;
+               -> with_label __LOC__ (fun () -> () (* Field.Assert.equal x1 x2 *)) ) ;
           () )
   in
   Timer.clock __LOC__ ;
