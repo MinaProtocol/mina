@@ -144,7 +144,7 @@ module type Digest_intf = sig
 
     val create :
          ?chain:Mina_signature_kind.t
-      -> (Account_update.Body.t, _) Account_update.Poly.t
+      -> (Account_update.Body.t, _, _) Account_update.Poly.t
       -> t
 
     val create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
@@ -259,7 +259,7 @@ module Make_digest_str
 
     let create :
            ?chain:Mina_signature_kind.t
-        -> (Account_update.Body.t, _) Account_update.Poly.t
+        -> (Account_update.Body.t, _, _) Account_update.Poly.t
         -> t =
       Account_update.digest
 
@@ -469,7 +469,8 @@ let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
   let tree : _ Tree.t = { account_update; account_update_digest; calls } in
   cons_tree tree xs
 
-let cons ?calls (account_update : Account_update.t) xs =
+let cons (type aux) ?calls (account_update : (_, _, aux) Account_update.Poly.t)
+    xs =
   cons_aux ~digest_account_update:Digest.Account_update.create ?calls
     account_update xs
 
@@ -519,15 +520,15 @@ let forget_hashes =
   in
   impl
 
+let forget_hashes_and_proofs_and_aux p =
+  forget_hashes @@ map ~f:Account_update.forget_proofs_and_aux p
+
 module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('proof, 'data) t =
-        ( ( Account_update.Body.Stable.V1.t
-          , ('proof, Signature.Stable.V1.t) Control.Poly.Stable.V1.t )
-          Account_update.Poly.Stable.V1.t
-          * 'data
+      type ('update, 'data) t =
+        ( 'update * 'data
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t
@@ -593,13 +594,10 @@ module With_hashes = struct
   end]
 
   let read_all_proofs_from_disk : t -> Stable.Latest.t =
-    map ~f:(Account_update.map_proofs ~f:Proof_cache_tag.read_proof_from_disk)
+    map ~f:Account_update.read_all_proofs_from_disk
 
   let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-    map
-      ~f:
-        (Account_update.map_proofs
-           ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+    map ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
 
   let empty = Digest.Forest.empty
 
