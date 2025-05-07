@@ -52,6 +52,49 @@ module Make (Field : Kimchi_pasta_snarky_backend.Field.S_with_version) = struct
     | Error msg ->
         Alcotest.fail (Printf.sprintf "Failed to parse hex JSON: %s" msg)
 
+  let test_field_of_yojson_hex_uppercase () =
+    let t = Field.random () in
+    let hex_str =
+      match Field.to_yojson t with
+      | `String s ->
+          s
+      | _ ->
+          failwith "Expected string from to_yojson"
+    in
+    let uppercase_hex_str = String.uppercase hex_str in
+    let uppercase_hex_json = `String uppercase_hex_str in
+    match Field.of_yojson uppercase_hex_json with
+    | Ok t' ->
+        Alcotest.(check bool)
+          "of_yojson works with uppercase 0X prefix" true (Field.equal t t')
+    | Error msg ->
+        Alcotest.fail
+          (Printf.sprintf "Failed to parse uppercase hex JSON: %s" msg)
+
+  let test_field_of_yojson_hex_uppercase_lowercase_gives_same_value () =
+    let t = Field.random () in
+    let hex_str =
+      match Field.to_yojson t with
+      | `String s ->
+          s
+      | _ ->
+          failwith "Expected string from to_yojson"
+    in
+    let uppercase_hex_str = String.uppercase hex_str in
+    let lowercase_hex_str = String.lowercase hex_str in
+    let uppercase_hex_json = `String uppercase_hex_str in
+    let lowercase_hex_json = `String lowercase_hex_str in
+    match
+      (Field.of_yojson uppercase_hex_json, Field.of_yojson lowercase_hex_json)
+    with
+    | Ok t1, Ok t2 ->
+        Alcotest.(check bool)
+          "of_yojson works with uppercase and lowercase hex strings" true
+          (Field.equal t1 t2)
+    | _, _ ->
+        Alcotest.fail
+          "Failed to parse uppercase or lowercase hex JSON: both should succeed"
+
   let test_field_of_yojson_decimal () =
     let t = Field.random () in
     let bigint = Field.to_bigint t in
@@ -217,6 +260,10 @@ let () =
         ; test_case "of_bits to_bits" `Quick Pallas.test_field_of_bits_to_bits
         ; test_case "to_bits of_bits" `Quick Pallas.test_field_to_bits_of_bits
         ; test_case "of_yojson hex" `Quick Pallas.test_field_of_yojson_hex
+        ; test_case "of_yojson hex uppercase" `Quick
+            Pallas.test_field_of_yojson_hex_uppercase
+        ; test_case "of_yojson hex uppercase lowercase gives same value" `Quick
+            Pallas.test_field_of_yojson_hex_uppercase_lowercase_gives_same_value
         ; test_case "of_yojson decimal" `Quick
             Pallas.test_field_of_yojson_decimal
         ; test_case "of_yojson invalid type" `Quick
@@ -258,6 +305,10 @@ let () =
         ; test_case "of_bits to_bits" `Quick Vesta.test_field_of_bits_to_bits
         ; test_case "to_bits of_bits" `Quick Vesta.test_field_to_bits_of_bits
         ; test_case "of_yojson hex" `Quick Vesta.test_field_of_yojson_hex
+        ; test_case "of_yojson hex uppercase" `Quick
+            Vesta.test_field_of_yojson_hex_uppercase
+        ; test_case "of_yojson hex uppercase lowercase gives same value" `Quick
+            Vesta.test_field_of_yojson_hex_uppercase_lowercase_gives_same_value
         ; test_case "of_yojson decimal" `Quick
             Vesta.test_field_of_yojson_decimal
         ; test_case "of_yojson invalid type" `Quick
