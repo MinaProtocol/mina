@@ -130,7 +130,9 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
        variable. *)
     Option.value_map transition_writer_ref
       ~default:(ref transition_frontier_controller_writer) ~f:(fun r ->
+        let old_pipe = !r in
         r := transition_frontier_controller_writer ;
+        Strict_pipe.Writer.kill old_pipe ;
         r )
   in
   let producer_transition_reader, producer_transition_writer =
@@ -186,7 +188,9 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
        [transition_writer_ref]. *)
     Option.value_map transition_writer_ref
       ~default:(ref bootstrap_controller_writer) ~f:(fun r ->
+        let old_pipe = !r in
         r := bootstrap_controller_writer ;
+        Strict_pipe.Writer.kill old_pipe ;
         r )
   in
   producer_transition_writer_ref := None ;
@@ -211,7 +215,6 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
        ~transition_reader:bootstrap_controller_reader ~persistent_frontier
        ~persistent_root ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
-      Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
@@ -712,7 +715,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                           ~context:(module Context)
                           frontier header_with_hash
                       then (
-                        Strict_pipe.Writer.kill !transition_writer_ref ;
                         Option.iter ~f:Strict_pipe.Writer.kill
                           !producer_transition_writer_ref ;
                         let initial_root_transition =
