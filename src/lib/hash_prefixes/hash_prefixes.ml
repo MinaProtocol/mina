@@ -39,7 +39,7 @@ let zkapp_body_mainnet = create "MainnetZkappBody"
 
 let zkapp_body_testnet = create "TestnetZkappBody"
 
-let zkapp_body ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
+let zkapp_body ~(signature_kind : Mina_signature_kind.t) =
   match signature_kind with
   | Mainnet ->
       zkapp_body_mainnet
