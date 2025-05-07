@@ -19,7 +19,7 @@ let test_hex_conversion_failwith_raised () =
   in
   let h = Hex.encode bytes in
   try
-    ignore @@ Bigint.of_hex_string h;
+    ignore @@ Bigint.of_hex_string h ;
     Alcotest.fail "Expected failure when not starting with 0x"
   with
   | Failure msg ->
@@ -33,8 +33,8 @@ let () =
   let open Alcotest in
   run "Bigint256"
     [ ( "hex conversion"
-      , [ test_case "hex conversion roundtrip" `Quick test_hex_conversion;
-          test_case "hex conversion failwith raised" `Quick
+      , [ test_case "hex conversion roundtrip" `Quick test_hex_conversion
+        ; test_case "hex conversion failwith raised" `Quick
             test_hex_conversion_failwith_raised
         ] )
     ]
