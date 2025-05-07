@@ -392,6 +392,15 @@ module Ledger_inner = struct
       in
       raise exn
 
+  let with_converting_ledger ~depth ~f =
+    let cfg = ConvertingLedger { primary_directory_name = None; converting_directory_name = None }
+    in
+    let ledger = create_converting ~cfg ~depth () in
+    try
+      let result = f ledger in
+      close (fst ledger) ; result
+    with exn -> close (fst ledger) ; raise exn
+
   let packed t = Any_ledger.cast (module Mask.Attached) t
 
   let register_mask t mask =
@@ -859,3 +868,43 @@ let%test_unit "zkapp_command application on masked ledger" =
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
           (*Parent updates reflected in child masks*)
           assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
+
+let%test_unit "user_command application on converting ledger" =
+  let open Mina_transaction_logic.For_tests in
+  let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
+      account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+    }
+  in
+  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      let cmds = List.map specs ~f:command_send in
+      L.with_converting_ledger ~depth ~f:(fun (l,cl_opt) ->
+          let cl = Option.value_exn cl_opt in
+          Init_ledger.init (module L) init_ledger l ;
+          let init_merkle_root = L.merkle_root l in
+          let init_cl_merkle_root = Unstable_db.merkle_root cl in
+          let () =
+            iter_err cmds
+              ~f:
+                (apply_user_command_unchecked ~constraint_constants
+                   ~txn_global_slot l )
+            |> Or_error.ok_exn
+          in
+          (* Assert that the ledger and the converting ledger are non-empty *)
+          assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l)));
+          L.commit l;
+          assert (not (Ledger_hash.equal init_cl_merkle_root (Unstable_db.merkle_root cl)));
+          (* Assert that the converted ledger has the same accounts as the first one, up to the new field*)
+          L.iteri l ~f:(fun index account ->
+              let account_converted = Unstable_db.get_at_index_exn cl index in
+              assert Mina_base.Account.Key.(equal account.public_key account_converted.public_key) ;
+              assert Mina_base.Account.Nonce.(equal account_converted.nonce account_converted.unstable_field)
+          );
+          (* Assert that the converted ledger doesn't have anything "extra" compared to the primary ledger *)
+          Unstable_db.iteri cl ~f:(fun index account_converted ->
+              let account = L.get_at_index_exn l index in
+              assert Mina_base.Account.Key.(equal account.public_key account_converted.public_key) ;
+          )
+      )
+    )
