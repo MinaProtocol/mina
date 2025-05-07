@@ -11,6 +11,8 @@
     ];
   };
 
+  inputs.self.submodules = true;
+
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11-small";
 
