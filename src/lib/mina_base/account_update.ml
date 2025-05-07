@@ -1490,9 +1490,12 @@ module Body = struct
         ]
 
     let digest ?signature_kind (t : t) =
+      let signature_kind =
+        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+      in
       Random_oracle.Checked.(
         hash
-          ~init:(Hash_prefix.zkapp_body ?signature_kind)
+          ~init:(Hash_prefix.zkapp_body ~signature_kind)
           (pack_input (to_input t)))
   end
 
@@ -1565,9 +1568,12 @@ module Body = struct
       ]
 
   let digest ?signature_kind (t : t) =
+    let signature_kind =
+      Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+    in
     Random_oracle.(
       hash
-        ~init:(Hash_prefix.zkapp_body ?signature_kind)
+        ~init:(Hash_prefix.zkapp_body ~signature_kind)
         (pack_input (to_input t)))
 
   module Digested = struct
