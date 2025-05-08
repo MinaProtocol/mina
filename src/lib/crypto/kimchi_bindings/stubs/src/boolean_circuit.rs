@@ -112,8 +112,11 @@ where
     fr_sponge.absorb(&fq_sponge.clone().digest());
 
     let eval_p = p.evaluate(&evaluation_point);
+    let eval_quotient = quotient_poly.evaluate(&evaluation_point);
 
-    fr_sponge.absorb(&eval_p);
+    for eval in [eval_p, eval_quotient].into_iter() {
+        fr_sponge.absorb(&eval);
+    }
 
     let (_, endo_r) = Vesta::endos();
     // Generate scalars used as combiners for sub-statements within our IPA opening proof.
@@ -129,7 +132,10 @@ where
             chunks: vec![Fp::zero(); n_chunks],
         };
 
-        vec![(coefficients_form(&p), non_hiding(1))]
+        vec![
+            (coefficients_form(&p), non_hiding(1)),
+            (coefficients_form(&quotient_poly), non_hiding(1)),
+        ]
     };
 
     let opening_proof = srs.open(
@@ -150,7 +156,7 @@ where
     }
 }
 
-pub fn verify<RNG>(
+fn verify<RNG>(
     domain: EvaluationDomains<Fp>,
     srs: &SRS<Vesta>,
     group_map: &<Vesta as CommitmentCurve>::Map,
@@ -221,4 +227,43 @@ where
         }],
         rng,
     )
+}
+
+mod tests {
+
+    use super::*;
+    use ark_ff::One;
+    use kimchi::groupmap::GroupMap;
+    use once_cell::sync::Lazy;
+    use rand::thread_rng;
+    use rand::Rng;
+
+    const SRS_SIZE: usize = 1 << 16;
+
+    static GROUP_MAP: Lazy<<Vesta as CommitmentCurve>::Map> =
+        Lazy::new(<Vesta as CommitmentCurve>::Map::setup);
+
+    static DOMAIN: Lazy<EvaluationDomains<Fp>> =
+        Lazy::new(|| EvaluationDomains::<Fp>::create(SRS_SIZE).unwrap());
+
+    static SRS: Lazy<SRS<Vesta>> = Lazy::new(|| SRS::create(SRS_SIZE));
+
+    #[test]
+    fn test_prove_verify() {
+        let mut rng = thread_rng();
+        let boolean_circuit = {
+            let mut vals = Vec::with_capacity(SRS_SIZE);
+            for _ in 0..SRS_SIZE {
+                let b: bool = rng.gen();
+                let v = if b { Fp::one() } else { Fp::zero() };
+                vals.push(v);
+            }
+            BooleanCircuit { vals }
+        };
+        let proof = prove(*DOMAIN, &SRS, &GROUP_MAP, &mut rng, &boolean_circuit);
+        assert!(
+            verify(*DOMAIN, &SRS, &GROUP_MAP, &mut rng, &proof),
+            "Proof verification failed"
+        );
+    }
 }
