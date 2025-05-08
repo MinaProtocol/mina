@@ -56,7 +56,7 @@ let ReleaseSpec =
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "\\\${MINA_DEB_RELEASE}"
           , deb_version = "\\\${MINA_DEB_VERSION}"
-          , deb_profile = Profiles.Type.Standard
+          , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
@@ -70,9 +70,8 @@ let ReleaseSpec =
 let stepKey =
           \(spec : ReleaseSpec.Type)
       ->  "${Artifacts.lowerName
-               spec.service}${Profiles.toLabelSegment
-                                spec.deb_profile}${BuildFlags.toLabelSegment
-                                                     spec.build_flags}${spec.step_key_suffix}"
+               spec.service}${BuildFlags.toLabelSegment
+                                spec.build_flags}${spec.step_key_suffix}"
 
 let stepLabel =
           \(spec : ReleaseSpec.Type)

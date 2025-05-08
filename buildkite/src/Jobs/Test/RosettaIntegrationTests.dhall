@@ -70,7 +70,7 @@ in  Pipeline.build
                 Dockers.dependsOn
                   Dockers.Type.Bullseye
                   network
-                  Profiles.Type.Standard
+                  Profiles.Type.Devnet
                   Artifacts.Type.Rosetta
             }
         ]
