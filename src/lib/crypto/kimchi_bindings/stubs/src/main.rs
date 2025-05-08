@@ -43,6 +43,8 @@ use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_
 use std::fs::File;
 use std::io::Write;
 
+mod boolean_circuit;
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 

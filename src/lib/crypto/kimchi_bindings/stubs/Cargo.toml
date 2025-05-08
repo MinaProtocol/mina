@@ -8,12 +8,25 @@ license = "MIT/Apache-2.0"
 edition = "2021"
 
 [dependencies]
+ark-ff = { version = "0.4.2", features = ["parallel", "asm"] }
+ark-poly = { version = "0.4.2", features = ["parallel"] }
 ocaml = { version = "0.22.2", features = ["no-caml-startup"] }
 ocaml-gen = "1.0.0"
+rand = { version = "=0.8.5", features = ["std_rng"] }
 
 # proof-systems
 kimchi = { path = "../../proof-systems/kimchi", features = ["ocaml_types"] }
+mina-curves = { path = "../../proof-systems/curves" }
 kimchi-stubs = { path = "../../proof-systems/kimchi-stubs" }
+poly-commitment = { path = "../../proof-systems/poly-commitment" }
 
 [[bin]]
 name = "wires_15_stubs"
+
+ocaml_types = [
+  "ocaml",
+  "ocaml-gen",
+  "poly-commitment/ocaml_types",
+  "mina-poseidon/ocaml_types",
+  "internal-tracing/ocaml_types",
+]
