@@ -30,19 +30,19 @@
    h_list.ppx))
  (libraries
   ;; opam libraries
-  sexplib0
+  base.caml
   bin_prot.shape
   core_kernel
-  base.caml
+  sexplib0
   ;; local libraries
-  mina_wire_types
+  kimchi_backend
+  kimchi_backend_common
   kimchi_pasta
   kimchi_pasta.basic
-  snarky.backendless
-  pickles_types
-  pickles.limb_vector
-  kimchi_backend
-  pickles_base
+  mina_wire_types
   pickles.backend
-  kimchi_backend_common
-  ppx_version.runtime))
+  pickles.limb_vector
+  pickles_base
+  pickles_types
+  ppx_version.runtime
+  snarky.backendless))

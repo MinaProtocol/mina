@@ -3,70 +3,70 @@
   (flags -verbose -show-counts))
  (name pickles)
  (public_name pickles)
- (modules_without_implementation full_signature type intf pickles_intf)
+ (modules_without_implementation full_signature intf pickles_intf type)
  (flags -open Core_kernel)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps
-   ppx_version
-   ppx_mina
-   ppx_jane
+   h_list.ppx
    ppx_compare
    ppx_deriving_yojson
-   h_list.ppx))
+   ppx_jane
+   ppx_mina
+   ppx_version))
  (libraries
   ;; opam libraries
-  stdio
-  integers
-  result
-  base.caml
-  bignum.bigint
-  core_kernel
-  base64
-  digestif
-  ppx_inline_test.config
-  sexplib0
-  base
   async_kernel
+  base
+  base.caml
+  base64
+  bignum.bigint
   bin_prot.shape
+  core_kernel
+  digestif
+  integers
+  ppx_inline_test.config
+  result
+  sexplib0
+  stdio
   ;; local libraries
-  mina_wire_types
+  base58_check
+  bitstring_lib
+  bounded_types
+  codable
+  error_json
+  group_map
+  key_cache
+  kimchi_backend
+  kimchi_backend_common
   kimchi_bindings
-  kimchi_types
-  pasta_bindings
   kimchi_pasta
   kimchi_pasta.basic
   kimchi_pasta.constraint_system
   kimchi_pasta_snarky_backend
-  bitstring_lib
-  snarky.intf
-  pickles.backend
-  pickles_types
-  snarky.backendless
-  snarky_group_map
-  sponge
-  pickles.pseudo
-  pickles.limb_vector
-  pickles_base
-  plonkish_prelude
-  kimchi_backend
-  base58_check
-  codable
-  random_oracle_input
-  pickles.composition_types
-  pickles.plonk_checks
-  pickles_base.one_hot_vector
-  snarky_log
-  group_map
-  snarky_curve
-  key_cache
-  snark_keys_header
-  tuple_lib
-  promise
-  kimchi_backend_common
+  kimchi_types
   logger
   logger.context_logger
+  mina_wire_types
+  pasta_bindings
+  pickles.backend
+  pickles.composition_types
+  pickles.limb_vector
+  pickles.kimchi_checks
+  pickles.pseudo
+  pickles_base
+  pickles_base.one_hot_vector
+  pickles_types
+  plonkish_prelude
   ppx_version.runtime
-  error_json
-  bounded_types))
+  promise
+  random_oracle_input
+  snarky.backendless
+  snarky.intf
+  snarky_curve
+  snarky_group_map
+  snarky_log
+  snark_keys_header
+  sponge
+  tuple_lib))

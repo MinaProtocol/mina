@@ -8,9 +8,9 @@
  (link_flags (-linkall))
  (libraries
   ;; opam libraries
+  base
   core_kernel
   stdio
-  base
   ;; local libraries
   kimchi_bindings
   kimchi_types

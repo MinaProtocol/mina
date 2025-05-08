@@ -19,16 +19,14 @@ module Make
 struct
   module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
-  let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
-
   module E = struct
     type t = Tock.Field.t array Double.t Plonk_types.Evals.t * Tock.Field.t
   end
 
-  module Plonk_checks = struct
-    include Plonk_checks
-    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
-    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
+  module Kimchi_checks = struct
+    include Kimchi_checks
+    module Type1 = Kimchi_checks.Make (Shifted_value.Type1) (Scalars.Tick)
+    module Type2 = Kimchi_checks.Make (Shifted_value.Type2) (Scalars.Tock)
   end
 
   (* The prover corresponding to the given inductive rule. *)
@@ -166,7 +164,7 @@ struct
             zeta * domain_generator ~log2_size:(Domain.log2_size domain))
         in
         let combined_evals =
-          Plonk_checks.evals_of_split_evals
+          Kimchi_checks.evals_of_split_evals
             (module Tick.Field)
             t.prev_evals.evals.evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta
             ~zetaw
@@ -203,7 +201,7 @@ struct
 
             let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
           end in
-          Plonk_checks.scalars_env
+          Kimchi_checks.scalars_env
             (module Env_bool)
             (module Env_field)
             ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows:data.zk_rows
@@ -212,7 +210,7 @@ struct
               Kimchi_pasta.Pasta.Bigint256.of_hex_string s
               |> Kimchi_pasta.Pasta.Fp.of_bigint )
             ~domain:
-              (Plonk_checks.domain
+              (Kimchi_checks.domain
                  (module Tick.Field)
                  domain ~shifts:Common.tick_shifts
                  ~domain_generator:Backend.Tick.Field.domain_generator )
@@ -222,7 +220,7 @@ struct
             let module Field = struct
               include Tick.Field
             end in
-            Plonk_checks.Type1.derive_plonk
+            Kimchi_checks.Type1.derive_plonk
               (module Field)
               ~env ~shift:Shifts.tick1 plonk_minimal combined_evals )
       in
@@ -411,14 +409,14 @@ struct
         }
       in
       let tock_domain =
-        Plonk_checks.domain
+        Kimchi_checks.domain
           (module Tock.Field)
           (Pow_2_roots_of_unity dlog_vk.domain.log_size_of_group)
           ~shifts:Common.tock_shifts
           ~domain_generator:Backend.Tock.Field.domain_generator
       in
       let tock_combined_evals =
-        Plonk_checks.evals_of_split_evals
+        Kimchi_checks.evals_of_split_evals
           (module Tock.Field)
           proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
           ~zeta:As_field.zeta ~zetaw
@@ -452,11 +450,11 @@ struct
 
           let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
         end in
-        Plonk_checks.scalars_env
+        Kimchi_checks.scalars_env
           (module Env_bool)
           (module Env_field)
           ~domain:tock_domain ~srs_length_log2:Common.Max_degree.wrap_log2
-          ~zk_rows:Plonk_checks.zk_rows_by_default
+          ~zk_rows:Kimchi_checks.zk_rows_by_default
           ~field_of_hex:(fun s ->
             Kimchi_pasta.Pasta.Bigint256.of_hex_string s
             |> Kimchi_pasta.Pasta.Fq.of_bigint )
@@ -487,7 +485,7 @@ struct
             v
         in
         let ft_eval0 =
-          Plonk_checks.Type2.ft_eval0
+          Kimchi_checks.Type2.ft_eval0
             (module Tock.Field)
             ~domain:tock_domain ~env:tock_env tock_plonk_minimal
             tock_combined_evals [| x_hat_1 |]
@@ -502,7 +500,7 @@ struct
           include Tock.Field
         end in
         (* Wrap proof, no features *)
-        Plonk_checks.Type2.derive_plonk
+        Kimchi_checks.Type2.derive_plonk
           (module Field)
           ~env:tock_env ~shift:Shifts.tock2 tock_plonk_minimal
           tock_combined_evals

@@ -10,8 +10,8 @@ let test_bit x i = B.(shift_right x i land one = one)
 (* TODO: I think there are other forbidden values as well. *)
 
 (** returns all the values that can fit in [~size_in_bits] bits and that are
- * either congruent with -2^[~size_in_bits] mod [~modulus] 
- * or congruent with -2^[~size_in_bits] - 1 mod [~modulus] 
+ * either congruent with -2^[~size_in_bits] mod [~modulus]
+ * or congruent with -2^[~size_in_bits] - 1 mod [~modulus]
  *)
 let forbidden_shifted_values ~modulus:r ~size_in_bits =
   let two_to_n = B.(pow (of_int 2) (of_int size_in_bits)) in
@@ -104,9 +104,6 @@ module Step = struct
     let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
-
-    let _to_bits (x, b) =
-      Field.unpack x ~length:(Field.size_in_bits - 1) @ [ b ]
   end
 
   module Digest = Digest.Make (Impl)
@@ -227,8 +224,6 @@ module Wrap = struct
     let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
-
-    let _to_bits x = Field.unpack x ~length:Field.size_in_bits
   end
 
   let input

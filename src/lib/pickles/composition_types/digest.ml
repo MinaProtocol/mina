@@ -21,45 +21,43 @@ module Constant = struct
   (* Force the typechecker to verify that these types are equal. *)
   let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
-  open Backend
+  let to_tick_field x = Backend.Tick.Field.of_bits (to_bits x)
 
-  let to_tick_field x = Tick.Field.of_bits (to_bits x)
+  let to_tock_field x = Backend.Tock.Field.of_bits (to_bits x)
 
-  let to_tock_field x = Tock.Field.of_bits (to_bits x)
-
-  let of_tick_field x = of_bits (Tick.Field.to_bits x)
+  let of_tick_field x = of_bits (Backend.Tick.Field.to_bits x)
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
-  open Impl
+  type t = Impl.Field.t
 
-  type t = Field.t
-
-  let to_bits = Field.choose_preimage_var ~length:Field.size_in_bits
+  let to_bits = Impl.Field.choose_preimage_var ~length:Impl.Field.size_in_bits
 
   module Unsafe = struct
     let to_bits_unboolean x =
-      with_label __LOC__ (fun () ->
-          let length = Field.size_in_bits in
+      Impl.with_label __LOC__ (fun () ->
+          let length = Impl.Field.size_in_bits in
           let res =
-            exists
-              (Typ.list Boolean.typ_unchecked ~length)
-              ~compute:As_prover.(fun () -> Field.Constant.unpack (read_var x))
+            Impl.exists
+              (Impl.Typ.list Impl.Boolean.typ_unchecked ~length)
+              ~compute:
+                Impl.As_prover.(
+                  fun () -> Impl.Field.Constant.unpack (read_var x))
           in
-          Field.Assert.equal x (Field.project res) ;
+          Impl.Field.Assert.equal x (Impl.Field.project res) ;
           res )
   end
 
-  let () = assert (Field.size_in_bits < 64 * Nat.to_int Limbs.n)
+  let () = assert (Impl.Field.size_in_bits < 64 * Nat.to_int Limbs.n)
 
   module Constant = struct
     include Constant
 
-    let to_bits x = List.take (to_bits x) Field.size_in_bits
+    let to_bits x = List.take (to_bits x) Impl.Field.size_in_bits
   end
 
   let typ =
-    Typ.transport Field.typ
-      ~there:(Fn.compose Field.Constant.project Constant.to_bits)
-      ~back:(Fn.compose Constant.of_bits Field.Constant.unpack)
+    Impl.Typ.transport Impl.Field.typ
+      ~there:(Fn.compose Impl.Field.Constant.project Constant.to_bits)
+      ~back:(Fn.compose Constant.of_bits Impl.Field.Constant.unpack)
 end

@@ -42,13 +42,13 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) : sig
       -> domain_generator:(log2_size:int -> Impl.Field.t)
       -> Impl.Field.t
 
-    type nonrec 'n t = (Plonk_checks.Domain.t, 'n) t
+    type nonrec 'n t = (Kimchi_checks.Domain.t, 'n) t
 
     val to_domain :
          shifts:(log2_size:int -> Impl.Field.Constant.t array)
       -> domain_generator:(log2_size:int -> Impl.Field.t)
       -> 'n t
-      -> Impl.Field.t Plonk_checks.plonk_domain
+      -> Impl.Field.t Kimchi_checks.plonk_domain
   end
 end
 

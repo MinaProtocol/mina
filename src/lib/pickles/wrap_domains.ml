@@ -30,7 +30,7 @@ struct
         (Promise.return
            (Vector.init num_choices ~f:(fun _ ->
                 let num_chunks =
-                  (* TODO *) Plonk_checks.num_chunks_by_default
+                  (* TODO *) Kimchi_checks.num_chunks_by_default
                 in
                 let g =
                   Array.init num_chunks ~f:(fun _ ->

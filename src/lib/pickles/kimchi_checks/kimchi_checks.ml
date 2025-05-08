@@ -410,9 +410,7 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
          ; joint_combiner
          ; feature_flags = actual_feature_flags
          } :
-          _ Minimal.t )
-        (e : (_ * _, _) Plonk_types.Evals.In_circuit.t)
-          (*((e0, e1) : _ Plonk_types.Evals.In_circuit.t Double.t) *) ->
+          _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) ->
       let open Plonk_types.Evals.In_circuit in
       let e1 field = snd (field e) in
       let zkp = env.zk_polynomial in
@@ -440,12 +438,11 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
         }
 
   (** Check that computed proof scalars match the expected ones,
-    using the native field.
-    Note that the expected scalars are used to check
-    the linearization in a proof over the other field
-    (where those checks are more efficient),
-    but we deferred the arithmetic checks until here
-    so that we have the efficiency of the native field.
+      using the native field.
+      Note that the expected scalars are used to check the linearization in a
+      proof over the other field (where those checks are more efficient),
+      but we deferred the arithmetic checks until here so that we have the
+      efficiency of the native field.
   *)
   let checked (type field field_var)
       (module Impl : Snarky_backendless.Snark_intf.Run

@@ -776,23 +776,23 @@ struct
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
-  module Plonk_checks = struct
-    include Plonk_checks
+  module Kimchi_checks = struct
+    include Kimchi_checks
 
     include
-      Plonk_checks.Make
+      Kimchi_checks.Make
         (Shifted_value.Type1)
         (struct
-          let constant_term = Plonk_checks.Scalars.Tick.constant_term
+          let constant_term = Kimchi_checks.Scalars.Tick.constant_term
 
-          let index_terms = Plonk_checks.Scalars.Tick.index_terms
+          let index_terms = Kimchi_checks.Scalars.Tick.index_terms
         end)
   end
 
   let domain_for_compiled (type branches)
       (domains : (Domains.t, branches) Vector.t)
       (branch_data : Branch_data.Checked.Step.t) :
-      Field.t Plonk_checks.plonk_domain =
+      Field.t Kimchi_checks.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
       |> List.dedup_and_sort ~compare:(fun d1 d2 ->
@@ -866,7 +866,7 @@ struct
           domain_for_compiled ds branch_data
       | `Side_loaded ->
           ( side_loaded_domain ~log2_size:branch_data.domain_log2
-            :> _ Plonk_checks.plonk_domain )
+            :> _ Kimchi_checks.plonk_domain )
     in
     let zetaw = Field.mul domain#generator plonk.zeta in
     let sg_olds =
@@ -988,7 +988,7 @@ struct
               | None ->
                   if_ b ~then_:(then_ ()) ~else_:(else_ ())
           end in
-          Plonk_checks.scalars_env
+          Kimchi_checks.scalars_env
             (module Env_bool)
             (module Env_field)
             ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows
@@ -1006,7 +1006,7 @@ struct
       in
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
-            Plonk_checks.ft_eval0
+            Kimchi_checks.ft_eval0
               (module Field)
               ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in
@@ -1071,7 +1071,7 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          Plonk_checks.checked
+          Kimchi_checks.checked
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in
@@ -1157,11 +1157,6 @@ struct
               Sponge.squeeze_field sponge
           | `Opt sponge ->
               Opt_sponge.squeeze sponge ) )
-
-  let _accumulation_verifier
-      (_accumulator_verification_key : _ Types_map.For_step.t)
-      _prev_accumulators _proof _new_accumulator : Boolean.var =
-    Boolean.false_
 
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
       ~lookup_parameters ~feature_flags ~(proof : Wrap_proof.Checked.t) ~srs

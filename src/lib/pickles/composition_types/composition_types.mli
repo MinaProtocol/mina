@@ -28,16 +28,17 @@ end
 module Wrap : sig
   module Proof_state : sig
     (** This module contains structures which contain the scalar-field elements
-      that are required to finalize the verification of a proof that is
-      partially verified inside a circuit.
+        that are required to finalize the verification of a proof that is
+        partially verified inside a circuit.
 
-      Each verifier circuit starts by verifying the parts of a proof involving
-      group operations.  At the end, there is a sequence of scalar-field
-      computations it must perform. Instead of performing them directly, it
-      exposes the values needed for those computations as a part of its own
-      public-input, so that the next circuit can do them (since it will use the
-      other curve on the cycle, and hence can efficiently perform computations
-      in that scalar field). *)
+        Each verifier circuit starts by verifying the parts of a proof involving
+        group operations.  At the end, there is a sequence of scalar-field
+        computations it must perform. Instead of performing them directly, it
+        exposes the values needed for those computations as a part of its own
+        public-input, so that the next circuit can do them (since it will use the
+        other curve on the cycle, and hence can efficiently perform computations
+        in that scalar field).
+    *)
     module Deferred_values : sig
       module Plonk : sig
         module Minimal : sig
@@ -178,9 +179,11 @@ module Wrap : sig
             ; xi : 'scalar_challenge
                   (** The challenge used for combining polynomials *)
             ; bulletproof_challenges : 'bulletproof_challenges
-                  (** The challenges from the inner-product argument that was partially verified. *)
+                  (** The challenges from the inner-product argument that was
+                      partially verified. *)
             ; branch_data : 'branch_data
-                  (** Data specific to which step branch of the proof-system was verified *)
+                  (** Data specific to which step branch of the proof-system was
+                      verified *)
             }
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
 

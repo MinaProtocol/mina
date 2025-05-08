@@ -12,9 +12,9 @@ module Shifted_value = Shifted_value.Type2
 *)
 type t = Impls.Step.unfinalized_proof_var
 
-module Plonk_checks = struct
-  include Plonk_checks
-  include Plonk_checks.Make (Shifted_value) (Plonk_checks.Scalars.Tock)
+module Kimchi_checks = struct
+  include Kimchi_checks
+  include Kimchi_checks.Make (Shifted_value) (Kimchi_checks.Scalars.Tock)
 end
 
 module Constant = struct
@@ -66,17 +66,17 @@ module Constant = struct
 
            let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
          end in
-         Plonk_checks.scalars_env
+         Kimchi_checks.scalars_env
            (module Env_bool)
            (module Env_field)
            ~srs_length_log2:Common.Max_degree.wrap_log2
-           ~zk_rows:Plonk_checks.zk_rows_by_default
+           ~zk_rows:Kimchi_checks.zk_rows_by_default
            ~endo:Endo.Wrap_inner_curve.base ~mds:Tock_field_sponge.params.mds
            ~field_of_hex:
              (Core_kernel.Fn.compose Tock.Field.of_bigint (fun x ->
                   Kimchi_pasta.Pasta.Bigint256.of_hex_string x ) )
            ~domain:
-             (Plonk_checks.domain
+             (Kimchi_checks.domain
                 (module Tock.Field)
                 (wrap_domains ~proofs_verified:2).h ~shifts:Common.tock_shifts
                 ~domain_generator:Tock.Field.domain_generator )
@@ -86,7 +86,7 @@ module Constant = struct
          let module Field = struct
            include Tock.Field
          end in
-         Plonk_checks.derive_plonk (module Field) ~env ~shift chals evals
+         Kimchi_checks.derive_plonk (module Field) ~env ~shift chals evals
          |> Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit
             .of_wrap
               ~assert_none:(fun x -> assert (Option.is_none (Opt.to_option x)))

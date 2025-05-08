@@ -118,7 +118,7 @@ let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
   let g len = Array.create ~len g0 in
   let tick_arr len = Array.init len ~f:(fun _ -> tick ()) in
   let lengths =
-    Commitment_lengths.default ~num_chunks:Plonk_checks.num_chunks_by_default
+    Commitment_lengths.default ~num_chunks:Kimchi_checks.num_chunks_by_default
     (* TODO *)
   in
   T

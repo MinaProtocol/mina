@@ -6,10 +6,10 @@ open Import
 open Backend
 
 (* TODO: Just stick this in plonk_checks.ml *)
-module Plonk_checks = struct
-  include Plonk_checks
+module Kimchi_checks = struct
+  include Kimchi_checks
   module Type1 =
-    Plonk_checks.Make (Shifted_value.Type1) (Plonk_checks.Scalars.Tick)
+    Kimchi_checks.Make (Shifted_value.Type1) (Kimchi_checks.Scalars.Tick)
 end
 
 let expand_deferred (type n most_recent_width) ~zk_rows
@@ -36,7 +36,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        Composition_types.Wrap.Proof_state.Minimal.Stable.V1.t ) :
     _ Types.Wrap.Proof_state.Deferred_values.t =
   let module Tick_field = Backend.Tick.Field in
-  let tick_field : _ Plonk_checks.field = (module Tick_field) in
+  let tick_field : _ Kimchi_checks.field = (module Tick_field) in
   Timer.start __LOC__ ;
   let open Types.Wrap.Proof_state in
   let sc = SC.to_field_constant tick_field ~endo:Endo.Wrap_inner_curve.scalar in
@@ -65,13 +65,13 @@ let expand_deferred (type n most_recent_width) ~zk_rows
     }
   in
   let tick_combined_evals =
-    Plonk_checks.evals_of_split_evals
+    Kimchi_checks.evals_of_split_evals
       (module Tick.Field)
       evals.evals.evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw
     |> Plonk_types.Evals.to_in_circuit
   in
   let tick_domain =
-    Plonk_checks.domain
+    Kimchi_checks.domain
       (module Tick.Field)
       step_domain ~shifts:Common.tick_shifts
       ~domain_generator:Backend.Tick.Field.domain_generator
@@ -97,7 +97,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
 
       let if_ (b : bool) ~then_ ~else_ = if b then then_ () else else_ ()
     end in
-    Plonk_checks.scalars_env
+    Kimchi_checks.scalars_env
       (module Env_bool)
       (module Env_field)
       ~endo:Endo.Step_inner_curve.base ~mds:Tick_field_sponge.params.mds
@@ -112,7 +112,7 @@ let expand_deferred (type n most_recent_width) ~zk_rows
       let module Field = struct
         include Tick.Field
       end in
-      Plonk_checks.Type1.derive_plonk
+      Kimchi_checks.Type1.derive_plonk
         (module Field)
         ~shift:Shifts.tick1 ~env:tick_env tick_plonk_minimal tick_combined_evals
     in
