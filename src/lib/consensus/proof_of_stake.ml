@@ -2757,7 +2757,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let time_received =
         Time.(
           of_span_since_epoch
-            (Span.of_ms (Unix_timestamp.to_int64 time_received)))
+            (Span.of_ms (Mina_stdlib.Unix_timestamp.to_int64 time_received)))
       in
       let slot_diff =
         Epoch.diff_in_slots ~constants
@@ -3123,7 +3123,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let to_unix_timestamp recieved_time =
       recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
-      |> Unix_timestamp.of_int64
+      |> Mina_stdlib.Unix_timestamp.of_int64
 
     let%test "Receive a valid consensus_state with a bit of delay" =
       let constants = Lazy.force Constants.for_unit_tests in

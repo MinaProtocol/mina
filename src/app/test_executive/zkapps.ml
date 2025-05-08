@@ -372,12 +372,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { p with
           account_updates =
             Call_forest.map p.account_updates ~f:(fun other_p ->
-                match other_p.Account_update.authorization with
-                | Proof _ ->
+                match other_p.Account_update.Poly.authorization with
+                | Control.Poly.Proof _ ->
                     { other_p with
                       authorization =
-                        Control.Proof
-                          (Lazy.force Mina_base.Proof.blockchain_dummy)
+                        Control.Poly.Proof
+                          (Lazy.force
+                             Mina_base.Proof.For_tests.blockchain_dummy_tag )
                     }
                 | _ ->
                     other_p )

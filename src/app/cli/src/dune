@@ -6,10 +6,11 @@
  (public_name mina)
  (modules mina)
  (modes native)
- (libraries mina_cli_entrypoint)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
- (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
+ (libraries mina_cli_entrypoint disk_cache.lmdb)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
 
 (executable
  (package cli)
@@ -17,10 +18,11 @@
  (public_name mina-testnet)
  (modules mina_testnet_signatures)
  (modes native)
- (libraries mina_cli_entrypoint mina_signature_kind.testnet)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
- (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
+ (libraries mina_cli_entrypoint mina_signature_kind.testnet disk_cache.lmdb)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))
 
 (executable
  (package cli)
@@ -28,7 +30,8 @@
  (public_name mina-mainnet)
  (modules mina_mainnet_signatures)
  (modes native)
- (libraries mina_cli_entrypoint mina_signature_kind.mainnet)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
- (flags -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60-66))
+ (libraries mina_cli_entrypoint mina_signature_kind.mainnet disk_cache.lmdb)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

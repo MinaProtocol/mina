@@ -30,36 +30,26 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
   | None ->
       State.Unknown
   | Some transition_frontier ->
-      with_return (fun { return } ->
-          let best_tip_path =
-            Transition_frontier.best_tip_path transition_frontier
-          in
-          let in_breadcrumb breadcrumb =
-            breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
-            |> Mina_block.Validated.valid_commands
-            |> List.exists ~f:(fun { data = cmd'; _ } ->
-                   User_command.equal cmd (User_command.forget_check cmd') )
-          in
-          if List.exists ~f:in_breadcrumb best_tip_path then
-            return State.Included ;
-          if
-            List.exists ~f:in_breadcrumb
-              (Transition_frontier.all_breadcrumbs transition_frontier)
-          then return State.Pending ;
-          (*This is to look for commands in the pool which are valid.
-             Membership check requires only the user command and no other
-             aspect of User_command.Valid.t and so no need to check signatures
-             or extract zkApp verification keys.*)
-          let (`If_this_is_used_it_should_have_a_comment_justifying_it
-                checked_cmd ) =
-            User_command.to_valid_unsafe cmd
-          in
-          if
-            Transaction_pool.Resource_pool.member resource_pool
-              (Transaction_hash.User_command_with_valid_signature.create
-                 checked_cmd )
-          then return State.Pending ;
-          State.Unknown )
+      let best_tip_path =
+        Transition_frontier.best_tip_path transition_frontier
+      in
+      let in_breadcrumb breadcrumb =
+        breadcrumb |> Transition_frontier.Breadcrumb.validated_transition
+        |> Mina_block.Validated.valid_commands
+        |> List.exists ~f:(fun { data = found; _ } ->
+               let found' = User_command.forget_check found in
+               User_command.equal_ignoring_proofs_and_hashes cmd found' )
+      in
+      if List.exists ~f:in_breadcrumb best_tip_path then State.Included
+      else if
+        List.exists ~f:in_breadcrumb
+          (Transition_frontier.all_breadcrumbs transition_frontier)
+      then State.Pending
+      else if
+        Transaction_pool.Resource_pool.member resource_pool
+          (Transaction_hash.hash_command cmd)
+      then State.Pending
+      else State.Unknown
 
 let%test_module "transaction_status" =
   ( module struct
@@ -132,6 +122,7 @@ let%test_module "transaction_status" =
           ~verifier ~genesis_constants:precomputed_values.genesis_constants
           ~slot_tx_end:None
           ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
+          ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
       in
       let transaction_pool, _, local_sink =
         Transaction_pool.create ~config
@@ -149,8 +140,7 @@ let%test_module "transaction_status" =
                 throughout the 'network'"
                ~metadata:
                  [ ( "transactions"
-                   , Transaction_pool.Resource_pool.Diff.to_yojson transactions
-                   )
+                   , Transaction_pool.Diff_versioned.to_yojson transactions )
                  ] ;
              Deferred.unit ) ;
       (* Need to wait for transaction_pool to see the transition_frontier *)

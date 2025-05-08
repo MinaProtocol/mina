@@ -17,7 +17,7 @@ val vk : Pickles.Side_loaded.Verification_key.t Async.Deferred.t Lazy.t
 module P :
   Pickles.Proof_intf
     with type statement = Zkapp_statement.t
-     and type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+     and type t = Nat.N2.n Pickles.Proof.t
 
 val initialize :
      ?may_use_token:Account_update.May_use_token.t

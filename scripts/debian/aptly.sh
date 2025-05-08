@@ -12,7 +12,6 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 
 # global variables
-declare CLI_VERSION='1.0.0';
 declare CLI_NAME='aptly.sh';
 declare PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
@@ -25,8 +24,6 @@ function check_required() {
 }
 check_required aptly
 check_required jq
-check_required gsutil
-
 
 function start_aptly() {
     local __distribution=$1
@@ -34,28 +31,40 @@ function start_aptly() {
     local __background=$3
     local __clean=$4
     local __component=$5
-    local __repo="$__distribution-$__component"
+    local __repo="${__distribution}"-"${__component}"
     local __port=$6
+    local __wait=$7
 
-    if [ $__clean = 1 ]; then
+    if [ "${__clean}" = 1 ]; then
         rm -rf ~/.aptly
     fi
-    
-    aptly repo create -component $__component -distribution $__distribution  $__repo
 
-    aptly repo add $__repo $__debs
+    aptly repo create -component "${__component}" -distribution "${__distribution}"  "${__repo}"
 
-    aptly snapshot create $__component from repo $__repo
+    aptly repo add "${__repo}" "${__debs}"
 
-    aptly publish snapshot -distribution=$__distribution -skip-signing $__component
+    aptly snapshot create "${__component}" from repo "${__repo}"
 
-    if [ $__background = 1 ]; then
-        aptly serve -listen localhost:$__port &
-    else 
-        aptly serve -listen localhost:$__port
+    aptly publish snapshot -distribution="${__distribution}" -skip-signing "${__component}"
+
+    if [ "${__background}" = 1 ]; then
+        aptly serve -listen localhost:"${__port}" &
+    else
+        aptly serve -listen localhost:"${__port}"
     fi
 
-    
+    if [ $__wait = 1 ]; then
+        local __timeout=300
+        local __elapsed=0
+        while ! curl -s "http://localhost:$__port" >/dev/null; do
+            sleep 1
+            __elapsed=$((__elapsed + 1))
+            if [ $__elapsed -ge $__timeout ]; then
+                echo "Error: Aptly debian repo did not start within 5 minutes."
+                exit 1
+            fi
+        done
+    fi
 }
 
 
@@ -74,6 +83,8 @@ function start_help(){
     echo "  -m, --component   The Component for debian repository. For example: unstable"
     echo "  -l, --clean       Removes existing aptly installation"
     echo "  -p, --port        Server port. default=8080"
+    echo "  -w, --wait        Wait for the server to start before exiting"
+    echo "  -h, --help        Show this help message"
     echo ""
     echo "Example: $0  start --background --codename focal --debs *.deb --component unstable "
     echo ""
@@ -91,6 +102,7 @@ function start(){
     local __clean=0
     local __component="unstable"
     local __port=$PORT
+    local __wait=0
     
 
     while [ ${#} -gt 0 ]; do
@@ -99,7 +111,7 @@ function start(){
             -h | --help )
                 start_help;
             ;;
-            -b | --background ) 
+            -b | --background )
                 __background=1
                 shift;
             ;;
@@ -123,6 +135,10 @@ function start(){
                 __clean=1
                 shift;
             ;;
+            -w | --wait )
+                __wait=1
+                shift;
+            ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -136,8 +152,8 @@ function start(){
         $__background \
         $__clean \
         $__component \
-        $__port
-
+        $__port \
+        $__wait
 
 }
 
@@ -156,9 +172,9 @@ function stop_help(){
 }
 
 function stop(){
-    
+
     local __clean=0
-    
+
     while [ ${#} -gt 0 ]; do
         case $1 in
             -h | --help )
@@ -175,9 +191,9 @@ function stop(){
             ;;
         esac
     done
-    
+
     pkill aptly
-    if [ $__clean = 1 ]; then
+    if [ "${__clean}" = 1 ]; then
         rm -rf ~/.aptly
     fi
 }
