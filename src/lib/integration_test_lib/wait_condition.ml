@@ -80,7 +80,7 @@ struct
             |> Option.value ~default:false ) )
     |> with_timeouts
          ~soft_timeout:(Literal (Time.Span.of_min 10.0))
-         ~hard_timeout:(Literal (Time.Span.of_min 15.0))
+         ~hard_timeout:(Literal (Time.Span.of_min 30.0))
 
   let node_to_initialize node = nodes_to_initialize [ node ]
 
