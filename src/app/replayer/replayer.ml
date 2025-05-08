@@ -604,7 +604,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
       let%map input =
         create_replayer_checkpoint ~ledger ~start_slot_since_genesis
       in
-      input_to_yojson input |> Yojson.Safe.pretty_to_string
+      input_to_yojson input |> Yojson.Safe.to_string
     in
     let checkpoint_file =
       let checkpoint_filename =
@@ -1681,7 +1681,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                       ~next_epoch_ledger:!next_epoch_ledger
                       ~next_seed:!next_seed input.genesis_ledger
                   in
-                  output_to_yojson output |> Yojson.Safe.pretty_to_string
+                  output_to_yojson output |> Yojson.Safe.to_string
                 in
                 return
                 @@ Out_channel.with_file output_file ~f:(fun oc ->
