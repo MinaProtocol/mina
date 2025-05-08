@@ -70,7 +70,7 @@ let command
                 Dockers.dependsOn
                   spec.dockerType
                   spec.network
-                  Profiles.Type.Standard
+                  (Profiles.fromNetwork spec.network)
                   Artifacts.Type.Rosetta
             }
 
