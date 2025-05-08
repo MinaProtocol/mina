@@ -240,39 +240,35 @@ module Sql = struct
       ~op_status_field ~address_fields ~op_type_filters operator =
     let values_for_filter = function
       | `Block_height ->
-          ("<=", 1, None)
+          ("<=", 1, "int")
       | `Txn_hash ->
-          ("=", 2, None)
+          ("=", 2, "text")
       | `Account_identifier_pk ->
-          ("=", 3, None)
+          ("=", 3, "text")
       | `Account_identifier_token ->
-          ("=", 4, None)
+          ("=", 4, "text")
       | `Op_status ->
-          ("=", 5, Some "transaction_status")
+          ("=", 5, "transaction_status")
       | `Success ->
-          ("=", 6, Some "transaction_status")
+          ("=", 6, "transaction_status")
       | `Address ->
-          ("=", 7, None)
+          ("=", 7, "text")
     in
     let gen_filter (op_1, op_2, null_cmp) l =
       String.concat ~sep:[%string " %{op_1} "]
       @@ List.map l ~f:(function
-           | ((_, (_, n, _)) :: _) :: _ as field_n_l ->
+           | ((_, (_, n, typ)) :: _) :: _ as field_n_l ->
                let filters =
                  String.concat ~sep:" OR "
                  @@ List.map field_n_l ~f:(fun l ->
                         String.concat ~sep:" AND "
-                        @@ List.map l
-                             ~f:(fun (field', (cmp_op, n', cast_opt)) ->
-                               Option.value_map cast_opt
-                                 ~default:
-                                   [%string "%{field'} %{cmp_op} $%{n'#Int}"]
-                                 ~f:(fun cast ->
-                                   [%string
-                                     "%{field'} %{cmp_op} CAST($%{n'#Int} AS \
-                                      %{cast})"] ) ) )
+                        @@ List.map l ~f:(fun (field', (cmp_op, n', cast)) ->
+                               [%string
+                                 "%{field'} %{cmp_op} CAST($%{n'#Int} AS \
+                                  %{cast})"] ) )
                in
-               [%string "($%{n#Int} %{null_cmp} NULL %{op_2} (%{filters}))"]
+               [%string
+                 "($%{n#Int}::%{typ} %{null_cmp} NULL %{op_2} (%{filters}))"]
            | _ ->
                "" )
     in
@@ -308,7 +304,7 @@ module Sql = struct
     let ppf = Format.formatter_of_buffer buffer in
     let () =
       Option.value_map params ~default:(Caqti_request.pp ppf req)
-        ~f:(fun params -> Caqti_request.pp_with_param ppf (req, params))
+        ~f:(fun params -> Caqti_request.make_pp_with_param () ppf (req, params))
     in
     let () = Format.pp_print_flush ppf () in
     Buffer.contents buffer
@@ -499,8 +495,7 @@ module Sql = struct
             ORDER BY u.block_id, u.id, u.sequence_no
         |sql}]
 
-    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
-        =
+    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query_string =
@@ -509,9 +504,7 @@ module Sql = struct
           input.operator
       in
       let query =
-        Caqti_request.collect Params.typ
-          Caqti_type.(tup2 int64 typ)
-          query_string
+        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ) query_string
       in
       [%log debug] "Running SQL query $query"
         ~metadata:[ ("query", `String (request_to_string ~params query)) ] ;
@@ -781,12 +774,11 @@ module Sql = struct
             ORDER BY i.block_id, i.id, i.sequence_no, i.secondary_sequence_no
           |sql}]
 
-    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
-        =
+    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query =
-        Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
+        Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
         @@ query_string ~offset ~limit input.filter.op_type input.operator
       in
       [%log debug] "Running SQL query $query"
@@ -928,11 +920,10 @@ module Sql = struct
           ~address_fields:[ "pk_fee_payer.value"; "pk_update_body.value" ]
           ~op_type_filters operator
       in
-      Caqti_request.collect Params.typ Caqti_type.(tup2 int64 typ)
+      Mina_caqti.collect_req Params.typ Caqti_type.(t2 int64 typ)
       @@ query_string ~offset ~limit ~filters
 
-    let run (module Conn : Caqti_async.CONNECTION) ~logger ~offset ~limit input
-        =
+    let run (module Conn : Mina_caqti.CONNECTION) ~logger ~offset ~limit input =
       let open Deferred.Result.Let_syntax in
       let params = Params.of_query input in
       let query = query ~offset ~limit input.filter.op_type input.operator in
@@ -972,7 +963,7 @@ module Sql = struct
     end)
   end
 
-  let run (module Conn : Caqti_async.CONNECTION) ~logger query =
+  let run (module Conn : Mina_caqti.CONNECTION) ~logger query =
     let module Result = struct
       include Result
 
@@ -1055,7 +1046,7 @@ module Specific = struct
     module Mock = T (Result)
 
     let real :
-        logger:Logger.t -> db:(module Caqti_async.CONNECTION) -> 'gql Real.t =
+        logger:Logger.t -> db:(module Mina_caqti.CONNECTION) -> 'gql Real.t =
      fun ~logger ~db ->
       { db_transactions = Sql.run ~logger db
       ; validate_network_choice = Network.Validate_choice.Real.validate

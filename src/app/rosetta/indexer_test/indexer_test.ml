@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
 
-type async_pool = (Caqti_async.connection, Caqti_error.t) Caqti_async.Pool.t
+type async_pool = (Caqti_async.connection, Caqti_error.t) Mina_caqti.Pool.t
 
 type pool = { uri : Uri.t; pool : async_pool }
 
@@ -14,7 +14,7 @@ let archive_uri_arg =
       let uri = Uri.of_string s in
       let%map pool =
         Result.map_error ~f:(fun e -> `Msg (Caqti_error.show e))
-        @@ Caqti_async.connect_pool uri
+        @@ Mina_caqti.connect_pool uri
       in
       { uri; pool }
     in
@@ -31,7 +31,7 @@ let ok_or_failwith show result =
 
 let with_db pool f =
   let open Deferred.Let_syntax in
-  Caqti_async.Pool.use (fun db -> f db) pool >>| ok_or_failwith Caqti_error.show
+  Mina_caqti.Pool.use (fun db -> f db) pool >>| ok_or_failwith Caqti_error.show
 
 module Ops = Lib.Search.Transactions_info.T (Deferred.Result)
 
@@ -85,7 +85,7 @@ module Test_values = struct
     type t
 
     val get_values :
-      Caqti_async.connection -> (t T.t, Caqti_error.t) Deferred.Result.t
+      (module Mina_caqti.CONNECTION) -> (t T.t, Caqti_error.t) Deferred.Result.t
   end) =
   struct
     type t = M.t
@@ -120,26 +120,26 @@ module Test_values = struct
   module Txn_hash = Make (struct
     type t = string
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query table =
         [%string "SELECT hash FROM %{table} ORDER BY RANDOM() LIMIT 1000"]
       in
       let%bind user_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "user_commands" )
           ()
       in
       let%bind internal_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "internal_commands" )
           ()
       in
       let%map zkapp_commands =
         Conn.collect_list
-          ( Caqti_request.collect Caqti_type.unit Caqti_type.string
+          ( Mina_caqti.collect_req Caqti_type.unit Caqti_type.string
           @@ query "zkapp_commands" )
           ()
       in
@@ -155,9 +155,9 @@ module Test_values = struct
           Result.return (pk, token_id) )
         ~decode:(fun (pk, token_id) ->
           Result.return (`Pk pk, `Token_id token_id) )
-        Caqti_type.(tup2 string string)
+        Caqti_type.(t2 string string)
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query =
         [%string
@@ -171,7 +171,7 @@ module Test_values = struct
       |sql}]
       in
       let%map user_commands =
-        Conn.collect_list (Caqti_request.collect Caqti_type.unit typ query) ()
+        Conn.collect_list (Mina_caqti.collect_req Caqti_type.unit typ query) ()
       in
       let internal_commands = user_commands in
       let zkapp_commands = user_commands in
@@ -211,7 +211,7 @@ module Test_values = struct
         ~decode:(fun pk -> Result.return (`Pk pk))
         Caqti_type.string
 
-    let get_values (module Conn : Caqti_async.CONNECTION) =
+    let get_values (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let query =
         [%string
@@ -223,7 +223,7 @@ module Test_values = struct
       |sql}]
       in
       let%map user_commands =
-        Conn.collect_list (Caqti_request.collect Caqti_type.unit typ query) ()
+        Conn.collect_list (Mina_caqti.collect_req Caqti_type.unit typ query) ()
       in
       let internal_commands = user_commands in
       let zkapp_commands = user_commands in
@@ -248,11 +248,11 @@ module Test_values = struct
   module Max_block = struct
     type t = int64
 
-    let deferred_generator _ (module Conn : Caqti_async.CONNECTION) =
+    let deferred_generator _ (module Conn : Mina_caqti.CONNECTION) =
       let open Deferred.Result.Let_syntax in
       let%map max_height =
         Conn.find
-          (Caqti_request.find Caqti_type.unit Caqti_type.int64
+          (Mina_caqti.find_req Caqti_type.unit Caqti_type.int64
              "SELECT MAX(height) FROM blocks" )
           ()
       in
@@ -293,7 +293,7 @@ module Make (T : sig
 
   val deferred_generator :
        [ `User_commands | `Internal_commands | `Zkapp_commands ]
-    -> Caqti_async.connection
+    -> (module Mina_caqti.CONNECTION)
     -> (t Quickcheck.Generator.t, Caqti_error.t) Deferred.Result.t
 end) (I : sig
   type t = T.t
@@ -506,10 +506,10 @@ module Account_identifier = struct
           |sql}]
       in
       let%map values =
-        with_db pool (fun (module Conn : Caqti_async.CONNECTION) ->
+        with_db pool (fun (module Conn : Mina_caqti.CONNECTION) ->
             Conn.collect_list
-              (Caqti_request.collect Caqti_type.unit
-                 Caqti_type.(tup2 string string)
+              (Mina_caqti.collect_req Caqti_type.unit
+                 Caqti_type.(t2 string string)
                  query )
               () )
       in
