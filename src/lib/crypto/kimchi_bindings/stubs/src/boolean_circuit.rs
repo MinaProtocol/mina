@@ -266,4 +266,22 @@ mod tests {
             "Proof verification failed"
         );
     }
+
+    #[test]
+    #[should_panic(
+        expected = "Division by vanishing poly must not fail at this point, we checked it before"
+    )]
+    fn test_prove_fails_if_not_boolean_values() {
+        let mut rng = thread_rng();
+        let boolean_circuit = {
+            let mut vals = Vec::with_capacity(SRS_SIZE);
+            for _ in 0..SRS_SIZE {
+                let b: u32 = rng.gen();
+                let v = Fp::from(b);
+                vals.push(v);
+            }
+            BooleanCircuit { vals }
+        };
+        prove(*DOMAIN, &SRS, &GROUP_MAP, &mut rng, &boolean_circuit);
+    }
 }
