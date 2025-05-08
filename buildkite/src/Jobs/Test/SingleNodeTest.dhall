@@ -28,7 +28,7 @@ let dependsOn =
       # DebianVersions.dependsOn
           DebianVersions.DebVersion.Bullseye
           Network.Type.Berkeley
-          Profiles.Type.Standard
+          Profiles.Type.Devnet
 
 let buildTestCmd
     : Size -> Command.Type
