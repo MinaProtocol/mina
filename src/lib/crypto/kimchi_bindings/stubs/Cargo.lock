@@ -1376,6 +1376,7 @@ dependencies = [
  "mina-curves",
  "ocaml",
  "ocaml-gen",
+ "once_cell",
  "poly-commitment",
  "rand",
 ]

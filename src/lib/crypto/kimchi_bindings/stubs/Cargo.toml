@@ -12,6 +12,7 @@ ark-ff = { version = "0.4.2", features = ["parallel", "asm"] }
 ark-poly = { version = "0.4.2", features = ["parallel"] }
 ocaml = { version = "0.22.2", features = ["no-caml-startup"] }
 ocaml-gen = "1.0.0"
+once_cell = "=1.21.3"
 rand = { version = "=0.8.5", features = ["std_rng"] }
 
 # proof-systems
