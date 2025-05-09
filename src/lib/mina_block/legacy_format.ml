@@ -89,7 +89,7 @@ module Staged_ledger_diff = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = Mina_wire_types.Staged_ledger_diff.V2.t =
+      type t = Staged_ledger_diff.Stable.V2.t =
         { diff :
             ( Transaction_snark_work.Stable.V2.t
             , User_command.Stable.V1.t Mina_base.With_status.Stable.V2.t )
