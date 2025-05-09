@@ -4,6 +4,40 @@ open Mina_base
 module type S = Ledger_proof_intf.S
 
 module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
+  module Poly = struct
+    type ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'sok_digest
+         , 'local_state
+         , 'proof )
+         t =
+      ( ( 'ledger_hash
+        , 'amount
+        , 'pending_coinbase
+        , 'fee_excess
+        , 'sok_digest
+        , 'local_state )
+        Mina_state.Snarked_ledger_state.Poly.Stable.V2.t
+      , 'proof )
+      Proof_carrying_data.t
+
+    (* NOTE: all concrete alternative of these defined in Prof/Cached could be
+       erased, but then we'll need to propagate to every where in the codebase.
+       For the sake of reviewability I leave those old APIs as is.
+    *)
+    let statement (t : _ t) = { t.data with sok_digest = () }
+
+    let sok_digest (t : _ t) = t.data.sok_digest
+
+    let underlying_proof (t : _ t) = t.proof
+
+    let create ~(statement : Mina_state.Snarked_ledger_state.t) ~sok_digest
+        ~proof : _ t =
+      { Proof_carrying_data.proof; data = { statement with sok_digest } }
+  end
+
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -14,11 +48,11 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     end
   end]
 
-  let statement (t : t) = Transaction_snark.statement t
+  let statement = Poly.statement
 
   let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t
 
-  let sok_digest = Transaction_snark.sok_digest
+  let sok_digest = Poly.sok_digest
 
   let statement_target (t : Mina_state.Snarked_ledger_state.t) = t.target
 
@@ -26,13 +60,13 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
       =
     t.target
 
-  let underlying_proof = Transaction_snark.proof
+  let underlying_proof = Poly.underlying_proof
 
   let snarked_ledger_hash =
-    Fn.compose Mina_state.Snarked_ledger_state.snarked_ledger_hash statement
+    Fn.compose Mina_state.Snarked_ledger_state.snarked_ledger_hash
+      Poly.statement
 
-  let create ~statement ~sok_digest ~proof =
-    Transaction_snark.create ~statement:{ statement with sok_digest } ~proof
+  let create = Poly.create
 
   module Cached = struct
     type t =
@@ -53,15 +87,13 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
       Transaction_snark.create ~statement
         ~proof:(Proof_cache_tag.read_proof_from_disk proof)
 
-    let statement (t : t) = { t.data with sok_digest = () }
+    let statement = Poly.statement
 
-    let sok_digest (t : t) = t.data.sok_digest
+    let sok_digest = Poly.sok_digest
 
-    let underlying_proof (t : t) = t.proof
+    let underlying_proof = Poly.underlying_proof
 
-    let create ~(statement : Mina_state.Snarked_ledger_state.t) ~sok_digest
-        ~proof : t =
-      { Proof_carrying_data.proof; data = { statement with sok_digest } }
+    let create = Poly.create
   end
 end
 
@@ -69,12 +101,12 @@ include Prod
 
 module For_tests = struct
   let mk_dummy_proof statement =
-    create ~statement ~sok_digest:Sok_message.Digest.default
+    Poly.create ~statement ~sok_digest:Sok_message.Digest.default
       ~proof:(Lazy.force Proof.transaction_dummy)
 
   module Cached = struct
     let mk_dummy_proof statement =
-      Cached.create ~statement ~sok_digest:Sok_message.Digest.default
+      Poly.create ~statement ~sok_digest:Sok_message.Digest.default
         ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag)
   end
 end

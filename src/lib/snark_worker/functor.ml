@@ -75,7 +75,7 @@ module Make (Inputs : Intf.Inputs_intf) :
 
         let transaction t =
           Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.Stable.Latest.transaction )
+              w.Transaction_witness.Poly.transaction )
 
         let statement = Work.Single.Spec.statement
       end
