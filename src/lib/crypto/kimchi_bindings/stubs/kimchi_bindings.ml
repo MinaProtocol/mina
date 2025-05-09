@@ -591,9 +591,9 @@ module Protocol = struct
       }
 
     external boolean_prove : SRS.Fp.t -> FieldVectors.Fp.t -> boolean_proof
-      = "caml_fp_prove_boolean"
+      = "caml_pasta_fp_prove_boolean"
 
     external boolean_verify : SRS.Fp.t -> boolean_proof -> bool
-      = "caml_fp_verify_boolean"
+      = "caml_pasta_fp_verify_boolean"
   end
 end
