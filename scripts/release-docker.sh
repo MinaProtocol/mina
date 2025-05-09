@@ -62,13 +62,13 @@ case "${DEB_CODENAME##*=}" in
 esac
 IMAGE="--build-arg image=${IMAGE}"
 
-# Determine suffix for mina name. Suffix is combined from profile and service name 
+# Determine suffix for mina name. Suffix is combined from network or build flags/profile
+# but only for non standard builds.
 # Possible outcomes:
-# - instrumented
-# - hardfork
-# - lightnet
-# - hardfork-instrumented
-
+# mina-berkeley-instrumented
+# mina-archive-berkeley-instrumented
+# mina-devnet
+# mina-mainnet
 if [[ ${NETWORK} == *"berkeley"* ]]; then
   if [[ ${DEB_PROFILE} == *"lightnet"* ]]; then
     DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
