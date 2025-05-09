@@ -10,7 +10,7 @@ use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use kimchi_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
-    boolean_circuit::*,
+    pasta_fp_boolean_circuit::*,
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
@@ -489,9 +489,9 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
         });
 
         decl_module!(w, env, "Boolean_circuit", {
-            decl_type!(w, env, CamlBooleanProof => "boolean_proof");
-            decl_func!(w, env, caml_fp_prove_boolean => "boolean_prove");
-            decl_func!(w, env, caml_fp_verify_boolean => "boolean_verify");
+            decl_type!(w, env, CamlPastaFpBooleanProof => "boolean_proof");
+            decl_func!(w, env, caml_pasta_fp_prove_boolean => "boolean_prove");
+            decl_func!(w, env, caml_pasta_fp_verify_boolean => "boolean_verify");
         })
     });
 }
