@@ -68,32 +68,19 @@ IMAGE="--build-arg image=${IMAGE}"
 # - hardfork
 # - lightnet
 # - hardfork-instrumented
-  case "${DEB_PROFILE}" in
-    standard)
-      case "${DEB_BUILD_FLAGS}" in 
-        *instrumented)
-          DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
-          BUILD_FLAG_SUFFIX="-instrumented"
-          ;;
-        *)
-          ;;
-      esac
-      ;;
-    *)
-      case "${DEB_BUILD_FLAGS}" in 
-        *instrumented)
-          DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}-instrumented"
-          BUILD_FLAG_SUFFIX="-instrumented"
-          DEB_PROFILE_SUFFIX="-${DEB_PROFILE}"
-          ;;
-        *)
-          DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}"
-          DEB_PROFILE_SUFFIX="-${DEB_PROFILE}"
-          ;;
-      esac
-      ;;
-  esac
 
+if [[ ${NETWORK} == *"berkeley"* ]]; then
+  if [[ ${DEB_PROFILE} == *"lightnet"* ]]; then
+    DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
+    BUILD_FLAG_SUFFIX="-instrumented"
+  fi
+
+  if [[ ${DEB_BUILD_FLAGS} == *"instrumented"* ]]; then
+    DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
+    BUILD_FLAG_SUFFIX="-instrumented"
+  fi
+fi
+  
 # Debug prints for visability
 # Substring removal to cut the --build-arg arguments on the = so that the output is exactly the input flags https://wiki.bash-hackers.org/syntax/pe#substring_removal
 echo "--service ${SERVICE} --version ${VERSION} --branch ${BRANCH##*=} --deb-version ${DEB_VERSION##*=} --deb-suffix ${DOCKER_DEB_SUFFIX##*=} --deb-release ${DEB_RELEASE##*=} --deb-codename ${DEB_CODENAME##*=}"
