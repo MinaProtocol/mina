@@ -10,6 +10,7 @@ use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
 use kimchi_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
+    boolean_circuit::*,
     field_vector::{fp::*, fq::*},
     gate_vector::{fp::*, fq::*},
     oracles::{fp::*, fq::*, CamlOracles},
@@ -42,9 +43,6 @@ use kimchi_stubs::{
 use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
 use std::fs::File;
 use std::io::Write;
-
-mod boolean_circuit;
-use boolean_circuit::*;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

@@ -1369,16 +1369,10 @@ dependencies = [
 name = "wires_15_stubs"
 version = "0.1.0"
 dependencies = [
- "ark-ff",
- "ark-poly",
  "kimchi",
  "kimchi-stubs",
- "mina-curves",
  "ocaml",
  "ocaml-gen",
- "once_cell",
- "poly-commitment",
- "rand",
 ]
 
 [[package]]
