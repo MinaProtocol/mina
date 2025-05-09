@@ -578,4 +578,22 @@ module Protocol = struct
         = "caml_pasta_fq_plonk_proof_deep_copy"
     end
   end
+
+  module Boolean_circuit = struct
+    type nonrec boolean_proof =
+      { poly_commitment : Pasta_bindings.Fq.t Kimchi_types.or_infinity
+      ; quotient_commitment : Pasta_bindings.Fq.t Kimchi_types.or_infinity
+      ; evaluation : Pasta_bindings.Fp.t
+      ; opening_proof :
+          ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
+          , Pasta_bindings.Fp.t )
+          Kimchi_types.opening_proof
+      }
+
+    external boolean_prove : SRS.Fp.t -> FieldVectors.Fp.t -> boolean_proof
+      = "caml_fp_prove_boolean"
+
+    external boolean_verify : SRS.Fp.t -> boolean_proof -> bool
+      = "caml_fp_verify_boolean"
+  end
 end

@@ -44,6 +44,7 @@ use std::fs::File;
 use std::io::Write;
 
 mod boolean_circuit;
+use boolean_circuit::*;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -488,5 +489,11 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_pasta_fq_plonk_proof_deep_copy => "deep_copy");
             });
         });
+
+        decl_module!(w, env, "Boolean_circuit", {
+            decl_type!(w, env, CamlBooleanProof => "boolean_proof");
+            decl_func!(w, env, caml_fp_prove_boolean => "boolean_prove");
+            decl_func!(w, env, caml_fp_verify_boolean => "boolean_verify");
+        })
     });
 }
