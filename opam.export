@@ -165,7 +165,6 @@ installed: [
   "ocaml-base-compiler.4.14.0"
   "ocaml-compiler-libs.v0.12.3"
   "ocaml-config.2"
-  "ocaml-migrate-parsetree.2.3.0"
   "ocaml-options-vanilla.1"
   "ocaml-syntax-shims.1.0.0"
   "ocaml-version.3.4.0"
