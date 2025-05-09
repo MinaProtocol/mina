@@ -22,7 +22,7 @@ let archive_uri_arg =
     Cmdliner.Arg.conv ~docv:"URI" (parse, print)
   in
   let doc = "Postgres database URI" in
-  let env = Cmdliner.Arg.env_var ~doc "ARCHIVE_URI" in
+  let env = Cmdliner.Cmd.Env.info ~doc "ARCHIVE_URI" in
   Cmdliner.Arg.(
     required & opt (some pool) None & info [ "archive_uri" ] ~env ~doc)
 

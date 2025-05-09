@@ -295,6 +295,6 @@ let () =
           )
       ]
     in
-    Term.info ~version:"0.1" ~doc ~exits:Term.default_exits ~man "logproc"
+    Cmd.info ~version:"0.1" ~doc ~exits:Cmd.Exit.defaults ~man "logproc"
   in
-  Term.(exit @@ eval (main_term, main_info))
+  exit (Cmd.eval (Cmd.v main_info main_term))
