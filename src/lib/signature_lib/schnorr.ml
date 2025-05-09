@@ -305,7 +305,7 @@ module Message = struct
   let network_id_other chain_name = chain_name
 
   let network_id =
-    match Mina_signature_kind.t with
+    match Mina_signature_kind.t_DEPRECATED with
     | Mainnet ->
         network_id_mainnet
     | Testnet ->
@@ -335,7 +335,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ?(signature_kind = Mina_signature_kind.t) =
+    let derive ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -409,7 +409,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ?(signature_kind = Mina_signature_kind.t) =
+    let derive ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
       make_derive
         ~network_id:
           ( match signature_kind with

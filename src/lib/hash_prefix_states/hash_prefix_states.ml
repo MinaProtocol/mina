@@ -63,7 +63,7 @@ let signature_for_testnet = salt signature_testnet
 
 let signature_for_other chain_name = salt @@ signature_other chain_name
 
-let signature ?(signature_kind = Mina_signature_kind.t) =
+let signature ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
   match signature_kind with
   | Mainnet ->
       signature_for_mainnet
@@ -79,7 +79,7 @@ let signature_for_testnet_legacy = salt_legacy signature_testnet
 let signature_for_other_legacy chain_name =
   salt_legacy @@ signature_other chain_name
 
-let signature_legacy ?(signature_kind = Mina_signature_kind.t) =
+let signature_legacy ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
   match signature_kind with
   | Mainnet ->
       signature_for_mainnet_legacy
@@ -104,7 +104,8 @@ let zkapp_account = salt zkapp_account
 
 let zkapp_payload = salt zkapp_payload
 
-let zkapp_body ?(chain = Mina_signature_kind.t) = salt @@ zkapp_body ~chain
+let zkapp_body ?(chain = Mina_signature_kind.t_DEPRECATED) =
+  salt @@ zkapp_body ~chain
 
 let zkapp_precondition = salt zkapp_precondition
 

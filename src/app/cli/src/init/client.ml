@@ -2288,7 +2288,7 @@ let signature_kind =
     (let%map.Command () = Command.Param.return () in
      fun () ->
        let signature_kind_string =
-         match Mina_signature_kind.t with
+         match Mina_signature_kind.t_DEPRECATED with
          | Mainnet ->
              "mainnet"
          | Testnet ->
