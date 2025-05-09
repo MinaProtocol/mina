@@ -1,3 +1,79 @@
+(** Test Executive
+
+    This executable provides a framework for integration testing Mina networks
+    with various configurations. The test executive creates a test network with
+    configurable nodes and runs specified test scenarios.
+
+    Command-line options:
+    - TEST (positional arg): The name of the test to execute
+      Available tests:
+      - block-prod-prio
+      - block-reward
+      - chain-reliability
+      - epoch-ledger
+      - gossip-consis
+      - hard-fork
+      - medium-bootstrap
+      - peers-reliability
+      - payments
+      - slot-end
+      - verification-key
+      - zkapps
+      - zkapps-timing
+      - zkapps-nonce
+    - --mina-image MINA_IMAGE: Identifier of the Mina docker image to test
+        (required)
+    - --archive-image ARCHIVE_IMAGE: Identifier of the archive node docker image
+        (optional)
+    - --debug, -d: Enable debug mode. On failure, the test executive will pause
+        for user input
+
+    Environment variables:
+    - MINA_IMAGE: Can be used instead of the --mina-image flag
+    - ARCHIVE_IMAGE: Can be used instead of the --archive-image flag
+
+    Example:
+    ```
+    # The Mina daemon and archive images must be set to the correct value
+    dune exec src/app/test_executive/test_executive.exe -- \
+      local \
+      --mina-image=gcr.io/o1labs-192920/mina-daemon:latest \
+      --archive-image=gcr.io/o1labs-192920/mina-archive:latest \
+      medium-bootstrap
+    ```
+
+    This will run the "medium-bootstrap" test using the specified Mina and
+    archive images.
+
+    Logs can be filtered and pretty-printed using:
+    ```
+    dune exec src/app/test_executive/test_executive.exe -- \
+      local \
+      --mina-image=gcr.io/o1labs-192920/mina-daemon:latest \
+      --archive-image=gcr.io/o1labs-192920/mina-archive:latest \
+      medium-bootstrap | \
+      tee test.log | \
+      dune exec src/app/logproc/logproc.exe -- \
+        -i inline \
+        -f '!(.level in ["Debug", "Spam"])'
+    ```
+
+    A docker stack will be created with the specified images, and the test will run
+    against the network. The test executive will clean up the network after the
+    test is completed or if an error occurs. The test results will be printed to
+    the console, and any errors will be logged.
+
+    You can see the docker stack created using:
+    ```
+    docker stack ls
+    ```
+    and inspect the stack using:
+    ```
+    docker stack ps <stack_name>
+    ```
+    where `<stack_name>` is the name of the stack created by the test executive.
+*)
+
 open Core
 open Async
 open Cmdliner
@@ -255,16 +331,6 @@ let main inputs =
        and type node = Engine.Network.Node.t
        and type dsl = Dsl.t )
   in
-  (*
-    (module Test (Test_inputs)
-    : Intf.Test.S
-      with type network = Engine.Network.t
-       and type log_engine = Engine.Log_engine.t )
-    *)
-  (* TODO:
-   *   let (module Exec) = (module Execute.Make (Engine)) in
-   *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
-   *)
   let logger = Logger.create () in
   let constants : Test_config.constants =
     let protocol =
@@ -441,7 +507,8 @@ let start inputs =
     (Async.Scheduler.go_main ~main:(fun () -> don't_wait_for (main inputs)) ())
 
 let test_arg =
-  (* we nest the tests in a redundant index so that we still get the name back after cmdliner evaluates the argument *)
+  (* we nest the tests in a redundant index so that we still get the name back
+     after cmdliner evaluates the argument *)
   let indexed_tests =
     List.map tests ~f:(fun (name, test) -> (name, (name, test)))
   in
@@ -506,7 +573,8 @@ let default_cmd =
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 
-(* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
+(* TODO: move required args to positions instead of flags, or provide reasonable
+   defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
   Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))

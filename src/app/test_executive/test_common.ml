@@ -67,17 +67,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     go n hashlist
 
-  (* let pub_key_of_node node =
-     let open Signature_lib in
-     match Engine.Network.Node.network_keypair node with
-     | Some nk ->
-         Malleable_error.return (nk.keypair.public_key |> Public_key.compress)
-     | None ->
-         Malleable_error.hard_error_format
-           "Node '%s' did not have a network keypair, if node is a block \
-            producer this should not happen"
-           (Engine.Network.Node.id node) *)
-
   let make_get_key ~f node =
     match Engine.Network.Node.network_keypair node with
     | Some nk ->
@@ -152,7 +141,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (node, response) )
 
   let assert_peers_completely_connected nodes_and_responses =
-    (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
+    (* this check checks if every single peer in the network is connected to
+       every other peer, in graph theory this network would be a complete graph.
+       this property will only hold true on small networks *)
     let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
         ~connected_peers =
       let get_node_infra_id p =
@@ -187,14 +178,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~connected_peers )
 
   let assert_peers_cant_be_partitioned ~max_disconnections nodes_and_responses =
-    (* this check checks that the network does NOT become partitioned into isolated subgraphs, even if n nodes are hypothetically removed from the network.*)
+    (* this check checks that the network does NOT become partitioned into
+       isolated subgraphs, even if n nodes are hypothetically removed from the
+       network.*)
     let _, responses = List.unzip nodes_and_responses in
     let open Graph_algorithms in
     let () =
       Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
           G.output_graph c (graph_of_adjacency_list responses) )
     in
-    (* Check that the network cannot be disconnected by removing up to max_disconnections number of nodes. *)
+    (* Check that the network cannot be disconnected by removing up to
+        max_disconnections number of nodes. *)
     match
       Nat.take
         (Graph_algorithms.connectivity (module String) responses)

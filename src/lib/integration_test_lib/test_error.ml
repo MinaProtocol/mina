@@ -21,8 +21,10 @@ let occurrence_time { occurrence_time; _ } = occurrence_time
 
 let compare_time a b = Time.compare (occurrence_time a) (occurrence_time b)
 
-(* currently a flat set of contexts mapped to errors, but perhaps a tree (for nested contexts) is better *)
-(* TODO: consider switching to explicit context "enters/exits", recording introduction time upon entrance *)
+(* currently a flat set of contexts mapped to errors, but perhaps a tree (for
+   nested contexts) is better *)
+(* TODO: consider switching to explicit context "enters/exits", recording
+   introduction time upon entrance *)
 module Error_accumulator = struct
   type 'error contextualized_errors =
     { introduction_time : Time.t; errors_by_time : 'error list Time.Map.t }
@@ -113,7 +115,8 @@ module Error_accumulator = struct
             } )
     }
 
-  (* This only iterates over contextualized errors. You must check errors in the current context manually *)
+  (* This only iterates over contextualized errors. You must check errors in the
+     current context manually *)
   let iter_contexts { from_current_context = _; contextualized_errors } ~f =
     let contexts_by_time =
       contextualized_errors |> String.Map.to_alist
