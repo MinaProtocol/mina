@@ -20,6 +20,7 @@ use kimchi::{
     },
 };
 use kimchi_stubs::arkworks::{CamlFp, CamlGVesta};
+use kimchi_stubs::field_vector::fp::CamlFpVector;
 use kimchi_stubs::srs::fp::CamlFpSrs;
 use kimchi_stubs::CamlOpeningProof;
 use mina_curves::pasta::{Fp, Fq, Vesta, VestaParameters};
@@ -30,16 +31,9 @@ struct BooleanCircuit {
     vals: Vec<Fp>,
 }
 
-#[derive(Clone, ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
-pub struct CamlBooleanCircuit {
-    pub vals: Vec<CamlFp>,
-}
-
-impl From<CamlBooleanCircuit> for BooleanCircuit {
-    fn from(circuit: CamlBooleanCircuit) -> Self {
-        Self {
-            vals: circuit.vals.into_iter().map(Fp::from).collect(),
-        }
+fn from_caml_fp_vector(v: CamlFpVector) -> BooleanCircuit {
+    BooleanCircuit {
+        vals: v.as_slice().into(),
     }
 }
 
@@ -55,14 +49,14 @@ struct Proof {
 }
 
 #[derive(ocaml::IntoValue, ocaml::FromValue, ocaml_gen::Struct)]
-pub struct CamlProof {
+pub struct CamlBooleanProof {
     pub poly_commitment: CamlGVesta,
     pub quotient_commitment: CamlGVesta,
     pub evaluation: CamlFp,
     pub opening_proof: CamlOpeningProof<CamlGVesta, CamlFp>,
 }
 
-impl From<Proof> for CamlProof {
+impl From<Proof> for CamlBooleanProof {
     fn from(proof: Proof) -> Self {
         Self {
             poly_commitment: proof.poly_commitment.into(),
@@ -73,8 +67,8 @@ impl From<Proof> for CamlProof {
     }
 }
 
-impl From<CamlProof> for Proof {
-    fn from(proof: CamlProof) -> Self {
+impl From<CamlBooleanProof> for Proof {
+    fn from(proof: CamlBooleanProof) -> Self {
         Self {
             poly_commitment: proof.poly_commitment.into(),
             quotient_commitment: proof.quotient_commitment.into(),
@@ -89,13 +83,13 @@ fn prove<RNG>(
     srs: &SRS<Vesta>,
     group_map: &<Vesta as CommitmentCurve>::Map,
     rng: &mut RNG,
-    boolean_circuit: &BooleanCircuit,
+    witness: &BooleanCircuit,
 ) -> Proof
 where
     RNG: RngCore + CryptoRng,
 {
     let mut fq_sponge: VestaFqSponge = DefaultFqSponge::new(Vesta::other_curve_sponge_params());
-    let evals_d1 = Evaluations::from_vec_and_domain(boolean_circuit.vals.to_vec(), domain.d1);
+    let evals_d1 = Evaluations::from_vec_and_domain(witness.vals.to_vec(), domain.d1);
     let p: DensePolynomial<Fp> = evals_d1.interpolate_by_ref();
     let comm_p = srs.commit_non_hiding(&p, 1).chunks[0];
 
@@ -182,13 +176,10 @@ where
 }
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_prove_boolean_circuit(
-    srs: CamlFpSrs,
-    boolean_circuit: CamlBooleanCircuit,
-) -> CamlProof {
+pub fn caml_fp_prove_boolean(srs: CamlFpSrs, witness: CamlFpVector) -> CamlBooleanProof {
     let group_map = GroupMap::<Fq>::setup();
     let domain = EvaluationDomains::<Fp>::create(srs.size()).unwrap();
-    let boolean_circuit = BooleanCircuit::from(boolean_circuit);
+    let boolean_circuit = from_caml_fp_vector(witness);
     let mut rng = rand::thread_rng();
     let proof = prove(domain, &srs, &group_map, &mut rng, &boolean_circuit);
     proof.into()
@@ -269,7 +260,7 @@ where
 
 #[ocaml_gen::func]
 #[ocaml::func]
-pub fn caml_verify_boolean_circuit(srs: CamlFpSrs, proof: CamlProof) -> bool {
+pub fn caml_fp_verify_boolean(srs: CamlFpSrs, proof: CamlBooleanProof) -> bool {
     let group_map = GroupMap::<Fq>::setup();
     let domain = EvaluationDomains::<Fp>::create(srs.size()).unwrap();
     let proof = Proof::from(proof);
