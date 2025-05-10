@@ -10,6 +10,8 @@ let ReplayerTest = ../../Command/ReplayerTest.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let Dockers = ../../Constants/DockerVersions.dhall
 
 let Network = ../../Constants/Network.dhall
@@ -17,10 +19,12 @@ let Network = ../../Constants/Network.dhall
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let dependsOn =
-      Dockers.dependsOn
+      Dockers.dependsOnStep
         Dockers.Type.Bullseye
+        "MinaArtifact"
         Network.Type.Berkeley
         Profiles.Type.Devnet
+        BuildFlags.Type.Instrumented
         Artifacts.Type.FunctionalTestSuite
 
 in  Pipeline.build
