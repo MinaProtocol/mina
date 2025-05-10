@@ -43,16 +43,13 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+MINA_DEB_NAME="mina-berkeley"
+    
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
-  devnet|mainnet)
-    MINA_DEB_NAME="mina-berkeley"
-    DEB_SUFFIX=""
-   ;;
-  *)
+  lightnet)
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
-    MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
     DEB_SUFFIX="-${_SUFFIX}"
     ;;
 esac
@@ -396,7 +393,7 @@ build_archive_devnet_deb () {
 
 ##################################### ARCHIVE BERKELEY PACKAGE ###########################################
 build_archive_berkeley_deb () {
-  ARCHIVE_DEB=mina-archive${DEB_SUFFIX}
+  ARCHIVE_DEB=mina-archive-berkeley${DEB_SUFFIX}
 
   echo "------------------------------------------------------------"
   echo "--- Building archive berkeley deb"

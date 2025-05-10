@@ -71,8 +71,7 @@ IMAGE="--build-arg image=${IMAGE}"
 # mina-mainnet
 if [[ ${NETWORK} == *"berkeley"* ]]; then
   if [[ ${DEB_PROFILE} == *"lightnet"* ]]; then
-    DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
-    BUILD_FLAG_SUFFIX="-instrumented"
+    DOCKER_DEB_SUFFIX="--build-arg deb_suffix=lightnet"
   fi
 
   if [[ ${DEB_BUILD_FLAGS} == *"instrumented"* ]]; then
