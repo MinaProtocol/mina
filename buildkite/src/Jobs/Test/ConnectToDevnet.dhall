@@ -28,7 +28,7 @@ let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
         network
-        Profiles.Type.Standard
+        Profiles.Type.Devnet
         Artifacts.Type.Daemon
 
 in  Pipeline.build

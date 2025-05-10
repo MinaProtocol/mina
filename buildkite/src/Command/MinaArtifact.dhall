@@ -54,7 +54,7 @@ let MinaBuildSpec =
           { prefix = "MinaArtifact"
           , artifacts = Artifacts.AllButTests
           , debVersion = DebianVersions.DebVersion.Bullseye
-          , profile = Profiles.Type.Standard
+          , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
@@ -86,8 +86,7 @@ let nameSuffix
 let keySuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
-      ->  "${Profiles.toLabelSegment spec.profile}${BuildFlags.toLabelSegment
-                                                      spec.buildFlags}"
+      ->  "${BuildFlags.toLabelSegment spec.buildFlags}"
 
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
@@ -207,6 +206,7 @@ let docker_step
                     , service = Artifacts.Type.Archive
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
+                    , network = Network.lowerName spec.network
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local

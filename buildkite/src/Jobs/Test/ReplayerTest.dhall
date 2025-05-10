@@ -20,7 +20,7 @@ let dependsOn =
       Dockers.dependsOn
         Dockers.Type.Bullseye
         Network.Type.Berkeley
-        Profiles.Type.Standard
+        Profiles.Type.Devnet
         Artifacts.Type.FunctionalTestSuite
 
 in  Pipeline.build
