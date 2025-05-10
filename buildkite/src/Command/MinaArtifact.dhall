@@ -1,4 +1,4 @@
-let Prelude = ../External/Prelude.dhall
+9let Prelude = ../External/Prelude.dhall
 
 let List/map = Prelude.List.map
 
@@ -206,6 +206,7 @@ let docker_step
                     , service = Artifacts.Type.Archive
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
+                    , network = Network.lowerName spec.network
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
