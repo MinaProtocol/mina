@@ -1,4 +1,4 @@
-9let Prelude = ../External/Prelude.dhall
+let Prelude = ../External/Prelude.dhall
 
 let List/map = Prelude.List.map
 
