@@ -83,11 +83,6 @@ let nameSuffix
                                                     spec.profile}${BuildFlags.toSuffixUppercase
                                                                      spec.buildFlags}"
 
-let keySuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
-      ->  "${BuildFlags.toLabelSegment spec.buildFlags}"
-
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
@@ -322,5 +317,4 @@ in  { pipeline = pipeline
     , publishToDebian = publish_to_debian_repo
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
-    , keySuffix = keySuffix
     }
