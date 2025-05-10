@@ -52,6 +52,7 @@ case "${DUNE_PROFILE}" in
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
     DEB_SUFFIX="-${_SUFFIX}"
+    MINA_DEB_NAME="${MINA_DEB_NAME}-${DEB_SUFFIX}"
     ;;
 esac
 
