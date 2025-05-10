@@ -44,6 +44,7 @@ case "${MINA_DEB_CODENAME}" in
 esac
 
 MINA_DEB_NAME="mina-berkeley"
+DEB_SUFFIX=""
     
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
