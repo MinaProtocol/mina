@@ -19,13 +19,13 @@ let Network = ../Constants/Network.dhall
 let runInDockerWithPostgresConn
     :     List Text
       ->  Text
-      ->  Artifacts.Type
+      ->  Text
       ->  Optional Network.Type
       ->  Text
       ->  Cmd.Type
     =     \(environment : List Text)
       ->  \(initScript : Text)
-      ->  \(docker : Artifacts.Type)
+      ->  \(docker : Text)
       ->  \(network : Optional Network.Type)
       ->  \(innerScript : Text)
       ->  let port = "5432"
@@ -79,8 +79,7 @@ let runInDockerWithPostgresConn
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                 , "sleep 5"
                 , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}"
-                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName
-                                                                                                                                                    docker}:${minaDockerTag}${networkOrDefault} ${innerScript}"
+                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} gcr.io/o1labs-192920/${docker}:${minaDockerTag}${networkOrDefault} ${innerScript}"
                 ]
 
 in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }

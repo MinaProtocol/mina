@@ -4,6 +4,8 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
+let BuildFlags = ../Constants/BuildFlags.dhall
+
 let RunWithPostgres = ./RunWithPostgres.dhall
 
 let Network = ../Constants/Network.dhall
@@ -18,7 +20,7 @@ in  { step =
                 [ RunWithPostgres.runInDockerWithPostgresConn
                     ([] : List Text)
                     "./src/test/archive/sample_db/archive_db.sql"
-                    Artifacts.Type.FunctionalTestSuite
+                    "${Artifacts.name Artifacts.Type.FunctionalTestSuite}-${Network.lowerName network}-${BuildFlags.lowerName BuildFlags.Type.Instrumented}"
                     (None Network.Type)
                     "./buildkite/scripts/replayer-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]

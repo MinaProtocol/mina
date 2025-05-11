@@ -6,6 +6,8 @@ let Size = ./Size.dhall
 
 let Network = ../Constants/Network.dhall
 
+let BuildFlags = ../Constants/BuildFlags.dhall
+
 let RunWithPostgres = ./RunWithPostgres.dhall
 
 let key = "patch-archive-test"
@@ -20,7 +22,7 @@ in  { step =
                     , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
                     ]
                     "./src/test/archive/sample_db/archive_db.sql"
-                    Artifacts.Type.FunctionalTestSuite
+                    "${Artifacts.name Artifacts.Type.FunctionalTestSuite}-${Network.lowerName network}-${BuildFlags.lowerName BuildFlags.Type.Instrumented}"
                     (None Network.Type)
                     "./scripts/patch-archive-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
