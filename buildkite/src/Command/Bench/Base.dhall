@@ -54,7 +54,7 @@ let Spec =
               DebianVersions.dependsOnStep
                 DebianVersions.DebVersion.Bullseye
                 "MinaArtifact"
-                Network.Type.Berkeley
+                (Some Network.Type.Berkeley)
                 Profiles.Type.Devnet
                 BuildFlags.Type.Instrumented
           , additionalDirtyWhen = [] : List SelectFiles.Type
