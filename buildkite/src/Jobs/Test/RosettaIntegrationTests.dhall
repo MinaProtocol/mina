@@ -52,7 +52,8 @@ in  Pipeline.build
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
                   "./src/test/archive/sample_db/archive_db.sql"
-                  "${Artifacts.name Artifacts.Type.Rosetta}-${Network.lowerName network}"
+                  "${Artifacts.name Artifacts.Type.Rosetta}"
+                  (Some network)
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{
