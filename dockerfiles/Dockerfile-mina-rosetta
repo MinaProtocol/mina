@@ -62,6 +62,8 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Install rosetta-cli
+# Keep this in line with the target `install-rosetta-cli` in the Makefile
+# `../Makefile`.
 # The following commands install rosetta-cli with an updated rosetta-sdk-go
 # dependency, which supports delegation transactions.
 # Upstream PR to rosetta-sdk-go:

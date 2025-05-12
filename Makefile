@@ -395,6 +395,20 @@ genesiskeys:
 
 
 ##############################################
+## External toolings
+
+# Keep this in line with ./dockerfiles/Dockerfile-mina-rosetta
+.PHONY: install-rosetta-cli
+install-rosetta-cli:
+	curl -L "https://github.com/coinbase/mesh-cli/archive/refs/tags/v0.10.1.tar.gz" \
+		-o "/tmp/v0.10.1.tar.gz"
+	tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp"
+	cd /tmp/mesh-cli-0.10.1 \
+    && go mod edit -replace github.com/coinbase/mesh-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
+    && go mod tidy \
+    && GOBIN=${OPAM_SWITCH_PREFIX}/bin go install
+
+##############################################
 ## Genesis ledger in OCaml from running daemon
 
 .PHONY: genesis-ledger-ocaml
