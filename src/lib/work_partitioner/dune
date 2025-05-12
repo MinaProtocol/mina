@@ -16,7 +16,8 @@
  (preprocess
   (pps
    ppx_custom_printf
-   ppx_let))
+   ppx_let
+   ppx_mina))
    
  (instrumentation
   (backend bisect_ppx))

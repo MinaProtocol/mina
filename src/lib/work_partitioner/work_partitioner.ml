@@ -45,7 +45,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   end) in
   { logger
   ; transaction_snark = (module M)
-  ; id_generator = Id_generator.create ()
+  ; id_generator = Id_generator.create ~logger
   ; pairing_pool = Hashtbl.create (module Work.Partitioned.Pairing.ID)
   ; zkapp_command_jobs = Zkapp_command_job_pool.create ()
   ; reassignment_timeout
@@ -294,8 +294,6 @@ let submit_single ~partitioner ~this_single ~id =
                   this_single
           in
 
-          let (Pairing_ID id) = id in
-          Id_generator.recycle_id partitioner.id_generator id ;
           result := Some work ;
           None
       | None ->
@@ -314,9 +312,6 @@ let submit_into_pending_zkapp_command ~partitioner
   let returns = ref SchemeUnmatched in
   let process pending =
     Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
-
-    let (Job_ID id) = job_id in
-    Id_generator.recycle_id partitioner.id_generator id ;
 
     if 0 = pending.merge_remaining then
       let final_proof =
