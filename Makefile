@@ -73,6 +73,7 @@ help:
 	@echo "genesis-ledger-ocaml - Generate OCaml genesis ledger from daemon"
 	@echo "heap_usage         - Build heap usage analysis tool"
 	@echo "help               - Display this help information"
+	@echo "install            - Install all the binaries and libraries to the opam switch, and make it available in the PATH"
 	@echo "libp2p_helper      - Build libp2p helper"
 	@echo "missing_blocks_auditor - Build missing blocks auditor tool"
 	@echo "ml-docs            - Generate OCaml documentation"
@@ -88,6 +89,7 @@ help:
 	@echo "switch             - Set up the opam switch"
 	@echo "test-coverage      - Run tests with coverage instrumentation"
 	@echo "test-ppx           - Test PPX extensions"
+	@echo "uninstall          - Uninstall all binaries and libraries from the opam switch"
 	@echo "update-graphql     - Update GraphQL schema"
 	@echo "zkapp_limits       - Build ZkApp limits tool"
 
@@ -266,6 +268,21 @@ check-format: ocaml_checks
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
 
+.PHONY:
+install:
+	@dune build @install
+	@dune install
+	@echo "--------------------------------------------------------------"
+	@echo "All binaries and libraries installed to $(OPAM_SWITCH_PREFIX)/bin,"
+	@echo "path added to the environment variable PATH."
+	@echo "You can list the installed binaries with:"
+	@echo "> ls -al ${OPAM_SWITCH_PREFIX}/bin"
+	@echo "In particular, you should be able to run the command 'mina'"
+	@echo "'logproc', 'rosetta', 'generate_keypair', etc from this shell"
+
+.PHONY:
+uninstall:
+	@dune uninstall
 ########################################
 ## Artifacts
 
