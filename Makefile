@@ -269,16 +269,6 @@ check-snarky-submodule:
 ########################################
 ## Artifacts
 
-.PHONY: publish-macos
-publish-macos:
-	@./scripts/publish-macos.sh
-
-.PHONY: deb
-deb:
-	./scripts/debian/builder.sh
-	@mkdir -p /tmp/artifacts
-	@cp _build/mina*.deb /tmp/artifacts/.
-
 .PHONY: build_pv_keys
 build_pv_keys: ocaml_checks
 	$(info Building keys)
