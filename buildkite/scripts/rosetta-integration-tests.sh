@@ -61,23 +61,23 @@ TRANSACTION_FREQUENCY=10
 
 # Libp2p Keypair
 echo "=========================== GENERATING KEYPAIR IN ${MINA_LIBP2P_KEYPAIR_PATH} ==========================="
-mina libp2p generate-keypair -privkey-path $MINA_LIBP2P_KEYPAIR_PATH
+mina libp2p generate-keypair -privkey-path "${MINA_LIBP2P_KEYPAIR_PATH}"
 
 # Configuration
 echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} ==========================="
-mkdir -p $MINA_KEYS_PATH
-BLOCK_PRODUCER_KEY=$MINA_KEYS_PATH/block-producer.key
-SNARK_PRODUCER_KEY=$MINA_KEYS_PATH/snark-producer.key
-ZKAPP_FEE_PAYER_KEY=$MINA_KEYS_PATH/zkapp-fee-payer.key
-ZKAPP_SENDER_KEY=$MINA_KEYS_PATH/zkapp-sender.key
-ZKAPP_ACCOUNT_KEY=$MINA_KEYS_PATH/zkapp-account.key
-TIME_VESTING_ACCOUNT_1_KEY=$MINA_KEYS_PATH/time-vesting-account-1.key
-TIME_VESTING_ACCOUNT_2_KEY=$MINA_KEYS_PATH/time-vesting-account-2.key
+mkdir -p "${MINA_KEYS_PATH}"
+BLOCK_PRODUCER_KEY=${MINA_KEYS_PATH}/block-producer.key
+SNARK_PRODUCER_KEY=${MINA_KEYS_PATH}/snark-producer.key
+ZKAPP_FEE_PAYER_KEY=${MINA_KEYS_PATH}/zkapp-fee-payer.key
+ZKAPP_SENDER_KEY=${MINA_KEYS_PATH}/zkapp-sender.key
+ZKAPP_ACCOUNT_KEY=${MINA_KEYS_PATH}/zkapp-account.key
+TIME_VESTING_ACCOUNT_1_KEY=${MINA_KEYS_PATH}/time-vesting-account-1.key
+TIME_VESTING_ACCOUNT_2_KEY=${MINA_KEYS_PATH}/time-vesting-account-2.key
 keys=($BLOCK_PRODUCER_KEY $SNARK_PRODUCER_KEY $ZKAPP_FEE_PAYER_KEY $ZKAPP_SENDER_KEY $ZKAPP_ACCOUNT_KEY $TIME_VESTING_ACCOUNT_1_KEY $TIME_VESTING_ACCOUNT_2_KEY)
 for key in ${keys[*]}; do
-  mina advanced generate-keypair --privkey-path $key
+  mina advanced generate-keypair --privkey-path "${key}"
 done
-chmod -R 0700 $MINA_KEYS_PATH
+chmod -R 0700 "${MINA_KEYS_PATH}"
 BLOCK_PRODUCER_PUB_KEY=$(cat ${BLOCK_PRODUCER_KEY}.pub)
 SNARK_PRODUCER_PK=$(cat ${SNARK_PRODUCER_KEY}.pub)
 ZKAPP_FEE_PAYER_PUB_KEY=$(cat ${ZKAPP_FEE_PAYER_KEY}.pub)
@@ -86,8 +86,8 @@ ZKAPP_ACCOUNT_PUB_KEY=$(cat ${ZKAPP_ACCOUNT_KEY}.pub)
 TIME_VESTING_ACCOUNT_1_PUB_KEY=$(cat ${TIME_VESTING_ACCOUNT_1_KEY}.pub)
 TIME_VESTING_ACCOUNT_2_PUB_KEY=$(cat ${TIME_VESTING_ACCOUNT_2_KEY}.pub)
 
-mkdir -p $MINA_CONFIG_DIR/wallets/store
-cp ${BLOCK_PRODUCER_KEY} $MINA_CONFIG_DIR/wallets/store/$BLOCK_PRODUCER_PUB_KEY
+mkdir -p "${MINA_CONFIG_DIR}"/wallets/store
+cp "${BLOCK_PRODUCER_KEY}" "${MINA_CONFIG_DIR}"/wallets/store/"${BLOCK_PRODUCER_PUB_KEY}"
 CURRENT_TIME=$(date +"%Y-%m-%dT%H:%M:%S%z")
 cat <<EOF >"$MINA_CONFIG_FILE"
 {
@@ -138,37 +138,47 @@ done
 
 # Import Genesis Accounts
 echo "==================== IMPORTING GENESIS ACCOUNTS ======================"
-mina accounts import --privkey-path ${BLOCK_PRODUCER_KEY} --config-directory $MINA_CONFIG_DIR
-mina accounts import --privkey-path ${SNARK_PRODUCER_KEY} --config-directory $MINA_CONFIG_DIR
+mina accounts import \
+     --privkey-path "${BLOCK_PRODUCER_KEY}" \
+     --config-directory "${MINA_CONFIG_DIR}"
+mina accounts import \
+     --privkey-path "${SNARK_PRODUCER_KEY}" \
+     --config-directory "${MINA_CONFIG_DIR}"
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
-pg_ctlcluster ${POSTGRES_VERSION} main start
-pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
-sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
-sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
+pg_ctlcluster "${POSTGRES_VERSION}" main start
+pg_dropcluster --stop "${POSTGRES_VERSION}" main
+pg_createcluster --start -d "${POSTGRES_DATA_DIR}" \
+                 --createclusterconf \
+                 /etc/mina/rosetta/scripts/postgresql.conf \
+                 "${POSTGRES_VERSION}" \
+                 main
+sudo -u postgres psql --command \
+     "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
+sudo -u postgres createdb \
+     -O "${POSTGRES_USERNAME}" "${POSTGRES_DBNAME}"
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
 
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
-ports=($MINA_ROSETTA_ONLINE_PORT $MINA_ROSETTA_OFFLINE_PORT)
+ports=("${MINA_ROSETTA_ONLINE_PORT}" "${MINA_ROSETTA_OFFLINE_PORT}")
 for port in ${ports[*]}; do
   mina-rosetta \
     --archive-uri "${PG_CONN}" \
     --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
-    --log-level ${LOG_LEVEL} \
-    --port ${port} &
+    --log-level "${LOG_LEVEL}" \
+    --port "${port}" &
   sleep 5
 done
 
 # Mina Archive
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="
 mina-archive run \
-  --config-file ${MINA_CONFIG_FILE} \
-  --log-level ${LOG_LEVEL} \
+  --config-file "${MINA_CONFIG_FILE}" \
+  --log-level "${LOG_LEVEL}" \
   --postgres-uri "${PG_CONN}" \
-  --server-port ${MINA_ARCHIVE_PORT} &
+  --server-port "${MINA_ARCHIVE_PORT}" &
 sleep 5
 
 # Daemon
@@ -177,13 +187,13 @@ mina daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
   --background \
   --block-producer-pubkey "$BLOCK_PRODUCER_PUB_KEY" \
-  --config-directory ${MINA_CONFIG_DIR} \
-  --config-file ${MINA_CONFIG_FILE} \
-  --libp2p-keypair ${MINA_LIBP2P_KEYPAIR_PATH} \
-  --log-level ${LOG_LEVEL} \
+  --config-directory "${MINA_CONFIG_DIR}" \
+  --config-file "${MINA_CONFIG_FILE}" \
+  --libp2p-keypair "${MINA_LIBP2P_KEYPAIR_PATH}" \
+  --log-level "${LOG_LEVEL}" \
   --proof-level none \
-  --rest-port ${MINA_GRAPHQL_PORT} \
-  --run-snark-worker "$SNARK_PRODUCER_PK" \
+  --rest-port "${MINA_GRAPHQL_PORT}" \
+  --run-snark-worker "${SNARK_PRODUCER_PK}" \
   --seed \
   --demo-mode
 
@@ -214,15 +224,24 @@ send_zkapp_txn "${ZKAPP_TXN_QUERY}"
 
 # Unlock Genesis Accounts
 echo "==================== UNLOCKING GENESIS ACCOUNTS ======================"
-mina accounts unlock --public-key $BLOCK_PRODUCER_PUB_KEY
-mina accounts unlock --public-key $SNARK_PRODUCER_PK
+mina accounts unlock --public-key "${BLOCK_PRODUCER_PUB_KEY}"
+mina accounts unlock --public-key "${SNARK_PRODUCER_PK}"
 
 # Start sending value transfer transactions
 send_value_transfer_txns() {
-  mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -nonce 0 -receiver $BLOCK_PRODUCER_PUB_KEY -sender $BLOCK_PRODUCER_PUB_KEY
+  mina client send-payment \
+       -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
+       -amount 1 \
+       -nonce 0 \
+       -receiver "${BLOCK_PRODUCER_PUB_KEY}" \
+       -sender "${BLOCK_PRODUCER_PUB_KEY}"
   while true; do
-    sleep $TRANSACTION_FREQUENCY
-    mina client send-payment -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql -amount 1 -receiver $BLOCK_PRODUCER_PUB_KEY -sender $BLOCK_PRODUCER_PUB_KEY
+    sleep "${TRANSACTION_FREQUENCY}"
+    mina client send-payment \
+         -rest-server http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \
+         -amount 1 \
+         -receiver "${BLOCK_PRODUCER_PUB_KEY}" \
+         -sender "${BLOCK_PRODUCER_PUB_KEY}"
   done
 }
 send_value_transfer_txns &
@@ -257,15 +276,17 @@ sleep ${sleep_time}
 
 # Mina Rosetta Checks (spec construction data perf)
 echo "============ ROSETTA CLI: VALIDATE CONF FILE ${ROSETTA_CONFIGURATION_FILE} =============="
-rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
+rosetta-cli configuration:validate "${ROSETTA_CONFIGURATION_FILE}"
 
 echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
-rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+rosetta-cli check:spec --all \
+            --configuration-file "${ROSETTA_CONFIGURATION_FILE}"
 
 if [[ "$MODE" == "full" ]]; then
 
   echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
-  rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+  rosetta-cli check:construction \
+              --configuration-file "${ROSETTA_CONFIGURATION_FILE}"
 
   # wait until block height 11 is reached before starting check:data
   # so it gives enough time to vest the time-vesting accounts
@@ -284,5 +305,4 @@ if [[ "$MODE" == "full" ]]; then
 
   echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
   echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
-
 fi
