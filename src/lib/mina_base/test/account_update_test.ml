@@ -24,9 +24,8 @@ let update_json_roundtrip () =
     let%bind timing = Timing_info.gen in
     let%map voting_for = State_hash.gen in
     let app_state =
-      Zkapp_state.V.of_list_exn
-        Set_or_keep.
-          [ Set (F.of_int i); Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
+      Pickles_types.Vector.init Zkapp_state.Max_state_size.n
+            ~f:Zkapp_basic.Set_or_keep.(fun n -> if n = 0 then Set (F.of_int i) else Keep)
     in
     let verification_key =
       Set_or_keep.Set
