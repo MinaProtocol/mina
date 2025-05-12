@@ -30,6 +30,8 @@ module Single = struct
 
     type t = (Transaction_witness.t, Ledger_proof.Cached.t) Work.Single.Spec.t
 
+    let gen () : t Quickcheck.Generator.t = failwith "TODO"
+
     let read_all_proofs_from_disk : t -> Stable.Latest.t =
       Work.Single.Spec.map
         ~f_witness:Transaction_witness.read_all_proofs_from_disk
