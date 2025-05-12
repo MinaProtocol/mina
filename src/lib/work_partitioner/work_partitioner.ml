@@ -271,44 +271,30 @@ type submit_result =
 (* If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
 
 let submit_single ~partitioner ~this_single ~id =
-  let Mergable_single_work.{ which_half; common; _ } = this_single in
-  let issued = Time.of_span_since_epoch common.issued_since_unix_epoch in
-  let delta = Time.(diff (now ()) issued) in
-  if Time.Span.( > ) delta partitioner.reassignment_timeout then
-    (* This is how we guarantee there's no ID being repeated. We should remove
-       logic on slashing old work submitted in Work Selector though, as they're
-       now redundant.
-    *)
-    Slashed
-  else
-    let result = ref None in
-    Hashtbl.change partitioner.pairing_pool id ~f:(function
-      | Some other_single ->
-          let work =
-            match which_half with
-            | `First ->
-                Mergable_single_work.merge_to_one_result_exn this_single
-                  other_single
-            | `Second ->
-                Mergable_single_work.merge_to_one_result_exn other_single
-                  this_single
-          in
+  let Mergable_single_work.{ which_half; _ } = this_single in
+  let result = ref None in
+  Hashtbl.change partitioner.pairing_pool id ~f:(function
+    | Some other_single ->
+        let work =
+          match which_half with
+          | `First ->
+              Mergable_single_work.merge_to_one_result_exn this_single
+                other_single
+          | `Second ->
+              Mergable_single_work.merge_to_one_result_exn other_single
+                this_single
+        in
 
-          result := Some work ;
-          None
-      | None ->
-          Some this_single ) ;
-    Processed !result
+        result := Some work ;
+        None
+    | None ->
+        Some this_single ) ;
+  Processed !result
 
 let submit_into_pending_zkapp_command ~partitioner
     ~spec:({ pairing; job_id; _ } : Work.Partitioned.Zkapp_command_job.t)
     ~metric:({ proof; elapsed } : Work.Partitioned.Proof_with_metric.t)
     ~(prover : Signature_lib.Public_key.Compressed.t) =
-  let job_is_old (job : Work.Partitioned.Zkapp_command_job.t) : bool =
-    let issued = Time.of_span_since_epoch job.common.issued_since_unix_epoch in
-    let delta = Time.(diff (now ()) issued) in
-    Time.Span.( > ) delta partitioner.reassignment_timeout
-  in
   let returns = ref SchemeUnmatched in
   let process pending =
     Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
@@ -359,29 +345,18 @@ let submit_into_pending_zkapp_command ~partitioner
            meaning it's completed, ignoring" ;
         returns := Slashed ;
         None
-    | Some job -> (
-        if job_is_old job then (
-          (* This is how we guarantee there's no ID being repeated. We should remove
-             logic on slashing old work submitted in Work Selector though, as they're
-             now redundant.
-          *)
-          returns := Slashed ;
-          printf
-            "Job submitted is too old, it should be reissued by the work \
-             partitioner, ignoring" ;
-          Some job )
-        else
-          match
-            Zkapp_command_job_pool.find partitioner.zkapp_command_jobs pairing
-          with
-          | None ->
-              printf
-                "Worker submit a work that's already slashed from pending \
-                 zkapp command pool, meaning it's completed, ignoring " ;
-              returns := Slashed ;
-              None
-          | Some pending ->
-              process pending ; None )
+    | Some _ -> (
+        match
+          Zkapp_command_job_pool.find partitioner.zkapp_command_jobs pairing
+        with
+        | None ->
+            printf
+              "Worker submit a work that's already slashed from pending zkapp \
+               command pool, meaning it's completed, ignoring " ;
+            returns := Slashed ;
+            None
+        | Some pending ->
+            process pending ; None )
   in
 
   Sent_job_pool.change ~id:job_id ~f:slash_or_process
