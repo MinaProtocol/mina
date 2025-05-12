@@ -255,6 +255,7 @@ end
 
 let%test_module "Transaction hashes" =
   ( module struct
+
     let run_test ~transaction_id ~expected_hash =
       let hash =
         match hash_of_transaction_id transaction_id with
@@ -295,26 +296,15 @@ let%test_module "Transaction hashes" =
       run_test ~transaction_id ~expected_hash
 
 
-      let txn : Zkapp_command.Stable.V1.t = let txn : Zkapp_command.Stable.V1.t =
-        (Lazy.force Mina_base.Zkapp_command.stable_dummy) in
-        {txn with account_updates =
-          Mina_base.Zkapp_command.Call_forest.map
-            txn.account_updates
-            ~f:(fun x ->
-               {x with Mina_base.Account_update.Poly.authorization=
-                  Mina_base.Control.Poly.Proof
-                  (Lazy.force Mina_base.Proof.blockchain_dummy)
-              }
-            )};;
-
-    let () = Core_kernel.Out_channel.with_file "txn_id" ~f:(fun file -> Out_channel.output_string file (Core_kernel.Binable.to_string (module Mina_base.User_command.Stable.V2) (Zkapp_command txn) |> Base64.encode |> (function Ok x -> x | Error _ -> "")))
     (* To regenerate:
        * Run dune in this library's directory
        dune utop src/lib/transaction
+       * TODO it would be really nice if we could at least compile this to mitigate bit rot
        * Generate a zkapp transaction:
-            let txn = let txn = (Lazy.force Mina_base.Zkapp_command.dummy) in {txn with account_updates = Mina_base.Zkapp_command.Call_forest.map txn.account_updates ~f:(fun x -> {x with Mina_base.Account_update.Poly.authorization= Mina_base.Control.Poly.Proof (Lazy.force Mina_base.Proof.blockchain_dummy)})};;
+            let txn = let txn = (Lazy.force Mina_base.Zkapp_command.dummy) in {txn with account_updates = Mina_base.Zkapp_command.Call_forest.forget_hashes @@ Mina_base.Zkapp_command.Call_forest.map txn.account_updates ~f:(fun x -> {x with Mina_base.Account_update.Poly.authorization= Mina_base.Control.Poly.Proof (Lazy.force Mina_base.Proof.blockchain_dummy) })} ;;
        * Print the transaction:
-            Core_kernel.Out_channel.with_file "txn_id" ~f:(fun file -> Out_channel.output_string file (Core_kernel.Binable.to_string (module Mina_base.User_command.Stable.V2) (Zkapp_command txn) |> Base64.encode |> (function Ok x -> x | Error _ -> "")));;
+
+          Core_kernel.Out_channel.with_file "txn_id" ~f:(fun file -> Out_channel.output_string file (Core_kernel.Binable.to_string (module Mina_base.User_command.Stable.V2) (Zkapp_command txn) |> Base64.encode |> (function Ok x -> x | Error _ -> "")));
         * Get the hash:
             Mina_transaction.Transaction_hash.(hash_command (Zkapp_command txn) |> to_base58_check);;
     *)

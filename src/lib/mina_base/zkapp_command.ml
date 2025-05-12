@@ -931,7 +931,7 @@ let arg_query_string x =
 
 let dummy : T.t lazy_t =
   lazy
-    (let account_update : Account_update.Stable.V1.t  =
+    (let account_update =
        { Account_update.Poly.body = Account_update.Body.dummy
        ; authorization = Control.Poly.Signature Signature.dummy
        }
@@ -943,23 +943,6 @@ let dummy : T.t lazy_t =
      in
      { Poly.fee_payer
      ; account_updates = Call_forest.cons account_update []
-     ; memo = Signed_command_memo.empty
-     } )
-
-let stable_dummy : Stable.V1.t lazy_t =
-  lazy
-    (let account_update : Account_update.Stable.V1.t  =
-       { Account_update.Poly.body = Account_update.Body.dummy
-       ; authorization = Control.Poly.Signature Signature.dummy
-       }
-     in
-     let fee_payer : Account_update.Fee_payer.t =
-       { body = Account_update.Body.Fee_payer.dummy
-       ; authorization = Signature.dummy
-       }
-     in
-     { Poly.fee_payer
-     ; account_updates = Call_forest.forget_hashes @@ Call_forest.cons account_update []
      ; memo = Signed_command_memo.empty
      } )
 
