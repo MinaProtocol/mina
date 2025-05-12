@@ -3,7 +3,7 @@ module Schema = Graphql_wrapper.Make (Schema)
 
 let test_query schema query = Test_common.test_query schema () query
 
-let%test_unit "__schema: not deprecated" =
+let schema_not_deprecated_test () =
   let schema =
     Schema.(
       schema
@@ -35,7 +35,7 @@ let%test_unit "__schema: not deprecated" =
             ] )
       ] )
 
-let%test_unit "__schema: default deprecation" =
+let schema_default_deprecation_test () =
   let schema =
     Schema.(
       schema
@@ -65,7 +65,7 @@ let%test_unit "__schema: default deprecation" =
             ] )
       ] )
 
-let%test_unit "__schema: deprecated-without-reason" =
+let schema_deprecated_without_reason_test () =
   let schema =
     Schema.(
       schema
@@ -98,7 +98,7 @@ let%test_unit "__schema: deprecated-without-reason" =
             ] )
       ] )
 
-let%test_unit "__schema: deprecated with reason" =
+let schema_deprecated_with_reason_test () =
   let schema =
     Schema.(
       schema
@@ -132,7 +132,7 @@ let%test_unit "__schema: deprecated with reason" =
             ] )
       ] )
 
-let%test_unit "__schema: deduplicates argument types" =
+let schema_deduplicates_argument_types_test () =
   let schema =
     Schema.(
       schema
@@ -158,18 +158,18 @@ let%test_unit "__schema: deduplicates argument types" =
             ] )
       ] )
 
-let%test_unit "__type" =
+let type_test () =
   let query =
     {|
-      {
-        role_type: __type(name: "role") {
-          name
+        {
+          role_type: __type(name: "role") {
+            name
+          }
+          user_type: __type(name: "user") {
+            name
+          }
         }
-        user_type: __type(name: "user") {
-          name
-        }
-      }
-    |}
+      |}
   in
   test_query Test_schema.schema query
     (`Assoc
@@ -179,3 +179,20 @@ let%test_unit "__type" =
             ; ("user_type", `Assoc [ ("name", `String "user") ])
             ] )
       ] )
+
+let () =
+  Alcotest.run "GraphQL Introspection Tests"
+    [ ( "introspection operations"
+      , [ Alcotest.test_case "__schema: not deprecated" `Quick
+            schema_not_deprecated_test
+        ; Alcotest.test_case "__schema: default deprecation" `Quick
+            schema_default_deprecation_test
+        ; Alcotest.test_case "__schema: deprecated-without-reason" `Quick
+            schema_deprecated_without_reason_test
+        ; Alcotest.test_case "__schema: deprecated with reason" `Quick
+            schema_deprecated_with_reason_test
+        ; Alcotest.test_case "__schema: deduplicates argument types" `Quick
+            schema_deduplicates_argument_types_test
+        ; Alcotest.test_case "__type" `Quick type_test
+        ] )
+    ]
