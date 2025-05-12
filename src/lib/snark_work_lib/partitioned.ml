@@ -12,7 +12,7 @@ module Pairing = struct
     module Stable = struct
       module V1 = struct
         (* this identifies a One_or_two work from Work_selector's perspective *)
-        type t = Pairing_ID of int
+        type t = Pairing_ID of int64
         [@@deriving compare, hash, sexp, yojson, equal]
 
         let to_latest = Fn.id
@@ -82,7 +82,7 @@ module Zkapp_command_job = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Job_ID of int [@@deriving compare, hash, sexp, yojson]
+        type t = Job_ID of int64 [@@deriving compare, hash, sexp, yojson]
 
         let to_latest = Fn.id
       end
