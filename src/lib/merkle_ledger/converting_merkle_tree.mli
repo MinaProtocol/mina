@@ -49,9 +49,9 @@ end)
        and type account_id := Inputs.Account_id.t
        and type account_id_set := Inputs.Account_id.Set.t
 
-  val create : Primary_ledger.t -> Converting_ledger.t option -> t
+  val create : Primary_ledger.t -> Converting_ledger.t -> t
 
   val primary_ledger : t -> Primary_ledger.t
 
-  val converting_ledger : t -> Converting_ledger.t option
+  val converting_ledger : t -> Converting_ledger.t
 end

@@ -42,11 +42,11 @@ end)
        and type account_id := Inputs.Account_id.t
        and type account_id_set := Inputs.Account_id.Set.t
 
-  val create : Primary_ledger.t -> Converting_ledger.t option -> t
+  val create : Primary_ledger.t -> Converting_ledger.t -> t
 
   val primary_ledger : t -> Primary_ledger.t
 
-  val converting_ledger : t -> Converting_ledger.t option
+  val converting_ledger : t -> Converting_ledger.t
 end = struct
   let convert = Inputs.convert
 
@@ -60,7 +60,7 @@ end = struct
 
   type t =
     { primary_ledger : Primary_ledger.t
-    ; converting_ledger : Converting_ledger.t option
+    ; converting_ledger : Converting_ledger.t
     }
 
   let create primary_ledger converting_ledger =
@@ -82,23 +82,15 @@ end = struct
 
   let set_all_accounts_rooted_at_exn t addr accounts =
     Primary_ledger.set_all_accounts_rooted_at_exn t.primary_ledger addr accounts ;
-    match t.converting_ledger with
-    | None ->
-        ()
-    | Some converting_ledger ->
-        Converting_ledger.set_all_accounts_rooted_at_exn converting_ledger addr
-          (List.map ~f:convert accounts)
+    Converting_ledger.set_all_accounts_rooted_at_exn t.converting_ledger addr
+      (List.map ~f:convert accounts)
 
   let set_batch_accounts t addressed_accounts =
     Primary_ledger.set_batch_accounts t.primary_ledger addressed_accounts ;
-    match t.converting_ledger with
-    | None ->
-        ()
-    | Some converting_ledger ->
-        Converting_ledger.set_batch_accounts converting_ledger
-          (List.map
-             ~f:(fun (addr, account) -> (addr, convert account))
-             addressed_accounts )
+    Converting_ledger.set_batch_accounts t.converting_ledger
+      (List.map
+         ~f:(fun (addr, account) -> (addr, convert account))
+         addressed_accounts )
 
   let get_all_accounts_rooted_at_exn t addr =
     Primary_ledger.get_all_accounts_rooted_at_exn t.primary_ledger addr
@@ -141,12 +133,8 @@ end = struct
       Primary_ledger.get_or_create_account t.primary_ledger account_id account
     in
     let%map converting_res =
-      match t.converting_ledger with
-      | None ->
-          return res
-      | Some converting_ledger ->
-          Converting_ledger.get_or_create_account converting_ledger account_id
-            (convert account)
+      Converting_ledger.get_or_create_account t.converting_ledger account_id
+        (convert account)
     in
     let () =
       match (res, converting_res) with
@@ -160,7 +148,7 @@ end = struct
 
   let close t =
     Primary_ledger.close t.primary_ledger ;
-    Option.iter ~f:Converting_ledger.close t.converting_ledger
+    Converting_ledger.close t.converting_ledger
 
   let last_filled t = Primary_ledger.last_filled t.primary_ledger
 
@@ -175,34 +163,21 @@ end = struct
 
   let set t location account =
     Primary_ledger.set t.primary_ledger location account ;
-    match t.converting_ledger with
-    | None ->
-        ()
-    | Some converting_ledger ->
-        Converting_ledger.set converting_ledger location (convert account)
+    Converting_ledger.set t.converting_ledger location (convert account)
 
   let set_batch ?hash_cache t located_accounts =
     Primary_ledger.set_batch ?hash_cache t.primary_ledger located_accounts ;
-    match t.converting_ledger with
-    | None ->
-        ()
-    | Some converting_ledger ->
-        Converting_ledger.set_batch converting_ledger
-          (List.map
-             ~f:(fun (loc, account) -> (loc, convert account))
-             located_accounts )
+    Converting_ledger.set_batch t.converting_ledger
+      (List.map
+         ~f:(fun (loc, account) -> (loc, convert account))
+         located_accounts )
 
   let get_at_index_exn t idx =
     Primary_ledger.get_at_index_exn t.primary_ledger idx
 
   let set_at_index_exn t idx account =
     Primary_ledger.set_at_index_exn t.primary_ledger idx account ;
-    match t.converting_ledger with
-    | None ->
-        ()
-    | Some converting_ledger ->
-        Converting_ledger.set_at_index_exn converting_ledger idx
-          (convert account)
+    Converting_ledger.set_at_index_exn t.converting_ledger idx (convert account)
 
   let index_of_account_exn t account_id =
     Primary_ledger.index_of_account_exn t.primary_ledger account_id
