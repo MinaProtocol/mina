@@ -70,7 +70,7 @@ RUN export GOBIN="$(pwd)/bin" \
     && curl -L "https://github.com/coinbase/mesh-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
     && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp" \
     && cd "/tmp/mesh-cli-0.10.1" \
-    && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/mesh-sdk-go@${GO_VERSION}=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
+    && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/mesh-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
     && /usr/lib/go/bin/go mod tidy \
     && /usr/lib/go/bin/go install
 
