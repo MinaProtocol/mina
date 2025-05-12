@@ -16,8 +16,11 @@
  (preprocess
   (pps
    ppx_custom_printf
+   ppx_deriving_yojson
    ppx_let
-   ppx_mina))
+   ppx_mina
+   ppx_sexp_conv
+   ppx_version))
    
  (instrumentation
   (backend bisect_ppx))

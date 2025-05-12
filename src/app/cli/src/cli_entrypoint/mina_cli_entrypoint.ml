@@ -1753,8 +1753,11 @@ let internal_commands logger ~itn_features =
               in
 
               let sok_digest = Mina_base.Sok_message.digest sok_message in
-              let spec : Snark_work_lib.Selector.Spec.Stable.Latest.t =
+              let spec =
                 { instances = `One single_spec; fee = Currency.Fee.zero }
+                |> Snark_work_lib.Partitioned.Spec.Poly.of_selector_spec
+                     ~issued_since_unix_epoch:
+                       Time.(now () |> to_span_since_epoch)
               in
               match%map
                 Snark_worker.Worker.Prod.perform ~state ~sok_digest ~spec
