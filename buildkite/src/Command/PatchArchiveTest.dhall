@@ -22,7 +22,7 @@ in  { step =
                     , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
                     ]
                     "./src/test/archive/sample_db/archive_db.sql"
-                    "${Artifacts.dockerName Artifacts.Type.FunctionalTestSuite}-${Network.lowerName network}-${BuildFlags.lowerName BuildFlags.Type.Instrumented}"
+                    "${Artifacts.dockerName Artifacts.Type.FunctionalTestSuite}-${Network.lowerName Network.Type.Berkeley}-${BuildFlags.lowerName BuildFlags.Type.Instrumented}"
                     (None Network.Type)
                     "./scripts/patch-archive-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
