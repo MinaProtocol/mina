@@ -128,6 +128,8 @@ module Account_id : sig
 
   val eq :
     (Mina_wire_types.Mina_base_account_id.M.V2.t, t) Core_kernel.Type_equal.t
+
+  val eq2 : (Mina_base.Account_id.t, t) Core_kernel.Type_equal.t
 end = struct
   [%%versioned
   module Stable = struct
@@ -138,8 +140,6 @@ end = struct
       let to_latest = Fn.id
     end
   end]
-
-  type t = Mina_base.Account_id.t
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
@@ -163,6 +163,8 @@ end = struct
       (Quickcheck.Generator.list_with_length num_accounts gen)
 
   let eq = Core_kernel.Type_equal.T
+
+  let eq2 = Core_kernel.Type_equal.T
 end
 
 module Account : sig
@@ -180,6 +182,10 @@ module Account : sig
   val update_balance : t -> Balance.t -> t
 
   val public_key : t -> Mina_base.Account.Key.t
+
+  val of_yojson : Yojson.Safe.t -> (t, string) Result.t
+
+  val to_yojson : t -> Yojson.Safe.t
 end = struct
   (* want bin_io, not available with Account.t *)
   type t = Mina_base.Account.Stable.Latest.t
