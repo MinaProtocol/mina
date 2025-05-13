@@ -269,7 +269,7 @@ check-format: ocaml_checks
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
 
-.PHONY:
+.PHONY: install
 install:
 	@dune build @install
 	@dune install
@@ -281,7 +281,7 @@ install:
 	@echo "In particular, you should be able to run the command 'mina'"
 	@echo "'logproc', 'rosetta', 'generate_keypair', etc from this shell"
 
-.PHONY:
+.PHONY: uninstall
 uninstall:
 	@dune uninstall
 ########################################
