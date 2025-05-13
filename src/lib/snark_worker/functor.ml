@@ -57,7 +57,7 @@ type Structured_log_events.t +=
            $proof_zkapp_command_count proof zkapp_command"
       }]
 
-let work_spec_counter = ref 1
+let work_spec_counter = ref 0
 
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
@@ -109,10 +109,10 @@ module Make (Inputs : Intf.Inputs_intf) :
       ({ instances; fee } as spec : Work.Spec.t) =
     let dir = Sys.getenv_exn "PATH_DUMP_SNARK_WORK_SPEC" in
     let to_dump : DumpedWorkSpec.t = { prover = public_key; spec } in
+    work_spec_counter := !work_spec_counter + 1 ;
     to_dump |> DumpedWorkSpec.to_yojson
     |> Yojson.Safe.to_file
          (Printf.sprintf "%s/dumped_spec.%d.json" dir !work_spec_counter) ;
-    work_spec_counter := !work_spec_counter + 1 ;
 
     One_or_two.Deferred_result.map instances ~f:(fun w ->
         let open Deferred.Or_error.Let_syntax in
