@@ -209,6 +209,13 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
        ~transition_reader:bootstrap_controller_reader ~persistent_frontier
        ~persistent_root ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
+      [%log info]
+        "Bootstrap controller returned, killing its pipe to and replace it \
+         with transition frontier's"
+        ~metadata:
+          [ ( "closed_pipe"
+            , Strict_pipe.Writer.to_yojson bootstrap_controller_writer )
+          ] ;
       Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
         ~context:(module Context)
@@ -708,6 +715,14 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                           ~context:(module Context)
                           frontier header_with_hash
                       then (
+                        [%log info]
+                          "Need to start a new bootstrap controller, killing \
+                           old pipe"
+                          ~metadata:
+                            [ ( "closed_transition_pipe"
+                              , Strict_pipe.Writer.to_yojson
+                                  !transition_writer_ref )
+                            ] ;
                         Strict_pipe.Writer.kill !transition_writer_ref ;
                         Option.iter ~f:Strict_pipe.Writer.kill
                           !producer_transition_writer_ref ;
