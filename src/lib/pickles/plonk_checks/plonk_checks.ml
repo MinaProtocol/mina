@@ -474,4 +474,10 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
               ~f:(fun f -> Shifted_value.equal Field.equal (f plonk) (f actual))
               [ perm ] )
         |> Boolean.all )
+
+end
+
+
+module type Scalars_sig = sig
+include module type of Scalars 
 end

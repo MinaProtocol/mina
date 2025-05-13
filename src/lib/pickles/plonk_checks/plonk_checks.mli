@@ -155,3 +155,5 @@ module Domain = Pickles_base.Domain
 module Scalars = Scalars
 
 module Scalars_boolean = Scalars_boolean
+
+module type Scalars_sig = module type of Scalars
