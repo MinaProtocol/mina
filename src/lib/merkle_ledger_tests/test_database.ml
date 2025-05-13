@@ -130,6 +130,7 @@ module Make (Test : Test_intf) = struct
               Quickcheck.random_value ~seed:(`Deterministic "balance 1")
                 Balance.gen
             in
+            let T = Account_id.eq in
             let account = Account.create account_id balance in
             let balance' =
               Quickcheck.random_value ~seed:(`Deterministic "balance 2")
@@ -437,6 +438,7 @@ module Make (Test : Test_intf) = struct
             Quickcheck.random_value
               (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
           in
+          let T = Account_id.eq in
           let accounts = List.map2_exn account_ids balances ~f:Account.create in
           Test.with_instance (fun mdb ->
               List.iter accounts ~f:(fun account ->
@@ -462,6 +464,7 @@ module Make (Test : Test_intf) = struct
               List.fold balances ~init:0 ~f:(fun accum balance ->
                   Balance.to_nanomina_int balance + accum )
             in
+            let T = Account_id.eq in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
@@ -492,6 +495,7 @@ module Make (Test : Test_intf) = struct
                   List.fold some_balances ~init:0 ~f:(fun accum balance ->
                       Balance.to_int balance + accum )
                 in
+                let T = Account_id.eq in
                 let accounts =
                   List.map2_exn account_ids balances ~f:Account.create
                 in
@@ -517,6 +521,14 @@ module Make (Test : Test_intf) = struct
 end
 
 module Make_db (Depth : sig
+  module Account :
+    Merkle_ledger.Intf.Account
+      with type account_id := Account_id.t
+       and type token_id := Token_id.t
+       and type balance := Balance.t
+
+  module Hash : Merkle_ledger.Intf.Hash with type account := Account.t
+
   val depth : int
 end) =
 Make (struct
@@ -543,7 +555,7 @@ Make (struct
   end
 
   module Inputs = struct
-    include Test_stubs.Base_inputs
+    include Test_stubs.Make_base_inputs (Account) (Hash)
     module Location = Location
     module Location_binable = Location_binable
     module Kvdb = In_memory_kvdb
@@ -559,12 +571,18 @@ Make (struct
 end)
 
 module Depth_4 = struct
+  module Account = Test_stubs.Account
+  module Hash = Test_stubs.Hash
+
   let depth = 4
 end
 
 module Mdb_d4 = Make_db (Depth_4)
 
 module Depth_30 = struct
+  module Account = Test_stubs.Account
+  module Hash = Test_stubs.Hash
+
   let depth = 30
 end
 

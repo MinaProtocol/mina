@@ -8,69 +8,7 @@ module Balance = struct
   let of_int = of_nanomina_int_exn
 end
 
-module Account = struct
-  (* want bin_io, not available with Account.t *)
-  type t = Mina_base.Account.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp, equal, compare, hash, yojson]
-
-  type key = Mina_base.Account.Key.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp, equal, compare, hash]
-
-  (* use Account items needed *)
-  let empty = Mina_base.Account.empty
-
-  let public_key = Mina_base.Account.public_key
-
-  let identifier = Mina_base.Account.identifier
-
-  let key_gen = Mina_base.Account.key_gen
-
-  let gen = Mina_base.Account.gen
-
-  let create = Mina_base.Account.create
-
-  let balance Mina_base.Account.{ balance; _ } = balance
-
-  let update_balance t bal = { t with Mina_base.Account.balance = bal }
-
-  let token Mina_base.Account.{ token_id; _ } = token_id
-end
-
 module Receipt = Mina_base.Receipt
-
-module Hash = struct
-  module T = struct
-    type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, equal]
-  end
-
-  include T
-
-  include Codable.Make_base58_check (struct
-    type t = T.t [@@deriving bin_io_unversioned]
-
-    let description = "Ledger test hash"
-
-    let version_byte = Base58_check.Version_bytes.ledger_test_hash
-  end)
-
-  include Hashable.Make_binable (T)
-
-  (* to prevent pre-image attack,
-   * important impossible to create an account such that (merge a b = hash_account account) *)
-
-  let hash_account account =
-    Md5.digest_string (Format.sprintf !"0%{sexp: Account.t}" account)
-
-  let merge ~height a b =
-    let res =
-      Md5.digest_string
-        (sprintf "test_ledger_%d:%s%s" height (Md5.to_hex a) (Md5.to_hex b))
-    in
-    res
-
-  let empty_account = hash_account Account.empty
-end
-
 module Intf = Merkle_ledger.Intf
 
 module In_memory_kvdb : Intf.Key_value_database with type config := string =
@@ -146,7 +84,13 @@ module Storage_locations : Intf.Storage_locations = struct
   let key_value_db_dir = ""
 end
 
-module Key = struct
+module Key : sig
+  include Merkle_ledger.Intf.Key with type t = Mina_base.Account.Key.t
+
+  val gen : t Base_quickcheck.Generator.t
+
+  val gen_keys : int -> t list
+end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -159,9 +103,9 @@ module Key = struct
 
   let to_string = Signature_lib.Public_key.Compressed.to_base58_check
 
-  let gen = Account.key_gen
+  let gen = Mina_base.Account.key_gen
 
-  let empty : t = Account.empty.public_key
+  let empty : t = Mina_base.Account.empty.public_key
 
   let gen_keys num_keys =
     Quickcheck.random_value (Quickcheck.Generator.list_with_length num_keys gen)
@@ -172,7 +116,19 @@ end
 
 module Token_id = Mina_base.Token_id
 
-module Account_id = struct
+module Account_id : sig
+  include
+    Merkle_ledger.Intf.Account_id
+      with type token_id := Mina_base.Token_id.t
+       and type key := Key.t
+
+  val gen : t Base_quickcheck.Generator.t
+
+  val gen_accounts : int -> t list
+
+  val eq :
+    (Mina_wire_types.Mina_base_account_id.M.V2.t, t) Core_kernel.Type_equal.t
+end = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
@@ -182,6 +138,8 @@ module Account_id = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t = Mina_base.Account_id.t
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
@@ -203,9 +161,89 @@ module Account_id = struct
   let gen_accounts num_accounts =
     Quickcheck.random_value
       (Quickcheck.Generator.list_with_length num_accounts gen)
+
+  let eq = Core_kernel.Type_equal.T
 end
 
-module Base_inputs = struct
+module Account : sig
+  include
+    Merkle_ledger.Intf.Account
+      with type token_id := Token_id.t
+       and type account_id := Account_id.t
+       and type balance := Balance.t
+       and type t = Mina_base.Account.t
+
+  val gen : t Base_quickcheck.Generator.t
+
+  val create : Mina_base.Account_id.t -> Balance.t -> t
+
+  val update_balance : t -> Balance.t -> t
+
+  val public_key : t -> Mina_base.Account.Key.t
+end = struct
+  (* want bin_io, not available with Account.t *)
+  type t = Mina_base.Account.Stable.Latest.t
+  [@@deriving bin_io_unversioned, sexp, equal, compare, hash, yojson]
+
+  (* use Account items needed *)
+  let empty = Mina_base.Account.empty
+
+  let public_key = Mina_base.Account.public_key
+
+  let gen = Mina_base.Account.gen
+
+  let create = Mina_base.Account.create
+
+  let balance Mina_base.Account.{ balance; _ } = balance
+
+  let update_balance t bal = { t with Mina_base.Account.balance = bal }
+
+  let token Mina_base.Account.{ token_id; _ } = token_id
+
+  let identifier ({ public_key; token_id; _ } : t) =
+    Account_id.create public_key token_id
+end
+
+module Hash : Merkle_ledger.Intf.Hash with type account := Account.t = struct
+  module T = struct
+    type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, equal]
+  end
+
+  include T
+
+  include Codable.Make_base58_check (struct
+    type t = T.t [@@deriving bin_io_unversioned]
+
+    let description = "Ledger test hash"
+
+    let version_byte = Base58_check.Version_bytes.ledger_test_hash
+  end)
+
+  include Hashable.Make_binable (T)
+
+  (* to prevent pre-image attack,
+   * important impossible to create an account such that (merge a b = hash_account account) *)
+
+  let hash_account account =
+    Md5.digest_string (Format.sprintf !"0%{sexp: Account.t}" account)
+
+  let merge ~height a b =
+    let res =
+      Md5.digest_string
+        (sprintf "test_ledger_%d:%s%s" height (Md5.to_hex a) (Md5.to_hex b))
+    in
+    res
+
+  let empty_account = hash_account Account.empty
+end
+
+module Make_base_inputs
+    (Account : Merkle_ledger.Intf.Account
+                 with type account_id := Account_id.t
+                  and type token_id := Token_id.t
+                  and type balance := Balance.t)
+    (Hash : Merkle_ledger.Intf.Hash with type account := Account.t) =
+struct
   module Key = Key
   module Account_id = Account_id
   module Token_id = Token_id
@@ -221,3 +259,5 @@ module Base_inputs = struct
   module Account = Account
   module Hash = Hash
 end
+
+module Base_inputs = Make_base_inputs (Account) (Hash)
