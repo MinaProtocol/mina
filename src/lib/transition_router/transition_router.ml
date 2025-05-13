@@ -43,6 +43,29 @@ let block_or_header_to_header_hashed_with_validation b_or_h =
   | `Header h ->
       Envelope.Incoming.data h
 
+let block_or_header_debug_repr :
+       [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t
+       | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
+    -> Yojson.Safe.t = function
+  | `Header { sender; received_at; _ } ->
+      `Assoc
+        [ ("type", `String "header")
+        ; ("sender", Envelope.Sender.to_yojson sender)
+        ; ( "received_at"
+          , `String
+              (Time.to_string_iso8601_basic
+                 ~zone:Core_kernel_private.Time_zone.utc received_at ) )
+        ]
+  | `Block { sender; received_at; _ } ->
+      `Assoc
+        [ ("type", `String "block")
+        ; ("sender", Envelope.Sender.to_yojson sender)
+        ; ( "received_at"
+          , `String
+              (Time.to_string_iso8601_basic
+                 ~zone:Core_kernel_private.Time_zone.utc received_at ) )
+        ]
+
 let block_or_header_to_hash
     (b_or_h :
       [ `Block of
@@ -708,6 +731,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   let header_with_hash =
                     block_or_header_to_header_hashed_with_validation b_or_h
                   in
+                  [%log info] "Received a initial valid transition $b_or_h"
+                    ~metadata:[ ("b_or_h", block_or_header_debug_repr b_or_h) ] ;
                   match get_current_frontier () with
                   | Some frontier ->
                       if
@@ -750,6 +775,13 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   | None ->
                       Deferred.unit
                 in
+                [%log info]
+                  "Writing initial valid transition $b_or_h to pipe $pipe"
+                  ~metadata:
+                    [ ("b_or_h", block_or_header_debug_repr b_or_h)
+                    ; ( "pipe"
+                      , Strict_pipe.Writer.to_yojson !transition_writer_ref )
+                    ] ;
                 Strict_pipe.Writer.write !transition_writer_ref
                   (b_or_h, `Valid_cb (Some vc)) ) ) ;
   (verified_transition_reader, initialization_finish_signal)
