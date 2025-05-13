@@ -55,6 +55,7 @@ let json_serialization_roundtrips () =
   @@ Sample_precomputed_block.sample_block_json
 
 (* TODO I think I need to make a new one of these *)
+(* curled from https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz *)
 let large_precomputed_json_file = "hetzner-itn-1-1795.json"
 
 let json_serialization_is_stable_from_file () =
@@ -67,6 +68,7 @@ let json_serialization_roundtrips_from_file () =
 
 let field_element_decimal_deserialization () =
   let filename =
+    (* TODO this one too *)
     "regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json"
   in
   let json = Yojson.Safe.from_file filename in
