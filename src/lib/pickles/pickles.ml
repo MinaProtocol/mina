@@ -486,7 +486,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
-            ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
+            ( Step_verifier.Step_verifier_kimchi.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
@@ -2032,7 +2032,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
-            ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
+            ( Step_verifier.Step_verifier_kimchi.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
@@ -2340,7 +2340,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
-            ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
+            ( Step_verifier.Step_verifier_kimchi.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t ))
 

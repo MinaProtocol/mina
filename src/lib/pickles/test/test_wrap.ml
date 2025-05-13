@@ -123,7 +123,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
      once for the wrap circuit.  It was decided not to use a functor for this. *)
   let deferred_values_typ =
     let open Impls.Step in
-    let open Step_verifier in
+    let open Step_verifier.Step_verifier_kimchi in
     Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.typ
       ~feature_flags:full_features ~challenge:Challenge.typ
       ~scalar_challenge:Challenge.typ
@@ -132,7 +132,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
            Limb_vector.Challenge.Constant.zero )
       (Shifted_value.Type1.typ Field.typ)
       (Import.Branch_data.typ
-         ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
+         ~assert_16_bits:(Step_verifier.Step_verifier_kimchi.assert_n_bits ~n:16) )
   in
 
   (* Use deferred_values_typ and the constant helper to prepare deferred_values
@@ -178,7 +178,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
         in
 
         (* Call finalisation with all of the required details *)
-        Step_verifier.finalize_other_proof
+        Step_verifier.Step_verifier_kimchi.finalize_other_proof
           (module Nat.N0)
           ~step_domains:
             (`Known [ { h = Pow_2_roots_of_unity vk.domain.log_size_of_group } ])

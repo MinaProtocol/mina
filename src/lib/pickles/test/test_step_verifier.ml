@@ -32,7 +32,7 @@ let test_side_loaded_domains () =
           ~domain_generator:Backend.Tick.Field.domain_generator
       in
       let checked_domain () =
-        Pickles__Step_verifier.For_tests_only.side_loaded_domain
+        Pickles__Step_verifier.Step_verifier_kimchi.For_tests_only.side_loaded_domain
           ~log2_size:(Field.of_int ds.h)
       in
       let pp ppf cst =
