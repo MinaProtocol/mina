@@ -275,7 +275,7 @@ let wrap_main
                 ; lookup_pattern_xor
                 ; lookup_pattern_range_check
                 } =
-              Plonk_checks.expand_feature_flags
+              Kimchi_checks.expand_feature_flags
                 ( module struct
                   type t = Boolean.var
 
@@ -424,7 +424,7 @@ let wrap_main
                             Wrap_verifier.finalize_other_proof
                               (module Wrap_hack.Padded_length)
                               ~domain:
-                                (wrap_domain :> _ Plonk_checks.plonk_domain)
+                                (wrap_domain :> _ Kimchi_checks.plonk_domain)
                               ~sponge ~old_bulletproof_challenges
                               deferred_values evals )
                       in

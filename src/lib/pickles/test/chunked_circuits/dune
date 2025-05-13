@@ -3,59 +3,59 @@
  (libraries
   ;; opam libraries
   alcotest
-  stdio
-  integers
-  result
-  base.caml
-  bignum.bigint
-  core_kernel
-  base64
-  digestif
-  ppx_inline_test.config
-  sexplib0
-  base
-  async_kernel
-  bin_prot.shape
   async
+  async_kernel
   async_unix
+  base
+  base.caml
+  base64
+  bignum.bigint
+  bin_prot.shape
+  core_kernel
+  digestif
+  integers
+  ppx_inline_test.config
+  result
+  sexplib0
+  stdio
   ;; local libraries
-  mina_wire_types
+  base58_check
+  bitstring_lib
+  codable
+  error_json
+  group_map
+  key_cache
+  kimchi_backend
+  kimchi_backend_common
   kimchi_bindings
-  kimchi_types
-  pasta_bindings
   kimchi_pasta
   kimchi_pasta.basic
   kimchi_pasta.constraint_system
-  bitstring_lib
-  snarky.intf
-  pickles.backend
-  pickles_types
-  snarky.backendless
-  snarky_group_map
-  sponge
-  pickles
-  pickles.pseudo
-  pickles.limb_vector
-  pickles_base
-  kimchi_backend
-  base58_check
-  codable
-  random_oracle_input
-  pickles.composition_types
-  pickles.plonk_checks
-  pickles_base.one_hot_vector
-  snarky_log
-  group_map
-  snarky_curve
-  key_cache
-  snark_keys_header
-  tuple_lib
-  promise
-  kimchi_backend_common
+  kimchi_types
   logger
   logger.context_logger
+  mina_wire_types
+  pasta_bindings
+  pickles
+  pickles.backend
+  pickles.composition_types
+  pickles.limb_vector
+  pickles.kimchi_checks
+  pickles.pseudo
+  pickles_base
+  pickles_base.one_hot_vector
+  pickles_types
   ppx_version.runtime
-  error_json)
+  promise
+  random_oracle_input
+  snarky.backendless
+  snarky.intf
+  snarky_curve
+  snarky_group_map
+  snarky_log
+  snark_keys_header
+  sponge
+  tuple_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

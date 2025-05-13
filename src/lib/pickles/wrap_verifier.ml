@@ -266,7 +266,7 @@ struct
                in
                let none_sum =
                  let num_chunks =
-                   (* TODO *) Plonk_checks.num_chunks_by_default
+                   (* TODO *) Kimchi_checks.num_chunks_by_default
                  in
                  Option.map is_none ~f:(fun (b : Boolean.var) ->
                      Array.init num_chunks ~f:(fun _ ->
@@ -1433,9 +1433,10 @@ struct
     |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
          ~f:(Shifted_value.Type2.map ~f:Util.Wrap.seal)
 
-  module Plonk_checks = struct
-    include Plonk_checks
-    include Plonk_checks.Make (Shifted_value.Type2) (Plonk_checks.Scalars.Tock)
+  module Kimchi_checks = struct
+    include Kimchi_checks
+    include
+      Kimchi_checks.Make (Shifted_value.Type2) (Kimchi_checks.Scalars.Tock)
   end
 
   (* This finalizes the "deferred values" coming from a previous proof over the same field.
@@ -1567,11 +1568,11 @@ struct
           | None ->
               if_ b ~then_:(then_ ()) ~else_:(else_ ())
       end in
-      Plonk_checks.scalars_env
+      Kimchi_checks.scalars_env
         (module Env_bool)
         (module Env_field)
         ~srs_length_log2:Common.Max_degree.wrap_log2
-        ~zk_rows:Plonk_checks.zk_rows_by_default
+        ~zk_rows:Kimchi_checks.zk_rows_by_default
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->
@@ -1586,7 +1587,7 @@ struct
       with_label __LOC__ (fun () ->
           let ft_eval0 : Field.t =
             with_label __LOC__ (fun () ->
-                Plonk_checks.ft_eval0
+                Kimchi_checks.ft_eval0
                   (module Field)
                   ~env ~domain plonk_minimal combined_evals evals1.public_input )
           in
@@ -1662,7 +1663,7 @@ struct
     let plonk_checks_passed =
       with_label __LOC__ (fun () ->
           (* This proof is a wrap proof; no need to consider features. *)
-          Plonk_checks.checked
+          Kimchi_checks.checked
             (module Impl)
             ~env ~shift:shift2
             (Composition_types.Step.Proof_state.Deferred_values.Plonk.In_circuit

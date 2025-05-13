@@ -1,6 +1,6 @@
 (library
- (name plonk_checks)
- (public_name pickles.plonk_checks)
+ (name kimchi_checks)
+ (public_name pickles.kimchi_checks)
  (instrumentation
   (backend bisect_ppx))
  (flags
@@ -8,20 +8,20 @@
   -open
   Core_kernel)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (pps ppx_deriving.std ppx_deriving_yojson ppx_jane ppx_mina ppx_version))
  (libraries
   ;; opam libraries
-  sexplib0
-  ppxlib.ast
+  base.base_internalhash_types
   core_kernel
   ocaml-migrate-parsetree
-  base.base_internalhash_types
+  ppxlib.ast
+  sexplib0
   ;; local libraries
-  pickles_types
-  pickles_base
-  pickles.composition_types
   kimchi_backend
   kimchi_types
+  pickles.composition_types
+  pickles_base
+  pickles_types
   snarky.backendless
   tuple_lib))
 

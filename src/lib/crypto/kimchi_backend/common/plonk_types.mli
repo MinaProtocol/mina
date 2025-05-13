@@ -224,6 +224,10 @@ module Messages : sig
        Kimchi_pasta_snarky_backend.Wrap_impl.Typ.t
 end
 
+(** Evaluation points for each polynomials. The type parameter 'f (or 'a) is
+    used to encode the number and the type of the evaluations. In practice, we
+    would use a tuple of two values (as we do have two evaluation points ζ, and
+    ζω) *)
 module Evals : sig
   module In_circuit : sig
     type ('f, 'bool) t =
