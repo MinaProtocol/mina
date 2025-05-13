@@ -253,6 +253,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           let tx_statement : Zkapp_statement.t =
             { account_update =
                 Account_update.Body.digest
+                  ~signature_kind:Mina_signature_kind.t_DEPRECATED
                   (Account_update.of_simple snapp_account_update_data).body
             ; calls = (Zkapp_command.Digest.Forest.empty :> field)
             }
