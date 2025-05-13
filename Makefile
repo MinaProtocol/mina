@@ -274,8 +274,8 @@ install:
 	@dune build @install
 	@dune install
 	@echo "--------------------------------------------------------------"
-	@echo "All binaries and libraries installed to $(OPAM_SWITCH_PREFIX)/bin,"
-	@echo "path added to the environment variable PATH."
+	@echo "All binaries (resp. libraries) have been installed into $(OPAM_SWITCH_PREFIX)/bin"
+	@echo "(resp. ${OPAM_SWITCH_PREFIX}/lib) and the binaries are available in the path."
 	@echo "You can list the installed binaries with:"
 	@echo "> ls -al ${OPAM_SWITCH_PREFIX}/bin"
 	@echo "In particular, you should be able to run the command 'mina'"
