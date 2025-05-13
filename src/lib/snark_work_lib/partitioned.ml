@@ -297,7 +297,7 @@ module Spec = struct
                     One_or_two.map
                       ~f:(fun (single_spec, metric) ->
                         let stmt = Work.Single.Spec.statement single_spec in
-                        (single_spec, f stmt metric) )
+                        (single_spec, f stmhas been usedt metric) )
                       instances
                 ; common
                 }
@@ -323,35 +323,11 @@ module Spec = struct
           | Sub_zkapp_command { spec = { common; _ }; _ }
           | Old { common; _ } ->
               common.fee_of_full
-
-        let of_selector_spec ~issued_since_unix_epoch (spec : _ Work.Spec.t) :
-            _ t =
-          Old
-            { instances =
-                One_or_two.map ~f:(fun spec -> (spec, ())) spec.instances
-            ; common = { fee_of_full = spec.fee; issued_since_unix_epoch }
-            }
-
-        let to_selector_spec : _ t -> _ Work.Spec.t option = function
-          | Old spec ->
-              let instances =
-                One_or_two.map ~f:(fun (spec, ()) -> spec) spec.instances
-              in
-              Some { instances; fee = spec.common.fee_of_full }
-          | _ ->
-              None
       end
     end]
 
     [%%define_locally
-    Stable.Latest.
-      ( map
-      , statements
-      , map_with_statement
-      , transaction
-      , of_selector_spec
-      , to_selector_spec
-      , fee_of_full )]
+    Stable.Latest.(map, statements, map_with_statement, transaction, fee_of_full)]
   end
 
   [%%versioned
