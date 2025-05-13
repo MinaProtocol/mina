@@ -351,6 +351,7 @@ check-snarky-submodule:
 install:
 	@dune build @install
 	@dune install
+	@cp ${OPAM_SWITCH_PREFIX}/bin/signer ${OPAM_SWITCH_PREFIX}/bin/mina-ocaml-signer
 	@echo "--------------------------------------------------------------"
 	@echo "All binaries (resp. libraries) have been installed into $(OPAM_SWITCH_PREFIX)/bin"
 	@echo "(resp. ${OPAM_SWITCH_PREFIX}/lib) and the binaries are available in the path."
@@ -362,6 +363,7 @@ install:
 .PHONY: uninstall
 uninstall:
 	@dune uninstall
+	@rm ${OPAM_SWITCH_PREFIX}/bin/mina-ocaml-signer
 ########################################
 ## Artifacts
 
