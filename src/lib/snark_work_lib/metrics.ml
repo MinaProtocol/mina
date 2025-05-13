@@ -11,10 +11,10 @@ type snark_work_generated =
       }
   | Sub_zkapp_command of { kind : [ `Merge | `Segment ]; elapsed : Time.Span.t }
 
-let collect_single ~(single_spec : _ Work.Single.Spec.t)
-    ~metric:({ elapsed; _ } : _ Partitioned.Proof_with_metric.Poly.t) =
+let collect_single ~(single_spec : _ Single_spec.Poly.t)
+    ~metric:({ elapsed; _ } : _ Proof_with_metric.Poly.t) =
   match single_spec with
-  | Work.Single.Spec.Merge (_, _, _) ->
+  | Single_spec.Poly.Merge (_, _, _) ->
       Perf_histograms.add_span ~name:"snark_worker_merge_time" elapsed ;
 
       (* WARN: This `observe` is just noop, not sure why it's here *)
@@ -22,7 +22,7 @@ let collect_single ~(single_spec : _ Work.Single.Spec.t)
         Cryptography.Snark_work_histogram.observe
           Cryptography.snark_work_merge_time_sec (Time.Span.to_sec elapsed)) ;
       Merge_generated elapsed
-  | Work.Single.Spec.Transition
+  | Single_spec.Poly.Transition
       (_, ({ transaction; _ } : _ Transaction_witness.Poly.t)) ->
       Perf_histograms.add_span ~name:"snark_worker_transition_time" elapsed ;
       let transaction_type, zkapp_command_count, proof_zkapp_command_count =
@@ -93,12 +93,10 @@ let collect_single ~(single_spec : _ Work.Single.Spec.t)
 let emit_proof_metrics ~data =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
   match data with
-  | Partitioned.Spec.Poly.Single { single_spec; metric; _ } ->
+  | Spec.Poly.Single { single_spec; metric; _ } ->
       `One (collect_single ~single_spec ~metric)
-  | Partitioned.Spec.Poly.Sub_zkapp_command
-      { spec = { spec = Partitioned.Zkapp_command_job.Spec.Poly.Segment _; _ }
-      ; metric
-      } ->
+  | Spec.Poly.Sub_zkapp_command
+      { spec = { spec = Zkapp_command_job.Spec.Poly.Segment _; _ }; metric } ->
       (* WARN:
          I don't know if this is the desired behavior, we need CI engineers.
          We're likely to adapt the below somehow to here.
@@ -113,10 +111,8 @@ let emit_proof_metrics ~data =
       Perf_histograms.add_span
         ~name:"snark_worker_sub_zkapp_command_segment_time" metric.elapsed ;
       `One (Sub_zkapp_command { kind = `Segment; elapsed = metric.elapsed })
-  | Partitioned.Spec.Poly.Sub_zkapp_command
-      { spec = { spec = Partitioned.Zkapp_command_job.Spec.Poly.Merge _; _ }
-      ; metric
-      } ->
+  | Spec.Poly.Sub_zkapp_command
+      { spec = { spec = Zkapp_command_job.Spec.Poly.Merge _; _ }; metric } ->
       (* WARN:
          I don't know if this is the desired behavior, we need CI engineers.
          We're likely to adapt the below somehow to here.
@@ -131,6 +127,3 @@ let emit_proof_metrics ~data =
       Perf_histograms.add_span ~name:"snark_worker_sub_zkapp_command_merge_time"
         metric.elapsed ;
       `One (Sub_zkapp_command { kind = `Merge; elapsed = metric.elapsed })
-  | Partitioned.Spec.Poly.Old { instances; _ } ->
-      One_or_two.map instances ~f:(fun (single_spec, metric) ->
-          collect_single ~single_spec ~metric )
