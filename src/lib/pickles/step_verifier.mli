@@ -11,6 +11,8 @@ module Scalar_challenge :
 
 module Pseudo = Pseudo.Step
 
+module Scalars : Plonk_checks.Scalars_sig
+
 module Inner_curve : sig
   type t = Step_main_inputs.Inner_curve.t
 

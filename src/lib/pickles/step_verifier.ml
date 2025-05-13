@@ -22,7 +22,7 @@ module Make
                   Step_main_inputs.Impl.Internal_Basic.Typ.typ'
                  and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
                   ('var, 'value) Step_main_inputs.Impl.Internal_Basic.Typ.typ
-                 and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
+                 and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) (Scalars :  Plonk_checks.Scalars_sig)=
 struct
   open Inputs
   open Impl
@@ -778,14 +778,15 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-
     include
       Plonk_checks.Make
         (Shifted_value.Type1)
         (struct
-          let constant_term = Plonk_checks.Scalars.Tick.constant_term
+          let constant_term = 
+            Scalars.Tick.constant_term
 
-          let index_terms = Plonk_checks.Scalars.Tick.index_terms
+          let index_terms = 
+            Scalars.Tick.index_terms
         end)
   end
 
@@ -1222,10 +1223,13 @@ struct
             with_label (sprintf "%s:%d" __LOC__ i) (fun () ->
                 Field.Assert.equal c1 c2 ) ) ) ;
     bulletproof_success
-end
 
-include Make (Step_main_inputs)
+    module For_tests_only = struct
+      let side_loaded_domain = 
+        side_loaded_domain
+    end
+    
+  end
 
-module For_tests_only = struct
-  let side_loaded_domain = side_loaded_domain
-end
+include Make (Step_main_inputs) (Plonk_checks.Scalars)
+
