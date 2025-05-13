@@ -46,6 +46,8 @@ module Reader : sig
 
   val pipe_name : _ t -> string option
 
+  val to_yojson : _ t -> Yojson.Safe.t
+
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
   val filter_map : 'a t -> f:('a -> 'b option) -> 'b t
@@ -118,6 +120,8 @@ module Writer : sig
   type ('t, 'behavior, 'return) t
 
   val pipe_name : (_, _, _) t -> string option
+
+  val to_yojson : (_, _, _) t -> Yojson.Safe.t
 
   val to_linear_pipe : ('t, 'behavior, 'return) t -> 't Linear_pipe.Writer.t
 
