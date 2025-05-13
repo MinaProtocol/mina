@@ -29,6 +29,7 @@ struct
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
   module Utils = Util.Make (Impl)
+  module Scalars = Scalars
 
   (* Other_field.size > Field.size *)
   module Other_field = struct
