@@ -1231,5 +1231,7 @@ struct
     
   end
 
+module Step_verifier_kimchi = struct
 include Make (Step_main_inputs) (Plonk_checks.Scalars)
+end
 

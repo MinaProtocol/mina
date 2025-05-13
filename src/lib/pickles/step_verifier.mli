@@ -1,3 +1,5 @@
+module Step_verifier_kimchi : sig 
+
 module Impl := Step_main_inputs.Impl
 
 module Challenge : module type of Import.Challenge.Make (Impl)
@@ -150,4 +152,6 @@ module For_tests_only : sig
        ; log2_size : field
        ; shifts : field Pickles_types.Plonk_types.Shifts.t
        ; vanishing_polynomial : field -> field >
+end
+
 end
