@@ -410,6 +410,16 @@ install-rosetta-cli:
     && go mod tidy \
     && GOBIN=${OPAM_SWITCH_PREFIX}/bin go install
 
+.PHONY: setup-rosetta-pg-cluster
+setup-rosetta-pg-cluster:
+	@POSTGRES_VERSION=$$(psql -V | cut -d " " -f 3 | sed 's/\.[[:digit:]]*$$//') && \
+	pg_createcluster --start \
+		-d /data/postgresql \
+		--createclusterconf \
+		./src/app/rosetta/scripts/postgresql.conf \
+		$$POSTGRES_VERSION \
+		main
+
 ##############################################
 ## Genesis ledger in OCaml from running daemon
 
