@@ -54,4 +54,6 @@ end)
   val primary_ledger : t -> Primary_ledger.t
 
   val converting_ledger : t -> Converting_ledger.t
+
+  val convert : Inputs.Account.t -> Inputs.converted_account
 end
