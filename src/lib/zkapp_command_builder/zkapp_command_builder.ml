@@ -96,7 +96,8 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     let commitment =
       if use_full_commitment then full_txn_commitment else txn_commitment
     in
-    Signature_lib.Schnorr.Chunked.sign sk
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind sk
       (Random_oracle.Input.Chunked.field commitment)
   in
   let fee_payer_sk =
