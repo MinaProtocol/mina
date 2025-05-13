@@ -1,0 +1,3 @@
+(test
+ (name graph_algorithms_test)
+ (libraries alcotest core_kernel graph_algorithms))

@@ -68,7 +68,8 @@ module Vect = struct
   let rec map : type n. f:('a -> 'b) -> ('a, n) t -> ('b, n) t =
    fun ~f ls -> match ls with [] -> [] | h :: t -> f h :: map ~f t
 
-  let rec map2 : type n. f:('a -> 'b -> 'c) -> ('a, n) t -> ('b, n) t -> ('c, n) t =
+  let rec map2 :
+      type n. f:('a -> 'b -> 'c) -> ('a, n) t -> ('b, n) t -> ('c, n) t =
    fun ~f ls_a ls_b ->
     match (ls_a, ls_b) with
     | [], [] ->
@@ -81,7 +82,8 @@ module Vect = struct
     match ls with [] -> init | h :: t -> fold ~init:(f init h) ~f t
 
   let rec fold_map :
-      type n. init:'b -> f:('b -> 'a -> 'b * 'c) -> ('a, n) t -> 'b * ('c, n) t =
+      type n. init:'b -> f:('b -> 'a -> 'b * 'c) -> ('a, n) t -> 'b * ('c, n) t
+      =
    fun ~init ~f ls ->
     match ls with
     | [] ->
