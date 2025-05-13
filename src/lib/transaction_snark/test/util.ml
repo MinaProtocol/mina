@@ -472,8 +472,10 @@ module Wallet = struct
         ~nonce ~memo ~valid_until:None
         ~body:(Payment { receiver_pk; amount = Amount.of_nanomina_int_exn amt })
     in
-    let signature = Signed_command.sign_payload fee_payer.private_key payload in
-    Signed_command.check
+    let signature =
+      Signed_command.sign_payload ~signature_kind fee_payer.private_key payload
+    in
+    Signed_command.check ~signature_kind
       Signed_command.Poly.Stable.Latest.
         { payload
         ; signer = Public_key.of_private_key_exn fee_payer.private_key
@@ -488,8 +490,10 @@ module Wallet = struct
         ~nonce ~memo ~valid_until:None
         ~body:(Stake_delegation (Set_delegate { new_delegate = delegate_pk }))
     in
-    let signature = Signed_command.sign_payload fee_payer.private_key payload in
-    Signed_command.check
+    let signature =
+      Signed_command.sign_payload ~signature_kind fee_payer.private_key payload
+    in
+    Signed_command.check ~signature_kind
       Signed_command.Poly.Stable.Latest.
         { payload
         ; signer = Public_key.of_private_key_exn fee_payer.private_key

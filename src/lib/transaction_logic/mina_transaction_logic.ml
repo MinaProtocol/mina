@@ -2410,7 +2410,8 @@ module For_tests = struct
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Signed_command.t =
     let sender_pk = Public_key.compress sender.public_key in
-    Signed_command.sign sender
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    Signed_command.sign ~signature_kind sender
       { common =
           { fee
           ; fee_payer_pk = sender_pk
