@@ -20,13 +20,11 @@ let runInDockerWithPostgresConn
     :     List Text
       ->  Text
       ->  Text
-      ->  Optional Network.Type
       ->  Text
       ->  Cmd.Type
     =     \(environment : List Text)
       ->  \(initScript : Text)
       ->  \(docker : Text)
-      ->  \(network : Optional Network.Type)
       ->  \(innerScript : Text)
       ->  let port = "5432"
 
@@ -60,26 +58,13 @@ let runInDockerWithPostgresConn
               : Text
               = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
-          let minaDockerTag
-              : Text
-              = "\\\$MINA_DOCKER_TAG"
-
-          let maybeNetwork =
-                Optional/map
-                  Network.Type
-                  Text
-                  (\(network : Network.Type) -> "-${Network.lowerName network}")
-                  network
-
-          let networkOrDefault = Optional/default Text "" maybeNetwork
-
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                 , "source buildkite/scripts/export-git-env-vars.sh"
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                 , "sleep 5"
                 , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}"
-                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} gcr.io/o1labs-192920/${docker}:${minaDockerTag}${networkOrDefault} ${innerScript}"
+                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
                 ]
 
 in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }

@@ -22,8 +22,7 @@ in  { step =
                     , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
                     ]
                     "./src/test/archive/sample_db/archive_db.sql"
-                    "${Artifacts.dockerName Artifacts.Type.FunctionalTestSuite}-${Network.lowerName Network.Type.Berkeley}-${BuildFlags.lowerName BuildFlags.Type.Instrumented}"
-                    (None Network.Type)
+                    "gcr.io/o1labs-192920/${Artifacts.dockerName Artifacts.Type.FunctionalTestSuite}:\\\$MINA_DOCKER_TAG-${Network.lowerName Network.Type.Berkeley}-${Buildflags.lowerName BuildFlags.Type.Instrumented}"
                     "./scripts/patch-archive-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Patch Archive test"
