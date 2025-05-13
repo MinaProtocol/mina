@@ -227,8 +227,6 @@ build_rosetta_all_sigs: ocaml_checks
 		src/app/rosetta/rosetta_testnet_signatures.exe \
 		src/app/rosetta/rosetta_mainnet_signatures.exe \
 		src/app/rosetta/ocaml-signer/signer.exe \
-		src/app/rosetta/ocaml-signer/signer_testnet_signature.exe \
-		src/app/rosetta/ocaml-signer/signer_mainnet_signature.exe \
 		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
