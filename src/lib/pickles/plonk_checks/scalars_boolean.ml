@@ -62,30 +62,11 @@ end
 open Column
 
 module Env = struct
-  type 'a t =
-    { add : 'a -> 'a -> 'a
-    ; sub : 'a -> 'a -> 'a
+  type 'a t = {
+     sub : 'a -> 'a -> 'a
     ; mul : 'a -> 'a -> 'a
-    ; pow : 'a * int -> 'a
-    ; square : 'a -> 'a
-    ; zk_polynomial : 'a
-    ; omega_to_minus_zk_rows : 'a
-    ; zeta_to_n_minus_1 : 'a
-    ; zeta_to_srs_length : 'a Lazy.t
-    ; var : Column.t * curr_or_next -> 'a
-    ; field : string -> 'a
-    ; cell : 'a -> 'a
-    ; alpha_pow : int -> 'a
-    ; double : 'a -> 'a
-    ; endo_coefficient : 'a
-    ; mds : int * int -> 'a
-    ; srs_length_log2 : int
-    ; vanishes_on_zero_knowledge_and_previous_rows : 'a
-    ; joint_combiner : 'a
-    ; beta : 'a
-    ; gamma : 'a
-    ; unnormalized_lagrange_basis : bool * int -> 'a
-    ; if_feature : Kimchi_types.feature_flag * (unit -> 'a) * (unit -> 'a) -> 'a
+ ;   var : Column.t * curr_or_next -> 'a
+;    cell : 'a -> 'a
     }
 end
 
@@ -98,29 +79,12 @@ end
 (* The constraints are basically the same, but the literals in them differ. *)
 module Tick : S = struct
   let constant_term (type a)
-      ({ add = _
-       ; sub = ( - )
+      ({ 
+        sub = ( - )
        ; mul = ( * )
-       ; square = _
-       ; mds = _
-       ; endo_coefficient = _
-       ; pow= _
-       ; var
-       ; field= _
-       ; cell
-       ; alpha_pow= _
-       ; double= _
-       ; zk_polynomial = _
-       ; omega_to_minus_zk_rows = _
-       ; zeta_to_n_minus_1 = _
-       ; zeta_to_srs_length = _
-       ; srs_length_log2 = _
-       ; vanishes_on_zero_knowledge_and_previous_rows= _
-       ; joint_combiner= _
-       ; beta= _
-       ; gamma= _
-       ; unnormalized_lagrange_basis= _
-       ; if_feature= _
+       ; cell;
+       var
+       
        } :
         a Env.t ) =
     (cell (var (Witness 0, Curr)) * cell (var (Witness 0, Curr)))
@@ -131,29 +95,12 @@ end
 
 module Tock : S = struct
   let constant_term (type a)
-      ({ add =  _
-       ; sub = ( - )
+      ({ 
+        sub = ( - )
        ; mul = ( * )
-       ; square= _
-       ; mds= _
-       ; endo_coefficient= _
-       ; pow= _
+       
        ; var
-       ; field= _
        ; cell
-       ; alpha_pow= _
-       ; double= _
-       ; zk_polynomial = _
-       ; omega_to_minus_zk_rows = _
-       ; zeta_to_n_minus_1 = _
-       ; zeta_to_srs_length = _
-       ; srs_length_log2 = _
-       ; vanishes_on_zero_knowledge_and_previous_rows = _
-       ; joint_combiner = _
-       ; beta = _
-       ; gamma = _
-       ; unnormalized_lagrange_basis = _
-       ; if_feature = _
        } :
         a Env.t ) =
     (cell (var (Witness 0, Curr)) * cell (var (Witness 0, Curr)))
