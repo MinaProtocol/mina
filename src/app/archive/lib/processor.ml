@@ -349,6 +349,30 @@ module Zkapp_states_nullable = struct
     ; element5 : int option
     ; element6 : int option
     ; element7 : int option
+    ; element8 : int option
+    ; element9 : int option
+    ; element10 : int option
+    ; element11 : int option
+    ; element12 : int option
+    ; element13 : int option
+    ; element14 : int option
+    ; element15 : int option
+    ; element16 : int option
+    ; element17 : int option
+    ; element18 : int option
+    ; element19 : int option
+    ; element20 : int option
+    ; element21 : int option
+    ; element22 : int option
+    ; element23 : int option
+    ; element24 : int option
+    ; element25 : int option
+    ; element26 : int option
+    ; element27 : int option
+    ; element28 : int option
+    ; element29 : int option
+    ; element30 : int option
+    ; element31 : int option
     }
   [@@deriving fields, hlist]
 
@@ -356,6 +380,30 @@ module Zkapp_states_nullable = struct
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
       Caqti_type.
         [ option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
+        ; option int
         ; option int
         ; option int
         ; option int
@@ -386,6 +434,30 @@ module Zkapp_states_nullable = struct
         ; element5
         ; element6
         ; element7
+        ; element8
+        ; element9
+        ; element10
+        ; element11
+        ; element12
+        ; element13
+        ; element14
+        ; element15
+        ; element16
+        ; element17
+        ; element18
+        ; element19
+        ; element20
+        ; element21
+        ; element22
+        ; element23
+        ; element24
+        ; element25
+        ; element26
+        ; element27
+        ; element28
+        ; element29
+        ; element30
+        ; element31
         ] ->
           { element0
           ; element1
@@ -395,6 +467,30 @@ module Zkapp_states_nullable = struct
           ; element5
           ; element6
           ; element7
+          ; element8
+          ; element9
+          ; element10
+          ; element11
+          ; element12
+          ; element13
+          ; element14
+          ; element15
+          ; element16
+          ; element17
+          ; element18
+          ; element19
+          ; element20
+          ; element21
+          ; element22
+          ; element23
+          ; element24
+          ; element25
+          ; element26
+          ; element27
+          ; element28
+          ; element29
+          ; element30
+          ; element31
           }
       | _ ->
           failwith "Invalid number of nullable app state elements"
@@ -421,12 +517,36 @@ module Zkapp_states = struct
     ; element5 : int
     ; element6 : int
     ; element7 : int
+    ; element8 : int
+    ; element9 : int
+    ; element10 : int
+    ; element11 : int
+    ; element12 : int
+    ; element13 : int
+    ; element14 : int
+    ; element15 : int
+    ; element16 : int
+    ; element17 : int
+    ; element18 : int
+    ; element19 : int
+    ; element20 : int
+    ; element21 : int
+    ; element22 : int
+    ; element23 : int
+    ; element24 : int
+    ; element25 : int
+    ; element26 : int
+    ; element27 : int
+    ; element28 : int
+    ; element29 : int
+    ; element30 : int
+    ; element31 : int
     }
   [@@deriving fields, hlist]
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int; int; int; int ]
+      Caqti_type.[ int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int ]
 
   let table_name = "zkapp_states"
 
@@ -447,6 +567,30 @@ module Zkapp_states = struct
         ; element5
         ; element6
         ; element7
+        ; element8
+        ; element9
+        ; element10
+        ; element11
+        ; element12
+        ; element13
+        ; element14
+        ; element15
+        ; element16
+        ; element17
+        ; element18
+        ; element19
+        ; element20
+        ; element21
+        ; element22
+        ; element23
+        ; element24
+        ; element25
+        ; element26
+        ; element27
+        ; element28
+        ; element29
+        ; element30
+        ; element31
         ] ->
           { element0
           ; element1
@@ -456,6 +600,30 @@ module Zkapp_states = struct
           ; element5
           ; element6
           ; element7
+          ; element8
+          ; element9
+          ; element10
+          ; element11
+          ; element12
+          ; element13
+          ; element14
+          ; element15
+          ; element16
+          ; element17
+          ; element18
+          ; element19
+          ; element20
+          ; element21
+          ; element22
+          ; element23
+          ; element24
+          ; element25
+          ; element26
+          ; element27
+          ; element28
+          ; element29
+          ; element30
+          ; element31
           }
       | _ ->
           failwith "Invalid number of app state elements"

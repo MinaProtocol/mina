@@ -116,6 +116,30 @@ let update_of_id pool update_id =
              ; element5
              ; element6
              ; element7
+             ; element8
+             ; element9
+             ; element10
+             ; element11
+             ; element12
+             ; element13
+             ; element14
+             ; element15
+             ; element16
+             ; element17
+             ; element18
+             ; element19
+             ; element20
+             ; element21
+             ; element22
+             ; element23
+             ; element24
+             ; element25
+             ; element26
+             ; element27
+             ; element28
+             ; element29
+             ; element30
+             ; element31
              } =
       query_db ~f:(fun db ->
           Processor.Zkapp_states_nullable.load db app_state_id )
@@ -129,6 +153,30 @@ let update_of_id pool update_id =
       ; element5
       ; element6
       ; element7
+      ; element8
+      ; element9
+      ; element10
+      ; element11
+      ; element12
+      ; element13
+      ; element14
+      ; element15
+      ; element16
+      ; element17
+      ; element18
+      ; element19
+      ; element20
+      ; element21
+      ; element22
+      ; element23
+      ; element24
+      ; element25
+      ; element26
+      ; element27
+      ; element28
+      ; element29
+      ; element30
+      ; element31
       ]
     in
     let%map field_strs =
@@ -535,6 +583,30 @@ let get_account_update_body ~pool body_id =
                ; element5
                ; element6
                ; element7
+               ; element8
+               ; element9
+               ; element10
+               ; element11
+               ; element12
+               ; element13
+               ; element14
+               ; element15
+               ; element16
+               ; element17
+               ; element18
+               ; element19
+               ; element20
+               ; element21
+               ; element22
+               ; element23
+               ; element24
+               ; element25
+               ; element26
+               ; element27
+               ; element28
+               ; element29
+               ; element30
+               ; element31
                } =
         query_db ~f:(fun db ->
             Processor.Zkapp_states_nullable.load db state_id )
@@ -548,6 +620,30 @@ let get_account_update_body ~pool body_id =
         ; element5
         ; element6
         ; element7
+        ; element8
+        ; element9
+        ; element10
+        ; element11
+        ; element12
+        ; element13
+        ; element14
+        ; element15
+        ; element16
+        ; element17
+        ; element18
+        ; element19
+        ; element20
+        ; element21
+        ; element22
+        ; element23
+        ; element24
+        ; element25
+        ; element26
+        ; element27
+        ; element28
+        ; element29
+        ; element30
+        ; element31
         ]
       in
       let%map fields =
@@ -792,6 +888,30 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                  ; element5
                  ; element6
                  ; element7
+                 ; element8
+                 ; element9
+                 ; element10
+                 ; element11
+                 ; element12
+                 ; element13
+                 ; element14
+                 ; element15
+                 ; element16
+                 ; element17
+                 ; element18
+                 ; element19
+                 ; element20
+                 ; element21
+                 ; element22
+                 ; element23
+                 ; element24
+                 ; element25
+                 ; element26
+                 ; element27
+                 ; element28
+                 ; element29
+                 ; element30
+                 ; element31
                  } =
           query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
         in
@@ -804,6 +924,30 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           ; element5
           ; element6
           ; element7
+          ; element8
+          ; element9
+          ; element10
+          ; element11
+          ; element12
+          ; element13
+          ; element14
+          ; element15
+          ; element16
+          ; element17
+          ; element18
+          ; element19
+          ; element20
+          ; element21
+          ; element22
+          ; element23
+          ; element24
+          ; element25
+          ; element26
+          ; element27
+          ; element28
+          ; element29
+          ; element30
+          ; element31
           ]
         in
         let%bind app_state =
