@@ -12,7 +12,7 @@ MINA_COMMIT_SHA1=$(git rev-parse HEAD)
 # That's why we are converting it to dune argument
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
   INSTRUMENTED_PARAM="--instrument-with $DUNE_INSTRUMENT_WITH"
-else 
+else
   INSTRUMENTED_PARAM=""
 fi
 
@@ -21,13 +21,13 @@ echo "--- Build libp2p_helper"
 make -C src/app/libp2p_helper
 
 MAINNET_TARGETS=""
-[[ ${MINA_BUILD_MAINNET} ]] && MAINNET_TARGETS="src/app/cli/src/mina_mainnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe"
+[[ ${MINA_BUILD_MAINNET} ]] && MAINNET_TARGETS="src/app/cli/src/mina_mainnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe"
 
 echo "--- Build all major targets required for packaging"
 echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}"
 echo "Rust Version: $(rustc --version)"
 dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
-  ${MAINNET_TARGETS} \
+  "${MAINNET_TARGETS}" \
   src/app/logproc/logproc.exe \
   src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
   src/app/generate_keypair/generate_keypair.exe \
@@ -42,7 +42,6 @@ dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
   src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
   src/app/rosetta/rosetta_testnet_signatures.exe \
   src/app/rosetta/indexer_test/indexer_test.exe \
-  src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
   src/app/test_executive/test_executive.exe  \
   src/app/benchmarks/benchmarks.exe \
   src/app/ledger_export_bench/ledger_export_benchmark.exe \
