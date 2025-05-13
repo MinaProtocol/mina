@@ -204,12 +204,18 @@ end = struct
     Account_id.create public_key token_id
 end
 
-module Hash : Merkle_ledger.Intf.Hash with type account := Account.t = struct
+module Hash_arg = struct
+  type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, equal]
+end
+
+module Hash = struct
   module T = struct
     type t = Md5.t [@@deriving sexp, hash, compare, bin_io_unversioned, equal]
   end
 
   include T
+
+  let (_ : (t, Hash_arg.t) Type_equal.t) = Type_equal.T
 
   include Codable.Make_base58_check (struct
     type t = T.t [@@deriving bin_io_unversioned]
@@ -219,7 +225,7 @@ module Hash : Merkle_ledger.Intf.Hash with type account := Account.t = struct
     let version_byte = Base58_check.Version_bytes.ledger_test_hash
   end)
 
-  include Hashable.Make_binable (T)
+  include Hashable.Make_binable (Hash_arg)
 
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)

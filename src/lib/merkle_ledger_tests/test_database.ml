@@ -35,8 +35,8 @@ module type Account_Db =
   Merkle_ledger.Intf.Ledger.DATABASE
     with module Location = Location
     with module Addr = Location.Addr
-    with type root_hash := Hash.t
-     and type hash := Hash.t
+    with type root_hash := Md5.t
+     and type hash := Md5.t
      and type key := Key.t
      and type token_id := Token_id.t
      and type token_id_set := Token_id.Set.t
@@ -247,7 +247,7 @@ module Make (Test : Test_intf) = struct
                 in
                 MT.set_batch_accounts mdb addresses_and_accounts ;
                 let new_merkle_root = MT.merkle_root mdb in
-                assert (Hash.equal old_merkle_root new_merkle_root) ) ) )
+                assert (Md5.equal old_merkle_root new_merkle_root) ) ) )
 
   let () =
     add_test "set_batch_accounts would change the merkle root" (fun () ->
@@ -296,7 +296,7 @@ module Make (Test : Test_intf) = struct
                     let old_merkle_root = MT.merkle_root mdb in
                     MT.set_batch_accounts mdb new_addresses_and_accounts ;
                     let new_merkle_root = MT.merkle_root mdb in
-                    assert (not @@ Hash.equal old_merkle_root new_merkle_root) ) ) ) )
+                    assert (not @@ Md5.equal old_merkle_root new_merkle_root) ) ) ) )
 
   let () =
     add_test "key by key account retrieval after set_batch_accounts works"
@@ -385,7 +385,7 @@ module Make (Test : Test_intf) = struct
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
             | `Added, _ ->
-                [%test_eq: Hash.t] start_hash (merkle_root ledger) ) )
+                [%test_eq: Md5.t] start_hash (merkle_root ledger) ) )
 
   let () =
     add_test "get_at_index_exn t (index_of_account_exn t public_key) = account"
@@ -555,13 +555,14 @@ module Make (Test : Test_intf) = struct
     (test_section_name, actual_tests)
 end
 
+module Inputs = Make_inputs (Account) (Hash)
+
 module Make_db (Depth : sig
   val depth : int
 end) =
 Make (struct
   let depth = Depth.depth
 
-  module Inputs = Make_inputs (Account) (Hash)
   module MT = Database.Make (Inputs)
 
   (* TODO: maybe this function should work with dynamic modules *)
