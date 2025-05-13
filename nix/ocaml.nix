@@ -300,7 +300,6 @@ let
               "dune"
               "dune-project"
               "./graphql_schema.json"
-              ".ocamlformat"
               "opam.export"
             ];
           };

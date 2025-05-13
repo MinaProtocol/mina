@@ -112,10 +112,24 @@ val skip_genesis_protocol_state_validation :
      , 'e
      , 'f )
      with_block
-  -> ('a, [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t, 'b, 'c, 'd, 'e, 'f) with_block
+  -> ( 'a
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
 
 val reset_genesis_protocol_state_validation :
-     ('a, [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t, 'b, 'c, 'd, 'e, 'f) with_block
+     ( 'a
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
   -> ( 'a
      , [ `Genesis_state ] * unit Mina_stdlib.Truth.false_t
      , 'b
@@ -128,23 +142,67 @@ val reset_genesis_protocol_state_validation :
 val validate_proofs :
      verifier:Verifier.t
   -> genesis_state_hash:State_hash.t
-  -> ('a, 'b, [ `Proof ] * unit Mina_stdlib.Truth.false_t, 'c, 'd, 'e, 'f) with_header list
-  -> ( ('a, 'b, [ `Proof ] * unit Mina_stdlib.Truth.true_t, 'c, 'd, 'e, 'f) with_header list
+  -> ( 'a
+     , 'b
+     , [ `Proof ] * unit Mina_stdlib.Truth.false_t
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+     list
+  -> ( ( 'a
+       , 'b
+       , [ `Proof ] * unit Mina_stdlib.Truth.true_t
+       , 'c
+       , 'd
+       , 'e
+       , 'f )
+       with_header
+       list
      , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val validate_single_proof :
      verifier:Verifier.t
   -> genesis_state_hash:State_hash.t
-  -> ('a, 'b, [ `Proof ] * unit Mina_stdlib.Truth.false_t, 'c, 'd, 'e, 'f) with_header
-  -> ( ('a, 'b, [ `Proof ] * unit Mina_stdlib.Truth.true_t, 'c, 'd, 'e, 'f) with_header
+  -> ( 'a
+     , 'b
+     , [ `Proof ] * unit Mina_stdlib.Truth.false_t
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+  -> ( ( 'a
+       , 'b
+       , [ `Proof ] * unit Mina_stdlib.Truth.true_t
+       , 'c
+       , 'd
+       , 'e
+       , 'f )
+       with_header
      , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val skip_proof_validation :
      [ `This_block_was_generated_internally ]
-  -> ('a, 'b, [ `Proof ] * unit Mina_stdlib.Truth.false_t, 'c, 'd, 'e, 'f) with_block
-  -> ('a, 'b, [ `Proof ] * unit Mina_stdlib.Truth.true_t, 'c, 'd, 'e, 'f) with_block
+  -> ( 'a
+     , 'b
+     , [ `Proof ] * unit Mina_stdlib.Truth.false_t
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
+  -> ( 'a
+     , 'b
+     , [ `Proof ] * unit Mina_stdlib.Truth.true_t
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
 
 val extract_delta_block_chain_witness :
      ( 'a
@@ -349,9 +407,24 @@ val skip_staged_ledger_diff_validation :
      with_block
 
 val reset_staged_ledger_diff_validation :
-     'g * ('a, 'b, 'c, 'd, 'e, [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.true_t, 'f) t
+     'g
+     * ( 'a
+       , 'b
+       , 'c
+       , 'd
+       , 'e
+       , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.true_t
+       , 'f )
+       t
   -> 'g
-     * ('a, 'b, 'c, 'd, 'e, [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t, 'f) t
+     * ( 'a
+       , 'b
+       , 'c
+       , 'd
+       , 'e
+       , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t
+       , 'f )
+       t
 
 val validate_protocol_versions :
      ( 'a
