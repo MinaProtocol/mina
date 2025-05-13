@@ -63,6 +63,7 @@ TRANSACTION_FREQUENCY=10
 # Libp2p Keypair
 echo "=========================== GENERATING KEYPAIR IN ${MINA_LIBP2P_KEYPAIR_PATH} ==========================="
 mina libp2p generate-keypair -privkey-path "${MINA_LIBP2P_KEYPAIR_PATH}"
+chmod -R 0700 "${MINA_LIBP2P_KEYPAIR_PATH}"
 
 # Configuration
 echo "=========================== GENERATING GENESIS LEDGER FOR ${MINA_NETWORK} ==========================="
@@ -148,15 +149,9 @@ mina accounts import \
 
 # Postgres
 echo "========================= INITIALIZING POSTGRESQL ==========================="
-pg_ctlcluster "${POSTGRES_VERSION}" main start
-pg_dropcluster --stop "${POSTGRES_VERSION}" main
-pg_createcluster --start -d "${POSTGRES_DATA_DIR}" \
-                 --createclusterconf \
-                 /etc/mina/rosetta/scripts/postgresql.conf \
-                 "${POSTGRES_VERSION}" \
-                 main
-sudo -u postgres psql --command \
-     "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
+# sudo -u postgres psql --command \
+#      "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
+sudo -u postgres dropdb --if-exists "${POSTGRES_DBNAME}"
 sudo -u postgres createdb \
      -O "${POSTGRES_USERNAME}" "${POSTGRES_DBNAME}"
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
@@ -173,7 +168,7 @@ for port in ${ports[*]}; do
   sleep 5
 done
 
-# Mina Archive
+# # Mina Archive
 echo "========================= STARTING ARCHIVE NODE on PORT ${MINA_ARCHIVE_PORT} ==========================="
 mina-archive run \
   --config-file "${MINA_CONFIG_FILE}" \
@@ -182,7 +177,7 @@ mina-archive run \
   --server-port "${MINA_ARCHIVE_PORT}" &
 sleep 5
 
-# Daemon
+# # Daemon
 echo "========================= STARTING DAEMON connected to ${MINA_NETWORK} ==========================="
 mina daemon \
   --archive-address 127.0.0.1:${MINA_ARCHIVE_PORT} \
@@ -198,13 +193,16 @@ mina daemon \
   --seed \
   --demo-mode
 
-echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
+# # echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 daemon_status="Pending"
 retries_left=20
 until [ $daemon_status == "Synced" ]; do
-  [[ $retries_left -eq 0 ]] && echo "Unable to Sync the Daemon" && exit 1 || ((retries_left--))
+   [[ $retries_left -eq 0 ]] && \
+     echo "Unable to Sync the Daemon" && exit 1 || \
+       ((retries_left--))
   sleep 15
-  daemon_status=$(mina client status --json | jq -r .sync_status 2>/dev/null || echo "Pending")
+  daemon_status=$(mina client status --json | \
+                      jq -r .sync_status 2>/dev/null || echo "Pending")
   echo "Daemon Status: ${daemon_status}"
 done
 
@@ -220,7 +218,15 @@ send_zkapp_txn() {
 }
 
 echo "========================= ZKAPP ACCOUNT SETTING UP ==========================="
-ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction create-zkapp-account --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce 0 --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY} --fee 5 | sed 1,7d)
+ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction \
+                      create-zkapp-account \
+                      --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} \
+                      --nonce 0 \
+                      --sender-key ${ZKAPP_SENDER_KEY} \
+                      --sender-nonce 0 \
+                      --receiver-amount 1000 \
+                      --zkapp-account-key ${ZKAPP_ACCOUNT_KEY} \
+                      --fee 5 | sed 1,7d)
 send_zkapp_txn "${ZKAPP_TXN_QUERY}"
 
 # Unlock Genesis Accounts
@@ -253,12 +259,26 @@ ZKAPP_SENDER_NONCE=1
 ZKAPP_STATE=0
 send_zkapp_transactions() {
   while true; do
-    ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction transfer-funds-one-receiver --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --sender-key ${ZKAPP_SENDER_KEY} --sender-nonce ${ZKAPP_SENDER_NONCE} --receiver-amount 1 --fee 5 --receiver ${ZKAPP_ACCOUNT_PUB_KEY} | sed 1,5d)
+    ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction \
+                          transfer-funds-one-receiver \
+                          --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} \
+                          --nonce ${ZKAPP_FEE_PAYER_NONCE} \
+                          --sender-key ${ZKAPP_SENDER_KEY} \
+                          --sender-nonce ${ZKAPP_SENDER_NONCE} \
+                          --receiver-amount 1 \
+                          --fee 5 \
+                          --receiver ${ZKAPP_ACCOUNT_PUB_KEY} | sed 1,5d)
     send_zkapp_txn "${ZKAPP_TXN_QUERY}"
     let ZKAPP_FEE_PAYER_NONCE++
     let ZKAPP_SENDER_NONCE++
 
-    ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction update-state --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} --nonce ${ZKAPP_FEE_PAYER_NONCE} --zkapp-account-key ${ZKAPP_SENDER_KEY} --zkapp-state ${ZKAPP_STATE} --fee 5 | sed 1,5d)
+    ZKAPP_TXN_QUERY=$(mina-zkapp-test-transaction \
+                          update-state \
+                          --fee-payer-key ${ZKAPP_FEE_PAYER_KEY} \
+                          --nonce ${ZKAPP_FEE_PAYER_NONCE} \
+                          --zkapp-account-key ${ZKAPP_SENDER_KEY} \
+                          --zkapp-state ${ZKAPP_STATE} \
+                          --fee 5 | sed 1,5d)
     send_zkapp_txn "${ZKAPP_TXN_QUERY}"
     let ZKAPP_FEE_PAYER_NONCE++
     let ZKAPP_STATE++
@@ -270,8 +290,11 @@ if [[ "$MODE" == "full" ]]; then
   send_zkapp_transactions &
 fi
 
-next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
+next_block_time=$(mina client status --json | \
+                      jq '.next_block_production.timing[1].time' | tr -d '"')
+curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
+
 echo "Sleeping for ${sleep_time}s until next block is created..."
 sleep ${sleep_time}
 
@@ -291,9 +314,11 @@ if [[ "$MODE" == "full" ]]; then
 
   # wait until block height 11 is reached before starting check:data
   # so it gives enough time to vest the time-vesting accounts
-  current_block_height=$(mina client status --json | jq -r '.blockchain_length')
+  current_block_height=$(mina client status --json | \
+                             jq -r '.blockchain_length')
   while [[ ${current_block_height} -lt 11 ]]; do
-    current_block_height=$(mina client status --json | jq -r '.blockchain_length')
+    current_block_height=$(mina client status --json | \
+                               jq -r '.blockchain_length')
     echo "Waiting for block height 11 to be reached..."
     echo "Current block height is: ${current_block_height}"
     sleep 30
