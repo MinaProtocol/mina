@@ -48,46 +48,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module V2 = struct
-    module T = struct
-      type query =
-        Bounded_types.Wrapped_error.Stable.V1.t
-        * Work.Selector.Spec.Stable.V1.t
-        * Public_key.Compressed.Stable.V1.t
-
-      type response = unit
-
-      let query_of_caller_model (query : Master.Caller.query) : query =
-        let err, spec, key = query in
-        let spec =
-          Work.Partitioned.Spec.Poly.to_selector_spec spec
-          |> Option.value_exn
-               ~message:
-                 "FATAL: V2 Worker failed on a `Zkapp_command_segment` job \
-                  where the coordinator can't aggregate, this shouldn't happen \
-                  as the work is issued by the coordinator"
-        in
-        (err, spec, key)
-
-      let callee_model_of_query (query : query) : Master.Callee.query =
-        (* Old worker can't tell when it received the job,
-           so just assume it's taking 0s
-        *)
-        let issued_since_unix_epoch = Time.(now () |> to_span_since_epoch) in
-        Tuple3.map_snd
-          ~f:
-            (Work.Partitioned.Spec.Poly.of_selector_spec
-               ~issued_since_unix_epoch )
-          query
-
-      let response_of_callee_model = Fn.id
-
-      let caller_model_of_response = Fn.id
-    end
-
-    include T
-    include Register (T)
-  end
-
   module Latest = V3
 end]

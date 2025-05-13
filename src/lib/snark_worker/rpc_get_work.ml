@@ -12,7 +12,7 @@ module Master = struct
   let name = "get_work"
 
   module T = struct
-    type query = [ `V2 | `V3 ]
+    type query = [ `V3 ]
 
     type response =
       (Work.Partitioned.Spec.Stable.Latest.t * Public_key.Compressed.t) option
@@ -28,7 +28,7 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 module Stable = struct
   module V3 = struct
     module T = struct
-      type query = [ `V2 | `V3 ]
+      type query = [ `V3 ]
 
       type response =
         (Work.Partitioned.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
@@ -41,56 +41,6 @@ module Stable = struct
       let response_of_callee_model = Fn.id
 
       let caller_model_of_response = Fn.id
-    end
-
-    include T
-    include Register (T)
-  end
-
-  module V2 = struct
-    module T = struct
-      type query = unit
-
-      type response =
-        (Work.Selector.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
-        option
-
-      let query_of_caller_model = const ()
-
-      let callee_model_of_query = const `V2
-
-      let response_of_callee_model (resp : Master.Callee.response) : response =
-        match resp with
-        | Some (spec, key) -> (
-            match Work.Partitioned.Spec.Poly.to_selector_spec spec with
-            | None ->
-                (* WARN: we'd better report to the coordinator we failed rather *)
-                (*          than ignoring the work*)
-                printf
-                  "WARN: V2 Worker receving work `Zkapp_command_segment`, \
-                   which is out of its capability, work dropped" ;
-                None
-            | Some spec ->
-                Some (spec, key) )
-        | None ->
-            None
-
-      let caller_model_of_response : response -> Master.Caller.response =
-        function
-        | Some (spec, key) ->
-            (* Old worker can't tell when it received the job,
-               so just assume it's taking 0s
-            *)
-            let issued_since_unix_epoch =
-              Time.(now () |> to_span_since_epoch)
-            in
-            let spec =
-              Work.Partitioned.Spec.Poly.of_selector_spec
-                ~issued_since_unix_epoch spec
-            in
-            Some (spec, key)
-        | None ->
-            None
     end
 
     include T
