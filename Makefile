@@ -182,7 +182,18 @@ build_rosetta: ocaml_checks
 .PHONY: build_rosetta_all_sigs
 build_rosetta_all_sigs: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/archive/archive.exe \
+		src/app/archive/archive_testnet_signatures.exe \
+		src/app/archive/archive_mainnet_signatures.exe \
+		src/app/rosetta/rosetta.exe \
+		src/app/rosetta/rosetta_testnet_signatures.exe \
+		src/app/rosetta/rosetta_mainnet_signatures.exe \
+		src/app/rosetta/ocaml-signer/signer.exe \
+		src/app/rosetta/ocaml-signer/signer_testnet_signature.exe \
+		src/app/rosetta/ocaml-signer/signer_mainnet_signature.exe \
+		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_intgtest
