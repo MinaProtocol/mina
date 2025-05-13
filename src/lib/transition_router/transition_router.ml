@@ -167,7 +167,6 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~cache_exceptions ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
-  [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     let name = "bootstrap controller pipe" in
     create_buffered_pipe ~name
