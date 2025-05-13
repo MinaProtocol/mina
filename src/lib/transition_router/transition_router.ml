@@ -739,6 +739,16 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   | None ->
                       Deferred.unit
                 in
+                (* FIX:
+                   With PR17164 a bug is 100% reproducible where we're writing to
+                   closed pipe. A temporary and ugly solution is implemented here:
+                   busy waiting.
+                   Reading codes in this specific module, there're many ways to
+                   trigger. Ideally we should refactor this module so we're using
+                   an actor based design pattern to formulated this, rather than
+                   allowing `don't_wait_for`s and pipes and references to float
+                   everywhere in this codebase.
+                *)
                 let rec busy_wait_then_write () =
                   if Strict_pipe.Writer.is_closed !transition_writer_ref then
                     let%bind () = Async_kernel_scheduler.yield () in
