@@ -701,7 +701,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
            ~f:(fun (b_or_h, `Valid_cb vc) ->
              don't_wait_for
-             @@ let%map () =
+             @@ let%bind () =
                   let header_with_hash =
                     block_or_header_to_header_hashed_with_validation b_or_h
                   in
@@ -739,6 +739,14 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   | None ->
                       Deferred.unit
                 in
-                Strict_pipe.Writer.write !transition_writer_ref
-                  (b_or_h, `Valid_cb (Some vc)) ) ) ;
+                let rec busy_wait_then_write () =
+                  if Strict_pipe.Writer.is_closed !transition_writer_ref then
+                    let%bind () = Async_kernel_scheduler.yield () in
+                    busy_wait_then_write ()
+                  else (
+                    Strict_pipe.Writer.write !transition_writer_ref
+                      (b_or_h, `Valid_cb (Some vc)) ;
+                    Deferred.unit )
+                in
+                busy_wait_then_write () ) ) ;
   (verified_transition_reader, initialization_finish_signal)
