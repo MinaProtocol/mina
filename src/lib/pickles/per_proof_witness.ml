@@ -4,6 +4,8 @@ open Import
 module Impl = Impls.Step
 module One_hot_vector = One_hot_vector.Step
 
+module Make (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) = struct
+
 (* Let F, K be the two fields (either (Fp, Fq) or (Fq, Fp)).
    Each proof over F has an accumulator state which contains
    - a set of IPA challenges c_0, ..., c_{k-1}, which can be interpreted as F elements.
@@ -139,7 +141,7 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
     =
   let module Sc = Scalar_challenge in
   let open Impls.Step in
-  let open Step_verifier in
+   let open Step_verifier in 
   Impls.Step.Typ.of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:Constant.to_hlist ~value_of_hlist:Constant.of_hlist
     [ statement
@@ -156,3 +158,8 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
     ; Vector.typ (Vector.typ Field.typ Tick.Rounds.n) max_proofs_verified
     ; Vector.typ Inner_curve.typ max_proofs_verified
     ]
+
+end
+
+(*TODO remove*)
+include Make(Step_verifier.Step_verifier_kimchi)
