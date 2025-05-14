@@ -1298,7 +1298,7 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
 
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    Snark_work_lib.Spec.Single.Unissued.t One_or_two.t list Or_error.t =
+    Snark_work_lib.Spec.Single.t One_or_two.t list Or_error.t =
   let all_jobs = all_jobs t in
   let module A = Available_job in
   let open Or_error.Let_syntax in

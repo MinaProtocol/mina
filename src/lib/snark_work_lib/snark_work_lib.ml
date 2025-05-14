@@ -4,7 +4,7 @@ module With_status = With_status
 module Spec = struct
   module Sub_zkapp = Sub_zkapp_spec
   module Single = Single_spec
-  module Full = Full_spec
+  module Partitioned = Partitioned_spec
 end
 
 module Result = struct

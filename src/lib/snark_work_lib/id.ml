@@ -35,4 +35,7 @@ module Sub_zkapp = struct
 
   let of_single ~(job_id : int64) Single.{ which_one; pairing_id } =
     { which_one; pairing_id; job_id }
+
+  let to_single ({ which_one; pairing_id; _ } : t) : Single.t =
+    { which_one; pairing_id }
 end

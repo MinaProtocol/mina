@@ -4,31 +4,31 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('witness, 'zkapp_command_segment_witness, 'ledger_proof, 'metric) t =
+      type ('witness, 'zkapp_command_segment_witness, 'ledger_proof, 'data) t =
         { (* Throw everything inside the spec to ensure proofs, metrics have correct shape *)
           data :
             ( 'witness
             , 'zkapp_command_segment_witness
             , 'ledger_proof
-            , 'metric )
-            Full_spec.Poly.Stable.V1.t
+            , 'data )
+            Partitioned_spec.Poly.Stable.V1.t
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
         }
     end
   end]
 
-  let to_spec ({ data; _ } : _ t) : _ Full_spec.Poly.t =
+  let to_spec ({ data; _ } : _ t) : _ Partitioned_spec.Poly.t =
     match data with
-    | Full_spec.Poly.Single { job; _ } ->
-        Full_spec.Poly.Single { job; data = () }
-    | Full_spec.Poly.Sub_zkapp_command { job; _ } ->
-        Full_spec.Poly.Sub_zkapp_command { job; data = () }
+    | Partitioned_spec.Poly.Single { job; _ } ->
+        Partitioned_spec.Poly.Single { job; data = () }
+    | Partitioned_spec.Poly.Sub_zkapp_command { job; _ } ->
+        Partitioned_spec.Poly.Sub_zkapp_command { job; data = () }
 
   let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data
       ({ data; prover } : _ t) =
     { data =
-        Full_spec.Poly.map ~f_witness ~f_zkapp_command_segment_witness ~f_proof
-          ~f_data data
+        Partitioned_spec.Poly.map ~f_witness ~f_zkapp_command_segment_witness
+          ~f_proof ~f_data data
     ; prover
     }
 end

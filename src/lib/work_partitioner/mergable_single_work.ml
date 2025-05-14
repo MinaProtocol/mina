@@ -6,8 +6,7 @@ module Work = Snark_work_lib
 type half = [ `First | `Second ] [@@deriving equal]
 
 type t =
-  { which_half : half
-  ; single_result : Work.Result.Single.t
+  { single_result : Work.Result.Single.t option
   ; prover : Signature_lib.Public_key.Compressed.t
   ; fee_of_full : Currency.Fee.t
   }

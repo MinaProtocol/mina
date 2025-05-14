@@ -8,7 +8,7 @@ open Core_kernel
 module Work = Snark_work_lib
 
 type t =
-  { spec : Work.Spec.Single.t
+  { job : (Work.Spec.Single.t, Work.ID.Single.t) Work.With_status.t
         (* the original work being splitted, should be identical to Work_selector.work *)
   ; unscheduled_segments : Work.Spec.Sub_zkapp.t Queue.t
   ; pending_mergable_proofs : Ledger_proof.Cached.t Deque.t

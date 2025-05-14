@@ -7,14 +7,14 @@ module Poly = struct
       type ('single_spec, 'proof) t =
         { spec : 'single_spec
         ; proof : 'proof
-        ; elasped : Core.Time.Stable.V1.t
+        ; elapsed : Mina_stdlib.Time.Span.Stable.V1.t
         ; kind : [ `Transition | `Merge ]
         }
     end
   end]
 
-  let map ~f_spec ~f_proof { spec; proof; elasped; kind } =
-    { spec = f_spec spec; proof = f_proof proof; elasped; kind }
+  let map ~f_spec ~f_proof { spec; proof; elapsed; kind } =
+    { spec = f_spec spec; proof = f_proof proof; elapsed; kind }
 end
 
 [%%versioned
