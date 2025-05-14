@@ -28,8 +28,13 @@ let to_yojson (block_with_hashes, _) =
 
 let lift (b, v) =
   match v with
-  | _, _, _, (`Delta_block_chain, Mina_stdlib.Truth.True delta_block_chain_proof), _, _, _
-    ->
+  | ( _
+    , _
+    , _
+    , (`Delta_block_chain, Mina_stdlib.Truth.True delta_block_chain_proof)
+    , _
+    , _
+    , _ ) ->
       (b, delta_block_chain_proof)
 
 let forget (b, _) = b

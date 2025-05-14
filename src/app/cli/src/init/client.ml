@@ -3,7 +3,6 @@ open Async
 open Signature_lib
 open Mina_base
 open Mina_transaction
-
 module Client = Graphql_lib.Client
 
 module Args = struct
@@ -1244,7 +1243,8 @@ let import_key =
        Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
     (let%map_open.Command access_method =
-       choose_one ~if_nothing_chosen:(Default_to `None)
+       choose_one
+         ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1360,7 +1360,8 @@ let import_key =
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Importing to local directory %s%s\n"
-                 Mina_stdlib.Bash_colors.orange conf_dir Mina_stdlib.Bash_colors.none ;
+                 Mina_stdlib.Bash_colors.orange conf_dir
+                 Mina_stdlib.Bash_colors.none ;
                let%map res = do_local conf_dir in
                print_result res ) )
 
@@ -1454,7 +1455,8 @@ let export_key =
 let list_accounts =
   Command.async ~summary:"List all owned accounts"
     (let%map_open.Command access_method =
-       choose_one ~if_nothing_chosen:(Default_to `None)
+       choose_one
+         ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1530,7 +1532,8 @@ let list_accounts =
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Listing from local directory %s%s\n"
-                 Mina_stdlib.Bash_colors.orange conf_dir Mina_stdlib.Bash_colors.none ;
+                 Mina_stdlib.Bash_colors.orange conf_dir
+                 Mina_stdlib.Bash_colors.none ;
                do_local conf_dir ) )
 
 let create_account =
@@ -2285,7 +2288,7 @@ let signature_kind =
     (let%map.Command () = Command.Param.return () in
      fun () ->
        let signature_kind_string =
-         match Mina_signature_kind.t with
+         match Mina_signature_kind.t_DEPRECATED with
          | Mainnet ->
              "mainnet"
          | Testnet ->

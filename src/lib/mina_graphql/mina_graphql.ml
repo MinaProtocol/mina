@@ -2884,7 +2884,7 @@ module Queries = struct
       ~typ:(non_null string)
       ~args:Arg.[]
       ~resolve:(fun _ () ->
-        match Mina_signature_kind.t with
+        match Mina_signature_kind.t_DEPRECATED with
         | Mainnet ->
             "mainnet"
         | Testnet ->

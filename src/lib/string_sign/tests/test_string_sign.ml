@@ -22,8 +22,7 @@ let test_default_network () =
   in
   let signature = sign keypair.private_key s in
   Alcotest.(check bool)
-    "Sign and verify with default network"
-    true
+    "Sign and verify with default network" true
     (verify signature keypair.public_key s)
 
 (* Test signing and verification with mainnet *)
@@ -31,8 +30,7 @@ let test_mainnet () =
   let s = "Rain and Spain don't rhyme with cheese" in
   let signature = sign ~signature_kind:Mainnet keypair.private_key s in
   Alcotest.(check bool)
-    "Sign and verify with mainnet"
-    true
+    "Sign and verify with mainnet" true
     (verify ~signature_kind:Mainnet signature keypair.public_key s)
 
 (* Test legacy mainnet signature verification *)
@@ -44,8 +42,7 @@ let test_legacy_mainnet () =
     |> Core_kernel.Result.ok |> Option.value_exn
   in
   Alcotest.(check bool)
-    "Verify legacy mainnet signature"
-    true
+    "Verify legacy mainnet signature" true
     (verify ~signature_kind:Mainnet signature keypair.public_key s)
 
 (* Test signing and verification with testnet *)
@@ -53,8 +50,7 @@ let test_testnet () =
   let s = "In a galaxy far, far away" in
   let signature = sign ~signature_kind:Testnet keypair.private_key s in
   Alcotest.(check bool)
-    "Sign and verify with testnet"
-    true
+    "Sign and verify with testnet" true
     (verify ~signature_kind:Testnet signature keypair.public_key s)
 
 (* Test legacy testnet signature verification *)
@@ -66,108 +62,101 @@ let test_legacy_testnet () =
     |> Core_kernel.Result.ok |> Option.value_exn
   in
   Alcotest.(check bool)
-    "Verify legacy testnet signature"
-    true
+    "Verify legacy testnet signature" true
     (verify ~signature_kind:Testnet signature keypair.public_key s)
 
 (* Test signing and verification with other networks *)
 let test_other_network () =
   let s = "Sky is blue" in
-  let signature = sign ~signature_kind:(Other_network "Foo") keypair.private_key s in
+  let signature =
+    sign ~signature_kind:(Other_network "Foo") keypair.private_key s
+  in
   Alcotest.(check bool)
-    "Sign and verify with other network"
-    true
+    "Sign and verify with other network" true
     (verify ~signature_kind:(Other_network "Foo") signature keypair.public_key s)
 
 (* Test that signatures from one network don't verify on others *)
 let test_testnet_failures () =
   let s = "Some pills make you larger" in
   let signature = sign ~signature_kind:Testnet keypair.private_key s in
-  
+
   (* Should verify with testnet *)
   Alcotest.(check bool)
-    "Testnet signature verifies with testnet"
-    true
-    (verify ~signature_kind:Testnet signature keypair.public_key s);
-    
+    "Testnet signature verifies with testnet" true
+    (verify ~signature_kind:Testnet signature keypair.public_key s) ;
+
   (* Should not verify with mainnet *)
   Alcotest.(check bool)
-    "Testnet signature fails with mainnet"
-    false
-    (verify ~signature_kind:Mainnet signature keypair.public_key s);
-    
+    "Testnet signature fails with mainnet" false
+    (verify ~signature_kind:Mainnet signature keypair.public_key s) ;
+
   (* Should not verify with other network *)
   Alcotest.(check bool)
-    "Testnet signature fails with other network"
-    false
+    "Testnet signature fails with other network" false
     (verify ~signature_kind:(Other_network "Foo") signature keypair.public_key s)
 
 (* Test that mainnet signatures don't verify on other networks *)
 let test_mainnet_failures () =
   let s = "Watson, come here, I need you" in
   let signature = sign ~signature_kind:Mainnet keypair.private_key s in
-  
+
   (* Should verify with mainnet *)
   Alcotest.(check bool)
-    "Mainnet signature verifies with mainnet"
-    true
-    (verify ~signature_kind:Mainnet signature keypair.public_key s);
-    
+    "Mainnet signature verifies with mainnet" true
+    (verify ~signature_kind:Mainnet signature keypair.public_key s) ;
+
   (* Should not verify with testnet *)
   Alcotest.(check bool)
-    "Mainnet signature fails with testnet"
-    false
-    (verify ~signature_kind:Testnet signature keypair.public_key s);
-    
+    "Mainnet signature fails with testnet" false
+    (verify ~signature_kind:Testnet signature keypair.public_key s) ;
+
   (* Should not verify with other network *)
   Alcotest.(check bool)
-    "Mainnet signature fails with other network"
-    false
+    "Mainnet signature fails with other network" false
     (verify ~signature_kind:(Other_network "Foo") signature keypair.public_key s)
 
 (* Test that other network signatures don't verify on standard networks *)
 let test_other_network_failures () =
   let s = "Roses are red" in
-  let signature = sign ~signature_kind:(Other_network "Foo") keypair.private_key s in
-  
+  let signature =
+    sign ~signature_kind:(Other_network "Foo") keypair.private_key s
+  in
+
   (* Should verify with the same other network *)
   Alcotest.(check bool)
-    "Other network signature verifies with same network"
-    true
-    (verify ~signature_kind:(Other_network "Foo") signature keypair.public_key s);
-    
+    "Other network signature verifies with same network" true
+    (verify ~signature_kind:(Other_network "Foo") signature keypair.public_key s) ;
+
   (* Should not verify with mainnet *)
   Alcotest.(check bool)
-    "Other network signature fails with mainnet"
-    false
-    (verify ~signature_kind:Mainnet signature keypair.public_key s);
-    
+    "Other network signature fails with mainnet" false
+    (verify ~signature_kind:Mainnet signature keypair.public_key s) ;
+
   (* Should not verify with testnet *)
   Alcotest.(check bool)
-    "Other network signature fails with testnet"
-    false
-    (verify ~signature_kind:Testnet signature keypair.public_key s);
-    
+    "Other network signature fails with testnet" false
+    (verify ~signature_kind:Testnet signature keypair.public_key s) ;
+
   (* Should not verify with different other network *)
   Alcotest.(check bool)
-    "Other network signature fails with different other network"
-    false
+    "Other network signature fails with different other network" false
     (verify ~signature_kind:(Other_network "Bar") signature keypair.public_key s)
 
 (* Define the test suite *)
 let () =
-  Alcotest.run "String_sign" [
-    ( "Basic signing and verification",
-      [ Alcotest.test_case "Default network" `Quick test_default_network
-      ; Alcotest.test_case "Mainnet" `Quick test_mainnet
-      ; Alcotest.test_case "Legacy mainnet" `Quick test_legacy_mainnet
-      ; Alcotest.test_case "Testnet" `Quick test_testnet
-      ; Alcotest.test_case "Legacy testnet" `Quick test_legacy_testnet
-      ; Alcotest.test_case "Other network" `Quick test_other_network
-      ] );
-    ( "Cross-network verification failures",
-      [ Alcotest.test_case "Testnet failures" `Quick test_testnet_failures
-      ; Alcotest.test_case "Mainnet failures" `Quick test_mainnet_failures
-      ; Alcotest.test_case "Other network failures" `Quick test_other_network_failures
-      ] );
-  ]
+  Alcotest.run "String_sign"
+    [ ( "Basic signing and verification"
+      , [ Alcotest.test_case "Default network" `Quick test_default_network
+        ; Alcotest.test_case "Mainnet" `Quick test_mainnet
+        ; Alcotest.test_case "Legacy mainnet" `Quick test_legacy_mainnet
+        ; Alcotest.test_case "Testnet" `Quick test_testnet
+        ; Alcotest.test_case "Legacy testnet" `Quick test_legacy_testnet
+        ; Alcotest.test_case "Other network" `Quick test_other_network
+        ] )
+    ; ( "Cross-network verification failures"
+      , [ Alcotest.test_case "Testnet failures" `Quick test_testnet_failures
+        ; Alcotest.test_case "Mainnet failures" `Quick test_mainnet_failures
+        ; Alcotest.test_case "Other network failures" `Quick
+            test_other_network_failures
+        ] )
+    ]

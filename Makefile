@@ -45,51 +45,54 @@ LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  
 help:
 	@echo "Mina Makefile Targets:"
 	@echo "======================="
-	@echo "all                - Clean and build the project"
-	@echo "archive_blocks     - Build the archive_blocks executable"
-	@echo "benchmarks         - Build benchmarking tools"
-	@echo "build              - Build the main project executables"
-	@echo "build_all_sigs     - Build all signature variants of the daemon"
-	@echo "build_archive      - Build the archive node"
-	@echo "build_archive_utils - Build archive node and related utilities"
-	@echo "build_intgtest     - Build integration test tools"
+	@echo "all                       - Clean and build the project"
+	@echo "archive_blocks            - Build the archive_blocks executable"
+	@echo "benchmarks                - Build benchmarking tools"
+	@echo "build                     - Build the main project executables"
+	@echo "build_all_sigs            - Build all signature variants of the daemon"
+	@echo "build_archive             - Build the archive node"
+	@echo "build_archive_utils       - Build archive node and related utilities"
+	@echo "build_intgtest            - Build integration test tools"
 	@echo "build_or_download_pv_keys - Build or download proving/verification keys"
-	@echo "build_pv_keys      - Build proving/verification keys"
-	@echo "build_rosetta      - Build Rosetta API components"
-	@echo "build_rosetta_all_sigs - Build all signature variants of Rosetta"
-	@echo "check              - Check that all OCaml packages build without issues"
-	@echo "check-format       - Check formatting of OCaml code"
-	@echo "check_opam_switch  - Verify the opam switch has correct packages"
-	@echo "check-snarky-submodule - Check the snarky submodule"
-	@echo "clean              - Remove build artifacts"
-	@echo "coverage-html      - Generate HTML report from coverage data"
-	@echo "coverage-summary   - Generate coverage summary report"
-	@echo "deb                - Build Debian package"
-	@echo "dev                - Alias for build"
-	@echo "doc_diagrams       - Generate documentation diagrams"
-	@echo "extract_blocks     - Build the extract_blocks executable"
-	@echo "genesiskeys        - Generate and copy genesis keys"
-	@echo "genesis_ledger     - Build runtime genesis ledger"
-	@echo "genesis-ledger-ocaml - Generate OCaml genesis ledger from daemon"
-	@echo "heap_usage         - Build heap usage analysis tool"
-	@echo "help               - Display this help information"
-	@echo "libp2p_helper      - Build libp2p helper"
-	@echo "missing_blocks_auditor - Build missing blocks auditor tool"
-	@echo "ml-docs            - Generate OCaml documentation"
-	@echo "ocaml_checks       - Run OCaml version and config checks"
-	@echo "ocaml_version      - Check OCaml version"
-	@echo "ocaml_word_size    - Check OCaml word size"
-	@echo "patch_archive_test - Build the patch archive test"
-	@echo "publish-macos      - Publish macOS artifacts"
-	@echo "reformat           - Reformat all OCaml code"
-	@echo "reformat-diff      - Reformat only modified OCaml files"
-	@echo "replayer           - Build the replayer tool"
-	@echo "rosetta_lib_encodings - Test Rosetta library encodings"
-	@echo "switch             - Set up the opam switch"
-	@echo "test-coverage      - Run tests with coverage instrumentation"
-	@echo "test-ppx           - Test PPX extensions"
-	@echo "update-graphql     - Update GraphQL schema"
-	@echo "zkapp_limits       - Build ZkApp limits tool"
+	@echo "build_pv_keys             - Build proving/verification keys"
+	@echo "build_rosetta             - Build Rosetta API components"
+	@echo "build_rosetta_all_sigs    - Build all signature variants of Rosetta"
+	@echo "check                     - Check that all OCaml packages build without issues"
+	@echo "check-format              - Check formatting of OCaml code"
+	@echo "check_opam_switch         - Verify the opam switch has correct packages"
+	@echo "check-snarky-submodule    - Check the snarky submodule"
+	@echo "clean                     - Remove build artifacts"
+	@echo "coverage-html             - Generate HTML report from coverage data"
+	@echo "coverage-summary          - Generate coverage summary report"
+	@echo "deb                       - Build Debian package"
+	@echo "dev                       - Alias for build"
+	@echo "doc_diagrams              - Generate documentation diagrams"
+	@echo "extract_blocks            - Build the extract_blocks executable"
+	@echo "genesiskeys               - Generate and copy genesis keys"
+	@echo "genesis_ledger            - Build runtime genesis ledger"
+	@echo "genesis-ledger-ocaml      - Generate OCaml genesis ledger from daemon"
+	@echo "heap_usage                - Build heap usage analysis tool"
+	@echo "help                      - Display this help information"
+	@echo "install                   - Install all the binaries and libraries to the"
+	@echo "                            opam switch, and make it available in the PATH"
+	@echo "libp2p_helper             - Build libp2p helper"
+	@echo "missing_blocks_auditor    - Build missing blocks auditor tool"
+	@echo "ml-docs                   - Generate OCaml documentation"
+	@echo "ocaml_checks              - Run OCaml version and config checks"
+	@echo "ocaml_version             - Check OCaml version"
+	@echo "ocaml_word_size           - Check OCaml word size"
+	@echo "patch_archive_test        - Build the patch archive test"
+	@echo "publish-macos             - Publish macOS artifacts"
+	@echo "reformat                  - Reformat all OCaml code"
+	@echo "reformat-diff             - Reformat only modified OCaml files"
+	@echo "replayer                  - Build the replayer tool"
+	@echo "rosetta_lib_encodings     - Test Rosetta library encodings"
+	@echo "switch                    - Set up the opam switch"
+	@echo "test-coverage             - Run tests with coverage instrumentation"
+	@echo "test-ppx                  - Test PPX extensions"
+	@echo "uninstall                 - Uninstall all binaries and libraries from the opam switch"
+	@echo "update-graphql            - Update GraphQL schema"
+	@echo "zkapp_limits              - Build ZkApp limits tool"
 
 ########################################
 ## Code
@@ -141,7 +144,12 @@ endif
 .PHONY: genesis_ledger
 genesis_ledger: ocaml_checks
 	$(info Building runtime_genesis_ledger)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune exec \
+		--profile=$(DUNE_PROFILE) \
+		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- \
+		--genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
 # Checks that every OCaml packages in the project build without issues
@@ -152,31 +160,59 @@ check: ocaml_checks libp2p_helper
 .PHONY: build
 build: ocaml_checks reformat-diff libp2p_helper
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/generate_keypair/generate_keypair.exe src/app/validate_keypair/validate_keypair.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --profile=$(DUNE_PROFILE)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune build \
+		src/app/logproc/logproc.exe \
+		src/app/cli/src/mina.exe \
+		src/app/generate_keypair/generate_keypair.exe \
+		src/app/validate_keypair/validate_keypair.exe \
+		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_all_sigs
 build_all_sigs: ocaml_checks reformat-diff libp2p_helper build
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune build \
+		src/app/cli/src/mina_testnet_signatures.exe \
+		src/app/cli/src/mina_mainnet_signatures.exe \
+		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_archive
 build_archive: ocaml_checks reformat-diff
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/archive/archive.exe \
+		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_archive_utils
 build_archive_utils: ocaml_checks reformat-diff
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/replayer/replayer.exe src/app/archive_blocks/archive_blocks.exe src/app/extract_blocks/extract_blocks.exe src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=$(DUNE_PROFILE)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/archive/archive.exe \
+		src/app/replayer/replayer.exe \
+		src/app/archive_blocks/archive_blocks.exe \
+		src/app/extract_blocks/extract_blocks.exe \
+		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_rosetta
 build_rosetta: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/archive/archive.exe \
+		src/app/rosetta/rosetta.exe \
+		src/app/rosetta/ocaml-signer/signer.exe \
+		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_rosetta_all_sigs
@@ -188,55 +224,82 @@ build_rosetta_all_sigs: ocaml_checks
 .PHONY: build_intgtest
 build_intgtest: ocaml_checks
 	$(info Starting Build)
-	dune build --profile=$(DUNE_PROFILE) src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+	@dune build \
+		--profile=$(DUNE_PROFILE) \
+		src/app/test_executive/test_executive.exe \
+		src/app/logproc/logproc.exe
 	$(info Build complete)
 
 .PHONY: rosetta_lib_encodings
 rosetta_lib_encodings: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=mainnet
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+	  src/lib/rosetta_lib/test/test_encodings.exe \
+	  --profile=mainnet
 	$(info Build complete)
 
 .PHONY: replayer
 replayer: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=devnet
+	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/replayer/replayer.exe \
+		--profile=devnet
 	$(info Build complete)
 
 .PHONY: missing_blocks_auditor
 missing_blocks_auditor: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=testnet_postake_medium_curves
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		--profile=testnet_postake_medium_curves
 	$(info Build complete)
 
 .PHONY: extract_blocks
 extract_blocks: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/extract_blocks/extract_blocks.exe --profile=testnet_postake_medium_curves
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/extract_blocks/extract_blocks.exe \
+		--profile=testnet_postake_medium_curves
 	$(info Build complete)
 
 .PHONY: archive_blocks
 archive_blocks: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive_blocks/archive_blocks.exe --profile=testnet_postake_medium_curves
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/archive_blocks/archive_blocks.exe \
+		--profile=testnet_postake_medium_curves
 	$(info Build complete)
 
 .PHONY: patch_archive_test
 patch_archive_test: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/patch_archive_test/patch_archive_test.exe --profile=testnet_postake_medium_curves
+	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
+	dune build \
+	  src/app/patch_archive_test/patch_archive_test.exe \
+		--profile=testnet_postake_medium_curves
 	$(info Build complete)
 
 .PHONY: heap_usage
 heap_usage: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/heap_usage/heap_usage.exe --profile=devnet
+	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/heap_usage/heap_usage.exe \
+		--profile=devnet
 	$(info Build complete)
 
 .PHONY: zkapp_limits
 zkapp_limits: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/zkapp_limits/zkapp_limits.exe --profile=devnet
+	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/zkapp_limits/zkapp_limits.exe \
+		--profile=devnet
 	$(info Build complete)
 
 .PHONY: dev
@@ -244,14 +307,20 @@ dev: build
 
 .PHONY: update-graphql
 update-graphql:
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build --profile=$(DUNE_PROFILE) graphql_schema.json
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		--profile=$(DUNE_PROFILE) \
+		graphql_schema.json
 
 ########################################
 ## Lint
 
 .PHONY: reformat
 reformat: ocaml_checks
-	dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path .
+	dune exec \
+		--profile=$(DUNE_PROFILE) \
+	  src/app/reformat/reformat.exe -- \
+		-path .
 
 .PHONY: reformat-diff
 reformat-diff:
@@ -260,35 +329,53 @@ reformat-diff:
 
 .PHONY: check-format
 check-format: ocaml_checks
-	dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
+	dune exec \
+		--profile=$(DUNE_PROFILE) \
+	  src/app/reformat/reformat.exe -- \
+		-path . -check
 
 .PHONY: check-snarky-submodule
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
 
+.PHONY: install
+install:
+	@dune build @install
+	@dune install
+	@echo "--------------------------------------------------------------"
+	@echo "All binaries (resp. libraries) have been installed into $(OPAM_SWITCH_PREFIX)/bin"
+	@echo "(resp. ${OPAM_SWITCH_PREFIX}/lib) and the binaries are available in the path."
+	@echo "You can list the installed binaries with:"
+	@echo "> ls -al ${OPAM_SWITCH_PREFIX}/bin"
+	@echo "In particular, you should be able to run the command 'mina'"
+	@echo "'logproc', 'rosetta', 'generate_keypair', etc from this shell"
+
+.PHONY: uninstall
+uninstall:
+	@dune uninstall
 ########################################
 ## Artifacts
-
-.PHONY: publish-macos
-publish-macos:
-	@./scripts/publish-macos.sh
-
-.PHONY: deb
-deb:
-	./scripts/debian/builder.sh
-	@mkdir -p /tmp/artifacts
-	@cp _build/mina*.deb /tmp/artifacts/.
 
 .PHONY: build_pv_keys
 build_pv_keys: ocaml_checks
 	$(info Building keys)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune exec \
+		--profile=$(DUNE_PROFILE) \
+	  src/lib/snark_keys/gen_keys/gen_keys.exe -- \
+		--generate-keys-only
 	$(info Keys built)
 
 .PHONY: build_or_download_pv_keys
 build_or_download_pv_keys: ocaml_checks
 	$(info Building keys)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune exec \
+		--profile=$(DUNE_PROFILE) \
+		src/lib/snark_keys/gen_keys/gen_keys.exe -- \
+		--generate-keys-only
 	$(info Keys built)
 
 .PHONY: genesiskeys

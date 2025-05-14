@@ -14,6 +14,9 @@ let genesis_constants = Genesis_constants.Compiled.genesis_constants
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full
 
+(* The default signature kind for tests is Testnet *)
+let signature_kind = Mina_signature_kind.Testnet
+
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants
     ~protocol_constants:genesis_constants.protocol

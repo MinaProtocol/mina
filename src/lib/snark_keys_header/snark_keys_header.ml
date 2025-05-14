@@ -208,7 +208,6 @@ let parse_lexbuf (lexbuf : Lexing.lexbuf) =
          *)
          Yojson.Safe.read_t yojson_parsebuffer lexbuf )
 
-
 let write_with_header ~expected_max_size_log2 ~append_data header filename =
   (* In order to write the correct length here, we provide the maximum expected
      size and store that in the initial header. Once the data has been written,
