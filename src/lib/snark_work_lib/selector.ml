@@ -54,6 +54,9 @@ module Spec = struct
       [@@deriving sexp, yojson]
 
       let to_latest = Fn.id
+
+      let transactions (t : t) =
+        One_or_two.map t.instances ~f:Work.Single.Spec.transaction
     end
   end]
 
@@ -65,6 +68,9 @@ module Spec = struct
   let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
       Stable.Latest.t -> t =
     Work.Spec.map ~f:(Single.Spec.write_all_proofs_to_disk ~proof_cache_db)
+
+  let transactions (t : t) =
+    One_or_two.map t.instances ~f:Work.Single.Spec.transaction
 end
 
 module Result = struct

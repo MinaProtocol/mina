@@ -55,6 +55,10 @@ module Single = struct
         Merge (statement, p1, p2)
       in
       union [ gen_transition; gen_merge ]
+
+    let transaction (spec : _ t) =
+      witness spec
+      |> Option.map ~f:(fun spec -> spec.Transaction_witness.Poly.transaction)
   end
 end
 
