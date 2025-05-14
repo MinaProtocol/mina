@@ -1,4 +1,4 @@
-module Make (Inductive_rule : Inductive_rule.Intf) : sig
+module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) : sig
   (** [step_main] is the SNARK function corresponding to the input inductive rule. **)
   val step_main :
     'proofs_verified 'self_branches 'prev_vars 'prev_values 'var 'value 'a_var

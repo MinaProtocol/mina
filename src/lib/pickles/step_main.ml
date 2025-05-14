@@ -4,7 +4,7 @@ open Import
 open Impls.Step
 
 
-module Make (Inductive_rule : Inductive_rule.Intf) = struct
+module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : module type of Step_verifier.Step_verifier_kimchi)= struct
   module B = Inductive_rule.B
 
   let verify_one ~srs
