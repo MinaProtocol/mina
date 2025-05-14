@@ -1,6 +1,6 @@
 open Pickles_types
 
-module Make (Inductive_rule : Inductive_rule.Intf) : sig
+module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) : sig
   (** The data obtained from "compiling" an inductive rule into a circuit. *)
   type ( 'a_var
        , 'a_value

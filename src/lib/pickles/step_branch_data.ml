@@ -3,7 +3,7 @@ open Pickles_types
 open Hlist
 open Import
 
-module Make (Inductive_rule : Inductive_rule.Intf) = struct
+module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) = struct
   (* The data obtained from "compiling" an inductive rule into a circuit. *)
   type ( 'a_var
        , 'a_value
@@ -184,7 +184,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
       go rule.prevs
     in
     Timer.clock __LOC__ ;
-    let module Step_main = Step_main.Make (Inductive_rule) in
+    let module Step_main = Step_main.Make (Inductive_rule) (Step_verifier) in
     let step ~step_domains ~known_wrap_keys =
       Step_main.step_main requests
         (Nat.Add.create max_proofs_verified)

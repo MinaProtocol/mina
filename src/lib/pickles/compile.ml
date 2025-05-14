@@ -21,7 +21,6 @@ open Kimchi_backend
 module Proof_ = P.Base
 module Proof = P
 module Inductive_rule = Inductive_rule.Kimchi
-module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
 type chunking_data = Verify.Instance.chunking_data =
   { num_chunks : int; domain_size : int; zk_rows : int }
@@ -294,6 +293,9 @@ struct
       (Auxiliary_var)
       (Auxiliary_value)
   module HIR = H4.T (IR)
+
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule) (Step_verifier)
+
 
   let max_local_max_proofs_verifieds ~self (type n)
       (module Max_proofs_verified : Nat.Intf with type n = n) branches choices =
@@ -731,7 +733,7 @@ struct
       Step.Make (Inductive_rule) (Arg_var) (Arg_value)
         (struct
           include Max_proofs_verified
-        end)
+        end) (Step_verifier)
     in
     let (typ : (var, value) Impls.Step.Typ.t) =
       match public_input with
