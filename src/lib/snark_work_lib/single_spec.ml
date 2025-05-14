@@ -1,100 +1,55 @@
 open Core_kernel
 
-module Unissued = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V2 = struct
-        type ('witness, 'ledger_proof) t =
-          | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
-          | Merge of
-              Transaction_snark.Statement.Stable.V2.t
-              * 'ledger_proof
-              * 'ledger_proof
-        [@@deriving sexp, yojson]
-      end
-    end]
-
-    [%%define_locally
-    Stable.Latest.(sexp_of_t, t_of_sexp, to_yojson, of_yojson)]
-
-    let map ~f_witness ~f_proof = function
-      | Transition (s, w) ->
-          Transition (s, f_witness w)
-      | Merge (s, p1, p2) ->
-          Merge (s, f_proof p1, f_proof p2)
-
-    let witness (t : (_, _) t) =
-      match t with Transition (_, witness) -> Some witness | Merge _ -> None
-
-    let statement = function Transition (s, _) -> s | Merge (s, _, _) -> s
-
-    let transaction (spec : _ t) =
-      witness spec
-      |> Option.map ~f:(fun spec -> spec.Transaction_witness.Poly.transaction)
-
-    let gen :
-           'witness Quickcheck.Generator.t
-        -> 'ledger_proof Quickcheck.Generator.t
-        -> ('witness, 'ledger_proof) t Quickcheck.Generator.t =
-     fun gen_witness gen_proof ->
-      let open Quickcheck.Generator in
-      let gen_transition =
-        let open Let_syntax in
-        let%bind statement = Transaction_snark.Statement.gen in
-        let%map witness = gen_witness in
-        Transition (statement, witness)
-      in
-      let gen_merge =
-        let open Let_syntax in
-        let%bind statement = Transaction_snark.Statement.gen in
-        let%map p1, p2 = tuple2 gen_proof gen_proof in
-        Merge (statement, p1, p2)
-      in
-      union [ gen_transition; gen_merge ]
-  end
-
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
-
-    module V1 = struct
-      type t =
-        ( Transaction_witness.Stable.V2.t
-        , Ledger_proof.Stable.V2.t )
-        Poly.Stable.V2.t
-      [@@deriving sexp, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  type t = (Transaction_witness.t, Ledger_proof.Cached.t) Poly.t
-
-  let read_all_proofs_from_disk : t -> Stable.Latest.t =
-    Poly.map ~f_witness:Transaction_witness.read_all_proofs_from_disk
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-
-  let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-      Stable.Latest.t -> t =
-    Poly.map
-      ~f_witness:(Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
-      ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
-end
-
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type 'spec t = { spec : 'spec; pairing : Pairing.Single.Stable.V1.t }
+    module V2 = struct
+      type ('witness, 'ledger_proof) t =
+        | Transition of Transaction_snark.Statement.Stable.V2.t * 'witness
+        | Merge of
+            Transaction_snark.Statement.Stable.V2.t
+            * 'ledger_proof
+            * 'ledger_proof
       [@@deriving sexp, yojson]
     end
   end]
 
-  [%%define_locally Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, of_yojson)]
+  [%%define_locally Stable.Latest.(sexp_of_t, t_of_sexp, to_yojson, of_yojson)]
 
-  let map ~(f_spec : 'a -> 'b) (t : 'a t) : 'b t =
-    { t with spec = f_spec t.spec }
+  let map ~f_witness ~f_proof = function
+    | Transition (s, w) ->
+        Transition (s, f_witness w)
+    | Merge (s, p1, p2) ->
+        Merge (s, f_proof p1, f_proof p2)
+
+  let witness (t : (_, _) t) =
+    match t with Transition (_, witness) -> Some witness | Merge _ -> None
+
+  let statement = function Transition (s, _) -> s | Merge (s, _, _) -> s
+
+  let transaction (spec : _ t) =
+    witness spec
+    |> Option.map ~f:(fun spec -> spec.Transaction_witness.Poly.transaction)
+
+  let gen :
+         'witness Quickcheck.Generator.t
+      -> 'ledger_proof Quickcheck.Generator.t
+      -> ('witness, 'ledger_proof) t Quickcheck.Generator.t =
+   fun gen_witness gen_proof ->
+    let open Quickcheck.Generator in
+    let gen_transition =
+      let open Let_syntax in
+      let%bind statement = Transaction_snark.Statement.gen in
+      let%map witness = gen_witness in
+      Transition (statement, witness)
+    in
+    let gen_merge =
+      let open Let_syntax in
+      let%bind statement = Transaction_snark.Statement.gen in
+      let%map p1, p2 = tuple2 gen_proof gen_proof in
+      Merge (statement, p1, p2)
+    in
+    union [ gen_transition; gen_merge ]
 end
 
 [%%versioned
@@ -102,17 +57,24 @@ module Stable = struct
   [@@@no_toplevel_latest_type]
 
   module V1 = struct
-    type t = Unissued.Stable.V1.t Poly.Stable.V1.t [@@deriving sexp, yojson]
+    type t =
+      ( Transaction_witness.Stable.V2.t
+      , Ledger_proof.Stable.V2.t )
+      Poly.Stable.V2.t
+    [@@deriving sexp, yojson]
 
     let to_latest = Fn.id
   end
 end]
 
-type t = Unissued.t Poly.t
+type t = (Transaction_witness.t, Ledger_proof.Cached.t) Poly.t
 
 let read_all_proofs_from_disk : t -> Stable.Latest.t =
-  Poly.map ~f_spec:Unissued.read_all_proofs_from_disk
+  Poly.map ~f_witness:Transaction_witness.read_all_proofs_from_disk
+    ~f_proof:Ledger_proof.Cached.read_proof_from_disk
 
 let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
     Stable.Latest.t -> t =
-  Poly.map ~f_spec:(Unissued.write_all_proofs_to_disk ~proof_cache_db)
+  Poly.map
+    ~f_witness:(Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
+    ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)

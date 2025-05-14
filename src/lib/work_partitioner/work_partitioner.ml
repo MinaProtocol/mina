@@ -6,7 +6,7 @@ module Zkapp_command_job_pool =
 module Sent_zkapp_job_pool =
   Job_pool.Make (Work.Spec.Sub_zkapp.ID) (Work.Spec.Sub_zkapp)
 module Sent_single_job_pool =
-  Job_pool.Make (Work.Spec.Sub_zkapp.ID) (Work.Spec.Sub_zkapp)
+  Job_pool.Make (Work.Pairing.Single) (Work.Spec.Single.Unissued)
 
 module Pairing_status = struct
   type t =
@@ -29,10 +29,9 @@ type t =
   ; zkapp_command_jobs : Zkapp_command_job_pool.t
         (* NOTE: Fields for reissue pooling*)
   ; reassignment_timeout : Time.Span.t
-  ; jobs_sent_by_partitioner : Sent_job_pool.t
-        (* we only track tasks created by a Work_partitioner here. For reissue
-           of regular jobs, we still turn to the underlying Work_selector *)
-        (* WARN: we're assuming everything in this queue is sorted in time from old to new.
+  ; zkapp_jobs_sent_by_partitioner : Sent_zkapp_job_pool.t
+  ; single_jobs_sent_by_partitioner : Sent_single_job_pool.t
+        (* NOTE: we're assuming everything in this queue is sorted in time from old to new.
            So queue head is the oldest task.
         *)
   ; mutable tmp_slot :
@@ -54,40 +53,35 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   ; pairing_pool = Hashtbl.create (module Work.Pairing.ID)
   ; zkapp_command_jobs = Zkapp_command_job_pool.create ()
   ; reassignment_timeout
-  ; jobs_sent_by_partitioner = Sent_job_pool.create ()
+  ; zkapp_jobs_sent_by_partitioner = Sent_zkapp_job_pool.create ()
+  ; single_jobs_sent_by_partitioner = Sent_single_job_pool.create ()
   ; tmp_slot = None
   }
 
 let epoch_now () = Time.(now () |> to_span_since_epoch)
 
 (* Logics for work requesting *)
-let reissue_old_task ~(partitioner : t) () : Work.Spec.t option =
-  let job_is_old (job : Work.Partitioned.Zkapp_command_job.t) : bool =
-    let issued = Time.of_span_since_epoch job.common.issued_since_unix_epoch in
+let reissue_old_zkapp_task ~(partitioner : t) () : Work.Spec.t option =
+  let job_is_old (job : Work.Spec.Sub_zkapp.t) : bool =
+    let issued = Time.of_span_since_epoch job.issued_since_unix_epoch in
     let delta = Time.(diff (now ()) issued) in
     Time.Span.( > ) delta partitioner.reassignment_timeout
   in
   match
-    Sent_job_pool.fold_until ~init:None
+    Sent_zkapp_job_pool.fold_until ~init:None
       ~f:(fun _ ((_, job) as item) ->
         if job_is_old job then { slashed = true; action = `Stop (Some item) }
         else { slashed = false; action = `Continue None } )
-      ~finish:Fn.id partitioner.jobs_sent_by_partitioner
+      ~finish:Fn.id partitioner.zkapp_jobs_sent_by_partitioner
   with
   | None ->
       None
   | Some (id, job) ->
       let issued_since_unix_epoch = epoch_now () in
-      let reissued =
-        { job with common = { job.common with issued_since_unix_epoch } }
-      in
-      Sent_job_pool.replace ~id ~job:reissued
-        partitioner.jobs_sent_by_partitioner ;
-      Some (Sub_zkapp_command { spec = reissued; metric = () })
-
-(* let fold_until ~(init : 'accum) *)
-(*     ~(f : 'accum -> ID.t * Job.t -> ('accum, 'final) fold_action) *)
-(*     ~(finish : 'accum -> 'final) t : 'final = *)
+      let reissued = { job with issued_since_unix_epoch } in
+      Sent_zkapp_job_pool.replace ~id ~job:reissued
+        partitioner.zkapp_jobs_sent_by_partitioner ;
+      Some (Sub_zkapp_command { spec = reissued; data = () })
 
 let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     Work.Partitioned.Spec.t option =

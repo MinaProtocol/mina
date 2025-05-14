@@ -15,7 +15,8 @@ struct
   let gen_staged_ledger =
     (*Staged_ledger for tests is a list of work specs*)
     Quickcheck.Generator.list
-    @@ Snark_work_lib.Spec.Single.Poly.gen Int.quickcheck_generator Fee.gen
+    @@ Snark_work_lib.Spec.Single.Unissued.Poly.gen Int.quickcheck_generator
+         Fee.gen
 
   let precomputed_values = Precomputed_values.for_unit_tests
 

@@ -1,4 +1,4 @@
-module Pairing = Pairing
+module ID = ID
 
 module Spec = struct
   module Sub_zkapp = Zkapp_command_job

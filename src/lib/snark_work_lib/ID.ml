@@ -5,8 +5,7 @@ module ID = struct
   module Stable = struct
     module V1 = struct
       (* this identifies a One_or_two work from Work_selector's perspective *)
-      type t = Pairing_ID of int64
-      [@@deriving compare, hash, sexp, yojson, equal]
+      type t = ID of int64 [@@deriving compare, hash, sexp, yojson, equal]
 
       let to_latest = Fn.id
     end
@@ -34,7 +33,11 @@ module Sub_zkapp = struct
     module V1 = struct
       (* Case `One` indicate no need to pair. ID is still needed because zkapp command
          might be left in pool of half completion. *)
-      type t = { which_one : [ `First | `Second | `One ]; id : ID.Stable.V1.t }
+      type t =
+        { which_one : [ `First | `Second | `One ]
+        ; pairing_id : ID.Stable.V1.t
+        ; job_id : ID.Stable.V1.t
+        }
       [@@deriving compare, hash, sexp, yojson, equal]
 
       let to_latest = Fn.id

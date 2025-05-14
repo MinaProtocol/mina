@@ -6,18 +6,19 @@ module Poly = struct
     module V1 = struct
       type ('witness, 'zkapp_command_segment_witness, 'ledger_proof, 'data) t =
         | Single of
-            { single_spec :
-                ('witness, 'ledger_proof) Single_spec.Unissued.Poly.Stable.V2.t
-                Single_spec.Poly.Stable.V1.t
-            ; pairing : Pairing.Single.Stable.V1.t
+            { spec :
+                ( ('witness, 'ledger_proof) Single_spec.Poly.Stable.V2.t
+                , Pairing.Single.Stable.V1.t )
+                With_status.Stable.V1.t
             ; data : 'data
             }
         | Sub_zkapp_command of
             { spec :
-                ( 'zkapp_command_segment_witness
-                , 'ledger_proof )
-                Zkapp_command_job.Unissued.Poly.Stable.V1.t
-                Zkapp_command_job.Poly.Stable.V1.t
+                ( ( 'zkapp_command_segment_witness
+                  , 'ledger_proof )
+                  Zkapp_command_job.Poly.Stable.V1.t
+                , Pairing.Sub_zkapp.Stable.V1.t )
+                With_status.Stable.V1.t
             ; data : 'data
             }
       [@@deriving sexp, yojson]
@@ -26,14 +27,15 @@ module Poly = struct
 
   let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data =
     function
-    | Single { single_spec; pairing; data } ->
+    | Single { spec; data } ->
         Single
-          { single_spec =
-              Single_spec.Poly.map
-                ~f_spec:(fun unissued ->
-                  Single_spec.Unissued.Poly.map ~f_witness ~f_proof unissued )
+          { spec =
+              With_status.map
+                ~f_spec:(fun spec ->
+                  Single_spec.Poly.map ~f_spec:(fun unissued ->
+                      Single_spec.Unissued.Poly.map ~f_witness ~f_proof unissued )
+                  )
                 single_spec
-          ; pairing
           ; data = f_data data
           }
     | Sub_zkapp_command { spec; data } ->

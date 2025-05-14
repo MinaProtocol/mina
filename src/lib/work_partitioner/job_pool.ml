@@ -3,8 +3,11 @@ open Core_kernel
 type ('accum, 'final) fold_action =
   { action : [ `Continue of 'accum | `Stop of 'final ]; slashed : bool }
 
-(* NOTE: Maybe this is reusable with Work Selector as they also have reissue mechanism *)
 module Make (ID : Hashtbl.Key) (Job : T) = struct
+  type id = ID.t
+
+  type job = Job.t
+
   type job_item = Job.t option ref
 
   type t =
@@ -98,4 +101,26 @@ module Make (ID : Hashtbl.Key) (Job : T) = struct
         Some job
     | _ ->
         None
+
+  let reissue_if_old (t : t) ~(reassignment_timeout : Time.Span.t) =
+    let job_is_old (job : Work.Spec.Sub_zkapp.t) : bool =
+      let issued = Time.of_span_since_epoch job.issued_since_unix_epoch in
+      let delta = Time.(diff (now ()) issued) in
+      Time.Span.( > ) delta partitioner.reassignment_timeout
+    in
+    match
+      Sent_zkapp_job_pool.fold_until ~init:None
+        ~f:(fun _ ((_, job) as item) ->
+          if job_is_old job then { slashed = true; action = `Stop (Some item) }
+          else { slashed = false; action = `Continue None } )
+        ~finish:Fn.id partitioner.zkapp_jobs_sent_by_partitioner
+    with
+    | None ->
+        None
+    | Some (id, job) ->
+        let issued_since_unix_epoch = epoch_now () in
+        let reissued = { job with issued_since_unix_epoch } in
+        Sent_zkapp_job_pool.replace ~id ~job:reissued
+          partitioner.zkapp_jobs_sent_by_partitioner ;
+        Some (Sub_zkapp_command { spec = reissued; data = () })
 end
