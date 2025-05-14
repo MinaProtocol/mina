@@ -1,4 +1,5 @@
 open Core_kernel
+module Spec = Work_spec
 
 type snark_work_generated =
   | Merge_generated of Time.Span.t
@@ -12,7 +13,9 @@ type snark_work_generated =
   | Sub_zkapp_command of { kind : [ `Merge | `Segment ]; elapsed : Time.Span.t }
 
 let collect_single ~(single_spec : _ Single_spec.Poly.t)
-    ~metric:({ elapsed; _ } : _ Proof_with_metric.Poly.t) =
+    ~data:
+      ({ data = elapsed; _ } :
+        (Core.Time.Stable.Span.V1.t, _) Proof_carrying_data.t ) =
   match single_spec with
   | Single_spec.Poly.Merge (_, _, _) ->
       Perf_histograms.add_span ~name:"snark_worker_merge_time" elapsed ;
@@ -93,10 +96,12 @@ let collect_single ~(single_spec : _ Single_spec.Poly.t)
 let emit_proof_metrics ~data =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
   match data with
-  | Spec.Poly.Single { single_spec; metric; _ } ->
-      `One (collect_single ~single_spec ~metric)
+  | Spec.Poly.Single { single_spec; data; _ } ->
+      `One (collect_single ~single_spec ~data)
   | Spec.Poly.Sub_zkapp_command
-      { spec = { spec = Zkapp_command_job.Spec.Poly.Segment _; _ }; metric } ->
+      { spec = { spec = Zkapp_command_job.Spec.Poly.Segment _; _ }
+      ; data = Proof_carrying_data.{ data = elapsed; _ }
+      } ->
       (* WARN:
          I don't know if this is the desired behavior, we need CI engineers.
          We're likely to adapt the below somehow to here.
@@ -107,12 +112,14 @@ let emit_proof_metrics ~data =
              Counter.inc zkapp_transaction_length (Float.of_int c) ;
              Counter.inc zkapp_proof_updates (Float.of_int p))) ;
       *)
-      Perf_histograms.add_span ~name:"snark_worker_subzkapp_time" metric.elapsed ;
+      Perf_histograms.add_span ~name:"snark_worker_subzkapp_time" elapsed ;
       Perf_histograms.add_span
-        ~name:"snark_worker_sub_zkapp_command_segment_time" metric.elapsed ;
-      `One (Sub_zkapp_command { kind = `Segment; elapsed = metric.elapsed })
+        ~name:"snark_worker_sub_zkapp_command_segment_time" elapsed ;
+      `One (Sub_zkapp_command { kind = `Segment; elapsed })
   | Spec.Poly.Sub_zkapp_command
-      { spec = { spec = Zkapp_command_job.Spec.Poly.Merge _; _ }; metric } ->
+      { spec = { spec = Zkapp_command_job.Spec.Poly.Merge _; _ }
+      ; data = Proof_carrying_data.{ data = elapsed; _ }
+      } ->
       (* WARN:
          I don't know if this is the desired behavior, we need CI engineers.
          We're likely to adapt the below somehow to here.
@@ -123,7 +130,7 @@ let emit_proof_metrics ~data =
              Counter.inc zkapp_transaction_length (Float.of_int c) ;
              Counter.inc zkapp_proof_updates (Float.of_int p))) ;
       *)
-      Perf_histograms.add_span ~name:"snark_worker_subzkapp_time" metric.elapsed ;
+      Perf_histograms.add_span ~name:"snark_worker_subzkapp_time" elapsed ;
       Perf_histograms.add_span ~name:"snark_worker_sub_zkapp_command_merge_time"
-        metric.elapsed ;
-      `One (Sub_zkapp_command { kind = `Merge; elapsed = metric.elapsed })
+        elapsed ;
+      `One (Sub_zkapp_command { kind = `Merge; elapsed })

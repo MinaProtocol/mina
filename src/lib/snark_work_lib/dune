@@ -16,6 +16,7 @@
   mina_stdlib
   one_or_two
   ppx_version.runtime
+  proof_carrying_data
   signature_lib
   transaction_snark)
  (preprocess
