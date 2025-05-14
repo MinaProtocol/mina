@@ -2,14 +2,14 @@ open Core_kernel
 module Snark_worker_shared = Snark_worker_shared
 module Work = Snark_work_lib
 module Zkapp_command_job_pool =
-  Job_pool.Make (Work.ID.Zkapp) (Pending_zkapp_command)
+  Job_pool.Make (Work.ID.Single) (Pending_zkapp_command)
 module Sent_zkapp_job_pool =
   Job_pool.Make (Work.ID.Sub_zkapp) (Work.Spec.Sub_zkapp)
 module Sent_single_job_pool = Job_pool.Make (Work.ID.Single) (Work.Spec.Single)
 
 module Pairing_status = struct
   type t =
-    | None of
+    | OnlyMeta of
         { prover : Signature_lib.Public_key.Compressed.t
         ; fee_of_full : Currency.Fee.t
         }
@@ -78,11 +78,11 @@ let reissue_old_single_job ~(partitioner : t) () : Work.Spec.Full.t option =
 let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     Work.Spec.Full.t option =
   let open Option.Let_syntax in
-  let attempt_issue_from_pending (zkapp_id : Work.ID.Zkapp.t)
+  let attempt_issue_from_pending (zkapp_id : Work.ID.Single.t)
       (pending : Pending_zkapp_command.t) =
     let%map spec = Pending_zkapp_command.generate_job_spec pending in
     let job_id =
-      Work.ID.Sub_zkapp.of_zkapp
+      Work.ID.Sub_zkapp.of_single
         ~job_id:(Id_generator.next_id partitioner.id_generator ())
         zkapp_id
     in
@@ -150,21 +150,16 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing :
                   ; elapsed = Time.Span.zero
                   }
               in
-              let zkapp_id =
-                Work.ID.Zkapp.of_single
-                  (Id_generator.next_id partitioner.id_generator)
-                  pairing
-              in
               let pending_zkapp_command_job =
                 Work.With_status.
                   { spec = pending_zkapp_command
-                  ; job_id = zkapp_id
+                  ; job_id = pairing
                   ; issued_since_unix_epoch = epoch_now ()
                   }
               in
               assert (
                 phys_equal `Ok
-                  (Zkapp_command_job_pool.attempt_add ~key:zkapp_id
+                  (Zkapp_command_job_pool.attempt_add ~key:pairing
                      ~job:pending_zkapp_command_job
                      partitioner.zkapp_command_jobs ) ) ;
               issue_job_from_partitioner ~partitioner ()
@@ -208,51 +203,51 @@ and issue_job_from_partitioner ~(partitioner : t) () : Work.Spec.Full.t option =
     ; issue_from_tmp_slot ~partitioner
     ]
 
+(* and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing : *)
+(*     Work.Spec.Full.t = *)
 (* WARN: this should only be called if partitioner.first_in_pair is None *)
 let consume_job_from_selector ~(partitioner : t)
-    ~(spec : Work.Spec.Single.t One_or_two.t) () : Work.Spec.Full.t =
-  let fee_of_full = spec.fee in
-  match spec.instances with
+    ~(prover : Signature_lib.Public_key.Compressed.t) ~(fee : Currency.Fee.t)
+    ~(instances : Work.Spec.Single.t One_or_two.t) () : Work.Spec.Full.t =
+  let pairing_id = Id_generator.next_id partitioner.id_generator () in
+  Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
+    ~data:(None { prover; fee_of_full = fee }) ;
+
+  match instances with
   | `One single_spec ->
-      convert_single_work_from_selector ~partitioner ~single_spec ~pairing:`One
-        ~fee_of_full
+      let pairing : Work.ID.Single.t = { which_one = `One; pairing_id } in
+      convert_single_work_from_selector ~partitioner ~single_spec ~pairing
   | `Two (spec1, spec2) ->
       assert (phys_equal None partitioner.tmp_slot) ;
-      let id = Id_generator.next_id partitioner.id_generator in
-      let pairing1 : Work.Partitioned.Pairing.Single.t =
-        `First (Pairing_ID id)
-      in
-      let pairing2 : Work.Partitioned.Pairing.Single.t =
-        `Second (Pairing_ID id)
-      in
-      partitioner.tmp_slot <- Some (spec1, pairing1, fee_of_full) ;
+      let pairing1 : Work.ID.Single.t = { which_one = `First; pairing_id } in
+      let pairing2 : Work.ID.Single.t = { which_one = `Second; pairing_id } in
+      partitioner.tmp_slot <- Some (spec1, pairing1) ;
       convert_single_work_from_selector ~partitioner ~single_spec:spec2
-        ~pairing:pairing2 ~fee_of_full
+        ~pairing:pairing2
 
-let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
-    ~(selection_method : (module Work_selector.Selection_method_intf))
-    ~(selector : Work_selector.State.t) ~(logger : Logger.t)
-    ~(fee : Currency.Fee.t) ~snark_pool () =
-  let (module Work_selection_method) = selection_method in
+type work_from_selector =
+     fee:Currency.Fee.t
+  -> logger:Logger.t
+  -> Work_selector.work One_or_two.t option
+
+let request_from_selector_and_consume_by_partitioner ~(partitioner : t) ~logger
+    ~(work_from_selector : work_from_selector) ~(fee : Currency.Fee.t)
+    ~(prover : Signature_lib.Public_key.Compressed.t) () =
   let open Core_kernel in
   let open Option.Let_syntax in
-  let%map instances =
-    Work_selection_method.work ~logger ~fee ~snark_pool selector
-  in
-  let spec : Work.Selector.Spec.t = { instances; fee } in
+  let%map instances = work_from_selector ~fee ~logger in
 
-  consume_job_from_selector ~partitioner ~spec ()
+  consume_job_from_selector ~partitioner ~prover ~instances ~fee ()
 
-let request_partitioned_work
-    ~(selection_method : (module Work_selector.Selection_method_intf))
-    ~(logger : Logger.t) ~(fee : Currency.Fee.t)
-    ~(snark_pool : Work_selector.snark_pool) ~(selector : Work_selector.State.t)
-    ~(partitioner : t) : Work.Partitioned.Spec.t option =
+let request_partitioned_work ~(logger : Logger.t) ~(fee : Currency.Fee.t)
+    ~(prover : Signature_lib.Public_key.Compressed.t)
+    ~(work_from_selector : work_from_selector) ~(partitioner : t) :
+    Work.Spec.Full.t option =
   List.find_map
     ~f:(fun f -> f ())
     [ issue_job_from_partitioner ~partitioner
-    ; request_from_selector_and_consume_by_partitioner ~partitioner
-        ~selection_method ~selector ~logger ~fee ~snark_pool
+    ; request_from_selector_and_consume_by_partitioner ~partitioner ~logger
+        ~work_from_selector ~fee ~prover
     ]
 
 (* Logics for work submitting *)
@@ -260,29 +255,33 @@ let request_partitioned_work
 type submit_result =
   | SchemeUnmatched
   | Slashed
-  | Processed of Work.Selector.Result.t option
+  | Processed of Work.Result.Combined.t option
 (* If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
 
-let submit_single ~partitioner ~this_single ~id =
-  let Mergable_single_work.{ which_half; _ } = this_single in
-  let result = ref None in
+let submit_single ~partitioner ~(this_result : Work.Result.Single.t) ~this_half
+    ~id =
+  let result = ref SchemeUnmatched in
   Hashtbl.change partitioner.pairing_pool id ~f:(function
-    | Some other_single ->
+    | Some (Single other_single) ->
         let work =
-          match which_half with
-          | `First ->
-              Mergable_single_work.merge_to_one_result_exn this_single
-                other_single
-          | `Second ->
-              Mergable_single_work.merge_to_one_result_exn other_single
-                this_single
+          Mergable_single_work.merge_to_one_result_exn other_single this_result
+            this_half
         in
-
-        result := Some work ;
+        result := Processed (Some work) ;
         None
+    | Some (OnlyMeta { prover; fee_of_full }) ->
+        result := Processed None ;
+        Some
+          (Single
+             { which_half = this_half
+             ; single_result = this_result
+             ; prover
+             ; fee_of_full
+             } )
     | None ->
-        Some this_single ) ;
-  Processed !result
+        (* We should always at least having a OnlyMeta, this would be SchemeUnmatched indeed *)
+        None ) ;
+  !result
 
 let submit_into_pending_zkapp_command ~partitioner
     ~spec:({ pairing; job_id; _ } : Work.Partitioned.Zkapp_command_job.t)

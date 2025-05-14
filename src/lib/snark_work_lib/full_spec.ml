@@ -8,7 +8,7 @@ module Poly = struct
         | Single of
             { job :
                 ( ('witness, 'ledger_proof) Single_spec.Poly.Stable.V2.t
-                , ID.Single.Stable.V1.t )
+                , Id.Single.Stable.V1.t )
                 With_status.Stable.V1.t
             ; data : 'data
             }
@@ -17,7 +17,7 @@ module Poly = struct
                 ( ( 'zkapp_command_segment_witness
                   , 'ledger_proof )
                   Sub_zkapp_spec.Poly.Stable.V1.t
-                , ID.Sub_zkapp.Stable.V1.t )
+                , Id.Sub_zkapp.Stable.V1.t )
                 With_status.Stable.V1.t
             ; data : 'data
             }
