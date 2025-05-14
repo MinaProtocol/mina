@@ -2494,9 +2494,12 @@ module Make_str (A : Wire_types.Concrete) = struct
                       Boolean.Assert.any
                         [ Boolean.not is_user_command; permitted_to_send ] )
                 in
-                (*second fee receiver of a fee transfer and fee receiver of a coinbase transaction remain unchanged if
-                   1. These accounts are not permitted to receive tokens and,
-                   2. Receiver account that corresponds to first fee receiver of a fee transfer or coinbase receiver of a coinbase transaction, doesn't allow receiving tokens*)
+                (* second fee receiver of a fee transfer and fee receiver of a
+                   coinbase transaction remain unchanged if
+                     1. These accounts are not permitted to receive tokens and,
+                     2. Receiver account that corresponds to first fee receiver of
+                     a fee transfer or coinbase receiver of a coinbase
+                     transaction, doesn't allow receiving tokens *)
                 let%bind update_account =
                   let%bind receiving_allowed =
                     Boolean.all
@@ -2506,7 +2509,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 let%bind is_empty_and_writeable =
                   (* If this is a coinbase with zero fee, do not create the
-                     account, since the fee amount won't be enough to pay for it.
+                     account, since the fee amount won't be enough to pay for
+                     it.
                   *)
                   Boolean.(all [ is_empty_and_writeable; not is_zero_fee ])
                 in
@@ -2650,7 +2654,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Account.Checked.has_permission ~to_:`Receive account
                   |> Boolean.( &&& ) permitted_to_access
                 in
-                (*Account remains unchanged if balance update is not permitted for payments, fee_transfers and coinbase transactions*)
+                (* Account remains unchanged if balance update is not permitted
+                   for payments, fee_transfers and coinbase transactions *)
                 let%bind payment_or_internal_command =
                   Boolean.any [ is_payment; is_coinbase_or_fee_transfer ]
                 in
@@ -2779,7 +2784,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   Boolean.(!receiver_overflow ||| user_command_fails)
                 in
                 let%bind is_empty_and_writeable =
-                  (* Do not create a new account if the user command will fail or if receiving is not permitted *)
+                  (* Do not create a new account if the user command will fail
+                     or if receiving is not permitted *)
                   Boolean.all
                     [ is_empty_and_writeable
                     ; Boolean.not user_command_fails
@@ -2884,7 +2890,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 let permitted_to_receive =
                   Account.Checked.has_permission ~to_:`Receive account
                 in
-                (*Account remains unchanged if not permitted to send, receive, or set delegate*)
+                (* Account remains unchanged if not permitted to send, receive,
+                   or set delegate *)
                 let%bind payment_permitted =
                   Boolean.all
                     [ is_payment
@@ -3054,7 +3061,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     (* Someday:
        write the following soundness tests:
        - apply a transaction where the signature is incorrect
-       - apply a transaction where the sender does not have enough money in their account
+       - apply a transaction where the sender does not have enough money in
+         their account
        - apply a transaction and stuff in the wrong target hash
     *)
 
@@ -3062,8 +3070,10 @@ module Make_str (A : Wire_types.Concrete) = struct
        constraints pass iff there exists
           t : Tagged_transaction.t
        such that
-       - applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
-       - applying [t] to [pc.source] with results in pending coinbase stack [pc.target]
+       - applying [t] to ledger with merkle hash [l1] results in ledger with
+         merkle hash [l2].
+       - applying [t] to [pc.source] with results in pending coinbase stack
+         [pc.target]
        - t has fee excess equal to [fee_excess]
        - t has supply increase equal to [supply_increase]
          where statement includes
@@ -3726,7 +3736,7 @@ module Make_str (A : Wire_types.Concrete) = struct
              Account_update_group.Zkapp_command_intermediate_state.t )
            witnesses
          ->
-        (*Transaction snark says nothing about failure status*)
+        (* Transaction snark says nothing about failure status *)
         let source_local = { source_local with failure_status_tbl = [] } in
         let target_local = { target_local with failure_status_tbl = [] } in
         let current_commitment = !commitment in
@@ -3808,7 +3818,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                   remaining_zkapp_command := rest ;
                   commitment := commitment' ;
                   full_commitment := full_commitment' ;
-                  (*TODO: Remove `Two_new case because the resulting pending_coinbase_init_stack will not be correct for zkapp_command2 if it is in a different scan state tree*)
+                  (*TODO: Remove `Two_new case because the resulting
+                    pending_coinbase_init_stack will not be correct for
+                    zkapp_command2 if it is in a different scan state tree*)
                   pending_coinbase_init_stack := pending_coinbase_init_stack1 ;
                   pending_coinbase_stack_state :=
                     { pending_coinbase_stack_state1 with
@@ -4700,10 +4712,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       zkapp_command
 
-    (* This spec is intended to build a zkapp command with only one account update
-       with proof authorization. This is mainly for cross-network replay tests. We
-       want to test the condition that when a proof is generated in one network
-       and being rejected by another network.
+    (* This spec is intended to build a zkapp command with only one account
+       update with proof authorization. This is mainly for cross-network replay
+       tests. We want to test the condition that when a proof is generated in
+       one network and being rejected by another network.
     *)
     module Single_account_update_spec = struct
       type t =
