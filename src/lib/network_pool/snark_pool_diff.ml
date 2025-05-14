@@ -121,8 +121,7 @@ module Make
   let of_result (res : Snark_work_lib.Result.Combined.Stable.Latest.t) =
     let statements =
       One_or_two.map res.data ~f:(fun single_result ->
-          Snark_work_lib.Spec.Single.Unissued.Poly.statement
-            single_result.spec.spec )
+          Snark_work_lib.Spec.Single.Poly.statement single_result.spec )
     in
     let proof =
       One_or_two.map res.data ~f:(fun single_result -> single_result.proof)

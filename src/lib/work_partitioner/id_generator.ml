@@ -9,7 +9,7 @@ let create ~logger =
   ; next_id = Int64.min_value
   }
 
-let next_id (t : t) : Int64.t =
+let next_id (t : t) () : Int64.t =
   let open Int64 in
   let result = t.next_id in
   let lower, upper = t.range in

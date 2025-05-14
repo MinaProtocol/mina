@@ -1,9 +1,10 @@
 module ID = ID
+module With_status = With_status
 
 module Spec = struct
-  module Sub_zkapp = Zkapp_command_job
+  module Sub_zkapp = Sub_zkapp_spec
   module Single = Single_spec
-  include Work_spec
+  module Full = Full_spec
 end
 
 module Result = struct

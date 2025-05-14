@@ -1,5 +1,4 @@
 open Core_kernel
-module Spec = Work_spec
 
 module Poly = struct
   [%%versioned
@@ -12,23 +11,23 @@ module Poly = struct
             , 'zkapp_command_segment_witness
             , 'ledger_proof
             , 'metric )
-            Spec.Poly.Stable.V1.t
+            Full_spec.Poly.Stable.V1.t
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
         }
     end
   end]
 
-  let to_spec ({ data; _ } : _ t) : _ Spec.Poly.t =
+  let to_spec ({ data; _ } : _ t) : _ Full_spec.Poly.t =
     match data with
-    | Spec.Poly.Single { single_spec; pairing; _ } ->
-        Spec.Poly.Single { single_spec; pairing; data = () }
-    | Spec.Poly.Sub_zkapp_command { spec; _ } ->
-        Spec.Poly.Sub_zkapp_command { spec; data = () }
+    | Full_spec.Poly.Single { job; _ } ->
+        Full_spec.Poly.Single { job; data = () }
+    | Full_spec.Poly.Sub_zkapp_command { job; _ } ->
+        Full_spec.Poly.Sub_zkapp_command { job; data = () }
 
   let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data
       ({ data; prover } : _ t) =
     { data =
-        Spec.Poly.map ~f_witness ~f_zkapp_command_segment_witness ~f_proof
+        Full_spec.Poly.map ~f_witness ~f_zkapp_command_segment_witness ~f_proof
           ~f_data data
     ; prover
     }

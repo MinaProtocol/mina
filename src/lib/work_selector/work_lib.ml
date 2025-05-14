@@ -4,7 +4,7 @@ open Async
 
 module Make (Inputs : Intf.Inputs_intf) = struct
   module Inputs = Inputs
-  module Work_spec = Snark_work_lib.Spec.Single.Unissued.Poly
+  module Work_spec = Snark_work_lib.Spec.Single.Poly
 
   module Job_status = struct
     type t = Assigned of Time.t

@@ -2,11 +2,10 @@ open Core_kernel
 module Snark_worker_shared = Snark_worker_shared
 module Work = Snark_work_lib
 module Zkapp_command_job_pool =
-  Job_pool.Make (Work.Pairing.Sub_zkapp) (Pending_zkapp_command)
+  Job_pool.Make (Work.ID.Zkapp) (Pending_zkapp_command)
 module Sent_zkapp_job_pool =
-  Job_pool.Make (Work.Spec.Sub_zkapp.ID) (Work.Spec.Sub_zkapp)
-module Sent_single_job_pool =
-  Job_pool.Make (Work.Pairing.Single) (Work.Spec.Single.Unissued)
+  Job_pool.Make (Work.ID.Sub_zkapp) (Work.Spec.Sub_zkapp)
+module Sent_single_job_pool = Job_pool.Make (Work.ID.Single) (Work.Spec.Single)
 
 module Pairing_status = struct
   type t =
@@ -23,7 +22,7 @@ type t =
         (* WARN: we're mixing ID for `pairing_pool` and `zkapp_command_jobs.
            Should be fine *)
   ; id_generator : Id_generator.t (* NOTE: Fields for pooling *)
-  ; pairing_pool : (Work.Pairing.ID.t, Pairing_status.t) Hashtbl.t
+  ; pairing_pool : (int64, Pairing_status.t) Hashtbl.t
         (* if one single work from underlying Work_selector is completed but
            not the other. throw it here. *)
   ; zkapp_command_jobs : Zkapp_command_job_pool.t
@@ -34,8 +33,7 @@ type t =
         (* NOTE: we're assuming everything in this queue is sorted in time from old to new.
            So queue head is the oldest task.
         *)
-  ; mutable tmp_slot :
-      (Work.Spec.Single.t * Work.Pairing.Single.t * Currency.Fee.t) option
+  ; mutable tmp_slot : (Work.Spec.Single.t * Work.ID.Single.t) option
         (* When receving a `Two works from the underlying Work_selector, store one of them here,
            so we could issue them to another worker.
         *)
@@ -50,7 +48,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   { logger
   ; transaction_snark = (module M)
   ; id_generator = Id_generator.create ~logger
-  ; pairing_pool = Hashtbl.create (module Work.Pairing.ID)
+  ; pairing_pool = Hashtbl.create (module Int64)
   ; zkapp_command_jobs = Zkapp_command_job_pool.create ()
   ; reassignment_timeout
   ; zkapp_jobs_sent_by_partitioner = Sent_zkapp_job_pool.create ()
@@ -61,58 +59,44 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
 let epoch_now () = Time.(now () |> to_span_since_epoch)
 
 (* Logics for work requesting *)
-let reissue_old_zkapp_task ~(partitioner : t) () : Work.Spec.t option =
-  let job_is_old (job : Work.Spec.Sub_zkapp.t) : bool =
-    let issued = Time.of_span_since_epoch job.issued_since_unix_epoch in
-    let delta = Time.(diff (now ()) issued) in
-    Time.Span.( > ) delta partitioner.reassignment_timeout
+let reissue_old_zkapp_job ~(partitioner : t) () : Work.Spec.Full.t option =
+  let%map.Option job =
+    Sent_zkapp_job_pool.reissue_if_old
+      partitioner.zkapp_jobs_sent_by_partitioner
+      ~reassignment_timeout:partitioner.reassignment_timeout
   in
-  match
-    Sent_zkapp_job_pool.fold_until ~init:None
-      ~f:(fun _ ((_, job) as item) ->
-        if job_is_old job then { slashed = true; action = `Stop (Some item) }
-        else { slashed = false; action = `Continue None } )
-      ~finish:Fn.id partitioner.zkapp_jobs_sent_by_partitioner
-  with
-  | None ->
-      None
-  | Some (id, job) ->
-      let issued_since_unix_epoch = epoch_now () in
-      let reissued = { job with issued_since_unix_epoch } in
-      Sent_zkapp_job_pool.replace ~id ~job:reissued
-        partitioner.zkapp_jobs_sent_by_partitioner ;
-      Some (Sub_zkapp_command { spec = reissued; data = () })
+  Work.Spec.Full.Poly.Sub_zkapp_command { job; data = () }
+
+let reissue_old_single_job ~(partitioner : t) () : Work.Spec.Full.t option =
+  let%map.Option job =
+    Sent_single_job_pool.reissue_if_old
+      partitioner.single_jobs_sent_by_partitioner
+      ~reassignment_timeout:partitioner.reassignment_timeout
+  in
+  Work.Spec.Full.Poly.Single { job; data = () }
 
 let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
-    Work.Partitioned.Spec.t option =
+    Work.Spec.Full.t option =
   let open Option.Let_syntax in
-  let attempt_issue_from_pending
-      (pairing : Work.Partitioned.Pairing.Sub_zkapp.t)
+  let attempt_issue_from_pending (zkapp_id : Work.ID.Zkapp.t)
       (pending : Pending_zkapp_command.t) =
     let%map spec = Pending_zkapp_command.generate_job_spec pending in
     let job_id =
-      Work.Partitioned.Zkapp_command_job.ID.Job_ID
-        (Id_generator.next_id partitioner.id_generator)
+      Work.ID.Sub_zkapp.of_zkapp
+        ~job_id:(Id_generator.next_id partitioner.id_generator ())
+        zkapp_id
     in
-    let fee_of_full = pending.fee_of_full in
     let issued_since_unix_epoch = epoch_now () in
-    let spec =
-      Work.Partitioned.Zkapp_command_job.Poly.
-        { spec
-        ; pairing
-        ; job_id
-        ; common = { fee_of_full; issued_since_unix_epoch }
-        }
-    in
-    Sent_job_pool.replace ~id:job_id ~job:spec
-      partitioner.jobs_sent_by_partitioner ;
+    let job = Work.With_status.{ spec; job_id; issued_since_unix_epoch } in
+    Sent_zkapp_job_pool.replace ~id:job_id ~job
+      partitioner.zkapp_jobs_sent_by_partitioner ;
 
-    Work.Partitioned.Spec.Poly.Sub_zkapp_command { spec; metric = () }
+    Work.Spec.Full.Poly.Sub_zkapp_command { job; data = () }
   in
 
   Zkapp_command_job_pool.fold_until ~init:None
-    ~f:(fun _ (pairing, pending) ->
-      match attempt_issue_from_pending pairing pending with
+    ~f:(fun _ job ->
+      match attempt_issue_from_pending job.job_id job.spec with
       | None ->
           { slashed = false; action = `Continue None }
       | Some spec ->
@@ -123,17 +107,16 @@ let rec issue_from_tmp_slot ~(partitioner : t) () =
   match partitioner.tmp_slot with
   | Some spec ->
       partitioner.tmp_slot <- None ;
-      let single_spec, pairing, fee_of_full = spec in
+      let single_spec, pairing = spec in
       Some
-        (convert_single_work_from_selector ~partitioner ~single_spec ~pairing
-           ~fee_of_full )
+        (convert_single_work_from_selector ~partitioner ~single_spec ~pairing)
   | None ->
       None
 
 (* try to issue a single work received from the underlying Work_selector
    `one_or_two` tracks which task is it inside a `One_or_two`*)
-and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing
-    ~fee_of_full : Work.Partitioned.Spec.t =
+and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing :
+    Work.Spec.Full.t =
   match single_spec with
   | Transition (input, witness) as work -> (
       (* WARN: a smilar copy of this exists in `Snark_worker.Worker_impl_prod` *)
@@ -152,7 +135,7 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing
               let unscheduled_segments =
                 all
                 |> List.map ~f:(fun (witness, spec, statement) ->
-                       Work.Partitioned.Zkapp_command_job.Spec.Poly.Segment
+                       Work.Spec.Sub_zkapp.Poly.Segment
                          { statement; witness; spec } )
                 |> Queue.of_list
               in
@@ -165,20 +148,25 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing
                   ; merge_remaining
                   ; spec = work
                   ; elapsed = Time.Span.zero
-                  ; fee_of_full
                   }
               in
-              let pairing =
-                Work.Partitioned.Pairing.Sub_zkapp.of_single
-                  (fun () ->
-                    Pairing_ID (Id_generator.next_id partitioner.id_generator)
-                    )
+              let zkapp_id =
+                Work.ID.Zkapp.of_single
+                  (Id_generator.next_id partitioner.id_generator)
                   pairing
+              in
+              let pending_zkapp_command_job =
+                Work.With_status.
+                  { spec = pending_zkapp_command
+                  ; job_id = zkapp_id
+                  ; issued_since_unix_epoch = epoch_now ()
+                  }
               in
               assert (
                 phys_equal `Ok
-                  (Zkapp_command_job_pool.attempt_add ~key:pairing
-                     ~job:pending_zkapp_command partitioner.zkapp_command_jobs ) ) ;
+                  (Zkapp_command_job_pool.attempt_add ~key:zkapp_id
+                     ~job:pending_zkapp_command_job
+                     partitioner.zkapp_command_jobs ) ) ;
               issue_job_from_partitioner ~partitioner ()
               |> Option.value_exn
                    ~message:
@@ -192,31 +180,37 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing
               failwith (Exn.to_string e) )
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
           Single
-            { single_spec
-            ; pairing
-            ; metric = ()
-            ; common = { fee_of_full; issued_since_unix_epoch = epoch_now () }
+            { job =
+                Work.With_status.
+                  { spec = single_spec
+                  ; job_id = pairing
+                  ; issued_since_unix_epoch = epoch_now ()
+                  }
+            ; data = ()
             } )
   | Merge _ ->
       Single
-        { single_spec
-        ; pairing
-        ; metric = ()
-        ; common = { fee_of_full; issued_since_unix_epoch = epoch_now () }
+        { job =
+            Work.With_status.
+              { spec = single_spec
+              ; job_id = pairing
+              ; issued_since_unix_epoch = epoch_now ()
+              }
+        ; data = ()
         }
 
-and issue_job_from_partitioner ~(partitioner : t) () :
-    Work.Partitioned.Spec.t option =
+and issue_job_from_partitioner ~(partitioner : t) () : Work.Spec.Full.t option =
   List.find_map
     ~f:(fun f -> f ())
-    [ reissue_old_task ~partitioner
+    [ reissue_old_zkapp_job ~partitioner
+    ; reissue_old_single_job ~partitioner
     ; issue_from_zkapp_command_work_pool ~partitioner
     ; issue_from_tmp_slot ~partitioner
     ]
 
 (* WARN: this should only be called if partitioner.first_in_pair is None *)
-let consume_job_from_selector ~(partitioner : t) ~(spec : Work.Selector.Spec.t)
-    () : Work.Partitioned.Spec.t =
+let consume_job_from_selector ~(partitioner : t)
+    ~(spec : Work.Spec.Single.t One_or_two.t) () : Work.Spec.Full.t =
   let fee_of_full = spec.fee in
   match spec.instances with
   | `One single_spec ->

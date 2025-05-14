@@ -1,9 +1,9 @@
 module State :
   Intf.State_intf with type transition_frontier := Transition_frontier.t
 
-type work = Snark_work_lib.Spec.Single.Unissued.t
+type work = Snark_work_lib.Spec.Single.t
 
-type in_memory_work = Snark_work_lib.Spec.Single.Unissued.Stable.Latest.t
+type in_memory_work = Snark_work_lib.Spec.Single.Stable.Latest.t
 
 type snark_pool = Network_pool.Snark_pool.t
 
