@@ -489,7 +489,9 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
         });
 
         decl_module!(w, env, "Boolean_circuit", {
+            decl_type!(w, env, CamlPastaFpBooleanCircuit => "t");
             decl_type!(w, env, CamlPastaFpBooleanProof => "boolean_proof");
+            decl_func!(w, env, caml_pasta_fp_new_boolean_circuit => "create_witness");
             decl_func!(w, env, caml_pasta_fp_prove_boolean => "boolean_prove");
             decl_func!(w, env, caml_pasta_fp_verify_boolean => "boolean_verify");
         })

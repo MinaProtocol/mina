@@ -459,33 +459,34 @@ let test_cannot_finalize_twice_the_runtime_table_cfgs () =
 let () =
   let open Alcotest in
   run "Test constraint construction"
-    [ ( "Lookup tables"
-      , [ test_case "Add one fixed table" `Quick
-            test_finalize_and_get_gates_with_lookup_tables
-        ; test_case "Add one runtime table cfg" `Quick
-            test_finalize_and_get_gates_with_runtime_table_cfg
-        ; test_case "Compute witness with one runtime table lookup" `Quick
-            test_compute_witness_returns_correctly_filled_runtime_tables_one_lookup
-        ; test_case "Compute witness with multiple runtime table lookup" `Quick
-            test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
-        ; test_case
-            "Compute witness with runtime lookup at same index with\n\
-            \          different values" `Quick
-            test_compute_witness_with_lookup_to_the_same_idx_twice
-        ; test_case
-            "Compute witness with lookups within a runtime table and a fixed \
-             lookup table, not sharing the same ID"
-            `Quick
-            test_compute_witness_with_fixed_lookup_table_and_runtime_table
-        ; test_case
-            "Compute witness with lookups within a runtime table and a fixed \
-             lookup table, sharing the table ID"
-            `Quick
-            test_compute_witness_with_fixed_lookup_table_and_runtime_table_sharing_ids
-        ; test_case "Check that fixed lookup tables cannot be finalized twice"
-            `Quick test_cannot_finalize_twice_the_fixed_lookup_tables
-        ; test_case
-            "Check that runtime table configurations cannot be finalized twice"
-            `Quick test_cannot_finalize_twice_the_runtime_table_cfgs
-        ] )
-    ]
+  @@ [ ( "Lookup tables"
+       , [ test_case "Add one fixed table" `Quick
+             test_finalize_and_get_gates_with_lookup_tables
+         ; test_case "Add one runtime table cfg" `Quick
+             test_finalize_and_get_gates_with_runtime_table_cfg
+         ; test_case "Compute witness with one runtime table lookup" `Quick
+             test_compute_witness_returns_correctly_filled_runtime_tables_one_lookup
+         ; test_case "Compute witness with multiple runtime table lookup" `Quick
+             test_compute_witness_returns_correctly_filled_runtime_tables_multiple_lookup
+         ; test_case
+             "Compute witness with runtime lookup at same index with\n\
+             \          different values" `Quick
+             test_compute_witness_with_lookup_to_the_same_idx_twice
+         ; test_case
+             "Compute witness with lookups within a runtime table and a fixed \
+              lookup table, not sharing the same ID"
+             `Quick
+             test_compute_witness_with_fixed_lookup_table_and_runtime_table
+         ; test_case
+             "Compute witness with lookups within a runtime table and a fixed \
+              lookup table, sharing the table ID"
+             `Quick
+             test_compute_witness_with_fixed_lookup_table_and_runtime_table_sharing_ids
+         ; test_case "Check that fixed lookup tables cannot be finalized twice"
+             `Quick test_cannot_finalize_twice_the_fixed_lookup_tables
+         ; test_case
+             "Check that runtime table configurations cannot be finalized twice"
+             `Quick test_cannot_finalize_twice_the_runtime_table_cfgs
+         ] )
+     ]
+  @ Test_boolean_circuit.tests

@@ -580,6 +580,8 @@ module Protocol = struct
   end
 
   module Boolean_circuit = struct
+    type nonrec t = { vals : FieldVectors.Fp.t } [@@boxed]
+
     type nonrec boolean_proof =
       { poly_commitment : Pasta_bindings.Fq.t Kimchi_types.or_infinity
       ; quotient_commitment : Pasta_bindings.Fq.t Kimchi_types.or_infinity
@@ -590,7 +592,10 @@ module Protocol = struct
           Kimchi_types.opening_proof
       }
 
-    external boolean_prove : SRS.Fp.t -> FieldVectors.Fp.t -> boolean_proof
+    external create_witness : SRS.Fp.t -> FieldVectors.Fp.t -> t
+      = "caml_pasta_fp_new_boolean_circuit"
+
+    external boolean_prove : SRS.Fp.t -> t -> boolean_proof
       = "caml_pasta_fp_prove_boolean"
 
     external boolean_verify : SRS.Fp.t -> boolean_proof -> bool
