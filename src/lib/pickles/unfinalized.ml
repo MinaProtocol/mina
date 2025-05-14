@@ -6,6 +6,8 @@ open Common
 open Import
 module Shifted_value = Shifted_value.Type2
 
+module Make (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) = struct
+
 (* Unfinalized dlog-based proof, along with a flag which is true iff it
    is expected to verify. This allows for situations like the blockchain
    SNARK where we let the previous proof fail in the base case.
@@ -14,7 +16,7 @@ type t = Impls.Step.unfinalized_proof_var
 
 module Plonk_checks = struct
   include Plonk_checks
-  include Plonk_checks.Make (Shifted_value) (Plonk_checks.Scalars.Tock)
+  include Plonk_checks.Make (Shifted_value) (Step_verifier.Scalars.Tock)
 end
 
 module Constant = struct
@@ -116,3 +118,7 @@ let dummy : unit -> t =
       in
       let xs, aux = value_to_fields (Lazy.force Constant.dummy) in
       var_of_fields (Array.map ~f:Field.constant xs, aux) )
+
+    end
+
+  include Make (Step_verifier.Step_verifier_kimchi)
