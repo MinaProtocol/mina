@@ -225,9 +225,9 @@ type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t_ =
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
-      ( Zkapp_state.Value.Stable.V1.t
+      ( Zkapp_state.Value.Stable.V2.t
       , Verification_key_wire.Stable.V1.t option
       , Mina_numbers.Zkapp_version.Stable.V1.t
       , F.Stable.V1.t

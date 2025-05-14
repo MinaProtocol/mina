@@ -453,8 +453,8 @@ end
 module Account = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V3.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
         ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
         ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
@@ -1498,9 +1498,9 @@ module Other = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Account.Stable.V2.t
+        ( Account.Stable.V3.t
         , Account_state.Stable.V1.t Transition.Stable.V1.t
         , F.Stable.V1.t Hash.Stable.V1.t )
         Poly.Stable.V1.t
@@ -1573,11 +1573,11 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
-      ( Account.Stable.V2.t
+      ( Account.Stable.V3.t
       , Protocol_state.Stable.V1.t
-      , Other.Stable.V2.t
+      , Other.Stable.V3.t
       , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]

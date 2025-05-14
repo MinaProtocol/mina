@@ -69,13 +69,13 @@ module type Full = sig
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t
 
         val to_latest : t -> t
       end
 
-      module Latest = V2
+      module Latest = V3
     end
   end
 
@@ -84,13 +84,13 @@ module type Full = sig
       (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t
 
         val to_latest : t -> t
       end
 
-      module Latest = V2
+      module Latest = V3
     end
   end
 
@@ -100,7 +100,7 @@ module type Full = sig
       * Pre_diff_with_at_most_one_coinbase.t option
 
     module Stable : sig
-      module V2 : sig
+      module V3 : sig
         type t
 
         val coinbase :
@@ -112,7 +112,7 @@ module type Full = sig
         val to_latest : t -> t
       end
 
-      module Latest = V2
+      module Latest = V3
     end
 
     val coinbase :
@@ -125,7 +125,7 @@ module type Full = sig
   type t = { diff : Diff.t } [@@deriving fields]
 
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type t [@@deriving bin_io, equal, sexp, version, yojson]
 
       val to_latest : t -> t
@@ -135,7 +135,7 @@ module type Full = sig
       val completed_works : t -> Transaction_snark_work.Stable.Latest.t list
     end
 
-    module Latest = V2
+    module Latest = V3
   end
 
   val write_all_proofs_to_disk :

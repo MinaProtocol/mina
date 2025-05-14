@@ -219,9 +219,9 @@ module User_command = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( (User_command.Stable.V2.t[@hash.ignore])
+        ( (User_command.Stable.V3.t[@hash.ignore])
         , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
         With_hash.Stable.V1.t
       [@@deriving sexp, hash, to_yojson]

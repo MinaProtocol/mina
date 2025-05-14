@@ -57,7 +57,7 @@ module Answer = struct
     module V3 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
-        , Account.Stable.V2.t )
+        , Account.Stable.V3.t )
         Syncable_ledger.Answer.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
@@ -67,7 +67,7 @@ module Answer = struct
     module V2 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
-        , Account.Stable.V2.t )
+        , Account.Stable.V3.t )
         Syncable_ledger.Answer.Stable.V1.t
       [@@deriving sexp, to_yojson]
 

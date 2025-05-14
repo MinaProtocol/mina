@@ -255,7 +255,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V2.t
+        ( Staged_ledger.Scan_state.Stable.V3.t
         * Ledger_hash.Stable.V1.t
         * Pending_coinbase.Stable.V2.t
         * Mina_state.Protocol_state.Value.Stable.V2.t list )
@@ -535,7 +535,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
-      type response = Mina_block.Stable.V2.t list option
+      type response = Mina_block.Stable.V3.t list option
 
       let query_of_caller_model = Fn.id
 
@@ -934,8 +934,8 @@ module Get_ancestry = struct
       [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Mina_block.Stable.V3.t
+        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
         option
 
@@ -1139,8 +1139,8 @@ module Get_best_tip = struct
       type query = unit [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Mina_block.Stable.V3.t
+        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
         option
 

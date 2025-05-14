@@ -62,8 +62,8 @@ module type V1S8 = sig
   module V1 : S8
 end
 
-module type V2S0 = sig
-  module V2 : S0
+module type V3S0 = sig
+  module V3 : S0
 end
 
 module type V2S1 = sig
@@ -77,3 +77,8 @@ end
 module type V2S3 = sig
   module V2 : S3
 end
+
+module type V2S0 = sig
+  module V2 : S0
+end
+

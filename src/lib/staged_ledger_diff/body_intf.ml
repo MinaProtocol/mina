@@ -3,12 +3,12 @@ module type Full = sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V1 : sig
+    module V2 : sig
       type t [@@deriving equal, sexp]
 
-      val create : Diff.Stable.V2.t -> t
+      val create : Diff.Stable.V3.t -> t
 
-      val staged_ledger_diff : t -> Diff.Stable.V2.t
+      val staged_ledger_diff : t -> Diff.Stable.V3.t
     end
   end]
 
@@ -18,9 +18,9 @@ module type Full = sig
 
   val staged_ledger_diff : t -> Diff.t
 
-  val to_binio_bigstring : Stable.V1.t -> Core_kernel.Bigstring.t
+  val to_binio_bigstring : Stable.V2.t -> Core_kernel.Bigstring.t
 
-  val compute_reference : tag:int -> Stable.V1.t -> Consensus.Body_reference.t
+  val compute_reference : tag:int -> Stable.V2.t -> Consensus.Body_reference.t
 
   val write_all_proofs_to_disk :
     proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
