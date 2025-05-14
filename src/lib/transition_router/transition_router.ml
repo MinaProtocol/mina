@@ -839,6 +839,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                 [%log info] "Critical section writing to $transition_pipe ends"
                   ~metadata:
                     [ ( "transition_pipe"
-                      , Strict_pipe.Writer.to_yojson pipe_writer )
+                      , Strict_pipe.Writer.to_yojson
+                          !(!transition_writer_ref.writer) )
                     ] ) ) ;
   (verified_transition_reader, initialization_finish_signal)
