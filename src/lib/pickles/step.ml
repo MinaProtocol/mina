@@ -15,9 +15,9 @@ module Make
     (A : T0) (A_value : sig
       type t
     end)
-    (Max_proofs_verified : Nat.Add.Intf_transparent) =
+    (Max_proofs_verified : Nat.Add.Intf_transparent) (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) =
 struct
-  module Step_branch_data = Step_branch_data.Make (Inductive_rule)
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule) (Step_verifier)
 
   let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
@@ -27,8 +27,8 @@ struct
 
   module Plonk_checks = struct
     include Plonk_checks
-    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Scalars.Tick)
-    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Scalars.Tock)
+    module Type1 = Plonk_checks.Make (Shifted_value.Type1) (Step_verifier.Scalars.Tick)
+    module Type2 = Plonk_checks.Make (Shifted_value.Type2) (Step_verifier.Scalars.Tock)
   end
 
   (* The prover corresponding to the given inductive rule. *)
