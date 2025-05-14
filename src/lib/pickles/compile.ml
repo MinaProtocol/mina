@@ -286,7 +286,8 @@ module Make
     (Ret_var : T0)
     (Ret_value : T0)
     (Auxiliary_var : T0)
-    (Auxiliary_value : T0) =
+    (Auxiliary_value : T0)
+    (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) =
 struct
   module IR =
     Inductive_rule.Promise.T (Arg_var) (Arg_value) (Ret_var) (Ret_value)
@@ -1079,7 +1080,7 @@ let compile_with_wrap_main_override_promise :
   end in
   let module M =
     Make (A_var) (A_value) (Ret_var) (Ret_value) (Auxiliary_var)
-      (Auxiliary_value)
+      (Auxiliary_value) (*TODO remove*)(Step_verifier.Step_verifier_kimchi)
   in
   let rec conv_irs :
       type branches v1ss v2ss wss hss.
