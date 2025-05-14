@@ -27,7 +27,7 @@ let lowerName =
 let duneProfile =
           \(profile : Profile)
       ->  merge
-            { Standard = "devnet"
+            { Standard = "mainnet"
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
             , Hardfork = "hardfork"
