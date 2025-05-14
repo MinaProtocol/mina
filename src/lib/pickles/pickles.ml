@@ -11,7 +11,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
        and type 'a Proof.t = 'a A.Proof.t
 end
 
-module Make_str (_ : Wire_types.Concrete) = struct
+module Make_str   (_ : Wire_types.Concrete) (Step_verifier : module type of Step_verifier.Step_verifier_kimchi)  = struct
   module Endo = Endo
   module P = Proof
 
@@ -42,12 +42,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Dirty = Dirty
   module Cache_handle = Cache_handle
   module Step_main_inputs = Step_main_inputs
-  module Step_verifier = Step_verifier
+   module Step_verifier = struct module Step_verifier_kimchi = Step_verifier end 
   module Proof_cache = Proof_cache
   module Cache = Cache
   module Storables = Compile.Storables
   module Ro = Ro
-  module Step_branch_data = Step_branch_data.Make (Inductive_rule)
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule) (Step_verifier.Step_verifier_kimchi)
 
   type chunking_data = Verify.Instance.chunking_data =
     { num_chunks : int; domain_size : int; zk_rows : int }
@@ -1303,7 +1303,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
           in
           let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
           let module S =
-            Step.Make (Inductive_rule) (A) (A_value) (Max_proofs_verified)
+            Step.Make (Inductive_rule) (A) (A_value) (Max_proofs_verified) (Step_verifier.Step_verifier_kimchi)
           in
           let prover =
             let f :
@@ -2607,4 +2607,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
     end )
 end
 
-include Wire_types.Make (Make_sig) (Make_str)
+module F (M: Wire_types.Concrete) :  Make_sig(M).S= 
+struct 
+  module A = Make_str (M) (Step_verifier.Step_verifier_kimchi)   
+  (* include (struct 
+include Make_str (M) (Step_verifier.Step_verifier_kimchi) 
+end : Make_sig(M).S) *)
+include A
+end
+
+
+
+include Wire_types.Make (Make_sig) (F)
