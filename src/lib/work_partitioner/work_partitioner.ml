@@ -2,11 +2,20 @@ open Core_kernel
 module Snark_worker_shared = Snark_worker_shared
 module Work = Snark_work_lib
 module Zkapp_command_job_pool =
-  Job_pool.Make (Work.Partitioned.Pairing.Sub_zkapp) (Pending_zkapp_command)
-module Sent_job_pool =
-  Job_pool.Make
-    (Work.Partitioned.Zkapp_command_job.ID)
-    (Work.Partitioned.Zkapp_command_job)
+  Job_pool.Make (Work.Pairing.Sub_zkapp) (Pending_zkapp_command)
+module Sent_zkapp_job_pool =
+  Job_pool.Make (Work.Spec.Sub_zkapp.ID) (Work.Spec.Sub_zkapp)
+module Sent_single_job_pool =
+  Job_pool.Make (Work.Spec.Sub_zkapp.ID) (Work.Spec.Sub_zkapp)
+
+module Pairing_status = struct
+  type t =
+    | None of
+        { prover : Signature_lib.Public_key.Compressed.t
+        ; fee_of_full : Currency.Fee.t
+        }
+    | Single of Mergable_single_work.t
+end
 
 type t =
   { logger : Logger.t
@@ -14,8 +23,7 @@ type t =
         (* WARN: we're mixing ID for `pairing_pool` and `zkapp_command_jobs.
            Should be fine *)
   ; id_generator : Id_generator.t (* NOTE: Fields for pooling *)
-  ; pairing_pool :
-      (Work.Partitioned.Pairing.ID.t, Mergable_single_work.t) Hashtbl.t
+  ; pairing_pool : (Work.Pairing.ID.t, Pairing_status.t) Hashtbl.t
         (* if one single work from underlying Work_selector is completed but
            not the other. throw it here. *)
   ; zkapp_command_jobs : Zkapp_command_job_pool.t
@@ -28,10 +36,7 @@ type t =
            So queue head is the oldest task.
         *)
   ; mutable tmp_slot :
-      ( Work.Selector.Single.Spec.t
-      * Work.Partitioned.Pairing.Single.t
-      * Currency.Fee.t )
-      option
+      (Work.Spec.Single.t * Work.Pairing.Single.t * Currency.Fee.t) option
         (* When receving a `Two works from the underlying Work_selector, store one of them here,
            so we could issue them to another worker.
         *)
@@ -46,7 +51,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   { logger
   ; transaction_snark = (module M)
   ; id_generator = Id_generator.create ~logger
-  ; pairing_pool = Hashtbl.create (module Work.Partitioned.Pairing.ID)
+  ; pairing_pool = Hashtbl.create (module Work.Pairing.ID)
   ; zkapp_command_jobs = Zkapp_command_job_pool.create ()
   ; reassignment_timeout
   ; jobs_sent_by_partitioner = Sent_job_pool.create ()
@@ -56,7 +61,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
 let epoch_now () = Time.(now () |> to_span_since_epoch)
 
 (* Logics for work requesting *)
-let reissue_old_task ~(partitioner : t) () : Work.Partitioned.Spec.t option =
+let reissue_old_task ~(partitioner : t) () : Work.Spec.t option =
   let job_is_old (job : Work.Partitioned.Zkapp_command_job.t) : bool =
     let issued = Time.of_span_since_epoch job.common.issued_since_unix_epoch in
     let delta = Time.(diff (now ()) issued) in

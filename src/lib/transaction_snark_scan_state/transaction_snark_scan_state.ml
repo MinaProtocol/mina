@@ -1298,12 +1298,7 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
 
 let all_work_pairs t
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
-    ( Transaction_witness.t
-    , Ledger_proof.Cached.t )
-    Snark_work_lib.Work.Single.Spec.t
-    One_or_two.t
-    list
-    Or_error.t =
+    Snark_work_lib.Spec.Single.Unissued.t One_or_two.t list Or_error.t =
   let all_jobs = all_jobs t in
   let module A = Available_job in
   let open Or_error.Let_syntax in
@@ -1343,14 +1338,14 @@ let all_work_pairs t
           ; block_global_slot
           }
         in
-        Snark_work_lib.Work.Single.Spec.Transition (statement, witness)
+        Snark_work_lib.Spec.Single.Poly.Transition (statement, witness)
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge
             (Ledger_proof.Cached.statement p1)
             (Ledger_proof.Cached.statement p2)
         in
-        Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
+        Snark_work_lib.Spec.Single.Poly.Merge (merged, p1, p2)
   in
   List.fold_until all_jobs ~init:[]
     ~finish:(fun lst -> Ok lst)

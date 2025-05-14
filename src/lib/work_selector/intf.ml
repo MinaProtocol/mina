@@ -74,7 +74,7 @@ module type Inputs_intf = sig
            (Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
+         Snark_work_lib.Spec.Single.Unissued.Poly.t
          One_or_two.t
          list
          Or_error.t
@@ -123,7 +123,7 @@ module type Lib_intf = sig
          t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
+         Snark_work_lib.Spec.Single.Unissued.Poly.t
          One_or_two.t
          list
 
@@ -133,7 +133,7 @@ module type Lib_intf = sig
          t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
+         Snark_work_lib.Spec.Single.Unissued.Poly.t
          One_or_two.t
       -> unit
   end
@@ -143,12 +143,12 @@ module type Lib_intf = sig
     -> fee:Fee.t
     -> ( Transaction_witness.t
        , Ledger_proof.Cached.t )
-       Snark_work_lib.Work.Single.Spec.t
+       Snark_work_lib.Spec.Single.Unissued.Poly.t
        One_or_two.t
        list
     -> ( Transaction_witness.t
        , Ledger_proof.Cached.t )
-       Snark_work_lib.Work.Single.Spec.t
+       Snark_work_lib.Spec.Single.Unissued.Poly.t
        One_or_two.t
        list
 
@@ -193,7 +193,7 @@ module type Make_selection_method_intf = functor (Lib : Lib_intf) ->
      and type work :=
       ( Lib.Inputs.Transaction_witness.t
       , Lib.Inputs.Ledger_proof.Cached.t )
-      Snark_work_lib.Work.Single.Spec.t
+      Snark_work_lib.Spec.Single.Unissued.Poly.t
      and type snark_pool := Lib.Inputs.Snark_pool.t
      and type transition_frontier := Lib.Inputs.Transition_frontier.t
      and module State := Lib.State

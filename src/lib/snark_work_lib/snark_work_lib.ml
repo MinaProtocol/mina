@@ -1,10 +1,15 @@
 module Pairing = Pairing
 
 module Spec = struct
-  include Work_spec
   module Sub_zkapp = Zkapp_command_job
   module Single = Single_spec
+  include Work_spec
 end
 
-module Result = Work_result
+module Result = struct
+  module Partitioned = Partitioned_result
+  module Single = Single_result
+  module Combined = Combined_result
+end
+
 module Metrics = Metrics

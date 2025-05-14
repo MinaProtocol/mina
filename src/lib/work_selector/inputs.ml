@@ -75,7 +75,8 @@ module Test_inputs = struct
 
   module Staged_ledger = struct
     type t =
-      (int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t List.t
+      (int, Transaction_snark_work.t) Snark_work_lib.Spec.Single.Unissued.Poly.t
+      List.t
 
     let work = Fn.id
 

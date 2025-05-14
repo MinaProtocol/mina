@@ -16,8 +16,8 @@ let collect_single ~(single_spec : _ Single_spec.Poly.t)
     ~data:
       ({ data = elapsed; _ } :
         (Core.Time.Stable.Span.V1.t, _) Proof_carrying_data.t ) =
-  match single_spec with
-  | Single_spec.Poly.Merge (_, _, _) ->
+  match single_spec.spec with
+  | Single_spec.Unissued.Poly.Merge (_, _, _) ->
       Perf_histograms.add_span ~name:"snark_worker_merge_time" elapsed ;
 
       (* WARN: This `observe` is just noop, not sure why it's here *)
@@ -25,7 +25,7 @@ let collect_single ~(single_spec : _ Single_spec.Poly.t)
         Cryptography.Snark_work_histogram.observe
           Cryptography.snark_work_merge_time_sec (Time.Span.to_sec elapsed)) ;
       Merge_generated elapsed
-  | Single_spec.Poly.Transition
+  | Single_spec.Unissued.Poly.Transition
       (_, ({ transaction; _ } : _ Transaction_witness.Poly.t)) ->
       Perf_histograms.add_span ~name:"snark_worker_transition_time" elapsed ;
       let transaction_type, zkapp_command_count, proof_zkapp_command_count =
@@ -99,7 +99,7 @@ let emit_proof_metrics ~data =
   | Spec.Poly.Single { single_spec; data; _ } ->
       `One (collect_single ~single_spec ~data)
   | Spec.Poly.Sub_zkapp_command
-      { spec = { spec = Zkapp_command_job.Spec.Poly.Segment _; _ }
+      { spec = { spec = Zkapp_command_job.Unissued.Poly.Segment _; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
       } ->
       (* WARN:
@@ -117,7 +117,7 @@ let emit_proof_metrics ~data =
         ~name:"snark_worker_sub_zkapp_command_segment_time" elapsed ;
       `One (Sub_zkapp_command { kind = `Segment; elapsed })
   | Spec.Poly.Sub_zkapp_command
-      { spec = { spec = Zkapp_command_job.Spec.Poly.Merge _; _ }
+      { spec = { spec = Zkapp_command_job.Unissued.Poly.Merge _; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
       } ->
       (* WARN:

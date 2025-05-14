@@ -8,10 +8,9 @@ open Core_kernel
 module Work = Snark_work_lib
 
 type t =
-  { spec : Work.Selector.Single.Spec.t
+  { spec : Work.Spec.Single.t
         (* the original work being splitted, should be identical to Work_selector.work *)
-  ; fee_of_full : Currency.Fee.t
-  ; unscheduled_segments : Work.Partitioned.Zkapp_command_job.Spec.t Queue.t
+  ; unscheduled_segments : Work.Spec.Sub_zkapp.Unissued.t Queue.t
   ; pending_mergable_proofs : Ledger_proof.Cached.t Deque.t
         (* we may need to insert proofs to merge back to the queue, hence a Deque *)
   ; mutable elapsed : Time.Stable.Span.V1.t
@@ -32,15 +31,14 @@ let generate_merge ~(t : t) () =
   in
   let open Option.Let_syntax in
   let%map proof1, proof2 = try_take2 t.pending_mergable_proofs in
-  Work.Partitioned.Zkapp_command_job.Spec.Poly.Merge { proof1; proof2 }
+  Work.Spec.Sub_zkapp.Unissued.Poly.Merge { proof1; proof2 }
 
 let generate_segment ~(t : t) () =
   let open Option.Let_syntax in
   let%map segment = Queue.dequeue t.unscheduled_segments in
   segment
 
-let generate_job_spec (t : t) : Work.Partitioned.Zkapp_command_job.Spec.t option
-    =
+let generate_job_spec (t : t) : Work.Spec.Sub_zkapp.Unissued.t option =
   List.find_map ~f:(fun f -> f ()) [ generate_merge ~t; generate_segment ~t ]
 
 let submit_proof (t : t) ~(proof : Ledger_proof.Cached.t)

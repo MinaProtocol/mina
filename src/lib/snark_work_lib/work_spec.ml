@@ -7,7 +7,8 @@ module Poly = struct
       type ('witness, 'zkapp_command_segment_witness, 'ledger_proof, 'data) t =
         | Single of
             { single_spec :
-                ('witness, 'ledger_proof) Single_spec.Poly.Stable.V2.t
+                ('witness, 'ledger_proof) Single_spec.Unissued.Poly.Stable.V2.t
+                Single_spec.Poly.Stable.V1.t
             ; pairing : Pairing.Single.Stable.V1.t
             ; data : 'data
             }
@@ -15,62 +16,61 @@ module Poly = struct
             { spec :
                 ( 'zkapp_command_segment_witness
                 , 'ledger_proof )
-                Zkapp_command_job.Spec.Poly.Stable.V1.t
+                Zkapp_command_job.Unissued.Poly.Stable.V1.t
                 Zkapp_command_job.Poly.Stable.V1.t
             ; data : 'data
             }
       [@@deriving sexp, yojson]
-
-      let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data =
-        function
-        | Single { single_spec; pairing; data } ->
-            Single
-              { single_spec =
-                  Single_spec.Poly.map ~f_witness ~f_proof single_spec
-              ; pairing
-              ; data = f_data data
-              }
-        | Sub_zkapp_command { spec; data } ->
-            Sub_zkapp_command
-              { spec =
-                  Zkapp_command_job.Poly.map
-                    ~f_spec:
-                      (Zkapp_command_job.Spec.Poly.map
-                         ~f_witness:f_zkapp_command_segment_witness ~f_proof )
-                    spec
-              ; data = f_data data
-              }
-
-      let statements : _ t -> Transaction_snark.Statement.t One_or_two.t =
-        function
-        | Single { single_spec; _ } ->
-            let stmt = Single_spec.Poly.statement single_spec in
-            `One stmt
-        | Sub_zkapp_command { spec = { spec; _ }; _ } ->
-            `One (Zkapp_command_job.Spec.Poly.statement spec)
-
-      let map_with_statement (t : _ t) ~f : _ t =
-        match t with
-        | Single { single_spec; pairing; data } ->
-            let stmt = Single_spec.Poly.statement single_spec in
-            Single { single_spec; pairing; data = f stmt data }
-        | Sub_zkapp_command { spec = { spec; _ } as job_spec; data } ->
-            Sub_zkapp_command
-              { spec = job_spec
-              ; data = f (Zkapp_command_job.Spec.Poly.statement spec) data
-              }
-
-      let transaction = function
-        | Single { single_spec; _ } ->
-            let txn = Single_spec.Poly.transaction single_spec in
-            `Single txn
-        | Sub_zkapp_command _ ->
-            `Sub_zkapp_command
     end
   end]
 
-  [%%define_locally
-  Stable.Latest.(map, statements, map_with_statement, transaction)]
+  let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data =
+    function
+    | Single { single_spec; pairing; data } ->
+        Single
+          { single_spec =
+              Single_spec.Poly.map
+                ~f_spec:(fun unissued ->
+                  Single_spec.Unissued.Poly.map ~f_witness ~f_proof unissued )
+                single_spec
+          ; pairing
+          ; data = f_data data
+          }
+    | Sub_zkapp_command { spec; data } ->
+        Sub_zkapp_command
+          { spec =
+              Zkapp_command_job.Poly.map
+                ~f_spec:
+                  (Zkapp_command_job.Unissued.Poly.map
+                     ~f_witness:f_zkapp_command_segment_witness ~f_proof )
+                spec
+          ; data = f_data data
+          }
+
+  let statements : _ t -> Transaction_snark.Statement.t One_or_two.t = function
+    | Single { single_spec; _ } ->
+        let stmt = Single_spec.Unissued.Poly.statement single_spec.spec in
+        `One stmt
+    | Sub_zkapp_command { spec = { spec; _ }; _ } ->
+        `One (Zkapp_command_job.Unissued.Poly.statement spec)
+
+  let map_with_statement (t : _ t) ~f : _ t =
+    match t with
+    | Single { single_spec; pairing; data } ->
+        let stmt = Single_spec.Unissued.Poly.statement single_spec.spec in
+        Single { single_spec; pairing; data = f stmt data }
+    | Sub_zkapp_command { spec = { spec; _ } as job_spec; data } ->
+        Sub_zkapp_command
+          { spec = job_spec
+          ; data = f (Zkapp_command_job.Unissued.Poly.statement spec) data
+          }
+
+  let transaction = function
+    | Single { single_spec; _ } ->
+        let txn = Single_spec.Unissued.Poly.transaction single_spec.spec in
+        `Single txn
+    | Sub_zkapp_command _ ->
+        `Sub_zkapp_command
 end
 
 [%%versioned

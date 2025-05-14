@@ -346,12 +346,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> ( Transaction_witness.t
-     , Ledger_proof.Cached.t )
-     Snark_work_lib.Work.Single.Spec.t
-     One_or_two.t
-     list
-     Or_error.t
+  -> Snark_work_lib.Spec.Single.t One_or_two.t list Or_error.t
 
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list

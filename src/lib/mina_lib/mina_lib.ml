@@ -919,6 +919,18 @@ let add_work ~(result : Snark_work_lib.Partitioned.Result.t) t =
       Work_selector.remove t.snark_job_state.selector spec
     in
     ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
+
+    (* let of_result *)
+    (*     (res : *)
+    (*       ( (_, _) Snark_work_lib.Work.Single.Spec.t Snark_work_lib.Work.Spec.t *)
+    (*       , Ledger_proof.t ) *)
+    (*       Snark_work_lib.Work.Result.t ) = *)
+    (*   Add_solved_work *)
+    (*     ( One_or_two.map res.spec.instances *)
+    (*         ~f:Snark_work_lib.Work.Single.Spec.statement *)
+    (*     , { proof = res.proofs *)
+    (*       ; fee = { fee = res.spec.fee; prover = res.prover } *)
+    (*       } ) *)
     Network_pool.Snark_pool.(
       Local_sink.push t.pipes.snark_local_sink
         ( Resource_pool.Diff.of_result

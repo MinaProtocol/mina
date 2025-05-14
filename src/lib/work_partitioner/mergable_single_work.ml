@@ -3,29 +3,31 @@
 open Core_kernel
 module Work = Snark_work_lib
 
+type half = [ `First | `Second ] [@@deriving equal]
+
 type t =
-  { which_half : [ `First | `Second ]
-  ; proof : Ledger_proof.Cached.t
-  ; metric : Core.Time.Span.t * [ `Merge | `Transition ]
-  ; spec : Work.Selector.Single.Spec.t
+  { which_half : half
+  ; single_result : Work.Result.Single.t
   ; prover : Signature_lib.Public_key.Compressed.t
-  ; common : Work.Partitioned.Spec_common.t
+  ; fee_of_full : Currency.Fee.t
   }
 
-let merge_to_one_result_exn (left : t) (right : t) : Work.Selector.Result.t =
-  assert (
-    List.for_all ~f:Fn.id
-      [ phys_equal left.which_half `First
-      ; phys_equal right.which_half `Second
-      ; Signature_lib.Public_key.Compressed.equal left.prover right.prover
-      ; Currency.Fee.equal left.common.fee_of_full right.common.fee_of_full
-      ] ) ;
-  let metrics = `Two (left.metric, right.metric) in
-  { proofs = `Two (left.proof, right.proof)
-  ; metrics
-  ; spec =
-      { instances = `Two (left.spec, right.spec)
-      ; fee = left.common.fee_of_full
-      }
-  ; prover = left.prover
-  }
+let merge_to_one_result_exn (in_pool : t) (submitted : Work.Result.Single.t)
+    (submitted_half : half) : Work.Result.Combined.t =
+  let { which_half = in_pool_half
+      ; single_result = in_pool_result
+      ; prover
+      ; fee_of_full
+      } =
+    in_pool
+  in
+  assert (not (equal_half in_pool_half submitted_half)) ;
+
+  let results =
+    match submitted_half with
+    | `First ->
+        (submitted, in_pool_result)
+    | `Second ->
+        (in_pool_result, submitted)
+  in
+  { data = `Two results; fee = fee_of_full; prover }

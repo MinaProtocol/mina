@@ -15,25 +15,23 @@ module Poly = struct
             Spec.Poly.Stable.V1.t
         ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
         }
-
-      let to_spec ({ data; _ } : _ t) : _ Spec.Poly.t =
-        match data with
-        | Spec.Poly.Single { single_spec; pairing; _ } ->
-            Spec.Poly.Single { single_spec; pairing; data = () }
-        | Spec.Poly.Sub_zkapp_command { spec; _ } ->
-            Spec.Poly.Sub_zkapp_command { spec; data = () }
-
-      let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data
-          ({ data; prover } : _ t) =
-        { data =
-            Spec.Poly.map ~f_witness ~f_zkapp_command_segment_witness ~f_proof
-              ~f_data data
-        ; prover
-        }
     end
   end]
 
-  [%%define_locally Stable.Latest.(to_spec, map)]
+  let to_spec ({ data; _ } : _ t) : _ Spec.Poly.t =
+    match data with
+    | Spec.Poly.Single { single_spec; pairing; _ } ->
+        Spec.Poly.Single { single_spec; pairing; data = () }
+    | Spec.Poly.Sub_zkapp_command { spec; _ } ->
+        Spec.Poly.Sub_zkapp_command { spec; data = () }
+
+  let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data
+      ({ data; prover } : _ t) =
+    { data =
+        Spec.Poly.map ~f_witness ~f_zkapp_command_segment_witness ~f_proof
+          ~f_data data
+    ; prover
+    }
 end
 
 [%%versioned
