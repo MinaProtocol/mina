@@ -8,15 +8,13 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
   module State = struct
     module Seen_key = struct
-      module T = struct
-        type t = Transaction_snark.Statement.t One_or_two.t
-        [@@deriving compare, sexp, to_yojson, hash]
-      end
-
-      include T
-      include Comparable.Make (T)
+      type t = Transaction_snark.Statement.t One_or_two.t
+      [@@deriving compare, sexp, to_yojson, hash]
     end
 
+    (* TODO:
+       replace `available_jobs` with a mutable priority queue
+    *)
     type t =
       { mutable available_jobs :
           ( Inputs.Transaction_witness.t
