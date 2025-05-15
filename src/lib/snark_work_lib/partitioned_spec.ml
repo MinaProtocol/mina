@@ -47,6 +47,12 @@ module Poly = struct
           ; data = f_data data
           }
 
+  let fee_of_full : _ t -> Currency.Fee.t = function
+    | Single { job; _ } ->
+        job.fee_of_full
+    | Sub_zkapp_command { job; _ } ->
+        job.fee_of_full
+
   let statements : _ t -> Transaction_snark.Statement.t One_or_two.t = function
     | Single { job = { spec; _ }; _ } ->
         let stmt = Single_spec.Poly.statement spec in

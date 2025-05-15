@@ -99,7 +99,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
     | Ok (Some (spec, public_key)) -> (
         let address_json = `String (Host_and_port.to_string daemon_address) in
         let work_ids_json =
-          Work.Partitioned.Spec.Poly.statements spec
+          Work.Spec.Partitioned.Poly.statements spec
           |> Transaction_snark_work.Statement.compact_json
         in
         [%log info]
@@ -108,11 +108,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           ~metadata:[ ("address", address_json); ("work_ids", work_ids_json) ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
-        let fee = Work.Partitioned.Spec.Poly.fee_of_full spec in
-        let message = Mina_base.Sok_message.create ~fee ~prover:public_key in
-        let sok_digest = Mina_base.Sok_message.digest message in
-
-        match%bind Worker.perform ~state ~spec ~sok_digest with
+        match%bind Worker.perform ~state ~spec ~prover:public_key with
         | Error e ->
             let%bind () =
               match%map
@@ -127,8 +123,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
                   ()
             in
             log_and_retry "performing work" e (retry_pause 10.) go
-        | Ok data ->
-            Work.Metrics.emit_proof_metrics ~data
+        | Ok result ->
+            Work.Metrics.emit_proof_metrics ~data:result.data
             |> One_or_two.iter ~f:(fun generated ->
                    [%str_log info]
                      (Events.event_of_snark_work_generated generated) ) ;
@@ -136,9 +132,6 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
               ~metadata:
                 [ ("address", address_json); ("work_ids", work_ids_json) ] ;
             let rec submit_work () =
-              let result : _ Work.Partitioned.Result.Poly.t =
-                { data; prover = public_key }
-              in
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
                   shutdown_on_disconnect result daemon_address

@@ -9,7 +9,7 @@ module Prod = Snark_worker.Worker.Prod
 module Worker_state = struct
   module type S = sig
     val perform_single :
-         Sok_message.t * Work.Selector.Single.Spec.Stable.Latest.t
+         Sok_message.t * Work.Spec.Single.Stable.Latest.t
       -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
   end
 
@@ -23,20 +23,17 @@ module Worker_state = struct
     Deferred.return
       (let module M = struct
          let perform_single
-             (message, (single_spec : Work.Selector.Single.Spec.Stable.Latest.t))
-             =
+             (message, (single_spec : Work.Spec.Single.Stable.Latest.t)) =
            let%bind (state : Prod.Worker_state.t) =
              Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
            let sok_digest = Mina_base.Sok_message.digest message in
-           let spec : Work.Partitioned.Spec.Stable.Latest.t =
+           let spec : Work.Spec.Partitioned.Stable.Latest.t =
              { instances = `One single_spec; fee = Currency.Fee.zero }
-             |> Work.Partitioned.Spec.Poly.of_selector_spec
+             |> Work.Spec.Partitioned.Poly.of_selector_spec
                   ~issued_since_unix_epoch:Time.(now () |> to_span_since_epoch)
            in
-           match%bind.Deferred.Or_error
-             Prod.perform ~state ~sok_digest ~spec
-           with
+           match%bind.Deferred.Or_error Prod.perform ~state ~spec with
            | Old { instances = `One (_, { proof; elapsed }); _ } ->
                Deferred.Or_error.return (proof, elapsed)
            | Old { instances = `Two _; _ } ->
@@ -60,7 +57,7 @@ module Worker = struct
     type 'w functions =
       { perform_single :
           ( 'w
-          , Sok_message.t * Work.Selector.Single.Spec.Stable.Latest.t
+          , Sok_message.t * Work.Spec.Single.Stable.Latest.t
           , (Ledger_proof.t * Time.Span.t) Or_error.t )
           F.t
       }
@@ -92,8 +89,7 @@ module Worker = struct
         { perform_single =
             f
               ( [%bin_type_class:
-                  Sok_message.Stable.Latest.t
-                  * Work.Selector.Single.Spec.Stable.Latest.t]
+                  Sok_message.Stable.Latest.t * Work.Spec.Single.Stable.Latest.t]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_single )

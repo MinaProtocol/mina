@@ -95,11 +95,12 @@ let collect_single ~(single_spec : _ Single_spec.Poly.t)
 let emit_proof_metrics ~data =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
   match data with
-  | Partitioned_spec.Poly.Single { job; data } ->
+  | Partitioned_spec.Poly.Single { job; data; _ } ->
       `One (collect_single ~single_spec:job.spec ~data)
   | Partitioned_spec.Poly.Sub_zkapp_command
       { job = { spec = Sub_zkapp_spec.Poly.Segment _; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
+      ; _
       } ->
       (* WARN:
          I don't know if this is the desired behavior, we need CI engineers.
@@ -118,6 +119,7 @@ let emit_proof_metrics ~data =
   | Partitioned_spec.Poly.Sub_zkapp_command
       { job = { spec = Sub_zkapp_spec.Poly.Merge _; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
+      ; _
       } ->
       (* WARN:
          I don't know if this is the desired behavior, we need CI engineers.

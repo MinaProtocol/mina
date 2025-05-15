@@ -15,7 +15,7 @@ module Master = struct
     type query = [ `V3 ]
 
     type response =
-      (Work.Partitioned.Spec.Stable.Latest.t * Public_key.Compressed.t) option
+      (Work.Spec.Partitioned.Stable.Latest.t * Public_key.Compressed.t) option
   end
 
   module Caller = T
@@ -31,7 +31,7 @@ module Stable = struct
       type query = [ `V3 ]
 
       type response =
-        (Work.Partitioned.Spec.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
+        (Work.Spec.Partitioned.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
         option
 
       let query_of_caller_model = Fn.id

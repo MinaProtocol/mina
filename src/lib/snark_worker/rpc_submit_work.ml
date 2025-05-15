@@ -11,7 +11,7 @@ module Master = struct
   let name = "submit_work"
 
   module T = struct
-    type query = Work.Partitioned.Result.Stable.Latest.t
+    type query = Work.Result.Partitioned.Stable.Latest.t
 
     type response = [ `Ok | `Slashed | `SchemeUnmatched ]
   end
@@ -26,7 +26,7 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 module Stable = struct
   module V3 = struct
     module T = struct
-      type query = Work.Partitioned.Result.Stable.V1.t
+      type query = Work.Result.Partitioned.Stable.V1.t
 
       type response = [ `Ok | `Slashed | `SchemeUnmatched ]
 

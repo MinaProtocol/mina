@@ -24,7 +24,8 @@ type t =
         (* NOTE: we're assuming everything in this queue is sorted in time from old to new.
            So queue head is the oldest task.
         *)
-  ; mutable tmp_slot : (Work.Spec.Single.t * Work.ID.Single.t) option
+  ; mutable tmp_slot :
+      (Work.Spec.Single.t * Work.ID.Single.t * Currency.Fee.t) option
         (* When receving a `Two works from the underlying Work_selector, store one of them here,
            so we could issue them to another worker.
         *)
@@ -71,16 +72,19 @@ let reissue_old_single_job ~(partitioner : t) () :
 let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
     Work.Spec.Partitioned.t option =
   let open Option.Let_syntax in
-  let attempt_issue_from_pending (zkapp_id : Work.ID.Single.t)
-      (pending : Pending_zkapp_command.t) =
+  let attempt_issue_from_pending
+      ({ spec = pending; job_id = zkapp_id; fee_of_full; _ } :
+        Zkapp_command_job_pool.job ) =
     let%map spec = Pending_zkapp_command.generate_job_spec pending in
     let job_id =
       Work.ID.Sub_zkapp.of_single
         ~job_id:(Id_generator.next_id partitioner.id_generator ())
         zkapp_id
     in
-    let issued_since_unix_epoch = epoch_now () in
-    let job = Work.With_status.{ spec; job_id; issued_since_unix_epoch } in
+    let job =
+      Work.With_status.
+        { spec; job_id; issued_since_unix_epoch = epoch_now (); fee_of_full }
+    in
     Sent_zkapp_job_pool.replace ~id:job_id ~job
       partitioner.zkapp_jobs_sent_by_partitioner ;
 
@@ -89,7 +93,7 @@ let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
 
   Zkapp_command_job_pool.fold_until ~init:None
     ~f:(fun _ job ->
-      match attempt_issue_from_pending job.job_id job.spec with
+      match attempt_issue_from_pending job with
       | None ->
           { slashed = false; action = `Continue None }
       | Some spec ->
@@ -100,21 +104,23 @@ let rec issue_from_tmp_slot ~(partitioner : t) () =
   match partitioner.tmp_slot with
   | Some spec ->
       partitioner.tmp_slot <- None ;
-      let single_spec, pairing = spec in
+      let single_spec, pairing, fee_of_full = spec in
       Some
-        (convert_single_work_from_selector ~partitioner ~single_spec ~pairing)
+        (convert_single_work_from_selector ~partitioner ~single_spec ~pairing
+           ~fee_of_full )
   | None ->
       None
 
 (* try to issue a single work received from the underlying Work_selector
    `one_or_two` tracks which task is it inside a `One_or_two`*)
-and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing :
-    Work.Spec.Partitioned.t =
+and convert_single_work_from_selector ~(partitioner : t) ~single_spec
+    ~fee_of_full ~pairing : Work.Spec.Partitioned.t =
   let job =
     Work.With_status.
       { spec = single_spec
       ; job_id = pairing
       ; issued_since_unix_epoch = epoch_now ()
+      ; fee_of_full
       }
   in
   match single_spec with
@@ -154,6 +160,7 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing :
                   { spec = pending_zkapp_command
                   ; job_id = pairing
                   ; issued_since_unix_epoch = epoch_now ()
+                  ; fee_of_full
                   }
               in
               assert (
@@ -189,24 +196,26 @@ and issue_job_from_partitioner ~(partitioner : t) () :
 
 (* WARN: this should only be called if partitioner.first_in_pair is None *)
 let consume_job_from_selector ~(partitioner : t)
-    ~(prover : Signature_lib.Public_key.Compressed.t) ~(fee : Currency.Fee.t)
+    ~(prover : Signature_lib.Public_key.Compressed.t)
+    ~fee:(fee_of_full : Currency.Fee.t)
     ~(instances : Work.Spec.Single.t One_or_two.t) () : Work.Spec.Partitioned.t
     =
   let pairing_id = Id_generator.next_id partitioner.id_generator () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
-    ~data:{ single_result = None; prover; fee_of_full = fee } ;
+    ~data:{ single_result = None; prover; fee_of_full } ;
 
   match instances with
   | `One single_spec ->
       let pairing : Work.ID.Single.t = { which_one = `One; pairing_id } in
       convert_single_work_from_selector ~partitioner ~single_spec ~pairing
+        ~fee_of_full
   | `Two (spec1, spec2) ->
       assert (phys_equal None partitioner.tmp_slot) ;
       let pairing1 : Work.ID.Single.t = { which_one = `First; pairing_id } in
       let pairing2 : Work.ID.Single.t = { which_one = `Second; pairing_id } in
-      partitioner.tmp_slot <- Some (spec1, pairing1) ;
+      partitioner.tmp_slot <- Some (spec1, pairing1, fee_of_full) ;
       convert_single_work_from_selector ~partitioner ~single_spec:spec2
-        ~pairing:pairing2
+        ~fee_of_full ~pairing:pairing2
 
 type work_from_selector =
      fee:Currency.Fee.t

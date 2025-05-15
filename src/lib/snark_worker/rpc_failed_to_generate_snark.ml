@@ -13,7 +13,7 @@ module Master = struct
 
   module T = struct
     type query =
-      Error.t * Work.Partitioned.Spec.Stable.Latest.t * Public_key.Compressed.t
+      Error.t * Work.Spec.Partitioned.Stable.Latest.t * Public_key.Compressed.t
 
     type response = unit
   end
@@ -30,7 +30,7 @@ module Stable = struct
     module T = struct
       type query =
         Bounded_types.Wrapped_error.Stable.V1.t
-        * Work.Partitioned.Spec.Stable.V1.t
+        * Work.Spec.Partitioned.Stable.V1.t
         * Public_key.Compressed.Stable.V1.t
 
       type response = unit
