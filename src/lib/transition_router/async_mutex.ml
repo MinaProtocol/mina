@@ -10,4 +10,6 @@ let rec lock_async (t : t) : unit Deferred.t =
 
 let lock_sync = Mutex.lock
 
+let repr (t : t) = Printf.sprintf "Async_mutex.%x" (Obj.magic (Obj.repr t))
+
 [%%define_locally Mutex.(create, unlock, try_lock)]

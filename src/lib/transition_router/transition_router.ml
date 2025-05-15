@@ -256,6 +256,8 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
         ~metadata:
           [ ( "closed_pipe"
             , Strict_pipe.Writer.to_yojson bootstrap_controller_writer )
+          ; ( "mutex_locked"
+            , `String (Async_mutex.repr !transition_writer_ref.mutex) )
           ] ;
       Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
@@ -271,6 +273,10 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
         ~metadata:
           [ ( "replaced_pipe"
             , Strict_pipe.Writer.to_yojson bootstrap_controller_writer )
+          ; ( "new_pipe"
+            , Strict_pipe.Writer.to_yojson !(!transition_writer_ref.writer) )
+          ; ( "mutex_released"
+            , `String (Async_mutex.repr !transition_writer_ref.mutex) )
           ] ) ;
   transition_writer_ref
 
@@ -781,6 +787,10 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                             [ ( "closed_transition_pipe"
                               , Strict_pipe.Writer.to_yojson
                                   transition_writer_raw )
+                            ; ( "mutex_locked"
+                              , `String
+                                  (Async_mutex.repr !transition_writer_ref.mutex)
+                              )
                             ] ;
                         Strict_pipe.Writer.kill transition_writer_raw ;
                         Option.iter ~f:Strict_pipe.Writer.kill
@@ -812,6 +822,10 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                             [ ( "new_pipe"
                               , Strict_pipe.Writer.to_yojson
                                   !(!transition_writer_ref.writer) )
+                            ; ( "mutex_released"
+                              , `String
+                                  (Async_mutex.repr !transition_writer_ref.mutex)
+                              )
                             ] )
                       else Deferred.unit
                   | None ->
@@ -829,6 +843,9 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                     ; ( "transition_pipe"
                       , Strict_pipe.Writer.to_yojson
                           !(!transition_writer_ref.writer) )
+                    ; ( "mutex_locked"
+                      , `String (Async_mutex.repr !transition_writer_ref.mutex)
+                      )
                     ] ;
                 Strict_pipe.Writer.write
                   !(!transition_writer_ref.writer)
@@ -841,5 +858,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                     [ ( "transition_pipe"
                       , Strict_pipe.Writer.to_yojson
                           !(!transition_writer_ref.writer) )
+                    ; ( "mutex_released"
+                      , `String (Async_mutex.repr !transition_writer_ref.mutex)
+                      )
                     ] ) ) ;
   (verified_transition_reader, initialization_finish_signal)
