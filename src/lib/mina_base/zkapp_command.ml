@@ -137,6 +137,22 @@ module T = struct
                   account_updates = Call_forest.mask t.account_updates shape'
                 } ) )
     end
+
+    module V1 = struct
+      type t =
+        (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
+        Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest (t : t) : Latest.t =
+        { fee_payer= t.fee_payer
+        ; memo = t.memo
+        ; account_updates = Call_forest.map
+            ~f:Account_update.Stable.V1.to_latest
+            t.account_updates
+        }
+    end
+
   end]
 end
 
