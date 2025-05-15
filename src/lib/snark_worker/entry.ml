@@ -108,7 +108,11 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           ~metadata:[ ("address", address_json); ("work_ids", work_ids_json) ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
-        match%bind Worker.perform ~state ~spec ~prover:public_key with
+        let fee = Work.Spec.Partitioned.Poly.fee_of_full spec in
+        let messsage = Mina_base.Sok_message.create ~fee ~prover:public_key in
+        let sok_digest = Mina_base.Sok_message.digest messsage in
+
+        match%bind Worker.perform ~state ~spec ~sok_digest with
         | Error e ->
             let%bind () =
               match%map
@@ -124,7 +128,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
-            Work.Metrics.emit_proof_metrics ~data:result.data
+            Work.Metrics.emit_proof_metrics ~result
             |> One_or_two.iter ~f:(fun generated ->
                    [%str_log info]
                      (Events.event_of_snark_work_generated generated) ) ;

@@ -118,7 +118,7 @@ module Make
 
   let is_empty _ = false
 
-  let of_result (res : Snark_work_lib.Result.Combined.Stable.Latest.t) =
+  let of_result (res : Snark_work_lib.Result.Combined.Stable.Latest.t) ~prover =
     let statements =
       One_or_two.map res.data ~f:(fun single_result ->
           Snark_work_lib.Spec.Single.Poly.statement single_result.spec )
@@ -126,8 +126,7 @@ module Make
     let proof =
       One_or_two.map res.data ~f:(fun single_result -> single_result.proof)
     in
-    Add_solved_work
-      (statements, { proof; fee = { fee = res.fee; prover = res.prover } })
+    Add_solved_work (statements, { proof; fee = { fee = res.fee; prover } })
 
   (** Check whether there is a proof with lower fee in the pool.
       Returns [Ok ()] is the [~fee] would be the lowest in pool.

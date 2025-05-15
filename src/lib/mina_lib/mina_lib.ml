@@ -867,31 +867,20 @@ let best_chain ?max_length t =
   | _ ->
       Transition_frontier.root frontier :: best_tip_path
 
-let request_work ~(capability : [ `V2 | `V3 ]) t =
+let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
   let module Work = Snark_work_lib in
   let fee = snark_work_fee t in
-  let request_regular_work () =
-    let%map.Option instances =
-      Work_selection_method.work ~logger:t.config.logger ~fee
-        ~snark_pool:(snark_pool t) (snark_job_state t).selector
-    in
-    ({ instances; fee } : _ Work.Work.Spec.t)
-    |> Work.Partitioned.Spec.Poly.of_selector_spec
-         ~issued_since_unix_epoch:Time.(now () |> to_span_since_epoch)
+  let work_from_selector ~fee ~logger =
+    Work_selection_method.work ~snark_pool:(snark_pool t) ~fee ~logger
+      t.snark_job_state.selector
   in
-  match capability with
-  | `V2 ->
-      request_regular_work ()
-  | `V3 ->
-      Work_partitioner.request_partitioned_work
-        ~selection_method:t.config.work_selection_method ~logger:t.config.logger
-        ~fee ~snark_pool:(snark_pool t) ~selector:t.snark_job_state.selector
-        ~partitioner:t.snark_job_state.partitioner
+  Work_partitioner.request_partitioned_work ~work_from_selector
+    ~logger:t.config.logger ~fee ~partitioner:t.snark_job_state.partitioner
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work ~(result : Snark_work_lib.Partitioned.Result.t) t =
+let add_work ~(result : Snark_work_lib.Result.Partitioned.t) t =
   let module Work = Snark_work_lib in
   let update_metrics () =
     let snark_pool = snark_pool t in
@@ -907,10 +896,10 @@ let add_work ~(result : Snark_work_lib.Partitioned.Result.t) t =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   (* WARN: Callback hell *)
-  let after_partitioner_recombine_work (work : Work.Selector.Result.t) =
+  let after_partitioner_recombine_work (work : Work.Result.Combined.t) =
     let spec =
-      One_or_two.map work.spec.instances ~f:(fun instance ->
-          Work.Work.Single.Spec.statement instance )
+      One_or_two.map work.data ~f:(fun single ->
+          Work.Spec.Single.Poly.statement single.spec )
     in
     let after_work_enter_pool _ =
       (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
@@ -920,23 +909,10 @@ let add_work ~(result : Snark_work_lib.Partitioned.Result.t) t =
     in
     ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
 
-    (* let of_result *)
-    (*     (res : *)
-    (*       ( (_, _) Snark_work_lib.Work.Single.Spec.t Snark_work_lib.Work.Spec.t *)
-    (*       , Ledger_proof.t ) *)
-    (*       Snark_work_lib.Work.Result.t ) = *)
-    (*   Add_solved_work *)
-    (*     ( One_or_two.map res.spec.instances *)
-    (*         ~f:Snark_work_lib.Work.Single.Spec.statement *)
-    (*     , { proof = res.proofs *)
-    (*       ; fee = { fee = res.spec.fee; prover = res.prover } *)
-    (*       } ) *)
     Network_pool.Snark_pool.(
       Local_sink.push t.pipes.snark_local_sink
         ( Resource_pool.Diff.of_result
-            ( work
-            |> Work.Work.Result.map ~f_spec:Fn.id
-                 ~f_single:Ledger_proof.Cached.read_proof_from_disk )
+            (Work.Result.Combined.read_all_proofs_from_disk work)
         , after_work_enter_pool ))
     |> Deferred.don't_wait_for
   in

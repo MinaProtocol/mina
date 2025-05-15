@@ -25,6 +25,12 @@ module Poly = struct
     end
   end]
 
+  let drop_data : _ t -> _ t = function
+    | Single { job; _ } ->
+        Single { job; data = () }
+    | Sub_zkapp_command { job; _ } ->
+        Sub_zkapp_command { job; data = () }
+
   let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data =
     function
     | Single { job; data } ->

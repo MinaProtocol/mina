@@ -33,6 +33,6 @@ module type Worker = sig
   val perform :
        state:Worker_state.t
     -> spec:Work.Spec.Partitioned.Stable.Latest.t
-    -> message:Mina_base.Sok_message.Stable.Latest.t
+    -> sok_digest:Mina_base.Sok_message.Digest.Stable.Latest.t
     -> Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t
 end

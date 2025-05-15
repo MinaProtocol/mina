@@ -1,38 +1,5 @@
 open Core_kernel
 
-module Poly = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ('witness, 'zkapp_command_segment_witness, 'ledger_proof, 'data) t =
-        { (* Throw everything inside the spec to ensure proofs, metrics have correct shape *)
-          data :
-            ( 'witness
-            , 'zkapp_command_segment_witness
-            , 'ledger_proof
-            , 'data )
-            Partitioned_spec.Poly.Stable.V1.t
-        ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
-        }
-    end
-  end]
-
-  let to_spec ({ data; _ } : _ t) : _ Partitioned_spec.Poly.t =
-    match data with
-    | Partitioned_spec.Poly.Single { job; _ } ->
-        Partitioned_spec.Poly.Single { job; data = () }
-    | Partitioned_spec.Poly.Sub_zkapp_command { job; _ } ->
-        Partitioned_spec.Poly.Sub_zkapp_command { job; data = () }
-
-  let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data
-      ({ data; prover } : _ t) =
-    { data =
-        Partitioned_spec.Poly.map ~f_witness ~f_zkapp_command_segment_witness
-          ~f_proof ~f_data data
-    ; prover
-    }
-end
-
 [%%versioned
 module Stable = struct
   [@@@no_toplevel_latest_type]
@@ -45,7 +12,7 @@ module Stable = struct
       , ( Core.Time.Stable.Span.V1.t
         , Ledger_proof.Stable.V2.t )
         Proof_carrying_data.Stable.V1.t )
-      Poly.Stable.V1.t
+      Partitioned_spec.Poly.Stable.V1.t
 
     let to_latest = Fn.id
   end
@@ -56,10 +23,11 @@ type t =
   , Transaction_snark.Zkapp_command_segment.Witness.t
   , Ledger_proof.Cached.t
   , (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t )
-  Poly.t
+  Partitioned_spec.Poly.Stable.V1.t
 
 let read_all_proofs_from_disk : t -> Stable.Latest.t =
-  Poly.map ~f_witness:Transaction_witness.read_all_proofs_from_disk
+  Partitioned_spec.Poly.map
+    ~f_witness:Transaction_witness.read_all_proofs_from_disk
     ~f_zkapp_command_segment_witness:
       Transaction_witness.Zkapp_command_segment_witness
       .read_all_proofs_from_disk
@@ -68,7 +36,7 @@ let read_all_proofs_from_disk : t -> Stable.Latest.t =
       (Proof_carrying_data.map_proof ~f:Ledger_proof.Cached.read_proof_from_disk)
 
 let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-  Poly.map
+  Partitioned_spec.Poly.map
     ~f_witness:(Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
     ~f_zkapp_command_segment_witness:
       (Transaction_witness.Zkapp_command_segment_witness

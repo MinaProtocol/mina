@@ -29,21 +29,29 @@ module Worker_state = struct
            in
            let sok_digest = Mina_base.Sok_message.digest message in
            let spec : Work.Spec.Partitioned.Stable.Latest.t =
-             { instances = `One single_spec; fee = Currency.Fee.zero }
-             |> Work.Spec.Partitioned.Poly.of_selector_spec
-                  ~issued_since_unix_epoch:Time.(now () |> to_span_since_epoch)
+             Work.Spec.Partitioned.Poly.Single
+               { job =
+                   Work.With_status.
+                     { spec = single_spec
+                     ; job_id =
+                         Work.ID.Single.{ which_one = `One; pairing_id = 0L }
+                     ; issued_since_unix_epoch =
+                         Time.(now () |> to_span_since_epoch)
+                     ; fee_of_full = Currency.Fee.zero
+                     }
+               ; data = ()
+               }
            in
-           match%bind.Deferred.Or_error Prod.perform ~state ~spec with
-           | Old { instances = `One (_, { proof; elapsed }); _ } ->
+           match%bind.Deferred.Or_error
+             Prod.perform ~state ~spec ~sok_digest
+           with
+           | Single { data = Proof_carrying_data.{ proof; data = elapsed }; _ }
+             ->
                Deferred.Or_error.return (proof, elapsed)
-           | Old { instances = `Two _; _ } ->
-               Deferred.Or_error.error_string
-                 "This is a bug, submitted one work with old selector spec \
-                  into Snark worker, got an old result with 2 proofs"
            | _ ->
                Deferred.Or_error.error_string
-                 "This is a bug, submitted one work with old selector spec \
-                  into Snark worker, got non-old result"
+                 "This is a bug, submitted partitioned work of kind Single \
+                  into Snark worker, got non-Single result"
        end in
       (module M : S) )
 

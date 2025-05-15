@@ -110,13 +110,12 @@ val snark_work_fee : t -> Currency.Fee.t
 
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
-val request_work :
-  capability:[ `V2 | `V3 ] -> t -> Snark_work_lib.Partitioned.Spec.t option
+val request_work : t -> Snark_work_lib.Spec.Partitioned.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
 val add_work :
-     result:Snark_work_lib.Partitioned.Result.t
+     result:Snark_work_lib.Result.Partitioned.t
   -> t
   -> Snark_worker.Rpcs.Submit_work.Master.Callee.response
 

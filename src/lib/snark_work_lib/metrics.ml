@@ -92,9 +92,9 @@ let collect_single ~(single_spec : _ Single_spec.Poly.t)
         ; proof_zkapp_command_count
         }
 
-let emit_proof_metrics ~data =
+let emit_proof_metrics ~result =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
-  match data with
+  match result with
   | Partitioned_spec.Poly.Single { job; data; _ } ->
       `One (collect_single ~single_spec:job.spec ~data)
   | Partitioned_spec.Poly.Sub_zkapp_command

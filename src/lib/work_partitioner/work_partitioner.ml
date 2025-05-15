@@ -196,7 +196,6 @@ and issue_job_from_partitioner ~(partitioner : t) () :
 
 (* WARN: this should only be called if partitioner.first_in_pair is None *)
 let consume_job_from_selector ~(partitioner : t)
-    ~(prover : Signature_lib.Public_key.Compressed.t)
     ~fee:(fee_of_full : Currency.Fee.t)
     ~(instances : Work.Spec.Single.t One_or_two.t) () : Work.Spec.Partitioned.t
     =
@@ -223,23 +222,21 @@ type work_from_selector =
   -> Work_selector.work One_or_two.t option
 
 let request_from_selector_and_consume_by_partitioner ~(partitioner : t) ~logger
-    ~(work_from_selector : work_from_selector) ~(fee : Currency.Fee.t)
-    ~(prover : Signature_lib.Public_key.Compressed.t) () =
+    ~(work_from_selector : work_from_selector) ~(fee : Currency.Fee.t) () =
   let open Core_kernel in
   let open Option.Let_syntax in
   let%map instances = work_from_selector ~fee ~logger in
 
-  consume_job_from_selector ~partitioner ~prover ~instances ~fee ()
+  consume_job_from_selector ~partitioner ~instances ~fee ()
 
 let request_partitioned_work ~(logger : Logger.t) ~(fee : Currency.Fee.t)
-    ~(prover : Signature_lib.Public_key.Compressed.t)
     ~(work_from_selector : work_from_selector) ~(partitioner : t) :
     Work.Spec.Partitioned.t option =
   List.find_map
     ~f:(fun f -> f ())
     [ issue_job_from_partitioner ~partitioner
     ; request_from_selector_and_consume_by_partitioner ~partitioner ~logger
-        ~work_from_selector ~fee ~prover
+        ~work_from_selector ~fee
     ]
 
 (* Logics for work submitting *)
@@ -330,13 +327,10 @@ let submit_partitioned_work ~(result : Work.Result.Partitioned.t)
     ~(callback : Work.Result.Combined.t -> unit) ~(partitioner : t) =
   let rpc_result =
     match result with
-    | { data =
-          Work.Spec.Partitioned.Poly.Single
-            { job = Work.With_status.{ job_id; spec; _ }
-            ; data = { proof; data = elapsed }
-            }
-      ; _
-      } ->
+    | Work.Spec.Partitioned.Poly.Single
+        { job = Work.With_status.{ job_id; spec; _ }
+        ; data = { proof; data = elapsed }
+        } ->
         let Work.ID.Single.{ which_one = submitted_half; pairing_id = id } =
           job_id
         in
@@ -344,11 +338,8 @@ let submit_partitioned_work ~(result : Work.Result.Partitioned.t)
           Work.Result.Single.Poly.{ spec; proof; elapsed }
         in
         submit_single ~partitioner ~submitted_result ~submitted_half ~id
-    | { data =
-          Work.Spec.Partitioned.Poly.Sub_zkapp_command
-            { job = Work.With_status.{ job_id; _ }; data }
-      ; _
-      } ->
+    | Work.Spec.Partitioned.Poly.Sub_zkapp_command
+        { job = Work.With_status.{ job_id; _ }; data } ->
         submit_into_pending_zkapp_command ~partitioner ~job_id ~data
   in
   match rpc_result with

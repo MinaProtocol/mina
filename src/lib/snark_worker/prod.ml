@@ -127,79 +127,132 @@ module Impl : Intf.Worker = struct
             let elapsed = Time.abs_diff (Time.now ()) start in
             Ok (res, elapsed) )
 
-  let perform_single_raw ~(m : (module Worker_state.S))
+  let perform_single_raw ~(m : (module Worker_state.S)) ~logger ~proof_cache_db
       ~(single_spec : Work.Spec.Single.Stable.Latest.t) ~sok_digest () =
     let open Deferred.Or_error.Let_syntax in
     let (module M) = m in
     match single_spec with
-    | Transition (input, (witness : Transaction_witness.Stable.Latest.t)) ->
-        let%bind t =
-          Deferred.return
-          @@
-          (* Validate the received transaction *)
-          match witness.transaction with
-          | Command (Signed_command cmd) -> (
-              match Signed_command.check cmd with
-              | Some cmd ->
-                  ( Ok (Command (Signed_command cmd))
-                    : Transaction.Valid.t Or_error.t )
-              | None ->
-                  Or_error.errorf "Command has an invalid signature" )
-          | Command (Zkapp_command _) ->
-              Or_error.errorf
-                "V3 Worker doesn't support proving a whole zkapp command"
-          | Fee_transfer ft ->
-              Ok (Fee_transfer ft)
-          | Coinbase cb ->
-              Ok (Coinbase cb)
-        in
-        Deferred.Or_error.try_with ~here:[%here] (fun () ->
-            M.of_non_zkapp_command_transaction
-              ~statement:{ input with sok_digest }
-              { Transaction_protocol_state.Poly.transaction = t
-              ; block_data = witness.protocol_state_body
-              ; global_slot = witness.block_global_slot
-              }
-              ~init_stack:witness.init_stack
-              (unstage
-                 (Mina_ledger.Sparse_ledger.handler witness.first_pass_ledger) ) )
+    | Transition (input, (witness : Transaction_witness.Stable.Latest.t)) -> (
+        match witness.transaction with
+        | Command (Zkapp_command zkapp_command) -> (
+            let
+            (* WARN: this path is still required for uptime snark workers *)
+            open
+              Work_partitioner.Snark_worker_shared in
+            let zkapp_command_cached =
+              Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+                zkapp_command
+            in
+            let%bind witnesses_specs_stmts =
+              Work_partitioner.Snark_worker_shared.extract_zkapp_segment_works
+                ~m ~input ~witness ~zkapp_command:zkapp_command_cached
+            in
+            match witnesses_specs_stmts with
+            | [] ->
+                Deferred.Or_error.error_string "no witnesses generated"
+            | (witness, spec, stmt) :: rest as all_inputs ->
+                let%bind (p1 : Ledger_proof.t) =
+                  log_zkapp_cmd_base_snark ~logger
+                    ~statement:{ stmt with sok_digest } ~spec
+                    (M.of_zkapp_command_segment_exn ~witness)
+                    ()
+                in
+
+                let%bind (p : Ledger_proof.t) =
+                  Deferred.List.fold ~init:(Ok p1) rest
+                    ~f:(fun acc (witness, spec, stmt) ->
+                      let%bind (prev : Ledger_proof.t) = Deferred.return acc in
+                      let%bind (curr : Ledger_proof.t) =
+                        log_zkapp_cmd_base_snark ~logger
+                          ~statement:{ stmt with sok_digest } ~spec
+                          (M.of_zkapp_command_segment_exn ~witness)
+                          ()
+                      in
+                      log_zkapp_cmd_merge_snark ~m ~logger ~sok_digest prev curr
+                        () )
+                in
+                if
+                  Transaction_snark.Statement.equal (Ledger_proof.statement p)
+                    input
+                then Deferred.return (Ok p)
+                else (
+                  [%log fatal]
+                    "Zkapp_command transaction final statement mismatch \
+                     Expected $expected Got $got. All inputs: $inputs"
+                    ~metadata:
+                      [ ( "got"
+                        , Transaction_snark.Statement.to_yojson
+                            (Ledger_proof.statement p) )
+                      ; ("expected", Transaction_snark.Statement.to_yojson input)
+                      ; ( "inputs"
+                        , Zkapp_command_inputs.(
+                            read_all_proofs_from_disk all_inputs
+                            |> Stable.Latest.to_yojson) )
+                      ] ;
+                  Deferred.return
+                    (Or_error.error_string
+                       "Zkapp_command transaction final statement mismatch" ) )
+            )
+        | _ ->
+            let%bind t =
+              Deferred.return
+              @@
+              (* Validate the received transaction *)
+              match witness.transaction with
+              | Command (Signed_command cmd) -> (
+                  match Signed_command.check cmd with
+                  | Some cmd ->
+                      ( Ok (Command (Signed_command cmd))
+                        : Transaction.Valid.t Or_error.t )
+                  | None ->
+                      Or_error.errorf "Command has an invalid signature" )
+              | Command (Zkapp_command _) ->
+                  assert false
+              | Fee_transfer ft ->
+                  Ok (Fee_transfer ft)
+              | Coinbase cb ->
+                  Ok (Coinbase cb)
+            in
+            Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                M.of_non_zkapp_command_transaction
+                  ~statement:{ input with sok_digest }
+                  { Transaction_protocol_state.Poly.transaction = t
+                  ; block_data = witness.protocol_state_body
+                  ; global_slot = witness.block_global_slot
+                  }
+                  ~init_stack:witness.init_stack
+                  (unstage
+                     (Mina_ledger.Sparse_ledger.handler
+                        witness.first_pass_ledger ) ) ) )
     | Merge (_, proof1, proof2) ->
         M.merge ~sok_digest proof1 proof2
 
-  let perform_single_cached ~(logger : Logger.t) ~(cache : Cache.t)
-      ~(m : (module Worker_state.S)) ~sok_digest ~partitioned_spec
-      ~(single_spec : Work.Spec.Single.Stable.Latest.t) () =
+  let perform_single_non_zkapp_cached ~(logger : Logger.t) ~(cache : Cache.t)
+      ~proof_cache_db ~(m : (module Worker_state.S)) ~sok_digest
+      ~partitioned_spec ~(single_spec : Work.Spec.Single.Stable.Latest.t) () =
     let statement = Work.Spec.Single.Poly.statement single_spec in
     cache_and_time ~logger ~cache ~statement ~partitioned_spec
-      (perform_single_raw ~m ~single_spec ~sok_digest)
+      (perform_single_raw ~m ~logger ~proof_cache_db ~single_spec ~sok_digest)
 
   let perform
       ~state:
         ({ m_with_proof_level; cache; proof_cache_db; logger } : Worker_state.t)
       ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t)
-      ~(message : Mina_base.Sok_message.t) :
+      ~(sok_digest : Mina_base.Sok_message.Digest.t) :
       Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
-    let prover = message.prover in
-    let sok_digest = Mina_base.Sok_message.digest message in
     match m_with_proof_level with
     | Worker_state.Full ((module M) as m) -> (
         match partitioned_spec with
         | Work.Spec.Partitioned.Poly.Single
             { job = { spec = single_spec; _ } as job; data = () } ->
             let%map proof, elapsed =
-              perform_single_cached ~logger ~cache ~m ~sok_digest ~single_spec
-                ~partitioned_spec ()
+              perform_single_non_zkapp_cached ~logger ~cache ~m ~sok_digest
+                ~proof_cache_db ~single_spec ~partitioned_spec ()
             in
 
-            Work.Result.Partitioned.Poly.
-              { data =
-                  Single
-                    { job
-                    ; data = { Proof_carrying_data.data = elapsed; proof }
-                    }
-              ; prover
-              }
+            Work.Spec.Partitioned.Poly.Single
+              { job; data = { Proof_carrying_data.data = elapsed; proof } }
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
             { job =
                 { spec =
@@ -225,14 +278,9 @@ module Impl : Intf.Worker = struct
               |> cache_and_time ~logger ~cache ~statement:statement_without_sok
                    ~partitioned_spec
             in
-            Work.Result.Partitioned.Poly.
-              { data =
-                  Sub_zkapp_command
-                    { job
-                    ; data = { Proof_carrying_data.data = elapsed; proof }
-                    }
-              ; prover
-              }
+
+            Work.Spec.Partitioned.Poly.Sub_zkapp_command
+              { job; data = { Proof_carrying_data.data = elapsed; proof } }
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
             { job =
                 { spec =
@@ -250,17 +298,11 @@ module Impl : Intf.Worker = struct
               |> cache_and_time ~logger ~cache ~statement:statement_without_sok
                    ~partitioned_spec
             in
-            Work.Result.Partitioned.Poly.
-              { data =
-                  Sub_zkapp_command
-                    { job
-                    ; data = { Proof_carrying_data.data = elapsed; proof }
-                    }
-              ; prover
-              } )
+            Work.Spec.Partitioned.Poly.Sub_zkapp_command
+              { job; data = { Proof_carrying_data.data = elapsed; proof } } )
     | Worker_state.Check | Worker_state.No_check ->
         let elapsed = Time.Span.zero in
-        let data =
+        let result =
           Work.Spec.Partitioned.Poly.map_with_statement
             ~f:(fun statement () ->
               Proof_carrying_data.
@@ -273,6 +315,5 @@ module Impl : Intf.Worker = struct
                 } )
             partitioned_spec
         in
-        let result = Work.Result.Partitioned.Poly.{ data; prover } in
         Deferred.Or_error.return result
 end
