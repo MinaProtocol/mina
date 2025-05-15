@@ -370,48 +370,40 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   in
   let module Work = Snark_work_lib in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc
-        (fun () capability ->
+    [ implement Snark_worker.Rpcs.Get_work.Stable.Latest.rpc (fun () `V3 ->
           (let open Option.Let_syntax in
-          let%bind key =
-            Option.merge
-              (Mina_lib.snark_worker_key mina)
-              (Mina_lib.snark_coordinator_key mina)
-              ~f:Fn.const
-          in
-          let%map work = Mina_lib.request_work ~capability mina in
-          let work_wire : Work.Partitioned.Spec.Stable.Latest.t =
-            Work.Partitioned.Spec.read_all_proofs_from_disk work
+          let%map work = Mina_lib.request_work mina in
+          let work_wire : Work.Spec.Partitioned.Stable.Latest.t =
+            Work.Spec.Partitioned.read_all_proofs_from_disk work
           in
           [%log trace]
             ~metadata:
               [ ( "work_spec"
-                , Work.Partitioned.Spec.Stable.Latest.to_yojson work_wire )
+                , Work.Spec.Partitioned.Stable.Latest.to_yojson work_wire )
               ]
             "responding to a Get_work request with some new work" ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-          (work_wire, key))
+          work_wire)
           |> Deferred.return )
     ; implement Snark_worker.Rpcs.Submit_work.Stable.Latest.rpc
         (fun () wire_result ->
           [%log trace] "received completed work from a snark worker"
             ~metadata:
               [ ( "work_spec"
-                , Work.Partitioned.(
-                    wire_result |> Result.Poly.to_spec
-                    |> Spec.Stable.Latest.to_yojson) )
+                , Work.Spec.Partitioned.(
+                    wire_result |> Poly.drop_data |> Stable.Latest.to_yojson) )
               ] ;
           ignore
-            ( Work.Metrics.emit_proof_metrics ~data:wire_result.data
+            ( Work.Metrics.emit_proof_metrics ~result:wire_result
               : Work.Metrics.snark_work_generated One_or_two.t ) ;
           let proof_cache_db = Proof_cache_tag.create_identity_db () in
-          let result : Work.Partitioned.Result.t =
-            Work.Partitioned.Result.write_all_proofs_to_disk ~proof_cache_db
+          let result : Work.Result.Partitioned.t =
+            Work.Result.Partitioned.write_all_proofs_to_disk ~proof_cache_db
               wire_result
           in
           Deferred.return @@ Mina_lib.add_work ~result mina )
     ; implement Snark_worker.Rpcs.Failed_to_generate_snark.Stable.Latest.rpc
-        (fun () (error, _work_spec, _prover_public_key) ->
+        (fun () (error, _work_spec) ->
           [%str_log error]
             (Snark_worker.Events.Generating_snark_work_failed
                { error = Error_json.error_to_yojson error } ) ;

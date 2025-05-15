@@ -116,8 +116,6 @@ module type Lib_intf = sig
     include
       State_intf with type transition_frontier := Inputs.Transition_frontier.t
 
-    val remove_old_assignments : t -> logger:Logger.t -> unit
-
     (**Jobs that have not been assigned yet*)
     val all_unseen_works :
          t
@@ -182,7 +180,6 @@ module type Selection_method_intf = sig
   val work :
        snark_pool:snark_pool
     -> fee:Currency.Fee.t
-    -> logger:Logger.t
     -> State.t
     -> work One_or_two.t option
 end

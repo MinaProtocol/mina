@@ -42,8 +42,7 @@ module Make (Lib : Intf.Lib_intf) = struct
         List.nth_exn expensive_work !offset
   end
 
-  let work ~snark_pool ~fee ~logger (state : Lib.State.t) =
-    Lib.State.remove_old_assignments state ~logger ;
+  let work ~snark_pool ~fee (state : Lib.State.t) =
     let unseen_jobs = Lib.State.all_unseen_works state in
     match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] ->

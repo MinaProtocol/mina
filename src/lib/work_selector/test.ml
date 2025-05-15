@@ -42,40 +42,10 @@ struct
               [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
-              let stuff =
-                Selection_method.work ~snark_pool ~fee ~logger work_state
-              in
+              let stuff = Selection_method.work ~snark_pool ~fee work_state in
               match stuff with None -> return () | _ -> go (i + 1)
             in
             go 0 ) )
-
-  let%test_unit "Reassign work after the wait time" =
-    Backtrace.elide := false ;
-    let snark_pool = T.Snark_pool.create () in
-    let fee = Currency.Fee.zero in
-    let logger = Logger.null () in
-    let send_work work_state =
-      let rec go all_work =
-        let stuff = Selection_method.work ~snark_pool ~fee ~logger work_state in
-        match stuff with
-        | None ->
-            all_work
-        | Some work ->
-            go (One_or_two.to_list work @ all_work)
-      in
-      go []
-    in
-    Quickcheck.test gen_staged_ledger ~trials:10 ~f:(fun sl ->
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            let open Deferred.Let_syntax in
-            let%bind work_state = init_state sl reassignment_wait logger in
-            let work_sent = send_work work_state in
-            (*wait for wait_time after which all the work will be reassigned*)
-            let%map () =
-              Async.after (Time.Span.of_ms (Float.of_int reassignment_wait))
-            in
-            let work_sent_again = send_work work_state in
-            assert (List.length work_sent = List.length work_sent_again) ) )
 
   let gen_snark_pool (works : ('a, 'b) Lib.Work_spec.t One_or_two.t list) fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -129,7 +99,7 @@ struct
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let work =
-                Selection_method.work ~snark_pool ~fee:my_fee work_state ~logger
+                Selection_method.work ~snark_pool ~fee:my_fee work_state
               in
               match work with
               | None ->

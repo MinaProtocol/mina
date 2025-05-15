@@ -875,13 +875,12 @@ let request_work t =
   in
   let fee = snark_work_fee t in
   let sok_message = Sok_message.create ~fee ~prover in
-  let work_from_selector ~fee ~logger =
-    Work_selection_method.work ~snark_pool:(snark_pool t) ~fee ~logger
+  let work_from_selector ~fee =
+    Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
       t.snark_job_state.selector
   in
 
-  Work_partitioner.request_partitioned_work ~work_from_selector
-    ~logger:t.config.logger ~sok_message
+  Work_partitioner.request_partitioned_work ~work_from_selector ~sok_message
     ~partitioner:t.snark_job_state.partitioner
 
 let work_selection_method t = t.config.work_selection_method
