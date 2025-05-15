@@ -4,7 +4,36 @@ open Core_kernel
 open Ppxlib
 open Versioned_util
 
-let no_toplevel_latest_type = ref false
+module TopLevelType = struct
+  type t = Latest | Disabled | CachedInherited [@@deriving eq, ord]
+
+  let priority : t -> int = function
+    | Latest ->
+        0
+    | Disabled ->
+        1
+    | CachedInherited ->
+        2
+
+  let of_string : string -> t option = function
+    | "latest" ->
+        Some Latest
+    | "disabled" ->
+        Some Disabled
+    | "cache_inherited" ->
+        failwith "TODO"
+    | _ ->
+        None
+
+  let merge (kind1 : t) (kind2 : t) : t =
+    if priority kind1 < priority kind2 then kind2 else kind1
+
+  let toplevel_latest_type_directive = "toplevel_type"
+
+  let no_toplevel_latest_type_str = "no_toplevel_latest_type"
+end
+
+let top_level_type = ref TopLevelType.Latest
 
 let with_all_version_tags = "with_all_version_tags"
 
@@ -15,8 +44,6 @@ let with_top_version_tag = "with_top_version_tag"
 let with_top_version_tag_module = String.capitalize with_top_version_tag
 
 let with_versioned_json = "with_versioned_json"
-
-let no_toplevel_latest_type_str = "no_toplevel_latest_type"
 
 let ty_decl_to_string =
   let buf = Buffer.create 2048 in
