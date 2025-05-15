@@ -75,7 +75,8 @@ let report_test_errors ~log_error_set ~internal_error_set =
   let open Test_error in
   let open Test_error.Set in
   let color_eprintf color =
-    Printf.ksprintf (fun s -> Print.eprintf "%s%s%s" color s Mina_stdlib.Bash_colors.none)
+    Printf.ksprintf (fun s ->
+        Print.eprintf "%s%s%s" color s Mina_stdlib.Bash_colors.none )
   in
   let color_of_severity = function
     | `None ->
