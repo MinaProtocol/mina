@@ -639,7 +639,7 @@ module Snark_work_bundle = struct
             ~args:Arg.[]
             ~resolve:(fun _ { spec; _ } ->
               One_or_two.to_yojson
-                Snark_work_lib.Selector.Single.Spec.Stable.Latest.to_yojson spec
+                Snark_work_lib.Spec.Single.Stable.Latest.to_yojson spec
               |> Yojson.Safe.to_string )
         ; field "snarkFee" ~typ:fee
             ~doc:"Fee if proof for the spec exists in snark pool"
@@ -655,7 +655,7 @@ module Snark_work_bundle = struct
             ~resolve:(fun _ { spec; _ } ->
               One_or_two.map spec ~f:(fun w ->
                   Transaction_snark.Statement.hash
-                    (Snark_work_lib.Work.Single.Spec.statement w) )
+                    (Snark_work_lib.Spec.Single.Poly.statement w) )
               |> One_or_two.to_list )
         ] )
 end
@@ -2673,18 +2673,16 @@ module Input = struct
   end
 
   module ProofBundleInput = struct
-    type input = Ledger_proof.t Snark_work_lib.Work.Result_without_metrics.t
+    type input = Ledger_proof.t Snark_work_lib.Result.Flat.t
 
     let arg_typ =
       scalar "ProofBundleInput"
         ~doc:"Proof bundle for a given spec in json format"
         ~coerce:(fun json ->
           let json = Utils.to_yojson json in
-          Snark_work_lib.Work.Result_without_metrics.of_yojson
-            Ledger_proof.of_yojson json )
+          Snark_work_lib.Result.Flat.of_yojson Ledger_proof.of_yojson json )
         ~to_json:(fun (res : input) ->
-          Snark_work_lib.Work.Result_without_metrics.to_yojson
-            Ledger_proof.to_yojson res
+          Snark_work_lib.Result.Flat.to_yojson Ledger_proof.to_yojson res
           |> Yojson.Safe.to_basic )
   end
 

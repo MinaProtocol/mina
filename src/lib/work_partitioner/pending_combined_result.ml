@@ -9,7 +9,7 @@ type submitted_half = [ `First | `Second | `One ] [@@deriving equal]
 
 type t =
   { single_result : (Work.Result.Single.t * half) option
-  ; fee_of_full : Currency.Fee.t
+  ; sok_message : Mina_base.Sok_message.t
   }
 
 type merge_outcome =
@@ -19,12 +19,12 @@ type merge_outcome =
 
 let merge_single_result (in_pool : t) ~(submitted_result : Work.Result.Single.t)
     ~(submitted_half : submitted_half) : merge_outcome =
-  let { single_result; fee_of_full } = in_pool in
+  let { single_result; sok_message = { prover; fee } } = in_pool in
   match single_result with
   | None -> (
       match submitted_half with
       | `One ->
-          Done { data = `One submitted_result; fee = fee_of_full }
+          Done { data = `One submitted_result; fee; prover }
       | (`First | `Second) as submitted_half ->
           Pending
             { in_pool with
@@ -43,4 +43,4 @@ let merge_single_result (in_pool : t) ~(submitted_result : Work.Result.Single.t)
             | `Second ->
                 (in_pool_result, submitted_result)
           in
-          Done { data = `Two results; fee = fee_of_full } )
+          Done { data = `Two results; fee; prover } )

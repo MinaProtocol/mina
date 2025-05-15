@@ -30,40 +30,28 @@ let submit_graphql input graphql_endpoint =
 
 module Work = Snark_work_lib
 
-let perform (state : Prod.Worker_state.t) ~fee ~public_key instances =
-  let spec : Work.Partitioned.Spec.Stable.Latest.t =
-    { instances; fee = Currency.Fee.zero }
-    |> Work.Partitioned.Spec.Poly.of_selector_spec
-         ~issued_since_unix_epoch:Time.(now () |> to_span_since_epoch)
-  in
+let perform (state : Prod.Worker_state.t) ~sok_message
+    ~(single_spec : Work.Spec.Single.Stable.Latest.t) =
   let open Deferred.Or_error.Let_syntax in
-  let sok_digest = Sok_message.(create ~fee ~prover:public_key |> digest) in
-  let%bind result = Prod.perform ~state ~sok_digest ~spec in
-  match result with
-  | Old { instances; _ } ->
-      let statements =
-        instances
-        |> One_or_two.map ~f:(fun (spec, _) ->
-               Work.Work.Single.Spec.statement spec )
-      in
-      let proofs =
-        instances
-        |> One_or_two.map
-             ~f:(fun (_, { Work.Partitioned.Proof_with_metric.Poly.proof; _ })
-                -> proof )
-      in
-      Deferred.Or_error.return
-        { Work.Work.Result_without_metrics.proofs
-        ; statements
-        ; prover = public_key
-        ; fee
-        }
+  let partitioned_spec =
+    Work.Spec.Partitioned.Poly.Single
+      { job =
+          Work.With_status.
+            { spec = single_spec
+            ; job_id = Work.ID.Single.{ which_one = `One; pairing_id = 0L }
+            ; issued_since_unix_epoch = Time.(now () |> to_span_since_epoch)
+            ; sok_message
+            }
+      ; data = ()
+      }
+  in
+  match%bind Prod.perform ~state ~spec:partitioned_spec with
+  | Single { data = Proof_carrying_data.{ proof; _ }; _ } ->
+      Deferred.Or_error.return proof
   | _ ->
       Deferred.Or_error.error_string
-        "This is a bug, submitted one work with old selector spec into Snark \
-         worker, got non-old result"
-
-(* Or_error.error_string "wow" *)
+        "This is a bug, submitted one work with single spec into Snark worker, \
+         got non-single result"
 
 let command =
   let open Command.Let_syntax in
@@ -125,9 +113,7 @@ let command =
            match
              Yojson.Safe.from_string json
              |> One_or_two.of_yojson
-                  (Snark_work_lib.Work.Single.Spec.of_yojson
-                     Transaction_witness.Stable.Latest.of_yojson
-                     Ledger_proof.of_yojson )
+                  Snark_work_lib.Spec.Single.Stable.Latest.of_yojson
            with
            | Ok spec ->
                spec
@@ -148,14 +134,13 @@ let command =
                  match spec_sexp with
                  | Some spec ->
                      One_or_two.t_of_sexp
-                       (Snark_work_lib.Work.Single.Spec.t_of_sexp
-                          Transaction_witness.Stable.Latest.t_of_sexp
-                          Ledger_proof.t_of_sexp )
+                       Snark_work_lib.Spec.Single.Stable.Latest.t_of_sexp
                        (Sexp.of_string spec)
                  | None ->
                      failwith "Provide a spec either in json or sexp format" ) )
        in
-       let public_key =
+
+       let prover =
          Option.value
            ~default:(fst Key_gen.Sample_keypairs.genesis_winner)
            snark_worker_key
@@ -165,12 +150,36 @@ let command =
            ~default:(Currency.Fee.of_nanomina_int_exn 10)
            snark_work_fee
        in
-       match%bind perform worker_state ~fee ~public_key spec with
-       | Ok result -> (
+       let sok_message = Sok_message.create ~fee ~prover in
+       let proofs =
+         let open Deferred.Or_error.Let_syntax in
+         match spec with
+         | `One single_spec ->
+             let%map result = perform worker_state ~sok_message ~single_spec in
+             ( `One result
+             , `One (Snark_work_lib.Spec.Single.Poly.statement single_spec) )
+         | `Two (spec1, spec2) ->
+             let%bind result1 =
+               perform worker_state ~sok_message ~single_spec:spec1
+             in
+             let%map result2 =
+               perform worker_state ~sok_message ~single_spec:spec2
+             in
+             ( `Two (result1, result2)
+             , `Two
+                 ( Snark_work_lib.Spec.Single.Poly.statement spec1
+                 , Snark_work_lib.Spec.Single.Poly.statement spec2 ) )
+       in
+
+       match%bind proofs with
+       | Ok (proofs, statements) -> (
+           let result =
+             Snark_work_lib.Result.Flat.{ proofs; statements; prover; fee }
+           in
            Caml.Format.printf
              !"@[<v>Successfully proved. Result: \n\
               \               %{sexp: Ledger_proof.t \
-               Snark_work_lib.Work.Result_without_metrics.t}@]@."
+               Snark_work_lib.Result.Flat.t}@]@."
              result ;
            match proof_submission_graphql_endpoint with
            | Some endpoint ->

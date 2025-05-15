@@ -5,7 +5,7 @@ module Stable = struct
       { spec : 'spec
       ; job_id : 'job_id
       ; issued_since_unix_epoch : Mina_stdlib.Time.Span.Stable.V1.t
-      ; fee_of_full : Currency.Fee.Stable.V1.t
+      ; sok_message : Mina_base.Sok_message.Stable.V1.t
       }
     [@@deriving sexp, yojson]
   end

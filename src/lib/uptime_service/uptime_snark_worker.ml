@@ -23,11 +23,10 @@ module Worker_state = struct
     Deferred.return
       (let module M = struct
          let perform_single
-             (message, (single_spec : Work.Spec.Single.Stable.Latest.t)) =
+             (sok_message, (single_spec : Work.Spec.Single.Stable.Latest.t)) =
            let%bind (state : Prod.Worker_state.t) =
              Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
-           let sok_digest = Mina_base.Sok_message.digest message in
            let spec : Work.Spec.Partitioned.Stable.Latest.t =
              Work.Spec.Partitioned.Poly.Single
                { job =
@@ -37,14 +36,12 @@ module Worker_state = struct
                          Work.ID.Single.{ which_one = `One; pairing_id = 0L }
                      ; issued_since_unix_epoch =
                          Time.(now () |> to_span_since_epoch)
-                     ; fee_of_full = Currency.Fee.zero
+                     ; sok_message
                      }
                ; data = ()
                }
            in
-           match%bind.Deferred.Or_error
-             Prod.perform ~state ~spec ~sok_digest
-           with
+           match%bind.Deferred.Or_error Prod.perform ~state ~spec with
            | Single { data = Proof_carrying_data.{ proof; data = elapsed }; _ }
              ->
                Deferred.Or_error.return (proof, elapsed)

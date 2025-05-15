@@ -1,6 +1,5 @@
 open Async
 open Core
-open Signature_lib
 module Work = Snark_work_lib
 
 (** For versioning of the types here, see:
@@ -14,8 +13,7 @@ module Master = struct
   module T = struct
     type query = [ `V3 ]
 
-    type response =
-      (Work.Spec.Partitioned.Stable.Latest.t * Public_key.Compressed.t) option
+    type response = Work.Spec.Partitioned.Stable.Latest.t option
   end
 
   module Caller = T
@@ -30,9 +28,7 @@ module Stable = struct
     module T = struct
       type query = [ `V3 ]
 
-      type response =
-        (Work.Spec.Partitioned.Stable.V1.t * Public_key.Compressed.Stable.V1.t)
-        option
+      type response = Work.Spec.Partitioned.Stable.V1.t option
 
       let query_of_caller_model = Fn.id
 

@@ -9,16 +9,17 @@ module Poly = struct
             ('single_spec, 'proof) Single_result.Poly.Stable.V1.t
             One_or_two.Stable.V1.t
         ; fee : Currency.Fee.Stable.V1.t
+        ; prover : Signature_lib.Public_key.Compressed.Stable.V1.t
         }
     end
   end]
 
-  let map ~f_single_spec ~f_proof { data; fee } =
+  let map ~f_single_spec ~f_proof { data; fee; prover } =
     let f_single_result Single_result.Poly.{ spec; proof; elapsed } =
       Single_result.Poly.
         { spec = f_single_spec spec; proof = f_proof proof; elapsed }
     in
-    { data = One_or_two.map ~f:f_single_result data; fee }
+    { data = One_or_two.map ~f:f_single_result data; fee; prover }
 end
 
 [%%versioned

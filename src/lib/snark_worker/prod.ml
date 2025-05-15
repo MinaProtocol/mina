@@ -237,10 +237,13 @@ module Impl : Intf.Worker = struct
   let perform
       ~state:
         ({ m_with_proof_level; cache; proof_cache_db; logger } : Worker_state.t)
-      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t)
-      ~(sok_digest : Mina_base.Sok_message.Digest.t) :
+      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) :
       Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
+    let sok_digest =
+      Work.Spec.Partitioned.Poly.sok_message partitioned_spec
+      |> Sok_message.digest
+    in
     match m_with_proof_level with
     | Worker_state.Full ((module M) as m) -> (
         match partitioned_spec with

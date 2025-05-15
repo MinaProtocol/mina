@@ -870,13 +870,19 @@ let best_chain ?max_length t =
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
   let module Work = Snark_work_lib in
+  let%bind.Option prover =
+    Option.merge (snark_worker_key t) (snark_coordinator_key t) ~f:Fn.const
+  in
   let fee = snark_work_fee t in
+  let sok_message = Sok_message.create ~fee ~prover in
   let work_from_selector ~fee ~logger =
     Work_selection_method.work ~snark_pool:(snark_pool t) ~fee ~logger
       t.snark_job_state.selector
   in
+
   Work_partitioner.request_partitioned_work ~work_from_selector
-    ~logger:t.config.logger ~fee ~partitioner:t.snark_job_state.partitioner
+    ~logger:t.config.logger ~sok_message
+    ~partitioner:t.snark_job_state.partitioner
 
 let work_selection_method t = t.config.work_selection_method
 

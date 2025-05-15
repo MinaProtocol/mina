@@ -53,11 +53,11 @@ module Poly = struct
           ; data = f_data data
           }
 
-  let fee_of_full : _ t -> Currency.Fee.t = function
+  let sok_message : _ t -> Mina_base.Sok_message.t = function
     | Single { job; _ } ->
-        job.fee_of_full
+        job.sok_message
     | Sub_zkapp_command { job; _ } ->
-        job.fee_of_full
+        job.sok_message
 
   let statements : _ t -> Transaction_snark.Statement.t One_or_two.t = function
     | Single { job = { spec; _ }; _ } ->
@@ -75,12 +75,12 @@ module Poly = struct
         Sub_zkapp_command
           { job; data = f (Sub_zkapp_spec.Poly.statement spec) data }
 
-  let transaction = function
-    | Single { job = { spec; _ }; _ } ->
-        let txn = Single_spec.Poly.transaction spec in
-        `Single txn
-    | Sub_zkapp_command _ ->
-        `Sub_zkapp_command
+  (* let transaction = function *)
+  (*   | Single { job = { spec; _ }; _ } -> *)
+  (*       let txn = Single_spec.Poly.transaction spec in *)
+  (*       `Single txn *)
+  (*   | Sub_zkapp_command _ -> *)
+  (*       `Sub_zkapp_command *)
 end
 
 [%%versioned

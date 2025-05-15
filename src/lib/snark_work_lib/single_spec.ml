@@ -27,9 +27,9 @@ module Poly = struct
 
   let statement = function Transition (s, _) -> s | Merge (s, _, _) -> s
 
-  let transaction (spec : _ t) =
-    witness spec
-    |> Option.map ~f:(fun spec -> spec.Transaction_witness.Poly.transaction)
+  (* let transaction (spec : _ t) = *)
+  (*   witness spec *)
+  (*   |> Option.map ~f:(fun spec -> spec.Transaction_witness.Poly.transaction) *)
 
   let gen :
          'witness Quickcheck.Generator.t

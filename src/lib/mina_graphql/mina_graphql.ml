@@ -796,9 +796,7 @@ module Mutations = struct
           ]
       ~typ:(non_null string)
       ~resolve:(fun { ctx = mina; _ } ()
-                    (proof_bundle :
-                      Ledger_proof.t
-                      Snark_work_lib.Work.Result_without_metrics.t ) ->
+                    (proof_bundle : Ledger_proof.t Snark_work_lib.Result.Flat.t) ->
         let solved_work =
           Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work
             ( proof_bundle.statements
@@ -2390,7 +2388,7 @@ module Queries = struct
               let spec =
                 One_or_two.map spec
                   ~f:
-                    (Snark_work_lib.Work.Single.Spec.map
+                    (Snark_work_lib.Spec.Single.Poly.map
                        ~f_proof:Ledger_proof.Cached.read_proof_from_disk
                        ~f_witness:Transaction_witness.read_all_proofs_from_disk )
               in

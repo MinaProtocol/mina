@@ -96,7 +96,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           ~metadata:[ ("time", `Float random_delay) ] ;
         let%bind () = wait ~sec:random_delay () in
         go ()
-    | Ok (Some (spec, public_key)) -> (
+    | Ok (Some spec) -> (
         let address_json = `String (Host_and_port.to_string daemon_address) in
         let work_ids_json =
           Work.Spec.Partitioned.Poly.statements spec
@@ -107,17 +107,17 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
            generation"
           ~metadata:[ ("address", address_json); ("work_ids", work_ids_json) ] ;
         let%bind () = wait () in
-        (* Pause to wait for stdout to flush *)
-        let fee = Work.Spec.Partitioned.Poly.fee_of_full spec in
-        let messsage = Mina_base.Sok_message.create ~fee ~prover:public_key in
-        let sok_digest = Mina_base.Sok_message.digest messsage in
 
-        match%bind Worker.perform ~state ~spec ~sok_digest with
+        (* Pause to wait for stdout to flush *)
+        (* let fee = Work.Spec.Partitioned.Poly.fee_of_full spec in *)
+        (* let messsage = Mina_base.Sok_message.create ~fee ~prover:public_key in *)
+        (* let sok_digest = Mina_base.Sok_message.digest messsage in *)
+        match%bind Worker.perform ~state ~spec with
         | Error e ->
             let%bind () =
               match%map
                 dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
-                  shutdown_on_disconnect (e, spec, public_key) daemon_address
+                  shutdown_on_disconnect (e, spec) daemon_address
               with
               | Error e ->
                   [%log error]

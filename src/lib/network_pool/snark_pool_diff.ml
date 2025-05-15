@@ -118,7 +118,8 @@ module Make
 
   let is_empty _ = false
 
-  let of_result (res : Snark_work_lib.Result.Combined.Stable.Latest.t) ~prover =
+  let of_result (res : Snark_work_lib.Result.Combined.Stable.Latest.t) =
+    let prover = failwith "TODO" in
     let statements =
       One_or_two.map res.data ~f:(fun single_result ->
           Snark_work_lib.Spec.Single.Poly.statement single_result.spec )

@@ -1,6 +1,5 @@
 open Async
 open Core
-open Signature_lib
 module Work = Snark_work_lib
 
 (** For versioning of the types here, see:
@@ -12,8 +11,7 @@ module Master = struct
   let name = "failed_to_generate_snark"
 
   module T = struct
-    type query =
-      Error.t * Work.Spec.Partitioned.Stable.Latest.t * Public_key.Compressed.t
+    type query = Error.t * Work.Spec.Partitioned.Stable.Latest.t
 
     type response = unit
   end
@@ -31,7 +29,6 @@ module Stable = struct
       type query =
         Bounded_types.Wrapped_error.Stable.V1.t
         * Work.Spec.Partitioned.Stable.V1.t
-        * Public_key.Compressed.Stable.V1.t
 
       type response = unit
 
