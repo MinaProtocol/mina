@@ -75,6 +75,3 @@ let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
       (Transaction_snark.Zkapp_command_segment.Witness.write_all_proofs_to_disk
          ~proof_cache_db )
     ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
-
-(* ; pairing : Pairing.Sub_zkapp.Stable.V1.t *)
-(* ; job_id : ID.Stable.V1.t *)

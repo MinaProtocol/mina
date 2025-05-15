@@ -11,7 +11,7 @@ type snark_work_generated =
       }
   | Sub_zkapp_command of { kind : [ `Merge | `Segment ]; elapsed : Time.Span.t }
 
-let collect_single ~(single_spec : _ Single_spec.Poly.t)
+let collect_single ~(single_spec : Single_spec.Stable.Latest.t)
     ~data:
       ({ data = elapsed; _ } :
         (Core.Time.Stable.Span.V1.t, _) Proof_carrying_data.t ) =
@@ -25,7 +25,7 @@ let collect_single ~(single_spec : _ Single_spec.Poly.t)
           Cryptography.snark_work_merge_time_sec (Time.Span.to_sec elapsed)) ;
       Merge_generated elapsed
   | Single_spec.Poly.Transition
-      (_, ({ transaction; _ } : _ Transaction_witness.Poly.t)) ->
+      (_, ({ transaction; _ } : Transaction_witness.Stable.Latest.t)) ->
       Perf_histograms.add_span ~name:"snark_worker_transition_time" elapsed ;
       let transaction_type, zkapp_command_count, proof_zkapp_command_count =
         match transaction with
@@ -92,7 +92,7 @@ let collect_single ~(single_spec : _ Single_spec.Poly.t)
         ; proof_zkapp_command_count
         }
 
-let emit_proof_metrics ~result =
+let emit_proof_metrics ~(result : Partitioned_result.Stable.Latest.t) =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
   match result with
   | Partitioned_spec.Poly.Single { job; data; _ } ->
