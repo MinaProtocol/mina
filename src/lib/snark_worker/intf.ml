@@ -1,5 +1,5 @@
 open Async
-open Snark_work_lib.Partitioned
+module Work = Snark_work_lib
 
 module type Worker = sig
   module Worker_state : sig
@@ -32,12 +32,8 @@ module type Worker = sig
   *)
   val perform :
        state:Worker_state.t
-    -> spec:Spec.Stable.Latest.t
+    -> spec:Work.Spec.Partitioned.Stable.Latest.t
     -> sok_digest:Mina_base.Sok_message.Digest.Stable.Latest.t
-    -> ( Transaction_witness.Stable.Latest.t
-       , Transaction_snark.Zkapp_command_segment.Witness.Stable.Latest.t
-       , Ledger_proof.Stable.Latest.t
-       , Proof_with_metric.Stable.Latest.t )
-       Spec.Poly.Stable.Latest.t
-       Deferred.Or_error.t
+    -> prover:Signature_lib.Public_key.Compressed.Stable.Latest.t
+    -> Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t
 end
