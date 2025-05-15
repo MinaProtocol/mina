@@ -7,22 +7,13 @@ module Sent_zkapp_job_pool =
   Job_pool.Make (Work.ID.Sub_zkapp) (Work.Spec.Sub_zkapp)
 module Sent_single_job_pool = Job_pool.Make (Work.ID.Single) (Work.Spec.Single)
 
-module Pairing_status = struct
-  type t =
-    | OnlyMeta of
-        { prover : Signature_lib.Public_key.Compressed.t
-        ; fee_of_full : Currency.Fee.t
-        }
-    | Single of Mergable_single_work.t
-end
-
 type t =
   { logger : Logger.t
   ; transaction_snark : (module Transaction_snark.S)
         (* WARN: we're mixing ID for `pairing_pool` and `zkapp_command_jobs.
            Should be fine *)
   ; id_generator : Id_generator.t (* NOTE: Fields for pooling *)
-  ; pairing_pool : (int64, Pairing_status.t) Hashtbl.t
+  ; pairing_pool : (int64, Pending_combined_result.t) Hashtbl.t
         (* if one single work from underlying Work_selector is completed but
            not the other. throw it here. *)
   ; zkapp_command_jobs : Zkapp_command_job_pool.t
@@ -128,7 +119,6 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec ~pairing :
   in
   match single_spec with
   | Transition (input, witness) -> (
-      (* WARN: a smilar copy of this exists in `Snark_worker.Worker_impl_prod` *)
       match witness.transaction with
       | Command (Zkapp_command zkapp_command) -> (
           match
@@ -204,7 +194,7 @@ let consume_job_from_selector ~(partitioner : t)
     =
   let pairing_id = Id_generator.next_id partitioner.id_generator () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
-    ~data:(OnlyMeta { prover; fee_of_full = fee }) ;
+    ~data:{ single_result = None; prover; fee_of_full = fee } ;
 
   match instances with
   | `One single_spec ->
@@ -251,40 +241,24 @@ type submit_result =
   | Processed of Work.Result.Combined.t option
 (* If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
 
-let submit_single ~partitioner ~(this_result : Work.Result.Single.t)
-    ~(this_half : [ `One | `First | `Second ]) ~id =
+let submit_single ~partitioner ~(submitted_result : Work.Result.Single.t)
+    ~(submitted_half : [ `One | `First | `Second ]) ~id =
   let result = ref SchemeUnmatched in
   Hashtbl.change partitioner.pairing_pool id ~f:(function
-    | Some (Single other_single) -> (
-        match this_half with
-        | (`First | `Second) as this_half ->
-            let work =
-              Mergable_single_work.merge_to_one_result_exn other_single
-                this_result this_half
-            in
-            result := Processed (Some work) ;
-            None
-        | `One ->
-            (* can't submit, we have one in a `Two in pool, but trying to submit a `One *)
-            Some (Single other_single) )
-    | Some (OnlyMeta { prover; fee_of_full }) -> (
-        match this_half with
-        | (`First | `Second) as this_half ->
+    | Some pending_combined_result -> (
+        match
+          Pending_combined_result.merge_single_result pending_combined_result
+            ~submitted_result ~submitted_half
+        with
+        | Pending pending ->
             result := Processed None ;
-            Some
-              (Single
-                 { which_half = this_half
-                 ; single_result = this_result
-                 ; prover
-                 ; fee_of_full
-                 } )
-        | `One ->
-            let work_result : Work.Result.Combined.t =
-              Work.Result.Combined.Poly.
-                { data = `One this_result; fee = fee_of_full; prover }
-            in
-            result := Processed (Some work_result) ;
-            None )
+            Some pending
+        | Done combined ->
+            result := Processed (Some combined) ;
+            None
+        | HalfMismatch _ ->
+            result := SchemeUnmatched ;
+            Some pending_combined_result )
     | None ->
         (* We should always at least having a OnlyMeta, this would be SchemeUnmatched indeed *)
         None ) ;
@@ -303,19 +277,15 @@ let submit_into_pending_zkapp_command ~partitioner
       let final_proof =
         Deque.dequeue_front_exn pending.pending_mergable_proofs
       in
-      let this_result : Work.Result.Single.t =
+      let submitted_result : Work.Result.Single.t =
         Work.Result.Single.Poly.
-          { spec = pending.job.spec
-          ; proof = final_proof
-          ; elapsed
-          ; kind = `Transition
-          }
+          { spec = pending.job.spec; proof = final_proof; elapsed }
       in
 
       let Work.ID.Single.{ which_one; pairing_id } = pending.job.job_id in
 
       returns :=
-        submit_single ~partitioner ~this_result ~this_half:which_one
+        submit_single ~partitioner ~submitted_result ~submitted_half:which_one
           ~id:pairing_id
     else returns := Processed None
   in
@@ -349,84 +319,30 @@ let submit_into_pending_zkapp_command ~partitioner
 
 let submit_partitioned_work ~(result : Work.Result.Partitioned.t)
     ~(callback : Work.Result.Combined.t -> unit) ~(partitioner : t) =
-  let submit_result =
+  let rpc_result =
     match result with
-    | { data = Work.Spec.Partitioned.Poly.Single single_result; prover } ->
-        let this_single = Mergable_single_work.{
-          single_result
-        }
+    | { data =
+          Work.Spec.Partitioned.Poly.Single
+            { job = Work.With_status.{ job_id; spec; _ }
+            ; data = { proof; data = elapsed }
+            }
+      ; _
+      } ->
+        let Work.ID.Single.{ which_one = submitted_half; pairing_id = id } =
+          job_id
         in
-
-
-(* type t = *)
-(*   { which_half : half *)
-(*   ; single_result : Work.Result.Single.t *)
-(*   ; prover : Signature_lib.Public_key.Compressed.t *)
-(*   ; fee_of_full : Currency.Fee.t *)
-(*   } *)
-        (* let instances = `One (single_spec, metric) in *)
-        (* let to_submit = *)
-        (*   Work.Partitioned.construct_selector_result ~instances ~fee ~prover *)
-        (* in *)
-    (*     Processed (Some to_submit) *)
-
-    (* | { data = *)
-    (*       Work.Partitioned.Spec.Poly.Single *)
-    (*         { single_spec *)
-    (*         ; pairing = (`First id | `Second id) as first_or_second *)
-    (*         ; metric = { proof; elapsed } *)
-    (*         ; common *)
-    (*         } *)
-    (*   ; prover *)
-    (*   } -> *)
-    (*     let which_half = *)
-    (*       match first_or_second with `First _ -> `First | `Second _ -> `Second *)
-    (*     in *)
-    (**)
-        (* let metric = *)
-        (*   match single_spec with *)
-        (*   | Work.Work.Single.Spec.Transition (_, _) -> *)
-        (*       (elapsed, `Transition) *)
-        (*   | Work.Work.Single.Spec.Merge (_, _, _) -> *)
-        (*       (elapsed, `Merge) *)
-        (* in *)
-        (* let this_single = *)
-        (*   Mergable_single_work. *)
-        (*     { which_half; single_result; metric; spec = single_spec; prover; common } *)
-        (* in *)
-        submit_single ~partitioner ~this_single ~id
-    | _ -> failwith "TODO"
-    (* | { data = *)
-    (*       Work.Partitioned.Spec.Poly.Single *)
-    (*         { single_spec *)
-    (*         ; pairing = (`First id | `Second id) as first_or_second *)
-    (*         ; metric = { proof; elapsed } *)
-    (*         ; common *)
-    (*         } *)
-    (*   ; prover *)
-    (*   } -> *)
-    (*     let which_half = *)
-    (*       match first_or_second with `First _ -> `First | `Second _ -> `Second *)
-    (*     in *)
-    (**)
-    (*     let metric = *)
-    (*       match single_spec with *)
-    (*       | Work.Work.Single.Spec.Transition (_, _) -> *)
-    (*           (elapsed, `Transition) *)
-    (*       | Work.Work.Single.Spec.Merge (_, _, _) -> *)
-    (*           (elapsed, `Merge) *)
-    (*     in *)
-    (*     let this_single = *)
-    (*       Mergable_single_work. *)
-    (*         { which_half; proof; metric; spec = single_spec; prover; common } *)
-    (*     in *)
-    (*     submit_single ~partitioner ~this_single ~id *)
-    (* | { data = Work.Partitioned.Spec.Poly.Sub_zkapp_command { spec; metric } *)
-    (*   ; prover *)
-    (*   } -> *)
-    (*     submit_into_pending_zkapp_command ~partitioner ~spec ~metric ~prover *)
+        let submitted_result =
+          Work.Result.Single.Poly.{ spec; proof; elapsed }
+        in
+        submit_single ~partitioner ~submitted_result ~submitted_half ~id
+    | { data =
+          Work.Spec.Partitioned.Poly.Sub_zkapp_command
+            { job = Work.With_status.{ job_id; _ }; data }
+      ; _
+      } ->
+        submit_into_pending_zkapp_command ~partitioner ~job_id ~data
   in
-  match submit_result with
+  match rpc_result with
   | SchemeUnmatched ->
       `SchemeUnmatched
   | Slashed ->

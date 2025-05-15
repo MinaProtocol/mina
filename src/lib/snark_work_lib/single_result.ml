@@ -8,13 +8,12 @@ module Poly = struct
         { spec : 'single_spec
         ; proof : 'proof
         ; elapsed : Mina_stdlib.Time.Span.Stable.V1.t
-        ; kind : [ `Transition | `Merge ]
         }
     end
   end]
 
-  let map ~f_spec ~f_proof { spec; proof; elapsed; kind } =
-    { spec = f_spec spec; proof = f_proof proof; elapsed; kind }
+  let map ~f_spec ~f_proof { spec; proof; elapsed } =
+    { spec = f_spec spec; proof = f_proof proof; elapsed }
 end
 
 [%%versioned

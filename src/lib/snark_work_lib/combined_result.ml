@@ -15,9 +15,9 @@ module Poly = struct
   end]
 
   let map ~f_single_spec ~f_proof { data; prover; fee } =
-    let f_single_result Single_result.Poly.{ spec; proof; elapsed; kind } =
+    let f_single_result Single_result.Poly.{ spec; proof; elapsed } =
       Single_result.Poly.
-        { spec = f_single_spec spec; proof = f_proof proof; elapsed; kind }
+        { spec = f_single_spec spec; proof = f_proof proof; elapsed }
     in
     { data = One_or_two.map ~f:f_single_result data; prover; fee }
 end
