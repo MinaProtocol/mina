@@ -27,10 +27,9 @@ module Poly = struct
     | Segment { statement; _ } ->
         Mina_state.Snarked_ledger_state.Poly.drop_sok statement
     | Merge { proof1; proof2; _ } -> (
-        let module Statement = Mina_state.Snarked_ledger_state in
         let stmt1 = Ledger_proof.Poly.statement proof1 in
         let stmt2 = Ledger_proof.Poly.statement proof2 in
-        let stmt = Statement.merge stmt1 stmt2 in
+        let stmt = Mina_state.Snarked_ledger_state.merge stmt1 stmt2 in
         match stmt with
         | Ok stmt ->
             stmt
