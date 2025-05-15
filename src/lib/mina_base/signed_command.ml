@@ -168,7 +168,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let sign_payload ?signature_kind (private_key : Signature_lib.Private_key.t)
       (payload : Payload.t) : Signature.t =
-    Signature_lib.Schnorr.Legacy.sign ?signature_kind private_key
+    let signature_kind =
+      Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+    in
+    Signature_lib.Schnorr.Legacy.sign ~signature_kind private_key
       (to_input_legacy payload)
 
   let sign ?signature_kind (kp : Signature_keypair.t) (payload : Payload.t) : t
@@ -411,7 +414,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
   include Codable.Make_base64 (Stable.Latest.With_top_version_tag)
 
   let check_signature ?signature_kind ({ payload; signer; signature } : t) =
-    Signature_lib.Schnorr.Legacy.verify ?signature_kind signature
+    let signature_kind =
+      Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+    in
+    Signature_lib.Schnorr.Legacy.verify ~signature_kind signature
       (Snark_params.Tick.Inner_curve.of_affine signer)
       (to_input_legacy payload)
 

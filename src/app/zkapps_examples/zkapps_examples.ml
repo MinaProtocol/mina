@@ -792,6 +792,7 @@ end
 
 let insert_signatures pk_compressed sk
     ({ fee_payer; account_updates; memo } : Zkapp_command.t) : Zkapp_command.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let transaction_commitment : Zkapp_command.Transaction_commitment.t =
     (* TODO: This is a pain. *)
     let account_updates_hash = Zkapp_command.Call_forest.hash account_updates in
@@ -811,7 +812,7 @@ let insert_signatures pk_compressed sk
       when Public_key.Compressed.equal public_key pk_compressed ->
         { fee_payer with
           authorization =
-            Schnorr.Chunked.sign sk
+            Schnorr.Chunked.sign ~signature_kind sk
               (Random_oracle.Input.Chunked.field full_commitment)
         }
     | fee_payer ->
@@ -831,7 +832,7 @@ let insert_signatures pk_compressed sk
           { account_update with
             authorization =
               Control.Poly.Signature
-                (Schnorr.Chunked.sign sk
+                (Schnorr.Chunked.sign ~signature_kind sk
                    (Random_oracle.Input.Chunked.field commitment) )
           }
       | account_update ->
