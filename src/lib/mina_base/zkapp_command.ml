@@ -145,14 +145,13 @@ module T = struct
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest (t : t) : Latest.t =
-        { fee_payer= t.fee_payer
+        { fee_payer = t.fee_payer
         ; memo = t.memo
-        ; account_updates = Call_forest.map
-            ~f:Account_update.Stable.V1.to_latest
-            t.account_updates
+        ; account_updates =
+            Call_forest.map ~f:Account_update.Stable.V1.to_latest
+              t.account_updates
         }
     end
-
   end]
 end
 

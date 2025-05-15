@@ -546,7 +546,40 @@ module Zkapp_states = struct
 
   let typ =
     Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int; int ]
+      Caqti_type.
+        [ int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ; int
+        ]
 
   let table_name = "zkapp_states"
 

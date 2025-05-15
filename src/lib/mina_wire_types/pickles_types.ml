@@ -21,12 +21,8 @@ module Nat = struct
 
   type sixteen = z s s s s s s s s s s s s s s s s
 
-  type thirty_two = z
-    s s s s s s s s
-    s s s s s s s s
-    s s s s s s s s
-    s s s s s s s s
-
+  type thirty_two =
+    z s s s s s s s s s s s s s s s s s s s s s s s s s s s s s s s s
 end
 
 module Vector = struct

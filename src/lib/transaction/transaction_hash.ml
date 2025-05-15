@@ -255,7 +255,6 @@ end
 
 let%test_module "Transaction hashes" =
   ( module struct
-
     let run_test ~transaction_id ~expected_hash =
       let hash =
         match hash_of_transaction_id transaction_id with
@@ -294,7 +293,6 @@ let%test_module "Transaction hashes" =
         "5JvBt4173K3t7gQSpFoMGtbtZuYWPSg29cWad5pnnRd9BnAowoqY"
       in
       run_test ~transaction_id ~expected_hash
-
 
     (* To regenerate:
        * Run dune in this library's directory

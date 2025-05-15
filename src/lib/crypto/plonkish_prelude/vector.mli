@@ -81,7 +81,6 @@ end
 
 (** {2 Vectors} *)
 
-
 (** Vector of size 32 *)
 module Vector_32 : VECTOR with type 'a t = ('a, Nat.N32.n) vec
 

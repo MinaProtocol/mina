@@ -31,7 +31,9 @@ module Account_update_under_construction = struct
             ; nonce = Ignore
             ; receipt_chain_hash = Ignore
             ; delegate = Ignore
-            ; state = Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> Zkapp_basic.Or_ignore.Ignore)
+            ; state =
+                Pickles_types.Vector.init Zkapp_state.Max_state_size.n
+                  ~f:(fun _ -> Zkapp_basic.Or_ignore.Ignore)
             ; action_state = Ignore
             ; proved_state = Ignore
             ; is_new = Ignore
@@ -69,7 +71,9 @@ module Account_update_under_construction = struct
       type t = { app_state : Field.t option Zkapp_state.V.t }
 
       let create () =
-        { app_state = Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> None)
+        { app_state =
+            Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
+                None )
         }
 
       let to_zkapp_command_update ({ app_state } : t) :
@@ -86,9 +90,9 @@ module Account_update_under_construction = struct
         let default =
           var_of_t
             (Account_update.Update.typ ())
-            { app_state = Pickles_types.Vector.init
-                Zkapp_state.Max_state_size.n
-                ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep)
+            { app_state =
+                Pickles_types.Vector.init Zkapp_state.Max_state_size.n
+                  ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep)
             ; delegate = Keep
             ; verification_key = Keep
             ; permissions = Keep
@@ -111,11 +115,11 @@ module Account_update_under_construction = struct
         { default with app_state }
 
       let set_full_state app_state (_t : t) =
-            { app_state =
-                Pickles_types.Vector.map ~f:(fun a -> Some a)
-                @@ Pickles_types.Vector.of_list_and_length_exn app_state
-                   Zkapp_state.Max_state_size.n
-            }
+        { app_state =
+            Pickles_types.Vector.map ~f:(fun a -> Some a)
+            @@ Pickles_types.Vector.of_list_and_length_exn app_state
+                 Zkapp_state.Max_state_size.n
+        }
 
       let set_state i value (t : t) =
         if i < 0 || i >= 32 then failwith "Incorrect index" ;
