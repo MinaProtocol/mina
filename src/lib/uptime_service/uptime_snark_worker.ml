@@ -3,12 +3,13 @@
 open Core_kernel
 open Async
 open Mina_base
-module Prod = Snark_worker__Prod.Inputs
+module Work = Snark_work_lib
+module Prod = Snark_worker.Worker.Prod
 
 module Worker_state = struct
   module type S = sig
     val perform_single :
-         Sok_message.t * Prod.single_spec
+         Sok_message.t * Work.Spec.Single.Stable.Latest.t
       -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
   end
 
@@ -21,11 +22,36 @@ module Worker_state = struct
   let create ~constraint_constants () : t Deferred.t =
     Deferred.return
       (let module M = struct
-         let perform_single (message, single_spec) =
-           let%bind (worker_state : Prod.Worker_state.t) =
+         let perform_single
+             (message, (single_spec : Work.Spec.Single.Stable.Latest.t)) =
+           let%bind (state : Prod.Worker_state.t) =
              Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
-           Prod.perform_single worker_state ~message single_spec
+           let sok_digest = Mina_base.Sok_message.digest message in
+           let spec : Work.Spec.Partitioned.Stable.Latest.t =
+             Work.Spec.Partitioned.Poly.Single
+               { job =
+                   Work.With_status.
+                     { spec = single_spec
+                     ; job_id =
+                         Work.ID.Single.{ which_one = `One; pairing_id = 0L }
+                     ; issued_since_unix_epoch =
+                         Time.(now () |> to_span_since_epoch)
+                     ; fee_of_full = Currency.Fee.zero
+                     }
+               ; data = ()
+               }
+           in
+           match%bind.Deferred.Or_error
+             Prod.perform ~state ~spec ~sok_digest
+           with
+           | Single { data = Proof_carrying_data.{ proof; data = elapsed }; _ }
+             ->
+               Deferred.Or_error.return (proof, elapsed)
+           | _ ->
+               Deferred.Or_error.error_string
+                 "This is a bug, submitted partitioned work of kind Single \
+                  into Snark worker, got non-Single result"
        end in
       (module M : S) )
 
@@ -39,7 +65,7 @@ module Worker = struct
     type 'w functions =
       { perform_single :
           ( 'w
-          , Sok_message.t * Prod.single_spec
+          , Sok_message.t * Work.Spec.Single.Stable.Latest.t
           , (Ledger_proof.t * Time.Span.t) Or_error.t )
           F.t
       }
@@ -70,7 +96,8 @@ module Worker = struct
         in
         { perform_single =
             f
-              ( [%bin_type_class: Sok_message.Stable.Latest.t * Prod.single_spec]
+              ( [%bin_type_class:
+                  Sok_message.Stable.Latest.t * Work.Spec.Single.Stable.Latest.t]
               , [%bin_type_class:
                   (Ledger_proof.Stable.Latest.t * Time.Span.t) Or_error.t]
               , perform_single )

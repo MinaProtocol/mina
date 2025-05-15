@@ -99,6 +99,9 @@ type pipes =
   ; snark_local_sink : Network_pool.Snark_pool.Local_sink.t
   }
 
+type snark_job_state =
+  { selector : Work_selector.State.t; partitioner : Work_partitioner.t }
+
 type t =
   { config : Config.t
   ; processes : processes
@@ -107,7 +110,7 @@ type t =
   ; pipes : pipes
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
-  ; snark_job_state : Work_selector.State.t
+  ; snark_job_state : snark_job_state
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
@@ -192,8 +195,8 @@ module Snark_worker = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary ?env
         ~args:
-          ( "internal" :: Snark_worker.Intf.command_name
-          :: Snark_worker.arguments ~proof_level
+          ( "internal" :: Snark_worker.Entry.command_name
+          :: Snark_worker.Entry.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
@@ -866,17 +869,19 @@ let best_chain ?max_length t =
 
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
+  let module Work = Snark_work_lib in
   let fee = snark_work_fee t in
-  let instances_opt =
-    Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) (snark_job_state t)
+  let work_from_selector ~fee ~logger =
+    Work_selection_method.work ~snark_pool:(snark_pool t) ~fee ~logger
+      t.snark_job_state.selector
   in
-  Option.map instances_opt ~f:(fun instances ->
-      { Snark_work_lib.Work.Spec.instances; fee } )
+  Work_partitioner.request_partitioned_work ~work_from_selector
+    ~logger:t.config.logger ~fee ~partitioner:t.snark_job_state.partitioner
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_worker_lib.Work.Result.t) =
+let add_work ~(result : Snark_work_lib.Result.Partitioned.t) t =
+  let module Work = Snark_work_lib in
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -884,27 +889,36 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     in
     let pending_work =
       Work_selector.pending_work_statements ~snark_pool ~fee_opt
-        t.snark_job_state
+        t.snark_job_state.selector
       |> List.length
     in
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec =
-    One_or_two.map work.spec.instances
-      ~f:Snark_work_lib.Work.Single.Spec.statement
+  (* WARN: Callback hell *)
+  let after_partitioner_recombine_work (work : Work.Result.Combined.t) =
+    let spec =
+      One_or_two.map work.data ~f:(fun single ->
+          Work.Spec.Single.Poly.statement single.spec )
+    in
+    let after_work_enter_pool _ =
+      (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
+          * If the diff is accepted then remove it from the seen jobs.
+          * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
+      Work_selector.remove t.snark_job_state.selector spec
+    in
+    ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
+
+    Network_pool.Snark_pool.(
+      Local_sink.push t.pipes.snark_local_sink
+        ( Resource_pool.Diff.of_result
+            (Work.Result.Combined.read_all_proofs_from_disk work)
+        , after_work_enter_pool ))
+    |> Deferred.don't_wait_for
   in
-  let cb _ =
-    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
-     * If the diff is accepted then remove it from the seen jobs.
-     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selector.remove t.snark_job_state spec
-  in
-  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
-  Network_pool.Snark_pool.(
-    Local_sink.push t.pipes.snark_local_sink
-      (Resource_pool.Diff.of_result work, cb))
-  |> Deferred.don't_wait_for
+  Work_partitioner.submit_partitioned_work ~result
+    ~callback:after_partitioner_recombine_work
+    ~partitioner:t.snark_job_state.partitioner
 
 let add_work_graphql t diff =
   let results_ivar = Ivar.create () in
@@ -2079,11 +2093,19 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; constraint_constants
               }
           in
-          let snark_jobs_state =
-            Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-              ~logger:config.logger
+          let snark_jobs_state : snark_job_state =
+            { selector =
+                Work_selector.State.init
+                  ~reassignment_wait:config.work_reassignment_wait
+                  ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+                  ~logger:config.logger
+            ; partitioner =
+                Work_partitioner.create
+                  ~reassignment_timeout:
+                    (Time.Span.of_ms
+                       (Float.of_int config.work_reassignment_wait) )
+                  ~logger:config.logger
+            }
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
@@ -2094,7 +2116,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   ~get_transition_frontier:(fun () ->
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
                   ~get_snark_pool:(fun () -> Some snark_pool)
-                  ~snark_job_state:(fun () -> Some snark_jobs_state)
+                  ~snark_job_state:(fun () -> Some snark_jobs_state.selector)
                   ~get_node_status )
           in
           (* tie the first knot *)

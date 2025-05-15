@@ -1,7 +1,6 @@
 (library
  (name snark_work_lib)
  (public_name snark_work_lib)
- (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
@@ -14,14 +13,15 @@
   ;; local libraries
   currency
   ledger_proof
-  mina_state
+  mina_stdlib
   one_or_two
+  ppx_version.runtime
+  proof_carrying_data
   signature_lib
   transaction_snark
-  ppx_version.runtime)
-  
+  transaction_snark_work)
  (preprocess
-  (pps ppx_jane ppx_deriving_yojson ppx_version))
+  (pps ppx_deriving_yojson ppx_jane ppx_mina ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Snark work types"))

@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
-module Prod = Snark_worker__Prod.Inputs
+open Mina_base
+module Prod = Snark_worker.Worker.Prod
 module Graphql_client = Graphql_lib.Client
 module Encoders = Mina_graphql.Types.Input
 module Scalars = Graphql_lib.Scalars
@@ -27,29 +28,42 @@ let submit_graphql input graphql_endpoint =
       Format.printf "Graphql error: %s\n" s ;
       exit 1
 
-let perform (s : Prod.Worker_state.t) ~fee ~public_key
-    (spec :
-      ( Transaction_witness.Stable.Latest.t
-      , Ledger_proof.t )
-      Snark_work_lib.Work.Single.Spec.t
-      One_or_two.t ) =
-  One_or_two.Deferred_result.map spec ~f:(fun w ->
-      let open Deferred.Or_error.Let_syntax in
-      let%map proof, time =
-        Prod.perform_single s
-          ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-          w
+module Work = Snark_work_lib
+
+let perform (state : Prod.Worker_state.t) ~fee ~public_key instances =
+  let spec : Work.Partitioned.Spec.Stable.Latest.t =
+    { instances; fee = Currency.Fee.zero }
+    |> Work.Partitioned.Spec.Poly.of_selector_spec
+         ~issued_since_unix_epoch:Time.(now () |> to_span_since_epoch)
+  in
+  let open Deferred.Or_error.Let_syntax in
+  let sok_digest = Sok_message.(create ~fee ~prover:public_key |> digest) in
+  let%bind result = Prod.perform ~state ~sok_digest ~spec in
+  match result with
+  | Old { instances; _ } ->
+      let statements =
+        instances
+        |> One_or_two.map ~f:(fun (spec, _) ->
+               Work.Work.Single.Spec.statement spec )
       in
-      ( proof
-      , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge) ) )
-  |> Deferred.Or_error.map ~f:(fun proofs_and_time ->
-         { Snark_work_lib.Work.Result_without_metrics.proofs =
-             One_or_two.map proofs_and_time ~f:fst
-         ; statements =
-             One_or_two.map spec ~f:Snark_work_lib.Work.Single.Spec.statement
-         ; prover = public_key
-         ; fee
-         } )
+      let proofs =
+        instances
+        |> One_or_two.map
+             ~f:(fun (_, { Work.Partitioned.Proof_with_metric.Poly.proof; _ })
+                -> proof )
+      in
+      Deferred.Or_error.return
+        { Work.Work.Result_without_metrics.proofs
+        ; statements
+        ; prover = public_key
+        ; fee
+        }
+  | _ ->
+      Deferred.Or_error.error_string
+        "This is a bug, submitted one work with old selector spec into Snark \
+         worker, got non-old result"
+
+(* Or_error.error_string "wow" *)
 
 let command =
   let open Command.Let_syntax in

@@ -1,9 +1,21 @@
-module Prod = Prod
+(** NOTE: These documentation might be helpful
+    - {:https://docs.minaprotocol.com/mina-protocol/snark-workers}
+*)
 
-module Intf : module type of Intf
+(** module interacting with CLIs *)
+module Entry = Entry
 
-include Intf.S with type ledger_proof := Ledger_proof.t
+(** module providing versioned RPCs *)
+module Rpcs : sig
+  module Get_work = Rpc_get_work
+  module Submit_work = Rpc_submit_work
+  module Failed_to_generate_snark = Rpc_failed_to_generate_snark
+end
 
-type Structured_log_events.t +=
-  | Generating_snark_work_failed of { error : Yojson.Safe.t }
-  [@@deriving register_event]
+(** module providing workers Implementations *)
+module Worker : sig
+  module Prod : Intf.Worker
+end
+
+(** module providing all structured log events *)
+module Events = Events
