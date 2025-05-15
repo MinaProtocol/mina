@@ -61,4 +61,3 @@ let verify ?signature_kind signature pk s =
 let sign ?signature_kind sk s =
   let m = string_to_input s in
   Schnorr.Legacy.sign ?signature_kind sk m
-

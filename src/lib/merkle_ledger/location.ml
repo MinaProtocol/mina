@@ -49,12 +49,8 @@ module T = struct
     let hash ~ledger_depth depth = UInt8.of_int (ledger_depth - depth)
   end
 
-  [@@@warning "-4"] (* disabled because of deriving sexp *)
-
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
   [@@deriving hash, sexp, compare]
-
-  [@@@warning "+4"]
 
   let is_generic = function Generic _ -> true | Account _ | Hash _ -> false
 

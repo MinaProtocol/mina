@@ -1,6 +1,5 @@
 open Core
 open Async
-
 module Client = Graphql_lib.Client
 
 let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =

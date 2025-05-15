@@ -139,9 +139,10 @@ module type S_with_version = sig
       (** [of_yojson j] converts JSON to a field element.
 
           Accepted input formats:
-          - `String with "0x" prefix: Interpreted as a hexadecimal
+          - `String with "0x" or "0X" prefix: Interpreted as a hexadecimal
             representation
-          - `String without "0x" prefix: Interpreted as a decimal representation
+          - `String without "0x" or "0X" prefix: Interpreted as a decimal
+            representation
 
           Both formats do not allow values higher than the field modulus.
           An exception [Failure] is raised if it happens.
@@ -228,7 +229,10 @@ module Make (F : Input_intf) :
         match j with
         | `String s ->
             let parsed_bigint =
-              if String.is_prefix ~prefix:"0x" s then Bigint.of_hex_string s
+              if
+                String.is_prefix ~prefix:"0x" s
+                || String.is_prefix ~prefix:"0X" s
+              then Bigint.of_hex_string s
               else Bigint.of_decimal_string s
             in
             Ok (of_bigint parsed_bigint)
