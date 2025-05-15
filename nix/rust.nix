@@ -2,10 +2,15 @@
 final: prev:
 let
   rustPlatformFor = rust:
-    prev.makeRustPlatform {
-      cargo = rust;
-      rustc = rust;
-      # override stdenv.targetPlatform here, if necessary
+    let
+      rustWithTargetPlatforms = rust // {
+        # Ensure compatibility with nixpkgs >= 24.11
+        targetPlatforms = final.lib.platforms.all;
+        badTargetPlatforms = [ ];
+      };
+    in prev.makeRustPlatform {
+      cargo = rustWithTargetPlatforms;
+      rustc = rustWithTargetPlatforms;
     };
   toolchainHashes = {
     "1.81.0" = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
