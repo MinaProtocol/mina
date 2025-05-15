@@ -250,7 +250,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = State_hash.Stable.V1.t
 
@@ -531,7 +531,7 @@ module Get_transition_chain = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
@@ -925,7 +925,7 @@ module Get_ancestry = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query =
         ( Consensus.Data.Consensus_state.Value.Stable.V2.t
@@ -1134,7 +1134,7 @@ module Get_best_tip = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = unit [@@deriving sexp]
 
