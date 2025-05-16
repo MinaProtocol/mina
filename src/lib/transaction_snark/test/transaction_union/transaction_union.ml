@@ -664,7 +664,9 @@ let%test_module "Transaction union tests" =
           ~memo ~body
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
-      let user_command = Signed_command.sign signer payload in
+      let user_command =
+        Signed_command.sign ~signature_kind:U.signature_kind signer payload
+      in
       U.test_transaction_union ?expected_failure ledger
         (Command (Signed_command user_command)) ;
       let fee_payer = Signed_command.Payload.fee_payer payload in
