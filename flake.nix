@@ -262,10 +262,10 @@
     } // utils.lib.eachDefaultSystem (system:
       let
         rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isAarch64 || prev.stdenv.isDarwin then {
-            rocksdb-mina = pkgs.rocksdb;
-          } else {
+          if prev.stdenv.isx86_64 then {
             rocksdb-mina = pkgs.rocksdb511;
+          } else {
+            rocksdb-mina = pkgs.rocksdb;
           };
 
         # nixpkgs with all relevant overlays applied
@@ -306,10 +306,8 @@
           libiconv
           cargo
           curl
-          (pkgs.python3.withPackages (python-pkgs: [
-              python-pkgs.click
-              python-pkgs.requests
-            ]))
+          (pkgs.python3.withPackages
+            (python-pkgs: [ python-pkgs.click python-pkgs.requests ]))
           jq
           rocksdb.tools
         ];
