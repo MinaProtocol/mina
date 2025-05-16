@@ -48,6 +48,13 @@ module Value = struct
 
       let to_latest = Fn.id
     end
+
+    module V1 = struct
+      type t = Zkapp_basic.F.Stable.V1.t V.Stable.V1.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
   end]
 
   type t = Zkapp_basic.F.t V.t [@@deriving sexp, equal, yojson, hash, compare]

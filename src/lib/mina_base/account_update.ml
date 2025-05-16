@@ -512,6 +512,20 @@ module Update = struct
   module Timing_info = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+              Mina_wire_types.Mina_base.Account_update.Update.Timing_info.V1.t =
+          { initial_minimum_balance : Balance.Stable.V1.t
+          ; cliff_time : Global_slot_since_genesis.Stable.V1.t
+          ; cliff_amount : Amount.Stable.V1.t
+          ; vesting_period : Global_slot_span.Stable.V1.t
+          ; vesting_increment : Amount.Stable.V1.t
+          }
+        [@@deriving annot, compare, equal, sexp, hash, yojson, hlist, fields]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
               Mina_wire_types.Mina_base.Account_update.Update.Timing_info.V1.t =

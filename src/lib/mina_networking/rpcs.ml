@@ -378,9 +378,9 @@ module Answer_sync_ledger_query = struct
 
       let callee_model_of_query = Fn.id
 
-      let response_of_callee_model = Fn.id
+      let response_of_callee_model = fun _ -> failwith "TODO?"
 
-      let caller_model_of_response = Fn.id
+      let caller_model_of_response = fun _ -> failwith "TODO?"
     end
 
     module T' =
@@ -415,7 +415,7 @@ module Answer_sync_ledger_query = struct
 
       let response_of_callee_model : Master.T.response -> response = function
         | Ok a ->
-            Sync_ledger.Answer.Stable.V2.from_v3 a
+            Sync_ledger.Answer.Stable.V2.from_v4 a
         | Error e ->
             Error e
 

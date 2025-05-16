@@ -54,7 +54,7 @@ module Answer = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
         , Account.Stable.V3.t )
@@ -64,20 +64,46 @@ module Answer = struct
       let to_latest = Fn.id
     end
 
+    module V3 = struct
+      type t =
+        ( Ledger_hash.Stable.V1.t
+        , Account.Stable.V2.t )
+        Syncable_ledger.Answer.Stable.V2.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest (_t : t) : V4.t = failwith "TODO"
+
+      let from_v4 : V4.t -> t Or_error.t =
+       fun x -> Or_error.(Syncable_ledger.Answer.Stable.V2.(
+            match x with
+            | Child_hashes_are h -> return (Child_hashes_are h)
+            | Num_accounts (n,h) -> return (Num_accounts (n,h))
+            | Contents_are l -> let
+                  l' = List.map ~f:
+                    (fun (_x : Account.Stable.V3.t) ->
+                    ((failwith "TODO") : Account.Stable.V2.t)) l
+                  in return @@ Contents_are l'
+          ))
+    end
+
     module V2 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
-        , Account.Stable.V3.t )
+        , Account.Stable.V2.t )
         Syncable_ledger.Answer.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest x = Syncable_ledger.Answer.Stable.V1.to_latest Fn.id x
+      let to_latest (_x : t) : V4.t = failwith "TODO"
+          (* V3.to_latest @@ Syncable_ledger.Answer.Stable.V1.to_latest Fn.id x *)
 
       (* Not a standard versioning function *)
 
       (** Attempts to downgrade v3 -> v2 *)
       let from_v3 : V3.t -> t Or_error.t =
        fun x -> Syncable_ledger.Answer.Stable.V1.from_v2 x
+      (** Attempts to downgrade v4 -> v2 *)
+      let from_v4 : V4.t -> t Or_error.t =
+       fun _x -> failwith "TODO"
     end
   end]
 

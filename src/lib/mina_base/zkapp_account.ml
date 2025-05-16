@@ -239,6 +239,21 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  module V2 = struct
+    type t =
+      ( Zkapp_state.Value.Stable.V1.t
+      , Verification_key_wire.Stable.V1.t option
+      , Mina_numbers.Zkapp_version.Stable.V1.t
+      , F.Stable.V1.t
+      , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+      , bool
+      , Zkapp_uri.Stable.V1.t )
+      Poly.Stable.V2.t
+    [@@deriving sexp, equal, compare, hash, yojson]
+
+    let to_latest = Fn.id
+  end
 end]
 
 type t =

@@ -270,6 +270,27 @@ module Binable_arg = struct
 
       let public_key (t : t) : key = t.public_key
     end
+
+    module V2 = struct
+      type t =
+        { public_key : Public_key.Compressed.Stable.V1.t
+        ; token_id : Token_id.Stable.V2.t
+        ; token_symbol : Token_symbol.Stable.V1.t
+        ; balance : Balance.Stable.V1.t
+        ; nonce : Nonce.Stable.V1.t
+        ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t option
+        ; voting_for : State_hash.Stable.V1.t
+        ; timing : Timing.Stable.V2.t
+        ; permissions : Permissions.Stable.V2.t
+        ; zkapp : Zkapp_account.Stable.V2.t option
+        }
+      [@@deriving sexp, equal, hash, compare, yojson]
+
+      let to_latest = Fn.id
+
+      let public_key (t : t) : key = t.public_key
+    end
   end]
 end
 
@@ -296,6 +317,38 @@ module Stable = struct
     include
       Binable.Of_binable_without_uuid
         (Binable_arg.Stable.V3)
+        (struct
+          type nonrec t = t
+
+          let to_binable = check
+
+          let of_binable = check
+        end)
+
+    let to_latest = Fn.id
+
+    let public_key (t : t) : key = t.public_key
+  end
+
+  module V2 = struct
+    type t = Binable_arg.Stable.V2.t =
+      { public_key : Public_key.Compressed.Stable.V1.t
+      ; token_id : Token_id.Stable.V2.t
+      ; token_symbol : Token_symbol.Stable.V1.t
+      ; balance : Balance.Stable.V1.t
+      ; nonce : Nonce.Stable.V1.t
+      ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
+      ; delegate : Public_key.Compressed.Stable.V1.t option
+      ; voting_for : State_hash.Stable.V1.t
+      ; timing : Timing.Stable.V2.t
+      ; permissions : Permissions.Stable.V2.t
+      ; zkapp : Zkapp_account.Stable.V2.t option
+      }
+    [@@deriving sexp, equal, hash, compare, yojson, hlist, fields]
+
+    include
+      Binable.Of_binable_without_uuid
+        (Binable_arg.Stable.V2)
         (struct
           type nonrec t = t
 
