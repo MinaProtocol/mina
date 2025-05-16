@@ -13,6 +13,7 @@
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11-small";
+  inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
@@ -54,7 +55,7 @@
 
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
-    , nix-utils, flockenzeit, ... }:
+    , nix-utils, flockenzeit, nixpkgs-old, ... }:
     let
       inherit (nixpkgs) lib;
 
@@ -95,7 +96,6 @@
             requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
         };
       };
-
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
       # Mina Demo container
       # Use `nixos-container create --flake mina`
@@ -267,6 +267,10 @@
           } else {
             rocksdb-mina = pkgs.rocksdb;
           };
+        go119Overlay = (_: _: {
+          inherit (nixpkgs-old.legacyPackages.${system})
+            go_1_19 buildGo119Module;
+        });
 
         # nixpkgs with all relevant overlays applied
         pkgs = nixpkgs.legacyPackages.${system}.extend
@@ -281,7 +285,8 @@
                   nodejs = pkgs.nodejs-16_x;
                 };
             })
-          ] ++ builtins.attrValues self.overlays ++ [ rocksdbOverlay ]));
+          ] ++ builtins.attrValues self.overlays
+            ++ [ rocksdbOverlay go119Overlay ]));
 
         checks = import ./nix/checks.nix inputs pkgs;
 
@@ -312,17 +317,18 @@
           rocksdb.tools
         ];
       in {
+
         inherit ocamlPackages;
 
         # Main user-facing binaries.
-        packages = rec {
+        packages = (rec {
           inherit (ocamlPackages)
             mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
             test_executive with-instrumentation;
           # Granular nix
           inherit (ocamlPackages)
-            src exes all all-tested pkgs all-exes files tested info
-            dune-description base-libs external-libs;
+            src exes all all-tested all-exes files tested info dune-description
+            base-libs external-libs;
           # ^ TODO move elsewhere, external-libs isn't a package
           # TODO consider the following: inherit (ocamlPackages) default;
           granular = ocamlPackages.default;
@@ -334,6 +340,9 @@
             mina-image-slim mina-image-full mina-archive-image-full
             mina-image-instr-full;
           mina-deb = debianPackages.mina;
+          impure-shell = (import ./nix/impure-shell.nix pkgs).inputDerivation;
+        }) // {
+          inherit (ocamlPackages) pkgs;
         };
 
         # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
@@ -372,8 +381,6 @@
           '';
           buildInputs = [ self.packages.${system}.test_executive ];
         };
-        packages.impure-shell =
-          (import ./nix/impure-shell.nix pkgs).inputDerivation;
 
         # An "impure" shell, giving you the system deps of Mina, opam, cargo and go.
         devShells.impure = import ./nix/impure-shell.nix pkgs;
