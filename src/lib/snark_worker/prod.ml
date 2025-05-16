@@ -198,10 +198,10 @@ module Inputs = struct
                                   ~metadata:
                                     [ ( "stmt1"
                                       , Transaction_snark.Statement.to_yojson
-                                          (Ledger_proof.statement prev) )
+                                          (Ledger_proof.Poly.statement prev) )
                                     ; ( "stmt2"
                                       , Transaction_snark.Statement.to_yojson
-                                          (Ledger_proof.statement curr) )
+                                          (Ledger_proof.Poly.statement curr) )
                                     ; ("error", `String (Error.to_string_hum e))
                                     ; ( "inputs"
                                       , zkapp_command_inputs_to_yojson
@@ -238,7 +238,8 @@ module Inputs = struct
                               in
                               if
                                 Transaction_snark.Statement.equal
-                                  (Ledger_proof.statement p) input
+                                  (Ledger_proof.Poly.statement p)
+                                  input
                               then Deferred.return (Ok p)
                               else (
                                 [%log fatal]
@@ -248,7 +249,7 @@ module Inputs = struct
                                   ~metadata:
                                     [ ( "got"
                                       , Transaction_snark.Statement.to_yojson
-                                          (Ledger_proof.statement p) )
+                                          (Ledger_proof.Poly.statement p) )
                                     ; ( "expected"
                                       , Transaction_snark.Statement.to_yojson
                                           input )

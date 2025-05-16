@@ -353,7 +353,7 @@ struct
           let open Deferred.Let_syntax in
           let statement_check () =
             One_or_two.Deferred_result.map proofs ~f:(fun (p, s) ->
-                let proof_statement = Ledger_proof.statement p in
+                let proof_statement = Ledger_proof.Poly.statement p in
                 if Transaction_snark.Statement.( = ) proof_statement s then
                   Deferred.Result.return ()
                 else

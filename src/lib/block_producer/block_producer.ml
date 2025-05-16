@@ -351,7 +351,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 let ledger_proof_statement =
                   match ledger_proof_opt with
                   | Some (proof, _) ->
-                      Ledger_proof.Cached.statement proof
+                      Ledger_proof.Poly.statement proof
                   | None ->
                       let state =
                         previous_protocol_state
@@ -366,7 +366,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 let supply_increase =
                   Option.value_map ledger_proof_opt
                     ~f:(fun (proof, _) ->
-                      (Ledger_proof.Cached.statement proof).supply_increase )
+                      (Ledger_proof.Poly.statement proof).supply_increase )
                     ~default:Currency.Amount.Signed.zero
                 in
                 let body_reference =

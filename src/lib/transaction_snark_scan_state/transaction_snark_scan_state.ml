@@ -667,7 +667,7 @@ struct
 
   let check_invariants (t : t) ~verifier =
     check_invariants_impl t.scan_state
-      ~merge_to_statement:(Fn.compose Ledger_proof.Cached.statement fst)
+      ~merge_to_statement:(Fn.compose Ledger_proof.Poly.statement fst)
       ~verify:(Verifier.verify ~verifier)
 end
 
@@ -676,8 +676,8 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
       Some statement
   | Merge ((p1, _), (p2, _)) ->
       Transaction_snark.Statement.merge
-        (Ledger_proof.Cached.statement p1)
-        (Ledger_proof.Cached.statement p2)
+        (Ledger_proof.Poly.statement p1)
+        (Ledger_proof.Poly.statement p2)
       |> Result.ok
 
 let create ~work_delay ~transaction_capacity_log_2 : t =
@@ -1253,7 +1253,7 @@ let extract_from_job (job : job) =
 let snark_job_list_json t =
   let all_jobs : Job_view.t list list =
     let fa (a : Ledger_proof_with_sok_message.t) =
-      Ledger_proof.Cached.statement (fst a)
+      Ledger_proof.Poly.statement (fst a)
     in
     let fd (d : Transaction_with_witness.t) = d.statement in
     Parallel_scan.view_jobs_with_position t.scan_state fa fd
@@ -1346,8 +1346,8 @@ let all_work_pairs t
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge
-            (Ledger_proof.Cached.statement p1)
-            (Ledger_proof.Cached.statement p2)
+            (Ledger_proof.Poly.statement p1)
+            (Ledger_proof.Poly.statement p2)
         in
         Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
   in
@@ -1407,14 +1407,14 @@ let fill_work_and_enqueue_transactions t ~logger transactions work =
              } ) )
       proof_opt
       ~f:(fun ((proof, _), _txns_with_witnesses) ->
-        let curr_stmt = Ledger_proof.Cached.statement proof in
+        let curr_stmt = Ledger_proof.Poly.statement proof in
         let prev_stmt, incomplete_zkapp_updates_from_old_proof =
           Option.value_map
             ~default:
               (curr_stmt, ([], `Border_block_continued_in_the_next_tree false))
             old_proof_and_incomplete_zkapp_updates
             ~f:(fun ((p', _), incomplete_zkapp_updates_from_old_proof) ->
-              ( Ledger_proof.Cached.statement p'
+              ( Ledger_proof.Poly.statement p'
               , incomplete_zkapp_updates_from_old_proof ) )
         in
         (*prev_target is connected to curr_source- Order of the arguments is

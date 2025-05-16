@@ -25,6 +25,8 @@ module Poly = struct
   let create ~(statement : Mina_state.Snarked_ledger_state.t) ~sok_digest ~proof
       : _ t =
     { Proof_carrying_data.proof; data = { statement with sok_digest } }
+
+  let statement (t : _ t) = { t.data with sok_digest = () }
 end
 
 [%%versioned
@@ -36,8 +38,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-let statement (t : t) = Transaction_snark.statement t
 
 let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t
 
@@ -51,7 +51,7 @@ let statement_with_sok_target (t : Mina_state.Snarked_ledger_state.With_sok.t) =
 let underlying_proof = Transaction_snark.proof
 
 let snarked_ledger_hash =
-  Fn.compose Mina_state.Snarked_ledger_state.snarked_ledger_hash statement
+  Fn.compose Mina_state.Snarked_ledger_state.snarked_ledger_hash Poly.statement
 
 module Cached = struct
   type t =
@@ -70,8 +70,6 @@ module Cached = struct
       : Stable.Latest.t =
     Transaction_snark.create ~statement
       ~proof:(Proof_cache_tag.read_proof_from_disk proof)
-
-  let statement (t : t) = { t.data with sok_digest = () }
 
   let sok_digest (t : t) = t.data.sok_digest
 

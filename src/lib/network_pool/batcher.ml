@@ -467,7 +467,7 @@ module Snark_pool = struct
 
     let of_proof_envelope t =
       Envelope.Incoming.map t ~f:(fun (ps, message) ->
-          (One_or_two.map ~f:Ledger_proof.statement ps, message) )
+          (One_or_two.map ~f:Ledger_proof.Poly.statement ps, message) )
 
     include T
     include Comparable.Make (T)

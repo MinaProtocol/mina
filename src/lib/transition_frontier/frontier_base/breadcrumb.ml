@@ -441,7 +441,7 @@ module For_tests = struct
       in
       let ledger_proof_statement =
         Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) -> Ledger_proof.Cached.statement proof)
+          ~f:(fun (proof, _) -> Ledger_proof.Poly.statement proof)
           ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =

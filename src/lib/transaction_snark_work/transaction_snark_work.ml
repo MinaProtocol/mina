@@ -95,7 +95,7 @@ module T = struct
         }
       [@@deriving equal, fields, sexp, yojson]
 
-      let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
+      let statement t = One_or_two.map t.proofs ~f:Ledger_proof.Poly.statement
 
       let proofs t = t.proofs
 
@@ -110,10 +110,10 @@ module T = struct
     }
   [@@deriving fields]
 
-  let statement t = One_or_two.map t.proofs ~f:Ledger_proof.Cached.statement
+  let statement t = One_or_two.map t.proofs ~f:Ledger_proof.Poly.statement
 
   let info t =
-    let statements = One_or_two.map t.proofs ~f:Ledger_proof.Cached.statement in
+    let statements = One_or_two.map t.proofs ~f:Ledger_proof.Poly.statement in
     { Info.statements
     ; work_ids = One_or_two.map statements ~f:Transaction_snark.Statement.hash
     ; fee = t.fee

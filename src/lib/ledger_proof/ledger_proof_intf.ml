@@ -33,6 +33,23 @@ module type S = sig
          , Mina_state.Local_state.t
          , 'proof )
          t
+
+    val statement :
+         ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'sok_digest
+         , 'local_state
+         , 'proof )
+         t
+      -> ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , unit
+         , 'local_state )
+         Mina_state.Snarked_ledger_state.Poly.t
   end
 
   type t [@@deriving compare, equal, sexp, yojson, hash]
@@ -54,8 +71,6 @@ module type S = sig
        , Pending_coinbase.Stack_versioned.t
        , Mina_state.Local_state.t )
        Mina_state.Registers.t
-
-  val statement : t -> Mina_state.Snarked_ledger_state.t
 
   val statement_with_sok : t -> Mina_state.Snarked_ledger_state.With_sok.t
 
@@ -82,8 +97,6 @@ module type S = sig
       proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
     val read_proof_from_disk : t -> Stable.Latest.t
-
-    val statement : t -> Mina_state.Snarked_ledger_state.t
 
     val sok_digest : t -> Sok_message.Digest.t
 

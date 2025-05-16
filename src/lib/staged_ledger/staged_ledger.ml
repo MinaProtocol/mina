@@ -140,7 +140,7 @@ module T = struct
       List.exists proofs ~f:(fun (proof, statement, _msg) ->
           not
             (Transaction_snark.Statement.equal
-               (Ledger_proof.statement proof)
+               (Ledger_proof.Poly.statement proof)
                statement ) )
     then
       log_error "Statement and proof do not match"
@@ -149,7 +149,7 @@ module T = struct
             , `List
                 (List.map proofs ~f:(fun (p, _, _) ->
                      Transaction_snark.Statement.to_yojson
-                       (Ledger_proof.statement p) ) ) )
+                       (Ledger_proof.Poly.statement p) ) ) )
           ]
     else
       let start = Time.now () in
@@ -224,7 +224,7 @@ module T = struct
       verify_proofs ~logger ~verifier
         (List.map ts ~f:(fun (p, m) ->
              ( Ledger_proof.Cached.read_proof_from_disk p
-             , Ledger_proof.Cached.statement p
+             , Ledger_proof.Poly.statement p
              , m ) ) )
   end
 
@@ -274,7 +274,7 @@ module T = struct
     let statement_check = `Partial in
     let last_proof_statement =
       Option.map
-        ~f:(fun ((p, _), _) -> Ledger_proof.Cached.statement p)
+        ~f:(fun ((p, _), _) -> Ledger_proof.Poly.statement p)
         (Scan_state.latest_ledger_proof scan_state)
     in
     Statement_scanner.check_invariants ~constraint_constants scan_state
@@ -377,7 +377,7 @@ module T = struct
     in
     let last_proof_statement =
       Scan_state.latest_ledger_proof scan_state
-      |> Option.map ~f:(fun ((p, _), _) -> Ledger_proof.Cached.statement p)
+      |> Option.map ~f:(fun ((p, _), _) -> Ledger_proof.Poly.statement p)
     in
     f ~constraint_constants ~last_proof_statement ~ledger:snarked_ledger
       ~scan_state ~pending_coinbase_collection:pending_coinbases
@@ -946,7 +946,7 @@ module T = struct
             |> to_staged_ledger_or_error
           in
           let ledger_proof_stack =
-            (Ledger_proof.Cached.statement proof).target.pending_coinbase_stack
+            (Ledger_proof.Poly.statement proof).target.pending_coinbase_stack
           in
           let%map () =
             if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack then
@@ -2682,7 +2682,7 @@ let%test_module "staged ledger tests" =
       let fee_excess =
         Option.value_map ~default:Fee_excess.zero proof_opt
           ~f:(fun (proof, _txns) ->
-            (Ledger_proof.Cached.statement proof).fee_excess )
+            (Ledger_proof.Poly.statement proof).fee_excess )
       in
       assert (Fee_excess.is_zero fee_excess)
 
@@ -2816,7 +2816,7 @@ let%test_module "staged ledger tests" =
                         ~apply_first_pass_sparse_ledger !sl.scan_state
                     in
                     let target_snarked_ledger =
-                      let stmt = Ledger_proof.Cached.statement proof in
+                      let stmt = Ledger_proof.Poly.statement proof in
                       stmt.target.first_pass_ledger
                     in
                     [%test_eq: Ledger_hash.t] target_snarked_ledger
