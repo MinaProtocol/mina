@@ -50,6 +50,8 @@ module type S = sig
          , unit
          , 'local_state )
          Mina_state.Snarked_ledger_state.Poly.t
+
+    val underlying_proof : (_, _, _, _, _, _, 'proof) t -> 'proof
   end
 
   type t [@@deriving compare, equal, sexp, yojson, hash]
@@ -81,8 +83,6 @@ module type S = sig
        , Mina_state.Local_state.t )
        Mina_state.Registers.t
 
-  val underlying_proof : t -> Proof.t
-
   val snarked_ledger_hash : t -> Frozen_ledger_hash.t
 
   module Cached : sig
@@ -95,7 +95,5 @@ module type S = sig
       proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
 
     val read_proof_from_disk : t -> Stable.Latest.t
-
-    val underlying_proof : t -> Proof_cache_tag.t
   end
 end

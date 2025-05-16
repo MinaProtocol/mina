@@ -80,7 +80,7 @@ module Worker_state = struct
 
   let ledger_proof_opt next_state = function
     | Some t ->
-        Ledger_proof.(statement_with_sok t, underlying_proof t)
+        Ledger_proof.(statement_with_sok t, Poly.underlying_proof t)
     | None ->
         ( { (Blockchain_state.ledger_proof_statement
                (Protocol_state.blockchain_state next_state) )

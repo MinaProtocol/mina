@@ -46,7 +46,9 @@ let test_do ledger_proofs tmp_dir =
       ledger_proofs
   in
   let n = 10 in
-  let%bind growth = test_mem ~n ~f:Ledger_proof.underlying_proof proofs_file in
+  let%bind growth =
+    test_mem ~n ~f:Ledger_proof.Poly.underlying_proof proofs_file
+  in
   let f p = (Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db p).proof in
   let%map growth_cached = test_mem ~n ~f proofs_file in
   printf "Growth without cache: %d\n" growth ;
