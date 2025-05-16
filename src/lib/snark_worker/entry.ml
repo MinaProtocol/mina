@@ -109,9 +109,6 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         let%bind () = wait () in
 
         (* Pause to wait for stdout to flush *)
-        (* let fee = Work.Spec.Partitioned.Poly.fee_of_full spec in *)
-        (* let messsage = Mina_base.Sok_message.create ~fee ~prover:public_key in *)
-        (* let sok_digest = Mina_base.Sok_message.digest messsage in *)
         match%bind Worker.perform ~state ~spec with
         | Error e ->
             let%bind () =
