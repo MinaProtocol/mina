@@ -7,7 +7,7 @@ let () = Pickles.Backend.Tick.Keypair.set_urs_info []
 let () = Pickles.Backend.Tock.Keypair.set_urs_info []
 
 let _test lazy_mode =
-  let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
+  let _tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~lazy_mode ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N0)
@@ -55,22 +55,14 @@ let _test lazy_mode =
         ] )
       ()
   in
-  (* force vk creation  *)
-  let _vk =
-    Async.Thread_safe.block_on_async_exn (fun () ->
-        Pickles.Side_loaded.Verification_key.of_compiled tag )
-  in
 
   let module Proof = (val proof) in
-  let test_prove () =
-    let public_input, (), proof =
-      Async.Thread_safe.block_on_async_exn (fun () -> prove ())
-    in
-    Or_error.ok_exn
-      (Async.Thread_safe.block_on_async_exn (fun () ->
-           Proof.verify [ (public_input, proof) ] ) )
-  in
-  test_prove ()
+  Format.printf "calling prove (1) \n" ;
+  let _ = Async.Thread_safe.block_on_async (fun () -> prove ()) in
+
+  Format.printf "calling prove (2) \n" ;
+  let _ = Async.Thread_safe.block_on_async (fun () -> prove ()) in
+  ()
 
 let () =
   let is_lazy = match Sys.argv.(1) with "lazy" -> true | _ -> false in

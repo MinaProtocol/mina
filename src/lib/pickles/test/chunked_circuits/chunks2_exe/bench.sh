@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 ## usage: ./bench.sh <mode>
 ## mode: "lazy" or "eager"
