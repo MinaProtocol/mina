@@ -55,6 +55,15 @@ module Reader0 = struct
 
   let pipe_name t = t.name
 
+  let to_yojson (reader : 'a t) : Yojson.Safe.t =
+    let name = pipe_name reader |> Option.value ~default:"<anonymous>" in
+    let address = (Obj.magic (Obj.repr reader.reader) : int) in
+    `Assoc
+      [ ("type", `String "strict_pipe.reader")
+      ; ("name", `String name)
+      ; ("mem_address", `Int address)
+      ]
+
   let assert_not_read reader =
     if reader.has_reader then
       raise (Multiple_reads_attempted (value_or_empty reader.name))
@@ -245,17 +254,25 @@ module Writer = struct
       Pipe.write_without_pushback t.writer data ;
       normal_return )
 
+  let pipe_name : type type_ return. ('t, type_, return) t -> string option =
+   fun writer -> writer.name
+
+  let to_yojson : type type_ return. ('t, type_, return) t -> Yojson.Safe.t =
+   fun writer ->
+    let name = pipe_name writer |> Option.value ~default:"<anonymous>" in
+    let address = (Obj.magic (Obj.repr writer.writer) : int) in
+    `Assoc
+      [ ("type", `String "strict_pipe.writer")
+      ; ("name", `String name)
+      ; ("mem_address", `Int address)
+      ]
+
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
    fun writer data ->
     ( if Pipe.is_closed writer.writer then
       let logger = Logger.create () in
-      [%log warn] "writing to closed pipe $name"
-        ~metadata:
-          [ ( "name"
-            , `String
-                (Sexplib.Sexp.to_string ([%sexp_of: string option] writer.name))
-            )
-          ] ) ;
+      [%log warn] "writing to closed pipe $debug_repr"
+        ~metadata:[ ("debug_repr", to_yojson writer) ] ) ;
     match writer.type_ with
     | Synchronous ->
         Pipe.write writer.writer data
@@ -267,11 +284,10 @@ module Writer = struct
         handle_buffered_write writer data ~capacity
           ~on_overflow:(fun () ->
             let logger = Logger.create () in
-            let my_name = Option.value writer.name ~default:"<unnamed>" in
             if writer.warn_on_drop then
               [%log warn]
-                ~metadata:[ ("pipe_name", `String my_name) ]
-                "Dropping message on pipe $pipe_name" ;
+                ~metadata:[ ("debug_repr", to_yojson writer) ]
+                "Dropping message on pipe $debug_repr" ;
             ( match Pipe.read_now writer.strict_reader.reader with
             | `Ok head ->
                 f head
@@ -294,9 +310,6 @@ module Writer = struct
     Reader0.close_downstreams strict_reader.downstreams
 
   let is_closed { writer; _ } = Pipe.is_closed writer
-
-  let pipe_name : type type_ return. ('t, type_, return) t -> string option =
-   fun writer -> writer.name
 end
 
 let create ?name ?(warn_on_drop = true) type_ =

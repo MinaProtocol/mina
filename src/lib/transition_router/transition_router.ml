@@ -25,6 +25,30 @@ type Structured_log_events.t += Starting_transition_frontier_controller
 type Structured_log_events.t += Starting_bootstrap_controller
   [@@deriving register_event { msg = "Starting bootstrap controller phase" }]
 
+module GuardedWriter = struct
+  type ('data, 'behavior, 'return) t =
+    { writer : ('data, 'behavior, 'return) Strict_pipe.Writer.t ref
+    ; mutex : Async_mutex.t
+    }
+
+  (* NOTE: If [replaced] is None, it is set to [ref replacer]. If it already
+     contains a reference, the value of [replacer] is assigned to it. This avoids
+     creating a new variable and allows the existing reference in [replaced] to be
+     used each time a thread accesses this variable.
+     We don't lock here, it's expected to be handled correct manually.
+  *)
+  let swap_writter ~(replacer : _ Strict_pipe.Writer.t ref)
+      (replaced : _ t ref option) =
+    match replaced with
+    | None ->
+        let mutex = Async_mutex.create () in
+        let result = ref { writer = replacer; mutex } in
+        result
+    | Some writer_with_mutex ->
+        !writer_with_mutex.writer := !replacer ;
+        writer_with_mutex
+end
+
 let create_buffered_pipe ?name ~f () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow (Drop_head f)))
 
@@ -42,6 +66,29 @@ let block_or_header_to_header_hashed_with_validation b_or_h =
       (With_hash.map ~f:Mina_block.header b', v)
   | `Header h ->
       Envelope.Incoming.data h
+
+let block_or_header_debug_repr :
+       [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t
+       | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
+    -> Yojson.Safe.t = function
+  | `Header { sender; received_at; _ } ->
+      `Assoc
+        [ ("type", `String "header")
+        ; ("sender", Envelope.Sender.to_yojson sender)
+        ; ( "received_at"
+          , `String
+              (Time.to_string_iso8601_basic
+                 ~zone:Core_kernel_private.Time_zone.utc received_at ) )
+        ]
+  | `Block { sender; received_at; _ } ->
+      `Assoc
+        [ ("type", `String "block")
+        ; ("sender", Envelope.Sender.to_yojson sender)
+        ; ( "received_at"
+          , `String
+              (Time.to_string_iso8601_basic
+                 ~zone:Core_kernel_private.Time_zone.utc received_at ) )
+        ]
 
 let block_or_header_to_hash
     (b_or_h :
@@ -103,8 +150,9 @@ let is_transition_for_bootstrap
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ~collected_transitions ~cache_exceptions ?transition_writer_ref ~frontier_w
-    frontier =
+    ~collected_transitions ~cache_exceptions
+    ?(transition_writer_ref : _ GuardedWriter.t ref option) ~frontier_w frontier
+    ?transaction_pool_proxy =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -121,17 +169,9 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
       ()
   in
   let transition_writer_ref =
-    (* If [transition_writer_ref] is None, it is set to
-       [ref transition_frontier_controller_writer].
-       If it already contains a reference, the value of
-       [transition_frontier_controller_writer] is assigned to it. This avoids
-       creating a new variable and allows the existing reference in
-       [transition_writer_ref] to be used each time a thread accesses this
-       variable. *)
-    Option.value_map transition_writer_ref
-      ~default:(ref transition_frontier_controller_writer) ~f:(fun r ->
-        r := transition_frontier_controller_writer ;
-        r )
+    GuardedWriter.swap_writter
+      ~replacer:(ref transition_frontier_controller_writer)
+      transition_writer_ref
   in
   let producer_transition_reader, producer_transition_writer =
     Strict_pipe.create ~name:"transition frontier: producer transition"
@@ -151,6 +191,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
       ~frontier ~get_completed_work
       ~network_transition_reader:transition_frontier_controller_reader
       ~producer_transition_reader ~clear_reader ~cache_exceptions
+      ?transaction_pool_proxy
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -167,7 +208,6 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~cache_exceptions ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
-  [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     let name = "bootstrap controller pipe" in
     create_buffered_pipe ~name
@@ -179,15 +219,13 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
           ~pipe_name:name ~logger ?valid_cb )
       ()
   in
+
   let transition_writer_ref =
-    (* The handling is the same as in the [start_transition_frontier_controller]
-       function, in order to reuse the reference already defined in
-       [transition_writer_ref]. *)
-    Option.value_map transition_writer_ref
-      ~default:(ref bootstrap_controller_writer) ~f:(fun r ->
-        r := bootstrap_controller_writer ;
-        r )
+    GuardedWriter.swap_writter
+      ~replacer:(ref bootstrap_controller_writer)
+      transition_writer_ref
   in
+
   producer_transition_writer_ref := None ;
   let f b_or_h =
     Strict_pipe.Writer.write bootstrap_controller_writer (b_or_h, `Valid_cb None) ;
@@ -210,6 +248,17 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
        ~transition_reader:bootstrap_controller_reader ~persistent_frontier
        ~persistent_root ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
+      (* WARN: CRITICAL SECTION STARTS *)
+      let () = Async_mutex.lock_sync !transition_writer_ref.mutex in
+      [%log info]
+        "Bootstrap controller returned, killing its pipe to and replace it \
+         with transition frontier's"
+        ~metadata:
+          [ ( "closed_pipe"
+            , Strict_pipe.Writer.to_yojson bootstrap_controller_writer )
+          ; ( "mutex_locked"
+            , `String (Async_mutex.repr !transition_writer_ref.mutex) )
+          ] ;
       Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
         ~context:(module Context)
@@ -217,7 +266,18 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
         ~transition_writer_ref ~frontier_w new_frontier
-      |> Fn.const () ) ;
+      |> Fn.const () ;
+      Async_mutex.unlock !transition_writer_ref.mutex ;
+      (* WARN: CRITICAL SECTION ENDS *)
+      [%log info] "Critical section replacing pipe ends"
+        ~metadata:
+          [ ( "replaced_pipe"
+            , Strict_pipe.Writer.to_yojson bootstrap_controller_writer )
+          ; ( "new_pipe"
+            , Strict_pipe.Writer.to_yojson !(!transition_writer_ref.writer) )
+          ; ( "mutex_released"
+            , `String (Async_mutex.repr !transition_writer_ref.mutex) )
+          ] ) ;
   transition_writer_ref
 
 let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
@@ -416,7 +476,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~get_completed_work ~frontier_w ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~cache_exceptions
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+    ~consensus_local_state ~catchup_mode ~notify_online ?transaction_pool_proxy
+    =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -539,7 +600,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
-        ?transition_writer_ref:None ~frontier_w frontier
+        ?transition_writer_ref:None ~frontier_w frontier ?transaction_pool_proxy
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -590,7 +651,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~get_current_frontier ~frontier_broadcast_writer:frontier_w
     ~network_transition_reader ~producer_transition_reader
     ~get_most_recent_valid_block ~most_recent_valid_block_writer
-    ~get_completed_work ~catchup_mode ~notify_online () =
+    ~get_completed_work ~catchup_mode ~notify_online ?transaction_pool_proxy ()
+    =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -670,7 +732,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~get_completed_work ~frontier_w ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~most_recent_valid_block_writer
-          ~consensus_local_state ~notify_online
+          ~consensus_local_state ~notify_online ?transaction_pool_proxy
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
 
@@ -698,10 +760,12 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
            ~f:(fun (b_or_h, `Valid_cb vc) ->
              don't_wait_for
-             @@ let%map () =
+             @@ let%bind () =
                   let header_with_hash =
                     block_or_header_to_header_hashed_with_validation b_or_h
                   in
+                  [%log info] "Received a initial valid transition $b_or_h"
+                    ~metadata:[ ("b_or_h", block_or_header_debug_repr b_or_h) ] ;
                   match get_current_frontier () with
                   | Some frontier ->
                       if
@@ -709,7 +773,26 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                           ~context:(module Context)
                           frontier header_with_hash
                       then (
-                        Strict_pipe.Writer.kill !transition_writer_ref ;
+                        (* WARN: CRITICAL SECTION STARTS *)
+                        let%bind () =
+                          Async_mutex.lock_async !transition_writer_ref.mutex
+                        in
+                        let transition_writer_raw =
+                          !(!transition_writer_ref.writer)
+                        in
+                        [%log info]
+                          "Need to start a new bootstrap controller, killing \
+                           old pipe, critical section starts"
+                          ~metadata:
+                            [ ( "closed_transition_pipe"
+                              , Strict_pipe.Writer.to_yojson
+                                  transition_writer_raw )
+                            ; ( "mutex_locked"
+                              , `String
+                                  (Async_mutex.repr !transition_writer_ref.mutex)
+                              )
+                            ] ;
+                        Strict_pipe.Writer.kill transition_writer_raw ;
                         Option.iter ~f:Strict_pipe.Writer.kill
                           !producer_transition_writer_ref ;
                         let initial_root_transition =
@@ -731,11 +814,52 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                              ~clear_reader ~transition_writer_ref
                              ~consensus_local_state ~frontier_w ~persistent_root
                              ~persistent_frontier ~initial_root_transition
-                             ~best_seen_transition:(Some b_or_h) ~catchup_mode )
+                             ~best_seen_transition:(Some b_or_h) ~catchup_mode ;
+                        Async_mutex.unlock !transition_writer_ref.mutex ;
+                        (* WARN: CRITICAL SECTION ENDS *)
+                        [%log info] "Critical section replacing close pipe ends"
+                          ~metadata:
+                            [ ( "new_pipe"
+                              , Strict_pipe.Writer.to_yojson
+                                  !(!transition_writer_ref.writer) )
+                            ; ( "mutex_released"
+                              , `String
+                                  (Async_mutex.repr !transition_writer_ref.mutex)
+                              )
+                            ] )
                       else Deferred.unit
                   | None ->
                       Deferred.unit
                 in
-                Strict_pipe.Writer.write !transition_writer_ref
-                  (b_or_h, `Valid_cb (Some vc)) ) ) ;
+                (* WARN: CRITICAL SECTION STARTS *)
+                let%map () =
+                  Async_mutex.lock_async !transition_writer_ref.mutex
+                in
+                [%log info]
+                  "Writing initial valid transition $b_or_h to pipe \
+                   $transition_pipe"
+                  ~metadata:
+                    [ ("b_or_h", block_or_header_debug_repr b_or_h)
+                    ; ( "transition_pipe"
+                      , Strict_pipe.Writer.to_yojson
+                          !(!transition_writer_ref.writer) )
+                    ; ( "mutex_locked"
+                      , `String (Async_mutex.repr !transition_writer_ref.mutex)
+                      )
+                    ] ;
+                Strict_pipe.Writer.write
+                  !(!transition_writer_ref.writer)
+                  (b_or_h, `Valid_cb (Some vc)) ;
+                Async_mutex.unlock !transition_writer_ref.mutex ;
+
+                (* WARN: CRITICAL SECTION ENDS *)
+                [%log info] "Critical section writing to $transition_pipe ends"
+                  ~metadata:
+                    [ ( "transition_pipe"
+                      , Strict_pipe.Writer.to_yojson
+                          !(!transition_writer_ref.writer) )
+                    ; ( "mutex_released"
+                      , `String (Async_mutex.repr !transition_writer_ref.mutex)
+                      )
+                    ] ) ) ;
   (verified_transition_reader, initialization_finish_signal)
