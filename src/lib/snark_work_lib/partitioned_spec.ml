@@ -58,21 +58,6 @@ module Poly = struct
         job.sok_message
     | Sub_zkapp_command { job; _ } ->
         job.sok_message
-
-  let statement : _ t -> Transaction_snark.Statement.t = function
-    | Single { job = { spec; _ }; _ } ->
-        Single_spec.Poly.statement spec
-    | Sub_zkapp_command { job = { spec; _ }; _ } ->
-        Sub_zkapp_spec.Poly.statement spec
-
-  let map_with_statement (t : _ t) ~f : _ t =
-    match t with
-    | Single { job = { spec; _ } as job; data } ->
-        let stmt = Single_spec.Poly.statement spec in
-        Single { job; data = f stmt data }
-    | Sub_zkapp_command { job = { spec; _ } as job; data } ->
-        Sub_zkapp_command
-          { job; data = f (Sub_zkapp_spec.Poly.statement spec) data }
 end
 
 [%%versioned
@@ -89,6 +74,21 @@ module Stable = struct
     [@@deriving sexp, yojson]
 
     let to_latest = Fn.id
+
+    let statement : t -> Transaction_snark.Statement.t = function
+      | Single { job = { spec; _ }; _ } ->
+          Single_spec.Poly.statement spec
+      | Sub_zkapp_command { job = { spec; _ }; _ } ->
+          Sub_zkapp_spec.Poly.statement spec
+
+    let map_with_statement (t : t) ~f : _ Poly.t =
+      match t with
+      | Single { job = { spec; _ } as job; data } ->
+          let stmt = Single_spec.Poly.statement spec in
+          Single { job; data = f stmt data }
+      | Sub_zkapp_command { job = { spec; _ } as job; data } ->
+          Sub_zkapp_command
+            { job; data = f (Sub_zkapp_spec.Poly.statement spec) data }
   end
 end]
 

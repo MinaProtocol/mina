@@ -347,7 +347,7 @@ module Impl : Intf.Worker = struct
     | Worker_state.Check | Worker_state.No_check ->
         let elapsed = Time.Span.zero in
         let result =
-          Work.Spec.Partitioned.Poly.map_with_statement
+          Work.Spec.Partitioned.Stable.Latest.map_with_statement
             ~f:(fun statement () ->
               Proof_carrying_data.
                 { proof =
