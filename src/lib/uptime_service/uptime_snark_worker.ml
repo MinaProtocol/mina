@@ -27,28 +27,7 @@ module Worker_state = struct
            let%bind (state : Prod.Worker_state.t) =
              Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
-           let spec : Work.Spec.Partitioned.Stable.Latest.t =
-             Work.Spec.Partitioned.Poly.Single
-               { job =
-                   Work.With_status.
-                     { spec = single_spec
-                     ; job_id =
-                         Work.ID.Single.{ which_one = `One; pairing_id = 0L }
-                     ; issued_since_unix_epoch =
-                         Time.(now () |> to_span_since_epoch)
-                     ; sok_message
-                     }
-               ; data = ()
-               }
-           in
-           match%bind.Deferred.Or_error Prod.perform ~state ~spec with
-           | Single { data = Proof_carrying_data.{ proof; data = elapsed }; _ }
-             ->
-               Deferred.Or_error.return (proof, elapsed)
-           | _ ->
-               Deferred.Or_error.error_string
-                 "This is a bug, submitted partitioned work of kind Single \
-                  into Snark worker, got non-Single result"
+           Prod.perform_single ~state ~single_spec ~sok_message
        end in
       (module M : S) )
 

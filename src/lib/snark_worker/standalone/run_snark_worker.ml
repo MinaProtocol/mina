@@ -33,25 +33,8 @@ module Work = Snark_work_lib
 let perform (state : Prod.Worker_state.t) ~sok_message
     ~(single_spec : Work.Spec.Single.Stable.Latest.t) =
   let open Deferred.Or_error.Let_syntax in
-  let partitioned_spec =
-    Work.Spec.Partitioned.Poly.Single
-      { job =
-          Work.With_status.
-            { spec = single_spec
-            ; job_id = Work.ID.Single.{ which_one = `One; pairing_id = 0L }
-            ; issued_since_unix_epoch = Time.(now () |> to_span_since_epoch)
-            ; sok_message
-            }
-      ; data = ()
-      }
-  in
-  match%bind Prod.perform ~state ~spec:partitioned_spec with
-  | Single { data = Proof_carrying_data.{ proof; _ }; _ } ->
-      Deferred.Or_error.return proof
-  | _ ->
-      Deferred.Or_error.error_string
-        "This is a bug, submitted one work with single spec into Snark worker, \
-         got non-single result"
+  let%map proof, _ = Prod.perform_single ~state ~single_spec ~sok_message in
+  proof
 
 let command =
   let open Command.Let_syntax in
