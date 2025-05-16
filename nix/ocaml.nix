@@ -496,5 +496,5 @@ let
 
       inherit dune-description base-libs external-libs;
     };
-in scope.overrideScope'
+in scope.overrideScope
 (pkgs.lib.composeManyExtensions ([ overlay granularOverlay ]))
