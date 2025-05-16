@@ -227,12 +227,53 @@ module Impl : Intf.Worker = struct
     | Merge (_, proof1, proof2) ->
         M.merge ~sok_digest proof1 proof2
 
-  let perform_single_non_zkapp_cached ~(logger : Logger.t) ~(cache : Cache.t)
+  let perform_single_internal ~(logger : Logger.t) ~(cache : Cache.t)
       ~proof_cache_db ~(m : (module Worker_state.S)) ~sok_digest
       ~partitioned_spec ~(single_spec : Work.Spec.Single.Stable.Latest.t) () =
     let statement = Work.Spec.Single.Poly.statement single_spec in
     cache_and_time ~logger ~cache ~statement ~partitioned_spec
       (perform_single_raw ~m ~logger ~proof_cache_db ~single_spec ~sok_digest)
+
+  let perform_single
+      ~state:
+        ({ m_with_proof_level; cache; proof_cache_db; logger } : Worker_state.t)
+      ~(single_spec : Work.Spec.Single.Stable.Latest.t)
+      ~(sok_message : Mina_base.Sok_message.t) =
+    let sok_digest = Sok_message.digest sok_message in
+
+    match m_with_proof_level with
+    | Worker_state.Full ((module M) as m) ->
+        let partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t =
+          Work.Spec.Partitioned.Poly.Single
+            { job =
+                Work.With_status.
+                  { spec = single_spec
+                  ; job_id =
+                      Work.ID.Single.{ which_one = `One; pairing_id = 0L }
+                  ; issued_since_unix_epoch =
+                      Time.(now () |> to_span_since_epoch)
+                  ; sok_message
+                  }
+            ; data = ()
+            }
+        in
+        perform_single_internal
+          ~(logger : Logger.t)
+          ~(cache : Cache.t)
+          ~proof_cache_db
+          ~(m : (module Worker_state.S))
+          ~sok_digest ~partitioned_spec
+          ~(single_spec : Work.Spec.Single.Stable.Latest.t)
+          ()
+    | Worker_state.Check | Worker_state.No_check ->
+        (* NOTE: use a dummy proof *)
+        let statement = Work.Spec.Single.Poly.statement single_spec in
+        let proof =
+          Transaction_snark.create
+            ~statement:{ statement with sok_digest }
+            ~proof:(Lazy.force Proof.transaction_dummy)
+        in
+        Deferred.Or_error.return (proof, Time.Span.zero)
 
   let perform
       ~state:
@@ -250,7 +291,7 @@ module Impl : Intf.Worker = struct
         | Work.Spec.Partitioned.Poly.Single
             { job = { spec = single_spec; _ } as job; data = () } ->
             let%map proof, elapsed =
-              perform_single_non_zkapp_cached ~logger ~cache ~m ~sok_digest
+              perform_single_internal ~logger ~cache ~m ~sok_digest
                 ~proof_cache_db ~single_spec ~partitioned_spec ()
             in
 

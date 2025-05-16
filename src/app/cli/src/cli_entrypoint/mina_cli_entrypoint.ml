@@ -1748,23 +1748,10 @@ let internal_commands logger ~itn_features =
               let single_spec =
                 [%of_sexp: Snark_work_lib.Spec.Single.Stable.Latest.t] sexp
               in
-
-              let spec =
-                Snark_work_lib.Spec.Partitioned.Poly.Single
-                  { job =
-                      Snark_work_lib.With_status.
-                        { spec = single_spec
-                        ; job_id =
-                            Snark_work_lib.ID.Single.
-                              { which_one = `One; pairing_id = 0L }
-                        ; issued_since_unix_epoch =
-                            Time.(now () |> to_span_since_epoch)
-                        ; sok_message
-                        }
-                  ; data = ()
-                  }
-              in
-              match%map Snark_worker.Worker.Prod.perform ~state ~spec with
+              match%map
+                Snark_worker.Worker.Prod.perform_single ~state ~single_spec
+                  ~sok_message
+              with
               | Ok _ ->
                   [%log info] "Successfully worked"
               | Error err ->

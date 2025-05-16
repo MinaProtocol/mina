@@ -15,15 +15,8 @@ module type Worker = sig
   end
 
   (**
-     [perform ~state ~spec ~sok_digest] returns a [One_or_two.t] of triple
-     ([proof], [time_elapsed], [tag]) following the specification [spec] with
-     digest [sok_digest]. The proof is created by a worker with state [state].
-
-     The [tag] is used to indicate what kind of specification is provided, and
-     is used when logging metrics. ['a One_or_two.t] is leaky abstraction due to
-     the fact that a Work Selector issue 1 or 2 specs, and that has been encoded
-     in old RPCs in this library. And there's no way to get rid of them without
-     sacrificing compatibility.
+     [perform ~state ~spec] returns a Work.Result.Partitioned.t following the
+     specification [spec].The proof is created by a worker with state [state].
 
      We're using Stable.Latest type as we would be dealing with the internal of
      the specs/proofs, and input/output of all 3 RPCs will have to go across the
@@ -34,4 +27,17 @@ module type Worker = sig
        state:Worker_state.t
     -> spec:Work.Spec.Partitioned.Stable.Latest.t
     -> Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t
+
+  (**
+     [perform_single ~state ~single_spec ~sok_message] is retained so we can
+     still support old single spce, this is needed for components like
+     uptime_snark_worker
+  *)
+
+  val perform_single :
+       state:Worker_state.t
+    -> single_spec:Work.Spec.Single.Stable.V1.t
+    -> sok_message:Mina_base.Sok_message.t
+    -> (Ledger_proof.Stable.Latest.t * Core_kernel.Time.Span.t)
+       Deferred.Or_error.t
 end
