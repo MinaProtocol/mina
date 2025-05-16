@@ -10,7 +10,7 @@ type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
 
 let invalid_to_error = Common.invalid_to_error
 
-type ledger_proof = Ledger_proof.Prod.t
+type ledger_proof = Ledger_proof.t
 
 module Processor = struct
   let verify_commands
