@@ -43,6 +43,29 @@ let block_or_header_to_header_hashed_with_validation b_or_h =
   | `Header h ->
       Envelope.Incoming.data h
 
+let block_or_header_debug_repr :
+       [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t
+       | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
+    -> Yojson.Safe.t = function
+  | `Header { sender; received_at; _ } ->
+      `Assoc
+        [ ("type", `String "header")
+        ; ("sender", Envelope.Sender.to_yojson sender)
+        ; ( "received_at"
+          , `String
+              (Time.to_string_iso8601_basic
+                 ~zone:Core_kernel_private.Time_zone.utc received_at ) )
+        ]
+  | `Block { sender; received_at; _ } ->
+      `Assoc
+        [ ("type", `String "block")
+        ; ("sender", Envelope.Sender.to_yojson sender)
+        ; ( "received_at"
+          , `String
+              (Time.to_string_iso8601_basic
+                 ~zone:Core_kernel_private.Time_zone.utc received_at ) )
+        ]
+
 let block_or_header_to_hash
     (b_or_h :
       [ `Block of
@@ -167,7 +190,6 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~cache_exceptions ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
-  [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     let name = "bootstrap controller pipe" in
     create_buffered_pipe ~name
@@ -210,6 +232,13 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
        ~transition_reader:bootstrap_controller_reader ~persistent_frontier
        ~persistent_root ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
+      [%log info]
+        "Bootstrap controller returned, killing its pipe to and replace it \
+         with transition frontier's"
+        ~metadata:
+          [ ( "closed_pipe"
+            , Strict_pipe.Writer.to_yojson bootstrap_controller_writer )
+          ] ;
       Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
         ~context:(module Context)
@@ -702,6 +731,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   let header_with_hash =
                     block_or_header_to_header_hashed_with_validation b_or_h
                   in
+                  [%log info] "Received a initial valid transition $b_or_h"
+                    ~metadata:[ ("b_or_h", block_or_header_debug_repr b_or_h) ] ;
                   match get_current_frontier () with
                   | Some frontier ->
                       if
@@ -709,6 +740,14 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                           ~context:(module Context)
                           frontier header_with_hash
                       then (
+                        [%log info]
+                          "Need to start a new bootstrap controller, killing \
+                           old pipe"
+                          ~metadata:
+                            [ ( "closed_transition_pipe"
+                              , Strict_pipe.Writer.to_yojson
+                                  !transition_writer_ref )
+                            ] ;
                         Strict_pipe.Writer.kill !transition_writer_ref ;
                         Option.iter ~f:Strict_pipe.Writer.kill
                           !producer_transition_writer_ref ;
@@ -736,6 +775,13 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   | None ->
                       Deferred.unit
                 in
+                [%log info]
+                  "Writing initial valid transition $b_or_h to pipe $pipe"
+                  ~metadata:
+                    [ ("b_or_h", block_or_header_debug_repr b_or_h)
+                    ; ( "pipe"
+                      , Strict_pipe.Writer.to_yojson !transition_writer_ref )
+                    ] ;
                 Strict_pipe.Writer.write !transition_writer_ref
                   (b_or_h, `Valid_cb (Some vc)) ) ) ;
   (verified_transition_reader, initialization_finish_signal)
