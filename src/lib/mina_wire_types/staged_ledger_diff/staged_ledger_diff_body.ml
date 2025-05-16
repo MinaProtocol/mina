@@ -2,19 +2,19 @@ open Utils
 
 module Types = struct
   module type S = sig
-    module V1 : S0
+    module V2 : S0
   end
 end
 
 module type Concrete = sig
-  module V1 : sig
-    type t = { staged_ledger_diff : Staged_ledger_diff_diff.V2.t }
+  module V2 : sig
+    type t = { staged_ledger_diff : Staged_ledger_diff_diff.V3.t }
   end
 end
 
 module M = struct
-  module V1 = struct
-    type t = { staged_ledger_diff : Staged_ledger_diff_diff.V2.t }
+  module V2 = struct
+    type t = { staged_ledger_diff : Staged_ledger_diff_diff.V3.t }
   end
 end
 

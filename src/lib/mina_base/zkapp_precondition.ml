@@ -453,6 +453,22 @@ end
 module Account = struct
   [%%versioned
   module Stable = struct
+    module V3 = struct
+      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V3.t =
+        { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
+        ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
+        ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
+        ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
+        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V2.t
+        ; action_state : F.Stable.V1.t Eq_data.Stable.V1.t
+        ; proved_state : bool Eq_data.Stable.V1.t
+        ; is_new : bool Eq_data.Stable.V1.t
+        }
+      [@@deriving annot, hlist, sexp, equal, yojson, hash, compare, fields]
+
+      let to_latest = Fn.id
+    end
+
     module V2 = struct
       type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
@@ -479,7 +495,7 @@ module Account = struct
     let%bind state =
       let%bind fields =
         let field_gen = Snark_params.Tick.Field.gen in
-        Quickcheck.Generator.list_with_length 8 (Or_ignore.gen field_gen)
+        Quickcheck.Generator.list_with_length 32 (Or_ignore.gen field_gen)
       in
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
@@ -1498,9 +1514,9 @@ module Other = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type t =
-        ( Account.Stable.V2.t
+        ( Account.Stable.V3.t
         , Account_state.Stable.V1.t Transition.Stable.V1.t
         , F.Stable.V1.t Hash.Stable.V1.t )
         Poly.Stable.V1.t
@@ -1573,11 +1589,11 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
-      ( Account.Stable.V2.t
+      ( Account.Stable.V3.t
       , Protocol_state.Stable.V1.t
-      , Other.Stable.V2.t
+      , Other.Stable.V3.t
       , Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, equal, yojson, hash, compare]

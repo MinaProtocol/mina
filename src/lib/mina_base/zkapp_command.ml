@@ -6,7 +6,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type 'account_updates t =
-            'account_updates Mina_wire_types.Mina_base.Zkapp_command.V1.T.t =
+            'account_updates Mina_wire_types.Mina_base.Zkapp_command.V2.T.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates : 'account_updates
         ; memo : Signed_command_memo.Stable.V1.t
@@ -21,11 +21,18 @@ end
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = Account_update.Graphql_repr.Stable.V2.t list Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = Account_update.Graphql_repr.Stable.V1.t list Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
-      let to_latest = Fn.id
+      let to_latest _ = failwith "TODO"
     end
   end]
 end
@@ -34,6 +41,13 @@ module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = Account_update.Simple.Stable.V2.t list Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t = Account_update.Simple.Stable.V1.t list Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
@@ -76,9 +90,9 @@ module T = struct
        add hash_zkapp_command_vn for that version
     *)
 
-    module V1 = struct
+    module V2 = struct
       type t =
-        (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
+        (Account_update.Stable.V2.t, unit, unit) Call_forest.Stable.V1.t
         Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
@@ -136,6 +150,21 @@ module T = struct
                 { t with
                   account_updates = Call_forest.mask t.account_updates shape'
                 } ) )
+    end
+
+    module V1 = struct
+      type t =
+        (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
+        Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest (t : t) : Latest.t =
+        { fee_payer = t.fee_payer
+        ; memo = t.memo
+        ; account_updates =
+            Call_forest.map ~f:Account_update.Stable.V1.to_latest
+              t.account_updates
+        }
     end
   end]
 end
@@ -929,7 +958,7 @@ let zkapp_command_to_json x =
 let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
-let dummy =
+let dummy : T.t lazy_t =
   lazy
     (let account_update =
        { Account_update.Poly.body = Account_update.Body.dummy

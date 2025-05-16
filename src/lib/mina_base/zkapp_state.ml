@@ -1,6 +1,6 @@
 open Core_kernel
 open Pickles_types
-module Max_state_size = Nat.N8
+module Max_state_size = Nat.N32
 
 module V = struct
   (* Think about versioning here! These vector types *will* change
@@ -13,18 +13,23 @@ module V = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V2 = struct
+      type 'a t = 'a Vector.Vector_32.Stable.V1.t
+      [@@deriving compare, yojson, sexp, hash, equal]
+    end
+
     module V1 = struct
       type 'a t = 'a Vector.Vector_8.Stable.V1.t
       [@@deriving compare, yojson, sexp, hash, equal]
     end
   end]
 
-  type 'a t = 'a Vector.Vector_8.t
+  type 'a t = 'a Vector.Vector_32.t
   [@@deriving compare, yojson, sexp, hash, equal]
 
   let map = Vector.map
 
-  let of_list_exn = Vector.Vector_8.of_list_exn
+  let of_list_exn = Vector.Vector_32.of_list_exn
 
   let to_list = Vector.to_list
 end
@@ -41,6 +46,13 @@ module Value = struct
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
+
+    module V2 = struct
+      type t = Zkapp_basic.F.Stable.V1.t V.Stable.V2.t
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
 
     module V1 = struct
       type t = Zkapp_basic.F.Stable.V1.t V.Stable.V1.t

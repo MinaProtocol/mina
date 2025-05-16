@@ -296,7 +296,7 @@ let update_state =
        and app_state =
          Param.flag "--zkapp-state"
            ~doc:
-             "String(hash)|Integer(field element) a list of 8 elements that \
+             "String(hash)|Integer(field element) a list of 32 elements that \
               represent the zkApp state (Use empty string for no-op)"
            Param.(listed string)
        in
