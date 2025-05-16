@@ -689,7 +689,7 @@ module Update = struct
       (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t = Mina_wire_types.Mina_base.Account_update.Update.V2.t =
         { app_state :
-            F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V1.t
+            F.Stable.V1.t Set_or_keep.Stable.V1.t Zkapp_state.V.Stable.V2.t
         ; delegate : Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
         ; verification_key :
             Verification_key_wire.Stable.V1.t Set_or_keep.Stable.V1.t

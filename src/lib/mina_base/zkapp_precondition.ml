@@ -459,7 +459,7 @@ module Account = struct
         ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
         ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V2.t
         ; action_state : F.Stable.V1.t Eq_data.Stable.V1.t
         ; proved_state : bool Eq_data.Stable.V1.t
         ; is_new : bool Eq_data.Stable.V1.t

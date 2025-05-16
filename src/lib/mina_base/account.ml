@@ -368,7 +368,7 @@ module Stable = struct
          ; voting_for
          ; timing
          ; permissions
-         ; zkapp = (zkappv2 : Zkapp_account.Stable.V2.t option)
+         ; zkapp
          } ->
       { public_key
       ; token_id
@@ -380,9 +380,7 @@ module Stable = struct
       ; voting_for
       ; timing
       ; permissions
-      ; zkapp =
-          (zkappv2 : Zkapp_account.Stable.V3.t option)
-          (* TODO why does this work? *)
+      ; zkapp = Option.map ~f:Zkapp_account.Stable.V2.to_latest zkapp
       }
 
     let from_v3 : V3.t -> t Or_error.t =
@@ -409,7 +407,7 @@ module Stable = struct
         ; voting_for
         ; timing
         ; permissions
-        ; zkapp (* TODO same here *)
+        ; zkapp = Option.map ~f:Zkapp_account.Stable.V2.from_v3 zkapp
         }
 
     let public_key (t : t) : key = t.public_key

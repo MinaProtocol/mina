@@ -252,7 +252,9 @@ module Stable = struct
       Poly.Stable.V2.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
-    let to_latest = Fn.id
+    let to_latest = fun _ -> failwith "TODO"
+
+    let from_v3 = fun _ -> failwith "TODO"
   end
 end]
 
