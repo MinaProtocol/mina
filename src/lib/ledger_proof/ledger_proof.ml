@@ -3,6 +3,26 @@ open Mina_base
 
 module type S = Ledger_proof_intf.S
 
+module Poly = struct
+  type ( 'ledger_hash
+       , 'amount
+       , 'pending_coinbase
+       , 'fee_excess
+       , 'sok_digest
+       , 'local_state
+       , 'proof )
+       t =
+    ( ( 'ledger_hash
+      , 'amount
+      , 'pending_coinbase
+      , 'fee_excess
+      , 'sok_digest
+      , 'local_state )
+      Mina_state.Snarked_ledger_state.Poly.Stable.V2.t
+    , 'proof )
+    Proof_carrying_data.t
+end
+
 [%%versioned
 module Stable = struct
   module V2 = struct

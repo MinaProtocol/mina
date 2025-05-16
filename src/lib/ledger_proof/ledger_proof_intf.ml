@@ -2,6 +2,26 @@ open Core_kernel
 open Mina_base
 
 module type S = sig
+  module Poly : sig
+    type ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'sok_digest
+         , 'local_state
+         , 'proof )
+         t =
+      ( ( 'ledger_hash
+        , 'amount
+        , 'pending_coinbase
+        , 'fee_excess
+        , 'sok_digest
+        , 'local_state )
+        Mina_state.Snarked_ledger_state.Poly.Stable.V2.t
+      , 'proof )
+      Proof_carrying_data.t
+  end
+
   type t [@@deriving compare, equal, sexp, yojson, hash]
 
   [%%versioned:
