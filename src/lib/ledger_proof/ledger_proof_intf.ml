@@ -4,60 +4,6 @@ open Mina_base
 module type S = sig
   type t [@@deriving compare, equal, sexp, yojson, hash]
 
-  module Poly : sig
-    type ( 'ledger_hash
-         , 'amount
-         , 'pending_coinbase
-         , 'fee_excess
-         , 'sok_digest
-         , 'local_state
-         , 'proof )
-         t =
-      ( ( 'ledger_hash
-        , 'amount
-        , 'pending_coinbase
-        , 'fee_excess
-        , 'sok_digest
-        , 'local_state )
-        Mina_state.Snarked_ledger_state.Poly.Stable.V2.t
-      , 'proof )
-      Proof_carrying_data.t
-
-    val statement :
-         ( 'ledger_hash
-         , 'amount
-         , 'pending_coinbase
-         , 'fee_excess
-         , 'sok_digest
-         , 'local_state
-         , 'proof )
-         t
-      -> ( 'ledger_hash
-         , 'amount
-         , 'pending_coinbase
-         , 'fee_excess
-         , unit
-         , 'local_state )
-         Mina_state.Snarked_ledger_state.Poly.t
-
-    val sok_digest : (_, _, _, _, 'sok_digest, _, _) t -> 'sok_digest
-
-    val underlying_proof : (_, _, _, _, _, _, 'proof) t -> 'proof
-
-    val create :
-         statement:Mina_state.Snarked_ledger_state.t
-      -> sok_digest:'sok_digest
-      -> proof:'proof
-      -> ( Frozen_ledger_hash.t
-         , (Currency.Amount.t, Sgn.t) Currency.Signed_poly.t
-         , Pending_coinbase.Stack_versioned.t
-         , Fee_excess.t
-         , 'sok_digest
-         , Mina_state.Local_state.t
-         , 'proof )
-         t
-  end
-
   [%%versioned:
   module Stable : sig
     [@@@no_toplevel_latest_type]
