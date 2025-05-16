@@ -300,7 +300,7 @@ module Impl : Intf.Worker = struct
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
             { job =
                 { spec =
-                    Work.Spec.Sub_zkapp.Poly.Segment
+                    Work.Spec.Sub_zkapp.Stable.Latest.Segment
                       { statement; witness; spec = segment_spec; _ } as
                     sub_zkapp_spec
                 ; _
@@ -313,7 +313,7 @@ module Impl : Intf.Worker = struct
             in
 
             let statement_without_sok =
-              Work.Spec.Sub_zkapp.Poly.statement sub_zkapp_spec
+              Work.Spec.Sub_zkapp.Stable.Latest.statement sub_zkapp_spec
             in
 
             let%map proof, elapsed =
@@ -328,13 +328,14 @@ module Impl : Intf.Worker = struct
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
             { job =
                 { spec =
-                    Work.Spec.Sub_zkapp.Poly.Merge { proof1; proof2 } as spec
+                    Work.Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
+                    as spec
                 ; _
                 } as job
             ; data = ()
             } ->
             let statement_without_sok =
-              Work.Spec.Sub_zkapp.Poly.statement spec
+              Work.Spec.Sub_zkapp.Stable.Latest.statement spec
             in
 
             let%map proof, elapsed =

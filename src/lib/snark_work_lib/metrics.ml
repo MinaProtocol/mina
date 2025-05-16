@@ -98,7 +98,7 @@ let emit_proof_metrics ~(result : Partitioned_result.Stable.Latest.t) =
   | Partitioned_spec.Poly.Single { job; data; _ } ->
       `One (collect_single ~single_spec:job.spec ~data)
   | Partitioned_spec.Poly.Sub_zkapp_command
-      { job = { spec = Sub_zkapp_spec.Poly.Segment _; _ }
+      { job = { spec = Sub_zkapp_spec.Stable.Latest.Segment _; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
       ; _
       } ->
@@ -117,7 +117,7 @@ let emit_proof_metrics ~(result : Partitioned_result.Stable.Latest.t) =
         ~name:"snark_worker_sub_zkapp_command_segment_time" elapsed ;
       `One (Sub_zkapp_command { kind = `Segment; elapsed })
   | Partitioned_spec.Poly.Sub_zkapp_command
-      { job = { spec = Sub_zkapp_spec.Poly.Merge _; _ }
+      { job = { spec = Sub_zkapp_spec.Stable.Latest.Merge _; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
       ; _
       } ->

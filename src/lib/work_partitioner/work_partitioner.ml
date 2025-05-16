@@ -140,8 +140,7 @@ and convert_single_work_from_selector ~(partitioner : t) ~single_spec
               let unscheduled_segments =
                 all
                 |> List.map ~f:(fun (witness, spec, statement) ->
-                       Work.Spec.Sub_zkapp.Poly.Segment
-                         { statement; witness; spec } )
+                       Work.Spec.Sub_zkapp.Segment { statement; witness; spec } )
                 |> Queue.of_list
               in
               let pending_mergable_proofs = Deque.create () in

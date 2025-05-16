@@ -4,7 +4,7 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('witness, 'zkapp_command_segment_witness, 'ledger_proof, 'data) t =
+      type ('witness, 'ledger_proof, 'sub_zkapp_spec, 'data) t =
         | Single of
             { job :
                 ( ('witness, 'ledger_proof) Single_spec.Poly.Stable.V2.t
@@ -14,9 +14,7 @@ module Poly = struct
             }
         | Sub_zkapp_command of
             { job :
-                ( ( 'zkapp_command_segment_witness
-                  , 'ledger_proof )
-                  Sub_zkapp_spec.Poly.Stable.V1.t
+                ( 'sub_zkapp_spec
                 , Id.Sub_zkapp.Stable.V1.t )
                 With_status.Stable.V1.t
             ; data : 'data
@@ -31,8 +29,7 @@ module Poly = struct
     | Sub_zkapp_command { job; _ } ->
         Sub_zkapp_command { job; data = () }
 
-  let map ~f_witness ~f_zkapp_command_segment_witness ~f_proof ~f_data =
-    function
+  let map ~f_witness ~f_subzkapp_spec ~f_proof ~f_data = function
     | Single { job; data } ->
         Single
           { job =
@@ -44,12 +41,7 @@ module Poly = struct
           }
     | Sub_zkapp_command { job; data } ->
         Sub_zkapp_command
-          { job =
-              With_status.map
-                ~f_spec:
-                  (Sub_zkapp_spec.Poly.map
-                     ~f_witness:f_zkapp_command_segment_witness ~f_proof )
-                job
+          { job = With_status.map ~f_spec:f_subzkapp_spec job
           ; data = f_data data
           }
 
@@ -67,8 +59,8 @@ module Stable = struct
   module V1 = struct
     type t =
       ( Transaction_witness.Stable.V2.t
-      , Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
       , Ledger_proof.Stable.V2.t
+      , Sub_zkapp_spec.Stable.V1.t
       , unit )
       Poly.Stable.V1.t
     [@@deriving sexp, yojson]
@@ -79,7 +71,7 @@ module Stable = struct
       | Single { job = { spec; _ }; _ } ->
           Single_spec.Poly.statement spec
       | Sub_zkapp_command { job = { spec; _ }; _ } ->
-          Sub_zkapp_spec.Poly.statement spec
+          Sub_zkapp_spec.Stable.Latest.statement spec
 
     let map_with_statement (t : t) ~f : _ Poly.t =
       match t with
@@ -88,16 +80,12 @@ module Stable = struct
           Single { job; data = f stmt data }
       | Sub_zkapp_command { job = { spec; _ } as job; data } ->
           Sub_zkapp_command
-            { job; data = f (Sub_zkapp_spec.Poly.statement spec) data }
+            { job; data = f (Sub_zkapp_spec.Stable.Latest.statement spec) data }
   end
 end]
 
 type t =
-  ( Transaction_witness.t
-  , Transaction_snark.Zkapp_command_segment.Witness.t
-  , Ledger_proof.Cached.t
-  , unit )
-  Poly.t
+  (Transaction_witness.t, Ledger_proof.Cached.t, Sub_zkapp_spec.t, unit) Poly.t
 
 let read_all_proofs_from_disk : t -> Stable.Latest.t = function
   | Single { job; data } ->
