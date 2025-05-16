@@ -4,7 +4,7 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
-let Network = ../Constants/Network.dhall
+let BuildFlags = ../Constants/BuildFlags.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
@@ -20,8 +20,9 @@ in  { step =
                     , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
                     ]
                     "./src/test/archive/sample_db/archive_db.sql"
-                    Artifacts.Type.FunctionalTestSuite
-                    (None Network.Type)
+                    "gcr.io/o1labs-192920/${Artifacts.dockerName
+                                              Artifacts.Type.FunctionalTestSuite}:\\\$MINA_DOCKER_TAG-${BuildFlags.lowerName
+                                                                                                          BuildFlags.Type.Instrumented}"
                     "./scripts/patch-archive-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Patch Archive test"

@@ -53,7 +53,7 @@ let Spec =
           , genesis_timestamp = Some "2024-04-07T11:45:00Z"
           , config_json_gz_url =
               "https://storage.googleapis.com/o1labs-gitops-infrastructure/devnet/devnet-state-dump-3NK4eDgbkCjKj9fFUXVkrJXsfpfXzJySoAvrFJVCropPW7LLF14F-676026c4d4d2c18a76b357d6422a06f932c3ef4667a8fd88717f68b53fd6b2d7.json.gz"
-          , profile = Profiles.Type.Standard
+          , profile = Profiles.Type.Devnet
           , suffix = "hardfork"
           }
       }
@@ -103,7 +103,7 @@ let pipeline
                 , deps =
                   [ { name = pipelineName, key = generateLedgersJobKey } ]
                 , service = Artifacts.Type.Daemon
-                , network = network_name
+                , network = spec.network
                 , deb_codename = debVersion
                 , deb_profile = profile
                 , deb_repo = DebianRepo.Type.Local
@@ -207,7 +207,7 @@ let pipeline
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , service = Artifacts.Type.Archive
-                    , network = network_name
+                    , network = spec.network
                     , deb_codename = debVersion
                     , deb_profile = profile
                     , deb_repo = DebianRepo.Type.Local
@@ -217,7 +217,7 @@ let pipeline
                     , deps =
                       [ { name = pipelineName, key = generateLedgersJobKey } ]
                     , service = Artifacts.Type.Rosetta
-                    , network = network_name
+                    , network = spec.network
                     , deb_repo = DebianRepo.Type.Local
                     , deb_codename = debVersion
                     }
