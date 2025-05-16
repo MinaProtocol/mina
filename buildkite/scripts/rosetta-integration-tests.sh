@@ -265,7 +265,7 @@ rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 if [[ "$MODE" == "full" ]]; then
 
   echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
-  rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+  rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE} --verbose
 
   # wait until block height 11 is reached before starting check:data
   # so it gives enough time to vest the time-vesting accounts

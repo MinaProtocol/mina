@@ -88,6 +88,7 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
+      , S.strictlyStart (S.contains "dockerfiles")
       , S.exactly
           "buildkite/scripts/version-linter-patch-missing-type-shapes"
           "sh"
