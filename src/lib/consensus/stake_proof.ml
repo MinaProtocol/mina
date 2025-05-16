@@ -18,6 +18,19 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  module V2 = struct
+    type t =
+      { delegator : Account.Index.Stable.V1.t
+      ; delegator_pk : Public_key.Compressed.Stable.V1.t
+      ; coinbase_receiver_pk : Public_key.Compressed.Stable.V1.t
+      ; ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; producer_private_key : Private_key.Stable.V1.t
+      ; producer_public_key : Public_key.Stable.V1.t
+      }
+
+    let to_latest = fun _ -> failwith "TODO"
+  end
 end]
 
 (* This is only the data that is necessary for creating the
