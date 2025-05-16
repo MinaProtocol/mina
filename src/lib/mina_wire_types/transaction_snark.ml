@@ -1,8 +1,14 @@
 open Utils
+open Mina_state
 
 module Types = struct
   module type S = sig
-    module V2 : S0
+    module V2 : sig
+      type t =
+        ( Snarked_ledger_state.With_sok.V2.t
+        , Pickles.Proof.Proofs_verified_2.V2.t )
+        Proof_carrying_data.V1.t
+    end
   end
 end
 
