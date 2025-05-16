@@ -1,3 +1,6 @@
+(* WARN:
+   This file would be rewritten finally
+*)
 (*
    This file tracks the Work distributed by Work_selector, hence the name.
    A Work_selector is responsible for selecting works from a work pool, and send
