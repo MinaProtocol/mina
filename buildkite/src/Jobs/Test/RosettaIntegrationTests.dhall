@@ -52,7 +52,9 @@ in  Pipeline.build
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
                   "./src/test/archive/sample_db/archive_db.sql"
-                  "gcr.io/o1labs-192920/${Artifacts.dockerName Artifacts.Type.Rosetta}:\\\$MINA_DOCKER_TAG-${Network.lowerName network}"
+                  "gcr.io/o1labs-192920/${Artifacts.dockerName
+                                            Artifacts.Type.Rosetta}:\\\$MINA_DOCKER_TAG-${Network.lowerName
+                                                                                            network}"
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{
