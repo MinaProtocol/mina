@@ -10,7 +10,7 @@ type t =
   ; blockchain_verification_key : Pickles.Verification_key.t
   ; transaction_verification_key : Pickles.Verification_key.t
   ; verify_transaction_snarks :
-         (Ledger_proof.Prod.t * Mina_base.Sok_message.t) list
+         (Ledger_proof.t * Mina_base.Sok_message.t) list
       -> unit Or_error.t Or_error.t Deferred.t
   }
 
