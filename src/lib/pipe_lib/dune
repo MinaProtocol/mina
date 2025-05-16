@@ -1,7 +1,5 @@
 (library
  (name pipe_lib)
- (inline_tests
-  (flags -verbose -show-counts))
  (public_name pipe_lib)
  (libraries
   ;; opam libraries
@@ -9,7 +7,6 @@
   core_kernel
   async_kernel
   core
-  ppx_inline_test.config
   ;; local libraries
   run_in_thread
   logger)
