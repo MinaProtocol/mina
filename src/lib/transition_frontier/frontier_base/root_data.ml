@@ -21,7 +21,7 @@ module Common = struct
         ; pending_coinbase : Pending_coinbase.Stable.V2.t
         }
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
     end
   end]
 
@@ -158,7 +158,7 @@ module Minimal = struct
 
       let of_limited ~common hash = { hash; common }
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
 
       let common t = t.common
 

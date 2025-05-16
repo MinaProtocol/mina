@@ -32,7 +32,7 @@ module Graphql_repr = struct
       type t = Account_update.Graphql_repr.Stable.V1.t list Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
     end
   end]
 end

@@ -76,7 +76,7 @@ module Zkapp_command_applied = struct
         }
       [@@deriving sexp, to_yojson]
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
     end
   end]
 
@@ -125,7 +125,7 @@ module Command_applied = struct
         | Zkapp_command of Zkapp_command_applied.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
     end
   end]
 
@@ -224,7 +224,7 @@ end = struct
         | Coinbase of Coinbase_applied.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
     end
   end]
 
@@ -267,7 +267,7 @@ module Stable = struct
       { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V2.t }
     [@@deriving sexp, to_yojson]
 
-    let to_latest = fun _ -> failwith "TODO"
+    let to_latest _ = failwith "TODO"
   end
 end]
 

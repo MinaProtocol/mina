@@ -233,7 +233,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
           [@@deriving sexp]
 
-          let to_latest = fun _ -> failwith "TODO"
+          let to_latest _ = failwith "TODO"
         end
       end]
 

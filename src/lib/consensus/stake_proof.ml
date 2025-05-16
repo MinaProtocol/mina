@@ -29,7 +29,7 @@ module Stable = struct
       ; producer_public_key : Public_key.Stable.V1.t
       }
 
-    let to_latest = fun _ -> failwith "TODO"
+    let to_latest _ = failwith "TODO"
   end
 end]
 

@@ -71,26 +71,33 @@ module Answer = struct
         Syncable_ledger.Answer.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest (t : t) : V4.t = Syncable_ledger.Answer.Stable.V2.(
-        match t with
-        | Child_hashes_are h -> Child_hashes_are h
-        | Num_accounts (n,h) -> Num_accounts (n,h)
-        | Contents_are l -> Contents_are (List.map ~f:Account.Stable.V2.to_latest l)
-        )
+      let to_latest (t : t) : V4.t =
+        Syncable_ledger.Answer.Stable.V2.(
+          match t with
+          | Child_hashes_are h ->
+              Child_hashes_are h
+          | Num_accounts (n, h) ->
+              Num_accounts (n, h)
+          | Contents_are l ->
+              Contents_are (List.map ~f:Account.Stable.V2.to_latest l))
 
       let from_v4 : V4.t -> t Or_error.t =
-       fun x -> Or_error.(Syncable_ledger.Answer.Stable.V2.(
+       fun x ->
+        Or_error.(
+          Syncable_ledger.Answer.Stable.V2.(
             match x with
-            | Child_hashes_are h -> return (Child_hashes_are h)
-            | Num_accounts (n,h) -> return (Num_accounts (n,h))
+            | Child_hashes_are h ->
+                return (Child_hashes_are h)
+            | Num_accounts (n, h) ->
+                return (Num_accounts (n, h))
             | Contents_are l ->
-              (List.fold_right l
-                ~f:(fun (x : Account.Stable.V3.t) (ys : Account.Stable.V2.t list Or_error.t) ->
-                    (Account.Stable.V2.from_v3 x) >>= (fun x -> Or_error.map ~f:(List.cons x) ys)
-                  )
-                ~init:(return []))
-                  >>= (fun l -> return (Contents_are l))
-          ))
+                List.fold_right l
+                  ~f:(fun (x : Account.Stable.V3.t)
+                          (ys : Account.Stable.V2.t list Or_error.t) ->
+                    Account.Stable.V2.from_v3 x
+                    >>= fun x -> Or_error.map ~f:(List.cons x) ys )
+                  ~init:(return [])
+                >>= fun l -> return (Contents_are l)))
     end
 
     module V2 = struct
@@ -101,7 +108,7 @@ module Answer = struct
       [@@deriving sexp, to_yojson]
 
       let to_latest (x : t) : V4.t =
-          V3.to_latest @@ Syncable_ledger.Answer.Stable.V1.to_latest Fn.id x
+        V3.to_latest @@ Syncable_ledger.Answer.Stable.V1.to_latest Fn.id x
 
       (* Not a standard versioning function *)
 
@@ -111,7 +118,7 @@ module Answer = struct
 
       (** Attempts to downgrade v4 -> v2 *)
       let from_v4 : V4.t -> t Or_error.t =
-       fun x -> Or_error.( (V3.from_v4 x) >>= from_v3)
+       fun x -> Or_error.(V3.from_v4 x >>= from_v3)
     end
   end]
 

@@ -119,7 +119,7 @@ module Zkapp_command = struct
         }
       [@@deriving yojson, equal]
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
     end
   end]
 
@@ -211,7 +211,7 @@ module Block = struct
         }
       [@@deriving yojson, equal]
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
     end
   end]
 end
