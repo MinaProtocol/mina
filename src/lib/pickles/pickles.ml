@@ -2607,7 +2607,7 @@ module Make_str   (_ : Wire_types.Concrete) (Step_verifier : Step_verifier.Step_
     end )
 end
 
-module F (M: Wire_types.Concrete)  = 
+module F (M: Wire_types.Concrete) : Pickles_intf.S = 
 struct 
   module A = Make_str (M) (Step_verifier.Step_verifier_kimchi)   
 include A
