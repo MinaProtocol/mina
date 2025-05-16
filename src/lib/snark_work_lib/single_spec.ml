@@ -14,8 +14,6 @@ module Poly = struct
     end
   end]
 
-  [%%define_locally Stable.Latest.(sexp_of_t, t_of_sexp, to_yojson, of_yojson)]
-
   let map ~f_witness ~f_proof = function
     | Transition (s, w) ->
         Transition (s, f_witness w)

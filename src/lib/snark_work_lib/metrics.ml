@@ -96,7 +96,7 @@ let emit_proof_metrics ~(result : Partitioned_result.Stable.Latest.t) =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
   match result with
   | Partitioned_spec.Poly.Single { job; data; _ } ->
-      `One (collect_single ~single_spec:job.spec ~data)
+      collect_single ~single_spec:job.spec ~data
   | Partitioned_spec.Poly.Sub_zkapp_command
       { job = { spec = Sub_zkapp_spec.Stable.Latest.Segment _; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
@@ -115,7 +115,7 @@ let emit_proof_metrics ~(result : Partitioned_result.Stable.Latest.t) =
       Perf_histograms.add_span ~name:"snark_worker_subzkapp_time" elapsed ;
       Perf_histograms.add_span
         ~name:"snark_worker_sub_zkapp_command_segment_time" elapsed ;
-      `One (Sub_zkapp_command { kind = `Segment; elapsed })
+      Sub_zkapp_command { kind = `Segment; elapsed }
   | Partitioned_spec.Poly.Sub_zkapp_command
       { job = { spec = Sub_zkapp_spec.Stable.Latest.Merge _; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
@@ -134,4 +134,4 @@ let emit_proof_metrics ~(result : Partitioned_result.Stable.Latest.t) =
       Perf_histograms.add_span ~name:"snark_worker_subzkapp_time" elapsed ;
       Perf_histograms.add_span ~name:"snark_worker_sub_zkapp_command_merge_time"
         elapsed ;
-      `One (Sub_zkapp_command { kind = `Merge; elapsed })
+      Sub_zkapp_command { kind = `Merge; elapsed }

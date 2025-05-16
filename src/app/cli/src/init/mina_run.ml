@@ -395,7 +395,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               ] ;
           ignore
             ( Work.Metrics.emit_proof_metrics ~result:wire_result
-              : Work.Metrics.snark_work_generated One_or_two.t ) ;
+              : Work.Metrics.snark_work_generated ) ;
           let proof_cache_db = Proof_cache_tag.create_identity_db () in
           let result : Work.Result.Partitioned.t =
             Work.Result.Partitioned.write_all_proofs_to_disk ~proof_cache_db

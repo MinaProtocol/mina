@@ -216,7 +216,7 @@ let consume_job_from_selector ~(partitioner : t)
         ~sok_message ~pairing:pairing2
 
 type work_from_selector =
-  fee:Currency.Fee.t -> Work_selector.work One_or_two.t option
+  fee:Currency.Fee.t -> Work.Spec.Single.t One_or_two.t option
 
 let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
     ~(work_from_selector : work_from_selector)

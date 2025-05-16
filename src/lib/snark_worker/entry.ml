@@ -125,10 +125,9 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
-            Work.Metrics.emit_proof_metrics ~result
-            |> One_or_two.iter ~f:(fun generated ->
-                   [%str_log info]
-                     (Events.event_of_snark_work_generated generated) ) ;
+            [%str_log info]
+              (Events.event_of_snark_work_generated
+                 (Work.Metrics.emit_proof_metrics ~result) ) ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", address_json); ("work_ids", work_ids_json) ] ;
