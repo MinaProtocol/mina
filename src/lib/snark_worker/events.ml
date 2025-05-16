@@ -37,6 +37,8 @@ module Int_with_json = struct
         Error "Snark_worker.Functor: Could not parse int"
 end
 
+(* WARN: you can't write a interface for this file because of these, unless you
+   track what they dump manually in the interface *)
 type Structured_log_events.t +=
   | Merge_snark_generated of { time : Time_span_with_json.t }
   [@@deriving register_event { msg = "Merge SNARK generated in $time" }]
