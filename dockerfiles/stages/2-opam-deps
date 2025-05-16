@@ -2,7 +2,8 @@
 # The "opam-deps" Stage
 # - Continues from the build-deps image
 # - Installs all opam dependencies and pins from mina's github
-# - Includes the entire mina codebase and submodules in "${MINA_DIR}" (must be writable by opam user)
+# - Includes the entire mina codebase and submodules in "${MINA_DIR}" (must be
+# - writable by opam user)
 # - Largely mirrors/replaces ./scripts/setup-opam.sh
 #################################################################################################
 FROM build-deps AS opam-deps
@@ -28,7 +29,8 @@ ENV OPAMERRLOGLEN 20
 ENV GIT_LFS_SKIP_SMUDGE 1
 
 # --- Shallow clone the Mina repo, only focused on the given MINA_BRANCH
-# git will clone into an empty dir, but this also helps us set the workdir in advance
+# git will clone into an empty dir, but this also helps us set the workdir in
+# advance
 RUN git clone \
   -b "${MINA_BRANCH}" \
   --depth 1 \
@@ -41,11 +43,13 @@ WORKDIR $HOME/$MINA_DIR
 ENV OPAMYES 1
 
 # --- Import Opam Switch
-# TODO: handle this opam work without cloning the full repository (directly pull opam.export)
+# TODO: handle this opam work without cloning the full repository (directly pull
+# opam.export)
 RUN opam switch import opam.export --quiet
 
 # --- Pin external packages / submodules
-# TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
+# TODO: Would be really nice to pull this script, the git submodules, and
+# opam.export exclusively in this stage
 # Remove .ppx and the .ppx-cache so they can be built on each run
 RUN eval $(opam config env) \
   && scripts/pin-external-packages.sh \

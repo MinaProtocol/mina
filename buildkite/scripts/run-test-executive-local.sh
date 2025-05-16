@@ -12,7 +12,7 @@ function cleanup
   while [[ $(docker stack ls | wc -l) -gt 1 ]]; do
       echo "Active Docker stacks found. Removing them..."
       remove_active_stacks
-      sleep 5 
+      sleep 5
   done
 }
 

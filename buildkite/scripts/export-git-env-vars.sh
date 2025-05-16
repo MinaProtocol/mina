@@ -7,7 +7,7 @@ function find_most_recent_numeric_tag() {
     if [[ $TAG != [0-9]* ]]; then
         TAG=$(find_most_recent_numeric_tag $TAG~)
     fi
-    echo $TAG
+    echo "${TAG}"
 }
 
 export GITHASH=$(git rev-parse --short=7 HEAD)
