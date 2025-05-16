@@ -4,24 +4,12 @@ let P = Prelude
 
 let Text/concatMap = P.Text.concatMap
 
-let Optional/map = Prelude.Optional.map
-
-let Optional/default = Prelude.Optional.default
-
 let Cmd = ../Lib/Cmds.dhall
 
 let ContainerImages = ../Constants/ContainerImages.dhall
 
-let Artifacts = ../Constants/Artifacts.dhall
-
-let Network = ../Constants/Network.dhall
-
 let runInDockerWithPostgresConn
-    :     List Text
-      ->  Text
-      ->  Text
-      ->  Text
-      ->  Cmd.Type
+    : List Text -> Text -> Text -> Text -> Cmd.Type
     =     \(environment : List Text)
       ->  \(initScript : Text)
       ->  \(docker : Text)
