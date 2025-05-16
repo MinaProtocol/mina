@@ -42,7 +42,7 @@ module Zkapp_command_segment_witness : sig
         ; init_stack : Pending_coinbase.Stack_versioned.Stable.V1.t
         ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson]
     end
   end]
 
