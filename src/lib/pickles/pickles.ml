@@ -11,7 +11,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
        and type 'a Proof.t = 'a A.Proof.t
 end
 
-module Make_str   (_ : Wire_types.Concrete) (Step_verifier : module type of Step_verifier.Step_verifier_kimchi)  = struct
+module Make_str   (_ : Wire_types.Concrete) (Step_verifier : Step_verifier.Step_verifier_sig)  = struct
   module Endo = Endo
   module P = Proof
 
@@ -42,12 +42,12 @@ module Make_str   (_ : Wire_types.Concrete) (Step_verifier : module type of Step
   module Dirty = Dirty
   module Cache_handle = Cache_handle
   module Step_main_inputs = Step_main_inputs
-   module Step_verifier = struct module Step_verifier_kimchi = Step_verifier end 
+   module Step_verifier = Step_verifier 
   module Proof_cache = Proof_cache
   module Cache = Cache
   module Storables = Compile.Storables
   module Ro = Ro
-  module Step_branch_data = Step_branch_data.Make (Inductive_rule) (Step_verifier.Step_verifier_kimchi)
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule) (Step_verifier)
 
   type chunking_data = Verify.Instance.chunking_data =
     { num_chunks : int; domain_size : int; zk_rows : int }
@@ -486,7 +486,7 @@ module Make_str   (_ : Wire_types.Concrete) (Step_verifier : module type of Step
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
-            ( Step_verifier.Step_verifier_kimchi.Scalar_challenge.endo g ~num_bits:4
+            ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
@@ -1303,7 +1303,7 @@ module Make_str   (_ : Wire_types.Concrete) (Step_verifier : module type of Step
           in
           let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
           let module S =
-            Step.Make (Inductive_rule) (A) (A_value) (Max_proofs_verified) (Step_verifier.Step_verifier_kimchi)
+            Step.Make (Inductive_rule) (A) (A_value) (Max_proofs_verified) (Step_verifier)
           in
           let prover =
             let f :
@@ -2032,7 +2032,7 @@ module Make_str   (_ : Wire_types.Concrete) (Step_verifier : module type of Step
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
-            ( Step_verifier.Step_verifier_kimchi.Scalar_challenge.endo g ~num_bits:4
+            ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
@@ -2340,7 +2340,7 @@ module Make_str   (_ : Wire_types.Concrete) (Step_verifier : module type of Step
             ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
               : Step_main_inputs.Inner_curve.t ) ;
           ignore
-            ( Step_verifier.Step_verifier_kimchi.Scalar_challenge.endo g ~num_bits:4
+            ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
                 (Kimchi_backend_common.Scalar_challenge.create x)
               : Field.t * Field.t ))
 
@@ -2607,12 +2607,9 @@ module Make_str   (_ : Wire_types.Concrete) (Step_verifier : module type of Step
     end )
 end
 
-module F (M: Wire_types.Concrete) :  Make_sig(M).S= 
+module F (M: Wire_types.Concrete)  = 
 struct 
   module A = Make_str (M) (Step_verifier.Step_verifier_kimchi)   
-  (* include (struct 
-include Make_str (M) (Step_verifier.Step_verifier_kimchi) 
-end : Make_sig(M).S) *)
 include A
 end
 

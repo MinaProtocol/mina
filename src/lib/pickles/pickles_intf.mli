@@ -13,8 +13,8 @@ module type S = sig
   module Impls = Impls
   module Tag = Tag
   module Types_map = Types_map
-  module Step_verifier = Step_verifier
-  module Common = Common
+   module Step_verifier : Step_verifier.Step_verifier_sig
+   module Common = Common
   module Proof_cache = Proof_cache
   module Cache = Cache
   module Ro = Ro

@@ -4,7 +4,7 @@ open Import
 module Impl = Impls.Step
 module One_hot_vector = One_hot_vector.Step
 
-module Make (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) = struct
+module Make (Step_verifier : Step_verifier.Step_verifier_sig) = struct
 
 (* Let F, K be the two fields (either (Fp, Fq) or (Fq, Fp)).
    Each proof over F has an accumulator state which contains

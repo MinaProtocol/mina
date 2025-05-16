@@ -155,3 +155,5 @@ module For_tests_only : sig
 end
 
 end
+
+module type Step_verifier_sig = module type of Step_verifier_kimchi

@@ -6,7 +6,7 @@ open Common
 open Import
 module Shifted_value = Shifted_value.Type2
 
-module Make (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) = struct
+module Make (Step_verifier : Step_verifier.Step_verifier_sig) = struct
 
 (* Unfinalized dlog-based proof, along with a flag which is true iff it
    is expected to verify. This allows for situations like the blockchain

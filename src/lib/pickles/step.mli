@@ -5,7 +5,7 @@ module Make
     (A : Pickles_types.Poly_types.T0) (A_value : sig
       type t
     end)
-    (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) : sig
+    (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) (Step_verifier : Step_verifier.Step_verifier_sig) : sig
   module Step_branch_data : module type of Step_branch_data.Make (Inductive_rule) (Step_verifier)
 
   val f :

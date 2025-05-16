@@ -286,7 +286,7 @@ module Make
     (Ret_value : T0)
     (Auxiliary_var : T0)
     (Auxiliary_value : T0)
-    (Step_verifier : module type of Step_verifier.Step_verifier_kimchi) =
+    (Step_verifier : Step_verifier.Step_verifier_sig) =
 struct
   module IR =
     Inductive_rule.Promise.T (Arg_var) (Arg_value) (Ret_var) (Ret_value)
