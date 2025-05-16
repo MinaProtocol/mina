@@ -35,7 +35,7 @@ module Poly = struct
             stmt
         | Error e ->
             failwithf
-              "Failed to construct a statement from  zkapp merge command %s"
+              "Failed to construct a statement from zkapp merge command %s"
               (Error.to_string_hum e) () )
 end
 

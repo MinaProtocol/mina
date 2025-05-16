@@ -99,7 +99,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
     | Ok (Some spec) -> (
         let address_json = `String (Host_and_port.to_string daemon_address) in
         let work_ids_json =
-          Work.Spec.Partitioned.Poly.statements spec
+          `One (Work.Spec.Partitioned.Poly.statement spec)
           |> Transaction_snark_work.Statement.compact_json
         in
         [%log info]

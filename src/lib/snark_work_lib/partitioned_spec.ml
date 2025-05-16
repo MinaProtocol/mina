@@ -59,12 +59,11 @@ module Poly = struct
     | Sub_zkapp_command { job; _ } ->
         job.sok_message
 
-  let statements : _ t -> Transaction_snark.Statement.t One_or_two.t = function
+  let statement : _ t -> Transaction_snark.Statement.t = function
     | Single { job = { spec; _ }; _ } ->
-        let stmt = Single_spec.Poly.statement spec in
-        `One stmt
+        Single_spec.Poly.statement spec
     | Sub_zkapp_command { job = { spec; _ }; _ } ->
-        `One (Sub_zkapp_spec.Poly.statement spec)
+        Sub_zkapp_spec.Poly.statement spec
 
   let map_with_statement (t : _ t) ~f : _ t =
     match t with
@@ -74,13 +73,6 @@ module Poly = struct
     | Sub_zkapp_command { job = { spec; _ } as job; data } ->
         Sub_zkapp_command
           { job; data = f (Sub_zkapp_spec.Poly.statement spec) data }
-
-  (* let transaction = function *)
-  (*   | Single { job = { spec; _ }; _ } -> *)
-  (*       let txn = Single_spec.Poly.transaction spec in *)
-  (*       `Single txn *)
-  (*   | Sub_zkapp_command _ -> *)
-  (*       `Sub_zkapp_command *)
 end
 
 [%%versioned
