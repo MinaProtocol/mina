@@ -173,7 +173,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.Daemon
-                    , network = Network.lowerName spec.network
+                    , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
@@ -187,7 +187,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.BatchTxn
-                    , network = Network.lowerName spec.network
+                    , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
@@ -201,7 +201,6 @@ let docker_step
                     , service = Artifacts.Type.Archive
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
-                    , network = Network.lowerName spec.network
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
@@ -211,7 +210,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.Rosetta
-                    , network = Network.lowerName spec.network
+                    , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , docker_publish = docker_publish
@@ -233,7 +232,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.FunctionalTestSuite
-                    , network = Network.lowerName Network.Type.Berkeley
+                    , network = spec.network
                     , deb_codename = spec.debVersion
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
