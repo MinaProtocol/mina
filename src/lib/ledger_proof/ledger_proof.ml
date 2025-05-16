@@ -41,8 +41,6 @@ end]
 
 let statement_with_sok (t : t) = Transaction_snark.statement_with_sok t
 
-let sok_digest = Transaction_snark.sok_digest
-
 let statement_target (t : Mina_state.Snarked_ledger_state.t) = t.target
 
 let statement_with_sok_target (t : Mina_state.Snarked_ledger_state.With_sok.t) =
@@ -70,8 +68,6 @@ module Cached = struct
       : Stable.Latest.t =
     Transaction_snark.create ~statement
       ~proof:(Proof_cache_tag.read_proof_from_disk proof)
-
-  let sok_digest (t : t) = t.data.sok_digest
 
   let underlying_proof (t : t) = t.proof
 end
