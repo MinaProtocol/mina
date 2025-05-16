@@ -13,7 +13,6 @@
   stdio
   integers
   astring
-  async_ssl
   sexplib0
   async.async_rpc
   result
