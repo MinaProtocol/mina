@@ -1,12 +1,9 @@
 open Core_kernel
 
-(* A Pairing.Single.t identifies one part of a One_or_two work *)
 module Single = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* Case `One` indicate no need to pair. ID is still needed because zkapp command
-         might be left in pool of half completion. *)
       type t = { which_one : [ `First | `Second | `One ]; pairing_id : int64 }
       [@@deriving compare, hash, sexp, yojson, equal]
 
@@ -15,13 +12,10 @@ module Single = struct
   end]
 end
 
-(* A Pairing.Sub_zkapp.t identifies a sub-zkapp level work *)
 module Sub_zkapp = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* Case `One` indicate no need to pair. ID is still needed because zkapp command
-         might be left in pool of half completion. *)
       type t =
         { which_one : [ `First | `Second | `One ]
         ; pairing_id : int64
