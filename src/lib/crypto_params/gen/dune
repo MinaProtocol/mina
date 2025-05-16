@@ -24,7 +24,6 @@
   tuple_lib
   snarky.backendless
   fold_lib
-  crs
   pickles
   pickles.backend
   kimchi_backend
