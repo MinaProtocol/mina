@@ -357,7 +357,60 @@ module Stable = struct
           let of_binable = check
         end)
 
-    let to_latest = Fn.id
+    let to_latest : t -> Latest.t = fun
+      { public_key
+      ; token_id
+      ; token_symbol
+      ; balance
+      ; nonce
+      ; receipt_chain_hash
+      ; delegate
+      ; voting_for
+      ; timing
+      ; permissions
+      ; zkapp = (zkappv2 : Zkapp_account.Stable.V2.t option)
+      } ->
+        { public_key
+        ; token_id
+        ; token_symbol
+        ; balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate
+        ; voting_for
+        ; timing
+        ; permissions
+        ; zkapp = (zkappv2 : Zkapp_account.Stable.V3.t option)
+          (* TODO why does this work? *)
+        }
+
+
+    let from_v3 : V3.t -> t Or_error.t = fun
+      { public_key
+      ; token_id
+      ; token_symbol
+      ; balance
+      ; nonce
+      ; receipt_chain_hash
+      ; delegate
+      ; voting_for
+      ; timing
+      ; permissions
+      ; zkapp
+      } ->
+      Or_error.return
+        { public_key
+        ; token_id
+        ; token_symbol
+        ; balance
+        ; nonce
+        ; receipt_chain_hash
+        ; delegate
+        ; voting_for
+        ; timing
+        ; permissions
+        ; zkapp (* TODO same here *)
+        }
 
     let public_key (t : t) : key = t.public_key
   end
