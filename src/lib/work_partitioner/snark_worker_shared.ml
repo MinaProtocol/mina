@@ -1,15 +1,7 @@
-(* module contains logic that may be shared across coordinator and worker. This
-   is needed for backward compatibility reason. *)
-
 open Core_kernel
 open Async
 open Mina_base
 open Transaction_snark
-
-(* NOTE:
-   This is used in both Work_partitioner and Snark_worker for compatibility
-   reasons
-*)
 
 module Zkapp_command_inputs = struct
   [%%versioned
