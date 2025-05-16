@@ -175,6 +175,7 @@ module Make (Inputs : Inputs_intf) = struct
     (set_urs_info, load)
 
   let create ?(lazy_mode = false) ~prev_challenges cs =
+    Format.printf "Dlog_based.create: lazy_mode %s" (Bool.to_string lazy_mode) ;
     let gates, fixed_lookup_tables, runtime_table_cfgs =
       Inputs.Constraint_system.finalize_and_get_gates cs
     in
@@ -190,6 +191,7 @@ module Make (Inputs : Inputs_intf) = struct
           assert (prev_challenges = prev_challenges') ;
           prev_challenges'
     in
+    Format.printf "Inputs.Index.create: lazy_mode %s" (Bool.to_string lazy_mode) ;
     let index =
       Inputs.Index.create gates public_input_size fixed_lookup_tables
         runtime_table_cfgs prev_challenges (load_urs ()) lazy_mode
