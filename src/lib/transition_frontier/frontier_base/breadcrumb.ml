@@ -376,7 +376,7 @@ module For_tests = struct
              { fee = Fee.of_nanomina_int_exn 1
              ; proofs =
                  One_or_two.map stmts ~f:(fun statement ->
-                     Ledger_proof.Cached.create ~statement
+                     Ledger_proof.Poly.create ~statement
                        ~sok_digest:Sok_message.Digest.default
                        ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
              ; prover

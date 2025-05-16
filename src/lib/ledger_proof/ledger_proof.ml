@@ -21,6 +21,10 @@ module Poly = struct
       Mina_state.Snarked_ledger_state.Poly.Stable.V2.t
     , 'proof )
     Proof_carrying_data.t
+
+  let create ~(statement : Mina_state.Snarked_ledger_state.t) ~sok_digest ~proof
+      : _ t =
+    { Proof_carrying_data.proof; data = { statement with sok_digest } }
 end
 
 [%%versioned
@@ -49,9 +53,6 @@ let underlying_proof = Transaction_snark.proof
 let snarked_ledger_hash =
   Fn.compose Mina_state.Snarked_ledger_state.snarked_ledger_hash statement
 
-let create ~statement ~sok_digest ~proof =
-  Transaction_snark.create ~statement:{ statement with sok_digest } ~proof
-
 module Cached = struct
   type t =
     ( Mina_state.Snarked_ledger_state.With_sok.t
@@ -75,20 +76,16 @@ module Cached = struct
   let sok_digest (t : t) = t.data.sok_digest
 
   let underlying_proof (t : t) = t.proof
-
-  let create ~(statement : Mina_state.Snarked_ledger_state.t) ~sok_digest ~proof
-      : t =
-    { Proof_carrying_data.proof; data = { statement with sok_digest } }
 end
 
 module For_tests = struct
   let mk_dummy_proof statement =
-    create ~statement ~sok_digest:Sok_message.Digest.default
+    Poly.create ~statement ~sok_digest:Sok_message.Digest.default
       ~proof:(Lazy.force Proof.transaction_dummy)
 
   module Cached = struct
     let mk_dummy_proof statement =
-      Cached.create ~statement ~sok_digest:Sok_message.Digest.default
+      Poly.create ~statement ~sok_digest:Sok_message.Digest.default
         ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag)
   end
 end

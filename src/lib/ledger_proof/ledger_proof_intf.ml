@@ -20,6 +20,19 @@ module type S = sig
         Mina_state.Snarked_ledger_state.Poly.Stable.V2.t
       , 'proof )
       Proof_carrying_data.t
+
+    val create :
+         statement:Mina_state.Snarked_ledger_state.t
+      -> sok_digest:'sok_digest
+      -> proof:'proof
+      -> ( Frozen_ledger_hash.t
+         , (Currency.Amount.t, Sgn.t) Currency.Signed_poly.t
+         , Pending_coinbase.Stack_versioned.t
+         , Fee_excess.t
+         , 'sok_digest
+         , Mina_state.Local_state.t
+         , 'proof )
+         t
   end
 
   type t [@@deriving compare, equal, sexp, yojson, hash]
@@ -34,12 +47,6 @@ module type S = sig
       val to_latest : t -> t
     end
   end]
-
-  val create :
-       statement:Mina_state.Snarked_ledger_state.t
-    -> sok_digest:Sok_message.Digest.t
-    -> proof:Proof.t
-    -> t
 
   val statement_target :
        Mina_state.Snarked_ledger_state.t
@@ -81,11 +88,5 @@ module type S = sig
     val sok_digest : t -> Sok_message.Digest.t
 
     val underlying_proof : t -> Proof_cache_tag.t
-
-    val create :
-         statement:Mina_state.Snarked_ledger_state.t
-      -> sok_digest:Sok_message.Digest.t
-      -> proof:Proof_cache_tag.t
-      -> t
   end
 end

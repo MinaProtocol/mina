@@ -680,7 +680,7 @@ let%test_module "random set test" =
               in
               ( work
               , One_or_two.map work ~f:(fun statement ->
-                    Ledger_proof.create ~statement
+                    Ledger_proof.Poly.create ~statement
                       ~sok_digest:invalid_sok_digest
                       ~proof:(Lazy.force Proof.transaction_dummy) )
               , fee
