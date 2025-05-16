@@ -13,6 +13,12 @@ module Stable : sig
 
     val hash : t -> Staged_ledger_hash.Aux_hash.t
   end
+
+  module V2 : sig
+    type t
+
+    val hash : t -> Staged_ledger_hash.Aux_hash.t
+  end
 end]
 
 type t

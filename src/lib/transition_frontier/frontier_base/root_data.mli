@@ -8,6 +8,10 @@ module Common : sig
     module V3 : sig
       type t
     end
+
+    module V2 : sig
+      type t
+    end
   end]
 
   type t
@@ -109,6 +113,20 @@ module Minimal : sig
       val common : t -> Common.Stable.V3.t
 
       val scan_state : t -> Staged_ledger.Scan_state.Stable.V3.t
+
+      val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
+    end
+
+    module V2 : sig
+      type t
+
+      val hash : t -> State_hash.t
+
+      val of_limited : common:Common.Stable.V2.t -> State_hash.Stable.V1.t -> t
+
+      val common : t -> Common.Stable.V2.t
+
+      val scan_state : t -> Staged_ledger.Scan_state.Stable.V2.t
 
       val pending_coinbase : t -> Pending_coinbase.Stable.V2.t
     end

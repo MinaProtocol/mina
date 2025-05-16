@@ -85,6 +85,14 @@ module Stable = struct
 
     let to_latest = Fn.id
   end
+
+  module V2 = struct
+    type t =
+      (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+
+    let to_latest = Fn.id
+  end
 end]
 
 type t = (Signed_command.t, Zkapp_command.t) Poly.t

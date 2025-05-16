@@ -27,6 +27,13 @@ module Graphql_repr = struct
 
       let to_latest = Fn.id
     end
+
+    module V1 = struct
+      type t = Account_update.Graphql_repr.Stable.V1.t list Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = fun _ -> failwith "TODO"
+    end
   end]
 end
 
@@ -36,6 +43,13 @@ module Simple = struct
   module Stable = struct
     module V2 = struct
       type t = Account_update.Simple.Stable.V2.t list Poly.Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
+    module V1 = struct
+      type t = Account_update.Simple.Stable.V1.t list Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id

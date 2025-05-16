@@ -539,6 +539,20 @@ module With_hashes_and_data = struct
 
       let to_latest = Fn.id
     end
+
+    module V1 = struct
+      type ('proof, 'data) t =
+        ( ( Account_update.Body.Stable.V1.t
+          , ('proof, Signature.Stable.V1.t) Control.Poly.Stable.V1.t )
+          Account_update.Poly.Stable.V1.t
+          * 'data
+        , Digest.Account_update.Stable.V1.t
+        , Digest.Forest.Stable.V1.t )
+        Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
   end]
 
   let empty = Digest.Forest.empty
@@ -587,6 +601,17 @@ module With_hashes = struct
     module V2 = struct
       type t =
         ( Account_update.Stable.V2.t
+        , Digest.Account_update.Stable.V1.t
+        , Digest.Forest.Stable.V1.t )
+        Stable.V1.t
+      [@@deriving sexp, compare, equal, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+
+    module V1 = struct
+      type t =
+        ( Account_update.Stable.V1.t
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t

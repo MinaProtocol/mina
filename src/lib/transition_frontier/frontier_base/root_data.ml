@@ -14,6 +14,15 @@ module Common = struct
 
       let to_latest = Fn.id
     end
+
+    module V2 = struct
+      type t =
+        { scan_state : Staged_ledger.Scan_state.Stable.V2.t
+        ; pending_coinbase : Pending_coinbase.Stable.V2.t
+        }
+
+      let to_latest = fun _ -> failwith "TODO"
+    end
   end]
 
   type t =
@@ -141,6 +150,21 @@ module Minimal = struct
       let scan_state t = t.common.Common.Stable.Latest.scan_state
 
       let pending_coinbase t = t.common.Common.Stable.Latest.pending_coinbase
+    end
+
+    module V2 = struct
+      type t = { hash : State_hash.Stable.V1.t; common : Common.Stable.V2.t }
+      [@@deriving fields]
+
+      let of_limited ~common hash = { hash; common }
+
+      let to_latest = fun _ -> failwith "TODO"
+
+      let common t = t.common
+
+      let scan_state t = t.common.Common.Stable.V2.scan_state
+
+      let pending_coinbase t = t.common.Common.Stable.V2.pending_coinbase
     end
   end]
 

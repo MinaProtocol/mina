@@ -37,6 +37,24 @@ module Transactions = struct
 
       let to_latest = Fn.id
     end
+
+    module V2 = struct
+      type t =
+        { commands :
+            ( User_command.Stable.V2.t
+            , Transaction_hash.Stable.V1.t )
+            With_hash.Stable.V1.t
+            With_status.Stable.V2.t
+            list
+        ; fee_transfers :
+            (Fee_transfer.Single.Stable.V2.t * Fee_transfer_type.Stable.V1.t)
+            list
+        ; coinbase : Currency.Amount.Stable.V1.t
+        ; coinbase_receiver : Public_key.Compressed.Stable.V1.t option
+        }
+
+      let to_latest = Fn.id
+    end
   end]
 end
 
@@ -65,6 +83,19 @@ module Stable = struct
       ; winner : Public_key.Compressed.Stable.V1.t
       ; protocol_state : Protocol_state.Stable.V2.t
       ; transactions : Transactions.Stable.V3.t
+      ; snark_jobs : Transaction_snark_work.Info.Stable.V2.t list
+      ; proof : Proof.Stable.V2.t
+      }
+
+    let to_latest = Fn.id
+  end
+
+  module V2 = struct
+    type t =
+      { creator : Public_key.Compressed.Stable.V1.t
+      ; winner : Public_key.Compressed.Stable.V1.t
+      ; protocol_state : Protocol_state.Stable.V2.t
+      ; transactions : Transactions.Stable.V2.t
       ; snark_jobs : Transaction_snark_work.Info.Stable.V2.t list
       ; proof : Proof.Stable.V2.t
       }

@@ -1188,6 +1188,29 @@ module Body = struct
 
         let to_latest = Fn.id
       end
+
+      module V1 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
+          ; update : Update.Stable.V1.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V1.t
+          ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
     end]
 
     let deriver obj =
@@ -1237,6 +1260,29 @@ module Body = struct
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V2.t
+          ; use_full_commitment : bool
+          ; implicit_account_creation_fee : bool
+          ; may_use_token : May_use_token.Stable.V1.t
+          ; authorization_kind : Authorization_kind.Stable.V1.t
+          }
+        [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+
+        let to_latest = Fn.id
+      end
+
+      module V1 = struct
+        type t =
+          { public_key : Public_key.Compressed.Stable.V1.t
+          ; token_id : Token_id.Stable.V2.t
+          ; update : Update.Stable.V1.t
+          ; balance_change :
+              (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+          ; increment_nonce : bool
+          ; events : Events'.Stable.V1.t
+          ; actions : Events'.Stable.V1.t
+          ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
+          ; call_depth : int
+          ; preconditions : Preconditions.Stable.V1.t
           ; use_full_commitment : bool
           ; implicit_account_creation_fee : bool
           ; may_use_token : May_use_token.Stable.V1.t
@@ -1756,6 +1802,14 @@ module T = struct
 
         let to_latest = Fn.id
       end
+
+      module V1 = struct
+        type t =
+          (Body.Graphql_repr.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
     end]
 
     let deriver obj =
@@ -1773,6 +1827,13 @@ module T = struct
     module Stable = struct
       module V2 = struct
         type t = (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Poly.Stable.V1.t
+        [@@deriving sexp, equal, yojson, hash, compare]
+
+        let to_latest = Fn.id
+      end
+
+      module V1 = struct
+        type t = (Body.Simple.Stable.V1.t, Control.Stable.V2.t) Poly.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id

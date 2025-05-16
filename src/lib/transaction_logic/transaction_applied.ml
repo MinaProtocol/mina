@@ -67,6 +67,17 @@ module Zkapp_command_applied = struct
 
       let to_latest = Fn.id
     end
+
+    module V1 = struct
+      type t =
+        { accounts : (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
+        ; command : Zkapp_command.Stable.V1.t With_status.Stable.V2.t
+        ; new_accounts : Account_id.Stable.V2.t list
+        }
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = fun _ -> failwith "TODO"
+    end
   end]
 
   type t =
@@ -106,6 +117,15 @@ module Command_applied = struct
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type t =
+        | Signed_command of Signed_command_applied.Stable.V2.t
+        | Zkapp_command of Zkapp_command_applied.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = fun _ -> failwith "TODO"
     end
   end]
 
@@ -167,6 +187,10 @@ module Varying : sig
     module V3 : sig
       type t [@@deriving sexp, to_yojson]
     end
+
+    module V2 : sig
+      type t [@@deriving sexp, to_yojson]
+    end
   end]
 
   type t =
@@ -191,6 +215,16 @@ end = struct
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
+    end
+
+    module V2 = struct
+      type t =
+        | Command of Command_applied.Stable.V2.t
+        | Fee_transfer of Fee_transfer_applied.Stable.V2.t
+        | Coinbase of Coinbase_applied.Stable.V2.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = fun _ -> failwith "TODO"
     end
   end]
 
@@ -226,6 +260,14 @@ module Stable = struct
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
+  end
+
+  module V2 = struct
+    type t =
+      { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V2.t }
+    [@@deriving sexp, to_yojson]
+
+    let to_latest = fun _ -> failwith "TODO"
   end
 end]
 
