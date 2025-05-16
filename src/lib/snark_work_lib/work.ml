@@ -117,16 +117,3 @@ module Result = struct
     ; prover
     }
 end
-
-module Result_without_metrics = struct
-  type 'proof t =
-    { proofs : 'proof One_or_two.t
-    ; statements : Transaction_snark.Statement.t One_or_two.t
-    ; prover : Signature_lib.Public_key.Compressed.t
-    ; fee : Currency.Fee.t
-    }
-  [@@deriving yojson, sexp]
-
-  let map ~f_proof { proofs; statements; prover; fee } =
-    { proofs = One_or_two.map ~f:f_proof proofs; statements; prover; fee }
-end
