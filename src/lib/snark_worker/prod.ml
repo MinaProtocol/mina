@@ -31,6 +31,7 @@ module Inputs = struct
       { proof_level_snark : proof_level_snark
       ; cache : Cache.t
       ; proof_cache_db : Proof_cache_tag.cache_db
+      ; logger : Logger.t
       }
 
     let create ~constraint_constants ~proof_level () =
@@ -50,7 +51,11 @@ module Inputs = struct
             No_check
       in
       Deferred.return
-        { proof_level_snark; cache = Cache.create (); proof_cache_db }
+        { proof_level_snark
+        ; cache = Cache.create ()
+        ; proof_cache_db
+        ; logger = Logger.create ()
+        }
 
     let worker_wait_time = 5.
   end
@@ -85,11 +90,11 @@ module Inputs = struct
     Fn.compose impl convert
 
   let perform_single
-      ({ cache; proof_level_snark; proof_cache_db } : Worker_state.t) ~message =
+      ({ cache; proof_level_snark; proof_cache_db; logger } : Worker_state.t)
+      ~message =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
-    let logger = Logger.create () in
     fun (single : single_spec) ->
       match proof_level_snark with
       | Full (module M) -> (
