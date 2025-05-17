@@ -18,7 +18,7 @@ let mock_coordinator ~prover
     Hashtbl.create (module Selector_work_id)
   in
 
-  let work_from_selector ~fee:_ =
+  let work_from_selector () =
     let%map.Option spec = Queue.dequeue predefined_specs in
     let id = One_or_two.map ~f:Work.Spec.Single.Poly.statement spec in
     Hashtbl.add_exn selector_work_pool ~key:id ~data:(Time.now ()) ;
