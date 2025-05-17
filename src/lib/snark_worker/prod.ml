@@ -25,29 +25,32 @@ module Inputs = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
 
+    type proof_level_snark = Full of (module S) | Check | No_check
+
     type t =
-      { m : (module S) option
+      { proof_level_snark : proof_level_snark
       ; cache : Cache.t
-      ; proof_level : Genesis_constants.Proof_level.t
       ; proof_cache_db : Proof_cache_tag.cache_db
       }
 
     let create ~constraint_constants ~proof_level () =
       let proof_cache_db = Proof_cache_tag.create_identity_db () in
-      let m =
+      let proof_level_snark =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
-            Some
+            Full
               ( module Transaction_snark.Make (struct
                 let constraint_constants = constraint_constants
 
                 let proof_level = proof_level
               end) : S )
-        | Check | No_check ->
-            None
+        | Check ->
+            Check
+        | No_check ->
+            No_check
       in
       Deferred.return
-        { m; cache = Cache.create (); proof_level; proof_cache_db }
+        { proof_level_snark; cache = Cache.create (); proof_cache_db }
 
     let worker_wait_time = 5.
   end
@@ -82,15 +85,14 @@ module Inputs = struct
     Fn.compose impl convert
 
   let perform_single
-      ({ m; cache; proof_level; proof_cache_db } : Worker_state.t) ~message =
+      ({ cache; proof_level_snark; proof_cache_db } : Worker_state.t) ~message =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
     let logger = Logger.create () in
     fun (single : single_spec) ->
-      match proof_level with
-      | Genesis_constants.Proof_level.Full -> (
-          let (module M) = Option.value_exn m in
+      match proof_level_snark with
+      | Full (module M) -> (
           let statement = Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
