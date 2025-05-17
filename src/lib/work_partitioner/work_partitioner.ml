@@ -215,15 +215,14 @@ let consume_job_from_selector ~(partitioner : t)
       convert_single_work_from_selector ~partitioner ~single_spec:spec2
         ~sok_message ~pairing:pairing2
 
-type work_from_selector =
-  fee:Currency.Fee.t -> Work.Spec.Single.t One_or_two.t option
+type work_from_selector = unit -> Work.Spec.Single.t One_or_two.t option
 
 let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
     ~(work_from_selector : work_from_selector)
     ~(sok_message : Mina_base.Sok_message.t) () =
   let open Core_kernel in
   let open Option.Let_syntax in
-  let%map instances = work_from_selector ~fee:sok_message.fee in
+  let%map instances = work_from_selector () in
 
   consume_job_from_selector ~partitioner ~instances ~sok_message ()
 
