@@ -2,6 +2,8 @@ open Core
 open Async
 open Events
 
+let work_spec_counter = ref 0
+
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
@@ -40,8 +42,26 @@ module Make (Inputs : Intf.Inputs_intf) :
     end
   end
 
+  module DumpedWorkSpec = struct
+    type t =
+      { prover : Signature_lib.Public_key.Compressed.Stable.V1.t
+      ; spec : Work.Single.Spec.t One_or_two.Stable.V1.t
+      ; fee : Currency.Fee.Stable.V1.t
+      }
+    [@@deriving yojson]
+  end
+
   let perform (s : Worker_state.t) public_key
       ({ instances; fee } as spec : Work.Spec.t) =
+    let dir = Sys.getenv_exn "PATH_DUMP_SNARK_WORK_SPEC" in
+    let to_dump : DumpedWorkSpec.t =
+      { prover = public_key; spec = spec.instances; fee = spec.fee }
+    in
+    work_spec_counter := !work_spec_counter + 1 ;
+    to_dump |> DumpedWorkSpec.to_yojson
+    |> Yojson.Safe.to_file
+         (Printf.sprintf "%s/dumped_spec.%d.json" dir !work_spec_counter) ;
+
     One_or_two.Deferred_result.map instances ~f:(fun w ->
         let open Deferred.Or_error.Let_syntax in
         let%map proof, time =
