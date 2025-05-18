@@ -1,0 +1,12 @@
+(tests
+ (names test_actor)
+ (libraries
+  ;; OPAM libraries
+  alcotest
+  async
+  core
+  ;; MINA libraries
+  actor
+  logger)
+ (preprocess
+  (pps ppx_deriving_yojson ppx_let)))
