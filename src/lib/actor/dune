@@ -1,0 +1,18 @@
+(library
+ (name actor)
+ (public_name actor)
+ (libraries
+  ;; OPAM libraries
+  async
+  core
+  ;; MINA libraries
+  logger)
+  
+ (preprocess
+  (pps
+   ppx_let
+   ppx_mina
+   ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Actor pattern for mass concurrency"))
