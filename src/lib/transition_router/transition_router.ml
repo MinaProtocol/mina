@@ -102,11 +102,11 @@ let is_transition_for_bootstrap
           ~context:(module Context)
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
-let start_transition_frontier_controller ~context:(module Context : CONTEXT)
-    ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ~collected_transitions ~cache_exceptions ~frontier_w frontier
-    ~transition_writer_guard () =
+let start_transition_frontier_controller ?transaction_pool_proxy
+    ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
+    ~time_controller ~get_completed_work ~producer_transition_writer_ref
+    ~verified_transition_writer ~clear_reader ~collected_transitions
+    ~cache_exceptions ~frontier_w frontier ~transition_writer_guard () =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -141,7 +141,7 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
   producer_transition_writer_ref := Some producer_transition_writer ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
   let new_verified_transition_reader =
-    Transition_frontier_controller.run
+    Transition_frontier_controller.run ?transaction_pool_proxy
       ~context:(module Context)
       ~trust_system ~verifier ~network ~time_controller ~collected_transitions
       ~frontier ~get_completed_work
@@ -415,13 +415,13 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             "Will start initialization without connecting to too many peers" )
     ]
 
-let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
-    ~is_seed ~is_demo_mode ~verifier ~trust_system ~time_controller
-    ~get_completed_work ~frontier_w ~producer_transition_writer_ref
-    ~clear_reader ~verified_transition_writer ~cache_exceptions
-    ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online ~transition_writer_guard
-    =
+let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
+    ~sync_local_state ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
+    ~time_controller ~get_completed_work ~frontier_w
+    ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
+    ~cache_exceptions ~most_recent_valid_block_writer ~persistent_root
+    ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online
+    ~transition_writer_guard =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -541,7 +541,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
               | Ok () ->
                   () )
       in
-      start_transition_frontier_controller
+      start_transition_frontier_controller ?transaction_pool_proxy
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
@@ -591,13 +591,14 @@ let wait_till_genesis ~logger ~time_controller
    to set local state in the test
 *)
 let run ?(sync_local_state = true) ?(cache_exceptions = false)
-    ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~is_seed ~is_demo_mode ~time_controller ~consensus_local_state
-    ~persistent_root_location ~persistent_frontier_location
-    ~get_current_frontier ~frontier_broadcast_writer:frontier_w
-    ~network_transition_reader ~producer_transition_reader
-    ~get_most_recent_valid_block ~most_recent_valid_block_writer
-    ~get_completed_work ~catchup_mode ~notify_online () =
+    ?transaction_pool_proxy ~context:(module Context : CONTEXT) ~trust_system
+    ~verifier ~network ~is_seed ~is_demo_mode ~time_controller
+    ~consensus_local_state ~persistent_root_location
+    ~persistent_frontier_location ~get_current_frontier
+    ~frontier_broadcast_writer:frontier_w ~network_transition_reader
+    ~producer_transition_reader ~get_most_recent_valid_block
+    ~most_recent_valid_block_writer ~get_completed_work ~catchup_mode
+    ~notify_online () =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -681,7 +682,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       let%map pipe_id_ref =
-        initialize ~sync_local_state ~cache_exceptions
+        initialize ~transaction_pool_proxy ~sync_local_state ~cache_exceptions
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~persistent_frontier ~persistent_root ~time_controller
