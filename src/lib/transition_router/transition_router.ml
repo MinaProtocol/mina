@@ -449,9 +449,9 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
-        ~frontier_w ~persistent_root ~persistent_frontier ~cache_exceptions
-        ~initial_root_transition ~catchup_mode
+        ~clear_reader ~consensus_local_state ~frontier_w ~persistent_root
+        ~persistent_frontier ~cache_exceptions ~initial_root_transition
+        ~catchup_mode
         ~best_seen_transition:
           (Option.map ~f:(fun x -> `Block x) best_seen_transition)
         ()
@@ -479,9 +479,9 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
-        ~frontier_w ~initial_root_transition ~persistent_root
-        ~persistent_frontier ~cache_exceptions ~catchup_mode
+        ~clear_reader ~consensus_local_state ~frontier_w
+        ~initial_root_transition ~persistent_root ~persistent_frontier
+        ~cache_exceptions ~catchup_mode
         ~best_seen_transition:(Some (`Block best_tip))
         ()
   | best_tip_opt, Some frontier ->
@@ -540,8 +540,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~collected_transitions ~cache_exceptions
-        ?transition_writer_ref:None ~frontier_w frontier ()
+        ~clear_reader ~collected_transitions ~cache_exceptions ~frontier_w
+        frontier ()
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
