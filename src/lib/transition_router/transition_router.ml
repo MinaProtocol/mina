@@ -18,6 +18,8 @@ module type CONTEXT = sig
   val proof_cache_db : Proof_cache_tag.cache_db
 end
 
+module Valid_transition_guard = Pipe_guard.Make (Valid_transition)
+
 type Structured_log_events.t += Starting_transition_frontier_controller
   [@@deriving
     register_event { msg = "Starting transition frontier controller phase" }]
@@ -100,11 +102,11 @@ let is_transition_for_bootstrap
           ~context:(module Context)
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
-let start_transition_frontier_controller ?transition_writer_ref
-    ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~time_controller ~get_completed_work ~producer_transition_writer_ref
-    ~verified_transition_writer ~clear_reader ~collected_transitions
-    ~cache_exceptions ~frontier_w frontier () =
+let start_transition_frontier_controller ~context:(module Context : CONTEXT)
+    ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+    ~collected_transitions ~cache_exceptions ~frontier_w frontier
+    ~transition_writer_guard () =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -120,19 +122,13 @@ let start_transition_frontier_controller ?transition_writer_ref
           ?valid_cb ~pipe_name:name ~logger )
       ()
   in
-  let transition_writer_ref =
-    (* If [transition_writer_ref] is None, it is set to
-       [ref transition_frontier_controller_writer].
-       If it already contains a reference, the value of
-       [transition_frontier_controller_writer] is assigned to it. This avoids
-       creating a new variable and allows the existing reference in
-       [transition_writer_ref] to be used each time a thread accesses this
-       variable. *)
-    Option.value_map transition_writer_ref
-      ~default:(ref transition_frontier_controller_writer) ~f:(fun r ->
-        r := transition_frontier_controller_writer ;
-        r )
-  in
+  let pipe_id_assigned = Ivar.create () in
+  Valid_transition_guard.send_control ~actor:transition_writer_guard
+    ~message:
+      (Valid_transition_guard.ReplacePipe
+         { writer = transition_frontier_controller_writer
+         ; id_returned = pipe_id_assigned
+         } ) ;
   let producer_transition_reader, producer_transition_writer =
     Strict_pipe.create ~name:"transition frontier: producer transition"
       Synchronous
@@ -157,14 +153,14 @@ let start_transition_frontier_controller ?transition_writer_ref
       (Fn.compose Deferred.return
          (Strict_pipe.Writer.write verified_transition_writer) )
   |> don't_wait_for ;
-  transition_writer_ref
+  Ivar.read pipe_id_assigned
 
-let start_bootstrap_controller ?transition_writer_ref
-    ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~time_controller ~get_completed_work ~producer_transition_writer_ref
-    ~verified_transition_writer ~clear_reader ~consensus_local_state ~frontier_w
-    ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~cache_exceptions ~best_seen_transition ~catchup_mode () =
+let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
+    ~verifier ~network ~time_controller ~get_completed_work
+    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+    ~consensus_local_state ~frontier_w ~initial_root_transition ~persistent_root
+    ~persistent_frontier ~cache_exceptions ~best_seen_transition ~catchup_mode
+    ~transition_writer_guard () =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
@@ -179,15 +175,14 @@ let start_bootstrap_controller ?transition_writer_ref
           ~pipe_name:name ~logger ?valid_cb )
       ()
   in
-  let transition_writer_ref =
-    (* The handling is the same as in the [start_transition_frontier_controller]
-       function, in order to reuse the reference already defined in
-       [transition_writer_ref]. *)
-    Option.value_map transition_writer_ref
-      ~default:(ref bootstrap_controller_writer) ~f:(fun r ->
-        r := bootstrap_controller_writer ;
-        r )
-  in
+
+  let pipe_id_assigned = Ivar.create () in
+  Valid_transition_guard.send_control ~actor:transition_writer_guard
+    ~message:
+      (Valid_transition_guard.ReplacePipe
+         { writer = bootstrap_controller_writer
+         ; id_returned = pipe_id_assigned
+         } ) ;
   producer_transition_writer_ref := None ;
   let f b_or_h =
     Strict_pipe.Writer.write bootstrap_controller_writer (b_or_h, `Valid_cb None) ;
@@ -210,15 +205,24 @@ let start_bootstrap_controller ?transition_writer_ref
        ~transition_reader:bootstrap_controller_reader ~persistent_frontier
        ~persistent_root ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
-      Strict_pipe.Writer.kill bootstrap_controller_writer ;
-      start_transition_frontier_controller
-        ~context:(module Context)
-        ~trust_system ~verifier ~network ~time_controller ~get_completed_work
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~collected_transitions ~cache_exceptions
-        ~transition_writer_ref ~frontier_w new_frontier ()
-      |> Fn.const () ) ;
-  transition_writer_ref
+      don't_wait_for
+        (let close_result = Ivar.create () in
+         let%bind pipe_id = Ivar.read pipe_id_assigned in
+         Valid_transition_guard.send_control ~actor:transition_writer_guard
+           ~message:
+             (Valid_transition_guard.ClosePipe
+                { result = close_result; id = pipe_id } ) ;
+         let%bind _ = Ivar.read close_result in
+
+         start_transition_frontier_controller
+           ~context:(module Context)
+           ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+           ~producer_transition_writer_ref ~verified_transition_writer
+           ~clear_reader ~collected_transitions ~cache_exceptions ~frontier_w
+           ~transition_writer_guard new_frontier ()
+         |> Deferred.map ~f:(const ()) ) ) ;
+
+  Ivar.read pipe_id_assigned
 
 let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
     ~network ~verifier ~trust_system ~most_recent_valid_block_writer
@@ -416,7 +420,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~get_completed_work ~frontier_w ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~cache_exceptions
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+    ~consensus_local_state ~catchup_mode ~notify_online ~transition_writer_guard
+    =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -454,7 +459,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~catchup_mode
         ~best_seen_transition:
           (Option.map ~f:(fun x -> `Block x) best_seen_transition)
-        ()
+        ~transition_writer_guard ()
   | Some best_tip, Some frontier
     when is_transition_for_bootstrap
            ~context:(module Context)
@@ -483,7 +488,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~initial_root_transition ~persistent_root ~persistent_frontier
         ~cache_exceptions ~catchup_mode
         ~best_seen_transition:(Some (`Block best_tip))
-        ()
+        ~transition_writer_guard ()
   | best_tip_opt, Some frontier ->
       let collected_transitions =
         match best_tip_opt with
@@ -541,7 +546,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions ~frontier_w
-        frontier ()
+        ~transition_writer_guard frontier ()
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -617,6 +622,17 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
      of race condition between bootstrap and block creation) *)
   let producer_transition_writer_ref = ref None in
   O1trace.background_thread "transition_router" (fun () ->
+      let transition_writer_guard = Valid_transition_guard.create ~logger () in
+      don't_wait_for
+        (let%bind.Deferred spawn_result =
+           Valid_transition_guard.spawn transition_writer_guard
+         in
+         match spawn_result with
+         | Error e ->
+             failwithf "Pipe guard spawning failed: %s" (Error.to_string_hum e)
+               ()
+         | Ok () ->
+             Deferred.unit ) ;
       don't_wait_for
       @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
              Option.value_map ~f:Strict_pipe.Writer.write
@@ -664,7 +680,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~directory:persistent_root_location
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
-      let%map transition_writer_ref =
+      let%map pipe_id_ref =
         initialize ~sync_local_state ~cache_exceptions
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
@@ -672,7 +688,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~get_completed_work ~frontier_w ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~most_recent_valid_block_writer
-          ~consensus_local_state ~notify_online
+          ~consensus_local_state ~notify_online ~transition_writer_guard
+        |> Deferred.map ~f:(fun a -> ref a)
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
 
@@ -700,20 +717,28 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
            ~f:(fun (b_or_h, `Valid_cb vc) ->
              don't_wait_for
-             @@ let%map () =
+             @@ let%bind () =
                   let header_with_hash =
                     block_or_header_to_header_hashed_with_validation b_or_h
                   in
                   match get_current_frontier () with
+                  | None ->
+                      Deferred.unit
                   | Some frontier ->
                       if
                         is_transition_for_bootstrap
                           ~context:(module Context)
                           frontier header_with_hash
                       then (
-                        Strict_pipe.Writer.kill !transition_writer_ref ;
-                        Option.iter ~f:Strict_pipe.Writer.kill
-                          !producer_transition_writer_ref ;
+                        let%bind pipe_id = !pipe_id_ref in
+                        let close_result = Ivar.create () in
+                        Valid_transition_guard.send_control
+                          ~actor:transition_writer_guard
+                          ~message:
+                            (Valid_transition_guard.ClosePipe
+                               { result = close_result; id = pipe_id } ) ;
+                        let%bind _ = Ivar.read close_result in
+
                         let initial_root_transition =
                           Transition_frontier.(
                             Breadcrumb.validated_transition (root frontier))
@@ -730,15 +755,13 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                              ~trust_system ~verifier ~network ~time_controller
                              ~get_completed_work ~producer_transition_writer_ref
                              ~cache_exceptions ~verified_transition_writer
-                             ~clear_reader ~transition_writer_ref
-                             ~consensus_local_state ~frontier_w ~persistent_root
-                             ~persistent_frontier ~initial_root_transition
+                             ~clear_reader ~consensus_local_state ~frontier_w
+                             ~persistent_root ~persistent_frontier
+                             ~initial_root_transition
                              ~best_seen_transition:(Some b_or_h) ~catchup_mode
-                             () )
+                             ~transition_writer_guard () )
                       else Deferred.unit
-                  | None ->
-                      Deferred.unit
                 in
-                Strict_pipe.Writer.write !transition_writer_ref
-                  (b_or_h, `Valid_cb (Some vc)) ) ) ;
+                Valid_transition_guard.send_data ~actor:transition_writer_guard
+                  ~message:(b_or_h, `Valid_cb (Some vc)) ) ) ;
   (verified_transition_reader, initialization_finish_signal)
