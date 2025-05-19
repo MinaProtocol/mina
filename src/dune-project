@@ -1,6 +1,7 @@
 (lang dune 3.3)
 (implicit_transitive_deps true)
 
+(package (name actor))
 (package (name allocation_functor))
 (package (name archive))
 (package (name archive_blocks))
