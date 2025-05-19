@@ -53,7 +53,13 @@ struct
               Ivar.fill result `Closed_already_or_replaced ;
               Guard.Next state )
       | ReplacePipe { writer; id_returned } ->
-          Strict_pipe.Writer.kill writer ;
+          Option.iter state.writer ~f:(fun { writer; _ } ->
+              Strict_pipe.Writer.kill writer ) ;
+          (* WARN:
+             We know that the new writer provided is always valid because pipe
+             guard would only receive ClosePipe after ReplacePipe. If that's not
+             true we need to fix here.
+          *)
           Ivar.fill id_returned state.next_id ;
           let writer = Some { writer; id = state.next_id } in
           Guard.Next { writer; next_id = state.next_id + 1 } )
