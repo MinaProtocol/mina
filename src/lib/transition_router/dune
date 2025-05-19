@@ -40,9 +40,13 @@
   network_peer
   o1trace
   precomputed_values
+  proof_cache_tag
   proof_carrying_data
   pipe_lib
   signature_lib
+  staged_ledger
+  staged_ledger_diff
+  syncable_ledger
   transition_handler
   transition_frontier
   transition_frontier_base
