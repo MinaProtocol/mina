@@ -1071,14 +1071,14 @@ module Preconditions = struct
     module V1 = struct
       type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
-        ; account : Account_precondition.Stable.V2.t (*TODO should be 1? *)
+        ; account : Account_precondition.Stable.V1.t
         ; valid_while :
             Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             Zkapp_precondition.Numeric.Stable.V1.t
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
-      let to_latest = Fn.id
+      let to_latest = fun _ -> failwith "TODO"
     end
   end]
 
