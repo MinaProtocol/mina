@@ -63,8 +63,8 @@
   data_hash_lib
   currency
   genesis_constants
-  bash_colors
   graphql_lib
+  mina_stdlib
   o1trace_webkit_event
   generated_graphql_queries
   itn_crypto

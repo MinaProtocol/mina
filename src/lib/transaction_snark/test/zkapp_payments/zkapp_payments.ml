@@ -21,6 +21,8 @@ let%test_module "Zkapp payments tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let merkle_root_after_zkapp_command_exn t
         ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
         ~global_slot txn =
@@ -43,7 +45,7 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      Zkapp_command.of_simple
+      Zkapp_command.of_simple ~proof_cache_db
         { fee_payer =
             { body =
                 { public_key = acct1.account.public_key

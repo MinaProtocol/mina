@@ -49,7 +49,7 @@ For a score of 20:
 - too-big message "addr", "inventory", or "getdata" message sizes
 - too many headers, non-continuous headers
 
-And a score of of 1:
+And a score of 1:
 
 - missing "version" or "verack" messages, duplicate "version" message
 

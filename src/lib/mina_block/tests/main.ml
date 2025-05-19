@@ -64,6 +64,13 @@ let json_serialization_roundtrips_from_file () =
   json_serialization_roundtrips_impl
   @@ In_channel.read_all large_precomputed_json_file
 
+let field_element_decimal_deserialization () =
+  let filename =
+    "regtest-devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json"
+  in
+  let json = Yojson.Safe.from_file filename in
+  json_serialization_is_stable_impl @@ Yojson.Safe.to_string json
+
 let () =
   run "Precomputed block serialization tests"
     [ ( "sexp"
@@ -81,6 +88,10 @@ let () =
             json_serialization_is_stable_from_file
         ; test_case "serialization roundtrips from file" `Quick
             json_serialization_roundtrips_from_file
+        ] )
+    ; ( "field element represented by decimal"
+      , [ test_case "block is deserializable" `Quick
+            field_element_decimal_deserialization
         ] )
     ; ( "memory caching"
       , [ test_case "caching works" `Quick (fun () ->
