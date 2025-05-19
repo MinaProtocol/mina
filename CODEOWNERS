@@ -1,4 +1,4 @@
-/CODEOWNERS @nholland94 @bkase @mrmr1993
+/CODEOWNERS @bkase @dannywillems @deepthiskumar @georgeee
 /buildkite @MinaProtocol/infra-eng-reviewers
 /frontend/ @MinaProtocol/product-eng-reviewers
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers

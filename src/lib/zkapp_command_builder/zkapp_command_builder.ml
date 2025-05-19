@@ -59,25 +59,30 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
     Option.value_map memo ~default:Signed_command_memo.dummy
       ~f:Signed_command_memo.create_from_string_exn
   in
-  { fee_payer
-  ; memo
-  ; account_updates =
-      account_updates
-      |> Zkapp_command.Call_forest.map
-           ~f:(fun (p : Account_update.Body.Simple.t) : Account_update.t ->
-             let authorization =
-               match p.authorization_kind with
-               | None_given ->
-                   Control.Poly.None_given
-               | Proof _ ->
-                   Control.Poly.Proof
-                     (Lazy.force Mina_base.Proof.blockchain_dummy)
-               | Signature ->
-                   Control.Poly.Signature Signature.dummy
-             in
-             { body = Account_update.Body.of_simple p; authorization } )
-      |> Zkapp_command.Call_forest.accumulate_hashes_predicated
-  }
+  Zkapp_command.map_proofs
+    ~f:(const @@ Lazy.force Proof.For_tests.blockchain_dummy_tag)
+    { Zkapp_command.Poly.fee_payer
+    ; memo
+    ; account_updates =
+        Zkapp_command.Call_forest.map account_updates
+          ~f:(fun (p : Account_update.Body.Simple.t) ->
+            let authorization =
+              match p.authorization_kind with
+              | None_given ->
+                  Control.Poly.None_given
+              | Proof _ ->
+                  Control.Poly.Proof
+                    (Lazy.force Mina_base.Proof.blockchain_dummy)
+              | Signature ->
+                  Control.Poly.Signature Signature.dummy
+            in
+            { Account_update.Poly.body = Account_update.Body.of_simple p
+            ; authorization
+            } )
+        |> Zkapp_command.Call_forest.accumulate_hashes_predicated
+    }
+
+let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
 (* replace dummy signatures, proofs with valid ones for fee payer, other zkapp_command
    [keymap] maps compressed public keys to private keys
@@ -91,7 +96,8 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     let commitment =
       if use_full_commitment then full_txn_commitment else txn_commitment
     in
-    Signature_lib.Schnorr.Chunked.sign sk
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind sk
       (Random_oracle.Input.Chunked.field commitment)
   in
   let fee_payer_sk =
@@ -107,11 +113,11 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
   let open Async_kernel.Deferred.Let_syntax in
   let%map account_updates_with_valid_authorizations =
     Zkapp_command.Call_forest.deferred_mapi zkapp_command.account_updates
-      ~f:(fun _ndx ({ body; authorization } : Account_update.t) tree ->
+      ~f:(fun _ndx ({ body; authorization } : _ Account_update.Poly.t) tree ->
         let%map valid_authorization =
           match authorization with
           | Control.Poly.Signature _dummy ->
-              let pk = body.public_key in
+              let pk = body.Account_update.Body.public_key in
               let sk =
                 match
                   Signature_lib.Public_key.Compressed.Map.find keymap pk
@@ -140,7 +146,8 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
                   let%map (), (), proof =
                     prover ?handler:(Some handler) txn_stmt
                   in
-                  Control.Poly.Proof proof )
+                  Control.Poly.Proof
+                    (Proof_cache_tag.write_proof_to_disk proof_cache_db proof) )
           | None_given ->
               return authorization
         in

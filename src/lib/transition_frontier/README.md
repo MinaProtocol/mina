@@ -1,16 +1,37 @@
 # Transition Frontier
 
-The transition frontier is a hybrid in-memory/on-disk data structure which represents all known states on the network up to the point of finality. This data structure plays an essential role in tracking states produced by consensus protocol in a way that automatically garbage collects orphaned states which will never become part of the canonical chain, and does so in a way that optimizes for high read/write performance while also persisting information in the background for future recovery. As such, the transition frontier can be thought of as both an in-memory data structure, and a concurrent subsystem which maintains a persistent on-disk copy of the datastructure. To help maintain this viewpoint, the implementation is split into 2 main parts: a full frontier, which stores the entire expanded state of each block in-memory, and a persistent frontier, which asynchronously processes state transitions to the full frontier, proxying those operations to a RocksDB representation of the frontier in the background.
+The transition frontier is a hybrid in-memory/on-disk data structure which
+represents all known states on the network up to the point of finality. This
+data structure plays an essential role in tracking states produced by consensus
+protocol in a way that automatically garbage collects orphaned states which will
+never become part of the canonical chain, and does so in a way that optimizes
+for high read/write performance while also persisting information in the
+background for future recovery. As such, the transition frontier can be thought
+of as both an in-memory data structure, and a concurrent subsystem which
+maintains a persistent on-disk copy of the datastructure. To help maintain this
+viewpoint, the implementation is split into 2 main parts: a full frontier, which
+stores the entire expanded state of each block in-memory, and a persistent
+frontier, which asynchronously processes state transitions to the full frontier,
+proxying those operations to a RocksDB representation of the frontier in the
+background.
 
-In terms of the data structure, the transition frontier can be thought of as a combination of the following pieces of information:
+In terms of the data structure, the transition frontier can be thought of as a
+combination of the following pieces of information:
 
-1) A rose tree that contains all blockchains (including forks) up to `k` in length from the most recently finalized block.
+1) A rose tree that contains all blockchains (including forks) up to `k` in
+length from the most recently finalized block.
 2) A history of recently finalized blocks.
 3) A snarked ledger for the most recently finalized block.
-4) A series of ledger masks, chained off of the aforementioned snarked ledger, to represent intermediate staged ledger states achieved by blocks tracked past the most recently finalized block.
-5) The auxiliary scan state information associated with each block tracked past the most recently finalized block.
+4) A series of ledger masks, chained off of the aforementioned snarked ledger,
+to represent intermediate staged ledger states achieved by blocks tracked past
+the most recently finalized block.
+5) The auxiliary scan state information associated with each block tracked past
+the most recently finalized block.
 
-Importantly, the transition frontier also can identify which of the states it is tracking is the strongest state, which is referred to as the "best tip". The consensus mechanism informs the transition frontier of how to compare blocks for strength.
+Importantly, the transition frontier also can identify which of the states it is
+tracking is the strongest state, which is referred to as the "best tip". The
+consensus mechanism informs the transition frontier of how to compare blocks for
+strength.
 
 ## Formal Spec
 
@@ -39,8 +60,11 @@ TODO
 All frontiers must hold the following invariants at every state:
 
 - all paths leading from the root of the frontier are no more than `k` in length
-- the best tip of the frontier is stronger than all other nodes in the frontier (selected via consensus)
-- (for full frontier) all masks contained in breadcrumb staged ledgers are sequentially chained in a topology that matches the frontier's structure, ultimately rooted back to the snarked ledger stored in the root data
+- the best tip of the frontier is stronger than all other nodes in the frontier
+  (selected via consensus)
+- (for full frontier) all masks contained in breadcrumb staged ledgers are
+  sequentially chained in a topology that matches the frontier's structure,
+  ultimately rooted back to the snarked ledger stored in the root data
 
 #### Frontier Read Interace
 
@@ -51,21 +75,34 @@ Each frontier must expose the following operations:
 - find a node by block hash in O(1)
 - access the successor hashes of a node in O(1)
 
-Some other operations are also required, but these operations are more or less helpers on top of the operations described above.
+Some other operations are also required, but these operations are more or less
+helpers on top of the operations described above.
 
 #### Frontier State Transitions (Frontier Diffs)
 
-There are 3 types of state transitions that can be performed on a frontier. Frontier diffs serve as a data representation format for these 3 types of state transitions, and does so in a way that allows for the diffs to specify state transitions on different types of frontier nodes (as not all frontiers store the same node type). The supported frontier state transitions are:
+There are 3 types of state transitions that can be performed on a frontier.
+Frontier diffs serve as a data representation format for these 3 types of state
+transitions, and does so in a way that allows for the diffs to specify state
+transitions on different types of frontier nodes (as not all frontiers store the
+same node type). The supported frontier state transitions are:
 
 - add a node to the frontier
 - transition the root to a successor
 - update the best tip
 
-When these diffs are applied to frontiers, they are applied in a more-or-less blind fashion (as in, the frontier applying the diffs is not checking that the state reached after the application will still hold all of the frontier's invariants). Instead, the responsibility for maintaining frontier invariants is on the function which computes the diffs to apply.
+When these diffs are applied to frontiers, they are applied in a more-or-less
+blind fashion (as in, the frontier applying the diffs is not checking that the
+state reached after the application will still hold all of the frontier's
+invariants). Instead, the responsibility for maintaining frontier invariants is
+on the function which computes the diffs to apply.
 
 ### Persistent Root
 
-The persistent root stores and maintains the root snarked ledger of a frontier. This is the oldest ledger maintained by a frontier, and is persisted on-disk in the form of a RocksDB ledger. This ledger is loaded into the full frontier upon initialization and serves as the basis for ledger information for all ledgers maintained by the full frontier.
+The persistent root stores and maintains the root snarked ledger of a frontier.
+This is the oldest ledger maintained by a frontier, and is persisted on-disk in
+the form of a RocksDB ledger. This ledger is loaded into the full frontier upon
+initialization and serves as the basis for ledger information for all ledgers
+maintained by the full frontier.
 
 ### Root Data
 
@@ -73,7 +110,14 @@ TODO
 
 ### Full Frontier
 
-The full frontier is a fully expanded in memory frontier implementation. It is created from frontier root data and the root snarked ledger. The full frontier maintains a hash-indexed k-tree of breadcrumbs, implemented as a hashtable. Each breadcrumb in the frontier, including the root breadcrumb, consists of a block and a staged ledger associated with that block. The staged ledger's ledger state is built using ledger masks, where each ledger mask is chained off of the preceeding breadcrumbs staged ledger mask, and the root's staged ledger mask is chained off of the root's snarked ledger (the persistent root).
+The full frontier is a fully expanded in memory frontier implementation. It is
+created from frontier root data and the root snarked ledger. The full frontier
+maintains a hash-indexed k-tree of breadcrumbs, implemented as a hashtable. Each
+breadcrumb in the frontier, including the root breadcrumb, consists of a block
+and a staged ledger associated with that block. The staged ledger's ledger state
+is built using ledger masks, where each ledger mask is chained off of the
+preceeding breadcrumbs staged ledger mask, and the root's staged ledger mask is
+chained off of the root's snarked ledger (the persistent root).
 
 TODO: mask maintenance on root transition & mask chaining diagram
 
@@ -81,15 +125,42 @@ TODO: mask maintenance on root transition & mask chaining diagram
 
 TODO: add the new rules here for izzy's root hack
 
-The persistent frontier is an on-disk, limited representation of a frontier, along with a concurrent subsystem for synchronizing it with the full frontier's state. To maintain a reasonable level of disk I/O, the persistent frontier stores only blocks and not fully expanded breadcrumbs. It maintains neither the auxiliary scan state or the ledger required to construct the staged ledger. Instead, it relies on additional auxiliary information, "minimal root data", to also be available. This information is more expensive to write (larger) than the normal database synchronization operations, but occurs less often. Because the root data in the database is not necessarily kept in sync with the other information for the persistent frontier, and there is no guarantee that the persisted root (which is required for building the root staged ledger) will be in sync, it is important that the persistent frontier can recover from desynchronizations. The daemon attempts to always synchronize this data when it shuts down, but in the case of a crash, sometimes this will not happen.
+The persistent frontier is an on-disk, limited representation of a frontier,
+along with a concurrent subsystem for synchronizing it with the full frontier's
+state. To maintain a reasonable level of disk I/O, the persistent frontier
+stores only blocks and not fully expanded breadcrumbs. It maintains neither the
+auxiliary scan state or the ledger required to construct the staged ledger.
+Instead, it relies on additional auxiliary information, "minimal root data", to
+also be available. This information is more expensive to write (larger) than the
+normal database synchronization operations, but occurs less often. Because the
+root data in the database is not necessarily kept in sync with the other
+information for the persistent frontier, and there is no guarantee that the
+persisted root (which is required for building the root staged ledger) will be
+in sync, it is important that the persistent frontier can recover from
+desynchronizations. The daemon attempts to always synchronize this data when it
+shuts down, but in the case of a crash, sometimes this will not happen.
 
-The persistent frontier receives a notification every time diffs are applied to the full frontier. When this notification is received, the persistent frontier writes any diffs that were applied into a diff buffer. At a later point in time, this diff buffer is flushed, and all of the recorded diffs are performed against the persistent frontier's database. All diffs are processed in the buffer, but the auxiliary root data stored in the persistent frontier is only updated 1 time per flush.
+The persistent frontier receives a notification every time diffs are applied to
+the full frontier. When this notification is received, the persistent frontier
+writes any diffs that were applied into a diff buffer. At a later point in time,
+this diff buffer is flushed, and all of the recorded diffs are performed against
+the persistent frontier's database. All diffs are processed in the buffer, but
+the auxiliary root data stored in the persistent frontier is only updated 1 time
+per flush.
 
 ![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/persistent_frontier_concurrency.dot.png)
 
 #### Diff Buffer Flush Rules
 
-The diff buffer parameterized with 3 values: the preferred flush capacity, the maximum capacity, and a maximum latency. The diff buffer will attempt to flush as soon as the flush capacity is exceeded, so long as there is not an active flush job. If there is an active flush job, the diff buffer will continue accumulating diffs until that job has succeeded, up until it reaches the maximum capacity, at which point the daemon will crash. To ensure that the persistent frontier is still updated even when there is a low amount of activity on the network, the diff buffer will also be flushed after the maximum latency has been exceeded.
+The diff buffer parameterized with 3 values: the preferred flush capacity, the
+maximum capacity, and a maximum latency. The diff buffer will attempt to flush
+as soon as the flush capacity is exceeded, so long as there is not an active
+flush job. If there is an active flush job, the diff buffer will continue
+accumulating diffs until that job has succeeded, up until it reaches the maximum
+capacity, at which point the daemon will crash. To ensure that the persistent
+frontier is still updated even when there is a low amount of activity on the
+network, the diff buffer will also be flushed after the maximum latency has been
+exceeded.
 
 #### Database Representation
 
@@ -124,7 +195,12 @@ TODO
 
 ### Transition Frontier
 
-The transition frontier combines together the full frontier, persistent frontier, root history, and extensions into a single interface. It configures the root history to contain at most `2*k` previous roots, giving a total span of `3*k` blocks in the chains stored at any given time. This is done so that nodes can serve bootstrap requests (proofs of finality) to nodes within `2*k` blocks of the best tip.
+The transition frontier combines together the full frontier, persistent
+frontier, root history, and extensions into a single interface. It configures
+the root history to contain at most `2*k` previous roots, giving a total span of
+`3*k` blocks in the chains stored at any given time. This is done so that nodes
+can serve bootstrap requests (proofs of finality) to nodes within `2*k` blocks
+of the best tip.
 
 ![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/transition_frontier_diagram.conv.tex.png)
 
@@ -149,8 +225,12 @@ TODO: extensions
 
 ## Future Plans
 
-[RFC 0028](../../../rfcs/0028-frontier-synchronization.md) describes a long-term solution to a class of async race-conditions that are possible when consuming transition frontier extensions. We plan on implementing this work in the transition frontier at some point in the future.
+[RFC 0028](../../../rfcs/0028-frontier-synchronization.md) describes a long-term
+solution to a class of async race-conditions that are possible when consuming
+transition frontier extensions. We plan on implementing this work in the
+transition frontier at some point in the future.
 
-As mentioned in the root history section, there is some tech debt to refactor the root history as an extension or rip it out of extensions altogether.
+As mentioned in the root history section, there is some tech debt to refactor
+the root history as an extension or rip it out of extensions altogether.
 
 TODO: dump the state of desync recovery here

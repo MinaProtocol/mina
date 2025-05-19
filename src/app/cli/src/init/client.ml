@@ -3,12 +3,7 @@ open Async
 open Signature_lib
 open Mina_base
 open Mina_transaction
-
-module Client = Graphql_lib.Client.Make (struct
-  let preprocess_variables_string = Fn.id
-
-  let headers = String.Map.empty
-end)
+module Client = Graphql_lib.Client
 
 module Args = struct
   open Command.Param
@@ -1341,7 +1336,7 @@ let import_key =
                !"\n😄 Imported account!\nPublic key: %s\n"
                (Public_key.Compressed.to_base58_check public_key)
          | `Graphql_error _ as e ->
-             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn e)
+             don't_wait_for (Client.Connection_error.ok_exn e)
        in
        match access_method with
        | `GraphQL graphql_endpoint -> (
@@ -1349,7 +1344,7 @@ let import_key =
            | Ok res ->
                print_result res
            | Error err ->
-               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) )
+               don't_wait_for (Client.Connection_error.ok_exn err) )
        | `Conf_dir conf_dir ->
            let%map res = do_local conf_dir in
            print_result res
@@ -1365,7 +1360,8 @@ let import_key =
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Importing to local directory %s%s\n"
-                 Bash_colors.orange conf_dir Bash_colors.none ;
+                 Mina_stdlib.Bash_colors.orange conf_dir
+                 Mina_stdlib.Bash_colors.none ;
                let%map res = do_local conf_dir in
                print_result res ) )
 
@@ -1496,7 +1492,7 @@ let list_accounts =
          | Error (`Failed_request _ as err) ->
              Error err
          | Error (`Graphql_error _ as err) ->
-             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) ;
+             don't_wait_for (Client.Connection_error.ok_exn err) ;
              Ok ()
        in
        let do_local conf_dir =
@@ -1521,7 +1517,7 @@ let list_accounts =
            | Ok () ->
                ()
            | Error err ->
-               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) )
+               don't_wait_for (Client.Connection_error.ok_exn err) )
        | `Conf_dir conf_dir ->
            do_local conf_dir
        | `None -> (
@@ -1536,7 +1532,8 @@ let list_accounts =
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
                   Listing from local directory %s%s\n"
-                 Bash_colors.orange conf_dir Bash_colors.none ;
+                 Mina_stdlib.Bash_colors.orange conf_dir
+                 Mina_stdlib.Bash_colors.none ;
                do_local conf_dir ) )
 
 let create_account =
@@ -2125,6 +2122,7 @@ let archive_blocks =
                  add_to_failure_file path ) ) )
 
 let receipt_chain_hash =
+  let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let open Command.Let_syntax in
   Command.basic
     ~summary:
@@ -2162,7 +2160,8 @@ let receipt_chain_hash =
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =
                  Zkapp_command.get_transaction_commitments
-                   (Zkapp_command.write_all_proofs_to_disk zkapp_cmd)
+                   (Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+                      zkapp_cmd )
                in
                Receipt.Zkapp_command_elt.Zkapp_command_commitment
                  full_txn_commitment
@@ -2289,7 +2288,7 @@ let signature_kind =
     (let%map.Command () = Command.Param.return () in
      fun () ->
        let signature_kind_string =
-         match Mina_signature_kind.t with
+         match Mina_signature_kind.t_DEPRECATED with
          | Mainnet ->
              "mainnet"
          | Testnet ->
@@ -2346,6 +2345,13 @@ let test_ledger_application =
      and benchmark =
        flag "--dump-benchmark" ~doc:"Dump json file with benchmark data"
          (optional string)
+     and transfer_parties_get_actions_events =
+       flag "--transfer-parties-get-actions-events"
+         ~doc:
+           "If true, all updates in the ledger commands will have full actions \
+            and events. If false, they will have empty actions and events. \
+            Default: false."
+         no_arg
      in
      Cli_lib.Exceptions.handle_nicely
      @@ fun () ->
@@ -2361,8 +2367,9 @@ let test_ledger_application =
      let genesis_constants = Genesis_constants.Compiled.genesis_constants in
      Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
-       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing num_txs
-       ~constraint_constants ~genesis_constants ~benchmark )
+       ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing
+       ~transfer_parties_get_actions_events num_txs ~constraint_constants
+       ~genesis_constants ~benchmark )
 
 let itn_create_accounts =
   let compile_config = Mina_compile_config.Compiled.t in

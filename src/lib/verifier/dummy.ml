@@ -10,7 +10,7 @@ type t =
   ; blockchain_verification_key : Pickles.Verification_key.t
   ; transaction_verification_key : Pickles.Verification_key.t
   ; verify_transaction_snarks :
-         (Ledger_proof.Prod.t * Mina_base.Sok_message.t) list
+         (Ledger_proof.t * Mina_base.Sok_message.t) list
       -> unit Or_error.t Or_error.t Deferred.t
   }
 
@@ -111,7 +111,13 @@ let verify_commands { proof_level; _ }
       let f cmd = convert_check_res cmd (Common.check cmd) in
       List.map cs ~f |> Deferred.Or_error.return
   | Full ->
-      let results = List.map cs ~f:Common.check in
+      let read_proof (vk, stmt, proof) =
+        (vk, stmt, Proof_cache_tag.read_proof_from_disk proof)
+      in
+      let read_proofs (`Assuming ls) = `Assuming (List.map ~f:read_proof ls) in
+      let results =
+        List.map cs ~f:(Fn.compose (Result.map ~f:read_proofs) Common.check)
+      in
       let to_verify =
         List.concat_map
           ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
