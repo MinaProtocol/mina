@@ -14,8 +14,6 @@ struct
     , unit )
     Strict_pipe.Writer.t
 
-  type identified_writer = { writer : writer; id : int }
-
   type control_msg =
     | ClosePipe of
         { result : [ `Closed_already_or_replaced | `Accepted ] Ivar.t
@@ -23,7 +21,7 @@ struct
         }
     | ReplacePipe of { writer : writer; id_returned : int Ivar.t }
 
-  type state = { writer : identified_writer option; next_id : int }
+  type state = { writer : writer option; id : int }
 
   module Guard = Actor.Make (Data)
 
@@ -33,19 +31,19 @@ struct
       | None ->
           let%bind () = Async.Scheduler.yield () in
           wait_till_writer_ready ()
-      | Some writer_with_id ->
-          Deferred.return writer_with_id
+      | Some writer ->
+          Deferred.return writer
     in
-    let%map writer_with_id = wait_till_writer_ready () in
-    Strict_pipe.Writer.write writer_with_id.writer message ;
+    let%map writer = wait_till_writer_ready () in
+    Strict_pipe.Writer.write writer message ;
     Guard.Next state
 
   let control_handler ~(state : state) ~(message : control_msg) =
     Deferred.return
       ( match message with
       | ClosePipe { result; id = request_id } -> (
-          match state.writer with
-          | Some { id = held_id; writer } when held_id = request_id ->
+          match state with
+          | { id = held_id; writer = Some writer } when held_id = request_id ->
               Strict_pipe.Writer.kill writer ;
               Ivar.fill result `Accepted ;
               Guard.Next { state with writer = None }
@@ -53,16 +51,16 @@ struct
               Ivar.fill result `Closed_already_or_replaced ;
               Guard.Next state )
       | ReplacePipe { writer; id_returned } ->
-          Option.iter state.writer ~f:(fun { writer; _ } ->
+          Option.iter state.writer ~f:(fun writer ->
               Strict_pipe.Writer.kill writer ) ;
           (* WARN:
              We know that the new writer provided is always valid because pipe
              guard would only receive ClosePipe after ReplacePipe. If that's not
              true we need to fix here.
           *)
-          Ivar.fill id_returned state.next_id ;
-          let writer = Some { writer; id = state.next_id } in
-          Guard.Next { writer; next_id = state.next_id + 1 } )
+          let new_id = state.id + 1 in
+          Ivar.fill id_returned new_id ;
+          Guard.Next { writer = Some writer; id = new_id } )
 
   [%%define_locally Guard.(spawn, send_data, send_control)]
 
@@ -72,6 +70,5 @@ struct
         (* NOTE: We already have buffering in strict pipe, no point to further
                  buffer. Hence capacity is set to a very small number *)
       ~data_channel_type:(With_capacity (`Capacity 8, `Overflow Push_back))
-      ~data_handler ~control_handler ~logger
-      ~state:{ writer = None; next_id = 0 }
+      ~data_handler ~control_handler ~logger ~state:{ writer = None; id = 0 }
 end
