@@ -9,12 +9,14 @@
   ;; opam libraries
   async
   async_kernel
+  async_unix
   base.caml
   core
   core_kernel
   integers
   sexplib0
   ;; local libraries
+  actor
   best_tip_prover
   block_time
   bootstrap_controller
