@@ -7,6 +7,7 @@
   (pps ppx_compare ppx_jane ppx_mina ppx_version))
  (libraries
   ;; opam libraries
+  actor
   async
   async_kernel
   base.caml
