@@ -18,6 +18,8 @@ module type CONTEXT = sig
   val proof_cache_db : Proof_cache_tag.cache_db
 end
 
+module Valid_transition_guard = Pipe_guard.Make (Valid_transition)
+
 type Structured_log_events.t += Starting_transition_frontier_controller
   [@@deriving
     register_event { msg = "Starting transition frontier controller phase" }]
@@ -100,11 +102,11 @@ let is_transition_for_bootstrap
           ~context:(module Context)
           ~existing:root_consensus_state ~candidate:new_consensus_state
 
-let start_transition_frontier_controller ?transition_writer_ref
-    ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~time_controller ~get_completed_work ~producer_transition_writer_ref
-    ~verified_transition_writer ~clear_reader ~collected_transitions
-    ~cache_exceptions ~frontier_w frontier () =
+let start_transition_frontier_controller ~context:(module Context : CONTEXT)
+    ~trust_system ~verifier ~network ~time_controller ~get_completed_work
+    ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
+    ~collected_transitions ~cache_exceptions ~frontier_w
+    ~transition_writer_guard frontier () =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
@@ -120,19 +122,12 @@ let start_transition_frontier_controller ?transition_writer_ref
           ?valid_cb ~pipe_name:name ~logger )
       ()
   in
-  let transition_writer_ref =
-    (* If [transition_writer_ref] is None, it is set to
-       [ref transition_frontier_controller_writer].
-       If it already contains a reference, the value of
-       [transition_frontier_controller_writer] is assigned to it. This avoids
-       creating a new variable and allows the existing reference in
-       [transition_writer_ref] to be used each time a thread accesses this
-       variable. *)
-    Option.value_map transition_writer_ref
-      ~default:(ref transition_frontier_controller_writer) ~f:(fun r ->
-        r := transition_frontier_controller_writer ;
-        r )
-  in
+  let pipe_id_assigned = Ivar.create () in
+  let pipe_id_deferred = Valid_transition_guard.send_control ~actor:transition_writer_guard
+    ~message:
+      (Valid_transition_guard.Request.ReplacePipe
+         transition_frontier_controller_writer)
+          ;
   let producer_transition_reader, producer_transition_writer =
     Strict_pipe.create ~name:"transition frontier: producer transition"
       Synchronous
