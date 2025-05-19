@@ -4,51 +4,55 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_compare))
+  (pps ppx_compare ppx_jane ppx_mina ppx_version))
  (libraries
   ;; opam libraries
-  integers
-  base.caml
-  async_kernel
-  core_kernel
-  core
   async
+  async_kernel
+  base.caml
+  core
+  core_kernel
+  integers
   sexplib0
   ;; local libraries
   best_tip_prover
-  transition_handler
-  o1trace
-  bounded_types
-  mina_stdlib
-  mina_net2
-  consensus
-  logger
-  error_json
-  trust_system
-  mina_block
-  mina_state
-  transition_frontier_persistent_frontier
-  mina_networking
-  transition_frontier_controller
-  pipe_lib
-  transition_frontier
-  bootstrap_controller
-  mina_intf
-  transition_frontier_persistent_root
-  transition_frontier_base
-  mina_base
-  signature_lib
-  network_peer
-  with_hash
   block_time
-  mina_metrics
-  precomputed_values
-  mina_numbers
-  interruptible
-  genesis_constants
-  unsigned_extended
-  proof_carrying_data
-  ledger_catchup
+  bootstrap_controller
+  bounded_types
+  consensus
   data_hash_lib
+  error_json
+  genesis_constants
+  internal_tracing
+  interruptible
+  ledger_catchup
+  logger
+  mina_base
+  mina_block
+  mina_intf
+  mina_metrics
+  mina_networking
+  mina_numbers
+  mina_net2
+  mina_state
+  mina_stdlib
   mina_wire_types
-  internal_tracing))
+  network_peer
+  o1trace
+  precomputed_values
+  proof_cache_tag
+  proof_carrying_data
+  pipe_lib
+  signature_lib
+  staged_ledger
+  staged_ledger_diff
+  syncable_ledger
+  transition_handler
+  transition_frontier
+  transition_frontier_base
+  transition_frontier_controller
+  transition_frontier_persistent_frontier
+  transition_frontier_persistent_root
+  trust_system
+  unsigned_extended
+  with_hash))
