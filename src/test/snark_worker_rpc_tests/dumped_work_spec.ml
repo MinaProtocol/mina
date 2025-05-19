@@ -3,4 +3,4 @@ type t =
   ; spec : Snark_work_lib.Spec.Single.Stable.Latest.t One_or_two.Stable.V1.t
   ; fee : Currency.Fee.Stable.V1.t
   }
-[@@deriving yojson]
+[@@deriving of_yojson]
