@@ -1,0 +1,4 @@
+(lang dune 3.3)
+(implicit_transitive_deps false)
+
+(package (name transition_router))

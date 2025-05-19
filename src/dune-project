@@ -217,7 +217,6 @@
 (package (name transition_frontier_persistent_frontier))
 (package (name transition_frontier_persistent_root))
 (package (name transition_handler))
-(package (name transition_router))
 (package (name trust_system))
 (package (name unsigned_extended))
 (package (name uptime_service))
