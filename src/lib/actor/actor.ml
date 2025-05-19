@@ -30,17 +30,17 @@ struct
         * [ `Overflow of ('returns, 'behavior) overflow_behavior ]
         -> ('returns, 'behavior) channel_type
 
-  type 'state or_exit = Next of 'state | Exit
+  type 'state processed = Next of 'state | Exit | Unprocessed
 
   type ('data_returns, 'data_overflew, 'control_msg, 'state) t =
     { name : Yojson.Safe.t
-    ; control_inbox : 'control_msg Queue.t
-    ; data_inbox : DataMessage.t Queue.t
+    ; control_inbox : 'control_msg Deque.t
+    ; data_inbox : DataMessage.t Deque.t
     ; data_channel_type : ('data_returns, 'data_overflew) channel_type
     ; data_handler :
-        state:'state -> message:DataMessage.t -> 'state or_exit Deferred.t
+        state:'state -> message:DataMessage.t -> 'state processed Deferred.t
     ; control_handler :
-        state:'state -> message:'control_msg -> 'state or_exit Deferred.t
+        state:'state -> message:'control_msg -> 'state processed Deferred.t
     ; logger : Logger.t
     ; mutable is_running : bool
     ; mutable state : 'state
@@ -49,8 +49,8 @@ struct
   let create ~name ~data_channel_type ~data_handler ~control_handler ~logger
       ~state =
     { name
-    ; control_inbox = Queue.create ()
-    ; data_inbox = Queue.create ()
+    ; control_inbox = Deque.create ()
+    ; data_inbox = Deque.create ()
     ; data_channel_type
     ; data_handler
     ; control_handler
@@ -62,7 +62,7 @@ struct
   let terminate ~(actor : _ t) = actor.is_running <- false
 
   let send_control ~(actor : _ t) ~message =
-    Queue.enqueue actor.control_inbox message
+    Deque.enqueue_back actor.control_inbox message
 
   let send_data :
       type data_returns data_overflew.
@@ -72,20 +72,20 @@ struct
    fun ~actor ~message ->
     match actor.data_channel_type with
     | Infinity ->
-        Queue.enqueue actor.data_inbox message
+        Deque.enqueue_back actor.data_inbox message
     | With_capacity (`Capacity capacity, `Overflow Push_back) ->
         let open Deferred.Let_syntax in
         let rec wait_then_enqueue () =
-          if Queue.length actor.data_inbox >= capacity then
+          if Deque.length actor.data_inbox >= capacity then
             let%bind () = Async.Scheduler.yield () in
             wait_then_enqueue ()
           else (
-            Queue.enqueue actor.data_inbox message ;
+            Deque.enqueue_back actor.data_inbox message ;
             Deferred.return () )
         in
         wait_then_enqueue ()
     | With_capacity (`Capacity capacity, `Overflow Throw) ->
-        if Queue.length actor.data_inbox >= capacity then
+        if Deque.length actor.data_inbox >= capacity then
           Or_error.of_exn
             (ActorDataInboxOverflow
                { name = actor.name; capacity; attempt_enqueing = message } )
@@ -93,9 +93,9 @@ struct
     | With_capacity (`Capacity capacity, `Overflow (Drop_head warns_or_not))
       -> (
         (* NOTE: always enqueue first to deal with capacity 0/negative *)
-        Queue.enqueue actor.data_inbox message ;
-        if Queue.length actor.data_inbox > capacity then
-          let dropped = Queue.dequeue_exn actor.data_inbox in
+        Deque.enqueue_back actor.data_inbox message ;
+        if Deque.length actor.data_inbox > capacity then
+          let dropped = Deque.dequeue_front_exn actor.data_inbox in
           match warns_or_not with
           | `Warns ->
               let logger = actor.logger in
@@ -112,10 +112,10 @@ struct
               () )
     | With_capacity (`Capacity cap, `Overflow (Call_head callback)) ->
         (* NOTE: always enqueue first to deal with capacity 0/negative *)
-        Queue.enqueue actor.data_inbox message ;
+        Deque.enqueue_back actor.data_inbox message ;
 
-        if Queue.length actor.data_inbox > cap then
-          let head = Queue.dequeue_exn actor.data_inbox in
+        if Deque.length actor.data_inbox > cap then
+          let head = Deque.dequeue_front_exn actor.data_inbox in
           Some (callback head)
         else None
 
@@ -127,7 +127,27 @@ struct
       let rec loop () =
         if not actor.is_running then Deferred.unit
         else
-          match Queue.dequeue actor.control_inbox with
+          let process_data_msg () =
+            match Deque.dequeue_front actor.data_inbox with
+            | Some data_msg -> (
+                let%bind new_state =
+                  actor.data_handler ~state:actor.state ~message:data_msg
+                in
+                match new_state with
+                | Next new_state ->
+                    actor.state <- new_state ;
+                    loop ()
+                | Exit ->
+                    Deferred.unit
+                | Unprocessed ->
+                    Deque.enqueue_front actor.data_inbox data_msg ;
+                    let%bind () = Async.Scheduler.yield () in
+                    loop () )
+            | None ->
+                let%bind () = Async.Scheduler.yield () in
+                loop ()
+          in
+          match Deque.dequeue_front actor.control_inbox with
           | Some control_msg -> (
               let%bind new_state =
                 actor.control_handler ~state:actor.state ~message:control_msg
@@ -137,23 +157,14 @@ struct
                   actor.state <- new_state ;
                   loop ()
               | Exit ->
-                  Deferred.unit )
-          | None -> (
-              match Queue.dequeue actor.data_inbox with
-              | Some data_msg -> (
-                  let%bind new_state =
-                    actor.data_handler ~state:actor.state ~message:data_msg
-                  in
-                  match new_state with
-                  | Next new_state ->
-                      actor.state <- new_state ;
-                      loop ()
-                  | Exit ->
-                      Deferred.unit )
-              | None ->
-                  let%bind () = Async.Scheduler.yield () in
-                  loop () )
+                  Deferred.unit
+              | Unprocessed ->
+                  Deque.enqueue_front actor.control_inbox control_msg ;
+                  process_data_msg () )
+          | None ->
+              process_data_msg ()
       in
+
       let%bind.Deferred () = loop () in
       Deferred.Or_error.return () )
 end
