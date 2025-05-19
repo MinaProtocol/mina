@@ -4,6 +4,8 @@ open Hlist
 open Import
 
 module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : Step_verifier.Step_verifier_sig) = struct
+ module Per_proof_witness = Per_proof_witness.Make(Step_verifier)
+ 
   (* The data obtained from "compiling" an inductive rule into a circuit. *)
   type ( 'a_var
        , 'a_value
@@ -47,7 +49,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : Step_verifie
                    Promise.t )
                Promise.t
         ; requests :
-            (module Requests.Step(Inductive_rule).S
+            (module Requests.Step(Inductive_rule)(Per_proof_witness).S
                with type statement = 'a_value
                 and type max_proofs_verified = 'max_proofs_verified
                 and type proofs_verified = 'proofs_verified
@@ -126,7 +128,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : Step_verifie
       extract_lengths rule.prevs proofs_verified
     in
     let lte = Nat.lte_exn self_width max_proofs_verified in
-    let module Step_requests = Requests.Step (Inductive_rule) in
+    let module Step_requests = Requests.Step (Inductive_rule) (Per_proof_witness) in
     let requests = Step_requests.create () in
     let (typ : (var, value) Impls.Step.Typ.t) =
       match public_input with

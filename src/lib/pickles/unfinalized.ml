@@ -121,4 +121,5 @@ let dummy : unit -> t =
 
     end
 
+    (*TODO remove*)
   include Make (Step_verifier.Step_verifier_kimchi)

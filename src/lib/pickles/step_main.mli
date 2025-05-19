@@ -4,7 +4,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : Step_verifie
     'proofs_verified 'self_branches 'prev_vars 'prev_values 'var 'value 'a_var
     'a_value 'ret_var 'ret_value 'auxiliary_var 'auxiliary_value
     'max_proofs_verified 'local_branches 'local_signature.
-       (module Requests.Step(Inductive_rule).S
+       (module Requests.Step(Inductive_rule)(Per_proof_witness.Make(Step_verifier)).S
           with type auxiliary_value = 'auxiliary_value
            and type local_branches = 'local_branches
            and type local_signature = 'local_signature

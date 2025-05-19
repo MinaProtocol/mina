@@ -18,7 +18,7 @@ module Make
     (Max_proofs_verified : Nat.Add.Intf_transparent) (Step_verifier : Step_verifier.Step_verifier_sig) =
 struct
   module Step_branch_data = Step_branch_data.Make (Inductive_rule) (Step_verifier)
-
+module Per_proof_witness = Per_proof_witness.Make(Step_verifier)
   let _double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
   module E = struct

@@ -6,7 +6,7 @@ open Impls.Step
 
 module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : Step_verifier.Step_verifier_sig)= struct
   module B = Inductive_rule.B
-
+module Per_proof_witness = Per_proof_witness.Make(Step_verifier)
   let verify_one ~srs
       ({ app_state
        ; wrap_proof
@@ -112,7 +112,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : Step_verifie
   (* The SNARK function corresponding to the input inductive rule. *)
   let step_main :
       type proofs_verified self_branches prev_vars prev_values var value a_var a_value ret_var ret_value auxiliary_var auxiliary_value max_proofs_verified local_branches local_signature.
-         (module Requests.Step(Inductive_rule).S
+         (module Requests.Step(Inductive_rule)(Per_proof_witness).S
             with type local_signature = local_signature
              and type local_branches = local_branches
              and type statement = a_value

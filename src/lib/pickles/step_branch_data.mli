@@ -51,7 +51,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) (Step_verifier : Step_verifie
                    Promise.t )
                Promise.t
         ; requests :
-            (module Requests.Step(Inductive_rule).S
+            (module Requests.Step(Inductive_rule)(Per_proof_witness.Make(Step_verifier)).S
                with type auxiliary_value = 'auxiliary_value
                 and type local_branches = 'local_heights
                 and type local_signature = 'local_widths
