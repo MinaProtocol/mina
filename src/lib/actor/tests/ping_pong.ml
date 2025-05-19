@@ -9,8 +9,8 @@ module PongMessage = struct
   type t = Pong [@@deriving yojson]
 end
 
-module Ponger = Actor.Make (PingMessage)
-module Pinger = Actor.Make (PongMessage)
+module Ponger = Actor.Regular (PingMessage)
+module Pinger = Actor.Regular (PongMessage)
 
 let test_case () =
   let emitted_numbers = Queue.create () in
@@ -24,7 +24,7 @@ let test_case () =
       ~data_handler:(fun ~state ~message:Pong ->
         !data_handler ~state ~message:PongMessage.Pong )
       ~control_handler:(fun ~state ~message:() ->
-        Deferred.return (Pinger.Next state) )
+        Deferred.return (Actor.MNext state) )
       ~logger ~state:10
   in
   let ponger =
@@ -33,9 +33,9 @@ let test_case () =
       ~data_handler:(fun ~state ~message:Ping ->
         Queue.enqueue emitted_numbers state ;
         let%bind.Deferred () = Pinger.send_data ~actor:pinger ~message:Pong in
-        Deferred.return (Ponger.Next (state - 1)) )
+        Deferred.return (Actor.MNext (state - 1)) )
       ~control_handler:(fun ~state ~message:() ->
-        Deferred.return (Ponger.Next state) )
+        Deferred.return (Actor.MNext state) )
       ~logger ~state:99
   in
   (data_handler :=
@@ -43,10 +43,10 @@ let test_case () =
        Queue.enqueue emitted_numbers state ;
        if 0 = state - 1 then (
          Ponger.terminate ~actor:ponger ;
-         Deferred.return Pinger.Exit )
+         Deferred.return Actor.MExit )
        else
          let%bind.Deferred () = Ponger.send_data ~actor:ponger ~message:Ping in
-         Deferred.return (Pinger.Next (state - 1)) ) ;
+         Deferred.return (Actor.MNext (state - 1)) ) ;
   let all_deferred () =
     Deferred.all
       [ Ponger.spawn ponger
