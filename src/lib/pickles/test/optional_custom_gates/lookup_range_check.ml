@@ -12,39 +12,7 @@ let add_plonk_constraint c = add_constraint c
 
 let fresh_int i = exists Field.typ ~compute:(fun () -> Field.Constant.of_int i)
 
-let range_check0 () =
-  add_plonk_constraint
-    (RangeCheck0
-       { v0 = fresh_int 0
-       ; v0p0 = fresh_int 0
-       ; v0p1 = fresh_int 0
-       ; v0p2 = fresh_int 0
-       ; v0p3 = fresh_int 0
-       ; v0p4 = fresh_int 0
-       ; v0p5 = fresh_int 0
-       ; v0c0 = fresh_int 0
-       ; v0c1 = fresh_int 0
-       ; v0c2 = fresh_int 0
-       ; v0c3 = fresh_int 0
-       ; v0c4 = fresh_int 0
-       ; v0c5 = fresh_int 0
-       ; v0c6 = fresh_int 0
-       ; v0c7 = fresh_int 0
-       ; (* Coefficients *)
-         compact = Field.Constant.zero
-       } )
-
-let range_check_in_lookup_gate () =
-  add_plonk_constraint
-    (Lookup
-       { w0 = (* Range check table *) fresh_int 1
-       ; w1 = fresh_int 1
-       ; w2 = fresh_int 0
-       ; w3 = fresh_int 2
-       ; w4 = fresh_int 0
-       ; w5 = fresh_int ((1 lsl 12) - 1)
-       ; w6 = fresh_int 0
-       } )
+let range_check0 () = add_plonk_constraint (Boolean (fresh_int 0))
 
 let test_range_check_lookup () =
   let _tag, _cache_handle, (module Proof), Pickles.Provers.[ prove ] =
@@ -57,15 +25,14 @@ let test_range_check_lookup () =
           ; prevs = []
           ; main =
               (fun _ ->
-                range_check0 () ;
-                range_check_in_lookup_gate () ;
+                for _i = 0 to 65536 do
+                  Printf.printf "dzerz" ; range_check0 ()
+                done ;
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
                 } )
-          ; feature_flags =
-              Plonk_types.Features.
-                { none_bool with range_check0 = true; lookup = true }
+          ; feature_flags = Plonk_types.Features.none_bool
           }
         ] )
       ()
