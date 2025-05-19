@@ -982,7 +982,7 @@ module Account_precondition = struct
 
       let to_latest = Fn.id
 
-      [%%define_locally Zkapp_precondition.Account.(equal, compare)]
+      [%%define_locally Zkapp_precondition.Account.Stable.V3.(equal, compare)]
     end
 
     module V1 = struct
@@ -998,7 +998,7 @@ module Account_precondition = struct
 
       let to_latest = Fn.id
 
-      [%%define_locally Zkapp_precondition.Account.(equal, compare)]
+      [%%define_locally Zkapp_precondition.Account.Stable.V2.(equal, compare)]
     end
   end]
 
@@ -1078,7 +1078,7 @@ module Preconditions = struct
         }
       [@@deriving annot, sexp, equal, yojson, hash, hlist, compare, fields]
 
-      let to_latest = fun _ -> failwith "TODO"
+      let to_latest _ = failwith "TODO"
     end
   end]
 
