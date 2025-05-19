@@ -717,7 +717,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
            ~f:(fun (b_or_h, `Valid_cb vc) ->
              don't_wait_for
-             @@ let%bind () =
+             @@ let%map () =
                   let header_with_hash =
                     block_or_header_to_header_hashed_with_validation b_or_h
                   in

@@ -65,10 +65,7 @@ struct
   [%%define_locally Guard.(spawn, send_data, send_control)]
 
   let create ~logger () =
-    Guard.create
-      ~name:(`String "Valid Transition Pipe Guard")
-        (* NOTE: We already have buffering in strict pipe, no point to further
-                 buffer. Hence capacity is set to a very small number *)
-      ~data_channel_type:(With_capacity (`Capacity 8, `Overflow Push_back))
-      ~data_handler ~control_handler ~logger ~state:{ writer = None; id = 0 }
+    Guard.create ~name:(`String "Valid Transition Pipe Guard")
+      ~data_channel_type:Infinity ~data_handler ~control_handler ~logger
+      ~state:{ writer = None; id = 0 }
 end
