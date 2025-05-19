@@ -1,17 +1,16 @@
-(executable
+(tests
  (package rosetta_lib)
- (name test_encodings)
- (public_name test_encodings)
- (modes native)
- (modules test_encodings)
+ (names test_encodings test_user_command_info)
  (libraries
-   ;; opam libraries
-   core_kernel
-   base
-   ;; local libraries
-   signature_lib
-   rosetta_lib
-   rosetta_coding
-)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+  ;; opam libraries
+  alcotest
+  core_kernel
+  ;; local libraries
+  mina_base
+  rosetta_coding
+  rosetta_lib
+  signature_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_sexp_conv)))

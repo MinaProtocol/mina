@@ -262,7 +262,7 @@
     } // utils.lib.eachDefaultSystem (system:
       let
         rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isDarwin then {
+          if prev.stdenv.isAarch64 || prev.stdenv.isDarwin then {
             rocksdb-mina = pkgs.rocksdb;
           } else {
             rocksdb-mina = pkgs.rocksdb511;
@@ -297,7 +297,22 @@
 
         # Packages for the development environment that are not needed to build mina-dev.
         # For instance dependencies for tests.
-        devShellPackages = with pkgs; [ rosetta-cli wasm-pack nodejs binaryen ];
+        devShellPackages = with pkgs; [
+          rosetta-cli
+          wasm-pack
+          nodejs
+          binaryen
+          zip
+          libiconv
+          cargo
+          curl
+          (pkgs.python3.withPackages (python-pkgs: [
+              python-pkgs.click
+              python-pkgs.requests
+            ]))
+          jq
+          rocksdb.tools
+        ];
       in {
         inherit ocamlPackages;
 
@@ -357,9 +372,7 @@
           shellHook = ''
             export MINA_BRANCH=$()
           '';
-          buildInputs = [
-            self.packages.${system}.test_executive
-          ];
+          buildInputs = [ self.packages.${system}.test_executive ];
         };
         packages.impure-shell =
           (import ./nix/impure-shell.nix pkgs).inputDerivation;

@@ -1,8 +1,7 @@
 #!/bin/bash
 
 BRANCH=$1
-CURRENT=$(git branch --show-current)
-echo 'Testing for conflicts between the current branch `'"${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"'` and `'"${BRANCH}"'`...'
+echo "Checking conflicts: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} <--> ${BRANCH}"
 
 
 # Adapted from this stackoverflow answer: https://stackoverflow.com/a/10856937
@@ -15,20 +14,18 @@ if [ "${BUILDKITE:-false}" == true ]
 then
     # Tell git where to find ssl certs
     git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt
+    git config --global user.email "hello@ci.com"
+    git config --global user.name "It's me, CI"
 fi
 
-# Fetch a fresh copy of the repo
-git fetch origin
+# Fetch a fresh copy of the target branch
+source buildkite/scripts/refresh_code.sh
 
-source buildkite/scripts/handle-fork.sh
-
-git config --global user.email "hello@ci.com"
-git config --global user.name "It's me, CI"
 # Check mergeability. We use flags so that
 # * `--no-commit` stops us from updating the index with a merge commit,
 # * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
 #   straightforward fast-forward
-git merge --no-commit --no-ff ${REMOTE}/$BRANCH
+git merge --no-commit --no-ff origin/"${BRANCH}"
 
 RET=$?
 
