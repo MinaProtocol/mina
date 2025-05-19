@@ -19,7 +19,7 @@ let test_case () =
     ref (fun ~state:_ ~message:_ -> failwith "unimplemented")
   in
   let pinger =
-    Pinger.create ~name:"pinger"
+    Pinger.create ~name:(`String "pinger")
       ~data_channel_type:(With_capacity (`Capacity 1, `Overflow Push_back))
       ~data_handler:(fun ~state ~message:Pong ->
         !data_handler ~state ~message:PongMessage.Pong )
@@ -28,7 +28,7 @@ let test_case () =
       ~logger ~state:10
   in
   let ponger =
-    Ponger.create ~name:"ponger"
+    Ponger.create ~name:(`String "ponger")
       ~data_channel_type:(With_capacity (`Capacity 1, `Overflow Push_back))
       ~data_handler:(fun ~state ~message:Ping ->
         Queue.enqueue emitted_numbers state ;

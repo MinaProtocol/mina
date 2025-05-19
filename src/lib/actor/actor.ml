@@ -9,9 +9,9 @@ end) =
 struct
   exception
     ActorDataInboxOverflow of
-      { name : string; capacity : int; attempt_enqueing : DataMessage.t }
+      { name : Yojson.Safe.t; capacity : int; attempt_enqueing : DataMessage.t }
 
-  exception RunningActorSpawned of { name : string }
+  exception RunningActorSpawned of { name : Yojson.Safe.t }
 
   type (_, _) overflow_behavior =
     | Throw : (unit Or_error.t, [ `Throw ]) overflow_behavior
@@ -33,7 +33,7 @@ struct
   type 'state or_exit = Next of 'state | Exit
 
   type ('data_returns, 'data_overflew, 'control_msg, 'state) t =
-    { name : string
+    { name : Yojson.Safe.t
     ; control_inbox : 'control_msg Queue.t
     ; data_inbox : DataMessage.t Queue.t
     ; data_channel_type : ('data_returns, 'data_overflew) channel_type
@@ -100,10 +100,14 @@ struct
           | `Warns ->
               let logger = actor.logger in
               [%log info]
-                "Actor %s has data inbox capacity %d, dropping head message \
-                 $message"
-                actor.name capacity
-                ~metadata:[ ("message", DataMessage.to_yojson dropped) ]
+                "Actor $actor_id has data inbox capacity %d, dropping head \
+                 message $message"
+                capacity
+                ~metadata:
+                  [ ("actor_id", actor.name)
+                  ; ("message", DataMessage.to_yojson dropped)
+                  ; ("capacity", `Int capacity)
+                  ]
           | `No_warns ->
               () )
     | With_capacity (`Capacity cap, `Overflow (Call_head callback)) ->
