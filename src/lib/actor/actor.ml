@@ -236,6 +236,7 @@ struct
               actor.state <- state ;
               loop ()
           | MExit ->
+              actor.is_running <- false ;
               Deferred.unit
           | MUnprocessed ->
               let%bind () = Async.Scheduler.yield () in
