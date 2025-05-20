@@ -604,7 +604,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
       let%map input =
         create_replayer_checkpoint ~ledger ~start_slot_since_genesis
       in
-      input_to_yojson input |> Yojson.Safe.to_string
+      input_to_yojson input
     in
     let checkpoint_file =
       let checkpoint_filename =
@@ -620,7 +620,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
     [%log info] "Writing checkpoint file"
       ~metadata:[ ("checkpoint_file", `String checkpoint_file) ] ;
     Out_channel.with_file checkpoint_file ~f:(fun oc ->
-        Out_channel.output_string oc replayer_checkpoint ) )
+        Yojson.Safe.to_channel oc replayer_checkpoint ) )
   else (
     [%log info] "Not writing checkpoint file at slot %Ld, because not canonical"
       last_global_slot_since_genesis
@@ -1681,11 +1681,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                       ~next_epoch_ledger:!next_epoch_ledger
                       ~next_seed:!next_seed input.genesis_ledger
                   in
-                  output_to_yojson output |> Yojson.Safe.to_string
+                  output_to_yojson output
                 in
                 return
                 @@ Out_channel.with_file output_file ~f:(fun oc ->
-                       Out_channel.output_string oc output ) )
+                       Yojson.Safe.to_channel oc output ) )
               else (
                 [%log error] "There were %d errors, not writing output"
                   !error_count ;
