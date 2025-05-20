@@ -307,6 +307,7 @@ module type Transition_router_intf = sig
   val run :
        ?sync_local_state:bool
     -> ?cache_exceptions:bool
+    -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
     -> context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
