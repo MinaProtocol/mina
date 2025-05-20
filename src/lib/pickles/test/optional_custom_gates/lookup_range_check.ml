@@ -12,10 +12,12 @@ let add_plonk_constraint c = add_constraint c
 
 let fresh_int i = exists Field.typ ~compute:(fun () -> Field.Constant.of_int i)
 
-let range_check0 () = add_plonk_constraint (Boolean (fresh_int 0))
+let add_bool_cst () = add_plonk_constraint (Boolean (fresh_int 0))
 
 let test_range_check_lookup () =
   let _tag, _cache_handle, (module Proof), Pickles.Provers.[ prove ] =
+
+Printf.printf "\n----starting test--------\n";
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
       ~max_proofs_verified:(module Nat.N0)
@@ -25,9 +27,7 @@ let test_range_check_lookup () =
           ; prevs = []
           ; main =
               (fun _ ->
-                for _i = 0 to 65536 do
-                  Printf.printf "dzerz" ; range_check0 ()
-                done ;
+              add_bool_cst ();
                 { previous_proof_statements = []
                 ; public_output = ()
                 ; auxiliary_output = ()
