@@ -4,10 +4,9 @@
  (libraries
   ;; OPAM libraries
   async
-  core
+  core_kernel
   ;; MINA libraries
   logger)
-  
  (preprocess
   (pps
    ppx_let

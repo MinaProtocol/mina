@@ -1,5 +1,5 @@
 open Async
-open Core
+open Core_kernel
 
 type 'state msg_processed = MNext of 'state | MExit | MUnprocessed
 
@@ -129,7 +129,7 @@ struct
         let open Deferred.Let_syntax in
         let rec wait_then_enqueue () =
           if Deque.length actor.data_inbox >= capacity then
-            let%bind () = Async.Scheduler.yield () in
+            let%bind () = Scheduler.yield () in
             wait_then_enqueue ()
           else (
             Deque.enqueue_back actor.data_inbox message ;
@@ -239,7 +239,7 @@ struct
               actor.is_running <- false ;
               Deferred.unit
           | MUnprocessed ->
-              let%bind () = Async.Scheduler.yield () in
+              let%bind () = Scheduler.yield () in
               loop ()
       in
 
