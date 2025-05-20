@@ -13,9 +13,9 @@ type (_, _, _) overflow_behavior =
   | Drop_head :
       [ `Warns | `No_warns ]
       -> ('data, unit, [ `Drop_head ]) overflow_behavior
-  | Call_head :
+  | Drop_and_call_head :
       ('data -> 'returns)
-      -> ('data, 'returns option, [ `Call_head ]) overflow_behavior
+      -> ('data, 'returns option, [ `Drop_and_call_head ]) overflow_behavior
   | Push_back : ('data, unit Deferred.t, [ `Push_back ]) overflow_behavior
 
 type (_, _, _) channel_type =
@@ -157,7 +157,7 @@ struct
                   ]
           | `No_warns ->
               () )
-    | With_capacity (`Capacity cap, `Overflow (Call_head callback)) ->
+    | With_capacity (`Capacity cap, `Overflow (Drop_and_call_head callback)) ->
         (* NOTE: always enqueue first to deal with capacity 0/negative *)
         Deque.enqueue_back actor.data_inbox message ;
 
