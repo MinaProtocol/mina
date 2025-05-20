@@ -1035,6 +1035,10 @@ module Pipe = struct
       Counter.v "transition_frontier_primary_transitions" ~help ~namespace
         ~subsystem
 
+    let router_writer_guard_void : Counter.t =
+      let help = "Overflow in writer guard in Transition_router" in
+      Counter.v "router_writer_guard_void" ~help ~namespace ~subsystem
+
     let router_transition_frontier_controller : Counter.t =
       let help =
         "Overflow in transition frontier controller pipe in Transition_router"

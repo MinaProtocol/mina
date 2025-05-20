@@ -341,6 +341,8 @@ module Pipe = struct
 
     let router_transition_frontier_controller : Counter.t = ()
 
+    let router_writer_guard_void : Counter.t = ()
+
     let router_bootstrap_controller : Counter.t = ()
 
     let router_verified_transitions : Counter.t = ()
