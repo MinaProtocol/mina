@@ -991,25 +991,38 @@ module Sql = struct
       User_commands.run ~logger ~offset ~limit (module Conn) query
       |> Errors.Lift.sql ~context:"Finding user commands with transaction query"
     in
+
+    (* user_command_count is a total number of user commands disregard limit & offset paramaters
+       therefore we need to calculate the real length of user commands.
+       The same for internal commands and zkapp commands
+    *)
+    let fetched_user_command_length =
+      List.length raw_user_commands |> Int64.of_int_exn
+    in
+
     let offset =
       Option.map offset ~f:(fun offset ->
           Int64.(max 0L (offset - user_commands_count)) )
     in
     let limit =
       Option.map limit ~f:(fun limit ->
-          Int64.(max 0L (limit - user_commands_count)) )
+          Int64.(max 0L (limit - fetched_user_command_length)) )
     in
     let%bind internal_commands_count, raw_internal_commands =
       Internal_commands.run (module Conn) ~logger ~offset ~limit query
       |> Errors.Lift.sql ~context:"Finding internal commands within block"
     in
+    let fetched_internal_command_length =
+      List.length raw_internal_commands |> Int64.of_int_exn
+    in
+
     let offset =
       Option.map offset ~f:(fun offset ->
-          Int64.(max 0L (offset - user_commands_count)) )
+          Int64.(max 0L (offset - internal_commands_count)) )
     in
     let limit =
       Option.map limit ~f:(fun limit ->
-          Int64.(max 0L (limit - user_commands_count)) )
+          Int64.(max 0L (limit - fetched_internal_command_length)) )
     in
     let%bind zkapp_commands_count, raw_zkapp_commands =
       Zkapp_commands.run (module Conn) ~logger ~offset ~limit query
