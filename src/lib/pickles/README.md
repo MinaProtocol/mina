@@ -90,7 +90,9 @@ library. Refer to the file header for a content description:
 
 ## Resources
 
-Some public videos you can find on YouTube describing the intial idea behind
+For a general explain for recursive-SNARKs, please check [ZKP MOOC Lec 10: Recursive SNARKs](https://www.youtube.com/watch?v=0LW-qeVe6QI&list=PLS01nW3Rtgor_yJmQsGBZAg5XM4TSGpPs&index=10)
+
+Some public videos you can find on YouTube describing the initial idea behind
 Pickles. It might be outdated if the IOP is changed.
 - [zkStudyClub: Izaak Meckler o1Labs - Pickles ](https://www.youtube.com/watch?v=kmCXdjv5oP0)
 - [ZK-GLOBAL 0x05 - Izaak Meckler - Meet Pickles SNARK ](https://www.youtube.com/watch?v=nOnGOxyh7jY)

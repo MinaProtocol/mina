@@ -55,6 +55,8 @@ end
 module Zkapp_command_applied = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         { accounts : (Account_id.Stable.V2.t * Account.Stable.V2.t option) list
@@ -66,11 +68,37 @@ module Zkapp_command_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    { accounts : (Account_id.t * Account.t option) list
+    ; command : Zkapp_command.t With_status.t
+    ; new_accounts : Account_id.t list
+    }
+
+  let write_all_proofs_to_disk ~proof_cache_db
+      { Stable.Latest.accounts; command; new_accounts } : t =
+    { accounts
+    ; command =
+        With_status.map
+          ~f:(Zkapp_command.write_all_proofs_to_disk ~proof_cache_db)
+          command
+    ; new_accounts
+    }
+
+  let read_all_proofs_from_disk { accounts; command; new_accounts } :
+      Stable.Latest.t =
+    { Stable.Latest.accounts
+    ; command =
+        With_status.map ~f:Zkapp_command.read_all_proofs_from_disk command
+    ; new_accounts
+    }
 end
 
 module Command_applied = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         | Signed_command of Signed_command_applied.Stable.V2.t
@@ -80,6 +108,23 @@ module Command_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    | Signed_command of Signed_command_applied.t
+    | Zkapp_command of Zkapp_command_applied.t
+
+  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t = function
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command c ->
+        Zkapp_command
+          (Zkapp_command_applied.write_all_proofs_to_disk ~proof_cache_db c)
+
+  let read_all_proofs_from_disk : t -> Stable.Latest.t = function
+    | Signed_command c ->
+        Signed_command c
+    | Zkapp_command c ->
+        Zkapp_command (Zkapp_command_applied.read_all_proofs_from_disk c)
 end
 
 module Fee_transfer_applied = struct
@@ -114,9 +159,30 @@ module Coinbase_applied = struct
   end]
 end
 
-module Varying = struct
+module Varying : sig
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V2 : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+  end]
+
+  type t =
+    | Command of Command_applied.t
+    | Fee_transfer of Fee_transfer_applied.t
+    | Coinbase of Coinbase_applied.t
+
+  val write_all_proofs_to_disk :
+    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
+end = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V2 = struct
       type t =
         | Command of Command_applied.Stable.V2.t
@@ -127,10 +193,33 @@ module Varying = struct
       let to_latest = Fn.id
     end
   end]
+
+  type t =
+    | Command of Command_applied.t
+    | Fee_transfer of Fee_transfer_applied.t
+    | Coinbase of Coinbase_applied.t
+
+  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t = function
+    | Command c ->
+        Command (Command_applied.write_all_proofs_to_disk ~proof_cache_db c)
+    | Fee_transfer f ->
+        Fee_transfer f
+    | Coinbase c ->
+        Coinbase c
+
+  let read_all_proofs_from_disk : t -> Stable.Latest.t = function
+    | Command c ->
+        Command (Command_applied.read_all_proofs_from_disk c)
+    | Fee_transfer f ->
+        Fee_transfer f
+    | Coinbase c ->
+        Coinbase c
 end
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V2 = struct
     type t =
       { previous_hash : Ledger_hash.Stable.V1.t; varying : Varying.Stable.V2.t }
@@ -139,6 +228,8 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
+
+type t = { previous_hash : Ledger_hash.t; varying : Varying.t }
 
 let burned_tokens : t -> Currency.Amount.t =
  fun { varying; _ } ->
@@ -239,3 +330,14 @@ let transaction_status : t -> Transaction_status.t =
       f.fee_transfer.status
   | Coinbase c ->
       c.coinbase.status
+
+let write_all_proofs_to_disk ~proof_cache_db
+    { Stable.Latest.previous_hash; varying } : t =
+  { previous_hash
+  ; varying = Varying.write_all_proofs_to_disk ~proof_cache_db varying
+  }
+
+let read_all_proofs_from_disk { previous_hash; varying } =
+  { Stable.Latest.previous_hash
+  ; varying = Varying.read_all_proofs_from_disk varying
+  }

@@ -140,7 +140,7 @@ module Pickles = struct
       (O.Side_loaded.Verification_key.Stable)
       (W.Side_loaded.Verification_key)
   include Assert_equal0V1 (O.Backend.Tick.Field.Stable) (W.Backend.Tick.Field)
-  include Assert_equal2 (O.Proof) (W.Proof)
+  include Assert_equal1 (O.Proof) (W.Proof)
   include
     Assert_equal0V2
       (O.Proof.Proofs_verified_2.Stable)
@@ -249,9 +249,7 @@ module Mina_base = struct
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
   include Assert_equal0V1 (O.Account_update.Stable) (W.Account_update)
   include Assert_equal0V1 (O.Zkapp_command.Stable) (W.Zkapp_command)
-  include Assert_equal0V1 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
   include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
-  include Assert_equal0V2 (O.User_command.Valid.Stable) (W.User_command.Valid)
   include
     Assert_equal0V1
       (O.Pending_coinbase.State_stack.Stable)

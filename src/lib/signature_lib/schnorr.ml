@@ -305,7 +305,7 @@ module Message = struct
   let network_id_other chain_name = chain_name
 
   let network_id =
-    match Mina_signature_kind.t with
+    match Mina_signature_kind.t_DEPRECATED with
     | Mainnet ->
         network_id_mainnet
     | Testnet ->
@@ -335,7 +335,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ?(signature_kind = Mina_signature_kind.t) =
+    let derive ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -362,7 +362,10 @@ module Message = struct
       |> Inner_curve.Scalar.of_bits
 
     let hash ?signature_kind =
-      make_hash ~init:(Hash_prefix_states.signature_legacy ?signature_kind)
+      let signature_kind =
+        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+      in
+      make_hash ~init:(Hash_prefix_states.signature_legacy ~signature_kind)
 
     let hash_for_mainnet =
       make_hash ~init:Hash_prefix_states.signature_for_mainnet_legacy
@@ -380,8 +383,9 @@ module Message = struct
       in
       make_checked (fun () ->
           let open Random_oracle.Legacy.Checked in
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           hash
-            ~init:(Hash_prefix_states.signature_legacy ?signature_kind:None)
+            ~init:(Hash_prefix_states.signature_legacy ~signature_kind)
             (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list )
@@ -409,7 +413,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ?(signature_kind = Mina_signature_kind.t) =
+    let derive ?(signature_kind = Mina_signature_kind.t_DEPRECATED) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -436,7 +440,10 @@ module Message = struct
       |> Inner_curve.Scalar.of_bits
 
     let hash ?signature_kind =
-      make_hash ~init:(Hash_prefix_states.signature ?signature_kind)
+      let signature_kind =
+        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+      in
+      make_hash ~init:(Hash_prefix_states.signature ~signature_kind)
 
     let hash_for_mainnet =
       make_hash ~init:Hash_prefix_states.signature_for_mainnet
@@ -454,8 +461,9 @@ module Message = struct
       in
       make_checked (fun () ->
           let open Random_oracle.Checked in
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
           hash
-            ~init:(Hash_prefix_states.signature ?signature_kind:None)
+            ~init:(Hash_prefix_states.signature ~signature_kind)
             (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list )

@@ -34,13 +34,13 @@ else
   debs=(${DEBS//,/ })
   for i in "${debs[@]}"; do
     case $i in
-      mina-devnet*|mina-mainnet)
+      mina-berkeley*|mina-devnet|mina-mainnet)
         # Downaload mina-logproc too
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
       mina-create-legacy-genesis)
         # Download locally static debians (for example mina-legacy-create-genesis )
-        ./buildkite/scripts/cache/manager.sh read --root debs "$MINA_DEB_CODENAME/$i*" _build
+        ./buildkite/scripts/cache/manager.sh read --root debs "$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
       ;;
     esac
     ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}_*" $LOCAL_DEB_FOLDER
@@ -53,7 +53,7 @@ for i in "${debs[@]}"; do
 done
 
 # Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
+source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
 
 # Install debians
 echo "Installing mina packages: $DEBS"

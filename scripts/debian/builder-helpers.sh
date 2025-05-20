@@ -46,13 +46,13 @@ esac
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
   devnet|mainnet)
-    MINA_DEB_NAME="mina-devnet"
+    MINA_DEB_NAME="mina-berkeley"
     DEB_SUFFIX=""
    ;;
   *)
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
-    MINA_DEB_NAME="mina-devnet-${_SUFFIX}"
+    MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
     DEB_SUFFIX="-${_SUFFIX}"
     ;;
 esac
@@ -137,9 +137,9 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet)"
+  echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
   echo "Signature Type: ${2} (mainnet or testnet)"
-  echo "Seed List URL path: ${3} (like seed-lists/devnet_seeds.txt)"
+  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
@@ -161,6 +161,7 @@ copy_common_daemon_configs() {
   # Include all useful genesis ledgers
   cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
   cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
+  cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
   # Set the default configuration based on Network name ($1)
   cp ../genesis_ledgers/"${1}".json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   cp ../scripts/hardfork/create_runtime_config.sh "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
@@ -286,8 +287,9 @@ build_rosetta_mainnet_deb() {
 
   build_deb mina-rosetta-mainnet
 }
+##################################### END ROSETTA MAINNET PACKAGE ####################################
 
-##################################### ROSETTA MAINNET PACKAGE #######################################
+##################################### ROSETTA DEVNET PACKAGE #########################################
 build_rosetta_devnet_deb() {
 
   echo "------------------------------------------------------------"
@@ -299,6 +301,21 @@ build_rosetta_devnet_deb() {
 
   build_deb mina-rosetta-devnet
 }
+##################################### END ROSETTA MAINNET PACKAGE #####################################
+
+##################################### ROSETTA BERKELEY PACKAGE #######################################
+build_rosetta_berkeley_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building berkeley rosetta deb"
+
+  create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+
+  build_deb mina-rosetta-berkeley
+}
+##################################### END BERKELEY PACKAGE #######################################
 
 ##################################### MAINNET PACKAGE #######################################
 build_daemon_mainnet_deb() {
@@ -314,21 +331,36 @@ build_daemon_mainnet_deb() {
 }
 ##################################### END MAINNET PACKAGE #######################################
 
-##################################### DEVNET PACKAGE #######################################
+##################################### DEVNET PACKAGE ############################################
 build_daemon_devnet_deb() {
 
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network'
+  create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
-  build_deb "${MINA_DEB_NAME}"
+  build_deb mina-devnet
 }
-##################################### END DEVNET PACKAGE #######################################
+##################################### END DEVNET PACKAGE ########################################
 
-##################################### ARCHIVE PACKAGE ##########################################
+##################################### BERKELEY PACKAGE ##########################################
+build_daemon_berkeley_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
+
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+
+  build_deb "${MINA_DEB_NAME}"
+
+}
+##################################### END BERKELEY PACKAGE ######################################
+
+##################################### ARCHIVE PACKAGE ###########################################
 build_archive_deb () {
   ARCHIVE_DEB=mina-archive${DEB_SUFFIX}
 
@@ -355,8 +387,10 @@ build_archive_deb () {
   build_deb "$ARCHIVE_DEB"
 
 }
+##################################### END ARCHIVE PACKAGE ########################################
 
-##################################### ZKAPP TEST TXN #######################################
+
+##################################### ZKAPP TEST TXN #############################################
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley ZkApp test transaction tool:"
@@ -368,4 +402,4 @@ build_zkapp_test_transaction_deb () {
 
   build_deb mina-zkapp-test-transaction
 }
-##################################### END ZKAPP TEST TXN PACKAGE #######################################
+##################################### END ZKAPP TEST TXN PACKAGE ##################################

@@ -73,7 +73,8 @@
   hex
   snark_bits
   error_json
-  ppx_version.runtime)
+  ppx_version.runtime
+  proof_cache_tag)
  (preprocess
   (pps
    ppx_annot

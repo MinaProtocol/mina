@@ -19,7 +19,6 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
-            , Artifacts.Type.BatchTxn
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
