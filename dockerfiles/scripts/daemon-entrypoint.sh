@@ -77,12 +77,15 @@ for script in /exitpoint.d/*; do
   fi
 done
 
-# TODO: have a better way to intersperse log files like we used to, without infinite disk use
-# For now, tail the last 20 lines of the verbose log files when the node shuts down
+# TODO: have a better way to intersperse log files like we used to, without
+# infinite disk use
+# For now, tail the last 20 lines of the verbose log files when the node shuts
+# down
 if [[ ${VERBOSE} ]]; then
   # Tail verbose log files
   tail -n 20 "${VERBOSE_LOG_FILES[@]}"
-  # Proccess .mina-config/mina-best-tip.log with jq for a short display of the last 5 blocks that the node considered "best tip"
+  # Proccess .mina-config/mina-best-tip.log with jq for a short display of the
+  # last 5 blocks that the node considered "best tip"
   CONSENSUS_STATE='.protocol_state.body.consensus_state'
   tail -n 5 ".mina-config/mina-best-tip.log" | jq -rc '.metadata.added_transitions[0] | {state_hash: .state_hash, height: '${CONSENSUS_STATE}'.blockchain_length, slot: '${CONSENSUS_STATE}'.global_slot_since_genesis}'
 fi

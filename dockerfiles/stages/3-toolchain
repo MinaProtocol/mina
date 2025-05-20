@@ -1,6 +1,7 @@
 #################################################################################################
 # The "toolchain" Stage
-# - installs optional tools that are required in our CI/CD but are not required to build mina
+# - installs optional tools that are required in our CI/CD but are not required
+# - to build mina
 #################################################################################################
 FROM opam-deps AS toolchain
 

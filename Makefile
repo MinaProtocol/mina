@@ -219,7 +219,16 @@ build_rosetta: ocaml_checks
 .PHONY: build_rosetta_all_sigs
 build_rosetta_all_sigs: ocaml_checks
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/archive/archive.exe \
+		src/app/archive/archive_testnet_signatures.exe \
+		src/app/archive/archive_mainnet_signatures.exe \
+		src/app/rosetta/rosetta.exe \
+		src/app/rosetta/rosetta_testnet_signatures.exe \
+		src/app/rosetta/rosetta_mainnet_signatures.exe \
+		src/app/rosetta/ocaml-signer/signer.exe \
+		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_intgtest
@@ -347,6 +356,7 @@ check-snarky-submodule:
 install:
 	@dune build @install
 	@dune install
+	@cp ${OPAM_SWITCH_PREFIX}/bin/signer ${OPAM_SWITCH_PREFIX}/bin/mina-ocaml-signer
 	@echo "--------------------------------------------------------------"
 	@echo "All binaries (resp. libraries) have been installed into $(OPAM_SWITCH_PREFIX)/bin"
 	@echo "(resp. ${OPAM_SWITCH_PREFIX}/lib) and the binaries are available in the path."
@@ -358,6 +368,7 @@ install:
 .PHONY: uninstall
 uninstall:
 	@dune uninstall
+	@rm ${OPAM_SWITCH_PREFIX}/bin/mina-ocaml-signer
 ########################################
 ## Artifacts
 
@@ -389,6 +400,30 @@ genesiskeys:
 	@cp _build/default/src/lib/key_gen/sample_keypairs.ml /tmp/artifacts/.
 	@cp _build/default/src/lib/key_gen/sample_keypairs.json /tmp/artifacts/.
 
+
+##############################################
+## External toolings
+
+# Keep this in line with ./dockerfiles/Dockerfile-mina-rosetta
+.PHONY: install-rosetta-cli
+install-rosetta-cli:
+	curl -L "https://github.com/coinbase/mesh-cli/archive/refs/tags/v0.10.1.tar.gz" \
+		-o "/tmp/v0.10.1.tar.gz"
+	tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp"
+	cd /tmp/mesh-cli-0.10.1 \
+    && go mod edit -replace github.com/coinbase/mesh-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
+    && go mod tidy \
+    && GOBIN=${OPAM_SWITCH_PREFIX}/bin go install
+
+.PHONY: setup-rosetta-pg-cluster
+setup-rosetta-pg-cluster:
+	@POSTGRES_VERSION=$$(psql -V | cut -d " " -f 3 | sed 's/\.[[:digit:]]*$$//') && \
+	pg_createcluster --start \
+		-d /data/postgresql \
+		--createclusterconf \
+		./src/app/rosetta/scripts/postgresql.conf \
+		$$POSTGRES_VERSION \
+		main
 
 ##############################################
 ## Genesis ledger in OCaml from running daemon

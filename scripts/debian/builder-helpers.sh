@@ -261,7 +261,7 @@ function copy_common_rosetta_configs () {
 
   # Copy rosetta-based Binaries
   cp ./default/src/app/rosetta/rosetta_"${1}"_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_"${1}"_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+  cp ./default/src/app/rosetta/ocaml-signer/signer.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
 
   mkdir -p "${BUILDDIR}/etc/mina/rosetta"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
