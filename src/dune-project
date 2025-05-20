@@ -230,6 +230,7 @@
 (package (name vrf_lib_tests))
 (package (name webkit_trace_event))
 (package (name with_hash))
+(package (name work_partitioner))
 (package (name work_selector))
 (package (name zkapp_command_builder))
 (package (name zkapps_examples))

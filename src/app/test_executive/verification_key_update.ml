@@ -241,8 +241,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             when Public_key.Compressed.equal public_key account_a_pk ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign account_a_kp.private_key
-                    (Random_oracle.Input.Chunked.field full_commitment)
+                  (let signature_kind = Mina_signature_kind.t_DEPRECATED in
+                   Schnorr.Chunked.sign ~signature_kind account_a_kp.private_key
+                     (Random_oracle.Input.Chunked.field full_commitment) )
               }
           | fee_payer ->
               fee_payer
@@ -260,9 +261,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 in
                 { account_update with
                   authorization =
-                    Control.Poly.Signature
-                      (Schnorr.Chunked.sign account_a_kp.private_key
-                         (Random_oracle.Input.Chunked.field commitment) )
+                    (let signature_kind = Mina_signature_kind.t_DEPRECATED in
+                     Control.Poly.Signature
+                       (Schnorr.Chunked.sign ~signature_kind
+                          account_a_kp.private_key
+                          (Random_oracle.Input.Chunked.field commitment) ) )
                 }
             | account_update ->
                 account_update )

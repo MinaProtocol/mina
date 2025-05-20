@@ -32,7 +32,8 @@ let sign_blake2_hash ~private_key s =
   let input : (Field.t, bool) Random_oracle.Legacy.Input.t =
     { field_elements; bitstrings }
   in
-  Schnorr.Legacy.sign private_key input
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  Schnorr.Legacy.sign ~signature_kind private_key input
 
 let create_request block_data submitter_keypair =
   let block_data_json = block_data_to_yojson block_data in
