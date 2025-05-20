@@ -8,22 +8,27 @@ type ('state, 'response) req_processed =
   | RExit of 'response
   | RUnprocessed
 
-type (_, _, _) overflow_behavior =
-  | Throw : ('data, unit Or_error.t, [ `Throw ]) overflow_behavior
+type (_, _, _, _) overflow_behavior =
+  | Throw : ('state, 'data, unit Or_error.t, [ `Throw ]) overflow_behavior
   | Drop_head :
       [ `Warns | `No_warns ]
-      -> ('data, unit, [ `Drop_head ]) overflow_behavior
+      -> ('state, 'data, unit, [ `Drop_head ]) overflow_behavior
   | Drop_and_call_head :
-      ('data -> 'returns)
-      -> ('data, 'returns option, [ `Drop_and_call_head ]) overflow_behavior
-  | Push_back : ('data, unit Deferred.t, [ `Push_back ]) overflow_behavior
+      ('state -> 'data -> 'returns)
+      -> ( 'state
+         , 'data
+         , 'returns option
+         , [ `Drop_and_call_head ] )
+         overflow_behavior
+  | Push_back
+      : ('state, 'data, unit Deferred.t, [ `Push_back ]) overflow_behavior
 
-type (_, _, _) channel_type =
-  | Infinity : ('data, unit, [ `Infinity ]) channel_type
+type (_, _, _, _) channel_type =
+  | Infinity : ('state, 'data, unit, [ `Infinity ]) channel_type
   | With_capacity :
       [ `Capacity of int ]
-      * [ `Overflow of ('data, 'returns, 'behavior) overflow_behavior ]
-      -> ('data, 'returns, 'behavior) channel_type
+      * [ `Overflow of ('state, 'data, 'returns, 'behavior) overflow_behavior ]
+      -> ('state, 'data, 'returns, 'behavior) channel_type
 
 module DummyMessage = struct
   type t = unit [@@deriving to_yojson]
@@ -75,7 +80,7 @@ struct
         state:'state -> message:'control_msg -> 'state msg_processed Deferred.t
     ; data_inbox : DataMessage.t Deque.t
     ; data_channel_type :
-        (DataMessage.t, 'data_returns, 'data_overflew) channel_type
+        ('state, DataMessage.t, 'data_returns, 'data_overflew) channel_type
     ; data_handler :
         state:'state -> message:DataMessage.t -> 'state msg_processed Deferred.t
     ; logger : Logger.t
@@ -163,7 +168,7 @@ struct
 
         if Deque.length actor.data_inbox > cap then
           let head = Deque.dequeue_front_exn actor.data_inbox in
-          Some (callback head)
+          Some (callback actor.state head)
         else None
 
   type process_status = Status_processed | Status_fallthrough | Status_exit
