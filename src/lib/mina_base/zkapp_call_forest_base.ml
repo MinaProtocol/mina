@@ -134,17 +134,24 @@ module type Digest_intf = sig
     module Checked : sig
       include Digest_intf.S_checked
 
-      val create : ?chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
+      val create :
+        ?signature_kind:Mina_signature_kind.t -> Account_update.Checked.t -> t
 
       val create_body :
-        ?chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
+           ?signature_kind:Mina_signature_kind.t
+        -> Account_update.Body.Checked.t
+        -> t
     end
 
     include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-    val create : ?chain:Mina_signature_kind.t -> Account_update.t -> t
+    val create :
+         ?signature_kind:Mina_signature_kind.t
+      -> (Account_update.Body.t, _) Account_update.Poly.t
+      -> t
 
-    val create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
+    val create_body :
+      ?signature_kind:Mina_signature_kind.t -> Account_update.Body.t -> t
   end
 
   module rec Forest : sig
@@ -254,11 +261,14 @@ module Make_digest_str
       let create_body = Account_update.Body.Checked.digest
     end
 
-    let create : ?chain:Mina_signature_kind.t -> Account_update.t -> t =
+    let create :
+           ?signature_kind:Mina_signature_kind.t
+        -> (Account_update.Body.t, _) Account_update.Poly.t
+        -> t =
       Account_update.digest
 
-    let create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
-        =
+    let create_body :
+        ?signature_kind:Mina_signature_kind.t -> Account_update.Body.t -> t =
       Account_update.Body.digest
   end
 
@@ -497,12 +507,31 @@ let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
 let accumulate_hashes_predicated xs =
   accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
+let forget_hashes =
+  let rec impl = List.map ~f:forget_digest
+  and forget_digest = function
+    | { With_stack_hash.stack_hash = _
+      ; elt = { Tree.account_update; account_update_digest = _; calls }
+      } ->
+        { With_stack_hash.stack_hash = ()
+        ; elt =
+            { Tree.account_update
+            ; account_update_digest = ()
+            ; calls = impl calls
+            }
+        }
+  in
+  impl
+
 module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'data t =
-        ( Account_update.Stable.V1.t * 'data
+      type ('proof, 'data) t =
+        ( ( Account_update.Body.Stable.V1.t
+          , ('proof, Signature.Stable.V1.t) Control.Poly.Stable.V1.t )
+          Account_update.Poly.Stable.V1.t
+          * 'data
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t
@@ -514,13 +543,12 @@ module With_hashes_and_data = struct
 
   let empty = Digest.Forest.empty
 
-  let hash_account_update ((p : Account_update.t), _) =
+  let hash_account_update ((p : Account_update.Stable.Latest.t), _) =
     Digest.Account_update.create p
 
   let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
 
-  let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list) :
-      _ t =
+  let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list) =
     of_account_updates xs
       ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
         p.body.call_depth )
@@ -548,8 +576,14 @@ module With_hashes_and_data = struct
 end
 
 module With_hashes = struct
+  type t =
+    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Stable.Latest.t
+  [@@deriving sexp_of, to_yojson]
+
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         ( Account_update.Stable.V1.t
@@ -562,21 +596,30 @@ module With_hashes = struct
     end
   end]
 
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
+    map ~f:(Account_update.map_proofs ~f:Proof_cache_tag.read_proof_from_disk)
+
+  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+    map
+      ~f:
+        (Account_update.map_proofs
+           ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+
   let empty = Digest.Forest.empty
 
-  let hash_account_update (p : Account_update.t) =
-    Digest.Account_update.create p
+  let hash_account_update p = Digest.Account_update.create p
 
-  let accumulate_hashes xs : t = accumulate_hashes ~hash_account_update xs
+  let accumulate_hashes xs = accumulate_hashes ~hash_account_update xs
 
-  let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) : t =
+  let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) =
     of_account_updates xs
       ~account_update_depth:(fun (p : Account_update.Simple.t) ->
         p.body.call_depth )
     |> map ~f:Account_update.of_simple
     |> accumulate_hashes
 
-  let of_account_updates (xs : Account_update.Graphql_repr.t list) : t =
+  let of_account_updates (xs : Account_update.Graphql_repr.t list) :
+      Stable.Latest.t =
     of_account_updates_map
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )

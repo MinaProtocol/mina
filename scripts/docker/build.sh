@@ -118,10 +118,6 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
-    bot)
-        DOCKERFILE_PATH="frontend/bot/Dockerfile"
-        DOCKER_CONTEXT="frontend/bot"
-        ;;
     mina-daemon)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
@@ -151,10 +147,6 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
         DOCKER_CONTEXT="src/app/delegation_backend"
         ;;
-    itn-orchestrator)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"
-        DOCKER_CONTEXT="src/app/itn_orchestrator"
-        ;;
     mina-test-suite)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
         DOCKER_CONTEXT="dockerfiles/"
@@ -166,6 +158,11 @@ export_base_image
 export_docker_tag
 
 BUILD_NETWORK="--network=host"
+
+# Prune old docker images (24 hours) from the cache
+# This is a temporary solution to keep the cache from growing too large.
+# We will also need to evaluate the impact of this on the build process and adjust as necessary.
+docker system prune --all --force --filter until=24h
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then

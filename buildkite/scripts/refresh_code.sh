@@ -1,4 +1,6 @@
 #!/bin/bash
 
-source ./buildkite/scripts/handle-fork.sh
-git fetch ${REMOTE}
+git branch -D "${BUILDKITE_BRANCH}" 2>/dev/null || true
+git fetch origin "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+git checkout -b "${BUILDKITE_BRANCH}"
+git reset --hard "${BUILDKITE_COMMIT}"

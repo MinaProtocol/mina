@@ -56,12 +56,12 @@ let MinaBuildSpec =
           , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Standard
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Devnet
+          , network = Network.Type.Berkeley
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
           , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , channel = DebianChannel.Type.Unstable
-          , debianRepo = DebianRepo.Type.PackagesO1Test
+          , debianRepo = DebianRepo.Type.Unstable
           }
       }
 
@@ -113,8 +113,8 @@ let build_artifacts
                                                               spec.artifacts
                                                               spec.network}"
                 # [ Cmd.run
-                      "./buildkite/scripts/debian/upload-to-gs.sh ${DebianVersions.lowerName
-                                                                      spec.debVersion}"
+                      "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
+                                                                        spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg"
@@ -238,7 +238,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.FunctionalTestSuite
-                    , network = Network.lowerName Network.Type.Devnet
+                    , network = Network.lowerName Network.Type.Berkeley
                     , deb_codename = spec.debVersion
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish

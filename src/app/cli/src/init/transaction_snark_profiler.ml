@@ -3,7 +3,7 @@ open Snark_profiler_lib
 
 let name = "transaction-snark-profiler"
 
-let run ~genesis_constants ~constraint_constants ~proof_level
+let run ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
     ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
     ?min_num_updates repeats preeval use_zkapps : unit =
   let logger = Logger.null () in
@@ -11,8 +11,8 @@ let run ~genesis_constants ~constraint_constants ~proof_level
   if use_zkapps then (
     let ledger, transactions =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          create_ledger_and_zkapps ~genesis_constants ~constraint_constants
-            ?min_num_updates ~max_num_updates () )
+          create_ledger_and_zkapps ~proof_cache_db ~genesis_constants
+            ~constraint_constants ?min_num_updates ~max_num_updates () )
     in
     Parallel.init_master () ;
     let verifier =
@@ -80,7 +80,7 @@ let witness ~genesis_constants ~constraint_constants ~proof_level
         ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
         repeats preeval use_zkapps )
 
-let main ~(genesis_constants : Genesis_constants.t)
+let main ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
     preeval use_zkapps () =
@@ -90,7 +90,7 @@ let main ~(genesis_constants : Genesis_constants.t)
 
         let proof_level = proof_level
       end) in
-      run ~genesis_constants ~constraint_constants ~proof_level
+      run ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
           (profile_user_command ~genesis_constants ~constraint_constants
              (module T) )
@@ -175,15 +175,16 @@ let command =
        Genesis_constants.Compiled.constraint_constants
      in
      let proof_level = Genesis_constants.Proof_level.Full in
+     let proof_cache_db = Proof_cache_tag.create_identity_db () in
      if witness_only then
-       witness ~genesis_constants ~constraint_constants ~proof_level
-         ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps
+       witness ~proof_cache_db ~genesis_constants ~constraint_constants
+         ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
+         preeval use_zkapps
      else if check_only then
-       dry ~genesis_constants ~constraint_constants ~proof_level
+       dry ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
          ~max_num_updates ?min_num_updates num_transactions repeats preeval
          use_zkapps
      else
-       main ~genesis_constants ~constraint_constants ~proof_level
-         ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps )
+       main ~proof_cache_db ~genesis_constants ~constraint_constants
+         ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
+         preeval use_zkapps )

@@ -7,7 +7,7 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-TESTNET_NAME="${TESTNET_NAME:-devnet}"
+TESTNET_NAME="${TESTNET_NAME:-berkeley}"
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
@@ -23,8 +23,10 @@ source buildkite/scripts/export-git-env-vars.sh
 
 pip3 install sexpdata==1.0.0
 
-base_branch=${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-compatible}
-pr_branch=origin/${BUILDKITE_BRANCH}
+source ./buildkite/scripts/refresh_code.sh
+
+base_branch=origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-compatible}
+pr_branch=${BUILDKITE_BRANCH}
 release_branch=origin/$1
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"

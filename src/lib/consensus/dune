@@ -56,7 +56,6 @@
   block_time
   perf_histograms
   test_util
-  unix_timestamp
   non_zero_curve_point
   mina_metrics
   mina_numbers

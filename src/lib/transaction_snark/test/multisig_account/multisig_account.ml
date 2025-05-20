@@ -221,7 +221,6 @@ let%test_module "multisig_account" =
                   ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                   ~public_input:(Input Zkapp_statement.typ)
                   ~auxiliary_typ:Typ.unit
-                  ~branches:(module Nat.N2)
                   ~max_proofs_verified:(module Nat.N2)
                     (* You have to put 2 here... *)
                   ~name:"multisig"
@@ -458,7 +457,7 @@ let%test_module "multisig_account" =
                 }
               in
               let zkapp_command : Zkapp_command.t =
-                Zkapp_command.of_simple
+                Zkapp_command.of_simple ~proof_cache_db
                   { fee_payer
                   ; account_updates =
                       [ sender
