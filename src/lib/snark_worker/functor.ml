@@ -2,9 +2,8 @@ open Core
 open Async
 open Events
 
-module Make (Inputs : Intf.Inputs_intf) = struct
-  open Inputs
-  module Rpcs = Rpcs.Make (Inputs)
+module Make = struct
+  module Rpcs = Rpcs.Make
 
   module Work = struct
     open Snark_work_lib
@@ -38,6 +37,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
     end
   end
+
+  include Prod.Inputs
 
   let perform (s : Worker_state.t) public_key
       ({ instances; fee } as spec : Work.Spec.t) =
@@ -175,8 +176,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
   let main
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
-      ~proof_level ~constraint_constants daemon_address shutdown_on_disconnect =
+        with type Work.ledger_proof = Ledger_proof.t ) ~logger ~proof_level
+      ~constraint_constants daemon_address shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
     in
@@ -291,7 +292,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   let command_from_rpcs ~commit_id ~proof_level:default_proof_level
       ~constraint_constants
       (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
+        with type Work.ledger_proof = Ledger_proof.t ) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
