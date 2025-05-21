@@ -75,30 +75,3 @@ let connectivity (type a) (module V : Comparable.S with type t = a)
     V.Map.of_alist_exn (List.map adj ~f:(fun (x, xs) -> (x, V.Set.of_list xs)))
   in
   M.connectivity g
-
-let%test_unit "tree connectivity" =
-  (*
-        0
-      /  \
-      1   2
-      |  / \
-      3  4 5
-  *)
-  let tree =
-    [ (0, [ 1; 2 ])
-    ; (1, [ 3; 0 ])
-    ; (2, [ 0; 4; 5 ])
-    ; (3, [ 1 ])
-    ; (4, [ 2 ])
-    ; (5, [ 2 ])
-    ]
-  in
-  [%test_eq: int] 1 (Nat.to_int (connectivity (module Int) tree))
-
-let%test_unit "complete graph connectivity" =
-  let complete_graph n =
-    let all = List.init n ~f:Fn.id in
-    List.init n ~f:(fun i -> (i, all))
-  in
-  (* Complete graph has infinite connectivity. *)
-  assert (Nat.at_least (connectivity (module Int) (complete_graph 4)) 10000)

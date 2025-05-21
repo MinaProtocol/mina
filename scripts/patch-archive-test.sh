@@ -13,5 +13,5 @@ CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${PG_PORT}
 
 
 echo "Running patch archive test"
-$PATCH_ARCHIVE_TEST_APP --source-uri $CONN \
-                        --network-data-folder $NETWORK_DATA_FOLDER
+"${PATCH_ARCHIVE_TEST_APP}" --source-uri "${CONN}" \
+                            --network-data-folder "${NETWORK_DATA_FOLDER}"

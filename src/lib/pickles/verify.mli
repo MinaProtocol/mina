@@ -10,7 +10,7 @@ module Instance : sig
         * chunking_data option
         * Verification_key.t
         * 'a
-        * ('n, 'n) Proof.t
+        * 'n Proof.t
         -> t
 end
 
@@ -19,7 +19,7 @@ val verify :
   -> (module Pickles_types.Nat.Intf with type n = 'n)
   -> (module Intf.Statement_value with type t = 'a)
   -> Verification_key.t
-  -> ('a * ('n, 'n) Proof.t) list
+  -> ('a * 'n Proof.t) list
   -> unit Or_error.t Promise.t
 
 val verify_heterogenous : Instance.t list -> unit Or_error.t Promise.t

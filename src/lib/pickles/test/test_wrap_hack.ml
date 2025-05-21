@@ -38,7 +38,7 @@ let test_hash_messages_for_next_wrap_proof (type n) (n : n Nat.t) () =
       make_checked (fun () ->
           Wrap_hack.Checked.hash_messages_for_next_wrap_proof n t ) )
     (fun t ->
-      Wrap_hack.Checked.hash_constant_messages_for_next_wrap_proof n t
+      Wrap_hack.Checked.hash_constant_messages_for_next_wrap_proof t
       |> Digest.Constant.to_bits |> Impls.Wrap.Field.Constant.project )
     messages_for_next_wrap_proof
 
