@@ -4,7 +4,7 @@ module Inputs = Prod.Inputs
 module Events = Events
 
 module Worker = struct
-  include Functor.Make (Inputs)
+  include Functor.Make
 
   module Rpcs_versioned = struct
     open Core_kernel
