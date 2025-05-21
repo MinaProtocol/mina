@@ -62,9 +62,20 @@ let
           '';
         };
 
-        rocksdb_stubs = super.rocksdb_stubs.overrideAttrs {
-          MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
-        };
+        rocksdb_stubs = super.rocksdb_stubs.overrideAttrs (oa: {
+          MINA_ROCKSDB = let
+            mainPath = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
+            staticPath = "${
+                pkgs.rocksdb-mina.static or pkgs.rocksdb-mina
+              }/lib/librocksdb.a";
+          in if builtins.pathExists mainPath then
+            mainPath
+          else if builtins.pathExists staticPath then
+            staticPath
+          else
+            throw
+            "Could not find librocksdb.a in either ${mainPath} or ${staticPath}";
+        });
 
         # This is needed because
         # - lld package is not wrapped to pick up the correct linker flags
@@ -485,5 +496,5 @@ let
 
       inherit dune-description base-libs external-libs;
     };
-in scope.overrideScope'
+in scope.overrideScope
 (pkgs.lib.composeManyExtensions ([ overlay granularOverlay ]))
