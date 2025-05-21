@@ -360,10 +360,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     *)
     let app_states_compat =
       let fs_requested =
-        Pickles_types.Vector.Vector_8.to_list requested_update.app_state
+        Pickles_types.Vector.Vector_32.to_list requested_update.app_state
       in
       let fs_ledger =
-        Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
+        Pickles_types.Vector.Vector_32.to_list ledger_update.app_state
       in
       List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
           compatible_item req ledg ~equal:Pickles.Backend.Tick.Field.equal )

@@ -24,6 +24,28 @@ module Update = struct
     end
   end
 
+  module V2 = struct
+    type t =
+      { app_state :
+          Snark_params.Tick.Field.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+          Mina_base_zkapp_state.V.V2.t
+      ; delegate :
+          Public_key.Compressed.V1.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+      ; verification_key :
+          Mina_base_verification_key_wire.V1.t
+          Mina_base_zkapp_basic.Set_or_keep.V1.t
+      ; permissions :
+          Mina_base_permissions.V2.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+      ; zkapp_uri : string Mina_base_zkapp_basic.Set_or_keep.V1.t
+      ; token_symbol :
+          Mina_base_account.Token_symbol.V1.t
+          Mina_base_zkapp_basic.Set_or_keep.V1.t
+      ; timing : Timing_info.V1.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+      ; voting_for :
+          Data_hash_lib.State_hash.V1.t Mina_base_zkapp_basic.Set_or_keep.V1.t
+      }
+  end
+
   module V1 = struct
     type t =
       { app_state :
@@ -48,12 +70,24 @@ module Update = struct
 end
 
 module Account_precondition = struct
+  module V2 = struct
+    type t = Mina_base_zkapp_precondition.Account.V3.t
+  end
+
   module V1 = struct
     type t = Mina_base_zkapp_precondition.Account.V2.t
   end
 end
 
 module Preconditions = struct
+  module V2 = struct
+    type t =
+      { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
+      ; account : Account_precondition.V2.t
+      ; valid_while : Mina_base_zkapp_precondition.Valid_while.V1.t
+      }
+  end
+
   module V1 = struct
     type t =
       { network : Mina_base_zkapp_precondition.Protocol_state.V1.t
@@ -79,6 +113,25 @@ module Body = struct
     module V1 = struct
       type t = Snark_params.Tick.Field.t array list
     end
+  end
+
+  module V2 = struct
+    type t =
+      { public_key : Public_key.Compressed.V1.t
+      ; token_id : Mina_base_token_id.V2.t
+      ; update : Update.V2.t
+      ; balance_change :
+          (Currency.Amount.V1.t, Sgn_type.Sgn.V1.t) Signed_poly.V1.t
+      ; increment_nonce : bool
+      ; events : Events'.V1.t
+      ; actions : Events'.V1.t
+      ; call_data : Pickles.Backend.Tick.Field.V1.t
+      ; preconditions : Preconditions.V2.t
+      ; use_full_commitment : bool
+      ; implicit_account_creation_fee : bool
+      ; may_use_token : May_use_token.V1.t
+      ; authorization_kind : Authorization_kind.V1.t
+      }
   end
 
   module V1 = struct
@@ -115,6 +168,6 @@ module Poly = struct
   end
 end
 
-module V1 = struct
-  type t = (Body.V1.t, Mina_base_control.V2.t) Poly.V1.t
+module V2 = struct
+  type t = (Body.V2.t, Mina_base_control.V2.t) Poly.V1.t
 end

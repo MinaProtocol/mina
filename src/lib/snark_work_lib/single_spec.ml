@@ -52,7 +52,7 @@ module Stable = struct
 
   module V1 = struct
     type t =
-      ( Transaction_witness.Stable.V2.t
+      ( Transaction_witness.Stable.V3.t
       , Ledger_proof.Stable.V2.t )
       Poly.Stable.V2.t
     [@@deriving sexp, yojson]

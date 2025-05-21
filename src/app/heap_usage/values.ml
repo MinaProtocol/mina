@@ -13,7 +13,7 @@ let account : Mina_base.Account.t =
   let zkapp_account : Mina_base.Zkapp_account.t =
     let app_state =
       Pickles_types.Vector.to_list Mina_base.Zkapp_account.default.app_state
-      |> Pickles_types.Vector.Vector_8.of_list_exn
+      |> Pickles_types.Vector.Vector_32.of_list_exn
     in
     { Mina_base.Zkapp_account.default with
       app_state

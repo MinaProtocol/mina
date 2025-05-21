@@ -54,6 +54,16 @@ module Answer = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
+    module V4 = struct
+      type t =
+        ( Ledger_hash.Stable.V1.t
+        , Account.Stable.V3.t )
+        Syncable_ledger.Answer.Stable.V2.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+
     module V3 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
@@ -61,7 +71,33 @@ module Answer = struct
         Syncable_ledger.Answer.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest = Fn.id
+      let to_latest (t : t) : V4.t =
+        Syncable_ledger.Answer.Stable.V2.(
+          match t with
+          | Child_hashes_are h ->
+              Child_hashes_are h
+          | Num_accounts (n, h) ->
+              Num_accounts (n, h)
+          | Contents_are l ->
+              Contents_are (List.map ~f:Account.Stable.V2.to_latest l))
+
+      let from_v4 : V4.t -> t Or_error.t =
+       fun x ->
+        Or_error.(
+          Syncable_ledger.Answer.Stable.V2.(
+            match x with
+            | Child_hashes_are h ->
+                return (Child_hashes_are h)
+            | Num_accounts (n, h) ->
+                return (Num_accounts (n, h))
+            | Contents_are l ->
+                List.fold_right l
+                  ~f:(fun (x : Account.Stable.V3.t)
+                          (ys : Account.Stable.V2.t list Or_error.t) ->
+                    Account.Stable.V2.from_v3 x
+                    >>= fun x -> Or_error.map ~f:(List.cons x) ys )
+                  ~init:(return [])
+                >>= fun l -> return (Contents_are l)))
     end
 
     module V2 = struct
@@ -71,13 +107,18 @@ module Answer = struct
         Syncable_ledger.Answer.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest x = Syncable_ledger.Answer.Stable.V1.to_latest Fn.id x
+      let to_latest (x : t) : V4.t =
+        V3.to_latest @@ Syncable_ledger.Answer.Stable.V1.to_latest Fn.id x
 
       (* Not a standard versioning function *)
 
       (** Attempts to downgrade v3 -> v2 *)
       let from_v3 : V3.t -> t Or_error.t =
        fun x -> Syncable_ledger.Answer.Stable.V1.from_v2 x
+
+      (** Attempts to downgrade v4 -> v2 *)
+      let from_v4 : V4.t -> t Or_error.t =
+       fun x -> Or_error.(V3.from_v4 x >>= from_v3)
     end
   end]
 

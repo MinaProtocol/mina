@@ -6,6 +6,19 @@ open Signature_lib
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
+  module V3 = struct
+    type t =
+      { delegator : Account.Index.Stable.V1.t
+      ; delegator_pk : Public_key.Compressed.Stable.V1.t
+      ; coinbase_receiver_pk : Public_key.Compressed.Stable.V1.t
+      ; ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
+      ; producer_private_key : Private_key.Stable.V1.t
+      ; producer_public_key : Public_key.Stable.V1.t
+      }
+
+    let to_latest = Fn.id
+  end
+
   module V2 = struct
     type t =
       { delegator : Account.Index.Stable.V1.t
@@ -16,7 +29,7 @@ module Stable = struct
       ; producer_public_key : Public_key.Stable.V1.t
       }
 
-    let to_latest = Fn.id
+    let to_latest _ = failwith "TODO"
   end
 end]
 
