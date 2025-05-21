@@ -14,8 +14,7 @@ open Signature_lib
    modules are defined in snark_worker.ml
 *)
 
-module Make (Inputs : Intf.Inputs_intf) = struct
-  open Inputs
+module Make = struct
   open Snark_work_lib
 
   module Get_work = struct
