@@ -171,16 +171,8 @@ let encode ?(reverse = false) t =
                           c in
       hex_char_of_int_exn (c land 15) )
 
-let%test_unit "decode" =
-  let t = String.init 100 ~f:(fun _ -> Char.of_int_exn (Random.int 256)) in
-  let h = encode t in
-  assert (String.equal t (decode ~init:String.init h)) ;
-  assert (
-    String.equal t
-      (decode ~reverse:true ~init:String.init (encode ~reverse:true t)) ) ;
-  assert (String.equal t Sequence_be.(to_string (decode h)))
-
-(* TODO: Better deduplicate the hex coding between these two implementations #5711 *)
+(* TODO: Better deduplicate the hex coding between these two implementations
+   #5711 *)
 module Safe = struct
   (** to_hex : {0x0-0xff}* -> [A-F0-9]* *)
   let to_hex (data : string) : string =
@@ -199,15 +191,6 @@ module Safe = struct
            let lo = charify (Char.to_int c land 0x0F) in
            String.of_char_list [ high; lo ] )
     |> String.concat
-
-  let%test_unit "to_hex sane" =
-    let start = "a" in
-    let hexified = to_hex start in
-    let expected = "61" in
-    if String.equal expected hexified then ()
-    else
-      failwithf "start: %s ; hexified : %s ; expected: %s" start hexified
-        expected ()
 
   (** of_hex : [a-fA-F0-9]* -> {0x0-0xff}* option *)
   let of_hex (hex : string) : string option =
@@ -232,17 +215,4 @@ module Safe = struct
                Or_error.error_string "invalid hex" )
     |> Or_error.ok
     |> Option.map ~f:(Fn.compose String.of_char_list List.rev)
-
-  let%test_unit "partial isomorphism" =
-    Quickcheck.test ~sexp_of:[%sexp_of: string] ~examples:[ "\243"; "abc" ]
-      Quickcheck.Generator.(map (list char) ~f:String.of_char_list)
-      ~f:(fun s ->
-        let hexified = to_hex s in
-        let actual = Option.value_exn (of_hex hexified) in
-        let expected = s in
-        if String.equal actual expected then ()
-        else
-          failwithf
-            !"expected: %s ; hexified: %s ; actual: %s"
-            expected hexified actual () )
 end

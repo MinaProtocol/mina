@@ -1,0 +1,5 @@
+(test
+ (name hex_test)
+ (libraries alcotest core_kernel hex)
+ (instrumentation
+  (backend bisect_ppx)))
