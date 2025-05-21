@@ -334,7 +334,8 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option sibling_hash =
           self_path_get_hash ~hashes ~current_location height sibling
         in
-        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
+        Mina_stdlib.Direction.map dir ~left:(`Left sibling_hash)
+          ~right:(`Right sibling_hash)
       in
       self_path_impl ~element
 
@@ -348,7 +349,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option self_hash =
           self_path_get_hash ~hashes ~current_location height address
         in
-        Direction.map dir
+        Mina_stdlib.Direction.map dir
           ~left:(`Left (self_hash, sibling_hash))
           ~right:(`Right (sibling_hash, self_hash))
       in
@@ -970,7 +971,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let first_location ~ledger_depth =
       Location.Account
         ( Addr.of_directions
-        @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
+        @@ List.init ledger_depth ~f:(fun _ -> Mina_stdlib.Direction.Left) )
 
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =
