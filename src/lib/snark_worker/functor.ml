@@ -2,8 +2,7 @@ open Core
 open Async
 open Events
 
-module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
+module Make (Inputs : Intf.Inputs_intf) = struct
   open Inputs
   module Rpcs = Rpcs.Make (Inputs)
 
