@@ -4680,25 +4680,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account_updates =
         Option.to_list sender_account_update @ snapp_zkapp_command
       in
-      let zkapp_command : Zkapp_command.t =
-        { fee_payer
-        ; memo
-        ; account_updates =
-            Zkapp_command.Call_forest.of_account_updates account_updates
-              ~account_update_depth:(fun (p : Account_update.Simple.t) ->
-                p.body.call_depth )
-            |> Zkapp_command.Call_forest.map
-                 ~f:
-                   (Fn.compose
-                      (Account_update.map_proofs
-                         ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
-                      Account_update.of_simple )
-            |> Zkapp_command.Call_forest.accumulate_hashes
-                 ~hash_account_update:(fun (p : Account_update.t) ->
-                   Zkapp_command.Digest.Account_update.create p )
-        }
-      in
-      zkapp_command
+      Zkapp_command.of_simple ~proof_cache_db
+        { fee_payer; memo; account_updates }
 
     (* This spec is intended to build a zkapp command with only one account update
        with proof authorization. This is mainly for cross-network replay tests. We
@@ -4834,9 +4817,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
         ]
       in
-      Zkapp_command.map_proofs
-        ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
-        { fee_payer; memo; account_updates = forest }
+      { Zkapp_command.Poly.fee_payer
+      ; memo
+      ; account_updates =
+          Zkapp_command.Call_forest.map
+            ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
+            forest
+      }
 
     module Update_states_spec = struct
       type t =
@@ -5070,8 +5057,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let sender_account_update = Option.value_exn sender_account_update in
         Zkapp_command.Call_forest.cons
           ( Account_update.of_simple sender_account_update
-          |> Account_update.map_proofs
-               ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+          |> Account_update.write_all_proofs_to_disk ~proof_cache_db )
           zkapp_command.account_updates
       in
       { zkapp_command with account_updates }

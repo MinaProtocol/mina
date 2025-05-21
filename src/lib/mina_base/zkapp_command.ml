@@ -142,65 +142,56 @@ end
 
 include T
 
-let map_proofs ~(f : 'p -> 'q)
-    ({ Poly.fee_payer; memo; account_updates } : ('p, 'b, 'c) with_forest) :
-    ('q, 'b, 'c) with_forest =
-  { Poly.fee_payer
-  ; memo
+let write_all_proofs_to_disk ~proof_cache_db (w : Stable.Latest.t) : t =
+  { fee_payer = w.fee_payer
+  ; memo = w.memo
   ; account_updates =
-      Call_forest.map ~f:(Account_update.map_proofs ~f) account_updates
+      Call_forest.map
+        ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
+      @@ Call_forest.accumulate_hashes
+           ~hash_account_update:Digest.Account_update.create w.account_updates
   }
 
-let write_all_proofs_to_disk ~proof_cache_db (w : Stable.Latest.t) : t =
-  map_proofs
-    ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
-    { fee_payer = w.fee_payer
-    ; memo = w.memo
-    ; account_updates =
-        Call_forest.accumulate_hashes
-          ~hash_account_update:Digest.Account_update.create w.account_updates
-    }
-
 let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
-  map_proofs ~f:Proof_cache_tag.read_proof_from_disk
-    { fee_payer = t.fee_payer
-    ; memo = t.memo
-    ; account_updates = Call_forest.forget_hashes t.account_updates
-    }
+  { fee_payer = t.fee_payer
+  ; memo = t.memo
+  ; account_updates =
+      Call_forest.map ~f:Account_update.read_all_proofs_from_disk
+      @@ Call_forest.forget_hashes t.account_updates
+  }
 
 let forget_digests_and_proofs
     ({ fee_payer; memo; account_updates } : (_, _, _) with_forest) :
     (unit, unit, unit) with_forest =
-  map_proofs ~f:(const ())
-    { Poly.fee_payer
-    ; memo
-    ; account_updates = Call_forest.forget_hashes account_updates
-    }
+  { Poly.fee_payer
+  ; memo
+  ; account_updates = Call_forest.forget_hashes_and_proofs account_updates
+  }
 
 [%%define_locally Stable.Latest.(gen)]
 
 let of_simple ~proof_cache_db (w : Simple.t) : t =
-  map_proofs
-    ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
-    { fee_payer = w.fee_payer
-    ; memo = w.memo
-    ; account_updates =
-        Call_forest.of_account_updates w.account_updates
-          ~account_update_depth:(fun (p : Account_update.Simple.t) ->
-            p.body.call_depth )
-        |> Call_forest.map ~f:Account_update.of_simple
-        |> Call_forest.accumulate_hashes
-             ~hash_account_update:Digest.Account_update.create
-    }
+  { fee_payer = w.fee_payer
+  ; memo = w.memo
+  ; account_updates =
+      Call_forest.of_account_updates w.account_updates
+        ~account_update_depth:(fun (p : Account_update.Simple.t) ->
+          p.body.call_depth )
+      |> Call_forest.map
+           ~f:
+             (Fn.compose
+                (Account_update.write_all_proofs_to_disk ~proof_cache_db)
+                Account_update.of_simple )
+      |> Call_forest.accumulate_hashes
+           ~hash_account_update:Digest.Account_update.create
+  }
 
-let to_simple (t_with_proofs_cached : t) : Simple.t =
-  let t =
-    map_proofs ~f:Proof_cache_tag.read_proof_from_disk t_with_proofs_cached
-  in
+let to_simple (t : t) : Simple.t =
   { fee_payer = t.fee_payer
   ; memo = t.memo
   ; account_updates =
-      t.account_updates
+      Call_forest.map ~f:Account_update.read_all_proofs_from_disk
+        t.account_updates
       |> Call_forest.to_account_updates_map
            ~f:(fun ~depth { Account_update.Poly.body = b; authorization } ->
              { Account_update.Poly.authorization
@@ -489,9 +480,7 @@ end = struct
     { fee_payer
     ; account_updates =
         Call_forest.map account_updates ~f:(fun (upd, aux) ->
-            ( Account_update.map_proofs ~f:Proof_cache_tag.read_proof_from_disk
-                upd
-            , aux ) )
+            (Account_update.read_all_proofs_from_disk upd, aux) )
     ; memo
     }
 
@@ -500,10 +489,7 @@ end = struct
     { fee_payer
     ; account_updates =
         Call_forest.map account_updates ~f:(fun (upd, aux) ->
-            ( Account_update.map_proofs
-                ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
-                upd
-            , aux ) )
+            (Account_update.write_all_proofs_to_disk ~proof_cache_db upd, aux) )
     ; memo
     }
 

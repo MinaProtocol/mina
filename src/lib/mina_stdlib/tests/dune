@@ -1,0 +1,18 @@
+(test
+ (name main)
+ (libraries
+  ;; opam libraries
+  core_kernel
+  async_kernel
+  async_unix
+  base
+  sexplib0
+  yojson
+  alcotest
+  ;; local libraries
+  mina_stdlib
+  ppx_version.runtime)
+ (preprocess
+  (pps ppx_jane ppx_version ppx_deriving.std ppx_base ppx_let ppx_assert))
+ (instrumentation
+  (backend bisect_ppx)))

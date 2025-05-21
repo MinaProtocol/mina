@@ -465,7 +465,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             * Signature_lib.Public_key.Compressed.t )
         ->
           [%str_log error]
-            (Snark_worker.Generating_snark_work_failed
+            (Snark_worker.Events.Generating_snark_work_failed
                { error = Error_json.error_to_yojson error } ) ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
           Deferred.unit )

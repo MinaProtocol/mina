@@ -6,8 +6,8 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocessor_deps
-  ../../graphql-ppx-config.inc
-  ../../../graphql_schema.json)
+  ../../../graphql-ppx-config.inc
+  ../../../../graphql_schema.json)
  (preprocess
   (pps
    ppx_here
@@ -22,7 +22,7 @@
    ppx_sexp_conv
    graphql_ppx
    --
-   %{read-lines:../../graphql-ppx-config.inc}))
+   %{read-lines:../../../graphql-ppx-config.inc}))
  (libraries
   ;; opam libraries
   async_unix

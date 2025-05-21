@@ -200,8 +200,6 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
                  catchup_state )
-        | _ ->
-            None
       in
       let sync_status =
         sync_status |> Mina_incremental.Status.Observer.value_exn

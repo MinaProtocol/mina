@@ -196,7 +196,7 @@ let rec load_with_max_length :
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:[ `Super ]
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -687,8 +687,7 @@ module For_tests = struct
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb_with_protocol_states ~logger ~verifier
-          ~precomputed_values ()) ~max_length ~size
-      ?(use_super_catchup : bool option) () =
+          ~precomputed_values ()) ~max_length ~size () =
     (* TODO: Take this as an argument *)
     let module Context = struct
       let logger = logger
@@ -766,15 +765,7 @@ module For_tests = struct
           load_with_max_length ~max_length ~retry_with_fresh_db:false
             ~context:(module Context)
             ~verifier ~consensus_local_state ~persistent_root
-            ~catchup_mode:
-              ( match use_super_catchup with
-              | Some true ->
-                  `Super
-              | Some false ->
-                  `Normal
-              | None ->
-                  `Normal )
-            ~persistent_frontier () )
+            ~catchup_mode:`Super ~persistent_frontier () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in
@@ -809,12 +800,12 @@ module For_tests = struct
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
-      ~branch_size ?(use_super_catchup : bool option) () =
+      ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ~verifier ?trust_system ?use_super_catchup
-        ?consensus_local_state ~precomputed_values ?gen_root_breadcrumb
-        ~root_ledger_and_accounts ~max_length ~size:frontier_size ()
+      gen ?logger ~verifier ?trust_system ?consensus_local_state
+        ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
+        ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ~precomputed_values ~verifier
