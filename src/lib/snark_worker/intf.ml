@@ -25,6 +25,16 @@ module type Inputs_intf = sig
     -> message:Mina_base.Sok_message.t
     -> (Transaction_witness.Stable.Latest.t, Ledger_proof.t) Work.Single.Spec.t
     -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
+
+  val perform :
+       Worker_state.t
+    -> Signature_lib.Public_key.Compressed.t
+    -> Snark_work_lib.Selector.Spec.Stable.V1.t
+    -> ( Snark_work_lib.Selector.Single.Spec.Stable.V1.t
+         Snark_work_lib.Work.Spec.t
+       , Ledger_proof.t )
+       Snark_work_lib.Work.Result.t
+       Deferred.Or_error.t
 end
 
 module type Rpc_master = sig
