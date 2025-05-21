@@ -83,9 +83,11 @@ module Make (Inputs : Intf.Graphviz.I) :
                      current_hash
               then (
                 Queue.enqueue jobs
-                  (Addr.child_exn ~ledger_depth address Direction.Left) ;
+                  (Addr.child_exn ~ledger_depth address
+                     Mina_stdlib.Direction.Left ) ;
                 Queue.enqueue jobs
-                  (Addr.child_exn ~ledger_depth address Direction.Right) ;
+                  (Addr.child_exn ~ledger_depth address
+                     Mina_stdlib.Direction.Right ) ;
                 Hash current_hash )
               else Empty_hash
             in
@@ -97,8 +99,10 @@ module Make (Inputs : Intf.Graphviz.I) :
       bfs ~edges:[]
         ~accounts:(Set.empty (module Account))
         (Queue.of_list
-           [ Addr.child_exn ~ledger_depth initial_address Direction.Left
-           ; Addr.child_exn ~ledger_depth initial_address Direction.Right
+           [ Addr.child_exn ~ledger_depth initial_address
+               Mina_stdlib.Direction.Left
+           ; Addr.child_exn ~ledger_depth initial_address
+               Mina_stdlib.Direction.Right
            ] )
     in
     let edges =
