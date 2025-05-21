@@ -312,19 +312,27 @@ module Make_str (_ : Wire_types.Concrete) = struct
   end
 
   let compile_with_wrap_main_override_promise =
-    Compile.compile_with_wrap_main_override_promise
+    Printf.printf "\n ---------- compile wrap main overide before-------\n%!" ;
+    let res = Compile.compile_with_wrap_main_override_promise in
+    Printf.printf "\n ---------- compile wrap main overide after-------\n%!" ;
+    res
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
-    compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
-      ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~max_proofs_verified ~name ~choices ()
+    Printf.printf "\n ---------- compile promsie start-------\n%!" ;
+    let res =
+      compile_with_wrap_main_override_promise ?self ?cache ?storables
+        ?proof_cache ?disk_keys ?override_wrap_domain ?num_chunks ~public_input
+        ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
+    in
+    Printf.printf "\n ---------- compile promsie end-------\n%!" ;
+    res
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
       ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
-                    Printf.printf "\n -------------starting compile---------------- \n";
+    Printf.printf "\n -------------starting compile---------------- \n%!" ;
     let choices ~self =
       let choices = choices ~self in
       let rec go :
@@ -370,8 +378,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
         ~max_proofs_verified ~name ~choices ()
     in
-    (*  let n = (H3_2.T(Prover)).length provers in 
-     Printf.printf "\n number of provers : %d \n" n ; *)  
+    Printf.printf "\n ---------- end compile-------\n%!" ;
+    let module F = H3_2.T (Prover) in
+    let n = F.len (provers, 0) in
+    Printf.printf "\n number of provers : %d \n" n
+    (* (Hlist.Length.to_nat n |> Nat.to_int) *) ;
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
            (a1, a2, a3, s1, s2_inner Promise.t) H3_2.T(Prover).t
@@ -379,11 +390,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
       | [] ->
           []
       | prover :: tl ->
-        Printf.printf "\n---------one prover------------\n";
+          Printf.printf "\n---------one prover------------\n%!" ;
           (fun ?handler public_input ->
-            Promise.to_deferred (let f = fun () -> 
-              Printf.printf "\n lauching prover--------------\n";
-              prover ?handler public_input in f ()) )
+            Promise.to_deferred
+              (let f () =
+                 Printf.printf "\n lauching prover--------------\n%!" ;
+                 prover ?handler public_input
+               in
+               f () ) )
           :: adjust_provers tl
     in
     (self, cache_handle, proof_module, adjust_provers provers)
@@ -1325,7 +1339,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
               let (_ : (Max_proofs_verified.n, Maxes.ns) Requests.Wrap.t) =
                 Requests.Wrap.create ()
               in
-              Printf.printf "\n I am here \n";
+              Printf.printf "\n I am here \n" ;
               let _, prev_vars_length = b.proofs_verified in
               let step () =
                 let%bind.Promise step_pk = Lazy.force step_pk in

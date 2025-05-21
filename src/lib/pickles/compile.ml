@@ -386,8 +386,11 @@ struct
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
         match constraint_constants with
         | Some constraint_constants ->
+            Printf.printf "----------we have constraint cosntats----------\n”%!" ;
             constraint_constants
         | None ->
+            Printf.printf
+              "----------we do not have constraint cosntats----------\n”%!" ;
             { sub_windows_per_window = 0
             ; ledger_depth = 0
             ; work_delay = 0
@@ -494,7 +497,10 @@ struct
             let f : type a b c d. (a, b, c, d) IR.t -> int =
              fun r ->
               let (T (n, _)) = M.length r.prevs in
-              Nat.to_int n
+              let res = Nat.to_int n in
+              Printf.printf "\n--------proof verified: %d --------------\n%!"
+                res ;
+              res
           end)
       in
       let module V = H4.To_vector (Int) in
@@ -742,6 +748,7 @@ struct
           Impls.Step.Typ.(input_typ * output_typ)
     in
     let provers =
+      Printf.printf "\n----------creating the prover------\n%!" ;
       let f :
           type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
@@ -1029,158 +1036,163 @@ let compile_with_wrap_main_override_promise :
          , (ret_value * auxiliary_value * max_proofs_verified Proof.t) Promise.t
          )
          H3_2.T(Prover).t =
- (* This function is an adapter between the user-facing Pickles.compile API
-    and the underlying Make(_).compile function which builds the circuits.
- *)
- fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
-     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
-     ~public_input ~auxiliary_typ ~max_proofs_verified ~name
-     ?constraint_constants ~choices () ->
-  let self =
-    match self with
-    | None ->
-        Tag.(create ~kind:Compiled name)
-    | Some self ->
-        self
-  in
-  (* Extract to_fields methods from the public input declaration. *)
-  let (a_var_to_fields : a_var -> _), (a_value_to_fields : a_value -> _) =
-    match public_input with
-    | Input (Typ typ) ->
-        ( (fun x -> fst (typ.var_to_fields x))
-        , fun x -> fst (typ.value_to_fields x) )
-    | Output _ ->
-        ((fun () -> [||]), fun () -> [||])
-    | Input_and_output (Typ typ, _) ->
-        ( (fun x -> fst (typ.var_to_fields x))
-        , fun x -> fst (typ.value_to_fields x) )
-  in
-  let module A_var = struct
-    type t = a_var
-
-    let to_field_elements = a_var_to_fields
-  end in
-  let module A_value = struct
-    type t = a_value
-
-    let to_field_elements = a_value_to_fields
-  end in
-  let module Ret_var = struct
-    type t = ret_var
-  end in
-  let module Ret_value = struct
-    type t = ret_value
-  end in
-  let module Auxiliary_var = struct
-    type t = auxiliary_var
-  end in
-  let module Auxiliary_value = struct
-    type t = auxiliary_value
-  end in
-  let module M =
-    Make (A_var) (A_value) (Ret_var) (Ret_value) (Auxiliary_var)
-      (Auxiliary_value)
-  in
-  let rec conv_irs :
-      type branches v1ss v2ss wss hss.
-         ( branches
-         , v1ss
-         , v2ss
-         , wss
-         , hss
-         , a_var
-         , a_value
-         , ret_var
-         , ret_value
-         , auxiliary_var
-         , auxiliary_value )
-         H4_6_with_length.T(Inductive_rule.Promise).t
-      -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
-    | [] ->
-        []
-    | r :: rs ->
-        r :: conv_irs rs
-  in
-  let choices = choices ~self in
-  let branches, prev_varss_length =
-    let module IR_hlist = H4_6_with_length.T (Inductive_rule.Promise) in
-    IR_hlist.length choices
-  in
-  let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
-      ~prev_varss_length ~max_proofs_verified ~name ~public_input ~auxiliary_typ
-      ?constraint_constants ~choices:(conv_irs choices) ()
-  in
-  let (module Max_proofs_verified) = max_proofs_verified in
-  let T = Max_proofs_verified.eq in
-  let module Value = struct
-    type t = value
-
-    let typ : (var, value) Impls.Step.Typ.t =
+  (* This function is an adapter between the user-facing Pickles.compile API
+     and the underlying Make(_).compile function which builds the circuits.
+  *)
+  Printf.printf "----------compile with overide--------\n%!" ;
+  (* let is_some = Option.is_some constraint_constants in
+     Printf.printf "\nwe have constraint constant : %b \n %!" is_some ; *)
+  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
+      ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
+      ~public_input ~auxiliary_typ ~max_proofs_verified ~name
+      ?constraint_constants ~choices () ->
+    let self =
+      match self with
+      | None ->
+          Tag.(create ~kind:Compiled name)
+      | Some self ->
+          self
+    in
+    (* Extract to_fields methods from the public input declaration. *)
+    let (a_var_to_fields : a_var -> _), (a_value_to_fields : a_value -> _) =
       match public_input with
-      | Input typ ->
-          typ
-      | Output typ ->
-          typ
-      | Input_and_output (input_typ, output_typ) ->
-          Impls.Step.Typ.(input_typ * output_typ)
+      | Input (Typ typ) ->
+          ( (fun x -> fst (typ.var_to_fields x))
+          , fun x -> fst (typ.value_to_fields x) )
+      | Output _ ->
+          ((fun () -> [||]), fun () -> [||])
+      | Input_and_output (Typ typ, _) ->
+          ( (fun x -> fst (typ.var_to_fields x))
+          , fun x -> fst (typ.value_to_fields x) )
+    in
+    let module A_var = struct
+      type t = a_var
 
-    let to_field_elements =
-      let (Typ typ) = typ in
-      fun x -> fst (typ.value_to_fields x)
-  end in
-  let chunking_data =
-    match num_chunks with
-    | None ->
-        Promise.return None
-    | Some num_chunks ->
-        let compiled = Types_map.lookup_compiled self.id in
-        let%map.Promise domains = promise_all compiled.step_domains in
-        let { h = Pow_2_roots_of_unity domain_size } =
-          domains
-          |> Vector.reduce_exn
-               ~f:(fun
-                    { h = Pow_2_roots_of_unity d1 }
-                    { h = Pow_2_roots_of_unity d2 }
-                  -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+      let to_field_elements = a_var_to_fields
+    end in
+    let module A_value = struct
+      type t = a_value
+
+      let to_field_elements = a_value_to_fields
+    end in
+    let module Ret_var = struct
+      type t = ret_var
+    end in
+    let module Ret_value = struct
+      type t = ret_value
+    end in
+    let module Auxiliary_var = struct
+      type t = auxiliary_var
+    end in
+    let module Auxiliary_value = struct
+      type t = auxiliary_value
+    end in
+    let module M =
+      Make (A_var) (A_value) (Ret_var) (Ret_value) (Auxiliary_var)
+        (Auxiliary_value)
+    in
+    let rec conv_irs :
+        type branches v1ss v2ss wss hss.
+           ( branches
+           , v1ss
+           , v2ss
+           , wss
+           , hss
+           , a_var
+           , a_value
+           , ret_var
+           , ret_value
+           , auxiliary_var
+           , auxiliary_value )
+           H4_6_with_length.T(Inductive_rule.Promise).t
+        -> (v1ss, v2ss, wss, hss) H4.T(M.IR).t = function
+      | [] ->
+          []
+      | r :: rs ->
+          r :: conv_irs rs
+    in
+    let choices = choices ~self in
+    let branches, prev_varss_length =
+      let module IR_hlist = H4_6_with_length.T (Inductive_rule.Promise) in
+      IR_hlist.length choices
+    in
+    let provers, wrap_vk, wrap_disk_key, cache_handle =
+      M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
+        ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
+        ~prev_varss_length ~max_proofs_verified ~name ~public_input
+        ~auxiliary_typ ?constraint_constants ~choices:(conv_irs choices) ()
+    in
+    let (module Max_proofs_verified) = max_proofs_verified in
+    let T = Max_proofs_verified.eq in
+    let module Value = struct
+      type t = value
+
+      let typ : (var, value) Impls.Step.Typ.t =
+        match public_input with
+        | Input typ ->
+            typ
+        | Output typ ->
+            typ
+        | Input_and_output (input_typ, output_typ) ->
+            Impls.Step.Typ.(input_typ * output_typ)
+
+      let to_field_elements =
+        let (Typ typ) = typ in
+        fun x -> fst (typ.value_to_fields x)
+    end in
+    let chunking_data =
+      match num_chunks with
+      | None ->
+          Promise.return None
+      | Some num_chunks ->
+          let compiled = Types_map.lookup_compiled self.id in
+          let%map.Promise domains = promise_all compiled.step_domains in
+          let { h = Pow_2_roots_of_unity domain_size } =
+            domains
+            |> Vector.reduce_exn
+                 ~f:(fun
+                      { h = Pow_2_roots_of_unity d1 }
+                      { h = Pow_2_roots_of_unity d2 }
+                    -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+          in
+          Some
+            { Verify.Instance.num_chunks
+            ; domain_size
+            ; zk_rows = compiled.zk_rows
+            }
+    in
+    let module P = struct
+      type statement = value
+
+      module Max_local_max_proofs_verified = Max_proofs_verified
+
+      include Proof.Make (struct
+        include Max_local_max_proofs_verified
+      end)
+
+      let id_promise = wrap_disk_key
+
+      let id = Lazy.map ~f:Promise.to_deferred wrap_disk_key
+
+      let verification_key_promise = wrap_vk
+
+      let verification_key = Lazy.map ~f:Promise.to_deferred wrap_vk
+
+      let verify_promise ts =
+        let%bind.Promise chunking_data = chunking_data in
+        let%bind.Promise verification_key =
+          Lazy.force verification_key_promise
         in
-        Some
-          { Verify.Instance.num_chunks
-          ; domain_size
-          ; zk_rows = compiled.zk_rows
-          }
-  in
-  let module P = struct
-    type statement = value
+        verify_promise ?chunking_data
+          ( module struct
+            include Max_proofs_verified
+          end )
+          (module Value)
+          verification_key ts
 
-    module Max_local_max_proofs_verified = Max_proofs_verified
-
-    include Proof.Make (struct
-      include Max_local_max_proofs_verified
-    end)
-
-    let id_promise = wrap_disk_key
-
-    let id = Lazy.map ~f:Promise.to_deferred wrap_disk_key
-
-    let verification_key_promise = wrap_vk
-
-    let verification_key = Lazy.map ~f:Promise.to_deferred wrap_vk
-
-    let verify_promise ts =
-      let%bind.Promise chunking_data = chunking_data in
-      let%bind.Promise verification_key = Lazy.force verification_key_promise in
-      verify_promise ?chunking_data
-        ( module struct
-          include Max_proofs_verified
-        end )
-        (module Value)
-        verification_key ts
-
-    let verify ts = verify_promise ts |> Promise.to_deferred
-  end in
-  (self, cache_handle, (module P), provers)
+      let verify ts = verify_promise ts |> Promise.to_deferred
+    end in
+    (self, cache_handle, (module P), provers)
 
 let wrap_main_dummy_override _ _ _ _ _ _ _ =
   let requests =
