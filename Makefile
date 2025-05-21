@@ -92,6 +92,7 @@ help:
 	@echo "test-ppx                  - Test PPX extensions"
 	@echo "uninstall                 - Uninstall all binaries and libraries from the opam switch"
 	@echo "update-graphql            - Update GraphQL schema"
+	@echo "update-rust-vendors       - Update the Rust vendors"
 	@echo "zkapp_limits              - Build ZkApp limits tool"
 
 ########################################
@@ -311,6 +312,10 @@ update-graphql:
 	dune build \
 		--profile=$(DUNE_PROFILE) \
 		graphql_schema.json
+
+update-rust-vendors:
+	@echo "Updating Rust vendors in src/lib/crypto/kimchi_bindings/stubs..."
+	@cd src/lib/crypto/kimchi_bindings/stubs && cargo vendor kimchi-stubs-vendors
 
 ########################################
 ## Lint

@@ -409,12 +409,12 @@ module Snark_work_failed = struct
 
   let name = "Snark_work_failed"
 
-  let id = Snark_worker.generating_snark_work_failed_structured_events_id
+  let id = Snark_worker.Events.generating_snark_work_failed_structured_events_id
 
   let parse_func message =
     let open Or_error.Let_syntax in
     match%bind parse id message with
-    | Snark_worker.Generating_snark_work_failed { error } ->
+    | Snark_worker.Events.Generating_snark_work_failed { error } ->
         Ok { error }
     | _ ->
         bad_parse
@@ -920,7 +920,7 @@ let%test_unit "parse breadcrumb functions properly" =
                 "current_protocol_version": "3.0.0"
               }
             },
-            "staged_ledger": "<opaque>"                
+            "staged_ledger": "<opaque>"
           }
 
         }

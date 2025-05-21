@@ -256,20 +256,31 @@ module Make_digest_str
     module Checked = struct
       include Checked
 
-      let create = Account_update.Checked.digest
+      let create ?signature_kind =
+        let signature_kind =
+          Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+        in
+        Account_update.Checked.digest ~signature_kind
 
-      let create_body = Account_update.Body.Checked.digest
+      let create_body ?signature_kind =
+        let signature_kind =
+          Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+        in
+        Account_update.Body.Checked.digest ~signature_kind
     end
 
-    let create :
-           ?signature_kind:Mina_signature_kind.t
-        -> (Account_update.Body.t, _) Account_update.Poly.t
-        -> t =
-      Account_update.digest
+    let create ?signature_kind :
+        (Account_update.Body.t, _) Account_update.Poly.t -> t =
+      let signature_kind =
+        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+      in
+      Account_update.digest ~signature_kind
 
-    let create_body :
-        ?signature_kind:Mina_signature_kind.t -> Account_update.Body.t -> t =
-      Account_update.Body.digest
+    let create_body ?signature_kind : Account_update.Body.t -> t =
+      let signature_kind =
+        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+      in
+      Account_update.Body.digest ~signature_kind
   end
 
   module Forest = struct

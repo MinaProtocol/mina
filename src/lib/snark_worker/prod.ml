@@ -20,7 +20,7 @@ module Cache = struct
 end
 
 module Inputs = struct
-  module Ledger_proof = Ledger_proof.Prod
+  module Ledger_proof = Ledger_proof
 
   module Worker_state = struct
     module type S = Transaction_snark.S
