@@ -59,15 +59,15 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
     Option.value_map memo ~default:Signed_command_memo.dummy
       ~f:Signed_command_memo.create_from_string_exn
   in
-  Zkapp_command.map_proofs
-    ~f:(const @@ Lazy.force Proof.For_tests.blockchain_dummy_tag)
+  Zkapp_command.write_all_proofs_to_disk
+    ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
     { Zkapp_command.Poly.fee_payer
     ; memo
     ; account_updates =
         Zkapp_command.Call_forest.map account_updates
-          ~f:(fun (p : Account_update.Body.Simple.t) ->
+          ~f:(fun (body : Account_update.Body.Simple.t) ->
             let authorization =
-              match p.authorization_kind with
+              match body.authorization_kind with
               | None_given ->
                   Control.Poly.None_given
               | Proof _ ->
@@ -76,10 +76,9 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
               | Signature ->
                   Control.Poly.Signature Signature.dummy
             in
-            { Account_update.Poly.body = Account_update.Body.of_simple p
+            { Account_update.Poly.body = Account_update.Body.of_simple body
             ; authorization
             } )
-        |> Zkapp_command.Call_forest.accumulate_hashes_predicated
     }
 
 let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
@@ -96,7 +95,8 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     let commitment =
       if use_full_commitment then full_txn_commitment else txn_commitment
     in
-    Signature_lib.Schnorr.Chunked.sign sk
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    Signature_lib.Schnorr.Chunked.sign ~signature_kind sk
       (Random_oracle.Input.Chunked.field commitment)
   in
   let fee_payer_sk =
