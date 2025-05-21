@@ -171,8 +171,6 @@ struct
           Some (callback actor.state head)
         else None
 
-  type process_status = Status_processed | Status_fallthrough | Status_exit
-
   let spawn (actor : _ t) : unit Deferred.Or_error.t =
     let process_msg ~state ~deque ~handler () =
       match Deque.dequeue_front deque with
