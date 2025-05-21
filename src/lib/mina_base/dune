@@ -72,7 +72,7 @@
   kimchi_backend
   hex
   snark_bits
-  error_json
+  mina_stdlib
   ppx_version.runtime
   proof_cache_tag)
  (preprocess

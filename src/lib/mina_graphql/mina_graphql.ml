@@ -826,7 +826,9 @@ module Mutations = struct
       ~resolve:(fun { ctx = mina; _ } () basename_opt ->
         let%map result = export_logs ~mina basename_opt in
         Result.map_error result
-          ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson) )
+          ~f:
+            (Fn.compose Yojson.Safe.to_string
+               Mina_stdlib.Error_json.error_to_yojson ) )
 
   let set_coinbase_receiver =
     field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"

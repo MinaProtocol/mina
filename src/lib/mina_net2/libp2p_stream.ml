@@ -191,7 +191,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
               [%log error] "error sending message on stream $idx: $error"
                 ~metadata:
                   [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
-                  ; ("error", Error_json.error_to_yojson e)
+                  ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
                   ] ;
               Pipe.close outgoing_w ;
               true )
@@ -206,7 +206,7 @@ let create_from_existing ~logger ~helper ~stream_id ~protocol ~peer
            [%log error] "error closing stream $idx: $error"
              ~metadata:
                [ ("idx", `String (Libp2p_ipc.stream_id_to_string stream_id))
-               ; ("error", Error_json.error_to_yojson e)
+               ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
                ] ;
              ) *)
   in

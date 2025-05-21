@@ -16,7 +16,6 @@
   integers
   result
   ;; local libraries
-  error_json
   data_hash_lib
   block_time
   trust_system

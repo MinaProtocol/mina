@@ -43,7 +43,6 @@
   snark_work_lib
   rfc3339_time
   ledger_proof
-  error_json
   pipe_lib
   blake2
   with_hash

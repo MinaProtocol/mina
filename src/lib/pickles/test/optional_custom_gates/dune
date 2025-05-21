@@ -58,7 +58,7 @@
   logger
   logger.context_logger
   ppx_version.runtime
-  error_json
+  mina_stdlib
   pickles_optional_custom_gates_circuits)
  (instrumentation
   (backend bisect_ppx))

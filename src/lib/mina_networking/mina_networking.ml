@@ -351,7 +351,8 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   ( Outgoing_connection_error
                   , Some
                       ( "Error while doing RPC"
-                      , [ ("error", Error_json.error_to_yojson e) ] ) ))
+                      , [ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
+                      ) ))
         | Local ->
             return ()
       in

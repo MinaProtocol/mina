@@ -71,4 +71,4 @@ let response_to_yojson (response : response) : Yojson.Safe.t =
   | Ok status ->
       to_yojson status
   | Error err ->
-      `Assoc [ ("error", Error_json.error_to_yojson err) ]
+      `Assoc [ ("error", Mina_stdlib.Error_json.error_to_yojson err) ]

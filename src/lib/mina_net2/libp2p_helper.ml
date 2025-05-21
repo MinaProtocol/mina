@@ -147,7 +147,7 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
     | Error err ->
         [%log' fatal t.logger]
           !"Child processes library could not track libp2p_helper process: $err"
-          ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
+          ~metadata:[ ("err", Mina_stdlib.Error_json.error_to_yojson err) ] ;
         t.finished <- true ;
         let%bind () = Deferred.ignore_m (Child_processes.kill t.process) in
         let%map () = Ivar.read t.stderr_finished in
@@ -163,7 +163,7 @@ let handle_libp2p_helper_termination t ~pids ~killed result =
       | Ok e ->
           `String (Unix.Exit_or_signal.to_string_hum e)
       | Error err ->
-          Error_json.error_to_yojson err
+          Mina_stdlib.Error_json.error_to_yojson err
     in
     [%log' info t.logger]
       !"libp2p_helper process killed successfully: $exit_status"

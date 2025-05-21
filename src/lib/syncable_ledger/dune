@@ -20,7 +20,6 @@
   network_peer
   merkle_address
   mina_stdlib
-  error_json
   ppx_version.runtime
   mina_compile_config)
  (preprocess

@@ -370,7 +370,8 @@ let%test_module "transaction logic consistency" =
               (Yojson.Safe.pretty_to_string
                  (Transaction.Valid.to_yojson transaction) )
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))
-              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error)) ) ;
+              (Yojson.Safe.pretty_to_string
+                 (Mina_stdlib.Error_json.error_to_yojson error) ) ) ;
       !passed
 
     let txn_jsons =
@@ -598,6 +599,7 @@ let%test_module "transaction logic consistency" =
               (Yojson.Safe.pretty_to_string
                  (Transaction.Valid.to_yojson transaction) )
               (Yojson.Safe.to_string (Sparse_ledger.to_yojson ledger))
-              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson error)) ) ;
+              (Yojson.Safe.pretty_to_string
+                 (Mina_stdlib.Error_json.error_to_yojson error) ) ) ;
       !passed
   end )

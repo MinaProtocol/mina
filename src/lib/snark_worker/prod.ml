@@ -106,7 +106,7 @@ module Inputs = struct
           | Error e ->
               [%log error] "SNARK worker failed: $error"
                 ~metadata:
-                  [ ("error", Error_json.error_to_yojson e)
+                  [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
                   ; ( "spec"
                       (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
                          so we use the less-desirable sexp here

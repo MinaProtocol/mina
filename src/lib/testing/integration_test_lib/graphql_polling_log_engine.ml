@@ -85,7 +85,7 @@ struct
           [%log error] "Encountered an error while polling $node for logs: $err"
             ~metadata:
               [ ("node", `String (Node.infra_id node))
-              ; ("err", Error_json.error_to_yojson err)
+              ; ("err", Mina_stdlib.Error_json.error_to_yojson err)
               ] ;
           (* Declare the node to be offline. *)
           Pipe.write_without_pushback_if_open event_writer

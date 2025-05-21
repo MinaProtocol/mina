@@ -24,7 +24,6 @@
   consensus
   currency
   data_hash_lib
-  error_json
   fake_network
   genesis_constants
   kimchi_backend

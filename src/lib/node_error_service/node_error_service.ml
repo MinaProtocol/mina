@@ -175,7 +175,7 @@ let send_report ~commit_id ~logger ~error =
   with_deps ~logger ~f:(fun ~node_state ~node_error_url ~contact_info ->
       match
         generate_report ~commit_id ~node_state ~contact_info
-          (Error_json.error_to_yojson error)
+          (Mina_stdlib.Error_json.error_to_yojson error)
       with
       | None ->
           Deferred.unit

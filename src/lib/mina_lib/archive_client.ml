@@ -130,7 +130,7 @@ let run ~logger ~precomputed_values
               | Error e ->
                   [%log warn]
                     ~metadata:
-                      [ ("error", Error_json.error_to_yojson e)
+                      [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
                       ; ( "breadcrumb"
                         , Transition_frontier.Breadcrumb.to_yojson breadcrumb )
                       ]

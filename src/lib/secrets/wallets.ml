@@ -40,7 +40,7 @@ let decode_public_key key file path logger =
         ~metadata:
           [ ("file", `String file)
           ; ("path", `String path)
-          ; ("error", Error_json.error_to_yojson e)
+          ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
           ] ;
       None
 
