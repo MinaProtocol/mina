@@ -34,7 +34,6 @@
   codable
   currency
   data_hash_lib
-  direction
   key_value_database
   merkle_address
   merkle_ledger
