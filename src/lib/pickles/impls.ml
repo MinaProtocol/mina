@@ -43,7 +43,7 @@ module Step = struct
 
     let generate ?(lazy_mode = false) ~prev_challenges cs =
       let open Tick.Keypair in
-      let keypair = create ~prev_challenges cs ~lazy_mode in
+      let keypair = create ~lazy_mode ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
@@ -52,7 +52,8 @@ module Step = struct
 
     module Constant = Tock.Field
 
-    type t = (* Low bits, high bit *)
+    type t =
+      (* Low bits, high bit *)
       Field.t * Boolean.var
 
     let forbidden_shifted_values =
@@ -181,9 +182,9 @@ module Wrap = struct
 
     let create = Fields.create
 
-    let generate ~prev_challenges cs =
+    let generate ?(lazy_mode = false) ~prev_challenges cs =
       let open Tock.Keypair in
-      let keypair = create ~prev_challenges cs in
+      let keypair = create ~lazy_mode ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
