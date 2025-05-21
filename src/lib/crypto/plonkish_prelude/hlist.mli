@@ -641,6 +641,8 @@ module H3_2 : sig
           -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 's1, 's2) t
 
     val length : ('t1, 't2, 't3, 'e1, 'e2) t -> 't1 Length.n
+
+    val len : ('t1, 't2, 't3, 'e1, 'e2) t * int -> int
   end
 end
 
