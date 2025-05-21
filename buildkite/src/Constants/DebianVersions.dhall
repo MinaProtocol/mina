@@ -10,7 +10,7 @@ let BuildFlags = ./BuildFlags.dhall
 
 let S = ../Lib/SelectFiles.dhall
 
-let DebVersion = < Bookworm | Bullseye | Jammy | Focal >
+let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
 let capitalName =
           \(debVersion : DebVersion)
@@ -19,6 +19,7 @@ let capitalName =
             , Bullseye = "Bullseye"
             , Jammy = "Jammy"
             , Focal = "Focal"
+            , Noble = "Noble"
             }
             debVersion
 
@@ -29,6 +30,7 @@ let lowerName =
             , Bullseye = "bullseye"
             , Jammy = "jammy"
             , Focal = "focal"
+            , Noble = "noble"
             }
             debVersion
 
@@ -54,6 +56,7 @@ let dependsOnStep =
                 , Bullseye = [ { name = name, key = "${step}-deb-pkg" } ]
                 , Jammy = [ { name = name, key = "${step}-deb-pkg" } ]
                 , Focal = [ { name = name, key = "${step}-deb-pkg" } ]
+                , Noble = [ { name = name, key = "${step}-deb-pkg" } ]
                 }
                 debVersion
 
@@ -113,6 +116,7 @@ let dirtyWhen =
             , Bullseye = bullseyeDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
+            , Noble = minimalDirtyWhen
             }
             debVersion
 
