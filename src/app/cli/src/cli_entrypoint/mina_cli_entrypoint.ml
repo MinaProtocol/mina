@@ -365,9 +365,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   and is_seed =
     flag "--seed" ~aliases:[ "seed" ] ~doc:"Start the node as a seed node"
       no_arg
-  and no_super_catchup =
-    flag "--no-super-catchup" ~aliases:[ "no-super-catchup" ]
-      ~doc:"Don't use super-catchup" no_arg
   and enable_flooding =
     flag "--enable-flooding" ~aliases:[ "enable-flooding" ]
       ~doc:
@@ -1377,9 +1374,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let%map mina =
             Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
-                 ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
-                 ~gossip_net_params ~proposed_protocol_version_opt
+                 ~chain_id ~is_seed ~disable_node_status ~demo_mode
+                 ~coinbase_receiver ~net_config ~gossip_net_params
+                 ~proposed_protocol_version_opt
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method )
