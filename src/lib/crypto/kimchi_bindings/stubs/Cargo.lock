@@ -645,6 +645,7 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 name = "mina-curves"
 version = "0.1.0"
 dependencies = [
+ "ark-bn254",
  "ark-ec",
  "ark-ff",
  "num-bigint",
@@ -826,9 +827,11 @@ dependencies = [
  "ark-serialize",
  "blake2",
  "groupmap",
+ "hex",
  "itertools 0.12.1",
  "mina-curves",
  "mina-poseidon",
+ "num-bigint",
  "o1-utils",
  "ocaml",
  "ocaml-gen",
