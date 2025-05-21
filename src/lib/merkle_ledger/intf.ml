@@ -216,7 +216,7 @@ module type SYNCABLE = sig
 
   type addr
 
-  type t [@@deriving sexp]
+  type t
 
   type path
 
@@ -227,8 +227,6 @@ module type SYNCABLE = sig
   val merkle_path_at_addr_exn : t -> addr -> path
 
   val get_inner_hash_at_addr_exn : t -> addr -> hash
-
-  val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
 
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
@@ -450,7 +448,7 @@ module Ledger = struct
 
     (** The type of the witness for a base ledger exposed here so that it can
    * be easily accessed from outside this module *)
-    type witness [@@deriving sexp_of]
+    type witness
 
     module type Base_intf =
       S

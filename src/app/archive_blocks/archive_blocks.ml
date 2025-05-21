@@ -6,6 +6,7 @@ open Archive_lib
 
 let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
     ~extensional ~success_file ~failure_file ~log_successes ~files () =
+  let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let output_file_line path =
     match path with
     | Some path ->
@@ -20,7 +21,7 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
   if Bool.equal precomputed extensional then
     failwith "Must provide exactly one of -precomputed and -extensional" ;
   let logger = Logger.create () in
-  match Mina_caqti.connect_pool archive_uri with
+  match Caqti_async.connect_pool archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -58,8 +59,9 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
               Error (Error.to_string_hum err)
         in
         make_add_block of_yojson
-          (Processor.add_block_aux_precomputed ~genesis_constants
-             ~constraint_constants ~pool ~delete_older_than:None ~logger )
+          (Processor.add_block_aux_precomputed ~proof_cache_db
+             ~genesis_constants ~constraint_constants ~pool
+             ~delete_older_than:None ~logger )
       in
       let add_extensional_block =
         (* allow use of older-versioned blocks *)
@@ -73,8 +75,8 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
               Error (Error.to_string_hum err)
         in
         make_add_block of_yojson
-          (Processor.add_block_aux_extensional ~genesis_constants ~logger ~pool
-             ~delete_older_than:None )
+          (Processor.add_block_aux_extensional ~proof_cache_db
+             ~genesis_constants ~logger ~pool ~delete_older_than:None )
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->

@@ -35,15 +35,15 @@ let%test_module "Archive node unit tests" =
       lazy
         ( Thread_safe.block_on_async_exn
         @@ fun () ->
-        match%bind Mina_caqti.connect archive_uri with
+        match%map Caqti_async.connect archive_uri with
         | Ok conn ->
-            return conn
+            conn
         | Error e ->
             failwith @@ Caqti_error.show e )
 
     let conn_pool_lazy =
       lazy
-        ( match Mina_caqti.connect_pool archive_uri with
+        ( match Caqti_async.connect_pool archive_uri with
         | Ok pool ->
             pool
         | Error e ->
@@ -128,13 +128,17 @@ let%test_module "Archive node unit tests" =
           Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
             ~min_fee:Currency.Fee.zero coinbase_amount )
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
       Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
         user_command_signed_gen ~f:(fun user_command ->
-          let transaction_hash = Transaction_hash.hash_command user_command in
+          let transaction_hash =
+            Transaction_hash.hash_command_with_hashes user_command
+          in
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
@@ -164,7 +168,9 @@ let%test_module "Archive node unit tests" =
       @@ fun () ->
       Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
         user_command_zkapp_gen ~f:(fun user_command ->
-          let transaction_hash = Transaction_hash.hash_command user_command in
+          let transaction_hash =
+            Transaction_hash.hash_command_with_hashes user_command
+          in
           match user_command with
           | Signed_command _ ->
               failwith "zkapp_gen failed"
@@ -306,7 +312,7 @@ let%test_module "Archive node unit tests" =
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
           let%bind () =
-            Processor.run
+            Processor.run ~proof_cache_db
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_constants:precomputed_values.constraint_constants pool
               reader ~logger ~delete_older_than:None
@@ -314,7 +320,7 @@ let%test_module "Archive node unit tests" =
           match%map
             Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
-                Mina_caqti.Pool.use
+                Caqti_async.Pool.use
                   (fun conn ->
                     let open Deferred.Result.Let_syntax in
                     match%bind

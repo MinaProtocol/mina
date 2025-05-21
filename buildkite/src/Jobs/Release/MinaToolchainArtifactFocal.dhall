@@ -1,16 +1,16 @@
-let S = ../../Lib/SelectFiles.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let Artifacts = ../../Constants/Artifacts.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let S = ../../Lib/SelectFiles.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -34,6 +34,7 @@ in  Pipeline.build
                 , service = Artifacts.Type.Toolchain
                 , deb_codename = DebianVersions.DebVersion.Focal
                 , no_cache = True
+                , no_debian = True
                 }
 
           in  DockerImage.generateStep toolchainBullseyeSpec

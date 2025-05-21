@@ -26,7 +26,7 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
-let network = Network.Type.Devnet
+let network = Network.Type.Berkeley
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")

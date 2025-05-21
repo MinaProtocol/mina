@@ -21,12 +21,12 @@ let Artifacts = ../../Constants/Artifacts.dhall
 let dependsOn =
         Dockers.dependsOn
           Dockers.Type.Bullseye
-          Network.Type.Devnet
+          Network.Type.Berkeley
           Profiles.Type.Standard
           Artifacts.Type.Daemon
       # Dockers.dependsOn
           Dockers.Type.Bullseye
-          Network.Type.Devnet
+          Network.Type.Berkeley
           Profiles.Type.Standard
           Artifacts.Type.Archive
 

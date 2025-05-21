@@ -21,12 +21,12 @@ let Artifacts = ../../Constants/Artifacts.dhall
 let dependsOn =
         Dockers.dependsOn
           Dockers.Type.Bullseye
-          Network.Type.Devnet
+          Network.Type.Berkeley
           Profiles.Type.Standard
           Artifacts.Type.Daemon
       # Dockers.dependsOn
           Dockers.Type.Bullseye
-          Network.Type.Devnet
+          Network.Type.Berkeley
           Profiles.Type.Standard
           Artifacts.Type.Archive
 
@@ -39,8 +39,6 @@ in  Pipeline.build
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
           , S.strictlyStart (S.contains "buildkite/src/Command/TestExecutive")
-          , S.strictlyStart
-              (S.contains "buildkite/scripts/run-test-executive-cloud")
           , S.strictlyStart
               (S.contains "buildkite/scripts/run-test-executive-local")
           ]

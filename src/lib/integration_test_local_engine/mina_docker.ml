@@ -15,7 +15,6 @@ module Network_config = struct
     ; stack_name : string
     ; mina_image : string
     ; mina_agent_image : string
-    ; mina_bots_image : string
     ; mina_points_image : string
     ; mina_archive_image : string
     ; runtime_config : Yojson.Safe.t
@@ -559,7 +558,6 @@ module Network_config = struct
         ; stack_name
         ; mina_image = images.mina
         ; mina_agent_image = images.user_agent
-        ; mina_bots_image = images.bots
         ; mina_points_image = images.points
         ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config

@@ -1,61 +1,6 @@
 open Core
 open Async
-
-module Time_span_with_json = struct
-  type t = Time.Span.t
-
-  let to_yojson total = `String (Time.Span.to_string_hum total)
-
-  let of_yojson = function
-    | `String time ->
-        Ok (Time.Span.of_string time)
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse timespan"
-end
-
-(*FIX: register_event fails when adding base types to the constructors*)
-module String_with_json = struct
-  type t = string
-
-  let to_yojson s = `String s
-
-  let of_yojson = function
-    | `String s ->
-        Ok s
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse string"
-end
-
-module Int_with_json = struct
-  type t = int
-
-  let to_yojson s = `Int s
-
-  let of_yojson = function
-    | `Int s ->
-        Ok s
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse int"
-end
-
-type Structured_log_events.t +=
-  | Merge_snark_generated of { time : Time_span_with_json.t }
-  [@@deriving register_event { msg = "Merge SNARK generated in $time" }]
-
-type Structured_log_events.t +=
-  | Base_snark_generated of
-      { time : Time_span_with_json.t
-      ; transaction_type : String_with_json.t
-      ; zkapp_command_count : Int_with_json.t
-      ; proof_zkapp_command_count : Int_with_json.t
-      }
-  [@@deriving
-    register_event
-      { msg =
-          "Base SNARK generated in $time for $transaction_type transaction \
-           with $zkapp_command_count zkapp_command and \
-           $proof_zkapp_command_count proof zkapp_command"
-      }]
+open Events
 
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
@@ -67,12 +12,15 @@ module Make (Inputs : Intf.Inputs_intf) :
 
     module Single = struct
       module Spec = struct
-        type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
+        type t =
+          ( Transaction_witness.Stable.Latest.t
+          , Ledger_proof.t )
+          Work.Single.Spec.t
         [@@deriving sexp, yojson]
 
         let transaction t =
           Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.transaction )
+              w.Transaction_witness.Stable.Latest.transaction )
 
         let statement = Work.Single.Spec.statement
       end
@@ -171,7 +119,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   let init =
                     match
                       (Mina_base.Account_update.of_fee_payer
-                         zkapp_command.Mina_base.Zkapp_command.fee_payer )
+                         zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
                         .authorization
                     with
                     | Proof _ ->
@@ -188,8 +136,9 @@ module Make (Inputs : Intf.Inputs_intf) :
                             Mina_base.Control.(
                               Tag.equal Proof
                                 (tag
-                                   (Mina_base.Account_update.authorization
-                                      account_update ) ))
+                                   account_update
+                                     .Mina_base.Account_update.Poly
+                                      .authorization ))
                           then proof_updates_count + 1
                           else proof_updates_count ) )
                   in

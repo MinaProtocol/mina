@@ -1,5 +1,3 @@
-let B = ../../External/Buildkite.dhall
-
 let Cmd = ../../Lib/Cmds.dhall
 
 let S = ../../Lib/SelectFiles.dhall
@@ -18,15 +16,13 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
-let RunWithPostgres = ../../Command/RunWithPostgres.dhall
+let Artifacts = ../../Constants/Artifacts.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
+let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
-let network = Network.Type.Devnet
+let network = Network.Type.Berkeley
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -57,7 +53,7 @@ in  Pipeline.build
                   ([] : List Text)
                   "./src/test/archive/sample_db/archive_db.sql"
                   Artifacts.Type.Rosetta
-                  (Some Network.Type.Devnet)
+                  (Some network)
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{
@@ -69,7 +65,6 @@ in  Pipeline.build
               ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
-            , soft_fail = Some (B/SoftFail.Boolean True)
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn

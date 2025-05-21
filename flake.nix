@@ -213,15 +213,7 @@
             { with-archive ? false }: {
               command =
                 runInEnv self.devShells.x86_64-linux.integration-tests ''
-                  export GOOGLE_CLOUD_KEYFILE_JSON=$AUTOMATED_VALIDATION_SERVICE_ACCOUNT
-                  export GCLOUD_API_KEY=$(cat $INTEGRATION_TEST_LOGS_GCLOUD_API_KEY_PATH)
-                  source $INTEGRATION_TEST_CREDENTIALS
-                  export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
-                  export KUBE_CONFIG_PATH=$$HOME/.kube/config
-                  gcloud auth activate-service-account --key-file=$AUTOMATED_VALIDATION_SERVICE_ACCOUNT automated-validation@o1labs-192920.iam.gserviceaccount.com --project o1labs-192920
-                  gcloud container clusters get-credentials --region us-west1 mina-integration-west1
-                  kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
-                  test_executive cloud ${test} \
+                  test_executive local ${test} \
                   --mina-image=${
                     dockerUrl "mina-image-full" "$BUILDKITE_COMMIT"
                   } \
@@ -270,7 +262,7 @@
     } // utils.lib.eachDefaultSystem (system:
       let
         rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isDarwin then {
+          if prev.stdenv.isAarch64 || prev.stdenv.isDarwin then {
             rocksdb-mina = pkgs.rocksdb;
           } else {
             rocksdb-mina = pkgs.rocksdb511;
@@ -311,11 +303,15 @@
           nodejs
           binaryen
           zip
+          libiconv
+          cargo
+          curl
           (pkgs.python3.withPackages (python-pkgs: [
               python-pkgs.click
               python-pkgs.requests
             ]))
           jq
+          rocksdb.tools
         ];
       in {
         inherit ocamlPackages;
@@ -376,13 +372,7 @@
           shellHook = ''
             export MINA_BRANCH=$()
           '';
-          buildInputs = [
-            self.packages.${system}.test_executive
-            pkgs.kubectl
-            pkgs.google-cloud-sdk
-            pkgs.terraform
-            pkgs.curl
-          ];
+          buildInputs = [ self.packages.${system}.test_executive ];
         };
         packages.impure-shell =
           (import ./nix/impure-shell.nix pkgs).inputDerivation;
