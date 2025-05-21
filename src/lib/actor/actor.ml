@@ -253,8 +253,7 @@ module Regular (DataMessage : sig
   val to_yojson : t -> Yojson.Safe.t
 end) =
 struct
-  module Inner = WithRequest (DataMessage) (DummyRequest)
-  include Inner
+  include WithRequest (DataMessage) (DummyRequest)
 
   let create = create ~request_handler:{ f = DummyRequest.handler }
 end
