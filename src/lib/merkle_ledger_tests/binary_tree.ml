@@ -55,8 +55,8 @@ struct
         function
         | [] ->
             hash
-        | Direction.Left :: xs ->
+        | Mina_stdlib.Direction.Left :: xs ->
             get_inner_hash_at_addr_exn left xs
-        | Direction.Right :: xs ->
+        | Mina_stdlib.Direction.Right :: xs ->
             get_inner_hash_at_addr_exn right xs )
 end

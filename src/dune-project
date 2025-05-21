@@ -32,7 +32,6 @@
 (package (name daemon_rpcs))
 (package (name data_hash_lib))
 (package (name debug_assert))
-(package (name direction))
 (package (name disk_cache))
 (package (name downloader))
 (package (name dummy_values))
