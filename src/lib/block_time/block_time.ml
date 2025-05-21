@@ -245,7 +245,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   end
 
   include Time
-  module Timeout = Timeout_lib.Make (Time)
+  module Timeout = Mina_stdlib.Timeout_lib.Make (Time)
 end
 
 include Wire_types.Make (Make_sig) (Make_str)
