@@ -1,0 +1,15 @@
+(tests
+ (names test_lmdb_storage)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async_kernel
+  base_quickcheck
+  core_kernel
+  lmdb
+  ;; local libraries
+  blake2
+  file_system
+  lmdb_storage)
+ (preprocess
+  (pps ppx_jane)))

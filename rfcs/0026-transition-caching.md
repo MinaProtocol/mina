@@ -29,7 +29,7 @@ In order to assist in ensuring that items in the cache are properly invalidated,
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-- This cachs is small and simple in its scope scope.
+- This cache is small and simple in its scope.
 - `Cached` enforces that our architecture correctly invalidates the `Unprocessed_transition_cache`, avoiding cache leaks.
 
 ## Unresolved questions

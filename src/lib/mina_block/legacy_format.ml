@@ -65,9 +65,18 @@ module User_command = struct
 
   type nonrec t = User_command.t
 
-  let proof_to_yojson = Proof.to_yojson
+  let proof_cache_db = Proof_cache_tag.create_identity_db ()
 
-  let proof_of_yojson = Proof.of_yojson
+  let proof_to_yojson proof =
+    Proof_cache_tag.read_proof_from_disk proof |> Proof.to_yojson
+
+  let proof_of_yojson json =
+    match Proof.of_yojson json with
+    | Ok proof ->
+        Ppx_deriving_yojson_runtime.Result.Ok
+          (Proof_cache_tag.write_proof_to_disk proof_cache_db proof)
+    | Error e ->
+        Ppx_deriving_yojson_runtime.Result.Error e
 
   let to_yojson = Helper.to_yojson ~proof_to_yojson
 
@@ -80,7 +89,7 @@ module Staged_ledger_diff = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = Mina_wire_types.Staged_ledger_diff.V2.t =
+      type t = Staged_ledger_diff.Stable.V2.t =
         { diff :
             ( Transaction_snark_work.Stable.V2.t
             , User_command.Stable.V1.t Mina_base.With_status.Stable.V2.t )

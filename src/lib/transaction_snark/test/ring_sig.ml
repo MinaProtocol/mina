@@ -15,7 +15,7 @@ open Snark_params.Tick.Let_syntax
 (* check a signature on msg against a public key *)
 let check_sig pk msg sigma : Boolean.var Checked.t =
   let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-  Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
+  Schnorr.Chunked.Checked.verifies ~signature_kind (module S) sigma pk msg
 
 (* verify witness signature against public keys *)
 let%snarkydef_ verify_sig pubkeys msg sigma =
@@ -67,7 +67,7 @@ let%test_unit "1-of-1" =
   in
   Quickcheck.test ~trials:1 gen ~f:(fun (sk, msg) ->
       let pk = Inner_curve.(scale one sk) in
-      (let sigma = Schnorr.Chunked.sign sk msg in
+      (let sigma = Schnorr.Chunked.sign ~signature_kind sk msg in
        let%bind sigma_var, msg_var =
          exists
            Typ.(Schnorr.Chunked.Signature.typ * Schnorr.chunked_message_typ ())
@@ -88,7 +88,7 @@ let%test_unit "1-of-2" =
   Quickcheck.test ~trials:1 gen ~f:(fun (sk0, sk1, msg) ->
       let pk0 = Inner_curve.(scale one sk0) in
       let pk1 = Inner_curve.(scale one sk1) in
-      (let sigma1 = Schnorr.Chunked.sign sk1 msg in
+      (let sigma1 = Schnorr.Chunked.sign ~signature_kind sk1 msg in
        let%bind sigma1_var =
          exists Schnorr.Chunked.Signature.typ ~compute:(As_prover.return sigma1)
        and msg_var =
@@ -252,7 +252,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           in
           let tx_statement : Zkapp_statement.t =
             { account_update =
-                Account_update.Body.digest
+                Account_update.Body.digest ~signature_kind
                   (Account_update.of_simple snapp_account_update_data).body
             ; calls = (Zkapp_command.Digest.Forest.empty :> field)
             }
@@ -262,7 +262,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             |> Random_oracle_input.Chunked.field_elements
           in
           let signing_sk = List.nth_exn ring_member_sks sign_index in
-          let sigma = Schnorr.Chunked.sign signing_sk msg in
+          let sigma = Schnorr.Chunked.sign ~signature_kind signing_sk msg in
           let handler (Snarky_backendless.Request.With { request; respond }) =
             match request with
             | Sigma ->
@@ -285,13 +285,15 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             in
             { fee_payer with
               authorization =
-                Signature_lib.Schnorr.Chunked.sign sender.private_key
+                Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                  sender.private_key
                   (Random_oracle.Input.Chunked.field txn_comm)
             }
           in
           let sender : Account_update.Simple.t =
             let sender_signature =
-              Signature_lib.Schnorr.Chunked.sign sender.private_key
+              Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                sender.private_key
                 (Random_oracle.Input.Chunked.field transaction)
             in
             { body = sender_account_update_data.body
@@ -299,7 +301,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             }
           in
           let zkapp_command : Zkapp_command.t =
-            Zkapp_command.of_simple
+            Zkapp_command.of_simple ~proof_cache_db
               { fee_payer
               ; account_updates =
                   [ sender

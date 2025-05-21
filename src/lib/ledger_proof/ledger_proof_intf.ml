@@ -39,8 +39,6 @@ module type S = sig
        , Mina_state.Local_state.t )
        Mina_state.Registers.t
 
-  val sok_digest : t -> Sok_message.Digest.t
-
   val underlying_proof : t -> Proof.t
 
   val snarked_ledger_hash : t -> Frozen_ledger_hash.t
@@ -57,8 +55,6 @@ module type S = sig
     val read_proof_from_disk : t -> Stable.Latest.t
 
     val statement : t -> Mina_state.Snarked_ledger_state.t
-
-    val sok_digest : t -> Sok_message.Digest.t
 
     val underlying_proof : t -> Proof_cache_tag.t
 

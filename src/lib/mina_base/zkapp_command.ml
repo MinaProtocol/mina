@@ -57,7 +57,8 @@ type ('proof, 'account_update_digest, 'forest_digest) with_forest =
 [@@deriving sexp, compare, equal, hash, yojson]
 
 module T = struct
-  type t = (Proof.t, Digest.Account_update.t, Digest.Forest.t) with_forest
+  type t =
+    (Proof_cache_tag.t, Digest.Account_update.t, Digest.Forest.t) with_forest
   [@@deriving sexp_of, to_yojson]
 
   [%%versioned
@@ -141,60 +142,56 @@ end
 
 include T
 
-let map_proofs ~(f : 'p -> 'q)
-    ({ Poly.fee_payer; memo; account_updates } : ('p, 'b, 'c) with_forest) :
-    ('q, 'b, 'c) with_forest =
-  { Poly.fee_payer
-  ; memo
-  ; account_updates =
-      Call_forest.map ~f:(Account_update.map_proofs ~f) account_updates
-  }
-
-let write_all_proofs_to_disk (w : Stable.Latest.t) : t =
+let write_all_proofs_to_disk ~proof_cache_db (w : Stable.Latest.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
-      w.account_updates
-      |> Call_forest.accumulate_hashes
-           ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
+      Call_forest.map
+        ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
+      @@ Call_forest.accumulate_hashes
+           ~hash_account_update:Digest.Account_update.create w.account_updates
   }
 
 let read_all_proofs_from_disk (t : t) : Stable.Latest.t =
   { fee_payer = t.fee_payer
   ; memo = t.memo
-  ; account_updates = Call_forest.forget_hashes t.account_updates
+  ; account_updates =
+      Call_forest.map ~f:Account_update.read_all_proofs_from_disk
+      @@ Call_forest.forget_hashes t.account_updates
   }
 
 let forget_digests_and_proofs
     ({ fee_payer; memo; account_updates } : (_, _, _) with_forest) :
     (unit, unit, unit) with_forest =
-  map_proofs ~f:(const ())
-    { Poly.fee_payer
-    ; memo
-    ; account_updates = Call_forest.forget_hashes account_updates
-    }
+  { Poly.fee_payer
+  ; memo
+  ; account_updates = Call_forest.forget_hashes_and_proofs account_updates
+  }
 
 [%%define_locally Stable.Latest.(gen)]
 
-let of_simple (w : Simple.t) : t =
+let of_simple ~proof_cache_db (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
       Call_forest.of_account_updates w.account_updates
         ~account_update_depth:(fun (p : Account_update.Simple.t) ->
           p.body.call_depth )
-      |> Call_forest.map ~f:Account_update.of_simple
+      |> Call_forest.map
+           ~f:
+             (Fn.compose
+                (Account_update.write_all_proofs_to_disk ~proof_cache_db)
+                Account_update.of_simple )
       |> Call_forest.accumulate_hashes
-           ~hash_account_update:(fun (p : Account_update.t) ->
-             Digest.Account_update.create p )
+           ~hash_account_update:Digest.Account_update.create
   }
 
 let to_simple (t : t) : Simple.t =
   { fee_payer = t.fee_payer
   ; memo = t.memo
   ; account_updates =
-      t.account_updates
+      Call_forest.map ~f:Account_update.read_all_proofs_from_disk
+        t.account_updates
       |> Call_forest.to_account_updates_map
            ~f:(fun ~depth { Account_update.Poly.body = b; authorization } ->
              { Account_update.Poly.authorization
@@ -382,7 +379,7 @@ end
 
 module Verifiable : sig
   type t =
-    ( Proof.t
+    ( Proof_cache_tag.t
     , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
@@ -453,10 +450,11 @@ module Verifiable : sig
 
   val to_serializable : t -> Serializable.t
 
-  val of_serializable : Serializable.t -> t
+  val of_serializable :
+    proof_cache_db:Proof_cache_tag.cache_db -> Serializable.t -> t
 end = struct
   type t =
-    ( Proof.Stable.Latest.t
+    ( Proof_cache_tag.t
     , ( Side_loaded_verification_key.Stable.Latest.t
       , Zkapp_basic.F.Stable.Latest.t )
       With_hash.Stable.Latest.t
@@ -482,16 +480,16 @@ end = struct
     { fee_payer
     ; account_updates =
         Call_forest.map account_updates ~f:(fun (upd, aux) ->
-            (Account_update.map_proofs ~f:ident upd, aux) )
+            (Account_update.read_all_proofs_from_disk upd, aux) )
     ; memo
     }
 
-  let of_serializable ({ fee_payer; account_updates; memo } : Serializable.t) :
-      t =
+  let of_serializable ~proof_cache_db
+      ({ fee_payer; account_updates; memo } : Serializable.t) : t =
     { fee_payer
     ; account_updates =
         Call_forest.map account_updates ~f:(fun (upd, aux) ->
-            (Account_update.map_proofs ~f:ident upd, aux) )
+            (Account_update.write_all_proofs_to_disk ~proof_cache_db upd, aux) )
     ; memo
     }
 
@@ -544,8 +542,7 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t) ~failed ~find_vk :
-      t Or_error.t =
+  let create ({ fee_payer; account_updates; memo } : T.t) ~failed ~find_vk =
     With_return.with_return (fun { return } ->
         let tbl = Account_id.Table.create () in
         let vks_overridden =
@@ -758,9 +755,13 @@ end = struct
   end
 end
 
-let of_verifiable ({ Poly.fee_payer; account_updates; memo } : Verifiable.t) : t
-    =
-  { fee_payer; account_updates = Call_forest.map account_updates ~f:fst; memo }
+let of_verifiable
+    ({ Poly.fee_payer; account_updates; memo } :
+      _ Call_forest.With_hashes_and_data.t Poly.t ) =
+  { Poly.fee_payer
+  ; account_updates = Call_forest.map account_updates ~f:fst
+  ; memo
+  }
 
 module Transaction_commitment = struct
   module Stable = Kimchi_backend.Pasta.Basic.Fp.Stable

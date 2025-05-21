@@ -4,14 +4,12 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_compare))
- (inline_tests
-  (flags -verbose -show-counts))
+  (pps ppx_compare ppx_jane ppx_version))
  (libraries
   ;; opam libraries
+  bignum
   bignum.bigint
   core_kernel
-  bignum
   sexplib0
   ;; local libraries
   snarky.backendless

@@ -1,2 +1,0 @@
-include Staged_ledger_diff_diff
-module Body = Staged_ledger_diff_body

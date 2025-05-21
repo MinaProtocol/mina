@@ -217,7 +217,7 @@ module type State_hooks = sig
   val generate_transition :
        previous_protocol_state:protocol_state
     -> blockchain_state:blockchain_state
-    -> current_time:Unix_timestamp.t
+    -> current_time:Mina_stdlib.Unix_timestamp.t
     -> block_data:block_data
     -> supercharge_coinbase:bool
     -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
@@ -679,7 +679,7 @@ module type S = sig
     val received_at_valid_time :
          constants:Constants.t
       -> Consensus_state.Value.t
-      -> time_received:Unix_timestamp.t
+      -> time_received:Mina_stdlib.Unix_timestamp.t
       -> (unit, [ `Too_early | `Too_late of int64 ]) result
 
     type select_status = [ `Keep | `Take ] [@@deriving equal]
@@ -700,7 +700,7 @@ module type S = sig
     (** Data required to evaluate VRFs for an epoch *)
     val get_epoch_data_for_vrf :
          constants:Constants.t
-      -> Unix_timestamp.t
+      -> Mina_stdlib.Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> logger:Logger.t

@@ -2,6 +2,8 @@ open Signature_lib
 
 let%test_module "Signatures are unchanged test" =
   ( module struct
+    let signature_kind = Mina_signature_kind.Testnet
+
     let privkey =
       Private_key.of_base58_check_exn
         "EKE2M5q5afTtdzZTzyKu89Pzc7274BD6fm2fsDLgLt5zy34TAN5N"
@@ -15,7 +17,7 @@ let%test_module "Signatures are unchanged test" =
 
     let%test "signature of empty random oracle input matches" =
       let signature_got =
-        Schnorr.Legacy.sign privkey
+        Schnorr.Legacy.sign ~signature_kind privkey
           (Random_oracle_input.Legacy.field_elements [||])
       in
       Snark_params.Tick.Field.equal (fst signature_expected) (fst signature_got)
@@ -24,7 +26,7 @@ let%test_module "Signatures are unchanged test" =
 
     let%test "signature of signature matches" =
       let signature_got =
-        Schnorr.Legacy.sign privkey
+        Schnorr.Legacy.sign ~signature_kind privkey
           (Random_oracle_input.Legacy.field_elements
              [| fst signature_expected |] )
       in
