@@ -31,7 +31,7 @@ case "${MINA_DEB_CODENAME}" in
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   bullseye|focal)
-    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, liblmdb-dev, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   stretch|bionic)
