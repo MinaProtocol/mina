@@ -26,6 +26,10 @@ SUGGESTED_DEPS="jq, curl, wget"
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker"
 
 case "${MINA_DEB_CODENAME}" in
+  noble)
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
+    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
+    ;;
   bookworm|jammy)
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"

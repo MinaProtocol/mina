@@ -52,8 +52,8 @@ SCRIPT=' export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     '
 
 case $CODENAME in
-  bullseye) DOCKER_IMAGE="debian:bullseye" ;;
-  focal) DOCKER_IMAGE="ubuntu:focal" ;;
+  bullseye) DOCKER_IMAGE="debian:$CODENAME" ;;
+  focal|noble) DOCKER_IMAGE="ubuntu:$CODENAME" ;;
   *) echo "❌  Unknown codename passed: $CODENAME"; exit 1;;
 esac
 
