@@ -873,7 +873,7 @@ let request_work t =
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_worker_lib.Work.Result.t) =
+let add_work t (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =

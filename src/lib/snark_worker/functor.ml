@@ -1,70 +1,11 @@
 open Core
 open Async
 open Events
+open Snark_work_lib
 
 module Make = struct
   module Rpcs = Rpcs.Make
-
-  module Work = struct
-    open Snark_work_lib
-
-    module Single = struct
-      module Spec = struct
-        type t =
-          ( Transaction_witness.Stable.Latest.t
-          , Ledger_proof.t )
-          Work.Single.Spec.t
-        [@@deriving sexp, yojson]
-
-        let transaction t =
-          Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.Stable.Latest.transaction )
-
-        let statement = Work.Single.Spec.statement
-      end
-    end
-
-    module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
-
-      let instances = Work.Spec.instances
-    end
-
-    module Result = struct
-      type t = (Spec.t, Ledger_proof.t) Work.Result.t
-
-      let transactions (t : t) =
-        One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
-    end
-  end
-
   include Prod.Inputs
-
-  let perform (s : Worker_state.t) public_key
-      ({ instances; fee } as spec : Work.Spec.t) =
-    One_or_two.Deferred_result.map instances ~f:(fun w ->
-        let open Deferred.Or_error.Let_syntax in
-        let%map proof, time =
-          perform_single s
-            ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-            w
-        in
-        ( proof
-        , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
-        ) )
-    |> Deferred.Or_error.map ~f:(function
-         | `One (proof1, metrics1) ->
-             { Snark_work_lib.Work.Result.proofs = `One proof1
-             ; metrics = `One metrics1
-             ; spec
-             ; prover = public_key
-             }
-         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-             { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
-             ; metrics = `Two (metrics1, metrics2)
-             ; spec
-             ; prover = public_key
-             } )
 
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
@@ -174,9 +115,7 @@ module Make = struct
                  ; proof_zkapp_command_count
                  } ) )
 
-  let main
-      (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Ledger_proof.t ) ~logger ~proof_level
+  let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
       ~constraint_constants daemon_address shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
@@ -264,7 +203,7 @@ module Make = struct
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics
-                (Work.Result.transactions result)
+                (Selector.Result.Stable.Latest.transactions result)
                 logger ;
               [%log info] "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
@@ -290,9 +229,7 @@ module Make = struct
     go ()
 
   let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-      ~constraint_constants
-      (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Ledger_proof.t ) =
+      ~constraint_constants (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
