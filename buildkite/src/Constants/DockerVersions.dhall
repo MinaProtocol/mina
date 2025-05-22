@@ -6,7 +6,7 @@ let Network = ./Network.dhall
 
 let Docker
     : Type
-    = < Bookworm | Bullseye | Jammy | Focal >
+    = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
 let capitalName =
           \(docker : Docker)
@@ -15,6 +15,7 @@ let capitalName =
             , Bullseye = "Bullseye"
             , Jammy = "Jammy"
             , Focal = "Focal"
+            , Noble = "Noble"
             }
             docker
 
@@ -25,6 +26,7 @@ let lowerName =
             , Bullseye = "bullseye"
             , Jammy = "jammy"
             , Focal = "focal"
+            , Noble = "noble"
             }
             docker
 
@@ -42,39 +44,11 @@ let dependsOnStep =
 
           let key = "${Artifacts.lowerName binary}-${suffix}"
 
-          in  merge
-                { Bookworm =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Bullseye =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Jammy =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Focal =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
+          in  [ { name =
+                    "${prefix}${capitalName docker}${network}${profileSuffix}"
+                , key = key
                 }
-                docker
+              ]
 
 let dependsOn =
           \(docker : Docker)
