@@ -7,8 +7,11 @@
 *)
 
 include Node_config_version
+include Node_config_unconfigurable_constants
 
 [%%inject "ledger_depth", ledger_depth]
+
+[%%inject "curve_size", curve_size]
 
 [%%inject "coinbase", coinbase]
 
@@ -53,6 +56,8 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "account_creation_fee_int", account_creation_fee_int]
 
+[%%inject "default_transaction_fee", default_transaction_fee]
+
 [%%inject "default_snark_worker_fee", default_snark_worker_fee]
 
 [%%inject "minimum_user_command_fee", minimum_user_command_fee]
@@ -64,8 +69,6 @@ let scan_state_transaction_capacity_log_2 =
 [%%inject "genesis_state_timestamp", genesis_state_timestamp]
 
 [%%inject "block_window_duration", block_window_duration]
-
-[%%inject "itn_features", itn_features]
 
 [%%ifndef compaction_interval]
 

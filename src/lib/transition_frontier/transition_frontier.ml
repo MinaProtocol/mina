@@ -24,6 +24,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 let max_catchup_chunk_length = 20
@@ -194,7 +196,7 @@ let rec load_with_max_length :
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:[ `Super ]
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -292,7 +294,7 @@ let rec load_with_max_length :
       ~snarked_ledger_hash:genesis_ledger_hash
   in
   match
-    time ~label:"Persistent_frontier.Instsance.check_database" ~logger
+    time ~label:"Persistent_frontier.Instance.check_database" ~logger
     @@ fun () ->
     Persistent_frontier.Instance.check_database
       ~genesis_state_hash:
@@ -466,10 +468,10 @@ let add_breadcrumb_exn t breadcrumb =
     Mina_block.Validated.valid_commands
     @@ Breadcrumb.validated_transition breadcrumb
   in
-  let tx_hash_json =
-    Fn.compose
-      Mina_transaction.Transaction_hash.(Fn.compose to_yojson hash_command)
-      User_command.forget_check
+  let tx_hash_json command =
+    User_command.forget_check command
+    |> Mina_transaction.Transaction_hash.hash_command_with_hashes
+    |> Mina_transaction.Transaction_hash.to_yojson
   in
   [%str_log' trace t.logger] Added_breadcrumb_user_commands
     ~metadata:
@@ -522,7 +524,7 @@ include struct
 
   let common_ancestor = proxy1 common_ancestor
 
-  (* reduce sucessors functions (probably remove hashes special case *)
+  (* reduce successors functions (probably remove hashes special case *)
   let successors = proxy1 successors
 
   let successors_rec = proxy1 successors_rec
@@ -578,30 +580,6 @@ module For_tests = struct
   let rec deferred_rose_tree_iter (Rose_tree.T (root, trees)) ~f =
     let%bind () = f root in
     Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f)
-
-  (*
-  let with_frontier_from_rose_tree (Rose_tree.T (root, trees)) ~logger ~verifier ~consensus_local_state ~max_length ~root_snarked_ledger ~f =
-    with_temp_persistence ~f:(fun ~persistent_root ~persistent_frontier ->
-      Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
-        Persistent_root.Instance.set_root_state_hash instance (Breadcrumb.state_hash @@ root);
-        ignore @@ Ledger_transfer.transfer_accounts
-          ~src:root_snarked_ledger
-          ~dest:(Persistent_root.snarked_ledger instance));
-      let frontier =
-        let fail msg = failwith ("failed to load transition frontier: "^msg) in
-        load_with_max_length
-          {logger; verifier; consensus_local_state}
-          ~persistent_root ~persistent_frontier
-          ~max_length
-        >>| Result.map_error ~f:(Fn.compose fail (function
-          | `Bootstrap_required -> "bootstrap required"
-          | `Persistent_frontier_malformed -> "persistent frontier malformed"
-          | `Faliure msg -> msg))
-        >>| Result.ok_or_failwith
-      in
-      let%bind () = Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) in
-      f frontier)
-  *)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~verifier
@@ -709,8 +687,7 @@ module For_tests = struct
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb_with_protocol_states ~logger ~verifier
-          ~precomputed_values ()) ~max_length ~size
-      ?(use_super_catchup : bool option) () =
+          ~precomputed_values ()) ~max_length ~size () =
     (* TODO: Take this as an argument *)
     let module Context = struct
       let logger = logger
@@ -721,7 +698,7 @@ module For_tests = struct
 
       let consensus_constants = precomputed_values.consensus_constants
 
-      let compile_config = precomputed_values.compile_config
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in
@@ -788,15 +765,7 @@ module For_tests = struct
           load_with_max_length ~max_length ~retry_with_fresh_db:false
             ~context:(module Context)
             ~verifier ~consensus_local_state ~persistent_root
-            ~catchup_mode:
-              ( match use_super_catchup with
-              | Some true ->
-                  `Super
-              | Some false ->
-                  `Normal
-              | None ->
-                  `Normal )
-            ~persistent_frontier () )
+            ~catchup_mode:`Super ~persistent_frontier () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in
@@ -831,12 +800,12 @@ module For_tests = struct
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
-      ~branch_size ?(use_super_catchup : bool option) () =
+      ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ~verifier ?trust_system ?use_super_catchup
-        ?consensus_local_state ~precomputed_values ?gen_root_breadcrumb
-        ~root_ledger_and_accounts ~max_length ~size:frontier_size ()
+      gen ?logger ~verifier ?trust_system ?consensus_local_state
+        ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
+        ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ~precomputed_values ~verifier

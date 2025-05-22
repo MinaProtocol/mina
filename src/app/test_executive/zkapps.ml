@@ -139,18 +139,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            ( Wait_condition.nodes_to_initialize
            @@ (Network.all_mina_nodes network |> Core.String.Map.data) ) )
     in
-    let node =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
+    let node = Network.block_producer_exn network "node-a" in
     let constraint_constants = Network.constraint_constants network in
-    let fish1_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1")
-        .keypair
-    in
-    let fish2_kp =
-      (Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2")
-        .keypair
-    in
+    let fish1_kp = (Network.genesis_keypair_exn network "fish1").keypair in
+    let fish2_kp = (Network.genesis_keypair_exn network "fish2").keypair in
     let num_zkapp_accounts = 3 in
     let zkapp_keypairs =
       List.init num_zkapp_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -354,7 +346,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
         in
         Transaction_snark.For_tests.single_account_update
-          ~chain:Mina_signature_kind.(Other_network "Invalid")
+          ~signature_kind:Mina_signature_kind.(Other_network "Invalid")
           ~constraint_constants spec
       in
       ( snapp_update
@@ -380,12 +372,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { p with
           account_updates =
             Call_forest.map p.account_updates ~f:(fun other_p ->
-                match other_p.Account_update.authorization with
-                | Proof _ ->
+                match other_p.Account_update.Poly.authorization with
+                | Control.Poly.Proof _ ->
                     { other_p with
                       authorization =
-                        Control.Proof
-                          (Lazy.force Mina_base.Proof.blockchain_dummy)
+                        Control.Poly.Proof
+                          (Lazy.force
+                             Mina_base.Proof.For_tests.blockchain_dummy_tag )
                     }
                 | _ ->
                     other_p )

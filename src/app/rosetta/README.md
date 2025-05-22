@@ -48,7 +48,7 @@ The container includes 3 scripts in `/etc/mina/rosetta/scripts` that run a diffe
   and Rosetta node), but for a demo network with all operations occurring inside
   this container and no external network activity.
 * `docker-start.sh` connects the Mina node to a network (by default,
-  [Mainnet](https://docs.minaprotocol.com/node-operators/connecting-to-the-network))
+  [Mainnet](https://docs.minaprotocol.com/node-operators/block-producer-node/connecting-to-the-network))
   and initializes the archive database from publicly available nightly
   O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a Mina
   node, a Mina archive, a PostgreSQL DB, and Rosetta. The script also
@@ -112,7 +112,8 @@ If you want to run the Rosetta server in a standalone container using Docker Com
 * `curl --data '{ metadata: {} }' 'localhost:3087/network/list'`
 * `curl --data '{ network_identifier: { blockchain: "mina", network: "devnet" }, metadata: {} }' 'localhost:3087/network/status'`
 
-Any queries that rely on historical data will fail until the archive database is populated. This happens automatically with the relevant entrypoints.
+Any queries that rely on historical data will fail until the archive database is
+populated. This happens automatically with the relevant entrypoints.
 
 ### Running natively
 
@@ -159,17 +160,38 @@ previous step. `POSTGRES_HOST` will usually be just `localhost` and
 
 #### init-db.sh
 
-As Mina does not store or broadcast historical blocks beyond the "transition frontier" (approximately 290 blocks), Rosetta requires logic to fetch historical data from a trusted archive node database. `docker-start.sh` and the `init-db.sh` script that it calls set up a fresh database when the node is first launched (located in `/data/postgresql` by default) and then restores the latest O(1) Labs nightly backup into that new database. If this data is persisted across reboots/deployments then the `init-db.sh` script will short-circuit and refuse to restore from the database backup.
+As Mina does not store or broadcast historical blocks beyond the "transition
+frontier" (approximately 290 blocks), Rosetta requires logic to fetch historical
+data from a trusted archive node database. `docker-start.sh` and the
+`init-db.sh` script that it calls set up a fresh database when the node is first
+launched (located in `/data/postgresql` by default) and then restores the latest
+O(1) Labs nightly backup into that new database. If this data is persisted
+across reboots/deployments then the `init-db.sh` script will short-circuit and
+refuse to restore from the database backup.
 
 #### download-missing-blocks.sh
 
-In all cases, `download-missing-blocks.sh` will check the database every 5 minutes for any gaps / missing blocks until the first missing block is encountered. Once this happens, `mina-missing-blocks-auditor` will return the state hash and block height for whichever blocks are missing, and the script will download them one at a time from O(1) Labs JSON block backups until the missing blocks auditor reaches the genesis block.
+In all cases, `download-missing-blocks.sh` will check the database every 5
+minutes for any gaps / missing blocks until the first missing block is
+encountered. Once this happens, `mina-missing-blocks-auditor` will return the
+state hash and block height for whichever blocks are missing, and the script
+will download them one at a time from O(1) Labs JSON block backups until the
+missing blocks auditor reaches the genesis block.
 
-If the data in PostgreSQL is really stale (>24 hours), it would likely be better/quicker to delete the `/data/` directory and force `init-db.sh` to restore from a complete database backup instead of relying on the individual block restore mechanism to download hundreds of blocks.
+If the data in PostgreSQL is really stale (>24 hours), it would likely be
+better/quicker to delete the `/data/` directory and force `init-db.sh` to
+restore from a complete database backup instead of relying on the individual
+block restore mechanism to download hundreds of blocks.
 
 ### Operation Statuses
 
-Operations are always `Pending` if retrieved from the mempool. `Success` if they are in a block and fully applied. A transaction status of `Failed` occurs for transactions within a block whenever certain invariants are not met such as not sending enough to cover the account creation fee. Other reasons include misconfiguring new tokens or zkapps. See [this section of the code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/coda_base/user_command_status.ml#L8-L21) for an exhaustive list.
+Operations are always `Pending` if retrieved from the mempool. `Success` if they
+are in a block and fully applied. A transaction status of `Failed` occurs for
+transactions within a block whenever certain invariants are not met such as not
+sending enough to cover the account creation fee. Other reasons include
+misconfiguring new tokens or zkapps. See [this section of the
+code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/mina_base/transaction_status.ml#L10-L50)
+for an exhaustive list.
 
 ### Operations Types
 
@@ -177,11 +199,16 @@ See [this section of the code](https://github.com/MinaProtocol/mina/blob/03e1197
 
 ### Account metadata
 
-Accounts in Mina are not uniquely identified by an address alone, you must also couple it with a `token_id`. A `token_id` of `wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf` denotes the default MINA token. Note that the `token_id` is passed via the metadata field of `account_identifier`.
+Accounts in Mina are not uniquely identified by an address alone, you must also
+couple it with a `token_id`. A `token_id` of
+`wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf` denotes the default MINA
+token. Note that the `token_id` is passed via the metadata field of
+`account_identifier`.
 
 ### Operations for Supported Transactions via Construction
 
-The following supported transactions for the Construction API are `payment` and `delegation`.
+The following supported transactions for the Construction API are `payment` and
+`delegation`.
 
 ## Future Work and Known Issues
 
@@ -193,32 +220,55 @@ The following supported transactions for the Construction API are `payment` and 
 
 ### Validation
 
-This Rosetta implementation has a few different test suites at different layers of the stack.
+This Rosetta implementation has a few different test suites at different layers
+of the stack.
 
 #### Unit Tests
 
-Some of the more interesting endpoints have unit tests asserting their behavior is expected. Additionally, interesting bits of logic have unit test coverage: For example, there are unit tests that validate that different transactions' `to_operations` and `of_operations` functions are self-inverse.
+Some of the more interesting endpoints have unit tests asserting their behavior
+is expected. Additionally, interesting bits of logic have unit test coverage:
+For example, there are unit tests that validate that different transactions'
+`to_operations` and `of_operations` functions are self-inverse.
 
 #### Curl Tests
 
-Most endpoints have an accompanying shell script in `src/app/rosetta/test-curl/` that can be run to manually hit and inspect those endpoints. To do so while developing locally run `./start.sh CURL`.
+Most endpoints have an accompanying shell script in `src/app/rosetta/test-curl/`
+that can be run to manually hit and inspect those endpoints. To do so while
+developing locally run `./start.sh CURL`.
 
 #### Integration Test Agent
 
 A separate agent binary is optionally run on top of the Mina, Archive,
 Rosetta triplet. This agent manipulates the Mina node through GraphQL and Rosetta to ensure certain invariants.
 
-To test the Data API, for every kind of transaction supported in the Mina protocol, we turn off block production send this transaction via the Mina GraphQL API and then verify that (a) it appears in the mempool with operations we expect, and (b) after turning on block production and producing the next block that the same transaction appears in the block with the operations we expect.
+To test the Data API, for every kind of transaction supported in the Mina
+protocol, we turn off block production send this transaction via the Mina
+GraphQL API and then verify that (a) it appears in the mempool with operations
+we expect, and (b) after turning on block production and producing the next
+block that the same transaction appears in the block with the operations we
+expect.
 
-To test the Construction API, for every kind of transaction supported in the Mina protocol, we turn off block production and then run through the standard Construction API flow as documented on the `rosetta-api` website. Further:
+To test the Construction API, for every kind of transaction supported in the
+Mina protocol, we turn off block production and then run through the standard
+Construction API flow as documented on the `rosetta-api` website. Further:
 
-1. We ensure that the unsigned transaction returned from the `/payloads` endpoint parses, and that the signed transaction returned from the `/combine` endpoint parses, and that the operations before payloads and after parsing are consistent.
-2. The hash returned by `/hash` is consistent with the hash the Mina daemon returns after submitting the transaction to the network.
+1. We ensure that the unsigned transaction returned from the `/payloads`
+   endpoint parses, and that the signed transaction returned from the `/combine`
+   endpoint parses, and that the operations before payloads and after parsing
+   are consistent.
+2. The hash returned by `/hash` is consistent with the hash the Mina daemon
+   returns after submitting the transaction to the network.
 3. The signature on the signed transactions is verified according to the signer.
 
-Finally, we then take the signed transaction submit it to the network and go through the same flow as the Data API checks for this transaction. Ensuring its behavior is the same as if it had gone through the submit path via GraphQL directly.
+Finally, we then take the signed transaction submit it to the network and go
+through the same flow as the Data API checks for this transaction. Ensuring its
+behavior is the same as if it had gone through the submit path via GraphQL
+directly.
 
-The signer library used by the test agent can be used as a reference for further signer implementations. An executable interface is also provided via the [`signer.exe` binary](https://github.com/MinaProtocol/mina/blob/src/app/rosetta/ocaml-signer/signer.ml).
+The signer library used by the test agent can be used as a reference for further
+signer implementations. An executable interface is also provided via the
+[`signer.exe`
+binary](https://github.com/MinaProtocol/mina/blob/develop/src/app/rosetta/ocaml-signer/signer.ml).
 
 #### Rosetta CLI Validation
 
@@ -263,7 +313,10 @@ openapi-generator generate -i api.json -g ocaml -o out
 cp -p out/src/models/* out/src/support/enums.ml $MINA/src/lib/rosetta_models/
 ```
 
-In the generated files, the type `deriving` clauses will need to have `eq` added manually.
-Any record types with a field named `_type` will need to annotate that field with `[@key "type"]`.
+In the generated files, the type `deriving` clauses will need to have `eq` added
+manually.
+Any record types with a field named `_type` will need to annotate that field
+with `[@key "type"]`.
 In `lib/network.ml`, update the two instances of the version number.
-Check the diff after regeneration and be sure to add `[@default None]` and `[@default []]` to all relevant fields of the models
+Check the diff after regeneration and be sure to add `[@default None]` and
+`[@default []]` to all relevant fields of the models

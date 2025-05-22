@@ -14,7 +14,7 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
                   { Permissions.user_default with set_verification_key = auth }
             }
         }
-    ; authorization = Control.dummy_of_tag Signature
+    ; authorization = Control.Poly.Signature Signature.dummy
     }
   in
   let fee_payer : Account_update.Fee_payer.t =
@@ -39,7 +39,6 @@ let update_vk_perm_with_different_version () =
       match
         User_command.check_well_formedness
           ~genesis_constants:Genesis_constants.For_unit_tests.t
-          ~compile_config:Mina_compile_config.For_unit_tests.t
           (Zkapp_command (update_vk_perm_to_be ~auth:(auth, different_version)))
       with
       | Ok _ ->
@@ -53,7 +52,6 @@ let update_vk_perm_with_current_version () =
   Quickcheck.test ~trials:10 auth_gen ~f:(fun auth ->
       match
         User_command.check_well_formedness
-          ~compile_config:Mina_compile_config.For_unit_tests.t
           ~genesis_constants:Genesis_constants.For_unit_tests.t
           (Zkapp_command
              (update_vk_perm_to_be

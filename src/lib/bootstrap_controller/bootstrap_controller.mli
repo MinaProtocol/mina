@@ -11,6 +11,10 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
@@ -43,5 +47,5 @@ val run :
   -> persistent_root:Transition_frontier.Persistent_root.t
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:Mina_block.Validated.t
-  -> catchup_mode:[ `Normal | `Super ]
+  -> catchup_mode:[ `Super ]
   -> (Transition_frontier.t * Transition_cache.element list) Deferred.t

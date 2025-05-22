@@ -10,6 +10,8 @@ type t
 module Scan_state : sig
   [%%versioned:
   module Stable : sig
+    [@@@no_toplevel_latest_type]
+
     module V2 : sig
       type t
 
@@ -17,15 +19,19 @@ module Scan_state : sig
     end
   end]
 
+  type t
+
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
   end
 
-  (** Space available and number of jobs required to enqueue transactions in the scan state.
+  (** Space available and number of jobs required to enqueue transactions in the
+      scan state.
 
-  first = space on the latest tree and number of proofs required
-
-  second = If the space on the latest tree is less than max size (defined at compile time) then remaining number of slots for a new tree and the corresponding number of proofs required *)
+      first = space on the latest tree and number of proofs required
+      second = If the space on the latest tree is less than max size (defined at
+      compile time) then remaining number of slots for a new tree and the
+      corresponding number of proofs required *)
   module Space_partition : sig
     type t = { first : int * int; second : (int * int) option }
     [@@deriving sexp]
@@ -43,10 +49,7 @@ module Scan_state : sig
     end
 
     type t = Transaction_snark_scan_state.Transaction_with_witness.t Poly.t
-    [@@deriving sexp, to_yojson]
   end
-
-  val hash : t -> Staged_ledger_hash.Aux_hash.t
 
   val empty :
     constraint_constants:Genesis_constants.Constraint_constants.t -> unit -> t
@@ -54,7 +57,8 @@ module Scan_state : sig
   (** Statements of the required snark work *)
   val snark_job_list_json : t -> string
 
-  (** All the transactions with hash of the parent block in which they were included in the order in which they were applied*)
+  (** All the transactions with hash of the parent block in which they were
+      included in the order in which they were applied *)
   val staged_transactions_with_state_hash :
        t
     -> ( Transaction.t With_status.t
@@ -63,13 +67,15 @@ module Scan_state : sig
        Transactions_ordered.Poly.t
        list
 
-  (** Statements of all the pending work. Fails if there are any invalid statements in the scan state [t] *)
+  (** Statements of all the pending work. Fails if there are any invalid
+      statements in the scan state [t] *)
   val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
-  (** Hashes of the protocol states required for proving pending transactions*)
+  (** Hashes of the protocol states required for proving pending transactions *)
   val required_state_hashes : t -> State_hash.Set.t
 
-  (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
+  (** Validate protocol states required for proving the transactions. Returns an
+      association list of state_hash and the corresponding state*)
   val check_required_protocol_states :
        t
     -> protocol_states:
@@ -78,7 +84,10 @@ module Scan_state : sig
        Or_error.t
 
   (** Apply transactions corresponding to the last emitted proof based on the
-    two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
+      two-pass system to get snarked ledger
+      - first pass includes legacy transactions and zkapp payments
+      - second pass includes account updates. This ignores any account updates
+      if a blocks transactions were split among two trees.
     *)
   val get_snarked_ledger_sync :
        ledger:Ledger.t
@@ -105,7 +114,10 @@ module Scan_state : sig
     -> unit Or_error.t
 
   (** Apply transactions corresponding to the last emitted proof based on the
-    two-pass system to get snarked ledger- first pass includes legacy transactions and zkapp payments and the second pass includes account updates. This ignores any account updates if a blocks transactions were split among two trees.
+      two-pass system to get snarked ledger
+      - first pass includes legacy transactions and zkapp payments
+      - second pass includes account updates. This ignores any account updates
+        if a blocks transactions were split among two trees.
     *)
   val get_snarked_ledger_async :
        ?async_batch_size:int
@@ -131,6 +143,11 @@ module Scan_state : sig
              Or_error.t )
     -> t
     -> unit Deferred.Or_error.t
+
+  val write_all_proofs_to_disk :
+    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
@@ -152,7 +169,7 @@ module Staged_ledger_error : sig
     | Invalid_public_key of Public_key.Compressed.t
     | ZkApps_exceed_limit of int * int
     | Unexpected of Error.t
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 
   val to_string : t -> string
 
@@ -186,15 +203,15 @@ val copy : t -> t
 
 val hash : t -> Staged_ledger_hash.t
 
+type transaction_pool_proxy = Check_commands.transaction_pool_proxy
+
 val apply :
      ?skip_verification:[ `Proofs | `All ]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
-  -> t
   -> get_completed_work:
        (   Transaction_snark_work.Statement.t
         -> Transaction_snark_work.Checked.t option )
-  -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t
@@ -202,9 +219,12 @@ val apply :
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
+  -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
+  -> t
+  -> Staged_ledger_diff.t
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
-           ( Ledger_proof.t
+           ( Ledger_proof.Cached.t
            * ( Transaction.t With_status.t
              * State_hash.t
              * Mina_numbers.Global_slot_since_genesis.t )
@@ -229,7 +249,7 @@ val apply_diff_unchecked :
   -> zkapp_cmd_limit_hardcap:int
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
-           ( Ledger_proof.t
+           ( Ledger_proof.Cached.t
            * ( Transaction.t With_status.t
              * State_hash.t
              * Mina_numbers.Global_slot_since_genesis.t )
@@ -242,7 +262,7 @@ val apply_diff_unchecked :
      Deferred.Result.t
 
 (** Most recent ledger proof in t *)
-val current_ledger_proof : t -> Ledger_proof.t option
+val current_ledger_proof : t -> Ledger_proof.Cached.t option
 
 (* Internals of the txn application. This is only exposed to facilitate
    writing unit tests. *)
@@ -291,7 +311,8 @@ val create_diff :
      , Pre_diff_info.Error.t )
      Result.t
 
-(** A block producer is eligible if the account won the slot [winner] has no unlocked tokens at slot [global_slot] in the staking ledger [epoch_ledger] *)
+(** A block producer is eligible if the account won the slot [winner] has no
+    unlocked tokens at slot [global_slot] in the staking ledger [epoch_ledger] *)
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
   -> epoch_ledger:Mina_ledger.Sparse_ledger.t
@@ -325,7 +346,9 @@ val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
-  -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+  -> ( Transaction_witness.t
+     , Ledger_proof.Cached.t )
+     Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
      Or_error.t
@@ -333,14 +356,7 @@ val all_work_pairs :
 (** Statements of all the pending work in t*)
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
-val check_commands :
-     Ledger.t
-  -> verifier:Verifier.t
-  -> User_command.t With_status.t list
-  -> (User_command.Valid.t list, Verifier.Failure.t) Result.t
-     Deferred.Or_error.t
-
-(** account ids created in the latest block, taken from the new_accounts
+(** Account ids created in the latest block, taken from the new_accounts
     in the latest and next-to-latest trees of the scan state
 *)
 val latest_block_accounts_created :

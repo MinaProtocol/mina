@@ -109,12 +109,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
   let is_block_in_frontier =
     Fn.compose Option.is_some @@ Transition_frontier.find frontier
   in
-  let module Consensus_context = struct
-    include Context
-
-    let compile_config = precomputed_values.compile_config
-  end in
-  let open Consensus_context in
+  let open Context in
   let header, transition_hash, transition_receipt_time, sender, validation =
     match block_or_header with
     | `Block cached_env ->
@@ -165,7 +160,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       [%log internal] "Validate_frontier_dependencies" ;
       match
         Mina_block.Validation.validate_frontier_dependencies
-          ~context:(module Consensus_context)
+          ~context:(module Context)
           ~root_block ~is_block_in_frontier ~to_header:ident
           (Envelope.Incoming.data env)
       with
@@ -181,7 +176,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             ~metadata:[ ("reason", `String "Already_in_frontier") ] ;
           [%log warn] ~metadata
             "Refusing to process the transition with hash $state_hash because \
-             is is already in the transition frontier" ;
+             it is already in the transition frontier" ;
           return () )
   | `Block cached_initially_validated_transition ->
       Deferred.ignore_m
@@ -196,7 +191,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
         [%log internal] "Validate_frontier_dependencies" ;
         match
           Mina_block.Validation.validate_frontier_dependencies
-            ~context:(module Consensus_context)
+            ~context:(module Context)
             ~root_block ~is_block_in_frontier ~to_header:Mina_block.header
             initially_validated_transition
         with
@@ -226,7 +221,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             | ( _
               , _
               , _
-              , (`Delta_block_chain, Truth.True delta_state_hashes)
+              , (`Delta_block_chain, Mina_stdlib.Truth.True delta_state_hashes)
               , _
               , _
               , _ ) ->
@@ -479,7 +474,7 @@ let%test_module "Transition_handler.Processor tests" =
 
     let () =
       (* Disable log messages from best_tip_diff logger. *)
-      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+      Logger.Consumer_registry.register ~commit_id:""
         ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
         ~transport:
           (Logger.Transport.create

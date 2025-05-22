@@ -26,6 +26,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 include Frontier_intf.S
@@ -66,7 +68,7 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> catchup_mode:[ `Normal | `Super ]
+  -> catchup_mode:[ `Super ]
   -> unit
   -> ( t
      , [ `Failure of string
@@ -121,7 +123,7 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:[ `Super ]
     -> unit
     -> ( t
        , [ `Failure of string
@@ -160,7 +162,6 @@ module For_tests : sig
          Quickcheck.Generator.t
     -> max_length:int
     -> size:int
-    -> ?use_super_catchup:bool
     -> unit
     -> t Quickcheck.Generator.t
 
@@ -182,7 +183,6 @@ module For_tests : sig
     -> max_length:int
     -> frontier_size:int
     -> branch_size:int
-    -> ?use_super_catchup:bool
     -> unit
     -> (t * Breadcrumb.t list) Quickcheck.Generator.t
 end

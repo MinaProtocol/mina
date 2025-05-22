@@ -36,14 +36,14 @@ else
     case $i in
       mina-berkeley*|mina-devnet|mina-mainnet)
         # Downaload mina-logproc too
-        source ./buildkite/scripts/download-artifact-from-cache.sh "mina-logproc*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
+        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
       mina-create-legacy-genesis)
-        # DowPnload locally static debians (for example mina-legacy-create-genesis )
-        gsutil -m cp "gs://buildkite_k8s/coda/shared/debs/$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
+        # Download locally static debians (for example mina-legacy-create-genesis )
+        ./buildkite/scripts/cache/manager.sh read --root debs "$MINA_DEB_CODENAME/$i*" $LOCAL_DEB_FOLDER
       ;;
     esac
-    source ./buildkite/scripts/download-artifact-from-cache.sh "${i}_*" $MINA_DEB_CODENAME/_build "" $LOCAL_DEB_FOLDER
+    ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}_*" $LOCAL_DEB_FOLDER
   done
 fi
 
@@ -52,18 +52,15 @@ for i in "${debs[@]}"; do
    debs_with_version+=("${i}=${MINA_DEB_VERSION}")
 done
 
-# Install aptly
-$SUDO apt-get update 
-$SUDO apt-get install -y aptly
-
 # Start aptly
-source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background
+source ./scripts/debian/aptly.sh start --codename $MINA_DEB_CODENAME --debians $LOCAL_DEB_FOLDER --component unstable --clean --background --wait
 
 # Install debians
 echo "Installing mina packages: $DEBS"
 echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SUDO tee /etc/apt/sources.list.d/mina.list
 
-$SUDO apt-get update --yes
+# Update apt packages for the new repo, preserving all others
+$SUDO apt-get update --yes -o Dir::Etc::sourcelist="sources.list.d/mina.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
 $SUDO apt-get remove --yes "${debs[@]}"
 $SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
 

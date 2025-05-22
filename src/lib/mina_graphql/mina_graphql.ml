@@ -380,7 +380,7 @@ module Mutations = struct
                   in
                   Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
                       { With_hash.data = cmd
-                      ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
+                      ; hash = Transaction_hash.hash_zkapp_command cmd
                       } ) )
             in
             Ok cmds_with_hash
@@ -391,8 +391,8 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let mock_zkapp_command mina zkapp_command :
-      ( (Zkapp_command.t, Transaction_hash.t) With_hash.t
+  let mock_zkapp_command mina (zkapp_command : Zkapp_command.Stable.Latest.t) :
+      ( (Zkapp_command.Stable.Latest.t, Transaction_hash.t) With_hash.t
         Types.Zkapp_command.With_status.t
       , string )
       result
@@ -465,19 +465,18 @@ module Mutations = struct
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
                       |> Consensus.Data.Consensus_state
                          .global_slot_since_genesis )
-                    ~state_view ledger zkapp_command
+                    ~state_view ledger
+                    (Zkapp_command.write_all_proofs_to_disk
+                       ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+                       zkapp_command )
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
                 let applied_ok =
                   Result.map applied
                     ~f:(fun (zkapp_command_applied, _local_state_and_amount) ->
-                      let ({ data = zkapp_command; status }
-                            : Zkapp_command.t With_status.t ) =
-                        zkapp_command_applied.command
-                      in
+                      let status = zkapp_command_applied.command.status in
                       let hash =
-                        Transaction_hash.hash_command
-                          (Zkapp_command zkapp_command)
+                        Transaction_hash.hash_zkapp_command zkapp_command
                       in
                       let (with_hash : _ With_hash.t) =
                         { data = zkapp_command; hash }
@@ -971,10 +970,8 @@ module Mutations = struct
                 "Could not find an archive process to connect to"
         in
         let%map () =
-          Mina_lib.Archive_client.dispatch_precomputed_block
-            ~compile_config:
-              (Mina_lib.config mina).precomputed_values.compile_config
-            archive_location block
+          Mina_lib.Archive_client.dispatch_precomputed_block archive_location
+            block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         () )
@@ -1004,10 +1001,8 @@ module Mutations = struct
                 "Could not find an archive process to connect to"
         in
         let%map () =
-          Mina_lib.Archive_client.dispatch_extensional_block
-            ~compile_config:
-              (Mina_lib.config mina).precomputed_values.compile_config
-            archive_location block
+          Mina_lib.Archive_client.dispatch_extensional_block archive_location
+            block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         () )
@@ -1088,7 +1083,7 @@ module Mutations = struct
           in
           let%bind.Result () =
             let open Currency.Fee in
-            Result.ok_if_true ~error:"Maximum fee less than mininum fee"
+            Result.ok_if_true ~error:"Maximum fee less than minimum fee"
               (payment_details.max_fee >= payment_details.min_fee)
           in
           let logger = Mina_lib.top_level_logger mina in
@@ -1656,7 +1651,8 @@ module Queries = struct
   open Schema
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
-  let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
+  let get_commands ~proof_cache_db ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+      =
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
         Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
@@ -1708,7 +1704,9 @@ module Queries = struct
                       match Zkapp_command.of_base64 serialized_txn with
                       | Ok zkapp_command ->
                           let user_cmd =
-                            User_command.Zkapp_command zkapp_command
+                            User_command.Zkapp_command
+                              (Zkapp_command.write_all_proofs_to_disk
+                                 ~proof_cache_db zkapp_command )
                           in
                           (* The command gets piped through [forget_check]
                              below; this is just to make the types work
@@ -1760,7 +1758,11 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        let cmds =
+          get_commands
+            ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+            ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
         List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
@@ -1796,11 +1798,16 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        let cmds =
+          get_commands
+            ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+            ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
         List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
                 txn
+              |> With_hash.map ~f:User_command.read_all_proofs_from_disk
             in
             match cmd_with_hash.data with
             | Signed_command _ ->
@@ -2054,6 +2061,7 @@ module Queries = struct
         in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
         let transaction_pool = Mina_lib.transaction_pool mina in
+        (* TODO: do not compute hashes to just get the status *)
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
           ~transaction_pool txn.data )
 
@@ -2147,8 +2155,8 @@ module Queries = struct
           [ arg "maxLength"
               ~doc:
                 "The maximum number of blocks to return. If there are more \
-                 blocks in the transition frontier from root to tip, the n \
-                 blocks closest to the best tip will be returned"
+                 blocks in the transition frontier from root to tip, the \
+                 maxLength blocks closest to the best tip will be returned"
               ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () max_length ->
@@ -2162,6 +2170,103 @@ module Queries = struct
         | None ->
             return
             @@ Error "Could not obtain best chain from transition frontier" )
+
+  let account_actions =
+    field "accountActions"
+      ~doc:
+        "Find all the actions associated to an account from the current best \
+         tip."
+      ~typ:(non_null @@ list @@ non_null Types.Action_state.spec)
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of account being retrieved"
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ; arg' "token"
+              ~doc:"Token of account being retrieved (defaults to MINA)"
+              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+          ; arg "maxLength"
+              ~doc:
+                "The maximum number of blocks to search for actions. If there \
+                 are more blocks in the transition frontier from root to tip, \
+                 the maxLength blocks closest to the best tip will be returned"
+              ~typ:int
+          ]
+      ~resolve:(fun { ctx = mina; _ } () pk token max_length ->
+        let best_chain = Mina_lib.best_chain ?max_length mina in
+        match best_chain with
+        | Some best_chain ->
+            let actions =
+              List.concat_map
+                ~f:(fun bc ->
+                  let user_cmds =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.body
+                    |> Staged_ledger_diff.Body.staged_ledger_diff
+                    |> Staged_ledger_diff.commands
+                  in
+                  let block_number =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.header |> Mina_block.Header.blockchain_length
+                  in
+                  let transaction_seq = ref 0 in
+                  let action_list_list =
+                    List.filter_map user_cmds ~f:(fun user_cmd ->
+                        transaction_seq := !transaction_seq + 1 ;
+                        match user_cmd.data with
+                        | Zkapp_command c
+                          when Transaction_status.Stable.V2.(
+                                 equal user_cmd.status Applied) -> (
+                            let actions =
+                              c.Zkapp_command.Poly.account_updates
+                              |> Zkapp_command.Call_forest.fold ~init:(0, [])
+                                   ~f:(fun acc au ->
+                                     let action_seq, acc = acc in
+                                     let account_id =
+                                       Account_id.create au.body.public_key
+                                         token
+                                     in
+                                     if
+                                       Account_id.equal account_id
+                                         (Account_id.create pk token)
+                                     then
+                                       let action_body = au.body.actions in
+                                       let field_elems =
+                                         List.map
+                                           ~f:(fun e -> Array.to_list e)
+                                           action_body
+                                       in
+                                       let action_seq = action_seq + 1 in
+                                       match field_elems with
+                                       | [] ->
+                                           (action_seq, acc)
+                                       | field_elems ->
+                                           let action_state =
+                                             { Types.Action_state.action =
+                                                 field_elems
+                                             ; action_sequence_no = action_seq
+                                             ; transaction_sequence_no =
+                                                 !transaction_seq
+                                             ; block_number
+                                             }
+                                           in
+                                           (action_seq, action_state :: acc)
+                                     else (action_seq, acc) )
+                            in
+                            let _, actions = actions in
+                            match actions with
+                            | [] ->
+                                None
+                            | actions ->
+                                Some actions )
+                        | Signed_command _ | Zkapp_command _ ->
+                            None )
+                  in
+                  action_list_list |> List.concat )
+                best_chain
+            in
+            actions
+        | None ->
+            [] )
 
   let block =
     result_field2 "block"
@@ -2280,6 +2385,13 @@ module Queries = struct
         let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
         let to_bundle_specs =
           List.map ~f:(fun (spec, fee_prover) ->
+              let spec =
+                One_or_two.map spec
+                  ~f:
+                    (Snark_work_lib.Work.Single.Spec.map
+                       ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                       ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+              in
               { Types.Snark_work_bundle.spec; fee_prover } )
         in
         match end_idx with
@@ -2772,7 +2884,7 @@ module Queries = struct
       ~typ:(non_null string)
       ~args:Arg.[]
       ~resolve:(fun _ () ->
-        match Mina_signature_kind.t with
+        match Mina_signature_kind.t_DEPRECATED with
         | Mainnet ->
             "mainnet"
         | Testnet ->
@@ -2881,6 +2993,7 @@ module Queries = struct
     ; network_id
     ; signature_kind
     ; protocol_state
+    ; account_actions
     ]
 
   module Itn = struct

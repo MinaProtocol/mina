@@ -75,15 +75,16 @@ let report_test_errors ~log_error_set ~internal_error_set =
   let open Test_error in
   let open Test_error.Set in
   let color_eprintf color =
-    Printf.ksprintf (fun s -> Print.eprintf "%s%s%s" color s Bash_colors.none)
+    Printf.ksprintf (fun s ->
+        Print.eprintf "%s%s%s" color s Mina_stdlib.Bash_colors.none )
   in
   let color_of_severity = function
     | `None ->
-        Bash_colors.green
+        Mina_stdlib.Bash_colors.green
     | `Soft ->
-        Bash_colors.yellow
+        Mina_stdlib.Bash_colors.yellow
     | `Hard ->
-        Bash_colors.red
+        Mina_stdlib.Bash_colors.red
   in
   let category_prefix_of_severity = function
     | `None ->
@@ -127,7 +128,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       (color_of_severity log_errors_severity)
       "=== Log %ss ===\n" log_type ;
     Error_accumulator.iter_contexts log_errors ~f:(fun node_id log_errors ->
-        color_eprintf Bash_colors.light_magenta "    %s:\n" node_id ;
+        color_eprintf Mina_stdlib.Bash_colors.light_magenta "    %s:\n" node_id ;
         List.iter log_errors ~f:(fun (severity, { error_message; _ }) ->
             color_eprintf
               (color_of_severity severity)
@@ -151,7 +152,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       | `Hard ->
           report_log_errors "Error" ) ;
       (* report contextualized internal errors *)
-      color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
+      color_eprintf Mina_stdlib.Bash_colors.magenta "=== Test Results ===\n" ;
       Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
           print_category_header
             (max_severity_of_list (List.map errors ~f:fst))
@@ -182,7 +183,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       Print.eprintf "\n" ;
       let exit_code =
         if test_failed then (
-          color_eprintf Bash_colors.red
+          color_eprintf Mina_stdlib.Bash_colors.red
             "The test has failed. See the above errors for details.\n\n" ;
           match (internal_error_set.exit_code, log_error_set.exit_code) with
           | None, None ->
@@ -190,7 +191,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
           | Some exit_code, _ | None, Some exit_code ->
               Some exit_code )
         else (
-          color_eprintf Bash_colors.green
+          color_eprintf Mina_stdlib.Bash_colors.green
             "The test has completed successfully.\n\n" ;
           None )
       in
@@ -289,7 +290,6 @@ let main inputs =
     ; archive_node =
         Option.value inputs.archive_image ~default:"archive_image_unused"
     ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; bots = "minaprotocol/mina-bots:latest"
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in

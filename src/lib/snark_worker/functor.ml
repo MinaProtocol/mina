@@ -1,134 +1,30 @@
 open Core
 open Async
+open Events
+open Snark_work_lib
 
-module Time_span_with_json = struct
-  type t = Time.Span.t
+module Make = struct
+  module Rpcs = Rpcs.Make
+  include Prod.Inputs
 
-  let to_yojson total = `String (Time.Span.to_string_hum total)
-
-  let of_yojson = function
-    | `String time ->
-        Ok (Time.Span.of_string time)
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse timespan"
-end
-
-(*FIX: register_event fails when adding base types to the constructors*)
-module String_with_json = struct
-  type t = string
-
-  let to_yojson s = `String s
-
-  let of_yojson = function
-    | `String s ->
-        Ok s
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse string"
-end
-
-module Int_with_json = struct
-  type t = int
-
-  let to_yojson s = `Int s
-
-  let of_yojson = function
-    | `Int s ->
-        Ok s
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse int"
-end
-
-type Structured_log_events.t +=
-  | Merge_snark_generated of { time : Time_span_with_json.t }
-  [@@deriving register_event { msg = "Merge SNARK generated in $time" }]
-
-type Structured_log_events.t +=
-  | Base_snark_generated of
-      { time : Time_span_with_json.t
-      ; transaction_type : String_with_json.t
-      ; zkapp_command_count : Int_with_json.t
-      ; proof_zkapp_command_count : Int_with_json.t
-      }
-  [@@deriving
-    register_event
-      { msg =
-          "Base SNARK generated in $time for $transaction_type transaction \
-           with $zkapp_command_count zkapp_command and \
-           $proof_zkapp_command_count proof zkapp_command"
-      }]
-
-module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
-  open Inputs
-  module Rpcs = Rpcs.Make (Inputs)
-
-  module Work = struct
-    open Snark_work_lib
-
-    module Single = struct
-      module Spec = struct
-        type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
-        [@@deriving sexp, yojson]
-
-        let transaction t =
-          Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.transaction )
-
-        let statement = Work.Single.Spec.statement
-      end
-    end
-
-    module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
-
-      let instances = Work.Spec.instances
-    end
-
-    module Result = struct
-      type t = (Spec.t, Ledger_proof.t) Work.Result.t
-
-      let transactions (t : t) =
-        One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
-    end
-  end
-
-  let perform (s : Worker_state.t) public_key
-      ({ instances; fee } as spec : Work.Spec.t) =
-    One_or_two.Deferred_result.map instances ~f:(fun w ->
-        let open Deferred.Or_error.Let_syntax in
-        let%map proof, time =
-          perform_single s
-            ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-            w
-        in
-        ( proof
-        , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
-        ) )
-    |> Deferred.Or_error.map ~f:(function
-         | `One (proof1, metrics1) ->
-             { Snark_work_lib.Work.Result.proofs = `One proof1
-             ; metrics = `One metrics1
-             ; spec
-             ; prover = public_key
-             }
-         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-             { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
-             ; metrics = `Two (metrics1, metrics2)
-             ; spec
-             ; prover = public_key
-             } )
-
-  let dispatch ~(compile_config : Mina_compile_config.t) rpc
-      shutdown_on_disconnect query address =
+  let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
       Rpc.Connection.with_client
-        ~handshake_timeout:compile_config.rpc_handshake_timeout
+        ~handshake_timeout:
+          (Time.Span.of_sec
+             Node_config_unconfigurable_constants.rpc_handshake_timeout_sec )
         ~heartbeat_config:
           (Rpc.Connection.Heartbeat_config.create
-             ~timeout:compile_config.rpc_heartbeat_timeout
-             ~send_every:compile_config.rpc_heartbeat_send_every () )
-        (Tcp.Where_to_connect.of_host_and_port address) (fun conn ->
-          Rpc.Rpc.dispatch rpc conn query )
+             ~timeout:
+               (Time_ns.Span.of_sec
+                  Node_config_unconfigurable_constants.rpc_heartbeat_timeout_sec )
+             ~send_every:
+               (Time_ns.Span.of_sec
+                  Node_config_unconfigurable_constants
+                  .rpc_heartbeat_send_every_sec )
+             () )
+        (Tcp.Where_to_connect.of_host_and_port address)
+        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
     match res with
     | Error exn ->
@@ -164,7 +60,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   let init =
                     match
                       (Mina_base.Account_update.of_fee_payer
-                         zkapp_command.Mina_base.Zkapp_command.fee_payer )
+                         zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
                         .authorization
                     with
                     | Proof _ ->
@@ -181,8 +77,9 @@ module Make (Inputs : Intf.Inputs_intf) :
                             Mina_base.Control.(
                               Tag.equal Proof
                                 (tag
-                                   (Mina_base.Account_update.authorization
-                                      account_update ) ))
+                                   account_update
+                                     .Mina_base.Account_update.Poly
+                                      .authorization ))
                           then proof_updates_count + 1
                           else proof_updates_count ) )
                   in
@@ -218,11 +115,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                  ; proof_zkapp_command_count
                  } ) )
 
-  let main
-      (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
-      ~proof_level ~constraint_constants ~compile_config daemon_address
-      shutdown_on_disconnect =
+  let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
+      ~constraint_constants daemon_address shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
     in
@@ -264,8 +158,8 @@ module Make (Inputs : Intf.Inputs_intf) :
         !"Snark worker using daemon $addr"
         ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
       match%bind
-        dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect
-          ~compile_config () daemon_address
+        dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
+          daemon_address
       with
       | Error e ->
           log_and_retry "getting work" e (retry_pause 10.) go
@@ -297,8 +191,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               let%bind () =
                 match%map
                   dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-                    ~compile_config shutdown_on_disconnect (e, work, public_key)
-                    daemon_address
+                    shutdown_on_disconnect (e, work, public_key) daemon_address
                 with
                 | Error e ->
                     [%log error]
@@ -310,7 +203,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics
-                (Work.Result.transactions result)
+                (Selector.Result.Stable.Latest.transactions result)
                 logger ;
               [%log info] "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
@@ -322,7 +215,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   ] ;
               let rec submit_work () =
                 match%bind
-                  dispatch ~compile_config Rpcs_versioned.Submit_work.Latest.rpc
+                  dispatch Rpcs_versioned.Submit_work.Latest.rpc
                     shutdown_on_disconnect result daemon_address
                 with
                 | Error e ->
@@ -335,16 +228,15 @@ module Make (Inputs : Intf.Inputs_intf) :
     in
     go ()
 
-  let command_from_rpcs ~commit_id
-      (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
+  let command_from_rpcs ~commit_id ~proof_level:default_proof_level
+      ~constraint_constants (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
         flag "--daemon-address" ~aliases:[ "daemon-address" ]
           (required (Arg_type.create Host_and_port.of_string))
           ~doc:"HOST-AND-PORT address daemon is listening on"
-      and cli_proof_level =
+      and proof_level =
         flag "--proof-level" ~aliases:[ "proof-level" ]
           (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
           ~doc:"full|check|none"
@@ -354,21 +246,13 @@ module Make (Inputs : Intf.Inputs_intf) :
           (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
-      and config_file = Cli_lib.Flag.config_files
       and conf_dir = Cli_lib.Flag.conf_dir in
       fun () ->
         let logger =
           Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
         in
-        let%bind.Deferred constraint_constants, proof_level, compile_config =
-          let%map.Deferred config =
-            Runtime_config.Constants.load_constants_with_logging ~logger
-              ?conf_dir ?cli_proof_level config_file
-          in
-          Runtime_config.Constants.
-            ( constraint_constants config
-            , proof_level config
-            , compile_config config )
+        let proof_level =
+          Option.value ~default:default_proof_level proof_level
         in
         Option.value_map ~default:() conf_dir ~f:(fun conf_dir ->
             let logrotate_max_size = 1024 * 10 in
@@ -387,7 +271,7 @@ module Make (Inputs : Intf.Inputs_intf) :
             Core.exit 0 ) ;
         main
           (module Rpcs_versioned)
-          ~logger ~proof_level ~constraint_constants ~compile_config daemon_port
+          ~logger ~proof_level ~constraint_constants daemon_port
           (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =

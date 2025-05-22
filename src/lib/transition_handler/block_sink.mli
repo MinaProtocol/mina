@@ -6,8 +6,8 @@ type Structured_log_events.t +=
   [@@deriving register_event]
 
 type block_or_header =
-  [ `Block of Mina_block.t Envelope.Incoming.t
-  | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+  [ `Block of Mina_block.Stable.Latest.t Envelope.Incoming.t
+  | `Header of Mina_block.Header.Stable.Latest.t Envelope.Incoming.t ]
 
 include
   Mina_net2.Sink.S_with_void
@@ -25,7 +25,6 @@ type block_sink_config =
   ; consensus_constants : Consensus.Constants.t
   ; genesis_constants : Genesis_constants.t
   ; constraint_constants : Genesis_constants.Constraint_constants.t
-  ; compile_config : Mina_compile_config.t
   }
 
 val create :

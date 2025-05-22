@@ -14,6 +14,8 @@ let DebianPackage = ../../Constants/DebianPackage.dhall
 
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
@@ -28,13 +30,25 @@ let PromotePackages = ../../Command/Promotion/PromotePackages.dhall
 
 let VerifyPackages = ../../Command/Promotion/VerifyPackages.dhall
 
+let Command = ../../Command/Base.dhall
+
+let TaggedKey = Command.TaggedKey
+
+let new_tags =
+          \(codename : DebianVersions.DebVersion)
+      ->  \(channel : DebianChannel.Type)
+      ->  \(branch : Text)
+      ->  \(repo : DebianRepo.Type)
+      ->  \(latestGitTag : Text)
+      ->  \(todayDate : Text)
+      ->  [ "latest-${branch}"
+          , "${todayDate}-${branch}"
+          , "${latestGitTag}.${todayDate}-${branch}"
+          ]
+
 let promotePackages =
       PromotePackages.PromotePackagesSpec::{
-      , debians =
-        [ DebianPackage.Type.Daemon
-        , DebianPackage.Type.LogProc
-        , DebianPackage.Type.Archive
-        ]
+      , debians = [] : List DebianPackage.Type
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       , version = "\\\${FROM_VERSION_MANUAL:-\\\${MINA_DEB_VERSION}}"
       , architecture = "amd64"
@@ -45,10 +59,7 @@ let promotePackages =
         [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
       , from_channel = DebianChannel.Type.Unstable
       , to_channel = DebianChannel.Type.Compatible
-      , new_tags =
-        [ "latest-compatible-nightly"
-        , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
-        ]
+      , new_tags = new_tags
       , remove_profile_from_name = False
       , publish = False
       }
@@ -56,11 +67,7 @@ let promotePackages =
 let verifyPackages =
       VerifyPackages.VerifyPackagesSpec::{
       , promote_step_name = Some "AutoPromoteNightly"
-      , debians =
-        [ DebianPackage.Type.Daemon
-        , DebianPackage.Type.LogProc
-        , DebianPackage.Type.Archive
-        ]
+      , debians = [] : List DebianPackage.Type
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       , new_debian_version = "\\\$(date \"+%Y%m%d\")"
       , profile = Profiles.Type.Standard
@@ -68,10 +75,7 @@ let verifyPackages =
       , codenames =
         [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
       , channel = DebianChannel.Type.Compatible
-      , new_tags =
-        [ "latest-compatible-nightly"
-        , "compatible-nightly-\\\$(date \"+%Y%m%d\")"
-        ]
+      , tags = new_tags
       , remove_profile_from_name = False
       , published = False
       }
@@ -97,7 +101,11 @@ in  Pipeline.build
         , name = "AutoPromoteNightly"
         }
       , steps =
-            PromotePackages.promoteSteps promoteDebiansSpecs promoteDockersSpecs
+            PromotePackages.promoteSteps
+              promoteDebiansSpecs
+              promoteDockersSpecs
+              "AutoPromoteNightly"
+              ([] : List TaggedKey.Type)
           # VerifyPackages.verificationSteps
               verifyDebiansSpecs
               verifyDockersSpecs

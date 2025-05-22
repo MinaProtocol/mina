@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -127,11 +129,14 @@ let write_graph (_ : t) =
   let _ = G.output_graph in
   ()
 
-let validate_block ~genesis_state_hash (b, v) =
+(** Validates block without time received validation *)
+let validate_block_skipping_time_received ~genesis_state_hash (b, v) =
   let open Mina_block.Validation in
   let open Result.Let_syntax in
   let h = (With_hash.map ~f:Mina_block.header b, v) in
-  validate_genesis_protocol_state ~genesis_state_hash h
+  Mina_block.Validation.skip_time_received_validation
+    `This_block_was_not_received_via_gossip h
+  |> validate_genesis_protocol_state ~genesis_state_hash
   >>= validate_protocol_versions >>= validate_delta_block_chain
   >>| Fn.flip with_body (Mina_block.body @@ With_hash.data b)
 
@@ -155,9 +160,8 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   let transition_with_hash = Envelope.Incoming.data enveloped_transition in
   let cached_initially_validated_transition_result =
     let%bind.Result initially_validated_transition =
-      Mina_block.Validation.skip_time_received_validation
-        `This_block_was_not_received_via_gossip transition_with_hash
-      |> validate_block ~genesis_state_hash
+      validate_block_skipping_time_received ~genesis_state_hash
+        transition_with_hash
     in
     let enveloped_initially_validated_transition =
       Envelope.Incoming.map enveloped_transition
@@ -506,8 +510,8 @@ module Initial_validate_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~logger ~verifier ~precomputed_values : _ t =
-    create
+  let create ~proof_cache_db ~logger ~verifier ~precomputed_values : _ t =
+    create ~proof_cache_db
       ~logger:
         (Logger.extend logger [ ("name", `String "initial_validate_batcher") ])
       ~how_to_add:`Insert ~max_weight_per_call:1000
@@ -551,13 +555,13 @@ module Verify_work_batcher = struct
 
   type nonrec 'a t = (input, input, 'a) t
 
-  let create ~logger ~verifier : _ t =
+  let create ~proof_cache_db ~logger ~verifier : _ t =
     let works (x : input) =
       let wh, _ = x.data in
       Mina_block.Body.staged_ledger_diff (Mina_block.body wh.data)
       |> Staged_ledger_diff.completed_works
     in
-    create
+    create ~proof_cache_db
       ~logger:(Logger.extend logger [ ("name", `String "verify_work_batcher") ])
       ~weight:(fun (x : input) ->
         List.fold ~init:0 (works x) ~f:(fun acc { proofs; _ } ->
@@ -582,7 +586,8 @@ module Verify_work_batcher = struct
             |> List.concat_map ~f:(fun { fee; prover; proofs } ->
                    let msg = Sok_message.create ~fee ~prover in
                    One_or_two.to_list
-                     (One_or_two.map proofs ~f:(fun p -> (p, msg))) ) )
+                     (One_or_two.map proofs ~f:(fun p ->
+                          (Ledger_proof.Cached.read_proof_from_disk p, msg) ) ) ) )
         |> Verifier.verify_transaction_snarks verifier
         >>| function
         | Ok (Ok ()) ->
@@ -761,11 +766,6 @@ let pick ~context:(module Context : CONTEXT)
     (x : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t)
     (y : Mina_state.Protocol_state.Value.t State_hash.With_state_hashes.t) =
   let f = With_hash.map ~f:Mina_state.Protocol_state.consensus_state in
-  let module Context = struct
-    include Context
-
-    let compile_config = precomputed_values.compile_config
-  end in
   match
     Consensus.Hooks.select
       ~context:(module Context)
@@ -786,6 +786,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
     ~catchup_breadcrumbs_writer
     ~(build_func :
           ?skip_staged_ledger_verification:[ `All | `Proofs ]
+       -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
        -> logger:Logger.t
        -> precomputed_values:Precomputed_values.t
        -> verifier:Verifier.t
@@ -804,9 +805,12 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
   let open Context in
   (* setup_state_machine_runner returns a fully configured lambda function, which is the state machine runner *)
   let initial_validation_batcher =
-    Initial_validate_batcher.create ~logger ~verifier ~precomputed_values
+    Initial_validate_batcher.create ~proof_cache_db ~logger ~verifier
+      ~precomputed_values
   in
-  let verify_work_batcher = Verify_work_batcher.create ~logger ~verifier in
+  let verify_work_batcher =
+    Verify_work_batcher.create ~proof_cache_db ~logger ~verifier
+  in
   let set_state t node s =
     set_state t node s ;
     try check_invariant ~downloader t
@@ -1095,15 +1099,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
        , unit )
        Strict_pipe.Writer.t ) =
   let open Context in
-  let t =
-    match Transition_frontier.catchup_state frontier with
-    | Full t ->
-        t
-    | Hash _ ->
-        failwith
-          "If super catchup is running, the frontier should have a full \
-           catchup state"
-  in
+  let (Full t) = Transition_frontier.catchup_state frontier in
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
@@ -1166,7 +1162,11 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
         in
         Mina_networking.get_transition_chain
           ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
-          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst) )
+          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst)
+        |> Deferred.Or_error.map
+             ~f:
+               (List.map
+                  ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) ) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
@@ -1437,7 +1437,7 @@ let%test_module "Ledger_catchup tests" =
 
     let () =
       (* Disable log messages from best_tip_diff logger. *)
-      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+      Logger.Consumer_registry.register ~commit_id:""
         ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
         ~transport:
           (Logger.Transport.create
@@ -1459,12 +1459,15 @@ let%test_module "Ledger_catchup tests" =
 
     (* let time_controller = Block_time.Controller.basic ~logger *)
 
-    let use_super_catchup = true
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
+
+    let ledger_sync_config =
+      Syncable_ledger.create_config
+        ~compile_config:Mina_compile_config.For_unit_tests.t
+        ~max_subtree_depth:None ~default_subtree_depth:None ()
 
     module Context = struct
       let logger = logger
@@ -1474,6 +1477,8 @@ let%test_module "Ledger_catchup tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     (* let mock_verifier =
@@ -1637,7 +1642,10 @@ let%test_module "Ledger_catchup tests" =
             (* We force evaluation of state body hash for both blocks for further equality check *)
             let _hash1 = Mina_block.Validated.state_body_hash b1 in
             let _hash2 = Mina_block.Validated.state_body_hash b2 in
-            Mina_block.Validated.equal b1 b2 )
+            Mina_block.Validated.(
+              Stable.Latest.equal
+                (read_all_proofs_from_disk b1)
+                (read_all_proofs_from_disk b2)) )
       in
       if not catchup_breadcrumbs_are_best_tip_path then
         failwith
@@ -1652,7 +1660,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1672,7 +1680,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1688,7 +1696,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1705,7 +1713,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 3) + 1)
@@ -1783,7 +1791,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup
+            ~ledger_sync_config
             [ fresh_peer
               (* ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) *)
             ; peer_with_branch_custom_rpc
@@ -1858,11 +1866,6 @@ let%test_module "Ledger_catchup tests" =
                         with
                         | Full tr ->
                             tr
-                        | Hash _ ->
-                            failwith
-                              "in super catchup unit tests, the catchup state \
-                               should always be Full_catchup_tree, but it is \
-                               Catchup_hash_tree for some reason"
                       in
                       let catchup_state_node_list =
                         State_hash.Table.data catchup_state.nodes

@@ -12,7 +12,11 @@ let DebianChannel = ../Constants/DebianChannel.dhall
 
 let Network = ../Constants/Network.dhall
 
+let Command = ../Command/Base.dhall
+
 let DebianVersions = ../Constants/DebianVersions.dhall
+
+let DebianRepo = ../Constants/DebianRepo.dhall
 
 let Pipeline = ../Pipeline/Dsl.dhall
 
@@ -29,6 +33,8 @@ let promote_artifacts =
       ->  \(codenames : List DebianVersions.DebVersion)
       ->  \(from_channel : DebianChannel.Type)
       ->  \(to_channel : DebianChannel.Type)
+      ->  \(from_repo : DebianRepo.Type)
+      ->  \(to_repo : DebianRepo.Type)
       ->  \(tag : Text)
       ->  \(remove_profile_from_name : Bool)
       ->  \(publish : Bool)
@@ -39,12 +45,21 @@ let promote_artifacts =
                 , version = version
                 , architecture = architecture
                 , new_debian_version = new_version
+                , source_debian_repo = from_repo
+                , target_debian_repo = to_repo
                 , profile = profile
                 , network = network
                 , codenames = codenames
                 , from_channel = from_channel
                 , to_channel = to_channel
-                , new_tags = [ tag ]
+                , new_tags =
+                        \(codename : DebianVersions.DebVersion)
+                    ->  \(channel : DebianChannel.Type)
+                    ->  \(branch : Text)
+                    ->  \(repo : DebianRepo.Type)
+                    ->  \(latestGitTag : Text)
+                    ->  \(todayDate : Text)
+                    ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , publish = publish
                 }
@@ -62,6 +77,7 @@ let promote_artifacts =
                       dockersSpecs
                       DebianVersions.DebVersion.Bullseye
                       PipelineMode.Type.Stable
+                      ([] : List Command.TaggedKey.Type)
                   )
 
           in  pipelineType.pipeline
@@ -74,6 +90,7 @@ let verify_artifacts =
       ->  \(network : Network.Type)
       ->  \(codenames : List DebianVersions.DebVersion)
       ->  \(to_channel : DebianChannel.Type)
+      ->  \(repo : DebianRepo.Type)
       ->  \(tag : Text)
       ->  \(remove_profile_from_name : Bool)
       ->  \(publish : Bool)
@@ -83,11 +100,19 @@ let verify_artifacts =
                 , debians = debians
                 , dockers = dockers
                 , new_debian_version = new_version
+                , debian_repo = repo
                 , profile = profile
                 , network = network
                 , codenames = codenames
                 , channel = to_channel
-                , new_tags = [ tag ]
+                , tags =
+                        \(codename : DebianVersions.DebVersion)
+                    ->  \(channel : DebianChannel.Type)
+                    ->  \(branch : Text)
+                    ->  \(repo : DebianRepo.Type)
+                    ->  \(latestGitTag : Text)
+                    ->  \(todayDate : Text)
+                    ->  [ tag ]
                 , remove_profile_from_name = remove_profile_from_name
                 , published = publish
                 }

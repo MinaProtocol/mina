@@ -41,7 +41,7 @@ let PromoteDockerSpec =
           , new_tags = [] : List Text
           , step_key = "promote-docker"
           , profile = Profiles.Type.Standard
-          , network = Network.Type.Berkeley
+          , network = Network.Type.Devnet
           , codename = DebianVersions.DebVersion.Bullseye
           , if = None B/If
           , publish = False
@@ -77,8 +77,8 @@ let promoteDockerStep =
                                 spec.remove_profile_from_name
 
                         in  Cmd.run
-                              ". ./buildkite/scripts/export-git-env-vars.sh && ./buildkite/scripts/promote-docker.sh --name ${Artifact.dockerName
-                                                                                                                                spec.name} --version ${old_tag} --tag ${new_tag} ${publish}"
+                              ". ./buildkite/scripts/export-git-env-vars.sh && ./scripts/docker/promote.sh --name ${Artifact.dockerName
+                                                                                                                      spec.name} --version ${old_tag} --tag \"\$(echo ${new_tag})\" ${publish}"
                   )
                   spec.new_tags
 

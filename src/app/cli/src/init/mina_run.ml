@@ -69,7 +69,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
           validate_cli_protocol_version protocol_version ;
           write_protocol_version protocol_version ;
           [%log info]
-            "Overwriting Coda config proposed protocol version \
+            "Overwriting Mina config proposed protocol version \
              $config_proposed_protocol_version with proposed protocol version \
              $protocol_version from the command line"
             ~metadata:
@@ -101,7 +101,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   match !coda_ref with
   | None ->
       [%log warn]
-        "Shutdown before Coda instance was created, not saving a visualization"
+        "Shutdown before Mina instance was created, not saving a visualization"
   | Some t -> (
       (*Transition frontier visualization*)
       match Mina_lib.visualize_frontier ~filename:frontier_file t with
@@ -133,7 +133,7 @@ let summary exn_json =
 let coda_status coda_ref =
   Option.value_map coda_ref
     ~default:
-      (Deferred.return (`String "Shutdown before Coda instance was created"))
+      (Deferred.return (`String "Shutdown before Mina instance was created"))
     ~f:(fun t ->
       Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
@@ -213,6 +213,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
   let compile_config = (Mina_lib.config mina).compile_config in
+  let itn_features = (Mina_lib.config mina).itn_features in
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -364,22 +365,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             List.map metadata ~f:(fun (s, value) ->
                 (s, Yojson.Safe.from_string value) )
           in
-          let config =
-            { Itn_logger.rpc_handshake_timeout =
-                compile_config.rpc_handshake_timeout
-            ; rpc_heartbeat_timeout = compile_config.rpc_heartbeat_timeout
-            ; rpc_heartbeat_send_every = compile_config.rpc_heartbeat_send_every
-            }
-          in
-          return
-          @@ Itn_logger.log ~process ~timestamp ~message ~metadata ~config () )
+          return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
+  let log_snark_work_metrics
+      (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
       (One_or_two.zip_exn work.metrics
-         (Snark_worker.Work.Result.transactions work) )
+         (Snark_work_lib.Selector.Result.Stable.Latest.transactions work) )
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with
         | `Merge ->
@@ -411,7 +405,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                           Mina_base.Control.(
                             Tag.equal Proof
                               (tag
-                                 (Mina_base.Account_update.authorization party) ))
+                                 (Mina_base.Account_update.Poly.authorization
+                                    party ) ))
                         then proof_parties_count + 1
                         else proof_parties_count ) )
                 in
@@ -442,17 +437,30 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 (Mina_lib.snark_coordinator_key mina)
                 ~f:Fn.const
             in
-            let%map r = Mina_lib.request_work mina in
+            let%map work = Mina_lib.request_work mina in
+            let work =
+              Snark_work_lib.Work.Spec.map work
+                ~f:
+                  (Snark_work_lib.Work.Single.Spec.map
+                     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                     ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+            in
             [%log trace]
-              ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson r) ]
+              ~metadata:
+                [ ( "work_spec"
+                  , Snark_work_lib.Selector.Spec.Stable.Latest.to_yojson work )
+                ]
               "responding to a Get_work request with some new work" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (r, key)) )
+            (work, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
-        (fun () (work : Snark_worker.Work.Result.t) ->
+        (fun () (work : Snark_work_lib.Selector.Result.Stable.Latest.t) ->
           [%log trace] "received completed work from a snark worker"
             ~metadata:
-              [ ("work_spec", Snark_worker.Work.Spec.to_yojson work.spec) ] ;
+              [ ( "work_spec"
+                , Snark_work_lib.Selector.Spec.Stable.Latest.to_yojson work.spec
+                )
+              ] ;
           log_snark_work_metrics work ;
           Deferred.return @@ Mina_lib.add_work mina work )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
@@ -460,11 +468,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           ()
           ((error, _work_spec, _prover_public_key) :
             Error.t
-            * Snark_worker.Work.Spec.t
+            * Snark_work_lib.Selector.Spec.Stable.Latest.t
             * Signature_lib.Public_key.Compressed.t )
         ->
           [%str_log error]
-            (Snark_worker.Generating_snark_work_failed
+            (Snark_worker.Events.Generating_snark_work_failed
                { error = Error_json.error_to_yojson error } ) ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
           Deferred.unit )
@@ -560,7 +568,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
-  if compile_config.itn_features then
+  if itn_features then
     (* Third graphql server with ITN-particular queries exposed *)
     Option.iter itn_graphql_port ~f:(fun rest_server_port ->
         O1trace.background_thread "serve_itn_graphql" (fun () ->
@@ -608,8 +616,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                  ~handshake_timeout:compile_config.rpc_handshake_timeout
                  ~heartbeat_config:
                    (Rpc.Connection.Heartbeat_config.create
-                      ~timeout:compile_config.rpc_heartbeat_timeout
-                      ~send_every:compile_config.rpc_heartbeat_send_every () )
+                      ~timeout:
+                        (Time_ns.Span.of_sec
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_timeout ) )
+                      ~send_every:
+                        (Time_ns.Span.of_sec
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_send_every ) )
+                      () )
                  reader writer
                  ~implementations:
                    (Rpc.Implementations.create_exn

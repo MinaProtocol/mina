@@ -8,6 +8,8 @@ let List/map = Prelude.List.map
 
 let Package = ../../Constants/DebianPackage.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
@@ -42,11 +44,19 @@ let VerifyPackagesSpec =
           , debians : List Package.Type
           , dockers : List Artifact.Type
           , new_debian_version : Text
+          , debian_repo : DebianRepo.Type
           , profile : Profiles.Type
           , network : Network.Type
           , codenames : List DebianVersions.DebVersion
           , channel : DebianChannel.Type
-          , new_tags : List Text
+          , tags :
+                  DebianVersions.DebVersion
+              ->  DebianChannel.Type
+              ->  Text
+              ->  DebianRepo.Type
+              ->  Text
+              ->  Text
+              ->  List Text
           , remove_profile_from_name : Bool
           , published : Bool
           }
@@ -55,11 +65,11 @@ let VerifyPackagesSpec =
           , debians = [] : List Package.Type
           , dockers = [] : List Artifact.Type
           , new_debian_version = "\\\\\$MINA_DEB_VERSION"
+          , debian_repo = DebianRepo.Type.Local
           , profile = Profiles.Type.Standard
           , network = Network.Type.Mainnet
           , codenames = [] : List DebianVersions.DebVersion
           , channel = DebianChannel.Type.Compatible
-          , new_tags = [] : List Text
           , remove_profile_from_name = False
           , published = False
           }
@@ -81,7 +91,14 @@ let verifyPackagesToDockerSpecs
                                 , profile = verify_packages.profile
                                 , name = docker
                                 , codename = codename
-                                , new_tags = verify_packages.new_tags
+                                , new_tags =
+                                    verify_packages.tags
+                                      codename
+                                      verify_packages.channel
+                                      "\\\${BUILDKITE_BRANCH}"
+                                      verify_packages.debian_repo
+                                      "\\\${GITTAG}"
+                                      "\\\$(date \"+%Y%m%d\")"
                                 , network = verify_packages.network
                                 , publish = verify_packages.published
                                 , remove_profile_from_name =
@@ -139,6 +156,7 @@ let verifyPackagesToDebianSpecs
                                 , package = debian
                                 , new_version =
                                     verify_packages.new_debian_version
+                                , target_repo = verify_packages.debian_repo
                                 , network = verify_packages.network
                                 , codename = codename
                                 , to_channel = verify_packages.channel

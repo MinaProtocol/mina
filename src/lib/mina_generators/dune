@@ -1,45 +1,50 @@
 (library
  (name mina_generators)
  (public_name mina_generators)
- (inline_tests (flags -verbose -show-counts))
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_let ppx_version ppx_custom_printf ppx_inline_test ppx_deriving_yojson))
+ (inline_tests
+  (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_custom_printf
+   ppx_deriving_yojson
+   ppx_inline_test
+   ppx_let
+   ppx_version))
  (libraries
-   ;; opam libraries
-   yojson
-   core_kernel
-   base_quickcheck
-   core
-   async
-   async_unix
-   base
-   sexplib0
-   ppx_inline_test.config
-   ppx_deriving_yojson.runtime
-   ;; local libraries
-   bounded_types
-   genesis_constants
-   sgn
-   pickles_types
-   pickles
-   data_hash_lib
-   kimchi_pasta
-   kimchi_pasta.basic
-   mina_numbers
-   zkapp_command_builder
-   signature_lib
-   mina_ledger
-   mina_base
-   random_oracle
-   with_hash
-   mina_base.import
-   block_time
-   currency
-   kimchi_backend
-   pickles.backend
-   random_oracle_input
-   snark_params
-   snarky.backendless
-   transaction_snark
-   splittable_random
-))
+  ;; opam libraries
+  async
+  async_unix
+  base
+  base_quickcheck
+  core
+  ppx_deriving_yojson.runtime
+  ppx_inline_test.config
+  yojson
+  ;; local libraries
+  block_time
+  bounded_types
+  currency
+  data_hash_lib
+  genesis_constants
+  kimchi_backend
+  kimchi_pasta
+  kimchi_pasta.basic
+  mina_base
+  mina_base.import
+  mina_ledger
+  mina_numbers
+  pickles
+  pickles.backend
+  pickles_types
+  random_oracle
+  random_oracle_input
+  sgn
+  signature_lib
+  snarky.backendless
+  snark_params
+  splittable_random
+  transaction_snark
+  with_hash
+  zkapp_command_builder))

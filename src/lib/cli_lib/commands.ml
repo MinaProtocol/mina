@@ -112,8 +112,9 @@ let validate_keypair =
           dummy_payload
       in
       let message = Mina_base.Signed_command.to_input_legacy dummy_payload in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let verified =
-        Schnorr.Legacy.verify signature
+        Schnorr.Legacy.verify ~signature_kind signature
           (Snark_params.Tick.Inner_curve.of_affine keypair.public_key)
           message
       in
@@ -230,17 +231,16 @@ module Vrf = struct
         flag "--total-stake"
           ~doc:"AMOUNT The total balance of all accounts in the epoch ledger"
           (optional int)
-      and config_file = Flag.config_files in
+      in
       Exceptions.handle_nicely
       @@ fun () ->
       let env = Secrets.Keypair.env in
-      let open Deferred.Let_syntax in
-      let%bind constraint_constants =
-        let%map conf = Runtime_config.Constants.load_constants config_file in
-        Runtime_config.Constants.constraint_constants conf
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
       in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
+      let open Deferred.Let_syntax in
       (* TODO-someday: constraint constants from config file. *)
       let%bind () =
         let password =
@@ -298,18 +298,17 @@ module Vrf = struct
          \"epochSeed\": _, \"delegatorIndex\": _} JSON message objects read on \
          stdin"
       (let open Command.Let_syntax in
-      let%map_open privkey_path = Flag.privkey_read_path
-      and config_file = Flag.config_files in
+      let%map_open privkey_path = Flag.privkey_read_path in
       Exceptions.handle_nicely
       @@ fun () ->
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then
         eprintf "Using password from environment variable %s\n" env ;
       let open Deferred.Let_syntax in
-      let%bind constraint_constants =
-        let%map conf = Runtime_config.Constants.load_constants config_file in
-        Runtime_config.Constants.constraint_constants conf
-      in
+      (* TODO-someday: constraint constants from config file. *)
       let%bind () =
         let password =
           lazy
@@ -364,15 +363,13 @@ module Vrf = struct
          totalStake: 1000000000}. The threshold is not checked against a \
          ledger; this should be done manually to confirm whether threshold_met \
          in the output corresponds to an actual won block."
-      (let open Command.Let_syntax in
-      let%map_open config_file = Flag.config_files in
-      Exceptions.handle_nicely
+      ( Command.Param.return @@ Exceptions.handle_nicely
       @@ fun () ->
       let open Deferred.Let_syntax in
-      let%bind constraint_constants =
-        let%map conf = Runtime_config.Constants.load_constants config_file in
-        Runtime_config.Constants.constraint_constants conf
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
       in
+      (* TODO-someday: constraint constants from config file. *)
       let lexbuf = Lexing.from_channel In_channel.stdin in
       let lexer = Yojson.init_lexer () in
       let%bind () =
@@ -403,7 +400,7 @@ module Vrf = struct
                      (Error_json.error_to_yojson err) ) ;
                 `Repeat () )
       in
-      exit 0)
+      exit 0 )
 
   let command_group =
     Command.group ~summary:"Commands for vrf evaluations"

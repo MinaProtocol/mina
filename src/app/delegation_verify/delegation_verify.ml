@@ -13,7 +13,9 @@ let get_filenames =
 let verify_snark_work ~verify_transaction_snarks ~proof ~message =
   verify_transaction_snarks [ (proof, message) ]
 
-let config_flag = Cli_lib.Flag.config_files
+let config_flag =
+  let open Command.Param in
+  flag "--config-file" ~doc:"FILE config file" (optional string)
 
 let keyspace_flag =
   let open Command.Param in
@@ -42,15 +44,36 @@ let timestamp =
   let open Command.Param in
   anon ("timestamp" %: string)
 
-let instantiate_verify_functions ~logger config_file =
-  let open Deferred.Let_syntax in
-  let%map constants =
-    Runtime_config.Constants.load_constants_with_logging ~logger config_file
-  in
-  let constraint_constants =
-    Runtime_config.Constants.constraint_constants constants
-  in
-  Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
+let instantiate_verify_functions ~logger ~genesis_constants
+    ~constraint_constants ~proof_level ~cli_proof_level = function
+  | None ->
+      Deferred.return
+        (Verifier.verify_functions ~constraint_constants ~proof_level ())
+  | Some config_file ->
+      let%bind.Deferred precomputed_values =
+        let%bind.Deferred.Or_error config_json =
+          Genesis_ledger_helper.load_config_json config_file
+        in
+        let%bind.Deferred.Or_error config =
+          Deferred.return
+          @@ Result.map_error ~f:Error.of_string
+          @@ Runtime_config.of_yojson config_json
+        in
+        Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
+          ~constraint_constants ~genesis_constants config ~cli_proof_level
+      in
+      let%map.Deferred precomputed_values =
+        match precomputed_values with
+        | Ok (precomputed_values, _) ->
+            Deferred.return precomputed_values
+        | Error _ ->
+            Output.display_error "fail to read config file" ;
+            exit 4
+      in
+      let constraint_constants =
+        Precomputed_values.constraint_constants precomputed_values
+      in
+      Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
   let verify_transaction_snarks = Source.verify_transaction_snarks
@@ -85,7 +108,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
             verify_snark_work ~verify_transaction_snarks ~proof ~message
       else return ()
     in
-    let header = Mina_block.header block in
+    let header = Mina_block.Stable.Latest.header block in
     let protocol_state = Mina_block.Header.protocol_state header in
     let consensus_state =
       Mina_state.Protocol_state.consensus_state protocol_state
@@ -121,7 +144,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
     |> Deferred.Or_error.all_unit
 end
 
-let filesystem_command ~logger =
+let filesystem_command =
   Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
       let%map_open block_dir = block_dir_flag
@@ -129,10 +152,16 @@ let filesystem_command ~logger =
       and no_checks = no_checks_flag
       and config_file = config_flag in
       fun () ->
-        let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+        let logger = Logger.create () in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+        let constraint_constants =
+          Genesis_constants.Compiled.constraint_constants
         in
-
+        let proof_level = Genesis_constants.Compiled.proof_level in
+        let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
+          instantiate_verify_functions ~logger config_file ~genesis_constants
+            ~constraint_constants ~proof_level ~cli_proof_level:None
+        in
         let submission_paths = get_filenames inputs in
         let module V = Make_verifier (struct
           include Submission.Filesystem
@@ -151,7 +180,7 @@ let filesystem_command ~logger =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let cassandra_command ~logger =
+let cassandra_command =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
     Command.Let_syntax.(
       let%map_open cqlsh = cassandra_executable_flag
@@ -162,8 +191,15 @@ let cassandra_command ~logger =
       and period_end = timestamp in
       fun () ->
         let open Deferred.Let_syntax in
+        let logger = Logger.create () in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+        let constraint_constants =
+          Genesis_constants.Compiled.constraint_constants
+        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+          instantiate_verify_functions ~logger config_file ~genesis_constants
+            ~constraint_constants ~proof_level ~cli_proof_level:None
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -186,15 +222,22 @@ let cassandra_command ~logger =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let stdin_command ~logger =
+let stdin_command =
   Command.async
     ~summary:"Verify submissions and blocks read from standard input"
     Command.Let_syntax.(
       let%map_open config_file = config_flag and no_checks = no_checks_flag in
       fun () ->
         let open Deferred.Let_syntax in
+        let logger = Logger.create () in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+        let constraint_constants =
+          Genesis_constants.Compiled.constraint_constants
+        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+          instantiate_verify_functions ~logger config_file ~genesis_constants
+            ~constraint_constants ~proof_level ~cli_proof_level:None
         in
         let module V = Make_verifier (struct
           include Submission.Stdin
@@ -210,14 +253,12 @@ let stdin_command ~logger =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let command ~logger =
+let command =
   Command.group
     ~summary:"A tool for verifying JSON payload submitted by the uptime service"
-    [ ("fs", filesystem_command ~logger)
-    ; ("cassandra", cassandra_command ~logger)
-    ; ("stdin", stdin_command ~logger)
+    [ ("fs", filesystem_command)
+    ; ("cassandra", cassandra_command)
+    ; ("stdin", stdin_command)
     ]
 
-let () =
-  let logger = Logger.create () in
-  Async.Command.run @@ command ~logger
+let () = Async.Command.run command

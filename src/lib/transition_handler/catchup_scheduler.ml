@@ -219,7 +219,8 @@ let make_timeout t transition_with_hash duration =
           ; ( "duration"
             , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
           ; ( "cached_transition"
-            , With_hash.data transition_with_hash |> Mina_block.to_yojson )
+            , With_hash.data transition_with_hash
+              |> Mina_block.header |> Mina_block.to_logging_yojson )
           ]
         "Timed out waiting for the parent of $cached_transition after \
          $duration ms, signalling a catchup job" ;
@@ -349,7 +350,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let () =
       (* Disable log messages from best_tip_diff logger. *)
-      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+      Logger.Consumer_registry.register ~commit_id:""
         ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
         ~transport:
           (Logger.Transport.create

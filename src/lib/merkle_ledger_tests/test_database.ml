@@ -172,23 +172,6 @@ module Make (Test : Test_intf) = struct
                    in
                    assert ([%equal: Test.Location.t] location location') ) ) )
 
-  let () =
-    add_test
-      "set_inner_hash_at_addr_exn(address,hash); \
-       get_inner_hash_at_addr_exn(address) = hash" (fun () ->
-        let random_hash =
-          Hash.hash_account @@ Quickcheck.random_value Account.gen
-        in
-        Test.with_instance (fun mdb ->
-            Quickcheck.test
-              (Direction.gen_var_length_list ~start:1 (MT.depth mdb))
-              ~sexp_of:[%sexp_of: Direction.t List.t]
-              ~f:(fun direction ->
-                let address = MT.Addr.of_directions direction in
-                MT.set_inner_hash_at_addr_exn mdb address random_hash ;
-                let result = MT.get_inner_hash_at_addr_exn mdb address in
-                assert (Hash.equal result random_hash) ) ) )
-
   let random_accounts max_height =
     let num_accounts = 1 lsl max_height in
     Quickcheck.random_value
@@ -214,11 +197,15 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
-            Quickcheck.test (Direction.gen_var_length_list max_height)
-              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+            Quickcheck.test
+              (Mina_stdlib.Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
                 let address =
                   let offset = depth - max_height in
-                  let padding = List.init offset ~f:(fun _ -> Direction.Left) in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Mina_stdlib.Direction.Left)
+                  in
                   let padded_directions = List.concat [ padding; directions ] in
                   MT.Addr.of_directions padded_directions
                 in
@@ -236,11 +223,15 @@ module Make (Test : Test_intf) = struct
             let depth = MT.depth mdb in
             let max_height = Int.min 5 depth in
             populate_db mdb max_height ;
-            Quickcheck.test (Direction.gen_var_length_list max_height)
-              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+            Quickcheck.test
+              (Mina_stdlib.Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
                 let address =
                   let offset = depth - max_height in
-                  let padding = List.init offset ~f:(fun _ -> Direction.Left) in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Mina_stdlib.Direction.Left)
+                  in
                   let padded_directions = List.concat [ padding; directions ] in
                   MT.Addr.of_directions padded_directions
                 in
@@ -330,11 +321,15 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let max_height = Int.min (MT.depth mdb) 5 in
             populate_db mdb max_height ;
-            Quickcheck.test (Direction.gen_var_length_list max_height)
-              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+            Quickcheck.test
+              (Mina_stdlib.Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
                 let address =
                   let offset = MT.depth mdb - max_height in
-                  let padding = List.init offset ~f:(fun _ -> Direction.Left) in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Mina_stdlib.Direction.Left)
+                  in
                   let padded_directions = List.concat [ padding; directions ] in
                   MT.Addr.of_directions padded_directions
                 in
@@ -407,10 +402,12 @@ module Make (Test : Test_intf) = struct
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
             populate_db mdb max_height ;
-            Quickcheck.test (Direction.gen_list max_height)
-              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+            Quickcheck.test (Mina_stdlib.Direction.gen_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
                 let offset =
-                  List.init (depth - max_height) ~f:(fun _ -> Direction.Left)
+                  List.init (depth - max_height) ~f:(fun _ ->
+                      Mina_stdlib.Direction.Left )
                 in
                 let padded_directions = List.concat [ offset; directions ] in
                 let address = MT.Addr.of_directions padded_directions in

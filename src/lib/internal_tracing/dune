@@ -2,13 +2,11 @@
  (name internal_tracing)
  (public_name internal_tracing)
  (library_flags -linkall)
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  base.base_internalhash_types
   core
-  core_kernel
-  sexplib0
   yojson
   async_kernel
   ;; local libraries
@@ -16,8 +14,7 @@
   mina_base
   mina_numbers
   internal_tracing.context_call
-  logger.context_logger
-  )
+  logger.context_logger)
  (preprocess
   (pps ppx_jane ppx_mina ppx_version ppx_deriving_yojson))
  (instrumentation

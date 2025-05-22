@@ -20,57 +20,100 @@ let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
+let DebianVersions = ../Constants/DebianVersions.dhall
+
+let Network = ../Constants/Network.dhall
+
+let DockerPublish = ../Constants/DockerPublish.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
           , network : Text
-          , service : Text
+          , service : Artifacts.Type
           , version : Text
           , branch : Text
           , repo : Text
           , no_cache : Bool
-          , deb_codename : Text
+          , no_debian : Bool
+          , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
-          , step_key : Text
+          , step_key_suffix : Text
+          , docker_publish : DockerPublish.Type
           , if : Optional B/If
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = "devnet"
+          , network = "${Network.lowerName Network.Type.Berkeley}"
           , version = "\\\${MINA_DOCKER_TAG}"
-          , service = Artifacts.dockerName Artifacts.Type.Daemon
+          , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
-          , deb_codename = "bullseye"
+          , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "\\\${MINA_DEB_RELEASE}"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
-          , deb_repo = DebianRepo.Type.PackagesO1Test
+          , deb_repo = DebianRepo.Type.Local
+          , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
-          , step_key = "daemon-standard-docker-image"
+          , no_debian = False
+          , step_key_suffix = "-docker-image"
           , if = None B/If
           }
       }
 
+let stepKey =
+          \(spec : ReleaseSpec.Type)
+      ->  "${Artifacts.lowerName
+               spec.service}${Profiles.toLabelSegment
+                                spec.deb_profile}${BuildFlags.toLabelSegment
+                                                     spec.build_flags}${spec.step_key_suffix}"
+
+let stepLabel =
+          \(spec : ReleaseSpec.Type)
+      ->  "Docker: ${Artifacts.capitalName
+                       spec.service} ${spec.network} ${DebianVersions.capitalName
+                                                         spec.deb_codename} ${Profiles.toSuffixUppercase
+                                                                                spec.deb_profile} ${BuildFlags.toSuffixUppercase
+                                                                                                      spec.build_flags}"
+
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->  let exportMinaDebCmd = "export MINA_DEB_CODENAME=${spec.deb_codename}"
+      ->  let exportMinaDebCmd =
+                "export MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                              spec.deb_codename}"
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
+          let maybeStartDebianRepo =
+                      if spec.no_debian
+
+                then  " && echo Skipping local debian repo setup "
+
+                else      " && apt update && apt install -y aptly"
+                      ++  " && ./buildkite/scripts/debian/start_local_repo.sh"
+
+          let maybeStopDebianRepo =
+                      if spec.no_debian
+
+                then  " && echo Skipping local debian repo teardown "
+
+                else  " && ./scripts/debian/aptly.sh stop"
+
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
-                ++  " --service ${spec.service}"
+                ++  " --service ${Artifacts.dockerName spec.service}"
                 ++  " --network ${spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
                 ++  " ${maybeCacheOption} "
-                ++  " --deb-codename ${spec.deb_codename}"
+                ++  " --deb-codename ${DebianVersions.lowerName
+                                         spec.deb_codename}"
                 ++  " --deb-repo ${DebianRepo.address spec.deb_repo}"
                 ++  " --deb-release ${spec.deb_release}"
                 ++  " --deb-version ${spec.deb_version}"
@@ -80,15 +123,24 @@ let generateStep =
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =
-                    "./scripts/docker/release.sh"
-                ++  " --service ${spec.service}"
-                ++  " --version ${spec.version}"
-                ++  " --network ${spec.network}"
-                ++  " --deb-codename ${spec.deb_codename}"
-                ++  " --deb-version ${spec.deb_version}"
-                ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
-                ++  " --deb-build-flags ${BuildFlags.lowerName
-                                            spec.build_flags}"
+                      if DockerPublish.shouldPublish
+                           spec.docker_publish
+                           spec.service
+
+                then      "./scripts/docker/release.sh"
+                      ++  " --service ${Artifacts.dockerName spec.service}"
+                      ++  " --version ${spec.version}"
+                      ++  " --network ${spec.network}"
+                      ++  " --deb-codename ${DebianVersions.lowerName
+                                               spec.deb_codename}"
+                      ++  " --deb-version ${spec.deb_version}"
+                      ++  " --deb-profile ${Profiles.lowerName
+                                              spec.deb_profile}"
+                      ++  " --deb-build-flags ${BuildFlags.lowerName
+                                                  spec.build_flags}"
+
+                else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
+                                                                                                                                                                                                spec.docker_publish}."
 
           let remoteRepoCmds =
                 [ Cmd.run
@@ -103,21 +155,19 @@ let generateStep =
 
           let commands =
                 merge
-                  { PackagesO1Test = remoteRepoCmds
-                  , Unstable = remoteRepoCmds
+                  { Unstable = remoteRepoCmds
                   , Nightly = remoteRepoCmds
                   , Stable = remoteRepoCmds
                   , Local =
                     [ Cmd.run
                         (     exportMinaDebCmd
-                          ++  " && apt update && apt install -y aptly"
-                          ++  " && ./buildkite/scripts/debian/start_local_repo.sh"
+                          ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
                           ++  buildDockerCmd
                           ++  " && "
                           ++  releaseDockerCmd
-                          ++  " && ./scripts/debian/aptly.sh stop"
+                          ++  maybeStopDebianRepo
                         )
                     ]
                   }
@@ -126,12 +176,16 @@ let generateStep =
           in  Command.build
                 Command.Config::{
                 , commands = commands
-                , label = "Docker: ${spec.step_key}"
-                , key = spec.step_key
+                , label = "${stepLabel spec}"
+                , key = "${stepKey spec}"
                 , target = Size.XLarge
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
                 , if = spec.if
                 }
 
-in  { generateStep = generateStep, ReleaseSpec = ReleaseSpec }
+in  { generateStep = generateStep
+    , ReleaseSpec = ReleaseSpec
+    , stepKey = stepKey
+    , stepLabel = stepLabel
+    }

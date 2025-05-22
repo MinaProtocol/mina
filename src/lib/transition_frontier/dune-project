@@ -1,3 +1,0 @@
-(lang dune 2.8)
-(name transition_frontier)
-(implicit_transitive_deps true)

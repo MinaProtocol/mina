@@ -29,6 +29,7 @@ val create :
 
 val build :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
+  -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
@@ -81,6 +82,8 @@ val mask : t -> Mina_ledger.Ledger.Mask.Attached.t
 val display : t -> display
 
 val name : t -> string
+
+val staged_ledger_hash : t -> Staged_ledger_hash.t
 
 module For_tests : sig
   val gen :

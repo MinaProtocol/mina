@@ -16,8 +16,6 @@ end = struct
 
   type t = { uuid : Uuid.t; depth : int } [@@deriving sexp_of]
 
-  let t_of_sexp _ = failwith "t_of_sexp unimplemented"
-
   type index = int
 
   module Location = Location
@@ -45,7 +43,7 @@ end = struct
       else
         let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
+        Mina_stdlib.Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)
     in
     loop location
@@ -65,7 +63,9 @@ end = struct
       else
         let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map dir ~left:(`Left (hash, hash)) ~right:(`Right (hash, hash))
+        Mina_stdlib.Direction.map dir
+          ~left:(`Left (hash, hash))
+          ~right:(`Right (hash, hash))
         :: loop (Location.parent k)
     in
     loop location
@@ -158,9 +158,6 @@ end = struct
 
   let set_batch_accounts _t =
     failwith "set_batch_accounts: null ledgers cannot be mutated"
-
-  let set_inner_hash_at_addr_exn _t =
-    failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"
 
   let get_inner_hash_at_addr_exn t addr =
     empty_hash_at_height (Addr.height ~ledger_depth:t.depth addr)

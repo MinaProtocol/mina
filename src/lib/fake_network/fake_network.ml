@@ -1,7 +1,7 @@
 open Async
 open Core
 module Sync_ledger = Mina_ledger.Sync_ledger
-open Gadt_lib
+open Mina_stdlib.Gadt
 open Signature_lib
 open Network_peer
 module Gossip_net = Mina_networking.Gossip_net
@@ -14,6 +14,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
 end
 
 (* There must be at least 2 peers to create a network *)
@@ -78,7 +80,7 @@ let setup (type n) ~context:(module Context : CONTEXT)
 
       let consensus_local_state = consensus_local_state
 
-      let compile_config = precomputed_values.compile_config
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end )
   in
   let config rpc_mocks peer =
@@ -215,7 +217,6 @@ module Generator = struct
        context:(module CONTEXT)
     -> verifier:Verifier.t
     -> max_frontier_length:int
-    -> use_super_catchup:bool
     -> peer_state Generator.t
 
   let fresh_peer_custom_rpc ?get_some_initial_peers
@@ -223,12 +224,7 @@ module Generator = struct
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
       ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier
-      ~max_frontier_length ~use_super_catchup =
-    let module Consensus_context = struct
-      include Context
-
-      let compile_config = precomputed_values.compile_config
-    end in
+      ~max_frontier_length =
     let open Context in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
@@ -237,7 +233,7 @@ module Generator = struct
     let genesis_ledger = Precomputed_values.genesis_ledger precomputed_values in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~context:(module Consensus_context)
+        ~context:(module Context)
         ~genesis_ledger
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
@@ -246,8 +242,7 @@ module Generator = struct
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~precomputed_values ~verifier
-        ~consensus_local_state ~max_length:max_frontier_length ~size:0
-        ~use_super_catchup ()
+        ~consensus_local_state ~max_length:max_frontier_length ~size:0 ()
     in
     let snark = None in
     make_peer_state ~frontier ~snark ~consensus_local_state
@@ -257,7 +252,7 @@ module Generator = struct
       ?get_transition_chain_proof ?get_transition_chain
 
   let fresh_peer ~context:(module Context : CONTEXT) ~verifier
-      ~max_frontier_length ~use_super_catchup =
+      ~max_frontier_length =
     fresh_peer_custom_rpc
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
@@ -265,19 +260,14 @@ module Generator = struct
       ?get_transition_chain_proof:None ?get_transition_chain:None
       ?get_completed_snarks:None
       ~context:(module Context)
-      ~verifier ~max_frontier_length ~use_super_catchup
+      ~verifier ~max_frontier_length
 
   let peer_with_branch_custom_rpc ~frontier_branch_size ?get_some_initial_peers
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash
       ?answer_sync_ledger_query ?get_transition_chain ?get_transition_knowledge
       ?get_transition_chain_proof ?get_ancestry ?get_best_tip
       ?get_completed_snarks ~context:(module Context : CONTEXT) ~verifier
-      ~max_frontier_length ~use_super_catchup =
-    let module Consensus_context = struct
-      include Context
-
-      let compile_config = precomputed_values.compile_config
-    end in
+      ~max_frontier_length =
     let open Context in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
@@ -286,7 +276,7 @@ module Generator = struct
     let genesis_ledger = Precomputed_values.genesis_ledger precomputed_values in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~context:(module Consensus_context)
+        ~context:(module Context)
         ~genesis_ledger
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
@@ -295,9 +285,8 @@ module Generator = struct
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch ~precomputed_values
-        ~verifier ~use_super_catchup ~max_length:max_frontier_length
-        ~frontier_size:0 ~branch_size:frontier_branch_size
-        ~consensus_local_state ()
+        ~verifier ~max_length:max_frontier_length ~frontier_size:0
+        ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Deferred.List.iter branch
@@ -310,7 +299,7 @@ module Generator = struct
       ?get_transition_chain_proof ?get_transition_chain
 
   let peer_with_branch ~frontier_branch_size ~context:(module Context : CONTEXT)
-      ~verifier ~max_frontier_length ~use_super_catchup =
+      ~verifier ~max_frontier_length =
     peer_with_branch_custom_rpc ~frontier_branch_size
       ?get_staged_ledger_aux_and_pending_coinbases_at_hash:None
       ?get_some_initial_peers:None ?answer_sync_ledger_query:None
@@ -318,11 +307,11 @@ module Generator = struct
       ?get_transition_knowledge:None ?get_transition_chain_proof:None
       ?get_transition_chain:None
       ~context:(module Context)
-      ~verifier ~max_frontier_length ~use_super_catchup
+      ~verifier ~max_frontier_length
 
   let gen ?(logger = Logger.null ()) ~precomputed_values ~verifier
-      ~max_frontier_length ~use_super_catchup
-      (configs : (peer_config, 'n num_peers) Gadt_lib.Vect.t) =
+      ~max_frontier_length ~ledger_sync_config
+      (configs : (peer_config, 'n num_peers) Vect.t) =
     (* TODO: Pass in *)
     let module Context = struct
       let logger = logger
@@ -334,13 +323,13 @@ module Generator = struct
 
       let consensus_constants =
         precomputed_values.Precomputed_values.consensus_constants
+
+      let ledger_sync_config = ledger_sync_config
     end in
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun (config : peer_config) ->
-          config
-            ~context:(module Context)
-            ~verifier ~max_frontier_length ~use_super_catchup )
+          config ~context:(module Context) ~verifier ~max_frontier_length )
     in
     setup ~context:(module Context) states
 end

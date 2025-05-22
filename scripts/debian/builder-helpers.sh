@@ -10,7 +10,7 @@ MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
 
 # Helper script to include when building deb archives.
 
-echo "--- Setting up the envrionment to build debian packages..."
+echo "--- Setting up the environment to build debian packages..."
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../../_build"
@@ -23,7 +23,7 @@ SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
 
 SUGGESTED_DEPS="jq, curl, wget"
 
-TEST_EXECUTIVE_DEPS=", mina-logproc, python3, nodejs, yarn, google-cloud-sdk, kubectl, google-cloud-sdk-gke-gcloud-auth-plugin, terraform, helm"
+TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker"
 
 case "${MINA_DEB_CODENAME}" in
   bookworm|jammy)
@@ -63,7 +63,7 @@ if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
     MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
     DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
-fi 
+fi
 
 BUILDDIR="deb_build"
 
@@ -123,9 +123,9 @@ build_deb() {
 
   # Build the package
   echo "------------------------------------------------------------"
-  fakeroot dpkg-deb --build "${BUILDDIR}" ${1}_${MINA_DEB_VERSION}.deb
+  fakeroot dpkg-deb --build "${BUILDDIR}" "${1}"_"${MINA_DEB_VERSION}".deb
   echo "build_deb outputs:"
-  ls -lh ${1}_*.deb
+  ls -lh "${1}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
 
@@ -148,7 +148,7 @@ copy_common_daemon_configs() {
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
   cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
-  cp ./default/src/app/cli/src/mina_${2}_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+  cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
 
   # Copy over Build Configs (based on $2)
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -163,7 +163,7 @@ copy_common_daemon_configs() {
   cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
   cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
   # Set the default configuration based on Network name ($1)
-  cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+  cp ../genesis_ledgers/"${1}".json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   cp ../scripts/hardfork/create_runtime_config.sh "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
   cp ../scripts/mina-verify-packaged-fork-config "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
   # Update the mina.service with a new default PEERS_URL based on Seed List URL $3
@@ -239,6 +239,10 @@ build_batch_txn_deb() {
 build_functional_test_suite_deb() {
   create_control_file mina-test-suite "${SHARED_DEPS}" 'Test suite apps for mina.'
 
+  mkdir -p "${BUILDDIR}/etc/mina/test/archive"
+
+  cp -r ../src/test/archive/* "${BUILDDIR}"/etc/mina/test/archive/
+
   # Binaries
   cp ./default/src/test/command_line_tests/command_line_tests.exe "${BUILDDIR}/usr/local/bin/mina-command-line-tests"
   cp ./default/src/app/benchmarks/benchmarks.exe "${BUILDDIR}/usr/local/bin/mina-benchmarks"
@@ -254,11 +258,11 @@ build_functional_test_suite_deb() {
 ##################################### END TEST SUITE PACKAGE #######################################
 
 function copy_common_rosetta_configs () {
- 
-  # Copy rosetta-based Binaries 
-  cp ./default/src/app/rosetta/rosetta_${1}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_${1}_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
- 
+
+  # Copy rosetta-based Binaries
+  cp ./default/src/app/rosetta/rosetta_"${1}"_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+  cp ./default/src/app/rosetta/ocaml-signer/signer_"${1}"_signatures.exe "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
+
   mkdir -p "${BUILDDIR}/etc/mina/rosetta"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   mkdir -p "${BUILDDIR}/etc/mina/rosetta/scripts"
@@ -268,52 +272,54 @@ function copy_common_rosetta_configs () {
   cp ../src/app/rosetta/rosetta-cli-config/*.json "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ../src/app/rosetta/rosetta-cli-config/*.ros "${BUILDDIR}/etc/mina/rosetta/rosetta-cli-config"
   cp ./default/src/app/rosetta/indexer_test/indexer_test.exe "${BUILDDIR}/usr/local/bin/mina-rosetta-indexer-test"
- 
+
 }
 
 ##################################### ROSETTA MAINNET PACKAGE #######################################
 build_rosetta_mainnet_deb() {
- 
+
   echo "------------------------------------------------------------"
   echo "--- Building mainnet rosetta deb"
 
   create_control_file mina-rosetta-mainnet "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
   copy_common_rosetta_configs "mainnet"
-  
+
   build_deb mina-rosetta-mainnet
 }
+##################################### END ROSETTA MAINNET PACKAGE ####################################
 
-##################################### ROSETTA MAINNET PACKAGE #######################################
+##################################### ROSETTA DEVNET PACKAGE #########################################
 build_rosetta_devnet_deb() {
- 
+
   echo "------------------------------------------------------------"
   echo "--- Building devnet rosetta deb"
 
   create_control_file mina-rosetta-devnet "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
   copy_common_rosetta_configs "testnet"
-  
+
   build_deb mina-rosetta-devnet
 }
+##################################### END ROSETTA MAINNET PACKAGE #####################################
 
 ##################################### ROSETTA BERKELEY PACKAGE #######################################
 build_rosetta_berkeley_deb() {
- 
+
   echo "------------------------------------------------------------"
-  echo "--- Building rosetta berkeley deb"
+  echo "--- Building berkeley rosetta deb"
 
   create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" 'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
 
   copy_common_rosetta_configs "testnet"
-  
+
   build_deb mina-rosetta-berkeley
 }
-
+##################################### END BERKELEY PACKAGE #######################################
 
 ##################################### MAINNET PACKAGE #######################################
 build_daemon_mainnet_deb() {
- 
+
   echo "------------------------------------------------------------"
   echo "--- Building mainnet deb without keys:"
 
@@ -325,9 +331,9 @@ build_daemon_mainnet_deb() {
 }
 ##################################### END MAINNET PACKAGE #######################################
 
-##################################### DEVNET PACKAGE #######################################
+##################################### DEVNET PACKAGE ############################################
 build_daemon_devnet_deb() {
-  
+
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
 
@@ -337,24 +343,24 @@ build_daemon_devnet_deb() {
 
   build_deb mina-devnet
 }
-##################################### END DEVNET PACKAGE #######################################
+##################################### END DEVNET PACKAGE ########################################
 
-##################################### BERKELEY PACKAGE #######################################
+##################################### BERKELEY PACKAGE ##########################################
 build_daemon_berkeley_deb() {
-  
+
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon'
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
   build_deb "${MINA_DEB_NAME}"
 
 }
-##################################### END BERKELEY PACKAGE #######################################
+##################################### END BERKELEY PACKAGE ######################################
 
-##################################### ARCHIVE PACKAGE ##########################################
+##################################### ARCHIVE PACKAGE ###########################################
 build_archive_deb () {
   ARCHIVE_DEB=mina-archive${DEB_SUFFIX}
 
@@ -368,21 +374,23 @@ build_archive_deb () {
   cp ./default/src/app/archive/archive.exe "${BUILDDIR}/usr/local/bin/mina-archive"
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
-  
+
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/missing-blocks-guardian.sh "${BUILDDIR}/usr/local/bin/mina-missing-blocks-guardian"
-  
+
   cp ./default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILDDIR}/usr/local/bin/mina-missing-blocks-auditor"
   cp ./default/src/app/replayer/replayer.exe "${BUILDDIR}/usr/local/bin/mina-replayer"
-  
+
   cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
   cp ../src/app/archive/drop_tables.sql "${BUILDDIR}/etc/mina/archive"
 
   build_deb "$ARCHIVE_DEB"
 
 }
+##################################### END ARCHIVE PACKAGE ########################################
 
-##################################### ZKAPP TEST TXN #######################################
+
+##################################### ZKAPP TEST TXN #############################################
 build_zkapp_test_transaction_deb () {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Berkeley ZkApp test transaction tool:"
@@ -392,6 +400,6 @@ build_zkapp_test_transaction_deb () {
   # Binaries
   cp ./default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-test-transaction"
 
-  build_deb mina-zkapp-test-transaction 
+  build_deb mina-zkapp-test-transaction
 }
-##################################### END ZKAPP TEST TXN PACKAGE #######################################
+##################################### END ZKAPP TEST TXN PACKAGE ##################################

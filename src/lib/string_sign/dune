@@ -1,25 +1,24 @@
 (library
  (name string_sign)
  (public_name string_sign)
- (inline_tests (flags -verbose -show-counts))
  (libraries
-   ;; opam libraries
-   core_kernel
-   ppx_inline_test.config
-   result
-   ;; local libraries
-   kimchi_backend
-   pickles.backend
-   kimchi_pasta
-   kimchi_pasta.basic
-   random_oracle_input
-   signature_lib
-   snark_params
-   random_oracle
-   pickles
-   mina_signature_kind
-   mina_base
- )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_jane ppx_version ppx_inline_test))
+  ;; opam libraries
+  core_kernel
+  result
+  ;; local libraries
+  kimchi_backend
+  kimchi_pasta
+  kimchi_pasta.basic
+  mina_base
+  mina_signature_kind
+  pickles
+  pickles.backend
+  random_oracle
+  random_oracle_input
+  signature_lib
+  snark_params)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_jane ppx_version))
  (synopsis "Schnorr signatures for strings"))

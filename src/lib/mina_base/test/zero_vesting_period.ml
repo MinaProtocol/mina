@@ -150,10 +150,10 @@ let mk_zkapp_with_vesting_period n =
             "7mXAxX8GG74Dvgf8t4bdFDuiv9LnXeQmPcev9aSyZKxgsJNsSsJBz92Vqi7uzarkj5nwj9ngVbcya5cizm9af1G4RU6JA7q4"
           ]
         },
-        "account_update_digest": "0x324D57B61E07061A094A9E064984738480D8D3BF336A4CD33993A9FE6B37A823",
+        "account_update_digest": null,
         "calls": []
       },
-      "stack_hash": "0x3C28388F95EAF826FCC6CF06DBDD4A2E694FA7C5A281E0A623560F3A5BAF94AB"
+      "stack_hash": null
     },
     {
       "elt": {
@@ -257,10 +257,10 @@ let mk_zkapp_with_vesting_period n =
           },
           "authorization": [ "None_given" ]
         },
-        "account_update_digest": "0x1581BF4B656B5D89E65A7B9322F460D9AEAF08ABDD62CD6DD6D6FE1EE266035E",
+        "account_update_digest": null,
         "calls": []
       },
-      "stack_hash": "0x1C66CA0E7429D1D71E51BF1A5240D5A5C712DB9C4B7C31034A7A0115B612E83A"
+      "stack_hash": null
     }
   ],
   "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
@@ -268,7 +268,7 @@ let mk_zkapp_with_vesting_period n =
 
       |json}
       n
-    |> Yojson.Safe.from_string |> Zkapp_command.of_yojson
+    |> Yojson.Safe.from_string |> Zkapp_command.Stable.Latest.of_yojson
   in
   match res with
   | Ppx_deriving_yojson_runtime.Result.Ok zkapp ->
@@ -282,7 +282,6 @@ let zero_vesting_period_is_error () =
   match
     User_command.check_well_formedness
       ~genesis_constants:Genesis_constants.For_unit_tests.t
-      ~compile_config:Mina_compile_config.For_unit_tests.t
       (Zkapp_command zkapp_zero_vesting_period)
   with
   | Error [ Zero_vesting_period ] ->
@@ -295,7 +294,6 @@ let zkapp_nonzero_vesting_period = mk_zkapp_with_vesting_period 1
 let nonzero_vesting_period_ok () =
   match
     User_command.check_well_formedness
-      ~compile_config:Mina_compile_config.For_unit_tests.t
       ~genesis_constants:Genesis_constants.For_unit_tests.t
       (Zkapp_command zkapp_nonzero_vesting_period)
   with

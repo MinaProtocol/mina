@@ -306,7 +306,6 @@ let visualize_to_string t =
 let calculate_root_transition_diff t heir =
   let root = root t in
   let heir_hash = Breadcrumb.state_hash heir in
-  let heir_transition = Breadcrumb.validated_transition heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->
@@ -326,15 +325,22 @@ let calculate_root_transition_diff t heir =
         in
         { transition; scan_state } )
   in
+  let new_scan_state = Staged_ledger.scan_state heir_staged_ledger in
   let protocol_states =
     Protocol_states_for_root_scan_state.protocol_states_for_next_root_scan_state
-      t.protocol_states_for_root_scan_state
-      ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+      t.protocol_states_for_root_scan_state ~new_scan_state
       ~old_root_state:(Breadcrumb.protocol_state_with_hashes root)
   in
+  let heir_transition =
+    Breadcrumb.validated_transition heir
+    |> Mina_block.Validated.read_all_proofs_from_disk
+  in
+  let new_scan_state_unwrapped =
+    Staged_ledger.Scan_state.read_all_proofs_from_disk new_scan_state
+  in
   let new_root_data =
-    Root_data.Limited.create ~transition:heir_transition
-      ~scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+    Root_data.Limited.Stable.Latest.create ~transition:heir_transition
+      ~scan_state:new_scan_state_unwrapped
       ~pending_coinbase:
         (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
       ~protocol_states
@@ -380,7 +386,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
    * the following operations on masks in order:
    *
    *     0) notify consensus that root transitioned
-   *     1) unattach and destroy all the garbage (to avoid unecessary trickling of
+   *     1) unattach and destroy all the garbage (to avoid unnecessary trickling of
    *        invalidations from `m0` during the next step)
    *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
    *        making `m1` into an identity mask (an empty mask on top of `m1'`).
@@ -563,11 +569,6 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
         ]
   end in
   let open Diff in
-  let module Consensus_context = struct
-    include Context
-
-    let compile_config = precomputed_values.compile_config
-  end in
   O1trace.sync_thread "calculate_diff_frontier_diffs" (fun () ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
       let parent_node =
@@ -588,7 +589,7 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
         if
           Consensus.Hooks.equal_select_status
             (Consensus.Hooks.select
-               ~context:(module Consensus_context)
+               ~context:(module Context)
                ~existing:
                  (Breadcrumb.consensus_state_with_hashes current_best_tip)
                ~candidate:(Breadcrumb.consensus_state_with_hashes breadcrumb) )
@@ -633,10 +634,12 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
-      let new_root_hash = (Root_data.Limited.hashes new_root).state_hash in
+      let new_root_hash =
+        (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+      in
       let old_root_hash = t.root in
       let new_root_protocol_states =
-        Root_data.Limited.protocol_states new_root
+        Root_data.Limited.Stable.Latest.protocol_states new_root
       in
       [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
@@ -963,8 +966,6 @@ module For_tests = struct
     let precomputed_values = precomputed_values
 
     let consensus_constants = precomputed_values.consensus_constants
-
-    let compile_config = precomputed_values.compile_config
   end
 
   let verifier () =
@@ -1010,12 +1011,14 @@ module For_tests = struct
            ~src:(Lazy.force Genesis_ledger.t)
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
+    let staged_ledger =
+      Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+    in
     let root_data =
       let open Root_data in
       { transition =
           Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
-      ; staged_ledger =
-          Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+      ; staged_ledger
       ; protocol_states = []
       }
     in

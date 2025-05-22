@@ -38,7 +38,9 @@ module type CONTEXT = sig
 
   val snark_job_state : unit -> Work_selector.State.t option
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type ctx = (module CONTEXT)
@@ -211,7 +213,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
       type query = State_hash.t
 
       type response =
-        ( Staged_ledger.Scan_state.t
+        ( Staged_ledger.Scan_state.Stable.Latest.t
         * Ledger_hash.t
         * Pending_coinbase.t
         * Mina_state.Protocol_state.value list )
@@ -293,35 +295,25 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     let hash = Envelope.Incoming.data request in
     let result =
       let%bind.Option frontier = get_transition_frontier () in
-      Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier
-        hash
+      Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash ~logger
+        ~frontier hash
     in
-    let%map () =
-      match result with
-      | Some
-          (scan_state, expected_merkle_root, pending_coinbases, _protocol_states)
-        ->
-          let staged_ledger_hash =
-            Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-              (Staged_ledger.Scan_state.hash scan_state)
-              expected_merkle_root pending_coinbases
-          in
-          [%log debug]
-            ~metadata:
-              [ ( "staged_ledger_hash"
-                , Staged_ledger_hash.to_yojson staged_ledger_hash )
-              ]
-            "sending scan state and pending coinbase" ;
-          Deferred.unit
-      | None ->
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender request)
-              Actions.
-                ( Requested_unknown_item
-                , Some (receipt_trust_action_message hash) ))
-    in
-    result
+    match result with
+    | None ->
+        Trust_system.(
+          record_envelope_sender trust_system logger
+            (Envelope.Incoming.sender request)
+            Actions.
+              (Requested_unknown_item, Some (receipt_trust_action_message hash)))
+        >>| const None
+    | Some (scan_state, expected_merkle_root, pending_coinbases, protocol_states)
+      ->
+        return
+          (Some
+             ( Staged_ledger.Scan_state.read_all_proofs_from_disk scan_state
+             , expected_merkle_root
+             , pending_coinbases
+             , protocol_states ) )
 
   let rate_limit_budget = (4, `Per Time.Span.minute)
 
@@ -512,7 +504,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.t list [@@deriving sexp, to_yojson]
 
-      type response = Mina_block.t list option
+      type response = Mina_block.Stable.Latest.t list option
     end
 
     module Caller = T
@@ -590,7 +582,8 @@ module Get_transition_chain = struct
             ~sender:(Envelope.Incoming.sender request)
             blocks
         in
-        Option.some_if valid_versions blocks
+        Option.some_if valid_versions
+        @@ List.map ~f:Mina_block.read_all_proofs_from_disk blocks
     | None ->
         let%map () =
           Trust_system.(
@@ -875,7 +868,10 @@ module Get_completed_snarks = struct
     | Some snark_pool, Some snark_state ->
         Work_selector.completed_work_statements ~snark_pool snark_state
         |> Fn.flip List.take limit
-        |> List.map ~f:Transaction_snark_work.forget
+        |> List.map
+             ~f:
+               Transaction_snark_work.(
+                 Fn.compose read_all_proofs_from_disk forget)
         |> Option.some |> return
     | _, _ ->
         return None
@@ -899,8 +895,8 @@ module Get_ancestry = struct
       [@@deriving sexp, to_yojson]
 
       type response =
-        ( Mina_block.t
-        , State_body_hash.t list * Mina_block.t )
+        ( Mina_block.Stable.Latest.t
+        , State_body_hash.t list * Mina_block.Stable.Latest.t )
         Proof_carrying_data.t
         option
     end
@@ -995,14 +991,18 @@ module Get_ancestry = struct
                 ))
         in
         None
-    | Some { proof = _, block; _ } ->
+    | Some { proof = chain, base_block; data = block } ->
         let%map valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_ancestry"
             ~sender:(Envelope.Incoming.sender request)
-            [ block ]
+            [ base_block ]
         in
-        if valid_versions then result else None
+        Option.some_if valid_versions
+          { Proof_carrying_data.proof =
+              (chain, Mina_block.read_all_proofs_from_disk base_block)
+          ; data = Mina_block.read_all_proofs_from_disk block
+          }
 
   let rate_limit_budget = (5, `Per Time.Span.minute)
 
@@ -1104,8 +1104,8 @@ module Get_best_tip = struct
       type query = unit [@@deriving sexp, to_yojson]
 
       type response =
-        ( Mina_block.t
-        , State_body_hash.t list * Mina_block.t )
+        ( Mina_block.Stable.Latest.t
+        , State_body_hash.t list * Mina_block.Stable.Latest.t )
         Proof_carrying_data.t
         option
     end
@@ -1194,7 +1194,7 @@ module Get_best_tip = struct
                 (Requested_unknown_item, Some (receipt_trust_action_message ())))
         in
         None
-    | Some { data = data_block; proof = _, proof_block } ->
+    | Some { data = data_block; proof = chain, proof_block } ->
         let%map data_valid_versions =
           validate_protocol_versions ~logger ~trust_system
             ~rpc_name:"Get_best_tip (data)"
@@ -1206,7 +1206,12 @@ module Get_best_tip = struct
             ~sender:(Envelope.Incoming.sender request)
             [ proof_block ]
         in
-        if data_valid_versions && proof_valid_versions then result else None
+        Option.some_if
+          (data_valid_versions && proof_valid_versions)
+          { Proof_carrying_data.data =
+              Mina_block.read_all_proofs_from_disk data_block
+          ; proof = (chain, Mina_block.read_all_proofs_from_disk proof_block)
+          }
 
   let rate_limit_budget = (3, `Per Time.Span.minute)
 

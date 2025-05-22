@@ -7,8 +7,7 @@ open Mina_base
 open Mina_transaction
 
 let create_accounts ~(genesis_constants : Genesis_constants.t)
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~(compile_config : Mina_compile_config.t) port
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) port
     (privkey_path, key_prefix, num_accounts, fee, amount) =
   let keys_per_zkapp = 8 in
   let zkapps_per_block = 10 in
@@ -38,7 +37,7 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
   in
   let%bind fee_payer_balance =
     match%bind
-      Daemon_rpcs.Client.dispatch ~compile_config Daemon_rpcs.Get_balance.rpc
+      Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_balance.rpc
         fee_payer_account_id port
     with
     | Ok (Ok (Some balance)) ->
@@ -61,8 +60,8 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
   let%bind fee_payer_initial_nonce =
     (* inferred nonce considers txns in pool, in addition to ledger *)
     match%map
-      Daemon_rpcs.Client.dispatch ~compile_config
-        Daemon_rpcs.Get_inferred_nonce.rpc fee_payer_account_id port
+      Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_inferred_nonce.rpc
+        fee_payer_account_id port
     with
     | Ok (Ok (Some nonce)) ->
         Account.Nonce.of_uint32 nonce
@@ -181,12 +180,13 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
         Transaction_snark.For_tests.multiple_transfers ~constraint_constants
           multispec )
   in
+  (* TODO do not compute hashes and remove Zkapp_command.read_all_proofs_from_disk *)
   let zkapps_batches = List.chunks_of zkapps ~length:zkapps_per_block in
   Deferred.List.iter zkapps_batches ~f:(fun zkapps_batch ->
       Format.printf "Processing batch of %d zkApps@." (List.length zkapps_batch) ;
       List.iteri zkapps_batch ~f:(fun i zkapp ->
           let txn_hash =
-            Transaction_hash.hash_command (Zkapp_command zkapp)
+            Transaction_hash.hash_zkapp_command_with_hashes zkapp
             |> Transaction_hash.to_base58_check
           in
           Format.printf " zkApp %d, transaction hash: %s@." i txn_hash ;
@@ -219,8 +219,9 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
               Format.printf "  Public key: %s  Balance change: %s%s@." pk sgn
                 balance_change_str ) ) ;
       let%bind res =
-        Daemon_rpcs.Client.dispatch ~compile_config
-          Daemon_rpcs.Send_zkapp_commands.rpc zkapps_batch port
+        Daemon_rpcs.Client.dispatch Daemon_rpcs.Send_zkapp_commands.rpc
+          (List.map ~f:Zkapp_command.read_all_proofs_from_disk zkapps_batch)
+          port
       in
       ( match res with
       | Ok res_inner -> (
@@ -254,8 +255,8 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
         Deferred.List.for_all batch_pks ~f:(fun pk ->
             let account_id = Account_id.create pk Token_id.default in
             let%map res =
-              Daemon_rpcs.Client.dispatch ~compile_config
-                Daemon_rpcs.Get_balance.rpc account_id port
+              Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_balance.rpc account_id
+                port
             in
             match res with
             | Ok (Ok (Some balance)) when Currency.Balance.(balance > zero) ->

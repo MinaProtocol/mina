@@ -149,7 +149,10 @@ let%test_module "Block storage tests" =
           f conf_dir helper )
 
     let send_and_receive ~helper ~reader ~db breadcrumb =
-      let body = Breadcrumb.block breadcrumb |> Mina_block.body in
+      let body =
+        Breadcrumb.block breadcrumb
+        |> Mina_block.body |> Mina_block.Body.read_all_proofs_from_disk
+      in
       let body_ref =
         Staged_ledger_diff.Body.compute_reference
           ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
@@ -166,10 +169,13 @@ let%test_module "Block storage tests" =
       let id = match id_ with `Ok a -> a | _ -> failwith "unexpected" in
       [%log info] "Push message received" ;
       [%test_eq: String.t] (Consensus.Body_reference.to_raw_string body_ref) id ;
-      [%test_eq:
-        ( Mina_block.Body.t
-        , [ `Invalid_structure of Error.t | `Non_full | `Tx_failed ] )
-        Result.t] (Ok body) (read_body db body_ref)
+      let body' =
+        read_body db body_ref
+        |> function
+        | Ok a -> a | Error _ -> failwith "unexpected failure to read_body"
+      in
+      if not (Mina_block.Body.Stable.Latest.equal body body') then
+        failwith "Retrieved body not equal to original body"
 
     let%test_unit "Write many blocks" =
       let n = 300 in

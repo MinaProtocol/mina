@@ -17,6 +17,10 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -45,7 +49,7 @@ let opt_time_to_yojson = function
   | None ->
       `Null
 
-(** An auxiliary data structure for collecting various metrics for boostrap controller. *)
+(** An auxiliary data structure for collecting various metrics for bootstrap controller. *)
 type bootstrap_cycle_stats =
   { cycle_result : string
   ; sync_ledger_time : time
@@ -65,8 +69,6 @@ let time_deferred deferred =
 let worth_getting_root ({ context = (module Context); _ } as t) candidate =
   let module Consensus_context = struct
     include Context
-
-    let compile_config = precomputed_values.compile_config
 
     let logger =
       Logger.extend logger
@@ -172,11 +174,22 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
             $error" ;
         Deferred.return `Ignored
     | Ok peer_root_with_proof -> (
+        let pcd =
+          peer_root_with_proof.data
+          |> Proof_carrying_data.map
+               ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+          |> Proof_carrying_data.map_proof
+               ~f:
+                 (Tuple2.map_snd
+                    ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) )
+        in
         match%bind
-          Sync_handler.Root.verify
-            ~context:(module Context)
-            ~verifier:t.verifier candidate_consensus_state
-            peer_root_with_proof.data
+          Mina_block.verify_on_header
+            ~verify:
+              (Sync_handler.Root.verify
+                 ~context:(module Context)
+                 ~verifier:t.verifier candidate_consensus_state )
+            pcd
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -236,17 +249,12 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
       else Deferred.unit )
 
 let external_transition_compare ~context:(module Context : CONTEXT) =
-  let module Consensus_context = struct
-    include Context
-
-    let compile_config = precomputed_values.compile_config
-  end in
   let get_consensus_state =
     Fn.compose Protocol_state.consensus_state Mina_block.Header.protocol_state
   in
   Comparable.lift
     (fun existing candidate ->
-      (* To prevent the logger to spam a lot of messsages, the logger input is set to null *)
+      (* To prevent the logger to spam a lot of messages, the logger input is set to null *)
       if
         State_hash.equal
           (State_hash.With_state_hashes.state_hash existing)
@@ -254,9 +262,7 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
       then 0
       else if
         Consensus.Hooks.equal_select_status `Keep
-        @@ Consensus.Hooks.select
-             ~context:(module Consensus_context)
-             ~existing ~candidate
+        @@ Consensus.Hooks.select ~context:(module Context) ~existing ~candidate
       then -1
       else 1 )
     ~f:(With_hash.map ~f:get_consensus_state)
@@ -333,16 +339,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
             temp_persistent_root_instance
         in
         (* step 1. download snarked_ledger *)
-        let module Consensus_context = struct
-          include Context
-
-          let compile_config = precomputed_values.compile_config
-        end in
         let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
           time_deferred
             (let root_sync_ledger =
                Sync_ledger.Db.create temp_snarked_ledger
-                 ~context:(module Consensus_context)
+                 ~context:(module Context)
                  ~trust_system
              in
              don't_wait_for
@@ -376,7 +377,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
           | Error err ->
               Deferred.return (staged_ledger_data_download_time, None, Error err)
           | Ok
-              ( scan_state
+              ( scan_state_uncached
               , expected_merkle_root
               , pending_coinbases
               , protocol_states ) -> (
@@ -385,7 +386,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     let open Deferred.Or_error.Let_syntax in
                     let received_staged_ledger_hash =
                       Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                        (Staged_ledger.Scan_state.hash scan_state)
+                        (Staged_ledger.Scan_state.Stable.Latest.hash
+                           scan_state_uncached )
                         expected_merkle_root pending_coinbases
                     in
                     [%log debug]
@@ -415,6 +417,10 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     let protocol_states =
                       List.map protocol_states
                         ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
+                    in
+                    let scan_state =
+                      Staged_ledger.Scan_state.write_all_proofs_to_disk
+                        ~proof_cache_db scan_state_uncached
                     in
                     let%bind protocol_states =
                       Staged_ledger.Scan_state.check_required_protocol_states
@@ -574,7 +580,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                     [%log info] "Synchronizing consensus local state" ;
                     let%map result =
                       Consensus.Hooks.sync_local_state
-                        ~context:(module Consensus_context)
+                        ~context:(module Context)
                         ~local_state:consensus_local_state ~trust_system
                         ~glue_sync_ledger:
                           (Mina_networking.glue_sync_ledger t.network)
@@ -612,7 +618,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                       (State_hash.With_state_hashes.state_hash
                          precomputed_values.protocol_state_with_hashes )
                 in
-                (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
+                (* TODO: lazy load db in persistent root to avoid unnecessary opens like this *)
                 Transition_frontier.Persistent_root.(
                   with_instance_exn persistent_root ~f:(fun instance ->
                       Instance.set_root_state_hash instance
@@ -625,7 +631,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                          bootstrapping: " ^ msg )
                   in
                   Transition_frontier.load
-                    ~context:(module Consensus_context)
+                    ~context:(module Context)
                     ~retry_with_fresh_db:false ~verifier ~consensus_local_state
                     ~persistent_root ~persistent_frontier ~catchup_mode ()
                   >>| function
@@ -667,7 +673,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
                       in
                       Consensus.Hooks.equal_select_status `Take
                       @@ Consensus.Hooks.select
-                           ~context:(module Consensus_context)
+                           ~context:(module Context)
                            ~existing:root_consensus_state
                            ~candidate:
                              (With_hash.map
@@ -724,7 +730,7 @@ let%test_module "Bootstrap_controller tests" =
 
     let () =
       (* Disable log messages from best_tip_diff logger. *)
-      Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+      Logger.Consumer_registry.register ~commit_id:""
         ~id:Logger.Logger_id.best_tip_diff ~processor:(Logger.Processor.raw ())
         ~transport:
           (Logger.Transport.create
@@ -750,6 +756,11 @@ let%test_module "Bootstrap_controller tests" =
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let ledger_sync_config =
+      Syncable_ledger.create_config
+        ~compile_config:Mina_compile_config.For_unit_tests.t
+        ~max_subtree_depth:None ~default_subtree_depth:None ()
+
     module Context = struct
       let logger = logger
 
@@ -759,6 +770,13 @@ let%test_module "Bootstrap_controller tests" =
         Genesis_constants.For_unit_tests.Constraint_constants.t
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let ledger_sync_config =
+        Syncable_ledger.create_config
+          ~compile_config:Mina_compile_config.For_unit_tests.t
+          ~max_subtree_depth:None ~default_subtree_depth:None ()
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     let verifier =
@@ -805,7 +823,7 @@ let%test_module "Bootstrap_controller tests" =
         let%bind fake_network =
           Fake_network.Generator.(
             gen ~precomputed_values ~verifier ~max_frontier_length
-              [ fresh_peer; fresh_peer ] ~use_super_catchup:false)
+              ~ledger_sync_config [ fresh_peer; fresh_peer ])
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~precomputed_values
@@ -833,15 +851,10 @@ let%test_module "Bootstrap_controller tests" =
           let bootstrap =
             make_non_running_bootstrap ~genesis_root ~network:me.network
           in
-          let module Consensus_context = struct
-            include Context
-
-            let compile_config = precomputed_values.compile_config
-          end in
           let root_sync_ledger =
             Sync_ledger.Db.create
               (Transition_frontier.root_snarked_ledger me.state.frontier)
-              ~context:(module Consensus_context)
+              ~context:(module Context)
               ~trust_system
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -909,7 +922,7 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Normal ~initial_root_transition )
+           ~catchup_mode:`Super ~initial_root_transition )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
@@ -944,7 +957,7 @@ let%test_module "Bootstrap_controller tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup:false
+            ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2)
@@ -1031,10 +1044,16 @@ let%test_module "Bootstrap_controller tests" =
                   ~pending_coinbases ~get_state
                 |> Deferred.Or_error.ok_exn
               in
-              assert (
-                Staged_ledger_hash.equal
-                  (Staged_ledger.hash staged_ledger)
-                  (Staged_ledger.hash actual_staged_ledger) ) ) )
+              let height =
+                Transition_frontier.Breadcrumb.consensus_state breadcrumb
+                |> Consensus.Data.Consensus_state.blockchain_length
+                |> Mina_numbers.Length.to_int
+              in
+              [%test_eq: Staged_ledger_hash.t]
+                ~message:
+                  (sprintf "mismatch of staged ledger hash height %d" height)
+                (Transition_frontier.Breadcrumb.staged_ledger_hash breadcrumb)
+                (Staged_ledger.hash actual_staged_ledger) ) )
 
     (*
     let%test_unit "if we see a new transition that is better than the \

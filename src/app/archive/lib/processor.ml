@@ -2079,7 +2079,7 @@ module User_command = struct
       in
       let memo = ps.memo |> Signed_command_memo.to_base58_check in
       let hash =
-        Transaction_hash.hash_command (Zkapp_command ps)
+        Transaction_hash.hash_zkapp_command_with_hashes ps
         |> Transaction_hash.to_base58_check
       in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -3304,9 +3304,14 @@ module Block = struct
         (Header.proposed_protocol_version_opt @@ Mina_block.header t)
       ~hash ~v1_transaction_hash:false
 
-  let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
+  let add_from_precomputed conn ~proof_cache_db ~constraint_constants
+      (t : Precomputed.t) =
+    let staged_ledger_diff =
+      Staged_ledger_diff.write_all_proofs_to_disk ~proof_cache_db
+        t.staged_ledger_diff
+    in
     add_parts_if_doesn't_exist conn ~constraint_constants
-      ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
+      ~protocol_state:t.protocol_state ~staged_ledger_diff
       ~protocol_version:t.protocol_version
       ~proposed_protocol_version:t.proposed_protocol_version
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
@@ -4060,7 +4065,7 @@ module Block = struct
     in
     return ()
 
-  let add_from_extensional (module Conn : CONNECTION)
+  let add_from_extensional (module Conn : CONNECTION) ~proof_cache_db
       ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
@@ -4241,7 +4246,8 @@ module Block = struct
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
-                (Zkapp_command.of_simple { fee_payer; account_updates; memo })
+                (Zkapp_command.of_simple ~proof_cache_db
+                   { fee_payer; account_updates; memo } )
             in
             (zkapp_cmd, cmd_id) :: acc )
       in
@@ -4680,10 +4686,11 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
 (* used by `archive_blocks` app *)
-let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
-    ~delete_older_than block =
+let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
+    ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:(Block.add_from_precomputed ~constraint_constants)
+    ~add_block:
+      (Block.add_from_precomputed ~proof_cache_db ~constraint_constants)
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~accounts_accessed:block.Precomputed.accounts_accessed
@@ -4691,23 +4698,30 @@ let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
     ~tokens_used:block.Precomputed.tokens_used block
 
 (* used by `archive_blocks` app *)
-let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
+let add_block_aux_extensional ~proof_cache_db ~logger ?retries ~pool
+    ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:(Block.add_from_extensional ~v1_transaction_hash:false)
+    ~add_block:
+      (Block.add_from_extensional ~proof_cache_db ~v1_transaction_hash:false)
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~accounts_accessed:block.Extensional.Block.accounts_accessed
     ~accounts_created:block.Extensional.Block.accounts_created
     ~tokens_used:block.Extensional.Block.tokens_used block
 
 (* receive blocks from a daemon, write them to the database *)
-let run pool reader ~genesis_constants ~constraint_constants ~logger
-    ~delete_older_than : unit Deferred.t =
+let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
+    ~logger ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
           { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
+        let block =
+          With_hash.map
+            ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+            block
+        in
         match%bind
           add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than
             ~hash ~add_block ~accounts_accessed ~accounts_created ~tokens_used
@@ -4728,12 +4742,26 @@ let run pool reader ~genesis_constants ~constraint_constants ~logger
         Deferred.unit )
 
 (* [add_genesis_accounts] is called when starting the archive process *)
-let add_genesis_accounts ~logger
-    ~(precomputed_values_opt : Precomputed_values.t option) pool =
-  match precomputed_values_opt with
+let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
+    ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
+  match runtime_config_opt with
   | None ->
       Deferred.unit
-  | Some precomputed_values -> (
+  | Some runtime_config -> (
+      let%bind precomputed_values =
+        match%map
+          Genesis_ledger_helper.init_from_config_file ~logger
+            ~proof_level:Genesis_constants.Compiled.proof_level
+            ~genesis_constants ~constraint_constants runtime_config
+            ~cli_proof_level:None
+        with
+        | Ok (precomputed_values, _) ->
+            precomputed_values
+        | Error err ->
+            failwithf "Could not get precomputed values, error: %s"
+              (Error.to_string_hum err) ()
+      in
       let ledger =
         Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
       in
@@ -4858,10 +4886,10 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       go ()
 
 (* for running the archive process *)
-let setup_server ~(genesis_constants : Genesis_constants.t)
+let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port
-    ~delete_older_than ~precomputed_values_opt ~missing_blocks_width =
+    ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4890,15 +4918,19 @@ let setup_server ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let%bind () = add_genesis_accounts pool ~logger ~precomputed_values_opt in
-      run ~constraint_constants ~genesis_constants pool reader ~logger
-        ~delete_older_than
+      let%bind () =
+        add_genesis_accounts pool ~logger ~genesis_constants
+          ~constraint_constants ~runtime_config_opt
+      in
+      run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
+        ~logger ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~logger ~pool ~genesis_constants
-              ~constraint_constants ~delete_older_than precomputed_block
+            add_block_aux_precomputed ~proof_cache_db ~logger ~pool
+              ~genesis_constants ~constraint_constants ~delete_older_than
+              precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -4915,8 +4947,8 @@ let setup_server ~(genesis_constants : Genesis_constants.t)
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~genesis_constants ~logger ~pool
-              ~delete_older_than extensional_block
+            add_block_aux_extensional ~proof_cache_db ~genesis_constants ~logger
+              ~pool ~delete_older_than extensional_block
           with
           | Error e ->
               [%log warn]

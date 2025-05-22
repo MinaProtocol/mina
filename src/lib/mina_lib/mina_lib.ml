@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Mina_base
 open Mina_transaction
@@ -71,7 +71,7 @@ type components =
 (* tag commands so they can share a common pipe, to ensure sequentiality of nonces *)
 type command_inputs =
   | Signed_command_inputs of User_command_input.t list
-  | Zkapp_command_command_inputs of Zkapp_command.t list
+  | Zkapp_command_command_inputs of Zkapp_command.Stable.Latest.t list
 
 type pipes =
   { validated_transitions_reader : Mina_block.Validated.t Strict_pipe.Reader.t
@@ -120,6 +120,7 @@ type t =
       (int * string list * bool) ref
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
   ; commit_id : string
+  ; proof_cache_db : Proof_cache_tag.cache_db
   }
 [@@deriving fields]
 
@@ -408,14 +409,11 @@ let get_node_state t =
     match Broadcast_pipe.Reader.peek @@ transition_frontier t with
     | None ->
         None
-    | Some tf -> (
-        match Transition_frontier.catchup_state tf with
-        | Full catchup_state ->
-            Some
-              (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_state )
-        | _ ->
-            None )
+    | Some tf ->
+        let (Full catchup_state) = Transition_frontier.catchup_state tf in
+        Some
+          (Transition_frontier.Full_catchup_tree.to_node_status_report
+             catchup_state )
   in
   let block_height_at_best_tip =
     best_tip t
@@ -875,7 +873,7 @@ let request_work t =
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_worker_lib.Work.Result.t) =
+let add_work t (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -889,7 +887,10 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec = work.spec.instances in
+  let spec =
+    One_or_two.map work.spec.instances
+      ~f:Snark_work_lib.Work.Single.Spec.statement
+  in
   let cb _ =
     (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
      * If the diff is accepted then remove it from the seen jobs.
@@ -897,8 +898,9 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     Work_selector.remove t.snark_job_state spec
   in
   ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
-  Network_pool.Snark_pool.Local_sink.push t.pipes.snark_local_sink
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
+  Network_pool.Snark_pool.(
+    Local_sink.push t.pipes.snark_local_sink
+      (Resource_pool.Diff.of_result work, cb))
   |> Deferred.don't_wait_for
 
 let add_work_graphql t diff =
@@ -950,8 +952,7 @@ let add_full_transactions t user_commands =
     List.find_map user_commands ~f:(fun cmd ->
         match
           User_command.check_well_formedness
-            ~genesis_constants:t.config.precomputed_values.genesis_constants
-            ~compile_config:t.config.precomputed_values.compile_config cmd
+            ~genesis_constants:t.config.precomputed_values.genesis_constants cmd
         with
         | Ok () ->
             None
@@ -969,7 +970,8 @@ let add_full_transactions t user_commands =
       in
       Deferred.Result.fail error
 
-let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
+let add_zkapp_transactions t
+    (zkapp_commands : Zkapp_command.Stable.Latest.t list) =
   let add_all_txns () =
     let result_ivar = Ivar.create () in
     let cmd_inputs = Zkapp_command_command_inputs zkapp_commands in
@@ -983,7 +985,6 @@ let add_zkapp_transactions t (zkapp_commands : Zkapp_command.t list) =
         match
           User_command.check_well_formedness
             ~genesis_constants:t.config.precomputed_values.genesis_constants
-            ~compile_config:t.config.precomputed_values.compile_config
             (Zkapp_command cmd)
         with
         | Ok () ->
@@ -1249,10 +1250,12 @@ module type CONTEXT = sig
 
   val compaction_interval : Time.Span.t option
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
-let context ~commit_id (config : Config.t) : (module CONTEXT) =
+let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
   ( module struct
     let logger = config.logger
 
@@ -1276,9 +1279,20 @@ let context ~commit_id (config : Config.t) : (module CONTEXT) =
 
     let compaction_interval = config.compile_config.compaction_interval
 
-    (*Same as config.precomputed_values.compile_config.
-      TODO: Remove redundant fields *)
-    let compile_config = config.compile_config
+    let ledger_sync_config =
+      let open Option.Let_syntax in
+      let max_subtree_depth =
+        let%bind daemon = precomputed_values.runtime_config.daemon in
+        daemon.sync_ledger_max_subtree_depth
+      in
+      let default_subtree_depth =
+        let%bind daemon = precomputed_values.runtime_config.daemon in
+        daemon.sync_ledger_default_subtree_depth
+      in
+      Syncable_ledger.create_config ~compile_config:config.compile_config
+        ~max_subtree_depth ~default_subtree_depth ()
+
+    let proof_cache_db = proof_cache_db
   end )
 
 let start t =
@@ -1345,7 +1359,10 @@ let start t =
     not
       (Keypair.And_compressed_pk.Set.is_empty t.config.block_production_keypairs)
   then
-    let module Context = (val context ~commit_id:t.commit_id t.config) in
+    let module Context =
+    ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+            t.config )
+    in
     Block_producer.run
       ~context:(module Context)
       ~vrf_evaluator:t.processes.vrf_evaluator ~verifier:t.processes.verifier
@@ -1420,7 +1437,9 @@ let start t =
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
-  let module Context = (val context ~commit_id:t.commit_id t.config) in
+  let module Context =
+  (val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id t.config)
+  in
   let%bind () =
     Block_producer.run_precomputed
       ~context:(module Context)
@@ -1509,42 +1528,56 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
   let%bind all_peers = Mina_networking.peers network in
   let peer_limit = 5 in
   let limited_peers = List.take all_peers peer_limit in
+  let check_every = Time.Span.of_ms 20. in
+  let log_every = Time.Span.of_sec 10. in
+  let log_rate = Time.Span.( // ) log_every check_every |> Float.to_int in
 
   (* Keep reading from the transition frontier until it has caught up to the most valid block from the network.
      * This is to ensure that the snarks are verified and added to the pool in the correct order
   *)
-  let rec wait_for_new_top_block received_block =
+  let rec wait_for_new_top_block received_block iteration_count =
     let frontier = get_current_frontier () in
     match frontier with
     | None ->
-        [%log error]
-          "Transition frontier is not available after sync something has gone \
-           terribly wrong" ;
-        let%bind () = after (Time.Span.of_ms 20.) in
-        wait_for_new_top_block received_block
+        let iteration_count =
+          if iteration_count >= log_rate then (
+            [%log error]
+              "Transition frontier is not available after sync something has \
+               gone terribly wrong" ;
+            0 )
+          else iteration_count + 1
+        in
+        let%bind () = after check_every in
+        wait_for_new_top_block received_block iteration_count
     | Some frontier ->
         let tip = Transition_frontier.best_tip frontier in
         let top_block =
           Transition_frontier.Breadcrumb.validated_transition tip
           |> Mina_block.Validated.header |> Mina_block.Header.blockchain_length
         in
-        [%log debug]
-          ~metadata:
-            [ ("old_top_block", `Int (received_block |> Unsigned.UInt32.to_int))
-            ; ("new_top_block", `Int (top_block |> Unsigned.UInt32.to_int))
-            ]
-          "WAITING  old top block: $old_top_block, new top block: \
-           $new_top_block" ;
         let delta =
           Unsigned.UInt32.(Infix.(received_block - top_block) |> to_int)
         in
         (* if delta is less than or equal to zero the transition frontier has caught up with the network *)
         if delta <= 0 then Deferred.unit
         else
-          let%bind () = after (Time.Span.of_ms 20.) in
-          wait_for_new_top_block received_block
+          let iteration_count =
+            if iteration_count >= log_rate then (
+              [%log debug]
+                ~metadata:
+                  [ ( "old_top_block"
+                    , `Int (received_block |> Unsigned.UInt32.to_int) )
+                  ; ("new_top_block", `Int (top_block |> Unsigned.UInt32.to_int))
+                  ]
+                "WAITING  old top block: $old_top_block, new top block: \
+                 $new_top_block" ;
+              0 )
+            else iteration_count + 1
+          in
+          let%bind () = after check_every in
+          wait_for_new_top_block received_block iteration_count
   in
-  let%bind () = wait_for_new_top_block received_block in
+  let%bind () = wait_for_new_top_block received_block log_rate in
 
   Deferred.List.iter
     ~f:(fun peer ->
@@ -1579,7 +1612,9 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
       let%bind () =
         Deferred.List.iter completed_works ~f:(fun work ->
             (* proofs should be verified in apply and broadcast *)
-            let statement = Transaction_snark_work.statement work in
+            let statement =
+              Transaction_snark_work.Stable.Latest.statement work
+            in
             let snark =
               Network_pool.Priced_proof.
                 { proof = work.proofs
@@ -1588,7 +1623,8 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
             in
             let msg =
               let diff =
-                Network_pool.Snark_pool.Diff_versioned.Add_solved_work
+                Network_pool.Snark_pool.Diff_versioned.Stable.Latest
+                .Add_solved_work
                   (statement, snark)
               in
               Envelope.Incoming.wrap_peer ~data:diff ~sender:peer
@@ -1613,8 +1649,14 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
                   "Successfully verified snark work from peer: $peer" ;
 
                 (* does an empty check for the snark, then an unsafe apply, and finally adds it to the pool *)
-                Network_pool.Snark_pool.apply_no_broadcast snark_pool msg
-                |> Deferred.return
+                Deferred.return
+                  Network_pool.Snark_pool.(
+                    apply_no_broadcast snark_pool
+                      (Envelope.Incoming.map
+                         ~f:
+                           (Resource_pool.Diff.Cached.write_all_proofs_to_disk
+                              ~proof_cache_db )
+                         msg ))
             | Error e ->
                 [%log info]
                   ~metadata:
@@ -1632,23 +1674,29 @@ let fetch_completed_snarks (module Context : CONTEXT) snark_pool network
       Deferred.unit )
     limited_peers
 
+let raise_on_initialization_error (`Initialization_error e) =
+  Error.raise @@ Error.tag ~tag:"proof cache initialization error" e
+
+let initialize_proof_cache_db (config : Config.t) =
+  Proof_cache_tag.create_db ~logger:config.logger
+    (config.conf_dir ^/ "proof_cache")
+  >>| function Error e -> raise_on_initialization_error e | Ok db -> db
+
+let initialize_zkapp_vk_cache_db (config : Config.t) =
+  Zkapp_vk_cache_tag.create_db ~logger:config.logger
+    (config.conf_dir ^/ "zkapp_vk_cache")
+  >>| function Error e -> raise_on_initialization_error e | Ok db -> db
+
 let create ~commit_id ?wallets (config : Config.t) =
-  let module Context = (val context ~commit_id config) in
   let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
-  let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
-  let compile_config = config.precomputed_values.compile_config in
-  let block_window_duration =
-    Float.of_int
-      config.precomputed_values.constraint_constants.block_window_duration_ms
-    |> Time.Span.of_ms
-  in
+  let block_window_duration = config.compile_config.block_window_duration in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       let set_itn_data (type t) (module M : Itn_settable with type t = t) (t : t)
           =
-        if config.compile_config.itn_features then
+        if config.itn_features then
           let ({ client_port; _ } : Node_addrs_and_ports.t) =
             config.gossip_net_params.addrs_and_ports
           in
@@ -1671,6 +1719,11 @@ let create ~commit_id ?wallets (config : Config.t) =
             @@ start_filtered_log ~commit_id
                  in_memory_reverse_structured_log_messages_for_integration_test
                  config.start_filtered_logs ;
+          let%bind proof_cache_db = initialize_proof_cache_db config in
+          let%bind zkapp_vk_cache_db = initialize_zkapp_vk_cache_db config in
+          let module Context =
+          (val context ~proof_cache_db ~commit_id config)
+          in
           let%bind prover =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -1760,9 +1813,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                     Vrf_evaluator.create ~commit_id ~constraint_constants
                       ~pids:config.pids ~logger:config.logger
                       ~conf_dir:config.conf_dir ~consensus_constants
-                      ~keypairs:config.block_production_keypairs
-                      ~compile_config:config.precomputed_values.compile_config )
-                )
+                      ~keypairs:config.block_production_keypairs ) )
             >>| Result.ok_exn
           in
           let snark_worker =
@@ -1966,7 +2017,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
-              ~slot_tx_end ~compile_config
+              ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db ~proof_cache_db
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -1999,7 +2050,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
-              ~disk_location:config.snark_pool_disk_location
+              ~disk_location:config.snark_pool_disk_location ~proof_cache_db
           in
           let snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config
@@ -2022,7 +2073,6 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; consensus_constants
               ; genesis_constants = config.precomputed_values.genesis_constants
               ; constraint_constants
-              ; compile_config
               }
           in
           let snark_jobs_state =
@@ -2108,8 +2158,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~persistent_root_location:config.persistent_root_location
               ~persistent_frontier_location:config.persistent_frontier_location
               ~get_current_frontier
-              ~frontier_broadcast_writer:frontier_broadcast_pipe_w ~catchup_mode
-              ~network_transition_reader:block_reader
+              ~frontier_broadcast_writer:frontier_broadcast_pipe_w
+              ~catchup_mode:`Super ~network_transition_reader:block_reader
               ~producer_transition_reader ~get_most_recent_valid_block
               ~most_recent_valid_block_writer
               ~get_completed_work:
@@ -2255,7 +2305,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                (Mina_networking.ban_notification_reader net)
                ~f:(Fn.const Deferred.unit) ) ;
 
-          let%bind wallets =
+          let%map wallets =
             match wallets with
             | Some wallets ->
                 return wallets
@@ -2424,44 +2474,43 @@ let create ~commit_id ?wallets (config : Config.t) =
                       loop ()
               in
               loop () ) ;
-          Deferred.return
-            { config
-            ; next_producer_timing = None
-            ; processes =
-                { prover
-                ; verifier
-                ; snark_worker
-                ; uptime_snark_worker_opt
-                ; vrf_evaluator
-                }
-            ; initialization_finish_signal
-            ; components =
-                { net
-                ; transaction_pool
-                ; snark_pool
-                ; transition_frontier = frontier_broadcast_pipe_r
-                ; most_recent_valid_block = most_recent_valid_block_reader
-                ; block_produced_bvar
-                }
-            ; pipes =
-                { validated_transitions_reader = valid_transitions_for_api
-                ; producer_transition_writer
-                ; user_command_input_writer
-                ; tx_local_sink
-                ; snark_local_sink
-                }
-            ; wallets
-            ; coinbase_receiver = ref config.coinbase_receiver
-            ; snark_job_state = snark_jobs_state
-            ; subscriptions
-            ; sync_status
-            ; precomputed_block_writer
-            ; block_production_status = ref `Free
-            ; in_memory_reverse_structured_log_messages_for_integration_test
-            ; vrf_evaluation_state =
-                Block_producer.Vrf_evaluation_state.create ()
-            ; commit_id
-            } ) )
+          { config
+          ; next_producer_timing = None
+          ; processes =
+              { prover
+              ; verifier
+              ; snark_worker
+              ; uptime_snark_worker_opt
+              ; vrf_evaluator
+              }
+          ; initialization_finish_signal
+          ; components =
+              { net
+              ; transaction_pool
+              ; snark_pool
+              ; transition_frontier = frontier_broadcast_pipe_r
+              ; most_recent_valid_block = most_recent_valid_block_reader
+              ; block_produced_bvar
+              }
+          ; pipes =
+              { validated_transitions_reader = valid_transitions_for_api
+              ; producer_transition_writer
+              ; user_command_input_writer
+              ; tx_local_sink
+              ; snark_local_sink
+              }
+          ; wallets
+          ; coinbase_receiver = ref config.coinbase_receiver
+          ; snark_job_state = snark_jobs_state
+          ; subscriptions
+          ; sync_status
+          ; precomputed_block_writer
+          ; block_production_status = ref `Free
+          ; in_memory_reverse_structured_log_messages_for_integration_test
+          ; vrf_evaluation_state = Block_producer.Vrf_evaluation_state.create ()
+          ; commit_id
+          ; proof_cache_db
+          } ) )
 
 let net { components = { net; _ }; _ } = net
 
@@ -2533,3 +2582,5 @@ let best_chain_block_by_state_hash (t : t) hash =
             (State_hash.to_base58_check hash) )
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
+
+let proof_cache_db t = t.proof_cache_db

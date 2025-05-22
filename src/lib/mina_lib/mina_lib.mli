@@ -43,7 +43,9 @@ module type CONTEXT = sig
 
   val compaction_interval : Time.Span.t option
 
-  val compile_config : Mina_compile_config.t
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 exception Snark_worker_error of int
@@ -105,11 +107,11 @@ val snark_work_fee : t -> Currency.Fee.t
 
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
-val request_work : t -> Snark_worker.Work.Spec.t option
+val request_work : t -> Work_selector.work Snark_work_lib.Work.Spec.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_worker.Work.Result.t -> unit
+val add_work : t -> Snark_work_lib.Selector.Result.Stable.Latest.t -> unit
 
 val add_work_graphql :
      t
@@ -136,7 +138,7 @@ val add_transactions :
 
 val add_full_transactions :
      t
-  -> User_command.t list
+  -> User_command.Stable.Latest.t list
   -> ( [ `Broadcasted | `Not_broadcasted ]
      * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
@@ -144,7 +146,7 @@ val add_full_transactions :
 
 val add_zkapp_transactions :
      t
-  -> Zkapp_command.t list
+  -> Zkapp_command.Stable.Latest.t list
   -> ( [ `Broadcasted | `Not_broadcasted ]
      * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
@@ -204,7 +206,7 @@ val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 val create :
   commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
-val staged_ledger_ledger_proof : t -> Ledger_proof.t option
+val staged_ledger_ledger_proof : t -> Ledger_proof.Cached.t option
 
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -256,3 +258,5 @@ val best_chain_block_by_state_hash :
   t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
 
 val zkapp_cmd_limit : t -> int option ref
+
+val proof_cache_db : t -> Proof_cache_tag.cache_db
