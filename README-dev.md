@@ -271,7 +271,7 @@ Steps:
 ./scripts/debian/aptly.sh start -b -c focal -d _build/ -m unstable -l -p 8081
 ```
 
-IMPORTANT: debians should be placed in _build folder
+IMPORTANT: debian's should be placed in _build folder
 
 2. Build docker:
 ```
