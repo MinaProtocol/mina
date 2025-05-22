@@ -4,44 +4,11 @@ open Events
 
 module Make = struct
   module Rpcs = Rpcs.Make
-
-  module Work = struct
-    open Snark_work_lib
-
-    module Single = struct
-      module Spec = struct
-        type t =
-          ( Transaction_witness.Stable.Latest.t
-          , Ledger_proof.t )
-          Work.Single.Spec.t
-        [@@deriving sexp, yojson]
-
-        let transaction t =
-          Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.Stable.Latest.transaction )
-
-        let statement = Work.Single.Spec.statement
-      end
-    end
-
-    module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
-
-      let instances = Work.Spec.instances
-    end
-
-    module Result = struct
-      type t = (Spec.t, Ledger_proof.t) Work.Result.t
-
-      let transactions (t : t) =
-        One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
-    end
-  end
-
+  module Work = Snark_work_lib
   include Prod.Inputs
 
   let perform (s : Worker_state.t) public_key
-      ({ instances; fee } as spec : Work.Spec.t) =
+      ({ instances; fee } as spec : Work.Selector.Spec.Stable.Latest.t) =
     One_or_two.Deferred_result.map instances ~f:(fun w ->
         let open Deferred.Or_error.Let_syntax in
         let%map proof, time =
@@ -174,9 +141,7 @@ module Make = struct
                  ; proof_zkapp_command_count
                  } ) )
 
-  let main
-      (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Ledger_proof.t ) ~logger ~proof_level
+  let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
       ~constraint_constants daemon_address shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
@@ -242,8 +207,9 @@ module Make = struct
               [ ("address", `String (Host_and_port.to_string daemon_address))
               ; ( "work_ids"
                 , Transaction_snark_work.Statement.compact_json
-                    (One_or_two.map (Work.Spec.instances work)
-                       ~f:Work.Single.Spec.statement ) )
+                    (One_or_two.map
+                       (Work.Work.Spec.instances work)
+                       ~f:Work.Work.Single.Spec.statement ) )
               ] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
@@ -264,15 +230,16 @@ module Make = struct
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics
-                (Work.Result.transactions result)
+                (Work.Selector.Result.Stable.Latest.transactions result)
                 logger ;
               [%log info] "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
                   [ ("address", `String (Host_and_port.to_string daemon_address))
                   ; ( "work_ids"
                     , Transaction_snark_work.Statement.compact_json
-                        (One_or_two.map (Work.Spec.instances work)
-                           ~f:Work.Single.Spec.statement ) )
+                        (One_or_two.map
+                           (Work.Work.Spec.instances work)
+                           ~f:Work.Work.Single.Spec.statement ) )
                   ] ;
               let rec submit_work () =
                 match%bind
@@ -290,9 +257,7 @@ module Make = struct
     go ()
 
   let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-      ~constraint_constants
-      (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Ledger_proof.t ) =
+      ~constraint_constants (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
