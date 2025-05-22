@@ -1,10 +1,10 @@
 open Core
 open Async
 open Events
+open Snark_work_lib
 
 module Make = struct
   module Rpcs = Rpcs.Make
-  module Work = Snark_work_lib
   include Prod.Inputs
 
   let dispatch rpc shutdown_on_disconnect query address =
@@ -181,9 +181,8 @@ module Make = struct
               [ ("address", `String (Host_and_port.to_string daemon_address))
               ; ( "work_ids"
                 , Transaction_snark_work.Statement.compact_json
-                    (One_or_two.map
-                       (Work.Work.Spec.instances work)
-                       ~f:Work.Work.Single.Spec.statement ) )
+                    (One_or_two.map (Work.Spec.instances work)
+                       ~f:Work.Single.Spec.statement ) )
               ] ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
@@ -204,16 +203,15 @@ module Make = struct
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics
-                (Work.Selector.Result.Stable.Latest.transactions result)
+                (Selector.Result.Stable.Latest.transactions result)
                 logger ;
               [%log info] "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
                   [ ("address", `String (Host_and_port.to_string daemon_address))
                   ; ( "work_ids"
                     , Transaction_snark_work.Statement.compact_json
-                        (One_or_two.map
-                           (Work.Work.Spec.instances work)
-                           ~f:Work.Work.Single.Spec.statement ) )
+                        (One_or_two.map (Work.Spec.instances work)
+                           ~f:Work.Single.Spec.statement ) )
                   ] ;
               let rec submit_work () =
                 match%bind
