@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-A primary goal of the Mina Protocol project is to be inclusive to the largest number of contributors, with the most varied and diverse backgrounds possible. As such, all contributors and maintainers of the project are expected to foster a friendly, safe, and welcoming environment for all, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
+A primary goal of the Mina Protocol project is to be inclusive to the largest number of contributors, with the most varied and diverse backgrounds possible. As such, all contributors and maintainers of the project are expected to foster a friendly, safe, and welcoming environment for all, regardless of age, body size, disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socioeconomic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
 This Code of Conduct outlines the community's expectations for all participants.
 
