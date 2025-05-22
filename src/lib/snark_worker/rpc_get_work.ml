@@ -1,6 +1,6 @@
 open Async
 open Core
-module Work = Snark_work_lib
+open Snark_work_lib
 
 (** For versioning of the types here, see:
     - RFC 0013: {:https://github.com/MinaProtocol/mina/blob/develop/rfcs/0013-rpc-versioning.md}
@@ -14,7 +14,7 @@ module Master = struct
     type query = unit
 
     type response =
-      ( Snark_work_lib.Selector.Spec.Stable.Latest.t
+      ( Selector.Spec.Stable.Latest.t
       * Signature_lib.Public_key.Compressed.Stable.Latest.t )
       option
   end
@@ -32,7 +32,7 @@ module Stable = struct
       type query = unit
 
       type response =
-        ( Snark_work_lib.Selector.Spec.Stable.V1.t
+        ( Selector.Spec.Stable.V1.t
         * Signature_lib.Public_key.Compressed.Stable.V1.t )
         option
 
