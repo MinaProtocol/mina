@@ -5,12 +5,14 @@
  (public_name pipe_lib)
  (libraries
   ;; opam libraries
+  async
   sexplib
   core_kernel
   async_kernel
   core
   ppx_inline_test.config
   ;; local libraries
+  actor
   run_in_thread
   logger)
  (instrumentation
