@@ -19,20 +19,9 @@ module Make = struct
 
   module Get_work = struct
     module Master = struct
-      let name = "get_work"
+      let name = Rpc_get_work.name
 
-      module T = struct
-        type query = unit
-
-        type response =
-          ( ( Transaction_witness.Stable.Latest.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
-            Work.Spec.t
-          * Public_key.Compressed.t )
-          option
-      end
-
+      module T = Rpc_get_work.Master.T
       module Caller = T
       module Callee = T
     end
