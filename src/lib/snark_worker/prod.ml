@@ -308,4 +308,31 @@ module Inputs = struct
         @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
                ~proof:(Lazy.force Proof.transaction_dummy)
            , Time.Span.zero )
+
+  let perform (s : Worker_state.t) public_key
+      ({ instances; fee } as spec : Snark_work_lib.Selector.Spec.Stable.Latest.t)
+      =
+    One_or_two.Deferred_result.map instances ~f:(fun w ->
+        let open Deferred.Or_error.Let_syntax in
+        let%map proof, time =
+          perform_single s
+            ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
+            w
+        in
+        ( proof
+        , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
+        ) )
+    |> Deferred.Or_error.map ~f:(function
+         | `One (proof1, metrics1) ->
+             { Snark_work_lib.Work.Result.proofs = `One proof1
+             ; metrics = `One metrics1
+             ; spec
+             ; prover = public_key
+             }
+         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
+             { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
+             ; metrics = `Two (metrics1, metrics2)
+             ; spec
+             ; prover = public_key
+             } )
 end

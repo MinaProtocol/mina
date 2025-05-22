@@ -9,13 +9,6 @@ module Worker = struct
   module Rpcs_versioned = struct
     open Core_kernel
     open Signature_lib
-
-    module Work = struct
-      type ledger_proof = Inputs.Ledger_proof.t
-
-      include Work
-    end
-
     module Get_work = Rpc_get_work.Stable
 
     [%%versioned_rpc

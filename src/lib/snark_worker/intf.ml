@@ -1,5 +1,6 @@
 open Core
 open Async
+open Snark_work_lib
 
 let command_name = "snark-worker"
 
@@ -35,8 +36,6 @@ module type Rpc_master = sig
 end
 
 module type Work_S = sig
-  open Snark_work_lib
-
   type ledger_proof
 
   module Single : sig
@@ -62,14 +61,13 @@ module type Work_S = sig
 end
 
 module type Rpcs_versioned_S = sig
-  module Work : Work_S
-
   module Get_work : sig
     module V2 : sig
       type query = unit [@@deriving bin_io]
 
       type response =
-        (Work.Spec.t * Signature_lib.Public_key.Compressed.t) option
+        (Selector.Spec.Stable.Latest.t * Signature_lib.Public_key.Compressed.t)
+        option
       [@@deriving bin_io]
 
       val rpc : (query, response) Rpc.Rpc.t
@@ -80,7 +78,7 @@ module type Rpcs_versioned_S = sig
 
   module Submit_work : sig
     module V2 : sig
-      type query = Work.Result.t [@@deriving bin_io]
+      type query = Selector.Result.Stable.Latest.t [@@deriving bin_io]
 
       type response = unit [@@deriving bin_io]
 
@@ -92,7 +90,10 @@ module type Rpcs_versioned_S = sig
 
   module Failed_to_generate_snark : sig
     module V2 : sig
-      type query = Error.t * Work.Spec.t * Signature_lib.Public_key.Compressed.t
+      type query =
+        Error.t
+        * Selector.Spec.Stable.Latest.t
+        * Signature_lib.Public_key.Compressed.t
       [@@deriving bin_io]
 
       type response = unit [@@deriving bin_io]
