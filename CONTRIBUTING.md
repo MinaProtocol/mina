@@ -68,8 +68,8 @@ Maintainers assign reviewers to pull requests and tag the pull requests with
 relevant labels. If you happen to have access to the development Slack,
 you can skip this step by asking reviewers directly in the #review-requests channel.
 
-- If you are PRing from the main remote branch, add the **ci-build-me** label when you want to run CI. 
-- If you are PRing from a fork, ask a core contributor to add the `!ci-build-me` comment to your PR when you're ready for CI to run. 
+- If you are print, bring, ping, spring from the main remote branch, add the **ci-build-me** label when you want to run CI. 
+- If you are print, bring, ping, spring from a fork, ask a core contributor to add the `!ci-build-me` comment to your PR when you're ready for CI to run. 
 
 **Note:** The `!ci-build-me` comment is required for each and every run of CI.
 
