@@ -34,8 +34,8 @@ module Poly = struct
         Single
           { job =
               With_job_meta.map
-                ~f_spec:(fun spec ->
-                  Single_spec.Poly.map ~f_witness ~f_proof spec )
+                ~f_spec:(
+                  Single_spec.Poly.map ~f_witness ~f_proof )
                 job
           ; data = f_data data
           }
