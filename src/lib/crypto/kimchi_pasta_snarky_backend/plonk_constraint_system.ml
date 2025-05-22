@@ -1529,9 +1529,9 @@ end = struct
 
   (** Adds a constraint to the constraint system. *)
   let add_constraint sys (constr : Constraint.t) =
-    let str = Sexp.to_string_hum (Constraint.sexp_of_t constr) in
-    Printf.printf "\n %s \n %!" str ;
+    let _str = Sexp.to_string_hum (Constraint.sexp_of_t constr) in
 
+    (* Printf.printf "\n %s \n %!" str ; *)
     let red = reduce_lincom sys in
     (* reduce any [Cvar.t] to a single internal variable *)
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =

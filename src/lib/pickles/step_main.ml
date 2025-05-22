@@ -31,6 +31,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
         _ Per_proof_witness.t ) (d : _ Types_map.For_step.t)
       (messages_for_next_wrap_proof : Digest.t) (unfinalized : Unfinalized.t)
       (must_verify : B.t) : _ Vector.t * B.t =
+    Printf.printf "\n-----in  verify one : ------\n%!" ;
     Boolean.Assert.( = ) unfinalized.should_finalize must_verify ;
     let deferred_values = proof_state.deferred_values in
     let finalized, chals =
@@ -42,6 +43,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
             Sponge.absorb sponge (`Field sponge_digest) ;
             sponge
           in
+          Printf.printf "\n-----calling finalize other------\n%!" ;
           (* TODO: Refactor args into an "unfinalized proof" struct *)
           Step_verifier.finalize_other_proof d.max_proofs_verified
             ~step_domains:d.step_domains ~zk_rows:d.zk_rows ~sponge
@@ -184,6 +186,8 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
    fun (module Req) max_proofs_verified ~self_branches ~local_signature
        ~local_signature_length ~local_branches_length ~proofs_verified ~lte
        ~public_input ~auxiliary_typ ~basic ~known_wrap_keys ~self rule ->
+    Printf.printf "\n-----in step main : -----\n%!" ;
+
     let module Typ_with_max_proofs_verified = struct
       type ('var, 'value, 'local_max_proofs_verified, 'local_branches) t =
         ( ( 'var
@@ -283,6 +287,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                        ; public_output = ret_var
                        ; auxiliary_output = auxiliary_var
                        } =
+        Printf.printf "\n-----run app logic------\n%!" ;
         (* Run the application logic of the rule on the predecessor statements *)
         with_label "rule_main" (fun () ->
             rule.main { public_input = app_state } )
@@ -302,6 +307,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           in
           (* Compute proof parts outside of the prover before requesting values.
         *)
+          Printf.printf "\n-----compute ooutside prover------\n%!" ;
           let%map.Promise () =
             Async_promise.unit_request (fun () ->
                 let previous_proof_statements =
@@ -375,6 +381,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           in
           let proof_witnesses =
             (* Inject the app-state values into the per-proof witnesses. *)
+            Printf.printf "\n-----inject in witness------\n%!" ;
             let rec go :
                 type vars ns1 ns2.
                    (vars, ns1, ns2) H3.T(Per_proof_witness.No_app_state).t
@@ -421,6 +428,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                     , actual_wrap_domains )
                   with
                   | [], [], [], [], [], Z, [] ->
+                      Printf.printf "\n-----empty list pattern: ------\n%!" ;
                       ([], [])
                   | ( pw :: proof_witnesses
                     , d :: datas
@@ -431,6 +439,8 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                     , S pi
                     , actual_wrap_domain :: actual_wrap_domains ) ->
                       let () =
+                        Printf.printf
+                          "\n-----NON empty list pattern: ------\n%!" ;
                         (* Fail with an error if the proof's domain differs from
                            the hard-coded one otherwise.
                         *)
@@ -464,6 +474,8 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                         | `Side_loaded _ ->
                             ()
                       in
+                      Printf.printf "\n-----calling verify one : ------\n%!" ;
+
                       let chals, v =
                         verify_one ~srs pw d messages_for_next_wrap_proof
                           unfinalized must_verify
@@ -533,7 +545,10 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                     unfinalized_proofs previous_proof_statements proofs_verified
                     ~actual_wrap_domains
                 in
-                Boolean.Assert.all vs ; chalss )
+                let n = Vector.length chalss |> Nat.to_int in
+                Printf.printf "\n------len of chals    : %d------\n%!" n ;
+                Boolean.Assert.all vs ;
+                chalss )
           in
           [%log internal] "Step_compute_bulletproof_challenges_done" ;
           let messages_for_next_step_proof =
@@ -584,6 +599,8 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
             Vector.extend_front unfinalized_proofs_unextended lte
               Max_proofs_verified.n (Unfinalized.dummy ())
           in
+          let n = Vector.length unfinalized_proofs |> Nat.to_int in
+          Printf.printf "\n------len of unfanilised proof : %d------\n%!" n ;
           ( { Types.Step.Statement.proof_state =
                 { unfinalized_proofs; messages_for_next_step_proof }
             ; messages_for_next_wrap_proof

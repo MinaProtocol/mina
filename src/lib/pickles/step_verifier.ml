@@ -844,6 +844,8 @@ struct
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
+    Printf.printf "\n------in finalize other proof------\n%!" ;
+
     Plonk_types.Evals.In_circuit.validate_feature_flags ~true_:Boolean.true_
       ~false_:Boolean.false_ ~or_:Boolean.( ||| )
       ~assert_equal:Boolean.Assert.( = ) ~feature_flags:plonk.feature_flags
@@ -876,8 +878,13 @@ struct
       let sg_evals pt =
         Vector.map2
           ~f:(fun keep f -> (keep, f pt))
-          (Vector.trim_front actual_width_mask
-             (Nat.lte_exn Proofs_verified.n Nat.N2.n) )
+          (let res =
+             Vector.trim_front actual_width_mask
+               (Nat.lte_exn Proofs_verified.n Nat.N2.n)
+           in
+           let n = Vector.length res |> Nat.to_int in
+           Printf.printf "\n------len of res : %d------\n%!" n ;
+           res )
           sg_olds
       in
       (sg_evals plonk.zeta, sg_evals zetaw)
