@@ -110,6 +110,22 @@ module type Full = sig
          , 'sok_digest
          , Mina_transaction_logic.Zkapp_command_logic.Local_state.Value.t )
          t
+
+    val drop_sok :
+         ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , 'sok_digest
+         , 'local_state )
+         t
+      -> ( 'ledger_hash
+         , 'amount
+         , 'pending_coinbase
+         , 'fee_excess
+         , unit
+         , 'local_state )
+         t
   end
 
   module Statement_ledgers : sig

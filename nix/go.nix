@@ -1,4 +1,10 @@
-# An overlay defining Go parts&dependencies of Mina
+# An overlay with an additional parameter buildGo119Module
+# defining Go parts&dependencies of Mina
+
+# We are using legacy Go 1.19 because it's hardcoded
+# in libp2p libraries, and we'd need to update these libraries in
+# order to use a higher version
+
 final: prev: {
   vend = final.callPackage ./vend { };
 

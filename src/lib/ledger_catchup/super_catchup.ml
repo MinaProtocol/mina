@@ -1099,15 +1099,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
        , unit )
        Strict_pipe.Writer.t ) =
   let open Context in
-  let t =
-    match Transition_frontier.catchup_state frontier with
-    | Full t ->
-        t
-    | Hash _ ->
-        failwith
-          "If super catchup is running, the frontier should have a full \
-           catchup state"
-  in
+  let (Full t) = Transition_frontier.catchup_state frontier in
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
@@ -1467,8 +1459,6 @@ let%test_module "Ledger_catchup tests" =
 
     (* let time_controller = Block_time.Controller.basic ~logger *)
 
-    let use_super_catchup = true
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
@@ -1670,7 +1660,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1690,7 +1680,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1706,7 +1696,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1723,7 +1713,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 3) + 1)
@@ -1801,7 +1791,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer
               (* ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) *)
             ; peer_with_branch_custom_rpc
@@ -1876,11 +1866,6 @@ let%test_module "Ledger_catchup tests" =
                         with
                         | Full tr ->
                             tr
-                        | Hash _ ->
-                            failwith
-                              "in super catchup unit tests, the catchup state \
-                               should always be Full_catchup_tree, but it is \
-                               Catchup_hash_tree for some reason"
                       in
                       let catchup_state_node_list =
                         State_hash.Table.data catchup_state.nodes

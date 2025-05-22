@@ -131,7 +131,7 @@ let%test_module "Actions test" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -151,7 +151,7 @@ let%test_module "Actions test" =
                 { account_update with
                   authorization =
                     Control.Poly.Signature
-                      (Schnorr.Chunked.sign sk
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->

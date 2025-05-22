@@ -46,6 +46,7 @@ RUN apt-get update --quiet --yes \
     libssl1.1 \
     tzdata \
     jq \
+    git \
     sudo \
     procps \
     && rm -rf /var/lib/apt/lists/*

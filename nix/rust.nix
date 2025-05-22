@@ -2,14 +2,20 @@
 final: prev:
 let
   rustPlatformFor = rust:
-    prev.makeRustPlatform {
-      cargo = rust;
-      rustc = rust;
-      # override stdenv.targetPlatform here, if necessary
+    let
+      rustWithTargetPlatforms = rust // {
+        # Ensure compatibility with nixpkgs >= 24.11
+        targetPlatforms = final.lib.platforms.all;
+        badTargetPlatforms = [ ];
+      };
+    in prev.makeRustPlatform {
+      cargo = rustWithTargetPlatforms;
+      rustc = rustWithTargetPlatforms;
     };
   toolchainHashes = {
-    "1.79.0" = "sha256-Ngiz76YP4HTY75GGdH2P+APE/DEIx2R/Dn+BwwOyzZU=";
-    "nightly-2024-06-13" = "sha256-s5nlYcYG9EuO2HK2BU3PkI928DZBKCTJ4U9bz3RX1t4=";
+    "1.81.0" = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
+    "nightly-2024-09-05" =
+      "sha256-s5nlYcYG9EuO2HK2BU3PkI928DZBKCTJ4U9bz3RX1t4=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -95,9 +101,8 @@ in {
   in rust_platform.buildRustPackage {
     pname = "kimchi_stubs_static_lib";
     version = "0.1.0";
-    src = final.lib.sourceByRegex ../src [
-      "^lib(/crypto(/proof-systems(/.*)?)?)?$"
-    ];
+    src = final.lib.sourceByRegex ../src
+      [ "^lib(/crypto(/proof-systems(/.*)?)?)?$" ];
     sourceRoot = "source/lib/crypto/proof-systems";
     nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
@@ -110,8 +115,8 @@ in {
       cargo build -p kimchi-stubs --release --lib
     '';
     installPhase = ''
-        mkdir -p $out/lib
-        cp target/release/libkimchi_stubs.a $out/lib/
+      mkdir -p $out/lib
+      cp target/release/libkimchi_stubs.a $out/lib/
     '';
     doCheck = false;
   };
@@ -156,7 +161,7 @@ in {
         sha256 = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
       };
 
-      cargoSha256 = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
+      cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;

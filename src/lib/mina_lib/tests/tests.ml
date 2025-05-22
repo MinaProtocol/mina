@@ -356,10 +356,10 @@ let%test_module "Epoch ledger sync tests" =
             (make_dirname "persistent_frontier_location")
           ~get_current_frontier
           ~frontier_broadcast_writer:frontier_broadcast_pipe_w
-          ~get_completed_work:(Fn.const None) ~catchup_mode:`Normal
+          ~get_completed_work:(Fn.const None) ~catchup_mode:`Super
           ~network_transition_reader:block_reader ~producer_transition_reader
           ~get_most_recent_valid_block ~most_recent_valid_block_writer
-          ~notify_online ?transaction_pool_proxy:None ()
+          ~notify_online ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
       let tr_tm1 = Unix.gettimeofday () in

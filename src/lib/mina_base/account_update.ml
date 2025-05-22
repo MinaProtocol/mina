@@ -1489,9 +1489,11 @@ module Body = struct
         ; Authorization_kind.Checked.to_input authorization_kind
         ]
 
-    let digest ?chain (t : t) =
+    let digest ~signature_kind (t : t) =
       Random_oracle.Checked.(
-        hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
+        hash
+          ~init:(Hash_prefix.zkapp_body ~signature_kind)
+          (pack_input (to_input t)))
   end
 
   let typ () : (Checked.t, t) Typ.t =
@@ -1562,9 +1564,11 @@ module Body = struct
       ; Authorization_kind.to_input authorization_kind
       ]
 
-  let digest ?chain (t : t) =
+  let digest ~signature_kind (t : t) =
     Random_oracle.(
-      hash ~init:(Hash_prefix.zkapp_body ?chain) (pack_input (to_input t)))
+      hash
+        ~init:(Hash_prefix.zkapp_body ~signature_kind)
+        (pack_input (to_input t)))
 
   module Digested = struct
     type t = Random_oracle.Digest.t
@@ -1730,12 +1734,12 @@ module T = struct
   let of_simple (p : Simple.t) : Stable.Latest.t =
     { body = Body.of_simple p.body; authorization = p.authorization }
 
-  let digest ?chain t = Body.digest ?chain t.Poly.body
+  let digest ~signature_kind t = Body.digest ~signature_kind t.Poly.body
 
   module Checked = struct
     type t = Body.Checked.t
 
-    let digest ?chain (t : t) = Body.Checked.digest ?chain t
+    let digest ~signature_kind (t : t) = Body.Checked.digest ~signature_kind t
   end
 end
 
@@ -1749,6 +1753,8 @@ let map_proofs ~f p =
         None_given
   in
   { Poly.authorization = map_auth p.Poly.authorization; body = p.Poly.body }
+
+let forget_proofs p = map_proofs ~f:(const ()) p
 
 module Fee_payer = struct
   [%%versioned
@@ -1795,6 +1801,12 @@ module Fee_payer = struct
 end
 
 include T
+
+let read_all_proofs_from_disk (p : t) : Stable.Latest.t =
+  map_proofs ~f:Proof_cache_tag.read_proof_from_disk p
+
+let write_all_proofs_to_disk ~proof_cache_db (p : Stable.Latest.t) : t =
+  map_proofs ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) p
 
 let account_id (t : (Body.t, _) Poly.t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id

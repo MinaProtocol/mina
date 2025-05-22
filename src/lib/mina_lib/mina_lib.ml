@@ -409,14 +409,11 @@ let get_node_state t =
     match Broadcast_pipe.Reader.peek @@ transition_frontier t with
     | None ->
         None
-    | Some tf -> (
-        match Transition_frontier.catchup_state tf with
-        | Full catchup_state ->
-            Some
-              (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_state )
-        | _ ->
-            None )
+    | Some tf ->
+        let (Full catchup_state) = Transition_frontier.catchup_state tf in
+        Some
+          (Transition_frontier.Full_catchup_tree.to_node_status_report
+             catchup_state )
   in
   let block_height_at_best_tip =
     best_tip t
@@ -1692,7 +1689,6 @@ let initialize_zkapp_vk_cache_db (config : Config.t) =
 
 let create ~commit_id ?wallets (config : Config.t) =
   let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
-  let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let block_window_duration = config.compile_config.block_window_duration in
@@ -2152,17 +2148,6 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_most_recent_valid_block () =
             Broadcast_pipe.Reader.peek most_recent_valid_block_reader
           in
-
-          let transaction_resource_pool =
-            Network_pool.Transaction_pool.resource_pool transaction_pool
-          in
-          let transaction_pool_proxy : Staged_ledger.transaction_pool_proxy =
-            { find_by_hash =
-                Network_pool.Transaction_pool.Resource_pool.find_by_hash
-                  transaction_resource_pool
-            }
-          in
-
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2173,13 +2158,13 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~persistent_root_location:config.persistent_root_location
               ~persistent_frontier_location:config.persistent_frontier_location
               ~get_current_frontier
-              ~frontier_broadcast_writer:frontier_broadcast_pipe_w ~catchup_mode
-              ~network_transition_reader:block_reader
+              ~frontier_broadcast_writer:frontier_broadcast_pipe_w
+              ~catchup_mode:`Super ~network_transition_reader:block_reader
               ~producer_transition_reader ~get_most_recent_valid_block
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ()
+              ~notify_online ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

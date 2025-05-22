@@ -60,8 +60,8 @@ let test_db () =
             Sequence.range 0 (max_depth - 1)
             |> Sequence.fold ~init:[ [] ] ~f:(fun acc _ ->
                    acc
-                   @ List.map acc ~f:(List.cons Direction.Left)
-                   @ List.map acc ~f:(List.cons Direction.Right) )
+                   @ List.map acc ~f:(List.cons Mina_stdlib.Direction.Left)
+                   @ List.map acc ~f:(List.cons Mina_stdlib.Direction.Right) )
           in
           List.iter accounts ~f:(fun account ->
               let account_id = Account.identifier account in

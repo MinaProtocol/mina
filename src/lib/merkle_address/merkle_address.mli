@@ -17,7 +17,7 @@ include Hashable.S_binable with type t := t
 
 val of_byte_string : string -> t
 
-val of_directions : Direction.t list -> t
+val of_directions : Mina_stdlib.Direction.t list -> t
 
 val root : unit -> t
 
@@ -29,9 +29,9 @@ val copy : t -> t
 
 val parent : t -> t Or_error.t
 
-val child : ledger_depth:int -> t -> Direction.t -> t Or_error.t
+val child : ledger_depth:int -> t -> Mina_stdlib.Direction.t -> t Or_error.t
 
-val child_exn : ledger_depth:int -> t -> Direction.t -> t
+val child_exn : ledger_depth:int -> t -> Mina_stdlib.Direction.t -> t
 
 val extend : ledger_depth:int -> t -> num_bits:int -> int64 -> t Or_error.t
 
@@ -39,7 +39,7 @@ val extend_exn : ledger_depth:int -> t -> num_bits:int -> int64 -> t
 
 val parent_exn : t -> t
 
-val dirs_from_root : t -> Direction.t list
+val dirs_from_root : t -> Mina_stdlib.Direction.t list
 
 val sibling : t -> t
 

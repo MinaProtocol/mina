@@ -134,20 +134,24 @@ module type Digest_intf = sig
     module Checked : sig
       include Digest_intf.S_checked
 
-      val create : ?chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
+      val create :
+        ?signature_kind:Mina_signature_kind.t -> Account_update.Checked.t -> t
 
       val create_body :
-        ?chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
+           ?signature_kind:Mina_signature_kind.t
+        -> Account_update.Body.Checked.t
+        -> t
     end
 
     include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
     val create :
-         ?chain:Mina_signature_kind.t
+         ?signature_kind:Mina_signature_kind.t
       -> (Account_update.Body.t, _) Account_update.Poly.t
       -> t
 
-    val create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
+    val create_body :
+      ?signature_kind:Mina_signature_kind.t -> Account_update.Body.t -> t
   end
 
   module rec Forest : sig
@@ -252,20 +256,31 @@ module Make_digest_str
     module Checked = struct
       include Checked
 
-      let create = Account_update.Checked.digest
+      let create ?signature_kind =
+        let signature_kind =
+          Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+        in
+        Account_update.Checked.digest ~signature_kind
 
-      let create_body = Account_update.Body.Checked.digest
+      let create_body ?signature_kind =
+        let signature_kind =
+          Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+        in
+        Account_update.Body.Checked.digest ~signature_kind
     end
 
-    let create :
-           ?chain:Mina_signature_kind.t
-        -> (Account_update.Body.t, _) Account_update.Poly.t
-        -> t =
-      Account_update.digest
+    let create ?signature_kind :
+        (Account_update.Body.t, _) Account_update.Poly.t -> t =
+      let signature_kind =
+        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+      in
+      Account_update.digest ~signature_kind
 
-    let create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
-        =
-      Account_update.Body.digest
+    let create_body ?signature_kind : Account_update.Body.t -> t =
+      let signature_kind =
+        Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+      in
+      Account_update.Body.digest ~signature_kind
   end
 
   module Forest = struct
@@ -493,13 +508,6 @@ let rec accumulate_hashes ~hash_account_update (xs : _ t) =
       let node_hash = Digest.Tree.create node in
       { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) } :: xs
 
-let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
-    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
-  let hash_account_update (p : Account_update.t) =
-    Digest.Account_update.create p
-  in
-  accumulate_hashes ~hash_account_update xs
-
 let accumulate_hashes_predicated xs =
   accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
@@ -518,6 +526,9 @@ let forget_hashes =
         }
   in
   impl
+
+let forget_hashes_and_proofs p =
+  forget_hashes @@ map ~f:Account_update.forget_proofs p
 
 module With_hashes_and_data = struct
   [%%versioned
@@ -593,13 +604,10 @@ module With_hashes = struct
   end]
 
   let read_all_proofs_from_disk : t -> Stable.Latest.t =
-    map ~f:(Account_update.map_proofs ~f:Proof_cache_tag.read_proof_from_disk)
+    map ~f:Account_update.read_all_proofs_from_disk
 
   let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-    map
-      ~f:
-        (Account_update.map_proofs
-           ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+    map ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
 
   let empty = Digest.Forest.empty
 
