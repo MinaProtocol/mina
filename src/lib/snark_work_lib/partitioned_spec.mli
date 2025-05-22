@@ -52,15 +52,6 @@ module Stable : sig
     val to_latest : t -> t
 
     val statement : t -> Transaction_snark.Statement.t
-
-    val map_with_statement :
-         t
-      -> f:(Transaction_snark.Statement.Stable.Latest.t -> unit -> 'a)
-      -> ( Transaction_witness.Stable.V2.t
-         , Mina_wire_types.Transaction_snark.V2.t
-         , Sub_zkapp_spec.Stable.V1.t
-         , 'a )
-         Poly.t
   end
 end]
 

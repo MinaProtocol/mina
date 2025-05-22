@@ -34,8 +34,7 @@ module Poly = struct
         Single
           { job =
               With_job_meta.map
-                ~f_spec:(
-                  Single_spec.Poly.map ~f_witness ~f_proof )
+                ~f_spec:(Single_spec.Poly.map ~f_witness ~f_proof)
                 job
           ; data = f_data data
           }
@@ -72,15 +71,6 @@ module Stable = struct
           Single_spec.Poly.statement spec
       | Sub_zkapp_command { job = { spec; _ }; _ } ->
           Sub_zkapp_spec.Stable.Latest.statement spec
-
-    let map_with_statement (t : t) ~f : _ Poly.t =
-      match t with
-      | Single { job = { spec; _ } as job; data } ->
-          let stmt = Single_spec.Poly.statement spec in
-          Single { job; data = f stmt data }
-      | Sub_zkapp_command { job = { spec; _ } as job; data } ->
-          Sub_zkapp_command
-            { job; data = f (Sub_zkapp_spec.Stable.Latest.statement spec) data }
   end
 end]
 
