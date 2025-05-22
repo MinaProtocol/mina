@@ -80,7 +80,7 @@ struct
              ({ writer_with_aux = Some writer_with_aux; id = new_id }, new_id)
           )
 
-  [%%define_locally Guard.(spawn, send_data, send_control, send_request)]
+  [%%define_locally Guard.(spawn, send_data, send_request)]
 
   let create ~logger () =
     Guard.create ~name:(`String "Valid Transition Pipe Guard")
