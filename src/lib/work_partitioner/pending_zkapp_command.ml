@@ -11,7 +11,7 @@ type t =
   { job : (Spec.Single.t, Id.Single.t) With_job_meta.t
         (* the original work being splitted, should be identical to Work_selector.work *)
   ; unscheduled_segments : Spec.Sub_zkapp.t Queue.t
-  ; pending_mergable_proofs : Ledger_proof.Cached.t Deque.t
+  ; pending_mergeable_proofs : Ledger_proof.Cached.t Deque.t
         (* we may need to insert proofs to merge back to the queue, hence a Deque *)
   ; mutable elapsed : Time.Stable.Span.V1.t
   ; mutable merge_remaining : int
@@ -30,7 +30,7 @@ let generate_merge ~(t : t) () =
             Deque.enqueue_front q fst ; None )
   in
   let open Option.Let_syntax in
-  let%map proof1, proof2 = try_take2 t.pending_mergable_proofs in
+  let%map proof1, proof2 = try_take2 t.pending_mergeable_proofs in
   Spec.Sub_zkapp.Merge { proof1; proof2 }
 
 let generate_segment ~(t : t) () =
@@ -43,6 +43,6 @@ let generate_job_spec (t : t) : Spec.Sub_zkapp.t option =
 
 let submit_proof (t : t) ~(proof : Ledger_proof.Cached.t)
     ~(elapsed : Time.Stable.Span.V1.t) =
-  Deque.enqueue_back t.pending_mergable_proofs proof ;
+  Deque.enqueue_back t.pending_mergeable_proofs proof ;
   t.merge_remaining <- t.merge_remaining - 1 ;
   t.elapsed <- Time.Span.(t.elapsed + elapsed)

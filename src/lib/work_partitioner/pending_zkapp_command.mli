@@ -5,7 +5,7 @@ type t =
   { job : (Spec.Single.t, Id.Single.t) With_job_meta.t
         (* the original work being splitted, should be identical to Work_selector.work *)
   ; unscheduled_segments : Spec.Sub_zkapp.t Queue.t
-  ; pending_mergable_proofs : Ledger_proof.Cached.t Deque.t
+  ; pending_mergeable_proofs : Ledger_proof.Cached.t Deque.t
         (* we may need to insert proofs to merge back to the queue, hence a Deque *)
   ; mutable elapsed : Time.Stable.Span.V1.t
   ; mutable merge_remaining : int
