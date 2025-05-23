@@ -31,7 +31,6 @@ RUN apt-get update --quiet --yes \
         curl \
         jq \
         dumb-init \
-        libssl1.1 \
         libgomp1 \
         libpq-dev \
         gnupg2 \
