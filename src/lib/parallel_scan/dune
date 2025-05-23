@@ -22,7 +22,6 @@
   mina_metrics
   mina_stdlib
   pipe_lib
-  state_or_error
   ppx_version.runtime)
  (preprocess
   (pps ppx_jane ppx_mina ppx_version ppx_compare lens.ppx_deriving))
