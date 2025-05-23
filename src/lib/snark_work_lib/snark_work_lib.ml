@@ -7,3 +7,4 @@ module Work = struct
 end
 
 module Selector = Selector
+module With_job_meta = With_job_meta
