@@ -1,0 +1,21 @@
+(executable
+ (name test_pipe_lib)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  core
+  core_kernel
+  ;; local libraries
+  pipe_lib
+  run_in_thread)
+ (preprocess
+  (pps ppx_jane ppx_let))
+ (modules test_pipe_lib))
+
+(rule
+ (alias runtest)
+ (deps test_pipe_lib.exe)
+ (action
+  (run %{deps} -q)))
