@@ -26,6 +26,7 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libffi7
 #    libprocps8
 #    libjemalloc2
+#    libssl
 
 
 # --- Dependencies across many platforms
@@ -43,7 +44,6 @@ RUN apt-get update --quiet --yes \
     gnupg2 \
     libgmp10 \
     libgomp1 \
-    libssl1.1 \
     tzdata \
     jq \
     git \
