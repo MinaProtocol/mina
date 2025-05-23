@@ -105,7 +105,6 @@
 (package (name mina_networking))
 (package (name mina_node_config))
 (package (name mina_numbers))
-(package (name mina_plugins))
 (package (name mina_runtime_config))
 (package (name mina_signature_kind))
 (package (name mina_state))

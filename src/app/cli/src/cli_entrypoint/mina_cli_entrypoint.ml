@@ -40,15 +40,6 @@ let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
   in
   Blake2.to_hex b2
 
-let plugin_flag =
-  if Node_config.plugins then
-    let open Command.Param in
-    flag "--load-plugin" ~aliases:[ "load-plugin" ] (listed string)
-      ~doc:
-        "PATH The path to load a .cmxs plugin from. May be passed multiple \
-         times"
-  else Command.Param.return []
-
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     ~genesis_dir ~cli_proof_level ~proof_level config_files =
   let%bind config_jsons =
@@ -470,7 +461,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "full|check|none Internal, for testing. Start or connect to a network \
          with full proving (full), snark-testing with dummy proofs (check), or \
          dummy proofs (none)"
-  and plugins = plugin_flag
   and precomputed_blocks_path =
     flag "--precomputed-blocks-file"
       ~aliases:[ "precomputed-blocks-file" ]
@@ -1461,7 +1451,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
               Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
           |> Option.value ~default:Deferred.unit
         in
-        let () = Mina_plugins.init_plugins ~logger mina plugins in
         return mina )
 
 let daemon logger ~itn_features =
