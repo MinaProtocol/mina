@@ -13,6 +13,7 @@ in  Pipeline.build
             [ Artifacts.Type.Daemon
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
+            , Artifacts.Type.FunctionalTestSuite
             ]
           , buildFlags = BuildFlags.Type.Instrumented
           }

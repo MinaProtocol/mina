@@ -4,6 +4,8 @@ let Artifacts = ./Artifacts.dhall
 
 let Network = ./Network.dhall
 
+let BuildFlags = ./BuildFlags.dhall
+
 let Docker
     : Type
     = < Bookworm | Bullseye | Jammy | Focal >
@@ -33,8 +35,11 @@ let dependsOnStep =
       ->  \(prefix : Text)
       ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
+      ->  \(buildFlag : BuildFlags.Type)
       ->  \(binary : Artifacts.Type)
       ->  let network = "${Network.capitalName network}"
+
+          let buildFlag = "${BuildFlags.toSuffixUppercase buildFlag}"
 
           let profileSuffix = "${Profiles.toSuffixUppercase profile}"
 
@@ -46,14 +51,14 @@ let dependsOnStep =
                 { Bookworm =
                   [ { name =
                         "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
+                                      docker}${network}${profileSuffix}${buildFlag}"
                     , key = key
                     }
                   ]
                 , Bullseye =
                   [ { name =
                         "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
+                                      docker}${network}${profileSuffix}${buildFlag}"
                     , key = key
                     }
                   ]
@@ -61,7 +66,7 @@ let dependsOnStep =
                   [ { name =
                         "${prefix}${capitalName
                                       docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
+                                                           docker}${profileSuffix}${buildFlag}"
                     , key = key
                     }
                   ]
@@ -69,7 +74,7 @@ let dependsOnStep =
                   [ { name =
                         "${prefix}${capitalName
                                       docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
+                                                           docker}${profileSuffix}${buildFlag}"
                     , key = key
                     }
                   ]
@@ -81,7 +86,13 @@ let dependsOn =
       ->  \(network : Network.Type)
       ->  \(profile : Profiles.Type)
       ->  \(binary : Artifacts.Type)
-      ->  dependsOnStep docker "MinaArtifact" network profile binary
+      ->  dependsOnStep
+            docker
+            "MinaArtifact"
+            network
+            profile
+            BuildFlags.Type.None
+            binary
 
 in  { Type = Docker
     , capitalName = capitalName

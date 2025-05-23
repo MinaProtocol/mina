@@ -4,9 +4,9 @@ let Command = ./Base.dhall
 
 let Size = ./Size.dhall
 
-let RunWithPostgres = ./RunWithPostgres.dhall
+let BuildFlags = ../Constants/BuildFlags.dhall
 
-let Network = ../Constants/Network.dhall
+let RunWithPostgres = ./RunWithPostgres.dhall
 
 let key = "replayer-test"
 
@@ -18,8 +18,9 @@ in  { step =
                 [ RunWithPostgres.runInDockerWithPostgresConn
                     ([] : List Text)
                     "./src/test/archive/sample_db/archive_db.sql"
-                    Artifacts.Type.FunctionalTestSuite
-                    (None Network.Type)
+                    "gcr.io/o1labs-192920/${Artifacts.dockerName
+                                              Artifacts.Type.FunctionalTestSuite}:\\\$MINA_DOCKER_TAG-${BuildFlags.lowerName
+                                                                                                          BuildFlags.Type.Instrumented}"
                     "./buildkite/scripts/replayer-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Replayer test"
