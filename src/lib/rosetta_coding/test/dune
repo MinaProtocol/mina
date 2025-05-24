@@ -1,0 +1,14 @@
+(test
+ (name test_rosetta_coding)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core_kernel
+  ;; local libraries
+  rosetta_coding
+  snark_params
+  signature_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_assert ppx_let)))
