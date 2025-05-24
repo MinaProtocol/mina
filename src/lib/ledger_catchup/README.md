@@ -2,7 +2,7 @@
 
 ### Quick definitions
 
-- Block recap: a block contains a hash of the current ledger, and a `staged_ledger_diff`, which is effectively a list of transactions that change the previous staged ledger to the current block's staged ledger. A transaction is of the form "acct a sends X mina tokens to acct B". It doesn't tell you the balances of acct A and B. The block does not contain the ledger in it's entirety, nor can any account balances be looked up.  https://docs.minaprotocol.com/en/architecture/whats-in-a-block#staged-ledger-diff
+- Block recap: a block contains a hash of the current ledger, and a `staged_ledger_diff`, which is effectively a list of transactions that change the previous staged ledger to the current block's staged ledger. A transaction is of the form "acct a sends X mina tokens to acct B". It doesn't tell you the balances of acct A and B. The block does not contain the ledger in it's entirety, nor can any account balances be looked up.  https://docs.minaprotocol.com/mina-protocol/whats-in-a-block#staged-ledger-diff
 
 - Breadcrumb: a breadcrumb is a block which has been fully validated and given an attached and connected ledger mask which connects to the previous mask which eventually connects to a ledger, and so an attached mask in essence is a full ledger. Breadcrumbs are the "nodes" in a transition frontier.  Breadcrumbs can only exist if the parent breadcrumb already exists in the transition frontier, because the parent is necessary for validating and of course a fully attached ledger mask can only exist if there exists a previous ledger.  The transition frontier, being made of breadcrumbs, is therefore always fully connected.
 
