@@ -1,6 +1,6 @@
 open Core
 open Async
-module Timeout = Timeout_lib.Core_time_ns
+module Timeout = Mina_stdlib.Timeout_lib.Core_time_ns
 
 type validation_result = [ `Accept | `Reject | `Ignore ] [@@deriving equal]
 

@@ -52,10 +52,9 @@
   signature_lib
   currency
   mina_version
-  timeout_lib
+  mina_stdlib
   mina_numbers
   mina_state
-  mina_stdlib
   mina_transaction
   file_system
   pickles
