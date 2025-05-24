@@ -44,7 +44,8 @@
   transaction_protocol_state
   transaction_snark
   transaction_snark_work
-  transaction_witness)
+  transaction_witness
+   work_partitioner)
  (preprocess
   (pps
    ppx_bin_prot
