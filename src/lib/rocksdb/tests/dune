@@ -13,7 +13,7 @@
   core_kernel.uuid
   rocks
   ;; local libraries
-  file_system
+  mina_stdlib
   rocksdb)
  (preprocess
   (pps ppx_version ppx_jane)))

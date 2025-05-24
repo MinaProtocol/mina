@@ -364,7 +364,7 @@ let create ~logger ~verifier ~time_controller ~directory =
 
 let destroy_database_exn t =
   assert (Option.is_none t.instance) ;
-  File_system.remove_dir t.directory
+  Mina_stdlib.Filesystem.remove_dir t.directory
 
 let create_instance_exn t =
   assert (Option.is_none t.instance) ;

@@ -59,7 +59,7 @@
   mina_compile_config
   node_error_service
   mina_user_error
-  file_system
+  mina_stdlib
   mina_version
   mina_net2
   block_time

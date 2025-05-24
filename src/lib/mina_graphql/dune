@@ -29,7 +29,7 @@
   network_pool
   cli_lib
   exit_handlers
-  file_system
+  mina_stdlib
   itn_crypto
   kimchi_pasta
   kimchi_pasta.basic

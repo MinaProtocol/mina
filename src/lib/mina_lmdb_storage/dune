@@ -28,7 +28,7 @@
   blake2
   error_json
   child_processes
-  file_system
+  mina_stdlib
   logger
   lmdb_storage
   network_peer

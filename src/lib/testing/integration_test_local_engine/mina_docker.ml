@@ -682,9 +682,9 @@ module Network_manager = struct
       ~network_config =
     let open Deferred.Let_syntax in
     let%bind () =
-      if%bind File_system.dir_exists docker_dir then (
+      if%bind Mina_stdlib.Filesystem.dir_exists docker_dir then (
         [%log info] "Old docker stack directory found; removing to start clean" ;
-        File_system.remove_dir docker_dir )
+        Mina_stdlib.Filesystem.remove_dir docker_dir )
       else return ()
     in
     [%log info] "Writing docker configuration %s" docker_dir ;
@@ -1089,7 +1089,7 @@ module Network_manager = struct
   let cleanup t =
     let%bind () = if t.deployed then destroy t else return () in
     [%log' info t.logger] "Cleaning up network configuration" ;
-    let%bind () = File_system.remove_dir t.docker_dir in
+    let%bind () = Mina_stdlib.Filesystem.remove_dir t.docker_dir in
     Deferred.unit
 
   let destroy t =

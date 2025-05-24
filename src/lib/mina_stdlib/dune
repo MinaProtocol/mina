@@ -13,6 +13,9 @@
   base.caml
   core_kernel
   async_kernel
+  async
+  async_unix
+  core
   sexplib0
   bin_prot.shape
   ; local libraries

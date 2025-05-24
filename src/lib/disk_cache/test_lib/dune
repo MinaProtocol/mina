@@ -8,7 +8,7 @@
   bounded_types
   ;; local libraries
   logger
-  file_system
+  mina_stdlib
   disk_cache.intf)
  (preprocess
   (pps ppx_mina ppx_version ppx_jane))

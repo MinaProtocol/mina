@@ -24,7 +24,7 @@ let test_with_dir f =
       let%bind result =
         Monitor.protect
           (fun () -> f dir)
-          ~finally:(fun () -> File_system.remove_dir dir)
+          ~finally:(fun () -> Mina_stdlib.Filesystem.remove_dir dir)
       in
       return result )
 

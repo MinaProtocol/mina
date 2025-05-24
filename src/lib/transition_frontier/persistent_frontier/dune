@@ -25,7 +25,6 @@
   otp_lib
   consensus
   mina_ledger
-  file_system
   transition_frontier_full_frontier
   transition_frontier_persistent_root
   transition_frontier_base

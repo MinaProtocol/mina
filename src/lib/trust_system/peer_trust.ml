@@ -503,5 +503,5 @@ module Make (Action : Action_intf) = Make0 (struct
   module Action = Action
   include Log_events
 
-  let remove_dir = File_system.remove_dir
+  let remove_dir = Mina_stdlib.Filesystem.remove_dir
 end)

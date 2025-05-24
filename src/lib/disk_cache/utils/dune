@@ -6,7 +6,7 @@
   core
   async
   ;; local libraries
-  file_system
+  mina_stdlib
   logger)
  (preprocess
   (pps ppx_mina ppx_version ppx_jane))

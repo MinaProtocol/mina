@@ -104,12 +104,12 @@ module Instance = struct
 
   let dequeue_snarked_ledger t =
     let location = Queue.dequeue_exn t.potential_snarked_ledgers in
-    File_system.rmrf location ;
+    Mina_stdlib.Filesystem.rmrf location ;
     write_potential_snarked_ledgers_to_disk t
 
   let destroy t =
-    List.iter (Queue.to_list t.potential_snarked_ledgers) ~f:File_system.rmrf ;
-    File_system.rmrf (Locations.potential_snarked_ledgers t.factory.directory) ;
+    List.iter (Queue.to_list t.potential_snarked_ledgers) ~f:Mina_stdlib.Filesystem.rmrf ;
+    Mina_stdlib.Filesystem.rmrf (Locations.potential_snarked_ledgers t.factory.directory) ;
     Ledger.Db.close t.snarked_ledger ;
     t.factory.instance <- None
 
@@ -169,18 +169,18 @@ module Instance = struct
             with
             | Ok _ ->
                 Ledger.Db.close potential_snarked_ledger ;
-                File_system.rmrf @@ Locations.snarked_ledger factory.directory ;
+                Mina_stdlib.Filesystem.rmrf @@ Locations.snarked_ledger factory.directory ;
                 Sys.rename
                   (Locations.tmp_snarked_ledger factory.directory)
                   (Locations.snarked_ledger factory.directory) ;
-                List.iter potential_snarked_ledgers ~f:File_system.rmrf ;
-                File_system.rmrf
+                List.iter potential_snarked_ledgers ~f:Mina_stdlib.Filesystem.rmrf ;
+                Mina_stdlib.Filesystem.rmrf
                   (Locations.potential_snarked_ledgers factory.directory) ;
                 Stop (Some snarked_ledger)
             | Error e ->
                 Ledger.Db.close potential_snarked_ledger ;
-                List.iter potential_snarked_ledgers ~f:File_system.rmrf ;
-                File_system.rmrf
+                List.iter potential_snarked_ledgers ~f:Mina_stdlib.Filesystem.rmrf ;
+                Mina_stdlib.Filesystem.rmrf
                   (Locations.potential_snarked_ledgers factory.directory) ;
                 [%log' error factory.logger]
                   ~metadata:[ ("error", `String (Error.to_string_hum e)) ]
@@ -190,8 +190,8 @@ module Instance = struct
             Ledger.Db.close potential_snarked_ledger ;
             Continue None ) )
         ~finish:(fun _ ->
-          List.iter potential_snarked_ledgers ~f:File_system.rmrf ;
-          File_system.rmrf
+          List.iter potential_snarked_ledgers ~f:Mina_stdlib.Filesystem.rmrf ;
+          Mina_stdlib.Filesystem.rmrf
             (Locations.potential_snarked_ledgers factory.directory) ;
           None )
     in
@@ -287,7 +287,7 @@ let with_instance_exn t ~f =
 
 let reset_to_genesis_exn t ~precomputed_values =
   assert (Option.is_none t.instance) ;
-  File_system.rmrf t.directory ;
+  Mina_stdlib.Filesystem.rmrf t.directory ;
   with_instance_exn t ~f:(fun instance ->
       ignore
         ( Ledger_transfer.transfer_accounts

@@ -8,7 +8,7 @@
   async
   ;; local libraries
   logger
-  file_system
+  mina_stdlib
   disk_cache.utils
   disk_cache.test_lib)
  (preprocess

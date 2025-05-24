@@ -9,7 +9,7 @@
   lmdb
   ;; local libraries
   blake2
-  file_system
+  mina_stdlib
   lmdb_storage)
  (preprocess
   (pps ppx_jane)))

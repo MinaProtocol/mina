@@ -10,7 +10,7 @@
   base.caml
   ;;local libraries
   precomputed_values
-  file_system
+  mina_stdlib
   merkle_ledger
   transition_frontier_base
   mina_base

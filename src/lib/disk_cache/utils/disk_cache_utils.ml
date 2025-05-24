@@ -18,14 +18,14 @@ let initialize_dir path ~logger =
   in
   match%bind Sys.is_directory path with
   | `Yes ->
-      let%map () = File_system.clear_dir path in
+      let%map () = Mina_stdlib.Filesystem.clear_dir path in
       Ok path
   | `No -> (
       match%bind Sys.file_exists ~follow_symlinks:false path with
       | `Yes ->
           fail "Path to proof cache folder points to a non-directory"
       | `No ->
-          let%map () = File_system.create_dir path in
+          let%map () = Mina_stdlib.Filesystem.create_dir path in
           Ok path
       | `Unknown ->
           fail "Cannot evaluate existence of cache folder" )

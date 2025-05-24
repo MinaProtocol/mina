@@ -33,7 +33,6 @@
   mina_base
   mina_stdlib
   mina_transaction
-  file_system
   currency
   mina_runtime_config
   secrets

@@ -14,7 +14,7 @@ module Tests = struct
   let test_get_batch () =
     Alcotest.test_case "get_batch" `Quick (fun () ->
         Async.Thread_safe.block_on_async_exn (fun () ->
-            File_system.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
+            Mina_stdlib.Filesystem.with_temp_dir "/tmp/mina-rocksdb-test" ~f:(fun db_dir ->
                 let db = create db_dir in
                 let[@warning "-8"] [ key1; key2; key3 ] =
                   List.map ~f:(fun s -> Bigstring.of_string s) [ "a"; "b"; "c" ]
@@ -46,7 +46,7 @@ module Tests = struct
             | `Duplicate_key _ ->
                 Async.Deferred.unit
             | `Ok _ ->
-                File_system.with_temp_dir "/tmp/mina-rocksdb-test"
+                Mina_stdlib.Filesystem.with_temp_dir "/tmp/mina-rocksdb-test"
                   ~f:(fun db_dir ->
                     let sorted =
                       List.sort kvs ~compare:[%compare: string * string]

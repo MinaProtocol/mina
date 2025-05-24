@@ -58,5 +58,5 @@ let () =
       (async ~summary:"Print heap usage of selected Mina data structures"
          (let%map.Command () = Let_syntax.return () in
           fun () ->
-            File_system.with_temp_dir "mina-heap-usage"
+            Mina_stdlib.Filesystem.with_temp_dir "mina-heap-usage"
               ~f:(main ~genesis_constants ~constraint_constants) ) ))

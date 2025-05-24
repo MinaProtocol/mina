@@ -66,7 +66,6 @@
   crypto_params
   data_hash_lib
   currency
-  file_system
   coda_genesis_ledger
   interruptible
   network_peer

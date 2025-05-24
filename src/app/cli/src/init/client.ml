@@ -1641,7 +1641,7 @@ let generate_libp2p_keypair_do privkey_path =
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
     (* Using the helper only for keypair generation requires no state. *)
-    File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
+    Mina_stdlib.Filesystem.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
@@ -1673,7 +1673,7 @@ let dump_libp2p_keypair_do privkey_path =
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
     (* Using the helper only for keypair generation requires no state. *)
-    File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
+    Mina_stdlib.Filesystem.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())

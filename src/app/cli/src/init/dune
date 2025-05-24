@@ -93,7 +93,6 @@
   transaction_snark_tests
   transaction_protocol_state
   test_util
-  file_system
   daemon_rpcs
   trust_system
   secrets

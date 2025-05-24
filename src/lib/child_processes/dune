@@ -37,6 +37,6 @@
   sexplib0
   ;; local libraries
   error_json
-  file_system
+  mina_stdlib
   logger
   pipe_lib))
