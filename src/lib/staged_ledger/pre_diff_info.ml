@@ -230,8 +230,8 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
         |> Or_error.all )
     |> Or_error.join |> to_staged_ledger_or_error
 
-  let fee_remainder (type proof a b c)
-      ~(to_user_command : c -> (proof, a, b) User_command.with_forest)
+  let fee_remainder (type update a b c)
+      ~(to_user_command : c -> (update, a, b) User_command.with_forest)
       (commands : c list) completed_works coinbase_fee =
     let open Result.Let_syntax in
     let%bind budget =
@@ -250,9 +250,9 @@ module Transaction_data_getter (T : Transaction_snark_work.S) = struct
       ~f:(fun x -> Ok x)
       (Currency.Fee.sub budget total_work_fee)
 
-  let get_transaction_data (type proof a b c) ~constraint_constants
+  let get_transaction_data (type update a b c) ~constraint_constants
       coinbase_parts ~receiver ~coinbase_amount
-      ~(to_user_command : c -> (proof, a, b) User_command.with_forest)
+      ~(to_user_command : c -> (update, a, b) User_command.with_forest)
       (commands : c list) (completed_works : T.t list) :
       (c Transaction_data.t, Error.t) Result.t =
     let open Result.Let_syntax in
