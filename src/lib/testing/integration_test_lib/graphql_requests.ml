@@ -940,6 +940,7 @@ let must_send_payment_with_raw_sig ~logger node_uri ~sender_pub_key
 let sign_and_send_payment ~logger node_uri
     ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
     ~fee ~nonce ~memo ~valid_until =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let sender_pub_key =
     sender_keypair.public_key |> Signature_lib.Public_key.compress
   in
@@ -959,7 +960,8 @@ let sign_and_send_payment ~logger node_uri
     { Signed_command_payload.Poly.common; body }
   in
   let raw_signature =
-    Signed_command.sign_payload sender_keypair.private_key payload
+    Signed_command.sign_payload ~signature_kind sender_keypair.private_key
+      payload
     |> Signature.Raw.encode
   in
   send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
