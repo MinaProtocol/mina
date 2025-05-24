@@ -12,7 +12,7 @@
 	url = https://github.com/MinaProtocol/rpc_parallel.git
 [submodule "frontend/wallet/tablecloth"]
 	path = frontend/wallet/tablecloth
-	url = https://github.com/bkase/tablecloth
+	url = https://github.com/bkase/tablecloth.git
 [submodule "src/lib/marlin"]
 	path = src/lib/marlin
 	url = https://github.com/o1-labs/marlin.git
