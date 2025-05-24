@@ -189,7 +189,7 @@ let list_peers t =
   | Error error ->
       [%log' error t.logger]
         "Encountered $error while asking libp2p_helper for peers"
-        ~metadata:[ ("error", Error_json.error_to_yojson error) ] ;
+        ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson error) ] ;
       []
 
 let bandwidth_info t =
@@ -302,7 +302,7 @@ let close_protocol ?(reset_existing_streams = false) t ~protocol =
          anyway: $err"
         ~metadata:
           [ ("protocol", `String protocol)
-          ; ("err", Error_json.error_to_yojson e)
+          ; ("err", Mina_stdlib.Error_json.error_to_yojson e)
           ]
 
 let release_stream t id =
@@ -397,7 +397,7 @@ let handle_push_message t push_message =
                           ; ( "subscription_id"
                             , `String
                                 (Subscription.Id.to_string subscription_id) )
-                          ; ("error", Error_json.error_to_yojson e)
+                          ; ("error", Mina_stdlib.Error_json.error_to_yojson e)
                           ] ;
                       Libp2p_helper.send_validation t.helper ~validation_id
                         ~validation_result:ValidationResult.Reject

@@ -484,7 +484,7 @@ module Answer_sync_ledger_query = struct
                         , Syncable_ledger.Query.to_yojson
                             Mina_ledger.Ledger.Addr.to_yojson
                             (Envelope.Incoming.data query) )
-                      ; ("error", Error_json.error_to_yojson err)
+                      ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
                       ] ) ))
     in
     result

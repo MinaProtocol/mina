@@ -16,7 +16,7 @@
   ;; local libraries
   kimchi_backend
   logger.file_system
-  error_json
+  mina_stdlib
   transaction_snark
   random_oracle_input
   child_processes

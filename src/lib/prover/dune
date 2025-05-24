@@ -17,7 +17,7 @@
   with_hash
   coda_genesis_ledger
   mina_metrics
-  error_json
+  mina_stdlib
   pickles_types
   snarky.backendless
   snark_params

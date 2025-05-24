@@ -196,7 +196,8 @@ module Make = struct
                 | Error e ->
                     [%log error]
                       "Couldn't inform the daemon about the snark work failure"
-                      ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+                      ~metadata:
+                        [ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
                 | Ok () ->
                     ()
               in

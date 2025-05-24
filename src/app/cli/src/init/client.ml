@@ -672,7 +672,7 @@ let send_rosetta_transactions_graphql =
          | Error err ->
              Format.eprintf "@[<v>Error:@,%a@,@]@."
                (Yojson.Safe.pretty_print ?std:None)
-               (Error_json.error_to_yojson err) ;
+               (Mina_stdlib.Error_json.error_to_yojson err) ;
              Core_kernel.exit 1 ) )
 
 module Export_logs = struct
@@ -705,7 +705,8 @@ module Export_logs = struct
             pp_export_result result
         | Error err ->
             failwithf "Error when exporting logs: %s"
-              (Error_json.error_to_yojson err |> Yojson.Safe.to_string)
+              ( Mina_stdlib.Error_json.error_to_yojson err
+              |> Yojson.Safe.to_string )
               ()
     in
     let open Command.Let_syntax in
@@ -1656,7 +1657,7 @@ let generate_libp2p_keypair_do privkey_path =
             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
         | Error e ->
             [%log fatal] "failed to generate libp2p keypair: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+              ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ;
             exit 20 ))
 
 let generate_libp2p_keypair =
@@ -1685,7 +1686,7 @@ let dump_libp2p_keypair_do privkey_path =
             printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
         | Error e ->
             [%log fatal] "failed to dump libp2p keypair: $error"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+              ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ;
             exit 20 ))
 
 let dump_libp2p_keypair =

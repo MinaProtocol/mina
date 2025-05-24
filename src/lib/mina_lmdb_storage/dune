@@ -26,7 +26,7 @@
   ppx_version.runtime
   ;; local libraries
   blake2
-  error_json
+  mina_stdlib
   child_processes
   file_system
   logger

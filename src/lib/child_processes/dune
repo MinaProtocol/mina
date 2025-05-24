@@ -36,7 +36,7 @@
   ppx_inline_test.config
   sexplib0
   ;; local libraries
-  error_json
+  mina_stdlib
   file_system
   logger
   pipe_lib))

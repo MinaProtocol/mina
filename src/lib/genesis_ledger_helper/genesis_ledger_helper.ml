@@ -442,7 +442,7 @@ module Ledger = struct
                 [%log error] "Could not load ledger from $path: $error"
                   ~metadata:
                     [ ("path", `String tar_path)
-                    ; ("error", Error_json.error_to_yojson err)
+                    ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
                     ] ;
                 Error err )
         | None -> (
@@ -550,7 +550,7 @@ module Ledger = struct
                       ~metadata:
                         [ ("ledger", `String ledger_name_prefix)
                         ; ("path", `String tar_path)
-                        ; ("error", Error_json.error_to_yojson err)
+                        ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
                         ] ;
                     return (Error err) ) ) )
 end

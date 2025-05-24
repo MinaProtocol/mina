@@ -20,7 +20,6 @@
   currency
   data_hash_lib
   debug_assert
-  error_json
   genesis_constants
   internal_tracing
   interruptible

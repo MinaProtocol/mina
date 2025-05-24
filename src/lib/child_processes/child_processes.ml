@@ -278,7 +278,7 @@ let start_custom :
         | Ok termination_status ->
             `String (Unix.Exit_or_signal.to_string_hum termination_status)
         | Error err ->
-            Error_json.error_to_yojson err
+            Mina_stdlib.Error_json.error_to_yojson err
       in
       [%log fatal] "Process died unexpectedly: $exit_or_signal"
         ~metadata:[ ("exit_or_signal", exit_or_signal) ] ;

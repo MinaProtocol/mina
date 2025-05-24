@@ -214,7 +214,7 @@ let verify_transition ~context:(module Context : CONTEXT) ~trust_system
   | Error (`Verifier_error error) ->
       [%log warn]
         ~metadata:
-          [ ("error", Error_json.error_to_yojson error)
+          [ ("error", Mina_stdlib.Error_json.error_to_yojson error)
           ; ("state_hash", state_hash)
           ]
         "initial_validate: verifier threw an error while verifying transiton \
@@ -622,7 +622,7 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
         [%log warn]
           ~metadata:
             [ ("state_hash", state_hash)
-            ; ("err", Error_json.error_to_yojson err)
+            ; ("err", Mina_stdlib.Error_json.error_to_yojson err)
             ]
           "initial_validate: block failed to verify due to $err." ;
         let%map () =
@@ -642,7 +642,7 @@ let initial_validate ~context:(module Context : CONTEXT) ~trust_system
     | Error e ->
         [%log warn]
           ~metadata:
-            [ ("error", Error_json.error_to_yojson e)
+            [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
             ; ("state_hash", state_hash)
             ]
           "initial_validate: verification of blockchain snark failed but it \
@@ -950,7 +950,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                   ~metadata:
                     [ ("state_hash", State_hash.to_yojson node.state_hash)
                     ; ( "error"
-                      , Error_json.error_to_yojson
+                      , Mina_stdlib.Error_json.error_to_yojson
                           (Verifier.invalid_to_error err) )
                     ] ;
                 ( match iv.sender with

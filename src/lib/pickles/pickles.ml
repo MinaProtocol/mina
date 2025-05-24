@@ -1991,7 +1991,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
           let check_verifier_error err =
             (* Convert to JSON to make it easy to parse. *)
-            err |> Error_json.error_to_yojson
+            err |> Mina_stdlib.Error_json.error_to_yojson
             |> Yojson.Safe.Util.member "multiple"
             |> Yojson.Safe.Util.to_list
             |> List.find_exn ~f:(fun json ->

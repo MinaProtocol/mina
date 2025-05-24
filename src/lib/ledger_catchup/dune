@@ -46,7 +46,6 @@
   network_peer
   logger
   trust_system
-  error_json
   rose_tree
   transition_frontier_base
   network_pool

@@ -17,7 +17,7 @@
   integers
   base.caml
   ;; local libraries
-  error_json
+  mina_stdlib
   transition_frontier_base
   rfc3339_time
   gossip_net

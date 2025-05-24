@@ -93,7 +93,7 @@ type t =
 let create ~logger ~constraint_constants ~pids : t Deferred.t =
   let on_failure err =
     [%log error] "Uptime service SNARK worker process failed with error $err"
-      ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
+      ~metadata:[ ("err", Mina_stdlib.Error_json.error_to_yojson err) ] ;
     Error.raise err
   in
   [%log info] "Starting a new uptime service SNARK worker process" ;

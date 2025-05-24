@@ -21,7 +21,7 @@
   merkle_ledger
   downloader
   protocol_version
-  error_json
+  mina_stdlib
   mina_net2
   block_time
   trust_system

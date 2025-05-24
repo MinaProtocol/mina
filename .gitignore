@@ -111,3 +111,5 @@ _coverage/
 
 # Claude AI assistance file
 CLAUDE.md
+
+**/.claude/settings.local.json

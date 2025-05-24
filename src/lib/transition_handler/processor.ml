@@ -259,7 +259,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
                   ~metadata:[ ("reason", `String (Error.to_string_hum error)) ] ;
                 [%log error]
                   ~metadata:
-                    (metadata @ [ ("error", Error_json.error_to_yojson error) ])
+                    ( metadata
+                    @ [ ("error", Mina_stdlib.Error_json.error_to_yojson error)
+                      ] )
                   "Error while building breadcrumb in the transition handler \
                    processor: $error" ;
                 Deferred.return (Error ())
@@ -399,8 +401,9 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       [%log error]
                         "Error, failed to attach all catchup breadcrumbs to \
                          transition frontier: $error"
-                        ~metadata:[ ("error", Error_json.error_to_yojson err) ]
-                  )
+                        ~metadata:
+                          [ ("error", Mina_stdlib.Error_json.error_to_yojson err)
+                          ] )
                   >>| fun () ->
                   match subsequent_callback_action with
                   | `Ledger_catchup decrement_signal ->
@@ -445,7 +448,9 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                             [ ("reason", `String (Error.to_string_hum err)) ] ;
                         [%log error]
                           ~metadata:
-                            [ ("error", Error_json.error_to_yojson err) ]
+                            [ ( "error"
+                              , Mina_stdlib.Error_json.error_to_yojson err )
+                            ]
                           "Error, failed to attach produced breadcrumb to \
                            transition frontier: $error" ;
                         let (_ : Transition_frontier.Breadcrumb.t) =

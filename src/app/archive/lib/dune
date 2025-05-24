@@ -32,7 +32,7 @@
   consensus.vrf
   currency
   data_hash_lib
-  error_json
+  mina_stdlib
   genesis_constants
   genesis_ledger_helper
   genesis_ledger_helper.lib

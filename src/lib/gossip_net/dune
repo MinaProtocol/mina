@@ -38,7 +38,7 @@
   node_addrs_and_ports
   mina_metrics
   child_processes
-  error_json
+  mina_stdlib
   block_time
   genesis_constants
   bounded_types)

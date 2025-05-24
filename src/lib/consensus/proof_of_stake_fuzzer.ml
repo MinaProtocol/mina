@@ -323,7 +323,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
       in
       Or_error.iter_error res ~f:(fun e ->
           [%log error]
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+            ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
             "Prover threw an error while extending block: $error" ) ;
       res
   | "check" ->
@@ -354,7 +354,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
       in
       Or_error.iter_error res ~f:(fun e ->
           [%log error]
-            ~metadata:[ ("error", Error_json.error_to_yojson e) ]
+            ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ]
             "Prover threw an error while extending block: $error" ) ;
       res
   | "none" ->

@@ -417,7 +417,7 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
     ~keypairs ~commit_id =
   let on_failure err =
     [%log error] "VRF evaluator process failed with error $err"
-      ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
+      ~metadata:[ ("err", Mina_stdlib.Error_json.error_to_yojson err) ] ;
     Error.raise err
   in
   [%log info] "Starting a new vrf-evaluator process" ;

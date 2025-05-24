@@ -462,7 +462,7 @@ let check_state_hash ~logger state_hash_opt =
           [%log error] "Error decoding state hash"
             ~metadata:
               [ ("state_hash", `String state_hash)
-              ; ("error", Error_json.error_to_yojson err)
+              ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
               ] ;
           Core.exit 1 )
 

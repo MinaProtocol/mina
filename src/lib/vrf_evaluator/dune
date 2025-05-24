@@ -15,7 +15,7 @@
   integers
   ;; local libraries
   mina_wire_types
-  error_json
+  mina_stdlib
   currency
   unsigned_extended
   interruptible
