@@ -101,13 +101,8 @@ module Inputs = struct
                 ~metadata:
                   [ ("error", Error_json.error_to_yojson e)
                   ; ( "spec"
-                      (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
-                         so we use the less-desirable sexp here
-                      *)
-                    , `String
-                        (Sexp.to_string
-                           (Snark_work_lib.Selector.Single.Spec.Stable.Latest
-                            .sexp_of_t single ) ) )
+                    , Snark_work_lib.Selector.Single.Spec.Stable.Latest
+                      .to_yojson single )
                   ] ;
               Error e
           | Ok res ->
