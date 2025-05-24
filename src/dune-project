@@ -168,6 +168,7 @@
 (package (name rosetta_lib))
 (package (name rosetta_models))
 (package (name run_in_thread))
+(package (name runtime_genesis_ledger))
 (package (name secrets))
 (package (name sgn))
 (package (name sgn_type))
