@@ -20,7 +20,7 @@
   yojson
   ;; local libraries
   block_time
-  bounded_types
+  mina_stdlib
   cli_lib
   consensus
   currency

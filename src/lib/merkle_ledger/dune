@@ -22,7 +22,6 @@
   rocks
   sexplib0
   ;; local libraries
-  bounded_types
   cache_dir
   mina_stdlib
   key_value_database

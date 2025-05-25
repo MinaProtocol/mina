@@ -95,7 +95,7 @@
  (modules kimchi_types)
  (instrumentation
   (backend bisect_ppx))
- (libraries bounded_types)
+ (libraries mina_stdlib)
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
@@ -105,7 +105,7 @@
  (public_name pasta_bindings)
  (name pasta_bindings)
  (modules pasta_bindings)
- (libraries kimchi_types pasta_bindings.backend bounded_types)
+ (libraries kimchi_types mina_stdlib pasta_bindings.backend)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
@@ -117,7 +117,7 @@
  (public_name kimchi_bindings)
  (name kimchi_bindings)
  (modules kimchi_bindings)
- (libraries pasta_bindings kimchi_types bounded_types)
+ (libraries pasta_bindings kimchi_types mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
@@ -134,7 +134,7 @@
  ; ^ Required for compilation of this library separately
  ; from libraries that depend on it
  (c_library_flags :standard "-lpthread")
- (libraries bounded_types)
+ (libraries mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests

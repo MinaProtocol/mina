@@ -16,7 +16,7 @@
   async_kernel
   mina_metrics
   ppx_version.runtime
-  bounded_types)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

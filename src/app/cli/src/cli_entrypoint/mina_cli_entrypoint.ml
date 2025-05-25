@@ -1585,9 +1585,9 @@ let primitive_ok = function
       true
   | "kimchi_backend_bigint_32_V1" ->
       true
-  | "Bounded_types.String.t"
-  | "Bounded_types.String.Tagged.t"
-  | "Bounded_types.Array.t" ->
+  | "Mina_stdlib.Bounded_types.String.t"
+  | "Mina_stdlib.Bounded_types.String.Tagged.t"
+  | "Mina_stdlib.Bounded_types.Array.t" ->
       true
   | "8fabab0a-4992-11e6-8cca-9ba2c4686d9e" ->
       true (* hashtbl *)

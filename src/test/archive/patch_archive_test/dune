@@ -24,7 +24,7 @@
   base.caml
   result
   mina_automation
-  bounded_types)
+  mina_stdlib)
  (preprocessor_deps ../../../config.mlh)
  (instrumentation
   (backend bisect_ppx))
