@@ -1,3 +1,10 @@
+(** Testing
+    -------
+    Component:  Mina stdlib time
+    Invocation: dune exec src/lib/mina_stdlib/tests/test_graph_algorithms.exe
+    Subject:    Graph algorithms tests
+*)
+
 open Core_kernel
 
 let test_tree_connectivity () =
@@ -17,7 +24,9 @@ let test_tree_connectivity () =
     ; (5, [ 2 ])
     ]
   in
-  let connectivity = Mina_stdlib.Graph_algorithms.connectivity (module Int) tree in
+  let connectivity =
+    Mina_stdlib.Graph_algorithms.connectivity (module Int) tree
+  in
   Alcotest.(check int)
     "Tree connectivity should be 1" 1
     (Mina_stdlib.Nat.to_int connectivity)
