@@ -70,7 +70,6 @@
   itn_crypto
   mina_transaction
   mina_generators
-  mina_user_error
   mina_ledger
   mina_block
   mina_lib

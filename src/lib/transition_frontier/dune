@@ -37,7 +37,7 @@
   block_time
   trust_system
   with_hash
-  rose_tree
+  mina_stdlib
   quickcheck_lib
   protocol_version
   mina_net2

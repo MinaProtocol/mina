@@ -37,7 +37,6 @@
   with_hash
   currency
   mina_stdlib
-  mina_user_error
   gossip_net
   transition_frontier
   trust_system
