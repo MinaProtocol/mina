@@ -22,7 +22,7 @@
   result
   bin_prot.shape
   ;; local libraries
-  bounded_types
+  mina_stdlib
   transition_chain_prover
   best_tip_prover
   proof_carrying_data
@@ -36,7 +36,6 @@
   transition_frontier_base
   with_hash
   currency
-  mina_stdlib
   gossip_net
   transition_frontier
   trust_system

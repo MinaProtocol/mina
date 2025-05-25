@@ -25,7 +25,7 @@
   pipe_lib
   network_peer
   o1trace
-  bounded_types)
+  mina_stdlib)
  (preprocess
   (pps ppx_version ppx_jane))
  (instrumentation

@@ -62,7 +62,9 @@ module Rpcs : sig
     type query = Ledger_hash.t * Sync_ledger.Query.t
 
     type response =
-      (Sync_ledger.Answer.t, Bounded_types.Wrapped_error.Stable.V1.t) Result.t
+      ( Sync_ledger.Answer.t
+      , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
+      Result.t
   end
 
   module Get_transition_chain : sig

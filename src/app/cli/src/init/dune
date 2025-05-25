@@ -39,7 +39,7 @@
   mirage-crypto-ec
   base_quickcheck
   ;;local libraries
-  bounded_types
+  mina_stdlib
   snark_profiler_lib
   archive_lib
   mina_wire_types
@@ -64,7 +64,6 @@
   currency
   genesis_constants
   graphql_lib
-  mina_stdlib
   o1trace_webkit_event
   generated_graphql_queries
   itn_crypto

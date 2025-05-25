@@ -12,10 +12,13 @@
   ; opam libraries
   async_kernel
   base.caml
+  bin_prot
   bin_prot.shape
   core_kernel
+  ppx_inline_test.config
   result
   sexplib0
+  stdlib
   ; local libraries
   ppx_version.runtime)
  (instrumentation
@@ -25,6 +28,7 @@
    ppx_compare
    ppx_deriving.std
    ppx_deriving_yojson
+   ppx_inline_test
    ppx_jane
    ppx_mina
    ppx_version))

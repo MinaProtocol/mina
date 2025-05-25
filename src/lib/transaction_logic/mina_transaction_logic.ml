@@ -1100,7 +1100,7 @@ module Make (L : Ledger_intf.S) :
     end
 
     module Zkapp_uri = struct
-      type t = Bounded_types.String.t
+      type t = Mina_stdlib.Bounded_types.String.t
 
       let if_ = value_if
     end

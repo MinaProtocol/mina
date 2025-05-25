@@ -30,7 +30,6 @@
   sexplib0
   ; Mina
   base58_check
-  bounded_types
   codable
   currency
   data_hash_lib

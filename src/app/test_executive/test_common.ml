@@ -189,15 +189,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let assert_peers_cant_be_partitioned ~max_disconnections nodes_and_responses =
     (* this check checks that the network does NOT become partitioned into isolated subgraphs, even if n nodes are hypothetically removed from the network.*)
     let _, responses = List.unzip nodes_and_responses in
-    let open Graph_algorithms in
     let () =
       Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
           G.output_graph c (graph_of_adjacency_list responses) )
     in
     (* Check that the network cannot be disconnected by removing up to max_disconnections number of nodes. *)
     match
-      Nat.take
-        (Graph_algorithms.connectivity (module String) responses)
+      Mina_stdlib.Nat.take
+        (Mina_stdlib.Graph_algorithms.connectivity (module String) responses)
         max_disconnections
     with
     | `Failed_after n ->
