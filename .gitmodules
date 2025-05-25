@@ -1,6 +1,6 @@
 [submodule "src/lib/snarky"]
 	path = src/lib/snarky
-	url = https://github.com/o1-labs/snarky
+	url = https://github.com/glyh/snarky
 [submodule "src/lib/crypto/proof-systems"]
 	path = src/lib/crypto/proof-systems
 	url = https://github.com/o1-labs/proof-systems.git
