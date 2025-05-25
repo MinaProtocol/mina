@@ -30,7 +30,7 @@
   cli_lib
   transition_frontier
   data_hash_lib
-  rose_tree
+  mina_stdlib
   consensus
   mina_wire_types
   pickles.backend

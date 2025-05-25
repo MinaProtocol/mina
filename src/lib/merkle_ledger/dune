@@ -24,11 +24,9 @@
   ;; local libraries
   bounded_types
   cache_dir
-  empty_hashes
-  immutable_array
+  mina_stdlib
   key_value_database
   merkle_address
-  mina_stdlib
   ppx_version.runtime
   visualization)
  (preprocess

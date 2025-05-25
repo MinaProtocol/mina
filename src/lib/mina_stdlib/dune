@@ -15,10 +15,17 @@
   async_kernel
   sexplib0
   bin_prot.shape
+  result
   ; local libraries
   ppx_version.runtime)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_version ppx_deriving.std ppx_mina ppx_compare))
+  (pps
+   ppx_jane
+   ppx_version
+   ppx_deriving.std
+   ppx_mina
+   ppx_compare
+   ppx_deriving_yojson))
  (synopsis "Mina standard library"))

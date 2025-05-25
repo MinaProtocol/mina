@@ -69,7 +69,8 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
         | Error err -> (
             match handle_missing with
             | `Must_exist ->
-                Mina_user_error.raisef ~where:"reading configuration file"
+                Mina_stdlib.Mina_user_error.raisef
+                  ~where:"reading configuration file"
                   "The configuration file %s could not be read:\n%s" config_file
                   (Error.to_string_hum err)
             | `May_be_missing ->
@@ -538,7 +539,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
            Option.value_map opt ~default:None ~f:(fun s ->
                if String.length s < 200 then Some s
                else
-                 Mina_user_error.raisef
+                 Mina_stdlib.Mina_user_error.raisef
                    "The length of contact info exceeds 200 characters:\n %s" s ) )
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
@@ -902,14 +903,15 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    | Ok key -> (
                        match Public_key.decompress key with
                        | None ->
-                           Mina_user_error.raisef
+                           Mina_stdlib.Mina_user_error.raisef
                              ~where:"decompressing a public key"
                              "The %s public key %s could not be decompressed."
                              which pk_str
                        | Some _ ->
                            Some key )
                    | Error _e ->
-                       Mina_user_error.raisef ~where:"decoding a public key"
+                       Mina_stdlib.Mina_user_error.raisef
+                         ~where:"decoding a public key"
                          "The %s public key %s could not be decoded." which
                          pk_str )
           in
@@ -977,11 +979,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               , Sys.getenv "MINA_BP_PRIVKEY" )
             with
             | Some _, Some _, _ ->
-                Mina_user_error.raise
+                Mina_stdlib.Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
             | None, Some _, Some _ ->
-                Mina_user_error.raise
+                Mina_stdlib.Mina_user_error.raise
                   "You cannot provide both `MINA_BP_PRIVKEY` and \
                    `block_production_pubkey`"
             | None, None, None ->
@@ -1167,7 +1169,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                 | Ok contents ->
                     return (Mina_net2.Multiaddr.of_file_contents contents)
                 | Error _ ->
-                    Mina_user_error.raisef
+                    Mina_stdlib.Mina_user_error.raisef
                       ~where:"reading libp2p peer address file"
                       "The file %s could not be read.\n\n\
                        It must be a newline-separated list of libp2p \
@@ -1177,7 +1179,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           List.iter libp2p_peers_raw ~f:(fun raw_peer ->
               if not Mina_net2.Multiaddr.(valid_as_peer @@ of_string raw_peer)
               then
-                Mina_user_error.raisef ~where:"decoding peer as a multiaddress"
+                Mina_stdlib.Mina_user_error.raisef
+                  ~where:"decoding peer as a multiaddress"
                   "The given peer \"%s\" is not a valid multiaddress (ex: \
                    /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
                   raw_peer ) ;
@@ -1241,7 +1244,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           else if
             List.is_empty initial_peers && Option.is_none seed_peer_list_url
           then
-            Mina_user_error.raise
+            Mina_stdlib.Mina_user_error.raise
               {|No peers were given.
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
@@ -1315,7 +1318,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           | Some _, Some _, None | Some _, None, Some _ | None, None, None ->
               ()
           | _ ->
-              Mina_user_error.raise
+              Mina_stdlib.Mina_user_error.raise
                 "Must provide both --uptime-url and exactly one of \
                  --uptime-submitter-key or --uptime-submitter-pubkey" ) ;
           let uptime_url =
@@ -1334,7 +1337,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                            not decompress)"
                           s () )
                 | Error err ->
-                    Mina_user_error.raisef
+                    Mina_stdlib.Mina_user_error.raisef
                       "Invalid public key %s for uptime submitter, %s" s
                       (Error.to_string_hum err) () )
           in
