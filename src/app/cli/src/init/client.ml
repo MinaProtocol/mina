@@ -673,7 +673,7 @@ let send_rosetta_transactions_graphql =
              Format.eprintf "@[<v>Error:@,%a@,@]@."
                (Yojson.Safe.pretty_print ?std:None)
                (Error_json.error_to_yojson err) ;
-             Core_kernel.exit 1 ) )
+             Core.exit 1 ) )
 
 module Export_logs = struct
   let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
@@ -802,7 +802,7 @@ let export_ledger =
            if Option.is_some state_hash then (
              Format.eprintf "A state hash should not be given for %s@."
                ledger_kind ;
-             Core_kernel.exit 1 )
+             Core.exit 1 )
          in
          let response =
            match ledger_kind with
@@ -1829,10 +1829,7 @@ let compile_time_constants =
     (Command.Param.return (fun () ->
          let home = Core.Sys.home_directory () in
          let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
-         let genesis_dir =
-           let home = Core.Sys.home_directory () in
-           home ^/ Cli_lib.Default.conf_dir_name
-         in
+         let genesis_dir = home ^/ Cli_lib.Default.conf_dir_name in
          let config_file =
            match Sys.getenv "MINA_CONFIG_FILE" with
            | Some config_file ->
@@ -1859,8 +1856,7 @@ let compile_time_constants =
                , `String
                    ( Block_time.to_time_exn
                        consensus_constants.genesis_state_timestamp
-                   |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
-                   ) )
+                   |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc ) )
              ; ("k", `Int (Unsigned.UInt32.to_int consensus_constants.k))
              ; ( "coinbase"
                , `String
@@ -1890,7 +1886,7 @@ let compile_time_constants =
                )
              ]
          in
-         Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ) )
+         printf "%s\n%!" (Yojson.Safe.to_string all_constants) ) )
 
 let node_status =
   let open Command.Param in
@@ -2300,7 +2296,7 @@ let signature_kind =
              (* Prefix string to disambiguate *)
              "other network: " ^ s
        in
-       Core.print_endline signature_kind_string )
+       print_endline signature_kind_string )
 
 let test_genesis_creation =
   Command.async ~summary:"Test genesis creation"
