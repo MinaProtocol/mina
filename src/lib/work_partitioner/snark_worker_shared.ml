@@ -14,7 +14,7 @@ module Zkapp_command_inputs = struct
         * Zkapp_command_segment.Basic.Stable.V1.t
         * Statement.With_sok.Stable.V2.t )
         list
-      [@@deriving sexp, to_yojson]
+      [@@deriving to_yojson]
 
       let to_latest = Fn.id
     end
