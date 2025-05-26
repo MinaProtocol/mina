@@ -1,0 +1,22 @@
+(test
+ (name test_transaction)
+ (flags
+  -open
+  Core_kernel)
+ (package graphql_lib)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+   ; opam libraries
+  alcotest
+  core_kernel
+  sexplib0
+  graphql-async
+  graphql
+  yojson
+  ; local libraries
+  genesis_constants
+  graphql_basic_scalars
+  mina_transaction
+  mina_base
+  graphql_lib.mina_transaction))

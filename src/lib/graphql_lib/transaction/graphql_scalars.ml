@@ -1,5 +1,4 @@
 open Graphql_basic_scalars.Utils
-open Graphql_basic_scalars.Testing
 
 module Make (Schema : Schema) = struct
   module TransactionHash =
@@ -24,36 +23,3 @@ module Make (Schema : Schema) = struct
 end
 
 include Make (Schema)
-
-let%test_module "Roundtrip tests" =
-  ( module struct
-    include Make (Test_schema)
-
-    let%test_module "TransactionHash" =
-      ( module struct
-        module TransactionHash_gen = struct
-          include Mina_transaction.Transaction_hash
-          open Core_kernel
-
-          let gen =
-            Mina_base.Coinbase.Gen.gen
-              ~constraint_constants:
-                Genesis_constants.For_unit_tests.Constraint_constants.t
-            |> Quickcheck.Generator.map ~f:(fun (coinbase, _) ->
-                   hash_coinbase coinbase )
-        end
-
-        include Make_test (TransactionHash) (TransactionHash_gen)
-      end )
-
-    let%test_module "TransactionId" =
-      ( module struct
-        module TransactionId_gen = struct
-          include Mina_base.User_command.Stable.Latest
-
-          let gen = Mina_base.User_command.gen
-        end
-
-        include Make_test (TransactionId) (TransactionId_gen)
-      end )
-  end )

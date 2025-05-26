@@ -1,12 +1,14 @@
 (**
-   This file defines basic graphql scalars in a shape usable by graphql_ppx for serialising.
+   This file defines basic graphql scalars in a shape usable by graphql_ppx for
+   serialising.
 
    It is meant to be used by backend graphql code.
 
-   It also includes basic round-trip testing facilities for GraphQL scalar types.
+   It also includes basic round-trip testing facilities for GraphQL scalar
+   types.
 
-   The [graphql_lib] library re-exports these basic scalars as well as other ones,
-   and is meant to be used by client code (via grapqh_ppx).
+   The [graphql_lib] library re-exports these basic scalars as well as other
+   ones, and is meant to be used by client code (via grapqh_ppx).
  *)
 
 open Core_kernel
@@ -212,10 +214,12 @@ let%test_module "Roundtrip tests" =
     module Time_gen = struct
       type t = Core_kernel.Time.t
 
-      (* The following generator function is copied from version 0.15.0 of the core library, and only generates values that can be serialized.
+      (* The following generator function is copied from version 0.15.0 of the
+         core library, and only generates values that can be serialized.
          https://github.com/janestreet/core/blob/35941320a3eab628786ae3853e5f753a3ab357c2/core/src/span_float.ml#L742-L754.
          See issue https://github.com/MinaProtocol/mina/issues/11310.
-         Once the core library is updated to >= 0.15.0, [Core.Time.quickcheck_generator] should be used instead work.*)
+         Once the core library is updated to >= 0.15.0,
+         [Core.Time.quickcheck_generator] should be used instead work.*)
 
       let gen =
         Quickcheck.Generator.map Span_gen.gen

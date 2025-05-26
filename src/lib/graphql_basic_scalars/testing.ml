@@ -1,6 +1,4 @@
-(**
-   Utils for roundtrip testing of graphql scalars.
- *)
+(** Utils for roundtrip testing of graphql scalars. *)
 open Utils
 
 module type Test_Intf = sig
@@ -85,4 +83,6 @@ struct
   include Produce_test (S) (G)
 
   let%test_unit "test" = test_query ()
+
+  let run_test_alcotest = test_query ()
 end
