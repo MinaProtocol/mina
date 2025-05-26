@@ -42,7 +42,7 @@
   node_status_service
   vrf_evaluator
   uptime_service
-  exit_handlers
+  mina_stdlib_unix
   daemon_rpcs
   sync_status
   node_addrs_and_ports

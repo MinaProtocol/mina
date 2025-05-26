@@ -126,4 +126,5 @@ let test_cache_deadlock (module Cache_impl : Cache_intf) =
   | Some dir ->
       run_in_dir dir
   | None ->
-      File_system.with_temp_dir "/tmp/cache_deadlock_test" ~f:run_in_dir
+      Mina_stdlib_unix.File_system.with_temp_dir "/tmp/cache_deadlock_test"
+        ~f:run_in_dir
