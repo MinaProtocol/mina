@@ -1,8 +1,11 @@
-(library
- (name staged_ledger_diff)
- (public_name staged_ledger_diff)
+(test
+ (name test_bitswap_block)
+ (package staged_ledger_diff)
+ (preprocess
+  (pps ppx_mina ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson))
  (libraries
-  ;; opam libraries
+  ; opam libraries
+  alcotest
   async
   async_kernel
   async_unix
@@ -14,7 +17,7 @@
   splittable_random
   stdint
   stdio
-  ;; local libraries
+  ; local libraries
   allocation_functor
   consensus
   currency
@@ -31,8 +34,5 @@
   ppx_version.runtime
   signature_lib
   snark_params
-  transaction_snark_work)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_mina ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))
+  staged_ledger_diff
+  transaction_snark_work))
