@@ -74,7 +74,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
   let simple_write ?additional_checks () =
     Async.Thread_safe.block_on_async_exn
     @@ fun () ->
-    File_system.with_temp_dir "disk_cache"
+    Mina_stdlib_unix.File_system.with_temp_dir "disk_cache"
       ~f:(simple_write_impl ?additional_checks)
 
   let remove_data_on_gc_impl tmp_dir =
@@ -99,7 +99,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
   let remove_data_on_gc () =
     Async.Thread_safe.block_on_async_exn
     @@ fun () ->
-    File_system.with_temp_dir "disk_cache-remove_data_on_gc"
+    Mina_stdlib_unix.File_system.with_temp_dir "disk_cache-remove_data_on_gc"
       ~f:remove_data_on_gc_impl
 
   let initialize_and_expect_failure path ~logger =
@@ -157,8 +157,8 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
   let initialization_special_cases () =
     Async.Thread_safe.block_on_async_exn
     @@ fun () ->
-    File_system.with_temp_dir "disk_cache-invalid-initialization"
-      ~f:initialization_special_cases_impl
+    Mina_stdlib_unix.File_system.with_temp_dir
+      "disk_cache-invalid-initialization" ~f:initialization_special_cases_impl
 end
 
 module Make (Disk_cache : Disk_cache_intf.F_with_count) :
