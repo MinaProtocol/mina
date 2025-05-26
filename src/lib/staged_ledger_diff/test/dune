@@ -1,6 +1,8 @@
 (test
  (name test_bitswap_block)
  (package staged_ledger_diff)
+ (instrumentation
+  (backend bisect_ppx))
  (libraries
   ; opam libraries
   alcotest
