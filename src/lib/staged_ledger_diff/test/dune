@@ -1,38 +1,10 @@
 (test
  (name test_bitswap_block)
  (package staged_ledger_diff)
- (preprocess
-  (pps ppx_mina ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson))
  (libraries
   ; opam libraries
   alcotest
-  async
-  async_kernel
-  async_unix
-  base.caml
-  bin_prot.shape
-  blake2
   core_kernel
-  sexplib0
   splittable_random
-  stdint
-  stdio
   ; local libraries
-  allocation_functor
-  consensus
-  currency
-  genesis_constants
-  kimchi_pasta
-  kimchi_pasta.basic
-  logger
-  mina_base
-  mina_base.import
-  mina_numbers
-  mina_wire_types
-  pickles
-  pickles.backend
-  ppx_version.runtime
-  signature_lib
-  snark_params
-  staged_ledger_diff
-  transaction_snark_work))
+  staged_ledger_diff))
