@@ -8,7 +8,7 @@ type half = [ `First | `Second ] [@@deriving equal]
 type submitted_half = [ `First | `Second | `One ] [@@deriving equal]
 
 type t =
-  | SpecOnly of
+  | Spec_only of
       { spec : Work.Spec.Single.t One_or_two.t
       ; sok_message : Mina_base.Sok_message.t
       }
@@ -32,7 +32,7 @@ let merge_single_result (current : t)
     ~(submitted_result : (unit, Ledger_proof.Cached.t) Work.Result.Single.Poly.t)
     ~(submitted_half : submitted_half) : merge_outcome =
   match (current, submitted_half) with
-  | SpecOnly { spec = `One spec; sok_message = { fee; prover } }, `One ->
+  | Spec_only { spec = `One spec; sok_message = { fee; prover } }, `One ->
       let submitted_result =
         Work.Result.Single.Poly.map ~f_spec:Fn.id
           ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
@@ -43,9 +43,9 @@ let merge_single_result (current : t)
         ( statements
         , Mina_wire_types.Network_pool_priced_proof.V1.
             { proof = `One proof; fee = { fee; prover } } )
-  | ( SpecOnly { spec = `Two (spec, other_spec); sok_message }
+  | ( Spec_only { spec = `Two (spec, other_spec); sok_message }
     , (`First as submitted_half) )
-  | ( SpecOnly { spec = `Two (other_spec, spec); sok_message }
+  | ( Spec_only { spec = `Two (other_spec, spec); sok_message }
     , (`Second as submitted_half) ) ->
       Pending
         (One_of_two
@@ -87,8 +87,9 @@ let merge_single_result (current : t)
         ( statements
         , Mina_wire_types.Network_pool_priced_proof.V1.
             { proof; fee = { fee; prover } } )
-  | SpecOnly { spec = `One _ as spec; _ }, ((`First | `Second) as submitted_half)
-  | SpecOnly { spec = `Two _ as spec; _ }, (`One as submitted_half) ->
+  | ( Spec_only { spec = `One _ as spec; _ }
+    , ((`First | `Second) as submitted_half) )
+  | Spec_only { spec = `Two _ as spec; _ }, (`One as submitted_half) ->
       NoSuchHalf { submitted_half; spec }
   | One_of_two { in_pool_half = in_pool; _ }, (`One as submitted_half) ->
       HalfMismatch { submitted_half; in_pool }
