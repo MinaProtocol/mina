@@ -5,7 +5,6 @@
  (libraries
   ;; opam libraries
   async_unix
-  core
   base
   base64
   integers

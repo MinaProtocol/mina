@@ -2426,6 +2426,7 @@ module For_tests = struct
       ?(double_sender_nonce = true)
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let sender_pk = Public_key.compress sender.public_key in
     let actual_nonce =
       (* Here, we double the spec'd nonce, because we bump the nonce a second
@@ -2520,7 +2521,7 @@ module For_tests = struct
     in
     let account_updates_signature =
       let c = if use_full_commitment then full_commitment else commitment in
-      Schnorr.Chunked.sign sender.private_key
+      Schnorr.Chunked.sign ~signature_kind sender.private_key
         (Random_oracle.Input.Chunked.field c)
     in
     let account_updates =
@@ -2537,7 +2538,7 @@ module For_tests = struct
               account_update )
     in
     let signature =
-      Schnorr.Chunked.sign sender.private_key
+      Schnorr.Chunked.sign ~signature_kind sender.private_key
         (Random_oracle.Input.Chunked.field full_commitment)
     in
     { zkapp_command with

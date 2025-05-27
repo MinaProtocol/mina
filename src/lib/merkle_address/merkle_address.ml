@@ -25,7 +25,7 @@ let of_directions dirs =
     | [] ->
         ()
     | h :: t ->
-        if Direction.to_bool h then set path i ;
+        if Mina_stdlib.Direction.to_bool h then set path i ;
         loop (i + 1) t
   in
   loop 0 dirs ; path
@@ -75,7 +75,7 @@ module Stable = struct
     let t_of_sexp =
       let of_string buf =
         String.to_list buf
-        |> List.map ~f:(Fn.compose Direction.of_int_exn Char.to_int)
+        |> List.map ~f:(Fn.compose Mina_stdlib.Direction.of_int_exn Char.to_int)
         |> of_directions
       in
       Fn.compose of_string string_of_sexp
@@ -126,7 +126,7 @@ let child ~ledger_depth (path : t) dir : t Or_error.t =
   if is_leaf ~ledger_depth path then
     Or_error.error_string "The address length cannot be greater than depth"
   else
-    let dir_bit = Direction.to_bool dir in
+    let dir_bit = Mina_stdlib.Direction.to_bool dir in
     let%bitstring path = {| path: -1: bitstring; dir_bit: 1|} in
     Or_error.return path
 
@@ -165,7 +165,8 @@ let of_int_exn ~ledger_depth index =
     buf
 
 let dirs_from_root t =
-  List.init (depth t) ~f:(fun pos -> Direction.of_bool (is_set t pos))
+  List.init (depth t) ~f:(fun pos ->
+      Mina_stdlib.Direction.of_bool (is_set t pos) )
 
 let root () = create_bitstring 0
 
@@ -290,10 +291,12 @@ struct
     List.is_empty (dirs_from_root (root ()))
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
-    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t List.t * Direction.t]
+    Quickcheck.test
+      ~sexp_of:
+        [%sexp_of: Mina_stdlib.Direction.t List.t * Mina_stdlib.Direction.t]
       (Quickcheck.Generator.tuple2
-         (Direction.gen_var_length_list Input.depth)
-         Direction.gen )
+         (Mina_stdlib.Direction.gen_var_length_list Input.depth)
+         Mina_stdlib.Direction.gen )
       ~f:(fun (path, direction) ->
         let address = of_directions path in
         [%test_eq: t]
@@ -308,21 +311,22 @@ struct
           (to_int @@ of_int_exn ~ledger_depth:Input.depth index) )
 
   let%test_unit "of_index_exn(to_index(addr)) = addr" =
-    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_list Input.depth) ~f:(fun directions ->
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
+      (Mina_stdlib.Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address
           (of_int_exn ~ledger_depth:Input.depth @@ to_int address) )
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
-    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:(fun directions ->
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
+      (Mina_stdlib.Direction.gen_var_length_list ~start:1 Input.depth)
+      ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address (sibling @@ sibling address) )
 
   let%test_unit "prev(next(addr)) = addr" =
-    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      (Direction.gen_list Input.depth) ~f:(fun directions ->
+    Quickcheck.test ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t list]
+      (Mina_stdlib.Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         match next address with
         | None ->

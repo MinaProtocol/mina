@@ -244,7 +244,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
           let first_location =
             Location.Account
               ( Addr.of_directions
-              @@ List.init mdb.depth ~f:(fun _ -> Direction.Left) )
+              @@ List.init mdb.depth ~f:(fun _ -> Mina_stdlib.Direction.Left) )
           in
           set_raw mdb location (Location.serialize ~ledger_depth first_location) ;
           Result.return first_location
@@ -506,12 +506,13 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   module For_tests = struct
     let gen_account_location ~ledger_depth =
       let open Quickcheck.Let_syntax in
-      let build_account (path : Direction.t list) =
+      let build_account (path : Mina_stdlib.Direction.t list) =
         assert (List.length path = ledger_depth) ;
         Location.Account (Addr.of_directions path)
       in
       let%map dirs =
-        Quickcheck.Generator.list_with_length ledger_depth Direction.gen
+        Quickcheck.Generator.list_with_length ledger_depth
+          Mina_stdlib.Direction.gen
       in
       build_account dirs
   end
@@ -618,7 +619,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     in
     let dependency_hashes = get_hash_batch_exn mdb dependency_locs in
     List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
-        Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
+        Mina_stdlib.Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
   let path_batch_impl ~expand_query ~compute_path mdb locations =
     let locations =
@@ -648,7 +649,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let res =
           List.map2_exn loc_and_dir_list sibling_hashes
             ~f:(fun (_, direction) sibling_hash ->
-              Direction.map direction ~left:(`Left sibling_hash)
+              Mina_stdlib.Direction.map direction ~left:(`Left sibling_hash)
                 ~right:(`Right sibling_hash) )
         in
         (rest_hashes, res) )
@@ -664,7 +665,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let res =
           List.map3_exn loc_and_dir_list sibling_hashes self_hashes
             ~f:(fun (_, direction) sibling_hash self_hash ->
-              Direction.map direction
+              Mina_stdlib.Direction.map direction
                 ~left:(`Left (self_hash, sibling_hash))
                 ~right:(`Right (sibling_hash, self_hash)) )
         in

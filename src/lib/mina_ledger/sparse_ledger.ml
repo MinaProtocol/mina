@@ -28,7 +28,8 @@ let of_ledger_subset_exn_impl ~path_query ~path_add (oledger : Ledger.t) keys =
     let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
     let empty_address =
       Ledger.Addr.of_directions
-      @@ List.init (Ledger.depth oledger) ~f:(Fn.const Direction.Left)
+      @@ List.init (Ledger.depth oledger)
+           ~f:(Fn.const Mina_stdlib.Direction.Left)
     in
     let empty_locations =
       if num_new_accounts = 0 then []

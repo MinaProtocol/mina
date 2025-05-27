@@ -550,8 +550,10 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%bind input =
         Transaction_union_payload.Checked.to_input_legacy payload
       in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let%bind verifies =
-        Schnorr.Legacy.Checked.verifies shifted signature signer input
+        Schnorr.Legacy.Checked.verifies ~signature_kind shifted signature signer
+          input
       in
       [%with_label_ "check signature"] (fun () ->
           Boolean.Assert.any [ Boolean.not is_user_command; verifies ] )
@@ -637,7 +639,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Chunked.Checked.verifies shifted signature pk
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      Schnorr.Chunked.Checked.verifies ~signature_kind shifted signature pk
         (Random_oracle.Input.Chunked.field payload_digest)
 
     module Zkapp_command_snark = struct
@@ -4250,6 +4253,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let create_zkapp_command ?receiver_auth ?empty_sender
         ~(constraint_constants : Genesis_constants.Constraint_constants.t) spec
         ~update ~receiver_update =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let { Spec.fee
           ; sender = sender, sender_nonce
           ; fee_payer = fee_payer_opt
@@ -4499,10 +4503,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         let fee_payer_signature_auth =
           match fee_payer_opt with
           | None ->
-              Signature_lib.Schnorr.Chunked.sign sender.private_key
+              Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                sender.private_key
                 (Random_oracle.Input.Chunked.field full_commitment)
           | Some (fee_payer_kp, _) ->
-              Signature_lib.Schnorr.Chunked.sign fee_payer_kp.private_key
+              Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                fee_payer_kp.private_key
                 (Random_oracle.Input.Chunked.field full_commitment)
         in
         { fee_payer with authorization = fee_payer_signature_auth }
@@ -4513,7 +4519,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               if s.body.use_full_commitment then full_commitment else commitment
             in
             let sender_signature_auth =
-              Signature_lib.Schnorr.Chunked.sign sender.private_key
+              Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                sender.private_key
                 (Random_oracle.Input.Chunked.field commitment)
             in
             { body = s.body; authorization = Signature sender_signature_auth } )
@@ -4536,7 +4543,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                          receiver keypair but got receiver public key"
                 in
                 let receiver_signature_auth =
-                  Signature_lib.Schnorr.Chunked.sign receiver_kp.private_key
+                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                    receiver_kp.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
                 { Account_update.Poly.body = s.body
@@ -4603,6 +4611,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
         (spec : Deploy_snapp_spec.t) =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let `VK vk, `Prover _trivial_prover = create_trivial_snapp () in
       let%map.Async.Deferred vk = vk in
       (* only allow timing on a single new snapp account
@@ -4659,7 +4668,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 else commitment
               in
               let signature =
-                Signature_lib.Schnorr.Chunked.sign keypair.private_key
+                Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                  keypair.private_key
                   (Random_oracle.Input.Chunked.field commitment)
               in
               ( { body = snapp_account_update.body
@@ -4670,25 +4680,8 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account_updates =
         Option.to_list sender_account_update @ snapp_zkapp_command
       in
-      let zkapp_command : Zkapp_command.t =
-        { fee_payer
-        ; memo
-        ; account_updates =
-            Zkapp_command.Call_forest.of_account_updates account_updates
-              ~account_update_depth:(fun (p : Account_update.Simple.t) ->
-                p.body.call_depth )
-            |> Zkapp_command.Call_forest.map
-                 ~f:
-                   (Fn.compose
-                      (Account_update.map_proofs
-                         ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
-                      Account_update.of_simple )
-            |> Zkapp_command.Call_forest.accumulate_hashes
-                 ~hash_account_update:(fun (p : Account_update.t) ->
-                   Zkapp_command.Digest.Account_update.create p )
-        }
-      in
-      zkapp_command
+      Zkapp_command.of_simple ~proof_cache_db
+        { fee_payer; memo; account_updates }
 
     (* This spec is intended to build a zkapp command with only one account update
        with proof authorization. This is mainly for cross-network replay tests. We
@@ -4734,9 +4727,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let single_account_update ?zkapp_prover_and_vk ~chain ~constraint_constants
-        (spec : Single_account_update_spec.t) : Zkapp_command.t Async.Deferred.t
-        =
+    let single_account_update ?zkapp_prover_and_vk ~signature_kind
+        ~constraint_constants (spec : Single_account_update_spec.t) :
+        Zkapp_command.t Async.Deferred.t =
       let `VK vk, `Prover prover =
         match zkapp_prover_and_vk with
         | Some (prover, vk) ->
@@ -4779,7 +4772,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
       in
       let account_update_digest_with_selected_chain =
-        Zkapp_command.Digest.Account_update.create ~chain
+        Zkapp_command.Digest.Account_update.create ~signature_kind
           account_update_with_dummy_auth
       in
       let account_update_digest_with_current_chain =
@@ -4824,9 +4817,13 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
         ]
       in
-      Zkapp_command.map_proofs
-        ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db)
-        { fee_payer; memo; account_updates = forest }
+      { Zkapp_command.Poly.fee_payer
+      ; memo
+      ; account_updates =
+          Zkapp_command.Call_forest.map
+            ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
+            forest
+      }
 
     module Update_states_spec = struct
       type t =
@@ -4893,6 +4890,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let update_states ?receiver_auth ?zkapp_prover_and_vk ?empty_sender
         ~constraint_constants (spec : Update_states_spec.t) =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let prover, vk =
         match zkapp_prover_and_vk with
         | Some (prover, vk) ->
@@ -4954,7 +4952,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   else commitment
                 in
                 let signature =
-                  Signature_lib.Schnorr.Chunked.sign snapp_keypair.private_key
+                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                    snapp_keypair.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
                 Async.Deferred.return
@@ -5058,8 +5057,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let sender_account_update = Option.value_exn sender_account_update in
         Zkapp_command.Call_forest.cons
           ( Account_update.of_simple sender_account_update
-          |> Account_update.map_proofs
-               ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) )
+          |> Account_update.write_all_proofs_to_disk ~proof_cache_db )
           zkapp_command.account_updates
       in
       { zkapp_command with account_updates }
@@ -5148,6 +5146,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let create_trivial_predicate_snapp
         ?(protocol_state_predicate = Zkapp_precondition.Protocol_state.accept)
         ~(snapp_kp : Signature_lib.Keypair.t) spec ledger =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let { Mina_transaction_logic.For_tests.Transaction_spec.fee
           ; sender = sender, sender_nonce
           ; receiver = _
@@ -5281,14 +5280,14 @@ module Make_str (A : Wire_types.Concrete) = struct
               (Zkapp_command.Digest.Account_update.create
                  (Account_update.of_fee_payer fee_payer) )
         in
-        Signature_lib.Schnorr.Chunked.sign sender.private_key
+        Signature_lib.Schnorr.Chunked.sign ~signature_kind sender.private_key
           (Random_oracle.Input.Chunked.field txn_comm)
       in
       let fee_payer =
         { fee_payer with authorization = fee_payer_signature_auth }
       in
       let sender_signature_auth =
-        Signature_lib.Schnorr.Chunked.sign sender.private_key
+        Signature_lib.Schnorr.Chunked.sign ~signature_kind sender.private_key
           (Random_oracle.Input.Chunked.field transaction)
       in
       let sender : Account_update.Simple.t =

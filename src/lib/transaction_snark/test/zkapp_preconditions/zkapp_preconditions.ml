@@ -239,6 +239,7 @@ let%test_module "Protocol state precondition tests" =
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "invalid protocol state predicate in other zkapp_command" =
+      let signature_kind = U.signature_kind in
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
       let gen =
@@ -374,14 +375,16 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let fee_payer =
                     let fee_payer_signature_auth =
-                      Signature_lib.Schnorr.Chunked.sign sender.private_key
+                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                        sender.private_key
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
                     { fee_payer with authorization = fee_payer_signature_auth }
                   in
                   let sender_account_update : Account_update.Simple.t =
                     let signature_auth : Signature.t =
-                      Signature_lib.Schnorr.Chunked.sign sender.private_key
+                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                        sender.private_key
                         (Random_oracle.Input.Chunked.field commitment)
                     in
                     { sender_account_update with
@@ -390,7 +393,8 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let snapp_account_update =
                     let signature_auth =
-                      Signature_lib.Schnorr.Chunked.sign new_kp.private_key
+                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                        new_kp.private_key
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
                     { snapp_account_update with
@@ -860,6 +864,7 @@ let%test_module "Account precondition tests" =
                     ~state_body ledger [ zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in fee payer" =
+      let signature_kind = U.signature_kind in
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -968,14 +973,16 @@ let%test_module "Account precondition tests" =
               in
               let fee_payer =
                 let fee_payer_signature_auth =
-                  Signature_lib.Schnorr.Chunked.sign sender.private_key
+                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                    sender.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
                 { fee_payer with authorization = fee_payer_signature_auth }
               in
               let sender_account_update =
                 let signature_auth : Signature.t =
-                  Signature_lib.Schnorr.Chunked.sign sender.private_key
+                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                    sender.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
                 { sender_account_update with
@@ -984,7 +991,8 @@ let%test_module "Account precondition tests" =
               in
               let snapp_account_update =
                 let signature_auth =
-                  Signature_lib.Schnorr.Chunked.sign new_kp.private_key
+                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                    new_kp.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
                 { snapp_account_update with

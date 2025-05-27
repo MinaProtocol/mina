@@ -390,7 +390,8 @@ end = struct
             let content_root_addr =
               funpow
                 (MT.depth mt - height)
-                (fun a -> Addr.child_exn ~ledger_depth a Direction.Left)
+                (fun a ->
+                  Addr.child_exn ~ledger_depth a Mina_stdlib.Direction.Left )
                 (Addr.root ())
             in
             Either.First

@@ -82,7 +82,9 @@ module Make (Test : Test_intf) = struct
     let rec add_direction count b accum =
       if count >= Test.depth then accum
       else
-        let dir = if b then Direction.Right else Direction.Left in
+        let dir =
+          if b then Mina_stdlib.Direction.Right else Mina_stdlib.Direction.Left
+        in
         add_direction (count + 1) (not b) (dir :: accum)
     in
     add_direction 0 false []

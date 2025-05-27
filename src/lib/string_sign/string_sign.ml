@@ -56,8 +56,14 @@ let string_to_input s =
 let verify ?signature_kind signature pk s =
   let m = string_to_input s in
   let inner_curve = Inner_curve.of_affine pk in
-  Schnorr.Legacy.verify ?signature_kind signature inner_curve m
+  let signature_kind =
+    Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+  in
+  Schnorr.Legacy.verify ~signature_kind signature inner_curve m
 
 let sign ?signature_kind sk s =
   let m = string_to_input s in
-  Schnorr.Legacy.sign ?signature_kind sk m
+  let signature_kind =
+    Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
+  in
+  Schnorr.Legacy.sign ~signature_kind sk m

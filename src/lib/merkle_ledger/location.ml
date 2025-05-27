@@ -69,7 +69,7 @@ module T = struct
   let root_hash : t = Hash (Addr.root ())
 
   let last_direction path =
-    Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
+    Mina_stdlib.Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
 
   let build_generic (data : Bigstring.t) : t = Generic data
 
@@ -146,9 +146,9 @@ module T = struct
 
   let order_siblings (location : t) (base : 'a) (sibling : 'a) : 'a * 'a =
     match last_direction (to_path_exn location) with
-    | Left ->
+    | Mina_stdlib.Direction.Left ->
         (base, sibling)
-    | Right ->
+    | Mina_stdlib.Direction.Right ->
         (sibling, base)
 
   (* Returns a reverse of traversal path from top of the tree to the location
@@ -157,7 +157,8 @@ module T = struct
      By reverse it means that head of returned list contains direction from
      location's parent to the location along with the location's sibling.
   *)
-  let merkle_path_dependencies_exn (location : t) : (t * Direction.t) list =
+  let merkle_path_dependencies_exn (location : t) :
+      (t * Mina_stdlib.Direction.t) list =
     let rec loop k =
       if Addr.depth k = 0 then []
       else

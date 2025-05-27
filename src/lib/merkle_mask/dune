@@ -35,7 +35,6 @@
   yojson
   ;; local libraries
   debug_assert
-  direction
   empty_hashes
   logger
   merkle_ledger

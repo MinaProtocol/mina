@@ -6,6 +6,8 @@ val genesis_constants : Genesis_constants.t
 
 val proof_level : Genesis_constants.Proof_level.t
 
+val signature_kind : Mina_signature_kind.t
+
 val consensus_constants : Consensus.Constants.t
 
 val constraint_constants : Genesis_constants.Constraint_constants.t
