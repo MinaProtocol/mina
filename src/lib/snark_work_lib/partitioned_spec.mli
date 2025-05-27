@@ -4,12 +4,10 @@ module Poly : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type ('witness, 'ledger_proof, 'sub_zkapp_spec, 'data) t =
+      type ('single_spec, 'sub_zkapp_spec, 'data) t =
         | Single of
             { job :
-                ( ('witness, 'ledger_proof) Single_spec.Poly.Stable.V2.t
-                , Id.Single.Stable.V1.t )
-                With_status.Stable.V1.t
+                ('single_spec, Id.Single.Stable.V1.t) With_status.Stable.V1.t
             ; data : 'data
             }
         | Sub_zkapp_command of
@@ -23,17 +21,16 @@ module Poly : sig
     end
   end]
 
-  val drop_data : ('a, 'b, 'c, 'd) t -> ('a, 'b, 'c, unit) t
+  val drop_data : ('a, 'b, 'c) t -> ('a, 'b, unit) t
 
   val map :
-       f_witness:('a -> 'b)
+       f_single_spec:('a -> 'b)
     -> f_subzkapp_spec:('c -> 'd)
-    -> f_proof:('e -> 'f)
-    -> f_data:('g -> 'h)
-    -> ('a, 'e, 'c, 'g) t
-    -> ('b, 'f, 'd, 'h) t
+    -> f_data:('e -> 'f)
+    -> ('a, 'c, 'e) t
+    -> ('b, 'd, 'f) t
 
-  val sok_message : ('a, 'b, 'c, 'd) t -> Mina_base.Sok_message.t
+  val sok_message : ('a, 'b, 'c) t -> Mina_base.Sok_message.t
 end
 
 [%%versioned:
@@ -42,8 +39,7 @@ module Stable : sig
 
   module V1 : sig
     type t =
-      ( Transaction_witness.Stable.V2.t
-      , Ledger_proof.Stable.V2.t
+      ( Single_spec.Stable.V1.t
       , Sub_zkapp_spec.Stable.V1.t
       , unit )
       Poly.Stable.V1.t
@@ -56,16 +52,11 @@ module Stable : sig
     val map_with_statement :
          t
       -> f:(Transaction_snark.Statement.Stable.Latest.t -> unit -> 'a)
-      -> ( Transaction_witness.Stable.V2.t
-         , Mina_wire_types.Transaction_snark.V2.t
-         , Sub_zkapp_spec.Stable.V1.t
-         , 'a )
-         Poly.t
+      -> (Single_spec.Stable.V1.t, Sub_zkapp_spec.Stable.V1.t, 'a) Poly.t
   end
 end]
 
-type t =
-  (Transaction_witness.t, Ledger_proof.Cached.t, Sub_zkapp_spec.t, unit) Poly.t
+type t = (Single_spec.t, Sub_zkapp_spec.t, unit) Poly.t
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
 

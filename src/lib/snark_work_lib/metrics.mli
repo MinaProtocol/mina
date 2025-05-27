@@ -12,4 +12,8 @@ type snark_work_generated =
   | Sub_zkapp_command of { kind : [ `Merge | `Segment ]; elapsed : Time.Span.t }
 
 val emit_proof_metrics :
-  result:Partitioned_result.Stable.V1.t -> snark_work_generated
+     ( Single_spec.Stable.V1.t
+     , Sub_zkapp_spec.Stable.V1.t
+     , (Core_kernel_private.Span_float.t, 'a) Proof_carrying_data.t )
+     Partitioned_spec.Poly.t
+  -> snark_work_generated
