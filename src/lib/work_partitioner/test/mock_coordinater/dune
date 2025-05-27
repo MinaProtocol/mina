@@ -1,0 +1,14 @@
+(test
+ (name test_mock_snark_coordinater)
+ (package work_partitioner)
+ (libraries snark_worker work_partitioner)
+ (preprocess
+  (pps
+   ppx_compare
+   ppx_hash
+   ppx_let
+   ppx_mina
+   ppx_deriving_yojson
+   ppx_sexp_conv))
+ (instrumentation
+  (backend bisect_ppx)))
