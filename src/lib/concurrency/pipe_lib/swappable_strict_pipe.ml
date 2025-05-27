@@ -1,111 +1,142 @@
 open Core_kernel
 open Async_kernel
 
-(* NOTE: Data flow:
-      long_live_writer
-   -external-producer-> long_live_reader
-   -actor-> tmp_swapped_writer
-   -external-consumer-> tmp_swapped_reader (tracked out of this structure)
-*)
+type 'data_in_pipe short_lived_sink_t =
+  ('data_in_pipe, Strict_pipe.synchronous, unit Deferred.t) Strict_pipe.Writer.t
 
-(* NOTE: We don't know exactly when a writer could be freed, hence a reference
-   counter is here. *)
-type 'data_in_pipe tmp_swapped =
-  { mutable rc : int
-  ; writer :
-      ( 'data_in_pipe
-      , Strict_pipe.synchronous
-      , unit Deferred.t )
-      Strict_pipe.Writer.t
-  }
+type ('data_in_pipe, 'write_return) t =
+  | Swappable :
+      { long_lived_writer :
+          ('data_in_pipe, 'pipe_kind, 'write_return) Strict_pipe.Writer.t
+      ; termination_signal : unit Ivar.t
+            (** mutable variable [next_short_lived_sink] is only written from
+          within the [background_thread] *)
+      ; mutable next_short_lived_sink :
+          ('data_in_pipe short_lived_sink_t * unit Ivar.t) Ivar.t
+      }
+      -> ('data_in_pipe, 'write_return) t
 
-let tmp_swapped_incr (tmp_swapped : _ tmp_swapped) =
-  tmp_swapped.rc <- tmp_swapped.rc + 1
-
-let tmp_swapped_decr (tmp_swapped : _ tmp_swapped) =
-  tmp_swapped.rc <- tmp_swapped.rc - 1 ;
-  if 0 = tmp_swapped.rc then Strict_pipe.Writer.kill tmp_swapped.writer
-
-type ('data_in_pipe, 'pipe_kind, 'write_return) t =
+type ('data_in_pipe, 'write_return) state_t =
   { name : string
-  ; long_live_writer :
-      ('data_in_pipe, 'pipe_kind, 'write_return) Strict_pipe.Writer.t
-  ; long_live_reader : 'data_in_pipe Strict_pipe.Reader.t
-  ; mutable should_terminate : bool
-  ; mutable reader_request :
-      (string * 'data_in_pipe Strict_pipe.Reader.t Ivar.t) option
-  ; mutable tmp_swapped : 'data_in_pipe tmp_swapped option
+  ; long_lived_reader : 'data_in_pipe Strict_pipe.Reader.t
+  ; short_lived_sink : 'data_in_pipe short_lived_sink_t option
+  ; data_unconsumed : 'data_in_pipe option
+  ; exposed : ('data_in_pipe, 'write_return) t
   }
 
-let run (t : _ t) =
-  let process_reader_request () =
-    let%map.Option tmp_pipe_name, response = t.reader_request in
-    let tmp_reader, new_tmp_writer =
-      Strict_pipe.create ~name:tmp_pipe_name Strict_pipe.Synchronous
-    in
-    Option.iter ~f:tmp_swapped_decr t.tmp_swapped ;
-    t.tmp_swapped <- Some { writer = new_tmp_writer; rc = 1 } ;
-    Ivar.fill response tmp_reader ;
-    t.reader_request <- None ;
-    `Worked
+let terminate state =
+  let (Swappable { long_lived_writer; next_short_lived_sink; _ }) =
+    state.exposed
   in
-  let process_write () =
-    match t.tmp_swapped with
-    | None ->
-        Deferred.return None
-    | Some tmp_swapped -> (
-        match%map Strict_pipe.Reader.read t.long_live_reader with
-        | `Ok data ->
-            tmp_swapped_incr tmp_swapped ;
-            Deferred.don't_wait_for
-              (let%map () = Strict_pipe.Writer.write tmp_swapped.writer data in
-               tmp_swapped_decr tmp_swapped ) ;
-            Some `Worked
+  Strict_pipe.Writer.kill long_lived_writer ;
+  Option.iter ~f:Strict_pipe.Writer.kill state.short_lived_sink ;
+  Option.iter (Ivar.peek next_short_lived_sink)
+    ~f:(fun (writer, processed_signal) ->
+      Strict_pipe.Writer.kill writer ;
+      Ivar.fill processed_signal () ) ;
+  `Finished ()
+
+let terminate_choice state =
+  let (Swappable { termination_signal; _ }) = state.exposed in
+  choice (Ivar.read termination_signal) (fun () -> terminate state)
+
+let read_short_lived_sink_choice state =
+  let (Swappable t) = state.exposed in
+  choice (Ivar.read t.next_short_lived_sink)
+    (fun (new_sink, processed_signal) ->
+      t.next_short_lived_sink <- Ivar.create () ;
+      Ivar.fill processed_signal () ;
+      Option.iter ~f:Strict_pipe.Writer.kill state.short_lived_sink ;
+      `Repeat { state with short_lived_sink = Some new_sink } )
+
+let write_sink_choice ~sink ~data state =
+  choice (Strict_pipe.Writer.write sink data) (fun () ->
+      `Repeat { state with data_unconsumed = None } )
+
+let short_lived_write state sink data =
+  choose
+    [ terminate_choice state
+    ; write_sink_choice ~sink ~data state
+    ; read_short_lived_sink_choice state
+    ]
+
+let read_short_lived_sink state =
+  choose [ terminate_choice state; read_short_lived_sink_choice state ]
+
+let read_long_lived state =
+  choose
+    [ terminate_choice state
+    ; choice (Strict_pipe.Reader.read state.long_lived_reader) (function
+        (* Only may happen due to termination, repeating to exit gracefully *)
         | `Eof ->
-            t.should_terminate <- true ;
-            Some `Worked )
-  in
-  let step t =
-    if t.should_terminate then (
-      Strict_pipe.Writer.kill t.long_live_writer ;
-      Option.iter ~f:tmp_swapped_decr t.tmp_swapped ;
-      Deferred.return (`Finished ()) )
-    else
-      match process_reader_request () with
-      | Some `Worked ->
-          let%map _ = process_write () in
-          `Repeat t
-      | None -> (
-          match%bind process_write () with
-          | Some `Worked ->
-              Deferred.return (`Repeat t)
-          | None ->
-              let%map () = Async_kernel_scheduler.yield () in
-              `Repeat t )
-  in
-  Deferred.repeat_until_finished t step
+            `Repeat state
+        | `Ok x ->
+            `Repeat { state with data_unconsumed = Some x } )
+    ]
+
+let step (state : _ state_t) =
+  let (Swappable { termination_signal; _ }) = state.exposed in
+  match (state.data_unconsumed, state.short_lived_sink) with
+  (* If the swappable pipe is terminated, we are done *)
+  | _ when Ivar.is_full termination_signal ->
+      Deferred.return (terminate state)
+  | _, None ->
+      read_short_lived_sink state
+  | None, Some _ ->
+      read_long_lived state
+  | Some data, Some short_lived_sink ->
+      short_lived_write state short_lived_sink data
+
+let background_thread ~name (t : _ state_t) =
+  O1trace.background_thread (name ^ "-swappable") (fun () ->
+      Deferred.repeat_until_finished t step )
 
 let create ?warn_on_drop ~name type_ =
-  let long_live_reader, long_live_writer =
+  let long_lived_reader, long_lived_writer =
     Strict_pipe.create ~name ?warn_on_drop type_
   in
-  let actor =
+  let exposed =
+    Swappable
+      { long_lived_writer
+      ; termination_signal = Ivar.create ()
+      ; next_short_lived_sink = Ivar.create ()
+      }
+  in
+  let state =
     { name
-    ; long_live_writer
-    ; long_live_reader
-    ; should_terminate = false
-    ; reader_request = None
-    ; tmp_swapped = None
+    ; long_lived_reader
+    ; exposed
+    ; short_lived_sink = None
+    ; data_unconsumed = None
     }
   in
-  don't_wait_for (run actor) ;
-  actor
+  background_thread ~name state ;
+  exposed
 
-let write { long_live_writer; _ } = Strict_pipe.Writer.write long_live_writer
+let write (Swappable { long_lived_writer; _ }) =
+  Strict_pipe.Writer.write long_lived_writer
 
-let swap_reader ~reader_name t : 'data_in_pipe Strict_pipe.Reader.t Deferred.t =
-  let response = Ivar.create () in
-  t.reader_request <- Some (reader_name, response) ;
-  Ivar.read response
+let swap_reader ~reader_name (Swappable t) =
+  let short_lived_reader, short_lived_writer =
+    Strict_pipe.create ~name:reader_name Synchronous
+  in
+  (* If the pipe is terminated, an immediately closed reader is returned.
+     If [t.next_short_lived_sink] is full, it means there was a race
+     (within the same async cycle) between two calls to [swap_reader],
+     and the first-that-came wins, while for later calls an immediately closed
+     reader is returned.
+  *)
+  if Ivar.is_full t.termination_signal || Ivar.is_full t.next_short_lived_sink
+  then (
+    Strict_pipe.Writer.kill short_lived_writer ;
+    Deferred.return short_lived_reader )
+  else
+    (* TODO when rewriting to Ocaml 5.x, the "else" case may result in a
+           concurrency bug, though it's safe in single-threaded ocaml execution
+    *)
+    let processed_signal = Ivar.create () in
+    Ivar.fill t.next_short_lived_sink (short_lived_writer, processed_signal) ;
+    let%map () = Ivar.read processed_signal in
+    short_lived_reader
 
-let kill t = t.should_terminate <- true
+let kill (Swappable t) = Ivar.fill_if_empty t.termination_signal ()
