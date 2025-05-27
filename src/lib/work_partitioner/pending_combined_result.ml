@@ -8,23 +8,31 @@ type half = [ `First | `Second ] [@@deriving equal]
 type submitted_half = [ `First | `Second | `One ] [@@deriving equal]
 
 type t =
-  { single_result : (Work.Result.Single.t * half) option
+  { single_result : (Work.Result.Single.Stable.Latest.t * half) option
   ; sok_message : Mina_base.Sok_message.t
   }
 
 type merge_outcome =
   | Pending of t
-  | Done of Work.Result.Combined.t
+  | Done of Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
   | HalfMismatch of { submitted : submitted_half; in_pool : half }
 
-let merge_single_result (in_pool : t) ~(submitted_result : Work.Result.Single.t)
+let merge_single_result (in_pool : t)
+    ~(submitted_result : Work.Result.Single.Stable.Latest.t)
     ~(submitted_half : submitted_half) : merge_outcome =
   let { single_result; sok_message = { prover; fee } } = in_pool in
   match single_result with
   | None -> (
       match submitted_half with
       | `One ->
-          Done { data = `One submitted_result; fee; prover }
+          let Work.Result.Single.Poly.{ spec; proof; _ } = submitted_result in
+          let statements = `One (Work.Spec.Single.Poly.statement spec) in
+          Done
+            (Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2
+             .Add_solved_work
+               ( statements
+               , Mina_wire_types.Network_pool_priced_proof.V1.
+                   { proof = `One proof; fee = { fee; prover } } ) )
       | (`First | `Second) as submitted_half ->
           Pending
             { in_pool with
@@ -39,8 +47,19 @@ let merge_single_result (in_pool : t) ~(submitted_result : Work.Result.Single.t)
           let results =
             match submitted_half with
             | `First ->
-                (submitted_result, in_pool_result)
+                `Two (submitted_result, in_pool_result)
             | `Second ->
-                (in_pool_result, submitted_result)
+                `Two (in_pool_result, submitted_result)
           in
-          Done { data = `Two results; fee; prover } )
+          let statements =
+            One_or_two.map
+              ~f:(fun result -> Work.Spec.Single.Poly.statement result.spec)
+              results
+          in
+          let proof = One_or_two.map ~f:(fun result -> result.proof) results in
+          Done
+            (Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2
+             .Add_solved_work
+               ( statements
+               , Mina_wire_types.Network_pool_priced_proof.V1.
+                   { proof; fee = { fee; prover } } ) ) )

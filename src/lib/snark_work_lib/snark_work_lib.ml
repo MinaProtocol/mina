@@ -10,7 +10,6 @@ end
 module Result = struct
   module Partitioned = Partitioned_result
   module Single = Single_result
-  module Combined = Combined_result
   module Flat = Flat_result
 end
 

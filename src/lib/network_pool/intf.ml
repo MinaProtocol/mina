@@ -345,7 +345,7 @@ module type Snark_pool_diff_intf = sig
 
   val compact_json : t -> Yojson.Safe.t option
 
-  val of_result : Snark_work_lib.Result.Combined.Stable.Latest.t -> t
+  (* val of_result : Snark_work_lib.Result.Combined.Stable.Latest.t -> t *)
 end
 
 module type Transaction_pool_diff_intf = sig
