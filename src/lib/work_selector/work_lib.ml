@@ -83,6 +83,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                                 ( Time.diff end_time start_time
                                 |> Time.Span.to_ms ) )
                           ] ;
+                      t.jobs_seen <- Seen_key.Map.empty ;
                       t.available_jobs <- new_available_jobs ) ;
                   Deferred.unit )
               |> Deferred.don't_wait_for ) ;
