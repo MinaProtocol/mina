@@ -3,5 +3,5 @@ module Linear_pipe = Linear_pipe
 
 module Strict_pipe = struct
   include Strict_pipe
-  module Replacable = Replacable_strict_pipe
+  module Replaceable = Replaceable_strict_pipe
 end
