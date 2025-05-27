@@ -1,0 +1,9 @@
+(test
+ (name test_mock_snark_coordinater)
+ (package work_partitioner)
+ (libraries
+  work_partitioner)
+ (preprocess
+  (pps ppx_let ppx_deriving_yojson))
+ (instrumentation
+  (backend bisect_ppx)))
