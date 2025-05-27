@@ -1170,7 +1170,10 @@ module Mutations = struct
                 ~memo:(Signed_command_memo.create_from_string_exn memo)
                 ~body
             in
-            let signature = Ok (Signed_command.sign_payload sender payload) in
+            let signature_kind = Mina_signature_kind.t_DEPRECATED in
+            let signature =
+              Ok (Signed_command.sign_payload ~signature_kind sender payload)
+            in
             [%log info]
               "Payment scheduler with handle %s is sending a payment from \
                sender %s"
@@ -2564,7 +2567,8 @@ module Queries = struct
             user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        Signed_command.check_signature user_command )
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
+        Signed_command.check_signature ~signature_kind user_command )
 
   let runtime_config =
     field "runtimeConfig"

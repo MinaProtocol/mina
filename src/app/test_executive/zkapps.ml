@@ -104,8 +104,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let body = Signed_command_payload.Body.Payment payment_payload in
       { Signed_command_payload.Poly.common; body }
     in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let raw_signature =
-      Signed_command.sign_payload sender.private_key payload
+      Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
     in
     match expected_failure with
