@@ -5,7 +5,7 @@ module Work = Snark_work_lib
 
 type half = [ `First | `Second ] [@@deriving equal]
 
-type submitted_half = [ `First | `Second | `One ] [@@deriving equal]
+type submitted_half = [ `First | `Second | `One ]
 
 type t =
   | Spec_only of
