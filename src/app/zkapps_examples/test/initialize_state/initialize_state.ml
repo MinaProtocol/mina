@@ -96,7 +96,9 @@ let%test_module "Initialize state test" =
     end
 
     module Update_state_account_update = struct
-      let new_state = List.init 8 ~f:(fun _ -> Snark_params.Tick.Field.one)
+      let new_state =
+        List.init Zkapp_state.max_size_int ~f:(fun _ ->
+            Snark_params.Tick.Field.one )
 
       let account_update, () =
         Async.Thread_safe.block_on_async_exn
