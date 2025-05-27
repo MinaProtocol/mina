@@ -1,15 +1,14 @@
 open Core_kernel
 open Snark_work_lib
 
-type t =
-  { job : (Spec.Single.t, Id.Single.t) With_job_meta.t
-        (* the original work being splitted, should be identical to Work_selector.work *)
-  ; unscheduled_segments : Spec.Sub_zkapp.t Queue.t
-  ; pending_mergeable_proofs : Ledger_proof.Cached.t Deque.t
-        (* we may need to insert proofs to merge back to the queue, hence a Deque *)
-  ; mutable elapsed : Time.Stable.Span.V1.t
-  ; mutable merge_remaining : int
-  }
+type t
+
+val create :
+     job:(Spec.Single.t, Id.Single.t) With_job_meta.t
+  -> unscheduled_segments:Spec.Sub_zkapp.t Base.Queue.t
+  -> pending_mergeable_proofs:Ledger_proof.Cached.t Deque.t
+  -> merge_remaining:int
+  -> t
 
 val generate_merge : t:t -> unit -> Spec.Sub_zkapp.t option
 

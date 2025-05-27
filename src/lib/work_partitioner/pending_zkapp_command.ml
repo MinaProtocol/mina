@@ -17,6 +17,15 @@ type t =
   ; mutable merge_remaining : int
   }
 
+let create ~job ~unscheduled_segments ~pending_mergeable_proofs ~merge_remaining
+    =
+  { job
+  ; unscheduled_segments
+  ; pending_mergeable_proofs
+  ; elapsed = Time.Span.zero
+  ; merge_remaining
+  }
+
 let generate_merge ~(t : t) () =
   let try_take2 (q : 'a Deque.t) : ('a * 'a) option =
     match Deque.dequeue_front q with
