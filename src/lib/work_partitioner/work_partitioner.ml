@@ -200,7 +200,7 @@ let consume_job_from_selector ~(partitioner : t)
     =
   let pairing_id = Id_generator.next_id partitioner.id_generator () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
-    ~data:{ single_result = None; sok_message } ;
+    ~data:{ spec = instances; single_result = None; sok_message } ;
 
   match instances with
   | `One single_spec ->
@@ -244,7 +244,8 @@ type submit_result =
   | Processed of Work.Result.Combined.t option
 (* If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
 
-let submit_single ~partitioner ~(submitted_result : Work.Result.Single.t)
+let submit_single ~partitioner
+    ~(submitted_result : (unit, Ledger_proof.Cached.t) Work.Result.Single.Poly.t)
     ~(submitted_half : [ `One | `First | `Second ]) ~id =
   let result = ref SchemeUnmatched in
   Hashtbl.change partitioner.pairing_pool id ~f:(function
@@ -259,7 +260,7 @@ let submit_single ~partitioner ~(submitted_result : Work.Result.Single.t)
         | Done combined ->
             result := Processed (Some combined) ;
             None
-        | HalfMismatch _ ->
+        | HalfMismatch _ | NoSuchHalf _ ->
             result := SchemeUnmatched ;
             Some pending_combined_result )
     | None ->
@@ -280,9 +281,9 @@ let submit_into_pending_zkapp_command ~partitioner
       let final_proof =
         Deque.dequeue_front_exn pending.pending_mergable_proofs
       in
-      let submitted_result : Work.Result.Single.t =
-        Work.Result.Single.Poly.
-          { spec = pending.job.spec; proof = final_proof; elapsed }
+      let submitted_result :
+          (unit, Ledger_proof.Cached.t) Work.Result.Single.Poly.t =
+        Work.Result.Single.Poly.{ spec = (); proof = final_proof; elapsed }
       in
 
       let Work.ID.Single.{ which_one; pairing_id } = pending.job.job_id in
