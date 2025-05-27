@@ -241,12 +241,10 @@ let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
 type submit_result =
   | SchemeUnmatched
   | Slashed
-  | Processed of
-      Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t option
+  | Processed of Work.Result.Combined.t option
 (* If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
 
-let submit_single ~partitioner
-    ~(submitted_result : Work.Result.Single.Stable.Latest.t)
+let submit_single ~partitioner ~(submitted_result : Work.Result.Single.t)
     ~(submitted_half : [ `One | `First | `Second ]) ~id =
   let result = ref SchemeUnmatched in
   Hashtbl.change partitioner.pairing_pool id ~f:(function

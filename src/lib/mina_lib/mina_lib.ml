@@ -901,11 +901,8 @@ let add_work ~(result : Snark_work_lib.Result.Partitioned.t) t =
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
   (* WARN: Callback hell *)
-  let after_partitioner_recombine_work (work : Work.Result.Combined.t) =
-    let spec =
-      One_or_two.map work.data ~f:(fun single ->
-          Work.Spec.Single.Poly.statement single.spec )
-    in
+  let after_partitioner_recombine_work ((spec, proof) : Work.Result.Combined.t)
+      =
     let after_work_enter_pool _ =
       (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
           * If the diff is accepted then remove it from the seen jobs.
@@ -916,8 +913,9 @@ let add_work ~(result : Snark_work_lib.Result.Partitioned.t) t =
 
     Network_pool.Snark_pool.(
       Local_sink.push t.pipes.snark_local_sink
-        ( Resource_pool.Diff.of_result
-            (Work.Result.Combined.read_all_proofs_from_disk work)
+        ( Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2
+          .Add_solved_work
+            (spec, proof)
         , after_work_enter_pool ))
     |> Deferred.don't_wait_for
   in
