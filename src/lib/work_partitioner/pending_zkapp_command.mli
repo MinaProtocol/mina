@@ -10,10 +10,6 @@ val create :
   -> merge_remaining:int
   -> t
 
-val generate_merge : t:t -> unit -> Spec.Sub_zkapp.t option
-
-val generate_segment : t:t -> unit -> Spec.Sub_zkapp.t option
-
 val generate_job_spec : t -> Spec.Sub_zkapp.t option
 
 val submit_proof :
