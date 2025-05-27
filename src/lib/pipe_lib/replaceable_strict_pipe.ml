@@ -8,6 +8,26 @@ open Async_kernel
    -external-consumer-> tmp_swapped_reader (tracked out of this structure)
 *)
 
+(* WARN: this is not real rw lock, but we need it to synchronize behavior
+   across different Async thread
+*)
+
+type 'data_in_pipe tmp_swapped =
+  { mutable rc : int
+  ; writer :
+      ( 'data_in_pipe
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
+  }
+
+let tmp_swapped_incr (tmp_swapped : _ tmp_swapped) =
+  tmp_swapped.rc <- tmp_swapped.rc + 1
+
+let tmp_swapped_decr (tmp_swapped : _ tmp_swapped) =
+  tmp_swapped.rc <- tmp_swapped.rc - 1 ;
+  if 0 = tmp_swapped.rc then Strict_pipe.Writer.kill tmp_swapped.writer
+
 type ('data_in_pipe, 'pipe_kind, 'write_return) t =
   { name : string
   ; long_live_writer :
@@ -16,12 +36,7 @@ type ('data_in_pipe, 'pipe_kind, 'write_return) t =
   ; mutable should_terminate : bool
   ; mutable reader_request :
       (string * 'data_in_pipe Strict_pipe.Reader.t Ivar.t) option
-  ; mutable tmp_swapped_writer :
-      ( 'data_in_pipe
-      , Strict_pipe.synchronous
-      , unit Deferred.t )
-      Strict_pipe.Writer.t
-      option
+  ; mutable tmp_swapped : 'data_in_pipe tmp_swapped option
   }
 
 let run (t : _ t) =
@@ -30,21 +45,23 @@ let run (t : _ t) =
     let tmp_reader, new_tmp_writer =
       Strict_pipe.create ~name:tmp_pipe_name Strict_pipe.Synchronous
     in
-    Option.iter ~f:Strict_pipe.Writer.kill t.tmp_swapped_writer ;
-    t.tmp_swapped_writer <- Some new_tmp_writer ;
+    Option.iter ~f:tmp_swapped_decr t.tmp_swapped ;
+    t.tmp_swapped <- Some { writer = new_tmp_writer; rc = 1 } ;
     Ivar.fill response tmp_reader ;
     t.reader_request <- None ;
     `Worked
   in
   let process_write () =
-    match t.tmp_swapped_writer with
+    match t.tmp_swapped with
     | None ->
         Deferred.return None
-    | Some tmp_swapped_writer -> (
+    | Some tmp_swapped -> (
         match%map Strict_pipe.Reader.read t.long_live_reader with
         | `Ok data ->
+            tmp_swapped_incr tmp_swapped ;
             Deferred.don't_wait_for
-              (Strict_pipe.Writer.write tmp_swapped_writer data) ;
+              (let%map () = Strict_pipe.Writer.write tmp_swapped.writer data in
+               tmp_swapped_decr tmp_swapped ) ;
             Some `Worked
         | `Eof ->
             t.should_terminate <- true ;
@@ -53,7 +70,7 @@ let run (t : _ t) =
   let step t =
     if t.should_terminate then (
       Strict_pipe.Writer.kill t.long_live_writer ;
-      Option.iter ~f:Strict_pipe.Writer.kill t.tmp_swapped_writer ;
+      Option.iter ~f:tmp_swapped_decr t.tmp_swapped ;
       Deferred.return (`Finished ()) )
     else
       match process_reader_request () with
@@ -80,7 +97,7 @@ let create ?warn_on_drop ~name type_ =
     ; long_live_reader
     ; should_terminate = false
     ; reader_request = None
-    ; tmp_swapped_writer = None
+    ; tmp_swapped = None
     }
   in
   don't_wait_for (run actor) ;
