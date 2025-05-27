@@ -41,13 +41,14 @@ let run (t : _ t) =
     | None ->
         Deferred.return None
     | Some tmp_swapped_writer -> (
-        match%bind Strict_pipe.Reader.read t.long_live_reader with
+        match%map Strict_pipe.Reader.read t.long_live_reader with
         | `Ok data ->
-            let%map () = Strict_pipe.Writer.write tmp_swapped_writer data in
+            Deferred.don't_wait_for
+              (Strict_pipe.Writer.write tmp_swapped_writer data) ;
             Some `Worked
         | `Eof ->
             t.should_terminate <- true ;
-            Deferred.return (Some `Worked) )
+            Some `Worked )
   in
   let step t =
     if t.should_terminate then (
