@@ -173,4 +173,23 @@ let () =
               Test_derivers.json_roundtrip_dummy
           ; test_case "Full circuit." `Quick Test_derivers.full_circuit
           ] )
+    ; Slot_reduction_vesting_test.
+        ( "slot reduction vesting update"
+        , [ test_case "Hardfork slot gen after vesting end works" `Quick
+              not_vesting_after_vesting
+          ; test_case "Hardfork slot gen before vesting end works" `Quick
+              vesting_before_vesting_end
+          ; test_case "Intermediate representation roundtrips" `Quick
+              record_conversion_roundtrip
+          ; test_case "Unadjusted vesting ends as expected" `Quick
+              unadjusted_vesting_ends_as_expected
+          ; test_case "Fast vesting schedules end as expected" `Quick
+              fast_vesting_ends_as_expected
+          ; test_case "Does not change minimum balance at hardfork" `Quick
+              minimum_balance_unchanged_at_hardfork
+          ; test_case "No even slot difference discrepancies" `Quick
+              no_even_vesting_discrepancies
+          ; test_case "No odd slot difference discrepancies" `Quick
+              no_odd_vesting_discrepancies
+          ] )
     ]
