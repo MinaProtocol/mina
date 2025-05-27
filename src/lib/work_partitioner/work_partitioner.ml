@@ -200,7 +200,7 @@ let consume_job_from_selector ~(partitioner : t)
     =
   let pairing_id = Id_generator.next_id partitioner.id_generator () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
-    ~data:{ spec = instances; single_result = None; sok_message } ;
+    ~data:(Spec_only { spec = instances; sok_message }) ;
 
   match instances with
   | `One single_spec ->
