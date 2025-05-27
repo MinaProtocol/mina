@@ -4,8 +4,10 @@
   ;; opam libraries
   alcotest
   async
-  core
+  core_kernel
+  yojson
   ;; mina libraries
+  mina_base
   pipe_lib
   snark_worker
   transaction_snark

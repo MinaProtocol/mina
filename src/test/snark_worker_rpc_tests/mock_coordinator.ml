@@ -7,19 +7,25 @@ module Selector_work_id = struct
   [@@deriving compare, sexp, to_yojson, hash]
 end
 
+let proof_cache_db = Proof_cache_tag.create_identity_db ()
+
 (* NOTE:
    The code here is adapt from Mina_lib/Mina_run.
 *)
-let mock_coordinator ~prover
-    ~(predefined_specs : Work.Spec.Single.t One_or_two.t Queue.t) ~partitioner
-    ~snark_work_fee ~logger ~port ~rpc_handshake_timeout
+let start ~prover
+    ~(predefined_specs : Work.Spec.Single.Stable.Latest.t One_or_two.t Queue.t)
+    ~partitioner ~snark_work_fee ~logger ~port ~rpc_handshake_timeout
     ~rpc_heartbeat_send_every ~rpc_heartbeat_timeout =
   let selector_work_pool : (Selector_work_id.t, Time.t) Hashtbl_intf.Hashtbl.t =
     Hashtbl.create (module Selector_work_id)
   in
-
   let work_from_selector () =
     let%map.Option spec = Queue.dequeue predefined_specs in
+    let spec =
+      One_or_two.map
+        ~f:(Snark_work_lib.Spec.Single.write_all_proofs_to_disk ~proof_cache_db)
+        spec
+    in
     let id = One_or_two.map ~f:Work.Spec.Single.Poly.statement spec in
     Hashtbl.add_exn selector_work_pool ~key:id ~data:(Time.now ()) ;
     let work_ids_json = id |> Transaction_snark_work.Statement.compact_json in
@@ -99,48 +105,45 @@ let mock_coordinator ~prover
     Tcp.Where_to_listen.bind_to All_addresses (On_port port)
   in
 
-  O1trace.background_thread "serve_client_rpcs" (fun () ->
-      Deferred.ignore_m
-        (Tcp.Server.create
-           ~on_handler_error:
+  Deferred.ignore_m
+    (Tcp.Server.create
+       ~on_handler_error:
+         (`Call
+           (fun _net exn ->
+             [%log error] "Exception while handling TCP server request: $error"
+               ~metadata:
+                 [ ("error", `String (Exn.to_string_mach exn))
+                 ; ("context", `String "rpc_tcp_server")
+                 ] ) )
+       where_to_listen
+       (fun address reader writer ->
+         let address = Socket.Address.Inet.addr address in
+         Rpc.Connection.server_with_close
+           ~handshake_timeout:rpc_handshake_timeout
+           ~heartbeat_config:
+             (Rpc.Connection.Heartbeat_config.create
+                ~timeout:
+                  (Time_ns.Span.of_sec
+                     (Time.Span.to_sec rpc_heartbeat_timeout) )
+                ~send_every:
+                  (Time_ns.Span.of_sec
+                     (Time.Span.to_sec rpc_heartbeat_send_every) )
+                () )
+           reader writer
+           ~implementations:
+             (Rpc.Implementations.create_exn
+                ~implementations:snark_worker_rpcs_coordinator
+                ~on_unknown_rpc:`Raise )
+           ~connection_state:(fun _ -> ())
+           ~on_handshake_error:
              (`Call
-               (fun _net exn ->
-                 [%log error]
-                   "Exception while handling TCP server request: $error"
+               (fun exn ->
+                 [%log warn]
+                   "Handshake error while handling RPC server request from \
+                    $address"
                    ~metadata:
                      [ ("error", `String (Exn.to_string_mach exn))
-                     ; ("context", `String "rpc_tcp_server")
-                     ] ) )
-           where_to_listen
-           (fun address reader writer ->
-             let address = Socket.Address.Inet.addr address in
-             Rpc.Connection.server_with_close
-               ~handshake_timeout:rpc_handshake_timeout
-               ~heartbeat_config:
-                 (Rpc.Connection.Heartbeat_config.create
-                    ~timeout:
-                      (Time_ns.Span.of_sec
-                         (Time.Span.to_sec rpc_heartbeat_timeout) )
-                    ~send_every:
-                      (Time_ns.Span.of_sec
-                         (Time.Span.to_sec rpc_heartbeat_send_every) )
-                    () )
-               reader writer
-               ~implementations:
-                 (Rpc.Implementations.create_exn
-                    ~implementations:snark_worker_rpcs_coordinator
-                    ~on_unknown_rpc:`Raise )
-               ~connection_state:(fun _ -> ())
-               ~on_handshake_error:
-                 (`Call
-                   (fun exn ->
-                     [%log warn]
-                       "Handshake error while handling RPC server request from \
-                        $address"
-                       ~metadata:
-                         [ ("error", `String (Exn.to_string_mach exn))
-                         ; ("context", `String "rpc_server")
-                         ; ( "address"
-                           , `String (Unix.Inet_addr.to_string address) )
-                         ] ;
-                     Deferred.unit ) ) ) ) )
+                     ; ("context", `String "rpc_server")
+                     ; ("address", `String (Unix.Inet_addr.to_string address))
+                     ] ;
+                 Deferred.unit ) ) ) )
