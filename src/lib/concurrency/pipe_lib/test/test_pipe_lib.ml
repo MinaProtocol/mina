@@ -1,24 +1,22 @@
-open Async
+open Async_kernel
 open Core_kernel
-open Pipe_lib
 
 let test_reader_hang () =
+  let open Pipe_lib.Strict_pipe.Swappable in
   let swappable =
-    Strict_pipe.Swappable.create ~name:"swappable"
+    create ~name:"swappable"
       (Buffered (`Capacity 50, `Overflow (Drop_head (const ()))))
   in
   let%bind _hanging_reader =
-    Strict_pipe.Swappable.swap_reader ~reader_name:"hanging reader" swappable
+    swap_reader ~reader_name:"hanging reader" swappable
   in
-  Strict_pipe.Swappable.write swappable 1 ;
-  Strict_pipe.Swappable.write swappable 2 ;
-  let%bind good_reader =
-    Strict_pipe.Swappable.swap_reader ~reader_name:"good reader" swappable
-  in
-  Strict_pipe.Swappable.write swappable 3 ;
+  write swappable 1 ;
+  write swappable 2 ;
+  let%bind good_reader = swap_reader ~reader_name:"good reader" swappable in
+  write swappable 3 ;
   let read_all_values =
     Deferred.List.iter [ 1; 2; 3 ] ~f:(fun i ->
-        match%map Strict_pipe.Swappable.Iterator.read good_reader with
+        match%map Iterator.read good_reader with
         | `Ok x when x = i ->
             ()
         | `Ok y ->
@@ -30,7 +28,7 @@ let test_reader_hang () =
   Deferred.choose
     [ Deferred.choice read_all_values ident
     ; Deferred.choice
-        (after (Time.Span.of_sec 1.5))
+        (after (Time_ns.Span.of_sec 1.5))
         (fun () -> failwith "Swappable strict pipe hangs, timeout!")
     ]
 
