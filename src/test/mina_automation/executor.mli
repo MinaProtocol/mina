@@ -3,11 +3,10 @@ open Async
 
 (** The type representing an executor *)
 
-
 module type AppPaths = sig
   (** The path to app from repo root *)
   val dune_name : string
- 
+
   (** The name of an app after debian/docker installation*)
   val official_name : string
 end
@@ -40,7 +39,8 @@ module Make (P : AppPaths) : sig
     | Local (* application ran from _build/default folder*)
     | Debian (* application installed from mina debian package *)
     | Docker of DockerContext.t (* application ran from docker container *)
-    | AutoDetect (* automatically detect the context *)
+    | AutoDetect
+  (* automatically detect the context *)
 
   module PathFinder : sig
     module Paths : AppPaths
