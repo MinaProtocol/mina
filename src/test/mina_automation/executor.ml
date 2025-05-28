@@ -57,6 +57,14 @@ module Make_PathFinder (P : AppPaths) = struct
             Deferred.return (Some P.official_name)
         | _ ->
             Deferred.return None )
+
+  let standalone_path_exn =
+    let%bind path = standalone_path in
+    match path with
+    | Some p ->
+        Deferred.return p
+    | None ->
+        failwithf "Cannot find %s in PATH or _build/default" P.official_name ()
 end
 
 module Make (P : AppPaths) = struct
