@@ -29,6 +29,8 @@ let verify_one ~srs
       _ Per_proof_witness.t ) (d : _ Types_map.For_step.t)
     (messages_for_next_wrap_proof : Digest.t) (unfinalized : Unfinalized.t)
     (must_verify : B.t) : _ Vector.t * B.t =
+  Printf.printf "\nverify one\n%!" ;
+
   Boolean.Assert.( = ) unfinalized.should_finalize must_verify ;
   let deferred_values = proof_state.deferred_values in
   let finalized, chals =
