@@ -268,7 +268,12 @@ module Inputs = struct
                           (* Validate the received transaction *)
                           match w.transaction with
                           | Command (Signed_command cmd) -> (
-                              match Signed_command.check cmd with
+                              let signature_kind =
+                                Mina_signature_kind.t_DEPRECATED
+                              in
+                              match
+                                Signed_command.check ~signature_kind cmd
+                              with
                               | Some cmd ->
                                   ( Ok (Command (Signed_command cmd))
                                     : Transaction.Valid.t Or_error.t )

@@ -338,7 +338,8 @@ module For_tests = struct
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:(Payment { receiver_pk; amount = send_amount })
         in
-        Signed_command.sign sender_keypair payload )
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
+        Signed_command.sign ~signature_kind sender_keypair payload )
 
   let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier

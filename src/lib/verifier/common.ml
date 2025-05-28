@@ -35,10 +35,11 @@ let invalid_to_error (invalid : invalid) : Error.t =
       Error.tag ~tag:"Invalid_proof" err
 
 let check_signed_command c =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   if not (Signed_command.check_valid_keys c) then
     Result.Error (`Invalid_keys (Signed_command.public_keys c))
   else
-    match Signed_command.check_only_for_signature c with
+    match Signed_command.check_only_for_signature ~signature_kind c with
     | Some _ ->
         Result.Ok (`Assuming [])
     | None ->

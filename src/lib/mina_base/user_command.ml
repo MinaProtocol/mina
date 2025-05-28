@@ -69,7 +69,8 @@ let gen_signed =
     Quickcheck.Generator.list_with_length 2
       Mina_base_import.Signature_keypair.gen
   in
-  G.payment_with_random_participants ~sign_type:`Real ~keys:(Array.of_list keys)
+  let sign_type = `Real Mina_signature_kind.t_DEPRECATED in
+  G.payment_with_random_participants ~sign_type ~keys:(Array.of_list keys)
     ~max_amount:10000 ~fee_range:1000 ()
 
 let gen = Gen.to_signed_command gen_signed
@@ -344,9 +345,10 @@ end
 
 module For_tests = struct
   let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match t with
     | Signed_command x -> (
-        match Signed_command.check x with
+        match Signed_command.check ~signature_kind x with
         | Some c ->
             Ok (Signed_command c)
         | None ->
