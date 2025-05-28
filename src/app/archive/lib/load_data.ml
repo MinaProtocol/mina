@@ -784,7 +784,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
            ; zkapp_uri_id
            }
          ->
-        let%bind { element0
+        let%bind [ element0
                  ; element1
                  ; element2
                  ; element3
@@ -792,7 +792,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
                  ; element5
                  ; element6
                  ; element7
-                 } =
+                 ] =
           query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
         in
         let elements =

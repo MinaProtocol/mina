@@ -55,6 +55,83 @@ module Type_spec = struct
     Caqti_type.custom ~encode ~decode (to_rep tys)
 end
 
+
+module Vecs = struct
+
+  type (_,_, _,_) t =
+    | [] : ('elem,unit,unit, Pickles_types.Nat.z) t
+    | ( :: ) : 'elem Caqti_type.t * ('elem,'a,'b,'n) t -> ('elem,'elem -> 'a,'elem * 'b, 'n Pickles_types.Nat.s) t
+
+  let rec vec_to_hlist :
+            'elem 'hlist 'tup 'n.
+            ('elem,'hlist,'tup, 'n ) t ->
+            ('elem,'n)Pickles_types.Vector.t ->
+            (unit, 'hlist) H_list.t =
+    fun (type elem hlist tup n)
+      (spec : (elem,hlist,tup, n) t)
+      (v : (elem,n)Pickles_types.Vector.t ) ->
+     match (spec, v) with
+     | [], [] ->
+         ([] : (unit, hlist) H_list.t)
+     | _ :: spec, (x :: v) ->
+         x :: vec_to_hlist spec v
+
+  let rec hlist_to_vec :
+            'elem 'hlist 'tup 'n.
+            ('elem,'hlist, 'tup, 'n) t -> (unit, 'hlist) H_list.t -> ('elem,'n)Pickles_types.Vector.t =
+    fun (type elem hlist tup n)
+        (spec : (elem,hlist,tup, n) t)
+        (l : (unit, hlist) H_list.t) ->
+     match (spec, l) with
+     | _ :: spec, x :: l ->
+         ((x :: hlist_to_vec spec l) : (elem,n)Pickles_types.Vector.t)
+     | [], [] -> []
+
+  let rec extract_type_spec : type elem hlist tuple n. (elem,hlist, tuple, n) t -> (hlist, tuple) Type_spec.t =
+    fun spec ->
+      match spec with
+      | [] -> []
+      | caqti_type :: rest ->
+          let extracted_rest = extract_type_spec rest in
+          caqti_type :: extracted_rest
+
+  let typ
+    = fun (spec : ('elem,'hlist,'tuple,'n)t) ->
+    Type_spec.custom_type
+      ~to_hlist:(vec_to_hlist spec)
+      ~of_hlist:(hlist_to_vec spec)
+      (extract_type_spec spec)
+
+  module type Intf = sig
+    type 'elem a
+    type 'elem b
+    type n
+    val spec : 'elem Caqti_type.t -> ('elem,'elem a,'elem b,n)t
+  end
+
+  let rec of_nat : type n. n Plonkish_prelude.Nat.nat -> (module Intf with type n = n) = function
+    | Z -> let
+      module N = struct
+          type 'elem a = unit
+          type 'elem b = unit
+          type n = Pickles_types.Nat.z
+          let spec = fun _ -> []
+      end
+        in (module N : Intf with type n = n)
+    | S p ->
+      let (module Prev) = of_nat p in
+      let
+      module N = struct
+          type 'elem a = 'elem -> 'elem Prev.a
+          type 'elem b = 'elem * 'elem Prev.b
+          type n = Prev.n Pickles_types.Nat.s
+          let spec : type elem . elem Caqti_type.t -> (elem,elem a,elem b,n)t
+            = fun (t : elem Caqti_type.t) -> t :: (Prev.spec t)
+      end
+        in (module N : Intf with type n = n)
+
+end
+
 (* build coding for array type that can be interpreted as a string
 
    for example, the ocaml string array `[| "foo"; "bar"; "baz" |]` would be encoded to

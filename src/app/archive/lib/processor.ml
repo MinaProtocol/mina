@@ -412,21 +412,13 @@ module Zkapp_states_nullable = struct
 end
 
 module Zkapp_states = struct
-  type t =
-    { element0 : int
-    ; element1 : int
-    ; element2 : int
-    ; element3 : int
-    ; element4 : int
-    ; element5 : int
-    ; element6 : int
-    ; element7 : int
-    }
-  [@@deriving fields, hlist]
+  type t = int Pickles_types.Vector.Vector_8.t
+
+  let names = List.init Mina_base.Zkapp_state.max_size_int ~f:(fun n -> sprintf "element%d" n)
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int; int; int; int ]
+    let (module M) = Mina_caqti.Vecs.of_nat Mina_base.Zkapp_state.Max_state_size.n in
+    Mina_caqti.Vecs.typ (M.spec Caqti_type.int)
 
   let table_name = "zkapp_states"
 
@@ -437,38 +429,17 @@ module Zkapp_states = struct
       Mina_caqti.deferred_result_list_map (Vector.to_list fps)
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
     in
-    let t =
-      match element_ids with
-      | [ element0
-        ; element1
-        ; element2
-        ; element3
-        ; element4
-        ; element5
-        ; element6
-        ; element7
-        ] ->
-          { element0
-          ; element1
-          ; element2
-          ; element3
-          ; element4
-          ; element5
-          ; element6
-          ; element7
-          }
-      | _ ->
-          failwith "Invalid number of app state elements"
+    let t = Pickles_types.Vector.of_list_and_length_exn element_ids Mina_base.Zkapp_state.Max_state_size.n
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
       id
 end
 
