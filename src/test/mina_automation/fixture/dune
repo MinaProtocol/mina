@@ -9,4 +9,5 @@
   mina_automation
   file_system
  )
- (preprocess (pps ppx_deriving_yojson ppx_jane ppx_mina)))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_deriving_yojson ppx_jane ppx_mina)))
