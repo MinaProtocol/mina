@@ -46,7 +46,6 @@ module Client = struct
       ~args:[ "client"; "status"; "-daemon-port"; sprintf "%d" t.port ]
       ~ignore_failure:true ()
 
-
   (** [wait_for_bootstrap t ?client_delay ?retry_delay ?retry_attempts ()] waits for the daemon to bootstrap.
     @param t The daemon instance containing the executor and port information.
     @param client_delay The delay before connecting to the daemon.
@@ -129,9 +128,7 @@ module Process = struct
     @param t The daemon instance containing the process to be killed.
     @return A deferred result indicating the success or failure of the operation.
   *)
-  let force_kill t =
-    Utils.force_kill t.process
-  
+  let force_kill t = Utils.force_kill t.process
 end
 
 let archive_blocks t ~archive_address ~(format : Archive_blocks.format) blocks =
@@ -178,7 +175,7 @@ let start t (config : Config.t) =
 
   [%log debug] "Starting daemon" ;
 
-  let%bind process = Executor.run_in_background t ~args () in
+  let%bind _, process = Executor.run_in_background t ~args () in
 
   let mina_process : Process.t =
     { config; process; client = Client.create ~port:config.port ~executor:t () }

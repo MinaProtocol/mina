@@ -105,8 +105,7 @@ let main ~db_uri ~network_data_folder () =
       ~archive_uri:target_db ~format:Extensional
   in
 
-  let%bind missing_blocks_auditor_path = Missing_blocks_auditor.path
-  in
+  let%bind missing_blocks_auditor_path = Missing_blocks_auditor.path in
 
   let%bind archive_blocks_path = Archive_blocks.path in
 
@@ -121,9 +120,7 @@ let main ~db_uri ~network_data_folder () =
     }
   in
 
-  let missing_blocks_guardian =
-    Missing_blocks_guardian.default
-  in
+  let missing_blocks_guardian = Missing_blocks_guardian.default in
 
   let%bind _ = Missing_blocks_guardian.run missing_blocks_guardian ~config in
 
