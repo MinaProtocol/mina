@@ -57,14 +57,16 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
     |> Result.ok
     |> Option.value_exn ~here:[%here] ?error:None ?message:None
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   (* TODO: Should we use the signer_input explicitly here to dogfood it? *)
   (* Should we just inline that here? *)
   let signature =
-    Schnorr.Legacy.sign keys.keypair.private_key
+    Schnorr.Legacy.sign ~signature_kind keys.keypair.private_key
       unsigned_transaction.random_oracle_input
   in
   let signature' =
-    Signed_command.sign_payload keys.keypair.private_key user_command_payload
+    Signed_command.sign_payload ~signature_kind keys.keypair.private_key
+      user_command_payload
   in
   [%test_eq: Signature.t] signature signature' ;
   signature |> Signature.Raw.encode
@@ -88,6 +90,7 @@ let verify ~public_key_hex_bytes ~signed_transaction_string =
     |> Option.value_exn ~here:[%here] ?error:None ?message:None
   in
   let message = Signed_command.to_input_legacy user_command_payload in
-  Schnorr.Legacy.verify signed_transaction.signature
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  Schnorr.Legacy.verify ~signature_kind signed_transaction.signature
     (Snark_params.Tick.Inner_curve.of_affine public_key)
     message

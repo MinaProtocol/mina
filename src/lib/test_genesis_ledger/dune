@@ -1,6 +1,0 @@
-(library
- (public_name test_genesis_ledger)
- (name test_genesis_ledger)
- (libraries coda_genesis_ledger core_kernel)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_let)))

@@ -104,8 +104,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let body = Signed_command_payload.Body.Payment payment_payload in
       { Signed_command_payload.Poly.common; body }
     in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let raw_signature =
-      Signed_command.sign_payload sender.private_key payload
+      Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
     in
     match expected_failure with
@@ -346,7 +347,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
         in
         Transaction_snark.For_tests.single_account_update
-          ~chain:Mina_signature_kind.(Other_network "Invalid")
+          ~signature_kind:Mina_signature_kind.(Other_network "Invalid")
           ~constraint_constants spec
       in
       ( snapp_update
@@ -372,12 +373,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         { p with
           account_updates =
             Call_forest.map p.account_updates ~f:(fun other_p ->
-                match other_p.Account_update.authorization with
-                | Proof _ ->
+                match other_p.Account_update.Poly.authorization with
+                | Control.Poly.Proof _ ->
                     { other_p with
                       authorization =
-                        Control.Proof
-                          (Lazy.force Mina_base.Proof.blockchain_dummy)
+                        Control.Poly.Proof
+                          (Lazy.force
+                             Mina_base.Proof.For_tests.blockchain_dummy_tag )
                     }
                 | _ ->
                     other_p )

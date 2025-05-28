@@ -62,9 +62,20 @@ let
           '';
         };
 
-        rocksdb_stubs = super.rocksdb_stubs.overrideAttrs {
-          MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
-        };
+        rocksdb_stubs = super.rocksdb_stubs.overrideAttrs (oa: {
+          MINA_ROCKSDB = let
+            mainPath = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
+            staticPath = "${
+                pkgs.rocksdb-mina.static or pkgs.rocksdb-mina
+              }/lib/librocksdb.a";
+          in if builtins.pathExists mainPath then
+            mainPath
+          else if builtins.pathExists staticPath then
+            staticPath
+          else
+            throw
+            "Could not find librocksdb.a in either ${mainPath} or ${staticPath}";
+        });
 
         # This is needed because
         # - lld package is not wrapped to pick up the correct linker flags
@@ -170,7 +181,8 @@ let
         let src = info.pseudoPackages."${pkg}";
         in dune-nix.makefileTest ./.. pkg src;
       marlinPlonkStubs = {
-        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+        KIMCHI_STUBS = "${pkgs.kimchi_bindings_stubs}";
+        KIMCHI_STUBS_STATIC_LIB = "${pkgs.kimchi_stubs_static_lib}";
       };
       childProcessesTester = pkgs.writeShellScriptBin "mina-tester.sh"
         (builtins.readFile ../src/lib/child_processes/tester.sh);
@@ -336,7 +348,8 @@ let
         # this is used to retrieve the path of the built static library
         # and copy it from within a dune rule
         # (see src/lib/crypto/kimchi_bindings/stubs/dune)
-        MARLIN_PLONK_STUBS = "${pkgs.kimchi_bindings_stubs}";
+        KIMCHI_STUBS = "${pkgs.kimchi_bindings_stubs}";
+        KIMCHI_STUBS_STATIC_LIB = "${pkgs.kimchi_stubs_static_lib}";
         DISABLE_CHECK_OPAM_SWITCH = "true";
 
         MINA_VERSION_IMPLEMENTATION = "mina_version.runtime";
@@ -483,5 +496,5 @@ let
 
       inherit dune-description base-libs external-libs;
     };
-in scope.overrideScope'
+in scope.overrideScope
 (pkgs.lib.composeManyExtensions ([ overlay granularOverlay ]))

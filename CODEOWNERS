@@ -1,4 +1,4 @@
-/CODEOWNERS @nholland94 @bkase @mrmr1993
+/CODEOWNERS @bkase @dannywillems @deepthiskumar @georgeee
 /buildkite @MinaProtocol/infra-eng-reviewers
 /frontend/ @MinaProtocol/product-eng-reviewers
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
@@ -20,10 +20,10 @@
 /src/app/runtime_genesis_ledger/ @MinaProtocol/protocol-eng-reviewers
 /src/app/archive_blocks/ @MinaProtocol/protocol-eng-reviewers
 /src/app/extract_blocks/ @MinaProtocol/protocol-eng-reviewers
-/src/app/rosetta/ @MinaProtocol/mina-foundation-eng
-/src/lib/rosetta_coding/ @MinaProtocol/mina-foundation-eng
-/src/lib/rosetta_lib/ @MinaProtocol/mina-foundation-eng
-/src/lib/rosetta_models/ @MinaProtocol/mina-foundation-eng
+/src/app/rosetta/ @MinaProtocol/protocol-eng-reviewers
+/src/lib/rosetta_coding/ @MinaProtocol/protocol-eng-reviewers
+/src/lib/rosetta_lib/ @MinaProtocol/protocol-eng-reviewers
+/src/lib/rosetta_models/ @MinaProtocol/protocol-eng-reviewers
 
 /src/lib/ @MinaProtocol/protocol-eng-reviewers
 
@@ -40,7 +40,7 @@
 /src/lib/pickles_types/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/pickles/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/precomputed_values/ @MinaProtocol/crypto-eng-reviewers
-/src/lib/promise @MinaProtocol/protocol-eng-reviewers @MinaProtocol/product-eng-reviewers
+/src/lib/concurrency/promise @MinaProtocol/protocol-eng-reviewers @MinaProtocol/product-eng-reviewers
 /src/lib/sha256_lib/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/signature_lib/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky @MinaProtocol/crypto-eng-reviewers

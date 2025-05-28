@@ -7,8 +7,10 @@ open Core_kernel
 open Async
 
 module type AppPaths = sig
+  (** The name of the application as it appears in the dune file. *)
   val dune_name : string
 
+  (** The name of the application as it appears in the debian package or docker image. *)
   val official_name : string
 end
 
@@ -55,13 +57,6 @@ module Make_PathFinder (P : AppPaths) = struct
             Deferred.return (Some P.official_name)
         | _ ->
             Deferred.return None )
-
-  let standalone_path_exn =
-    Deferred.map standalone_path ~f:(fun opt ->
-        Option.value_exn opt
-          ~message:
-            "Could not find standalone path. App is not executable outside the \
-             dune" )
 end
 
 module Make (P : AppPaths) = struct
@@ -69,8 +64,9 @@ module Make (P : AppPaths) = struct
     | Dune (* application ran from dune exec command *)
     | Local (* application ran from _build/default folder*)
     | Debian (* application installed from mina debian package *)
-    | Docker of DockerContext.t
+    | Docker of DockerContext.t (* application ran inside docker container *)
     | AutoDetect
+  (* application ran from any of the above *)
 
   module PathFinder = Make_PathFinder (P)
 

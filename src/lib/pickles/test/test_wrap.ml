@@ -100,7 +100,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
            - The next step proof also computes the deferred values inside the circuit and verifies
              that they match those used by the previous wrap proof.
 
-      The code below generates the deferred values so that we can verifiy that we can actually
+      The code below generates the deferred values so that we can verify that we can actually
       compute those values correctly inside the circuit.  Special thanks to Matthew Ryan for
       explaining this in detail. *)
   let { Wrap.For_tests_only.deferred_values
@@ -253,18 +253,18 @@ end
 (* Small combinators to lift gate example signatures to the expected
    signatures for the tests. This amounts to generating the list of public
    inputs from either no public inputs, a single one or a pair of inputs
-   returned by the gate example. *)
+   returned by the gate example. In all cases, it uses lazy_mode = false. *)
 
 let without_public_input gate_example srs =
-  let index, proof = gate_example srs in
+  let index, proof = gate_example srs false in
   (index, [], proof)
 
 let with_one_public_input gate_example srs =
-  let index, public_input, proof = gate_example srs in
+  let index, public_input, proof = gate_example srs false in
   (index, [ public_input ], proof)
 
 let with_two_public_inputs gate_example srs =
-  let index, (public_input1, public_input2), proof = gate_example srs in
+  let index, (public_input1, public_input2), proof = gate_example srs false in
   (index, [ public_input1; public_input2 ], proof)
 
 module Lookup = Make (struct

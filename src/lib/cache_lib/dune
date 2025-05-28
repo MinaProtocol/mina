@@ -1,17 +1,25 @@
 (library
  (name cache_lib)
  (public_name cache_lib)
- (inline_tests (flags -verbose -show-counts))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-   ;; opam libraries
-   async_kernel
-   core_kernel
-   base
-   base.base_internalhash_types
-   core
-   ppx_inline_test.config
-   ;; local libraries
-   logger
-   )
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_base ppx_let ppx_custom_printf ppx_inline_test)))
+  ;; opam libraries
+  async_kernel
+  base
+  base.base_internalhash_types
+  core
+  core_kernel
+  ppx_inline_test.config
+  ;; local libraries
+  logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps
+   ppx_base
+   ppx_custom_printf
+   ppx_inline_test
+   ppx_let
+   ppx_mina
+   ppx_version)))

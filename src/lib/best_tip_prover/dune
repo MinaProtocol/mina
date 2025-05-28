@@ -1,35 +1,35 @@
 (library
  (name best_tip_prover)
  (public_name best_tip_prover)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane ppx_compare))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane ppx_compare))
  (libraries
-   ;; opam libraries
-   core
-   core_kernel
-   async_kernel
-   ;; local libraries
-   genesis_constants
-   consensus
-   with_hash
-   precomputed_values
-   proof_carrying_data
-   logger
-   truth
-   merkle_list_verifier
-   transition_frontier
-   mina_base
-   mina_intf
-   mina_state
-   mina_block
-   data_hash_lib
-   transition_frontier_base
-   merkle_list_prover
-   mina_stdlib
-   mina_wire_types
-   pickles.backend
-   snark_params
-   pickles
-   kimchi_pasta
-   kimchi_pasta.basic
-))
+  ;; opam libraries
+  core
+  core_kernel
+  async_kernel
+  ;; local libraries
+  genesis_constants
+  consensus
+  with_hash
+  precomputed_values
+  proof_carrying_data
+  logger
+  merkle_list_verifier
+  transition_frontier
+  mina_base
+  mina_intf
+  mina_state
+  mina_block
+  data_hash_lib
+  transition_frontier_base
+  merkle_list_prover
+  mina_stdlib
+  mina_wire_types
+  pickles.backend
+  snark_params
+  pickles
+  kimchi_pasta
+  kimchi_pasta.basic))

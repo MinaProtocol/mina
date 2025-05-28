@@ -14,6 +14,9 @@ let genesis_constants = Genesis_constants.Compiled.genesis_constants
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full
 
+(* The default signature kind for tests is Testnet *)
+let signature_kind = Mina_signature_kind.Testnet
+
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants
     ~protocol_constants:genesis_constants.protocol
@@ -469,8 +472,10 @@ module Wallet = struct
         ~nonce ~memo ~valid_until:None
         ~body:(Payment { receiver_pk; amount = Amount.of_nanomina_int_exn amt })
     in
-    let signature = Signed_command.sign_payload fee_payer.private_key payload in
-    Signed_command.check
+    let signature =
+      Signed_command.sign_payload ~signature_kind fee_payer.private_key payload
+    in
+    Signed_command.check ~signature_kind
       Signed_command.Poly.Stable.Latest.
         { payload
         ; signer = Public_key.of_private_key_exn fee_payer.private_key
@@ -485,8 +490,10 @@ module Wallet = struct
         ~nonce ~memo ~valid_until:None
         ~body:(Stake_delegation (Set_delegate { new_delegate = delegate_pk }))
     in
-    let signature = Signed_command.sign_payload fee_payer.private_key payload in
-    Signed_command.check
+    let signature =
+      Signed_command.sign_payload ~signature_kind fee_payer.private_key payload
+    in
+    Signed_command.check ~signature_kind
       Signed_command.Poly.Stable.Latest.
         { payload
         ; signer = Public_key.of_private_key_exn fee_payer.private_key

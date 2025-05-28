@@ -1,122 +1,11 @@
 open Core
 open Async
+open Events
+open Snark_work_lib
 
-module Time_span_with_json = struct
-  type t = Time.Span.t
-
-  let to_yojson total = `String (Time.Span.to_string_hum total)
-
-  let of_yojson = function
-    | `String time ->
-        Ok (Time.Span.of_string time)
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse timespan"
-end
-
-(*FIX: register_event fails when adding base types to the constructors*)
-module String_with_json = struct
-  type t = string
-
-  let to_yojson s = `String s
-
-  let of_yojson = function
-    | `String s ->
-        Ok s
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse string"
-end
-
-module Int_with_json = struct
-  type t = int
-
-  let to_yojson s = `Int s
-
-  let of_yojson = function
-    | `Int s ->
-        Ok s
-    | _ ->
-        Error "Snark_worker.Functor: Could not parse int"
-end
-
-type Structured_log_events.t +=
-  | Merge_snark_generated of { time : Time_span_with_json.t }
-  [@@deriving register_event { msg = "Merge SNARK generated in $time" }]
-
-type Structured_log_events.t +=
-  | Base_snark_generated of
-      { time : Time_span_with_json.t
-      ; transaction_type : String_with_json.t
-      ; zkapp_command_count : Int_with_json.t
-      ; proof_zkapp_command_count : Int_with_json.t
-      }
-  [@@deriving
-    register_event
-      { msg =
-          "Base SNARK generated in $time for $transaction_type transaction \
-           with $zkapp_command_count zkapp_command and \
-           $proof_zkapp_command_count proof zkapp_command"
-      }]
-
-module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S0 with type ledger_proof := Inputs.Ledger_proof.t = struct
-  open Inputs
-  module Rpcs = Rpcs.Make (Inputs)
-
-  module Work = struct
-    open Snark_work_lib
-
-    module Single = struct
-      module Spec = struct
-        type t = (Transaction_witness.t, Ledger_proof.t) Work.Single.Spec.t
-        [@@deriving sexp, yojson]
-
-        let transaction t =
-          Option.map (Work.Single.Spec.witness t) ~f:(fun w ->
-              w.Transaction_witness.transaction )
-
-        let statement = Work.Single.Spec.statement
-      end
-    end
-
-    module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson]
-
-      let instances = Work.Spec.instances
-    end
-
-    module Result = struct
-      type t = (Spec.t, Ledger_proof.t) Work.Result.t
-
-      let transactions (t : t) =
-        One_or_two.map t.spec.instances ~f:(fun i -> Single.Spec.transaction i)
-    end
-  end
-
-  let perform (s : Worker_state.t) public_key
-      ({ instances; fee } as spec : Work.Spec.t) =
-    One_or_two.Deferred_result.map instances ~f:(fun w ->
-        let open Deferred.Or_error.Let_syntax in
-        let%map proof, time =
-          perform_single s
-            ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-            w
-        in
-        ( proof
-        , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
-        ) )
-    |> Deferred.Or_error.map ~f:(function
-         | `One (proof1, metrics1) ->
-             { Snark_work_lib.Work.Result.proofs = `One proof1
-             ; metrics = `One metrics1
-             ; spec
-             ; prover = public_key
-             }
-         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-             { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
-             ; metrics = `Two (metrics1, metrics2)
-             ; spec
-             ; prover = public_key
-             } )
+module Make = struct
+  module Rpcs = Rpcs.Make
+  include Prod.Inputs
 
   let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
@@ -171,7 +60,7 @@ module Make (Inputs : Intf.Inputs_intf) :
                   let init =
                     match
                       (Mina_base.Account_update.of_fee_payer
-                         zkapp_command.Mina_base.Zkapp_command.fee_payer )
+                         zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
                         .authorization
                     with
                     | Proof _ ->
@@ -188,8 +77,9 @@ module Make (Inputs : Intf.Inputs_intf) :
                             Mina_base.Control.(
                               Tag.equal Proof
                                 (tag
-                                   (Mina_base.Account_update.authorization
-                                      account_update ) ))
+                                   account_update
+                                     .Mina_base.Account_update.Poly
+                                      .authorization ))
                           then proof_updates_count + 1
                           else proof_updates_count ) )
                   in
@@ -225,10 +115,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                  ; proof_zkapp_command_count
                  } ) )
 
-  let main
-      (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t ) ~logger
-      ~proof_level ~constraint_constants daemon_address shutdown_on_disconnect =
+  let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
+      ~constraint_constants daemon_address shutdown_on_disconnect =
     let%bind state =
       Worker_state.create ~constraint_constants ~proof_level ()
     in
@@ -315,7 +203,7 @@ module Make (Inputs : Intf.Inputs_intf) :
               log_and_retry "performing work" e (retry_pause 10.) go
           | Ok result ->
               emit_proof_metrics result.metrics
-                (Work.Result.transactions result)
+                (Selector.Result.Stable.Latest.transactions result)
                 logger ;
               [%log info] "Submitted completed SNARK work $work_ids to $address"
                 ~metadata:
@@ -341,9 +229,7 @@ module Make (Inputs : Intf.Inputs_intf) :
     go ()
 
   let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-      ~constraint_constants
-      (module Rpcs_versioned : Intf.Rpcs_versioned_S
-        with type Work.ledger_proof = Inputs.Ledger_proof.t ) =
+      ~constraint_constants (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
