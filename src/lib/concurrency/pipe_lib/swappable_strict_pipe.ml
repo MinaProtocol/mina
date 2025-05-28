@@ -79,6 +79,8 @@ let terminate_choice state =
 
 let handle_next_short_lived_pipe state (new_sink, processed_signal) =
   let (Swappable t) = state.exposed in
+  (* TODO when rewriting to Ocaml 5.x, consider using
+     an R/W mutex to protect the mutable field. *)
   t.next_short_lived_pipe <- Ivar.create () ;
   Ivar.fill processed_signal () ;
   Option.iter ~f:terminate_short_lived_pipe state.short_lived_pipe ;
@@ -232,12 +234,7 @@ module Iterator = struct
 
   let read_one (Short_lived_pipe outer_ivar : _ t) =
     Ivar.fill_if_empty outer_ivar (Ivar.create ()) ;
-    let inner_ivar =
-      Ivar.peek outer_ivar
-      |> Option.value_exn
-           ~message:"unexpected condition in swappable pipe's iterator"
-    in
-    Ivar.read inner_ivar
+    Ivar.read (Ivar.value_exn outer_ivar)
 
   let iter (t_initial : _ t) ~f =
     Deferred.repeat_until_finished t_initial (fun t ->
