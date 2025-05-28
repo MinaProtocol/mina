@@ -200,6 +200,7 @@ let step_main :
         Per_proof_witness.Constant.No_app_state.t )
       Typ.t
   end in
+  Printf.printf "\n --------------- BEGIN STEP MAIN---------------\n%!" ;
   Printf.printf "\nproof verified : %d\n %!"
     (Length.to_nat proofs_verified |> Nat.to_int) ;
   let feature_flags_and_num_chunks (d : _ Tag.t) =
@@ -378,6 +379,17 @@ let step_main :
             (Vector.typ (Typ.prover_value ()) (Length.to_nat proofs_verified))
             ~request:(fun () -> Req.Wrap_domain_indices)
         in
+        let (_ : unit Plonk_verification_key_evals.t) =
+          Plonk_verification_key_evals.map dlog_plonk_index ~f:(fun array ->
+              Printf.printf "\nindex len : %d\n %!" (Array.length array) )
+        in
+        Printf.printf "\nmessages for next wrap len : %d\n %!"
+          (Vector.length messages_for_next_wrap_proof |> Nat.to_int) ;
+        Printf.printf "\nactual wrap domain len : %d\n %!"
+          (Vector.length actual_wrap_domains |> Nat.to_int) ;
+        let module M = H3.T (Per_proof_witness.No_app_state) in
+        Printf.printf "\nprevs len : %d\n %!" (M.len (prevs, 0)) ;
+
         let proof_witnesses =
           (* Inject the app-state values into the per-proof witnesses. *)
           let rec go :
@@ -538,7 +550,10 @@ let step_main :
                   unfinalized_proofs previous_proof_statements proofs_verified
                   ~actual_wrap_domains
               in
-              Boolean.Assert.all vs ; chalss )
+              Boolean.Assert.all vs ;
+              Printf.printf "\nchals len : %d\n %!"
+                (Vector.length chalss |> Nat.to_int) ;
+              chalss )
         in
         [%log internal] "Step_compute_bulletproof_challenges_done" ;
         let messages_for_next_step_proof =
@@ -557,6 +572,8 @@ let step_main :
             let module V = H3.To_vector (Step_verifier.Inner_curve) in
             V.f proofs_verified (M.f proof_witnesses)
           in
+          Printf.printf "\npoly comm len : %d\n %!"
+            (Vector.length challenge_polynomial_commitments |> Nat.to_int) ;
           with_label "hash_messages_for_next_step_proof" (fun () ->
               let hash_messages_for_next_step_proof =
                 let to_field_elements =
@@ -589,6 +606,8 @@ let step_main :
           Vector.extend_front unfinalized_proofs_unextended lte
             Max_proofs_verified.n (Unfinalized.dummy ())
         in
+        Printf.printf "\nunfinalized proof len : %d\n %!"
+          (Vector.length unfinalized_proofs |> Nat.to_int) ;
         ( { Types.Step.Statement.proof_state =
               { unfinalized_proofs; messages_for_next_step_proof }
           ; messages_for_next_wrap_proof
@@ -598,4 +617,5 @@ let step_main :
             , (Field.t, max_proofs_verified) Vector.t )
             Types.Step.Statement.t ) )
   in
+  Printf.printf "\n --------------- END STEP MAIN---------------\n%!" ;
   stage main

@@ -502,6 +502,7 @@ struct
          , _ )
          Types.Wrap.Proof_state.Deferred_values.Plonk.In_circuit.t ) =
     with_label "incrementally_verify_proof" (fun () ->
+        Printf.printf "\n incrementally verify proof \n %!" ;
         let receive ty f =
           with_label "receive" (fun () ->
               let x = f messages in
@@ -586,6 +587,7 @@ struct
              It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
              the combined inner product.
           *)
+          Printf.printf "--------AAAAAAAAA----------\n%!" ;
           let num_commitments_without_degree_bound = Nat.N45.n in
           let without_degree_bound =
             Vector.append
@@ -855,6 +857,7 @@ struct
       ~false_:Boolean.false_ ~or_:Boolean.( ||| )
       ~assert_equal:Boolean.Assert.( = ) ~feature_flags:plonk.feature_flags
       evals.evals ;
+    Printf.printf "\nfinalize other proof\n %!" ;
     let actual_width_mask = branch_data.proofs_verified_mask in
     let T = Proofs_verified.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
