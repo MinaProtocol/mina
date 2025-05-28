@@ -200,6 +200,8 @@ let step_main :
         Per_proof_witness.Constant.No_app_state.t )
       Typ.t
   end in
+  Printf.printf "\nproof verified : %d\n %!"
+    (Length.to_nat proofs_verified |> Nat.to_int) ;
   let feature_flags_and_num_chunks (d : _ Tag.t) =
     if Type_equal.Id.same self.id d.id then
       (basic.feature_flags, basic.num_chunks)
