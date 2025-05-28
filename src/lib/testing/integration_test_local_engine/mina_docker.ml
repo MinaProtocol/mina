@@ -157,16 +157,16 @@ module Network_config = struct
           Some
             { txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
-            ; zkapp_proof_update_cost = None
-            ; zkapp_signed_single_update_cost = None
-            ; zkapp_signed_pair_update_cost = None
-            ; zkapp_transaction_cost_limit = None
-            ; max_event_elements = None
-            ; max_action_elements = None
-            ; zkapp_cmd_limit_hardcap = None
+            ; zkapp_proof_update_cost = Some 10.26
+            ; zkapp_signed_single_update_cost = Some 9.140000000000001
+            ; zkapp_signed_pair_update_cost = Some 10.08
+            ; zkapp_transaction_cost_limit = Some 69.45
+            ; max_event_elements = Some 100
+            ; max_action_elements = Some 100
+            ; zkapp_cmd_limit_hardcap = Some 128
             ; slot_tx_end
             ; slot_chain_end
-            ; minimum_user_command_fee = None
+            ; minimum_user_command_fee = Some (Currency.Fee.of_string "1000000")
             ; network_id
             ; sync_ledger_max_subtree_depth = None
             ; sync_ledger_default_subtree_depth = None
