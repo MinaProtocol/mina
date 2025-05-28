@@ -286,30 +286,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   let open Context in
   O1trace.thread "bootstrap" (fun () ->
       let rec loop previous_cycles =
-        let sync_ledger_pipe = "sync ledger pipe" in
         let sync_ledger_reader, sync_ledger_writer =
-          create ~name:sync_ledger_pipe
-            (Buffered
-               ( `Capacity 50
-               , `Overflow
-                   (Drop_head
-                      (fun (b_or_h, `Valid_cb valid_cb) ->
-                        let hash =
-                          match b_or_h with
-                          | `Block b_env ->
-                              Envelope.Incoming.data b_env
-                              |> Mina_block.Validation.block_with_hash
-                              |> With_hash.hash
-                          | `Header h_env ->
-                              Envelope.Incoming.data h_env
-                              |> Mina_block.Validation.header_with_hash
-                              |> With_hash.hash
-                        in
-                        Mina_metrics.(
-                          Counter.inc_one
-                            Pipe.Drop_on_overflow.bootstrap_sync_ledger) ;
-                        Mina_block.handle_dropped_transition ?valid_cb hash
-                          ~pipe_name:sync_ledger_pipe ~logger ) ) ) )
+          create ~name:"sync ledger pipe" Synchronous
         in
         don't_wait_for
           (transfer_while_writer_alive transition_reader sync_ledger_writer
