@@ -141,7 +141,7 @@ module Make
           [ ("work", Work.compact_json work)
           ; ("sender", Envelope.Sender.to_yojson sender)
           ; ( "reason"
-            , Error_json.error_to_yojson
+            , Mina_stdlib.Error_json.error_to_yojson
               @@ Intf.Verification_error.to_error reason )
           ] ;
       Result.fail reason

@@ -42,7 +42,7 @@
   signature_lib
   mina_base
   mina_base.import
-  error_json
+  mina_stdlib
   genesis_ledger_helper
   consensus
   child_processes

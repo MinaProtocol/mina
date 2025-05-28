@@ -434,7 +434,8 @@ module Well_formedness_error = struct
   type t =
     | Insufficient_fee
     | Zero_vesting_period
-    | Zkapp_too_big of (Error.t[@to_yojson Error_json.error_to_yojson])
+    | Zkapp_too_big of
+        (Error.t[@to_yojson Mina_stdlib.Error_json.error_to_yojson])
     | Zkapp_invalid_call_forest
     | Transaction_type_disabled
     | Incompatible_version

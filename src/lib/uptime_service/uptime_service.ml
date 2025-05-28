@@ -261,7 +261,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
             [%log error]
               "Could not get SNARK work from best tip staged ledger for uptime \
                service"
-              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+              ~metadata:[ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ;
             Interruptible.return ()
         | Ok [] ->
             [%log info]
@@ -337,12 +337,14 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                     [%log error]
                       "Error when running uptime service SNARK worker on a \
                        transaction"
-                      ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                      ~metadata:
+                        [ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ;
                     Interruptible.return ()
                 | Ok (Error e) ->
                     (* error in creating the SNARK work *)
                     [%log error] "Error computing SNARK work for uptime service"
-                      ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+                      ~metadata:
+                        [ ("error", Mina_stdlib.Error_json.error_to_yojson e) ] ;
                     Interruptible.return ()
                 | Ok (Ok (proof, proof_time)) ->
                     let proof_data : Proof_data.t =

@@ -40,7 +40,7 @@
   mina_incremental
   coda_genesis_ledger
   work_selector
-  error_json
+  mina_stdlib
   mina_networking
   consensus.vrf
   vrf_evaluator

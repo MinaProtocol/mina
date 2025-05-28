@@ -23,7 +23,6 @@
   mina_net2
   consensus
   logger
-  error_json
   trust_system
   mina_block
   mina_state

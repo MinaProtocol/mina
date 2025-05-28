@@ -42,7 +42,7 @@
   unsigned_extended
   sgn
   with_hash
-  error_json)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

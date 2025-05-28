@@ -19,7 +19,7 @@
   consensus
   currency
   data_hash_lib
-  error_json
+  mina_stdlib
   genesis_constants
   interruptible
   kimchi_backend

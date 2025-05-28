@@ -25,7 +25,7 @@
   bounded_types
   cli_lib
   currency
-  error_json
+  mina_stdlib
   genesis_constants
   ledger_proof
   logger

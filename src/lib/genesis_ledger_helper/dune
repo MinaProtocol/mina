@@ -21,7 +21,7 @@
   with_hash
   bounded_types
   blockchain_snark
-  error_json
+  mina_stdlib
   mina_state
   random_oracle
   blake2

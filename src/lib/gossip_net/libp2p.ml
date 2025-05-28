@@ -111,7 +111,7 @@ let on_gossip_decode_failure (config : Config.t) envelope (err : Error.t) =
   let peer = Envelope.Incoming.sender envelope |> Envelope.Sender.remote_exn in
   let metadata =
     [ ("sender_peer_id", `String peer.peer_id)
-    ; ("error", Error_json.error_to_yojson err)
+    ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
     ]
   in
   Trust_system.(
@@ -419,7 +419,10 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                                 "failed to reset stream (this means it was \
                                  probably closed successfully): $error"
                                 ~metadata:
-                                  [ ("error", Error_json.error_to_yojson e) ]
+                                  [ ( "error"
+                                    , Mina_stdlib.Error_json.error_to_yojson e
+                                    )
+                                  ]
                           | Ok () ->
                               () ) ) )
             in
@@ -546,8 +549,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                    | Error e ->
                        [%log' warn config.logger]
                          "starting libp2p up failed: $error"
-                         ~metadata:[ ("error", Error_json.error_to_yojson e) ]
-                   ) ) ;
+                         ~metadata:
+                           [ ("error", Mina_stdlib.Error_json.error_to_yojson e)
+                           ] ) ) ;
             { publish_v0
             ; publish_v1_block
             ; publish_v1_tx
@@ -814,7 +818,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
             [%log' warn t.config.logger] "RPC call error for $rpc"
               ~metadata:
                 [ ("rpc", `String rpc_name)
-                ; ("error", Error_json.error_to_yojson err)
+                ; ("error", Mina_stdlib.Error_json.error_to_yojson err)
                 ] ;
             Mina_metrics.(Counter.inc_one rpc_failed_counter) ;
             match (Error.to_exn err, Error.sexp_of_t err) with
@@ -845,7 +849,9 @@ module Make (Rpc_interface : RPC_INTERFACE) :
                         ( Outgoing_connection_error
                         , Some
                             ( "RPC call failed, reason: $exn"
-                            , [ ("exn", Error_json.error_to_yojson err) ] ) ))
+                            , [ ( "exn"
+                                , Mina_stdlib.Error_json.error_to_yojson err )
+                              ] ) ))
                 in
                 Error err )
         | Error monitor_exn ->
