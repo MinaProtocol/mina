@@ -494,6 +494,12 @@ module H3 = struct
       | _ :: xs ->
           let (T (n, p)) = length xs in
           T (S n, S p)
+
+    let rec len : type t1 t2 t3. (t1, t2, t3) t * int -> int = function
+      | [], n ->
+          n
+      | _ :: xs, n ->
+          len (xs, n + 1)
   end
 
   module To_vector (X : T0) = struct

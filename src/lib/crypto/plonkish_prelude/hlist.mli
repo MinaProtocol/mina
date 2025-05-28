@@ -543,6 +543,8 @@ module H3 : sig
           -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3) t
 
     val length : ('tail1, 'tail2, 'tail3) t -> 'tail1 Length.n
+
+    val len : ('tail1, 'tail2, 'tail3) t * int -> int
   end
 
   (** See {!H1.To_vector}. *)
