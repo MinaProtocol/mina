@@ -205,6 +205,12 @@ let create ?warn_on_drop ~name type_ =
 let write (Swappable { long_lived_writer; _ }) =
   Strict_pipe.Writer.write long_lived_writer
 
+module Iterator = struct
+  type 'data_in_pipe t = 'data_in_pipe Strict_pipe.Reader.t
+
+  [%%define_locally Strict_pipe.Reader.(read, iter)]
+end
+
 let swap_reader ~reader_name (Swappable t) =
   let short_lived_reader, short_lived_writer =
     Strict_pipe.create ~name:reader_name Synchronous

@@ -18,7 +18,7 @@ let test_reader_hang () =
   Strict_pipe.Swappable.write swappable 3 ;
   let read_all_values =
     Deferred.List.iter [ 1; 2; 3 ] ~f:(fun i ->
-        match%map Strict_pipe.Reader.read good_reader with
+        match%map Strict_pipe.Swappable.Iterator.read good_reader with
         | `Ok x when x = i ->
             ()
         | `Ok y ->
