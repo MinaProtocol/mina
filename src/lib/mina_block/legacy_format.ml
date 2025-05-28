@@ -43,6 +43,10 @@ module User_command = struct
         let signature_kind = Mina_signature_kind.t_DEPRECATED in
         function
         | User_command.Poly.Signed_command _ as tx ->
+            (* ~proof_to_yojson is unused when Helper.to_yojson is applied to a
+               Signed_command; the unreachable_code function (which takes a
+               value of the uninhabited Nothing.t type) is a compile-time proof
+               of this fact through the type system. *)
             Helper.to_yojson ~proof_to_yojson:Nothing.unreachable_code tx
         | User_command.Poly.Zkapp_command { fee_payer; memo; account_updates }
           ->
