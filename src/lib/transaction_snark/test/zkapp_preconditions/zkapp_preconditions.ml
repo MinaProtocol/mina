@@ -279,7 +279,7 @@ let%test_module "Protocol state precondition tests" =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
                   let fee_payer =
-                    Account_update.Fee_payer.with_no_aux
+                    Account_update.Fee_payer.make
                       ~body:
                         { public_key = sender_pk
                         ; fee
@@ -882,7 +882,7 @@ let%test_module "Account precondition tests" =
                 Signature_lib.Public_key.compress new_kp.public_key
               in
               let fee_payer =
-                Account_update.Fee_payer.with_no_aux
+                Account_update.Fee_payer.make
                   ~body:
                     { public_key = sender_pk
                     ; fee

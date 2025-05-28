@@ -47,7 +47,7 @@ let%test_module "Zkapp payments tests" =
       in
       Zkapp_command.of_simple ~proof_cache_db
         { fee_payer =
-            Account_update.Fee_payer.with_no_aux
+            Account_update.Fee_payer.make
               ~body:
                 { public_key = acct1.account.public_key
                 ; fee = Fee.of_nanomina_int_exn full_amount

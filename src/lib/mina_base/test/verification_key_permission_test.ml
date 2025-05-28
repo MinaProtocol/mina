@@ -19,7 +19,7 @@ let update_vk_perm_to_be ~auth : Zkapp_command.t =
       ~authorization:(Control.Poly.Signature Signature.dummy)
   in
   let fee_payer : Account_update.Fee_payer.t =
-    Account_update.Fee_payer.with_no_aux
+    Account_update.Fee_payer.make
       ~body:
         { Account_update.Body.Fee_payer.dummy with
           fee = Currency.Fee.of_mina_int_exn 100

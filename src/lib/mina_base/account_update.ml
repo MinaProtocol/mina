@@ -1944,13 +1944,13 @@ module Fee_payer = struct
     end
   end]
 
-  let with_no_aux ~body ~authorization : t = { body; authorization }
+  let make ~body ~authorization : t = { body; authorization }
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%map body = Body.Fee_payer.gen in
     let authorization = Signature.dummy in
-    with_no_aux ~body ~authorization
+    make ~body ~authorization
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
 

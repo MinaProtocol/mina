@@ -2453,7 +2453,7 @@ module For_tests = struct
     let zkapp_command : Zkapp_command.Simple.t =
       { fee_payer =
           (* Real signature added in below *)
-          Account_update.Fee_payer.with_no_aux
+          Account_update.Fee_payer.make
             ~body:
               { public_key = sender_pk
               ; fee

@@ -510,7 +510,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
   let zkapp_command_wire : Zkapp_command.Stable.Latest.t =
     { fee_payer =
         (* Real signature added in below *)
-        Account_update.Fee_payer.with_no_aux
+        Account_update.Fee_payer.make
           ~body:{ public_key = sender_pk; fee; nonce; valid_until = None }
           ~authorization:Signature.dummy
     ; account_updates =

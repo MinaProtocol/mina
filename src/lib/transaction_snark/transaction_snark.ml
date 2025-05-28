@@ -4281,7 +4281,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           | Some (fee_payer_kp, fee_payer_nonce) ->
               (fee_payer_kp.public_key |> Public_key.compress, fee_payer_nonce)
         in
-        Account_update.Fee_payer.with_no_aux
+        Account_update.Fee_payer.make
           ~body:
             { public_key
             ; fee
@@ -5195,7 +5195,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let sender_pk = sender.public_key |> Public_key.compress in
       let fee_payer : Account_update.Fee_payer.t =
         (* Real signature added in below *)
-        Account_update.Fee_payer.with_no_aux
+        Account_update.Fee_payer.make
           ~body:
             { public_key = sender_pk
             ; fee

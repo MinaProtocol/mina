@@ -123,7 +123,7 @@ let body_json_roundtrip () =
 let fee_payer_json_roundtrip () =
   let open Fee_payer in
   let dummy : t =
-    Account_update.Fee_payer.with_no_aux ~body:Body.Fee_payer.dummy
+    Account_update.Fee_payer.make ~body:Body.Fee_payer.dummy
       ~authorization:Signature.dummy
   in
   let open Fields_derivers_zkapps.Derivers in

@@ -74,7 +74,7 @@ let transaction_commitment : Zkapp_command.Transaction_commitment.t =
   Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
 let fee_payer =
-  Account_update.Fee_payer.with_no_aux
+  Account_update.Fee_payer.make
     ~body:
       { Account_update.Body.Fee_payer.dummy with
         public_key = pk_compressed

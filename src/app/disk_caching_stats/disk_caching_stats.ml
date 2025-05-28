@@ -331,7 +331,7 @@ module Values (S : Sample) = struct
   let zkapp_command' () : Mina_base.Zkapp_command.t =
     let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer =
-        Mina_base.Account_update.Fee_payer.with_no_aux
+        Mina_base.Account_update.Fee_payer.make
           ~body:
             { public_key = public_key ()
             ; fee = fee ()

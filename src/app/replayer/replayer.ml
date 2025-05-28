@@ -522,7 +522,7 @@ let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
     let%map (body : Account_update.Body.Fee_payer.t) =
       Load_data.get_fee_payer_body ~pool cmd.zkapp_fee_payer_body_id
     in
-    Account_update.Fee_payer.with_no_aux ~body ~authorization:Signature.dummy
+    Account_update.Fee_payer.make ~body ~authorization:Signature.dummy
   in
   let nonce_str = Mina_numbers.Account_nonce.to_string fee_payer.body.nonce in
   [%log spam]

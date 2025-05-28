@@ -177,7 +177,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
           let sender_pk = sender.public_key |> Public_key.compress in
           let fee_payer : Account_update.Fee_payer.t =
             (* Real signature added in below *)
-            Account_update.Fee_payer.with_no_aux
+            Account_update.Fee_payer.make
               ~body:
                 { public_key = sender_pk
                 ; fee = Amount.to_fee fee

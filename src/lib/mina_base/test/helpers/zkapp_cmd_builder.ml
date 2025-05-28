@@ -239,7 +239,7 @@ let build_zkapp_cmd ?valid_until ~fee transactions :
   let%bind body = fee_payer_body ?valid_until fee in
   let%map updates = State.concat_map_m ~f:mk_updates transactions in
   { Zkapp_command.Poly.fee_payer =
-      Account_update.Fee_payer.with_no_aux ~body ~authorization:Signature.dummy
+      Account_update.Fee_payer.make ~body ~authorization:Signature.dummy
   ; account_updates = updates
   ; memo = Signed_command_memo.dummy
   }

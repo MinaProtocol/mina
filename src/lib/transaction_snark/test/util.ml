@@ -697,7 +697,7 @@ let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
     ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
     ~initialize_ledger ~finalize_ledger zkapp_command =
   let fee_payer : Account_update.Fee_payer.t =
-    Account_update.Fee_payer.with_no_aux
+    Account_update.Fee_payer.make
       ~body:
         { Account_update.Body.Fee_payer.dummy with
           public_key = fee_payer_pk

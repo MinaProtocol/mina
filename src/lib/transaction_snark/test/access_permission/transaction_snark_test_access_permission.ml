@@ -116,7 +116,7 @@ let%test_module "Access permission tests" =
       in
       let fee_payer =
         (* TODO: This is a pain. *)
-        Account_update.Fee_payer.with_no_aux
+        Account_update.Fee_payer.make
           ~body:
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed

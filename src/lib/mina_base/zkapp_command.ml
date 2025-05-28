@@ -945,8 +945,7 @@ let dummy =
          ~authorization:(Control.Poly.Signature Signature.dummy)
      in
      let fee_payer : Account_update.Fee_payer.t =
-       Account_update.Fee_payer.with_no_aux
-         ~body:Account_update.Body.Fee_payer.dummy
+       Account_update.Fee_payer.make ~body:Account_update.Body.Fee_payer.dummy
          ~authorization:Signature.dummy
      in
      { Poly.fee_payer

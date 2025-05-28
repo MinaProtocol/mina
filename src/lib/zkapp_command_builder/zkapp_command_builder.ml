@@ -46,7 +46,7 @@ let mk_account_update_body ?preconditions ?(increment_nonce = false)
 let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
     Zkapp_command.t =
   let fee_payer : Account_update.Fee_payer.t =
-    Account_update.Fee_payer.with_no_aux
+    Account_update.Fee_payer.make
       ~body:
         { public_key = fee_payer_pk
         ; fee = Currency.Fee.of_nanomina_int_exn fee

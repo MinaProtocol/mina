@@ -4233,7 +4233,7 @@ module Block = struct
           ~f:(fun acc ({ fee_payer; account_updates; memo; _ } as zkapp_cmd) ->
             (* add authorizations, not stored in the db *)
             let (fee_payer : Account_update.Fee_payer.t) =
-              Account_update.Fee_payer.with_no_aux ~body:fee_payer
+              Account_update.Fee_payer.make ~body:fee_payer
                 ~authorization:Signature.dummy
             in
             let (account_updates : Account_update.Simple.t list) =
