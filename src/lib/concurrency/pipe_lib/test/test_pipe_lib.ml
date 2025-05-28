@@ -103,6 +103,30 @@ let test_concurrent_iterators () =
   (* Repeat second iteration - should see the same elements again *)
   read_all_values_or_timeout ~expected:[ 3; 4; 5 ] reader2
 
+let test_read_after_kill () =
+  let open Pipe_lib.Strict_pipe.Swappable in
+  let pipe = create_buffered_swappable 10 in
+  (* Write some elements to the pipe *)
+  List.iter ~f:(write pipe) [ 1; 2; 3 ] ;
+  (* Kill the pipe *)
+  kill pipe ;
+  (* Try to get a new reader after killing the pipe *)
+  let%bind reader = swap_reader pipe in
+  (* Should get an empty result since the pipe was killed *)
+  read_all_values_or_timeout ~expected:[] reader
+
+let test_write_after_kill () =
+  let open Pipe_lib.Strict_pipe.Swappable in
+  let pipe = create_buffered_swappable 10 in
+  (* Kill the pipe first *)
+  kill pipe ;
+  (* Try to write to the killed pipe *)
+  let%map () = Async_kernel_scheduler.yield () in
+  let threw = ref false in
+  (try write pipe 1 with _ -> threw := true) ;
+  if not !threw then
+    failwith "Expected write to killed pipe to raise an exception"
+
 let () =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Alcotest_async in
@@ -115,5 +139,9 @@ let () =
                 test_multiple_iterations
             ; test_case "concurrent iterators read correct elements" `Quick
                 test_concurrent_iterators
+            ; test_case "read from killed pipe returns empty" `Quick
+                test_read_after_kill
+            ; test_case "write to killed pipe raises exception" `Quick
+                test_write_after_kill
             ] )
         ] )
