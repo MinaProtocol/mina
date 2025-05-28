@@ -7,5 +7,6 @@
    core
   ;; local libraries
   mina_automation
+  file_system
  )
  (preprocess (pps ppx_deriving_yojson ppx_jane ppx_mina)))
