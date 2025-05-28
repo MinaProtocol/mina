@@ -46,7 +46,6 @@ module Client = struct
       ~args:[ "client"; "status"; "-daemon-port"; sprintf "%d" t.port ]
       ~ignore_failure:true ()
 
-
   (** [wait_for_bootstrap t ?client_delay ?retry_delay ?retry_attempts ()] waits for the daemon to bootstrap.
     @param t The daemon instance containing the executor and port information.
     @param client_delay The delay before connecting to the daemon.

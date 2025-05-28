@@ -5,8 +5,6 @@ open Core
 
 open Async
 
-
-
 module Config = struct
   type t =
     { config_file : String.t; postgres_uri : String.t; server_port : int }
@@ -49,7 +47,6 @@ let of_config config = { config; executor = Executor.AutoDetect }
 module Process = struct
   type t = { process : Process.t; config : Config.t }
 
-  
   (** Forcefully kills the given process.
 
     @param t The process to be killed.
