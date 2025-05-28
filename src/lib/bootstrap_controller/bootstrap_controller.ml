@@ -267,6 +267,22 @@ let external_transition_compare ~context:(module Context : CONTEXT) =
       else 1 )
     ~f:(With_hash.map ~f:get_consensus_state)
 
+let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
+    ~sync_ledger_reader ~context t temp_snarked_ledger =
+  time_deferred
+    (let root_sync_ledger =
+       Sync_ledger.Db.create temp_snarked_ledger ~context ~trust_system
+     in
+     don't_wait_for
+       (sync_ledger t ~preferred:preferred_peers ~root_sync_ledger
+          ~transition_graph ~sync_ledger_reader ) ;
+     (* We ignore the resulting ledger returned here since it will always
+        * be the same as the ledger we started with because we are syncing
+        * a db ledger. *)
+     let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
+     Sync_ledger.Db.destroy root_sync_ledger ;
+     data )
+
 (** Run one bootstrap cycle *)
 let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~transition_reader ~preferred_peers
@@ -303,21 +319,10 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
   in
   (* step 1. download snarked_ledger *)
   let%bind sync_ledger_time, (hash, sender, expected_staged_ledger_hash) =
-    time_deferred
-      (let root_sync_ledger =
-         Sync_ledger.Db.create temp_snarked_ledger
-           ~context:(module Context)
-           ~trust_system
-       in
-       don't_wait_for
-         (sync_ledger t ~preferred:preferred_peers ~root_sync_ledger
-            ~transition_graph ~sync_ledger_reader ) ;
-       (* We ignore the resulting ledger returned here since it will always
-          * be the same as the ledger we started with because we are syncing
-          * a db ledger. *)
-       let%map _, data = Sync_ledger.Db.valid_tree root_sync_ledger in
-       Sync_ledger.Db.destroy root_sync_ledger ;
-       data )
+    download_snarked_ledger
+      ~context:(module Context)
+      ~trust_system ~preferred_peers ~transition_graph ~sync_ledger_reader t
+      temp_snarked_ledger
   in
   Mina_metrics.(
     Counter.inc Bootstrap.root_snarked_ledger_sync_ms
