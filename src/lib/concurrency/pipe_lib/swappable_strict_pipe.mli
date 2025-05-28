@@ -23,13 +23,17 @@ module Iterator : sig
     -> unit Async_kernel.Deferred.t
 end
 
-(** [swap_reader t] requests the swappable pipe [t] to prepare a
-    new pipe, kill the previous pipe, and returns an iterator for the new pipe.
-    
-    If two calls to [swap_reader] are made in parallel, the first
-    call "wins", and the second call returns an immediately closed reader.
+(** [swap_reader t] requests the swappable pipe [t] to create a new iterator
+    and attach it to the pipe as reader.
 
-    If [t] is terminated, [swap_reader] returns an immediately closed reader.
+    Any value that wasn't read by the previous iterator is passed to the new
+    iterator. It's guaranteed that no value is lost or passed to more than one
+    iterator.
+
+    If two calls to [swap_reader] are made in parallel, the first
+    call "wins", and the second call returns an immediately closed iterator.
+
+    If [t] is terminated, [swap_reader] returns an immediately closed iterator.
     *)
 val swap_reader :
      ('data_in_pipe, 'write_return) t

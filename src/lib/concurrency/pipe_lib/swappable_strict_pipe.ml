@@ -262,8 +262,8 @@ let swap_reader (Swappable t) : _ Iterator.t Deferred.t =
     (* TODO when rewriting to Ocaml 5.x, the "else" case may result in a
        concurrency bug, though it's safe in single-threaded ocaml execution.
 
-       Recommendation: have alternative to [fill_if_empty] that doesn't
-       that returns a boolean with whether the fill was successful.
+       Recommendation: have alternative to [Ivar.fill_if_empty] that returns a boolean
+       with whether the fill was successful or catch an exception on [Ivar.fill].
     *)
     let short_lived_pipe = Short_lived_pipe (Ivar.create ()) in
     let processed_signal = Ivar.create () in
