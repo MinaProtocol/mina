@@ -7,23 +7,23 @@ let test_reader_hang () =
     create ~name:"swappable"
       (Buffered (`Capacity 50, `Overflow (Drop_head (const ()))))
   in
-  let%bind _hanging_reader =
-    swap_reader ~reader_name:"hanging reader" swappable
-  in
+  let%bind _hanging_reader = swap_reader swappable in
   write swappable 1 ;
   write swappable 2 ;
-  let%bind good_reader = swap_reader ~reader_name:"good reader" swappable in
+  let%bind good_reader = swap_reader swappable in
   write swappable 3 ;
   let read_all_values =
-    Deferred.List.iter [ 1; 2; 3 ] ~f:(fun i ->
-        match%map Iterator.read good_reader with
-        | `Ok x when x = i ->
-            ()
-        | `Ok y ->
-            failwithf "unexpected read: broken order (expected: %d, got: %d)" i
-              y ()
-        | `Eof ->
-            failwith "unexpected read: EOF" )
+    let counter = ref 0 in
+    Iterator.iter good_reader ~f:(fun x ->
+        counter := !counter + 1 ;
+        if x <> !counter then
+          failwithf "unexpected read: broken order (expected: %d, got: %d)"
+            !counter x () ;
+        if !counter = 3 then kill swappable ;
+        return () )
+    >>| fun () ->
+    if !counter = 3 then ()
+    else failwithf "unexpected iter result: few elements, %d" !counter ()
   in
   Deferred.choose
     [ Deferred.choice read_all_values ident
