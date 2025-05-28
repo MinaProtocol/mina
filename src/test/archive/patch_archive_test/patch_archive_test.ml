@@ -59,7 +59,7 @@ let main ~db_uri ~network_data_folder () =
 
   let n =
     List.init missing_blocks_count ~f:(fun _ ->
-        (* never remove last block as missing-block-guardian can have issues when patching it
+        (* never remove last or first block as missing-block-guardian can have issues when patching it
            as it patching only gaps
         *)
         Random.int (List.length extensional_files - 2) + 1 )
