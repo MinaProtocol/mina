@@ -415,18 +415,16 @@ module Zkapp_states = struct
 end
 
 module Zkapp_action_states = struct
-  type t =
-    { element0 : int
-    ; element1 : int
-    ; element2 : int
-    ; element3 : int
-    ; element4 : int
-    }
-  [@@deriving fields, hlist]
+  (* TODO ideally don't hard code action_state length *)
+  module Len = Pickles_types.Nat.N5
 
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int ]
+  type t = (int, Len.n) Pickles_types.Vector.t
+
+  let typ = Mina_caqti.Vector.typ (Caqti_type.int, Len.n)
+
+  let names =
+    List.init (Pickles_types.Nat.to_int Len.n) ~f:(fun n ->
+        sprintf "element%d" n )
 
   let table_name = "zkapp_action_states"
 
@@ -438,21 +436,18 @@ module Zkapp_action_states = struct
           Zkapp_field.add_if_doesn't_exist (module Conn) field )
     in
     let t =
-      match element_ids with
-      | [ element0; element1; element2; element3; element4 ] ->
-          { element0; element1; element2; element3; element4 }
-      | _ ->
-          failwith "Invalid number of action state elements"
+      Pickles_types.Vector.of_list_and_length_exn element_ids
+        Pickles_types.Nat.N5.n
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
       id
 end
 

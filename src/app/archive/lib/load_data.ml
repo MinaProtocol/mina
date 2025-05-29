@@ -790,11 +790,11 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           zkapp_version |> Unsigned.UInt32.of_int64
           |> Mina_numbers.Zkapp_version.of_uint32
         in
-        let%bind { element0; element1; element2; element3; element4 } =
+        let%bind elements =
           query_db ~f:(fun db ->
               Processor.Zkapp_action_states.load db action_state_id )
         in
-        let elements = [ element0; element1; element2; element3; element4 ] in
+        let elements = Pickles_types.Vector.to_list elements in
         let%bind action_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
