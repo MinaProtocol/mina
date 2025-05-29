@@ -1,12 +1,8 @@
-(library
- (name bootstrap_controller)
- (public_name bootstrap_controller)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_compare ppx_jane ppx_mina ppx_register_event ppx_version))
+(test
+ (name test_bootstrap_controller)
  (libraries
   ;; opam libraries
+  alcotest
   async
   async_kernel
   async_unix
@@ -14,6 +10,7 @@
   core_kernel
   sexplib0
   ;; local libraries
+  bootstrap_controller
   block_time
   bounded_types
   child_processes
@@ -60,4 +57,8 @@
   transition_frontier_persistent_root
   trust_system
   verifier
-  with_hash))
+  with_hash)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_compare ppx_jane ppx_mina ppx_register_event ppx_version ppx_let)))
