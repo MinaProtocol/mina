@@ -59,7 +59,7 @@ module Vector = struct
   type (_, _, _, _) t =
     | [] : ('elem, unit, unit, Pickles_types.Nat.z) t
     | ( :: ) :
-        'elem Caqti_type.t * ('elem, 'a, 'b, 'n) t
+        'elem Caqti_type.t * ('elem, 'fun_t, 'tup_t, 'n) t
         -> ('elem, 'elem -> 'a, 'elem * 'b, 'n Pickles_types.Nat.s) t
 
   let rec vec_to_hlist :
