@@ -40,7 +40,6 @@ RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \
   && apt-get install --quiet --yes --no-install-recommends \
     apt-transport-https \
-    ca-certificates \
     curl \
     dnsutils \
     dumb-init \
