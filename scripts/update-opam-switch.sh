@@ -12,21 +12,22 @@ sum="$(cksum opam.export | grep -oE '^\S*')"
 switch_dir=opam_switches/"$sum"
 
 if [[ -d _opam ]]; then
-    read -rp "Directory '_opam' exists and will be removed. Continue? [y/N] " \
+    read -rp "Directory '_opam' exists and will be removed. Should I remove it(y), or continue with current switch(N)? [y/N] " \
          confirm
     if [[ "${confirm}" =~ ^[Yy]$ ]]; then
         rm -Rf _opam
     else
-        echo "Aborted."
-        exit 1
+        echo "Using existing OPAM switch"
+	eval $(opam env)
+        exit 0
     fi
 fi
 
 if [[ ! -d "${switch_dir}" ]]; then
     # We add o1-labs opam repository and make it default
     # (if it's repeated, it's a no-op)
-    opam repository add --yes --all --set-default o1-labs \
-         https://github.com/o1-labs/opam-repository.git
+    opam repository add --yes --all --set-default lyh \
+         https://github.com/glyh/opam-repository.git#corvo/bump-rocksdb
     opam update
     opam switch import -y --switch . opam.export
     mkdir -p opam_switches
@@ -34,3 +35,5 @@ if [[ ! -d "${switch_dir}" ]]; then
 fi
 
 ln -s "${switch_dir}" _opam
+
+eval $(opam env)

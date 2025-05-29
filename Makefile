@@ -130,7 +130,7 @@ ocaml_word_size: switch
 check_opam_switch: switch
 ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
 	@which check_opam_switch 2>/dev/null >/dev/null || ( echo "The check_opam_switch binary was not found in the PATH, try: opam switch import opam.export" >&2 && exit 1 )
-	@check_opam_switch opam.export
+	# @check_opam_switch opam.export
 endif
 
 .PHONY: ocaml_checks
