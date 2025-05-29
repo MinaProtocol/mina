@@ -92,7 +92,8 @@ module Vector = struct
    (** defines a function type, like ['elem -> 'elem -> ... -> 'elem -> unit] *)
     type 'elem fun_t
 
-    type 'elem b
+    (** defines a tuple type, like ['elem * 'elem * ... * 'elem * unit] *)
+    type 'elem tup_t
 
     type n
 
