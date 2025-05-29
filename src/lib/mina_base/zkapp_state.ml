@@ -1,6 +1,8 @@
 open Core_kernel
 open Pickles_types
 module Max_state_size = Nat.N8
+module State_length_vec : Vector.VECTOR with type 'a t = ('a,Max_state_size.n) Vector.vec
+  = Vector.Vector_8
 
 module V = struct
   (* Think about versioning here! These vector types *will* change
@@ -14,12 +16,12 @@ module V = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type 'a t = 'a Vector.Vector_8.Stable.V1.t
+      type 'a t = 'a State_length_vec.Stable.V1.t
       [@@deriving compare, yojson, sexp, hash, equal]
     end
   end]
 
-  type 'a t = 'a Vector.Vector_8.t
+  type 'a t = 'a State_length_vec.t
   [@@deriving compare, yojson, sexp, hash, equal]
 
   let map = Vector.map
