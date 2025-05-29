@@ -386,10 +386,7 @@ end
 
 module Verifiable : sig
   type t =
-    ( ( Account_update.Body.t
-      , (Proof_cache_tag.t, Signature.t) Control.Poly.t
-      , Account_update.Aux_data.t )
-      Account_update.Poly.t
+    ( Account_update.t
     , (Side_loaded_verification_key.t, Zkapp_basic.F.t) With_hash.t option )
     Call_forest.With_hashes_and_data.t
     Poly.t
@@ -448,10 +445,7 @@ module Verifiable : sig
 
   module Serializable : sig
     type t =
-      ( ( Account_update.Body.Stable.Latest.t
-        , (Proof.t, Signature.Stable.Latest.t) Control.Poly.Stable.Latest.t
-        , Account_update.No_aux.Stable.Latest.t )
-        Account_update.Poly.Stable.Latest.t
+      ( Account_update.Stable.Latest.t
       , ( Side_loaded_verification_key.Stable.Latest.t
         , Zkapp_basic.F.Stable.Latest.t )
         With_hash.Stable.Latest.t
@@ -467,12 +461,7 @@ module Verifiable : sig
     proof_cache_db:Proof_cache_tag.cache_db -> Serializable.t -> t
 end = struct
   type t =
-    ( ( Account_update.Body.Stable.Latest.t
-      , ( Proof_cache_tag.t
-        , Signature.Stable.Latest.t )
-        Control.Poly.Stable.Latest.t
-      , Account_update.Aux_data.t )
-      Account_update.Poly.Stable.Latest.t
+    ( Account_update.t
     , ( Side_loaded_verification_key.Stable.Latest.t
       , Zkapp_basic.F.Stable.Latest.t )
       With_hash.Stable.Latest.t

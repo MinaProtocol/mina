@@ -1639,57 +1639,11 @@ module Body = struct
     }
 end
 
-(** The [No_aux.t] type is a unit type that is not intended for serialization;
-    it has special yojson/sexp instances designed to work with the helper module
-    [Account_update.Poly.Without_aux.t] below, so that types of the form [(_, _,
-    No_aux.t) Account_update.Poly.t] can still have [@@deriving yojson, sexp]
-    applied to them. *)
-module No_aux = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = unit [@@deriving equal, hash, compare]
-
-      let to_latest = Fn.id
-
-      (** A to_yojson function that cannot be called *)
-      let to_yojson : _ -> Yojson.Safe.t = Nothing.unreachable_code
-
-      (** An of_yojson function that cannot be used for parsing, and which only
-          returns [No_aux.t] *)
-      let of_yojson : Base.Nothing.t -> t Ppx_deriving_yojson_runtime.error_or =
-        Fn.const (Ppx_deriving_yojson_runtime.Result.Ok ())
-
-      (** A sexp_of_t function that cannot be called *)
-      let sexp_of_t : _ -> Ppx_sexp_conv_lib.Sexp.t = Nothing.unreachable_code
-
-      (** A t_of_sexp function that cannot be used for parsing, and which only
-          returns [No_aux.t] *)
-      let t_of_sexp : Base.Nothing.t -> _ = Fn.const ()
-    end
-  end]
-
-  let to_yojson = Stable.Latest.to_yojson
-
-  let of_yojson = Stable.Latest.of_yojson
-
-  let sexp_of_t = Stable.Latest.sexp_of_t
-
-  let t_of_sexp = Stable.Latest.t_of_sexp
-end
-
 module Poly = struct
   (** This is a helper module to make writing the sexp/yojson/binable instances
       of types in this module easier. By going through this, the aux field of
       the Account_update types is properly ignored when serializing and
       deserializing.
-
-      The *_via functions in this module take three function paramaters because
-      they need to be compatible with ppx-generated code for types that look
-      like [{body; authorization; aux}]; the third, unused function is for the
-      aux field. This third function is constrained in type so that it must be a
-      constant function. In the [of_yojson_via] and [t_of_sexp_via] functions it
-      is also constrained so that it can only return [No_aux.t].
 
       The to_yojson and sexp_of_t functions created with this module will ignore
       the aux field entirely when writing their respective formats. The
@@ -1705,56 +1659,33 @@ module Poly = struct
               Mina_wire_types.Mina_base.Account_update.Poly.V1.t =
           { body : 'body; authorization : 'authorization }
         [@@deriving yojson, sexp]
-
-        let to_yojson_via ~to_wire f g (_h : Nothing.t -> Yojson.Safe.t) t =
-          to_yojson f g @@ to_wire t
-
-        let of_yojson_via ~of_wire f g
-            (_h : Nothing.t -> No_aux.t Ppx_deriving_yojson_runtime.error_or) t
-            =
-          Ppx_deriving_yojson_runtime.(of_yojson f g t >|= of_wire)
-
-        let sexp_of_t_via ~to_wire f g
-            (_h : Nothing.t -> Ppx_sexp_conv_lib.Sexp.t) t =
-          sexp_of_t f g @@ to_wire t
-
-        let t_of_sexp_via ~of_wire f g (_h : Nothing.t -> No_aux.t) t =
-          of_wire @@ t_of_sexp f g t
       end
     end]
   end
 
-  [%%versioned_binable
-  module Stable = struct
-    module V1 = struct
-      (** An account update in a zkApp transaction *)
-      type ('body, 'authorization, 'aux) t =
-        { body : 'body; authorization : 'authorization; aux : 'aux }
-      [@@deriving annot, equal, hash, compare, fields]
+  (** An account update in a zkApp transaction *)
+  type ('body, 'authorization, 'aux) t =
+    { body : 'body; authorization : 'authorization; aux : 'aux }
+  [@@deriving annot, equal, hash, compare, fields]
 
-      let of_wire (w : _ Wire.Stable.V1.t) : (_, _, No_aux.t) t =
-        { body = w.body; authorization = w.authorization; aux = () }
+  let of_wire (w : _ Wire.Stable.V1.t) : _ t =
+    { body = w.body; authorization = w.authorization; aux = () }
 
-      let to_wire (t : _ t) : _ Wire.Stable.V1.t =
-        { body = t.body; authorization = t.authorization }
+  let to_wire (t : _ t) : _ Wire.Stable.V1.t =
+    { body = t.body; authorization = t.authorization }
 
-      let to_yojson f g h t = Wire.Stable.V1.to_yojson_via ~to_wire f g h t
+  let to_yojson body authorization =
+    Fn.compose (Wire.Stable.V1.to_yojson body authorization) to_wire
 
-      let of_yojson f g h t = Wire.Stable.V1.of_yojson_via ~of_wire f g h t
+  let of_yojson body authorization =
+    let of_wire' = Result.map ~f:of_wire in
+    Fn.compose of_wire' (Wire.Stable.V1.of_yojson body authorization)
 
-      let sexp_of_t f g h t = Wire.Stable.V1.sexp_of_t_via ~to_wire f g h t
+  let sexp_of_t body authorization =
+    Fn.compose (Wire.Stable.V1.sexp_of_t body authorization) to_wire
 
-      let t_of_sexp f g h t = Wire.Stable.V1.t_of_sexp_via ~of_wire f g h t
-    end
-  end]
-
-  let to_yojson = Stable.Latest.to_yojson
-
-  let of_yojson = Stable.Latest.of_yojson
-
-  let sexp_of_t = Stable.Latest.sexp_of_t
-
-  let t_of_sexp = Stable.Latest.t_of_sexp
+  let t_of_sexp body authorization =
+    Fn.compose of_wire (Wire.Stable.V1.t_of_sexp body authorization)
 end
 
 module T = struct
@@ -1762,13 +1693,10 @@ module T = struct
     [%%versioned_binable
     module Stable = struct
       module V1 = struct
-        type ('body, 'authorization) t =
-          ('body, 'authorization, No_aux.t) Poly.Stable.V1.t
-        [@@deriving sexp, equal, yojson, hash, compare]
+        type ('body, 'authorization) t = ('body, 'authorization, unit) Poly.t
+        [@@deriving equal, hash, compare]
 
-        let of_wire = Poly.Stable.V1.of_wire
-
-        let to_wire = Poly.Stable.V1.to_wire
+        [%%define_locally Poly.(to_yojson, of_yojson, sexp_of_t, t_of_sexp)]
 
         include
           Binable.Of_binable2_without_uuid
@@ -1776,9 +1704,9 @@ module T = struct
             (struct
               type nonrec ('x, 'y) t = ('x, 'y) t
 
-              let of_binable t = of_wire t
+              let of_binable t = Poly.of_wire t
 
-              let to_binable = to_wire
+              let to_binable = Poly.to_wire
             end)
       end
     end]
@@ -1846,10 +1774,6 @@ module T = struct
             (** The cached hash of the actions in an account update body *)
       }
 
-    let to_yojson : _ -> Yojson.Safe.t = Nothing.unreachable_code
-
-    let sexp_of_t : _ -> Ppx_sexp_conv_lib.Sexp.t = Nothing.unreachable_code
-
     let of_body ~body : t =
       let actions = Zkapp_account.Actions.of_event_list body.Body.actions in
       { actions_hash = actions.hash }
@@ -1857,7 +1781,8 @@ module T = struct
 
   module With_aux = struct
     type ('body, 'authorization) t = ('body, 'authorization, Aux_data.t) Poly.t
-    [@@deriving sexp_of, to_yojson]
+
+    [%%define_locally Poly.(to_yojson, sexp_of_t)]
   end
 
   type t = (Body.t, Control.t) With_aux.t [@@deriving sexp_of, to_yojson]
