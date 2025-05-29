@@ -348,10 +348,8 @@ module Zkapp_states_nullable = struct
         sprintf "element%d" n )
 
   let typ =
-    let (module M) =
-      Mina_caqti.Vecs.of_nat Mina_base.Zkapp_state.Max_state_size.n
-    in
-    Mina_caqti.Vecs.typ (M.spec Caqti_type.(option int))
+    Mina_caqti.Vector.typ
+      (Caqti_type.(option int), Mina_base.Zkapp_state.Max_state_size.n)
 
   let table_name = "zkapp_states_nullable"
 
@@ -388,10 +386,8 @@ module Zkapp_states = struct
         sprintf "element%d" n )
 
   let typ =
-    let (module M) =
-      Mina_caqti.Vecs.of_nat Mina_base.Zkapp_state.Max_state_size.n
-    in
-    Mina_caqti.Vecs.typ (M.spec Caqti_type.int)
+    Mina_caqti.Vector.typ
+      (Caqti_type.int, Mina_base.Zkapp_state.Max_state_size.n)
 
   let table_name = "zkapp_states"
 

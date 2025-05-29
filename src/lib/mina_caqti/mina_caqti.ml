@@ -55,7 +55,7 @@ module Type_spec = struct
     Caqti_type.custom ~encode ~decode (to_rep tys)
 end
 
-module Vecs = struct
+module Vector = struct
   type (_, _, _, _) t =
     | [] : ('elem, unit, unit, Pickles_types.Nat.z) t
     | ( :: ) :
@@ -88,21 +88,6 @@ module Vecs = struct
      | [], [] ->
          []
 
-  let rec extract_type_spec :
-      type elem hlist tuple n.
-      (elem, hlist, tuple, n) t -> (hlist, tuple) Type_spec.t =
-   fun spec ->
-    match spec with
-    | [] ->
-        []
-    | caqti_type :: rest ->
-        let extracted_rest = extract_type_spec rest in
-        caqti_type :: extracted_rest
-
-  let typ (spec : ('elem, 'hlist, 'tuple, 'n) t) =
-    Type_spec.custom_type ~to_hlist:(vec_to_hlist spec)
-      ~of_hlist:(hlist_to_vec spec) (extract_type_spec spec)
-
   module type Intf = sig
     type 'elem a
 
@@ -111,9 +96,11 @@ module Vecs = struct
     type n
 
     val spec : 'elem Caqti_type.t -> ('elem, 'elem a, 'elem b, n) t
+
+    val type_spec : 'elem Caqti_type.t -> ('elem a, 'elem b) Type_spec.t
   end
 
-  let rec of_nat :
+  let rec spec_of_nat :
       type n. n Plonkish_prelude.Nat.nat -> (module Intf with type n = n) =
     function
     | Z ->
@@ -125,10 +112,12 @@ module Vecs = struct
           type n = Pickles_types.Nat.z
 
           let spec _ = []
+
+          let type_spec _ = Type_spec.[]
         end in
         (module N : Intf with type n = n)
     | S p ->
-        let (module Prev) = of_nat p in
+        let (module Prev) = spec_of_nat p in
         let module N = struct
           type 'elem a = 'elem -> 'elem Prev.a
 
@@ -138,9 +127,23 @@ module Vecs = struct
 
           let spec : type elem. elem Caqti_type.t -> (elem, elem a, elem b, n) t
               =
-           fun (t : elem Caqti_type.t) -> t :: Prev.spec t
+           fun t -> t :: Prev.spec t
+
+          let type_spec : 'elem Caqti_type.t -> ('elem a, 'elem b) Type_spec.t =
+           fun t -> t :: Prev.type_spec t
         end in
         (module N : Intf with type n = n)
+
+  let typ :
+      type elem n.
+         elem Caqti_type.t * n Plonkish_prelude.Nat.nat
+      -> (elem, n) Pickles_types.Vector.vec Caqti_type.t =
+   fun (elem, n) ->
+    let (module M) = spec_of_nat n in
+    Type_spec.custom_type
+      ~to_hlist:(vec_to_hlist (M.spec elem))
+      ~of_hlist:(hlist_to_vec (M.spec elem))
+      (M.type_spec elem)
 end
 
 (* build coding for array type that can be interpreted as a string
