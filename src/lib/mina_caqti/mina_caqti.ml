@@ -89,7 +89,7 @@ module Vector = struct
          []
 
   module type Intf = sig
-   (** defines a function type, like ['elem -> 'elem -> ... -> 'elem -> unit] *)
+    (** defines a function type, like ['elem -> 'elem -> ... -> 'elem -> unit] *)
     type 'elem fun_t
 
     (** defines a tuple type, like ['elem * 'elem * ... * 'elem * unit] *)
@@ -127,11 +127,13 @@ module Vector = struct
 
           type n = Prev.n Pickles_types.Nat.s
 
-          let spec : type elem. elem Caqti_type.t -> (elem, elem fun_t, elem tup_t, n) t
-              =
+          let spec :
+              type elem.
+              elem Caqti_type.t -> (elem, elem fun_t, elem tup_t, n) t =
            fun t -> t :: Prev.spec t
 
-          let type_spec : 'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t =
+          let type_spec :
+              'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t =
            fun t -> t :: Prev.type_spec t
         end in
         (module N : Intf with type n = n)
