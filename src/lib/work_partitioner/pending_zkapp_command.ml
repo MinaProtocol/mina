@@ -16,6 +16,9 @@ type t =
         (** we may need to insert proofs to merge back to the queue, hence a
             Deque *)
   ; mutable elapsed : Time.Stable.Span.V1.t
+        (** The total work time for all SNARK workers combined to prove this
+            specific zkapp command. Or, the time it would take a single SNARK
+            worker to generate the final proof of this command. *)
   ; mutable merge_remaining : int
         (** The number of merges we need to perform before getting the final
             proof. This is needed because in `pending_mergeable_proofs` we
