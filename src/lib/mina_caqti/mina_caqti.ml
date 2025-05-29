@@ -60,7 +60,7 @@ module Vector = struct
     | [] : ('elem, unit, unit, Pickles_types.Nat.z) t
     | ( :: ) :
         'elem Caqti_type.t * ('elem, 'fun_t, 'tup_t, 'n) t
-        -> ('elem, 'elem -> 'a, 'elem * 'b, 'n Pickles_types.Nat.s) t
+        -> ('elem, 'elem -> 'fun_t, 'elem * 'tup_t, 'n Pickles_types.Nat.s) t
 
   let rec vec_to_hlist :
             'elem 'hlist 'tup 'n.
@@ -97,9 +97,9 @@ module Vector = struct
 
     type n
 
-    val spec : 'elem Caqti_type.t -> ('elem, 'elem a, 'elem b, n) t
+    val spec : 'elem Caqti_type.t -> ('elem, 'elem fun_t, 'elem tup_t, n) t
 
-    val type_spec : 'elem Caqti_type.t -> ('elem a, 'elem b) Type_spec.t
+    val type_spec : 'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t
   end
 
   let rec spec_of_nat :
@@ -107,9 +107,9 @@ module Vector = struct
     function
     | Z ->
         let module N = struct
-          type 'elem a = unit
+          type 'elem fun_t = unit
 
-          type 'elem b = unit
+          type 'elem tup_t = unit
 
           type n = Pickles_types.Nat.z
 
@@ -121,17 +121,17 @@ module Vector = struct
     | S p ->
         let (module Prev) = spec_of_nat p in
         let module N = struct
-          type 'elem a = 'elem -> 'elem Prev.a
+          type 'elem fun_t = 'elem -> 'elem Prev.fun_t
 
-          type 'elem b = 'elem * 'elem Prev.b
+          type 'elem tup_t = 'elem * 'elem Prev.tup_t
 
           type n = Prev.n Pickles_types.Nat.s
 
-          let spec : type elem. elem Caqti_type.t -> (elem, elem a, elem b, n) t
+          let spec : type elem. elem Caqti_type.t -> (elem, elem fun_t, elem tup_t, n) t
               =
            fun t -> t :: Prev.spec t
 
-          let type_spec : 'elem Caqti_type.t -> ('elem a, 'elem b) Type_spec.t =
+          let type_spec : 'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t =
            fun t -> t :: Prev.type_spec t
         end in
         (module N : Intf with type n = n)
