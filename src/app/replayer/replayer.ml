@@ -46,7 +46,7 @@ type output =
 
 module type Get_command_ids = sig
   val run :
-       Caqti_async.connection
+       (module Mina_caqti.CONNECTION)
     -> state_hash:string
     -> start_slot:int64
     -> (int list, [> Caqti_error.call_or_retrieve ]) Deferred.Result.t
@@ -167,7 +167,7 @@ let get_slot_hashes slot = Hashtbl.find global_slot_hashes_tbl slot
 
 let process_block_infos_of_state_hash ~logger pool ~state_hash ~start_slot ~f =
   match%bind
-    Caqti_async.Pool.use
+    Mina_caqti.Pool.use
       (fun db -> Sql.Block_info.run db ~state_hash ~start_slot)
       pool
   with
@@ -651,7 +651,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
              msg )
   in
   let archive_uri = Uri.of_string archive_uri in
-  match Caqti_async.connect_pool ~max_size:128 archive_uri with
+  match Mina_caqti.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -786,7 +786,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
       (* end mutable state *)
       let get_command_ids (module Command_ids : Get_command_ids) name =
         match%bind
-          Caqti_async.Pool.use
+          Mina_caqti.Pool.use
             (fun db ->
               Command_ids.run db ~state_hash:target_state_hash
                 ~start_slot:input.start_slot_since_genesis )
@@ -822,7 +822,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map internal_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use
+              Mina_caqti.Pool.use
                 (fun db ->
                   Sql.Internal_command.run db
                     ~start_slot:input.start_slot_since_genesis
@@ -879,7 +879,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map user_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use (fun db -> Sql.User_command.run db id) pool
+              Mina_caqti.Pool.use (fun db -> Sql.User_command.run db id) pool
             with
             | Ok [] ->
                 failwithf "Expected at least one user command with id %d" id ()
@@ -910,7 +910,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         Deferred.List.map zkapp_cmd_ids ~f:(fun id ->
             let open Deferred.Let_syntax in
             match%map
-              Caqti_async.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
+              Mina_caqti.Pool.use (fun db -> Sql.Zkapp_command.run db id) pool
             with
             | Ok [] ->
                 failwithf "Expected at least one zkApp command with id %d" id ()
