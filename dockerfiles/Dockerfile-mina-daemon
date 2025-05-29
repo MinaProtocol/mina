@@ -27,6 +27,9 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libprocps8
 #    libjemalloc2
 
+# Use https for apt sources
+RUN sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list
+
 # Dependencies
 RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \
