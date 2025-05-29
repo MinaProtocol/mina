@@ -34,8 +34,8 @@ let create ~job ~unscheduled_segments ~pending_mergeable_proofs ~merge_remaining
   ; merge_remaining
   }
 
-(* This function attempts dequeuing 2 proofs from `pending_mergeable_proofs` and
-   generate a sub-zkapp level spec merging them together. *)
+(** [next_merge t] attempts dequeuing 2 proofs from [t.pending_mergeable_proofs]
+    and generate a sub-zkapp level spec merging them together. *)
 let next_merge (t : t) =
   let try_take2 (q : 'a Deque.t) : ('a * 'a) option =
     match Deque.dequeue_front q with
@@ -52,7 +52,7 @@ let next_merge (t : t) =
   let%map proof1, proof2 = try_take2 t.pending_mergeable_proofs in
   Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
 
-(* This function dequeus a segment from `unscheduled_segments and generate a
+(** [next_segment t] dequeus a segment from [t.unscheduled_segments] and generate a
    sub-zkapp level spec proving that segment. *)
 let next_segment (t : t) =
   let open Option.Let_syntax in
