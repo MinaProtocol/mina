@@ -89,7 +89,8 @@ module Vector = struct
          []
 
   module type Intf = sig
-    type 'elem a
+   (** defines a function type, like ['elem -> 'elem -> ... -> 'elem -> unit] *)
+    type 'elem fun_t
 
     type 'elem b
 
