@@ -1,7 +1,3 @@
-open Core_kernel
-open Async
-open Signature_lib
-
 (* for versioning of the types here, see
 
    RFC 0012, and
@@ -15,54 +11,7 @@ open Signature_lib
 *)
 
 module Make = struct
-  open Snark_work_lib
   module Get_work = Rpc_get_work.Master
-
-  module Submit_work = struct
-    module Master = struct
-      let name = "submit_work"
-
-      module T = struct
-        type query =
-          ( ( Transaction_witness.Stable.Latest.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
-            Work.Spec.t
-          , Ledger_proof.t )
-          Work.Result.t
-
-        type response = unit
-      end
-
-      module Caller = T
-      module Callee = T
-    end
-
-    include Master.T
-    include Versioned_rpc.Both_convert.Plain.Make (Master)
-  end
-
-  module Failed_to_generate_snark = struct
-    module Master = struct
-      let name = "failed_to_generate_snark"
-
-      module T = struct
-        type query =
-          Error.t
-          * ( Transaction_witness.Stable.Latest.t
-            , Ledger_proof.t )
-            Work.Single.Spec.t
-            Work.Spec.t
-          * Public_key.Compressed.t
-
-        type response = unit
-      end
-
-      module Caller = T
-      module Callee = T
-    end
-
-    include Master.T
-    include Versioned_rpc.Both_convert.Plain.Make (Master)
-  end
+  module Submit_work = Rpc_submit_work.Master
+  module Failed_to_generate_snark = Rpc_failed_to_generate_snark.Master
 end

@@ -61,16 +61,9 @@ module Inputs = struct
     let worker_wait_time = 5.
   end
 
-  (* bin_io is for uptime service SNARK worker *)
-  type single_spec =
-    ( Transaction_witness.Stable.Latest.t
-    , Transaction_snark.Stable.Latest.t )
-    Snark_work_lib.Work.Single.Spec.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp]
-
   let perform_single
       ({ cache; proof_level_snark; proof_cache_db; logger } : Worker_state.t)
-      ~message (single : single_spec) =
+      ~message (single : Snark_work_lib.Selector.Single.Spec.Stable.Latest.t) =
     let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
@@ -87,10 +80,8 @@ module Inputs = struct
                 ~metadata:
                   [ ("error", Error_json.error_to_yojson e)
                   ; ( "spec"
-                      (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
-                         so we use the less-desirable sexp here
-                      *)
-                    , `String (Sexp.to_string (sexp_of_single_spec single)) )
+                    , Snark_work_lib.Selector.Single.Spec.Stable.Latest
+                      .to_yojson single )
                   ] ;
               Error e
           | Ok res ->
@@ -224,7 +215,12 @@ module Inputs = struct
                           (* Validate the received transaction *)
                           match w.transaction with
                           | Command (Signed_command cmd) -> (
-                              match Signed_command.check cmd with
+                              let signature_kind =
+                                Mina_signature_kind.t_DEPRECATED
+                              in
+                              match
+                                Signed_command.check ~signature_kind cmd
+                              with
                               | Some cmd ->
                                   ( Ok (Command (Signed_command cmd))
                                     : Transaction.Valid.t Or_error.t )

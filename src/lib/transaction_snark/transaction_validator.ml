@@ -87,9 +87,10 @@ let%test_unit "invalid transactions do not dirty the ledger" =
         ~memo:Signed_command_memo.dummy
         ~body:(Signed_command_payload.Body.Payment payment)
     in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     Option.value_exn
-      (Signed_command.create_with_signature_checked
-         (Signed_command.sign_payload sender_sk payload)
+      (Signed_command.create_with_signature_checked ~signature_kind
+         (Signed_command.sign_payload ~signature_kind sender_sk payload)
          sender_pk payload )
   in
   Ledger.create_new_account_exn ledger sender_id sender_account ;
