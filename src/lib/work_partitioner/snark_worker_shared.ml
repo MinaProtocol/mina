@@ -1,5 +1,4 @@
 open Core_kernel
-open Async
 open Mina_base
 open Transaction_snark
 
@@ -43,8 +42,7 @@ end
 let extract_zkapp_segment_works ~m:(module M : S)
     ~(input : Mina_state.Snarked_ledger_state.t)
     ~(witness : Transaction_witness.Stable.Latest.t)
-    ~(zkapp_command : Zkapp_command.t) :
-    Zkapp_command_inputs.t Deferred.Or_error.t =
+    ~(zkapp_command : Zkapp_command.t) : Zkapp_command_inputs.t Or_error.t =
   Or_error.try_with (fun () ->
       Transaction_snark.zkapp_command_witnesses_exn
         ~constraint_constants:M.constraint_constants
@@ -69,4 +67,3 @@ let extract_zkapp_segment_works ~m:(module M : S)
            ( Zkapp_command.read_all_proofs_from_disk zkapp_command
            |> Zkapp_command.Stable.Latest.to_yojson |> Yojson.Safe.to_string )
            (Error.to_string_hum e) )
-  |> Deferred.return

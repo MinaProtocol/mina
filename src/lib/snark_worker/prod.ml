@@ -113,6 +113,7 @@ module Inputs = struct
                             ~zkapp_command:
                               (Zkapp_command.write_all_proofs_to_disk
                                  ~proof_cache_db zkapp_command )
+                          |> Deferred.return
                         in
                         let log_base_snark f ~statement ~spec ~all_inputs =
                           match%map.Deferred
