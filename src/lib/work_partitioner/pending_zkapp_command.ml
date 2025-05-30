@@ -67,3 +67,11 @@ let submit_proof (t : t) ~(proof : Ledger_proof.t)
   Deque.enqueue_back t.pending_mergeable_proofs proof ;
   t.proofs_in_flights <- t.proofs_in_flights - 1 ;
   t.elapsed <- Time.Span.(t.elapsed + elapsed)
+
+let try_finalize (t : t) =
+  if
+    0 = t.proofs_in_flights
+    && 0 = Queue.length t.unscheduled_segments
+    && 1 = Deque.length t.pending_mergeable_proofs
+  then Some (t.job, Deque.dequeue_back_exn t.pending_mergeable_proofs, t.elapsed)
+  else None
