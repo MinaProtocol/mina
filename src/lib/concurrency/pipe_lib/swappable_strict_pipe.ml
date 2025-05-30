@@ -1,17 +1,7 @@
 open Core_kernel
 open Async_kernel
 
-(** short-lived pipe: an [Ivar.t] that is filled with an [Ivar.t] 
-    to which some data can be put.
-    
-    Usage: reader fills the outer ivar with an empty ivar and
-    then waits for that one to be filled with data and the new ivar
-    that can be used in the same way (or `Eof if the pipe is terminated).
-    *)
-type 'data_in_pipe short_lived_pipe_t =
-  | Short_lived_pipe of
-      [ `Eof | `Ok of 'data_in_pipe * 'data_in_pipe short_lived_pipe_t ] Ivar.t
-      Ivar.t
+type 'data short_lived_pipe_t = 'data Choosable_synchronous_pipe.t
 
 type ('data_in_pipe, 'write_return) t =
   | Swappable :
@@ -46,13 +36,6 @@ type ('data_in_pipe, 'write_return) state_t =
   ; read_unfinished : [ `Eof | `Ok of 'data_in_pipe ] Deferred.t option
   }
 
-(** Terminates the short-lived pipe.
-    Ensures that any reader on it will get [`Eof].
-*)
-let terminate_short_lived_pipe (Short_lived_pipe outer_ivar) =
-  Ivar.fill_if_empty outer_ivar (Ivar.create_full `Eof) ;
-  Option.iter (Ivar.peek outer_ivar) ~f:(Fn.flip Ivar.fill_if_empty `Eof)
-
 (** Terminates the swappable pipe.
 
     Shouldn't be called more than once for a pipe.
@@ -62,10 +45,10 @@ let terminate state =
     state.exposed
   in
   Strict_pipe.Writer.kill long_lived_writer ;
-  Option.iter ~f:terminate_short_lived_pipe state.short_lived_pipe ;
+  Option.iter ~f:Choosable_synchronous_pipe.close state.short_lived_pipe ;
   Option.iter (Ivar.peek next_short_lived_pipe)
     ~f:(fun (writer, processed_signal) ->
-      terminate_short_lived_pipe writer ;
+      Choosable_synchronous_pipe.close writer ;
       Ivar.fill processed_signal () ) ;
   `Finished ()
 
@@ -84,7 +67,7 @@ let handle_next_short_lived_pipe state (new_sink, processed_signal) =
      an R/W mutex to protect the mutable field. *)
   t.next_short_lived_pipe <- Ivar.create () ;
   Ivar.fill processed_signal () ;
-  Option.iter ~f:terminate_short_lived_pipe state.short_lived_pipe ;
+  Option.iter ~f:Choosable_synchronous_pipe.close state.short_lived_pipe ;
   `Repeat { state with short_lived_pipe = Some new_sink }
 
 (** Returns a choice that updates state with a new short-lived sink
@@ -104,10 +87,8 @@ let read_short_lived_pipe_choice state =
     so it's safe to call use the choice repeatedly, until
     the choice is actually selected (then a single write happens).
 *)
-let write_sink_choice ~sink ~data state =
-  choice (Ivar.read sink) (fun ivar ->
-      let new_sink = Short_lived_pipe (Ivar.create ()) in
-      Ivar.fill_if_empty ivar (`Ok (data, new_sink)) ;
+let write_sink_choice state sink data =
+  Choosable_synchronous_pipe.write_choice sink data ~on_chosen:(fun new_sink ->
       `Repeat
         { state with data_unconsumed = None; short_lived_pipe = Some new_sink } )
 
@@ -132,8 +113,8 @@ let reconfiguration_choices state =
     of [Deferred.choice] guarantees that the result is determined in the
     async cycle if any of the choices becomes determined.
 *)
-let short_lived_write state (Short_lived_pipe sink) data =
-  choose (write_sink_choice ~sink ~data state :: reconfiguration_choices state)
+let short_lived_write state sink data =
+  choose (write_sink_choice state sink data :: reconfiguration_choices state)
 
 (** Attempt to read next short-lived sink.
     
@@ -254,21 +235,7 @@ let create (type data_in_pipe pipe_kind write_return) ?warn_on_drop ~name
 let write (Swappable { long_lived_writer; _ }) =
   Strict_pipe.Writer.write long_lived_writer
 
-module Iterator = struct
-  type 'data_in_pipe t = 'data_in_pipe short_lived_pipe_t
-
-  let read_one (Short_lived_pipe outer_ivar : _ t) =
-    Ivar.fill_if_empty outer_ivar (Ivar.create ()) ;
-    Ivar.read (Ivar.value_exn outer_ivar)
-
-  let iter (t_initial : _ t) ~f =
-    Deferred.repeat_until_finished t_initial (fun t ->
-        match%bind read_one t with
-        | `Eof ->
-            Deferred.return (`Finished ())
-        | `Ok (data, t') ->
-            f data >>| fun () -> `Repeat t' )
-end
+module Iterator = Choosable_synchronous_pipe
 
 let swap_reader (Swappable t) : _ Iterator.t Deferred.t =
   (* If the pipe is terminated, an immediately closed reader is returned.
@@ -278,8 +245,7 @@ let swap_reader (Swappable t) : _ Iterator.t Deferred.t =
      reader is returned.
   *)
   if Ivar.is_full t.termination_signal || Ivar.is_full t.next_short_lived_pipe
-  then
-    Deferred.return (Short_lived_pipe (Ivar.create_full (Ivar.create_full `Eof)))
+  then Deferred.return (Choosable_synchronous_pipe.create_closed ())
   else
     (* TODO when rewriting to Ocaml 5.x, the "else" case may result in a
        concurrency bug, though it's safe in single-threaded ocaml execution.
@@ -287,7 +253,7 @@ let swap_reader (Swappable t) : _ Iterator.t Deferred.t =
        Recommendation: have alternative to [Ivar.fill_if_empty] that returns a boolean
        with whether the fill was successful or catch an exception on [Ivar.fill].
     *)
-    let short_lived_pipe = Short_lived_pipe (Ivar.create ()) in
+    let short_lived_pipe = Choosable_synchronous_pipe.create () in
     let processed_signal = Ivar.create () in
     Ivar.fill t.next_short_lived_pipe (short_lived_pipe, processed_signal) ;
     let%map () = Ivar.read processed_signal in
