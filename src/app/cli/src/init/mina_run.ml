@@ -748,7 +748,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
-           | Mina_user_error.Mina_user_error { message; where } ->
+           | Mina_stdlib.Mina_user_error.Mina_user_error { message; where } ->
                Core.print_string "\nFATAL ERROR" ;
                let error =
                  match where with

@@ -58,7 +58,7 @@
   transaction_snark
   mina_compile_config
   node_error_service
-  mina_user_error
+  mina_stdlib
   file_system
   mina_version
   mina_net2

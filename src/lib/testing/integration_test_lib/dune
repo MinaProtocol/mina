@@ -51,13 +51,12 @@
   pipe_lib
   mina_networking
   logger
-  graph_algorithms
+  mina_stdlib
   block_producer
   transition_frontier
   mina_runtime_config
   mina_base
   mina_lib
-  bounded_types
   genesis_constants
   transition_router
   signature_lib

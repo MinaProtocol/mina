@@ -1,8 +1,8 @@
 (**
- * A [Rose_tree.t] is a tree with at least 1 element where a node
+ * A [Mina_stdlib.Rose_tree.t] is a tree with at least 1 element where a node
  * has a variable number of successors.
  *
- * @see <https://en.wikipedia.org/wiki/Rose_tree> Wikipedia Article
+ * @see <https://en.wikipedia.org/wiki/Mina_stdlib.Rose_tree> Wikipedia Article
  *)
 
 open Core_kernel
@@ -18,8 +18,7 @@ val print : ?whitespace:int -> element_to_string:('a -> string) -> 'a t -> unit
 
 val of_list_exn : ?subtrees:'a t list -> 'a list -> 'a t
 
-val of_non_empty_list :
-  ?subtrees:'a t list -> 'a Mina_stdlib.Nonempty_list.t -> 'a t
+val of_non_empty_list : ?subtrees:'a t list -> 'a Nonempty_list.t -> 'a t
 
 val equal : f:('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 

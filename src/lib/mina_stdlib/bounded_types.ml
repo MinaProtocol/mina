@@ -27,7 +27,7 @@ struct
 
       let bin_shape_t bin_shape_elt =
         Bin_prot.Shape.basetype
-          (Bin_prot.Shape.Uuid.of_string "Bounded_types.Array.t")
+          (Bin_prot.Shape.Uuid.of_string "Mina_stdlib.Bounded_types.Array.t")
           [ bin_shape_elt ]
 
       let bin_write_t bin_write_el buf ~pos a =
@@ -74,7 +74,7 @@ module String = struct
 
       let bin_shape_t =
         Bin_prot.Shape.basetype
-          (Bin_prot.Shape.Uuid.of_string "Bounded_types.String.t")
+          (Bin_prot.Shape.Uuid.of_string "Mina_stdlib.Bounded_types.String.t")
           []
 
       let bin_write_t buf ~pos s =

@@ -303,14 +303,14 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~(catchup_breadcrumbs_reader :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list
        * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ] )
        Reader.t )
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
@@ -360,7 +360,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   ( match%map
                       Deferred.Or_error.List.iter breadcrumb_subtrees
                         ~f:(fun subtree ->
-                          Rose_tree.Deferred.Or_error.iter
+                          Mina_stdlib.Rose_tree.Deferred.Or_error.iter
                             subtree
                             (* It could be the case that by the time we try and
                                * add the breadcrumb, it's no longer relevant when
@@ -390,7 +390,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       ()
                   | Error err ->
                       List.iter breadcrumb_subtrees ~f:(fun tree ->
-                          Rose_tree.iter tree
+                          Mina_stdlib.Rose_tree.iter tree
                             ~f:(fun (cached_breadcrumb, _vc) ->
                               let (_ : Transition_frontier.Breadcrumb.t) =
                                 Cached.invalidate_with_failure cached_breadcrumb

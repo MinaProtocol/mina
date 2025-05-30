@@ -1,12 +1,11 @@
-open Core_kernel
-
 (** Testing
     -------
-    Component:  Mina stdlib
-    Invocation: dune exec src/lib/mina_stdlib/tests/main.exe
+    Component:  Mina stdlib time
+    Invocation: dune exec src/lib/mina_stdlib/tests/test_time.exe
     Subject:    Test JSON roundtrip for Time.Span.Stable.V1
  *)
 
+open Core_kernel
 module SpanV1 = Mina_stdlib.Time.Span.Stable.V1
 
 (* Test that basic JSON serialization roundtrip works *)
@@ -115,3 +114,25 @@ let test_non_float_json_type () =
   | Error _ ->
       (* Expected error, test passes *)
       ()
+
+let () =
+  let open Alcotest in
+  run "Time.Span.Stable.V1 JSON roundtrip"
+    [ ( "basic roundtrip tests"
+      , [ test_case "basic json roundtrip" `Quick test_basic_json_roundtrip
+        ; test_case "zero span roundtrip" `Quick test_zero_span_roundtrip
+        ; test_case "positive span roundtrip" `Quick
+            test_positive_span_roundtrip
+        ; test_case "negative span roundtrip" `Quick
+            test_negative_span_roundtrip
+        ; test_case "fraction span roundtrip" `Quick
+            test_fraction_span_roundtrip
+        ; test_case "very small span roundtrip" `Quick
+            test_very_small_span_roundtrip
+        ; test_case "large span roundtrip" `Quick test_large_span_roundtrip
+        ] )
+    ; ( "error cases"
+      , [ test_case "invalid json input" `Quick test_invalid_json_input
+        ; test_case "non-float json type" `Quick test_non_float_json_type
+        ] )
+    ]

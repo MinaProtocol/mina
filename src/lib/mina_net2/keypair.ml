@@ -6,8 +6,8 @@ open Network_peer
 module Stable = struct
   module V1 = struct
     type t =
-      { secret : Bounded_types.String.Stable.V1.t
-      ; public : Bounded_types.String.Stable.V1.t
+      { secret : Mina_stdlib.Bounded_types.String.Stable.V1.t
+      ; public : Mina_stdlib.Bounded_types.String.Stable.V1.t
       ; peer_id : Peer.Id.Stable.V1.t
       }
 
