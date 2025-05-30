@@ -19,19 +19,17 @@ type t =
         (** The total work time for all SNARK workers combined to prove this
             specific zkapp command. Or, the time it would take a single SNARK
             worker to generate the final proof of this command. *)
-  ; mutable merge_remaining : int
-        (** The number of merges we need to perform before getting the final
-            proof. This is needed because in `pending_mergeable_proofs` we
-            don't know the number of segments each proof correspond to. *)
+  ; mutable proofs_in_flights : int
+        (** The number of proofs we need to wait for before being sure we could
+            continue with the only proof on hand as the final proof. *)
   }
 
-let create ~job ~unscheduled_segments ~pending_mergeable_proofs ~merge_remaining
-    =
+let create ~job ~unscheduled_segments ~pending_mergeable_proofs =
   { job
   ; unscheduled_segments
   ; pending_mergeable_proofs
   ; elapsed = Time.Span.zero
-  ; merge_remaining
+  ; proofs_in_flights = 0
   }
 
 (** [next_merge t] attempts dequeuing 2 proofs from [t.pending_mergeable_proofs]
@@ -50,6 +48,7 @@ let next_merge (t : t) =
   in
   let open Option.Let_syntax in
   let%map proof1, proof2 = try_take2 t.pending_mergeable_proofs in
+  t.proofs_in_flights <- t.proofs_in_flights + 1 ;
   Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
 
 (** [next_segment t] dequeus a segment from [t.unscheduled_segments] and generate a
@@ -57,6 +56,7 @@ let next_merge (t : t) =
 let next_segment (t : t) =
   let open Option.Let_syntax in
   let%map segment = Queue.dequeue t.unscheduled_segments in
+  t.proofs_in_flights <- t.proofs_in_flights + 1 ;
   segment
 
 let generate_job_spec (t : t) : Spec.Sub_zkapp.Stable.Latest.t option =
@@ -65,5 +65,5 @@ let generate_job_spec (t : t) : Spec.Sub_zkapp.Stable.Latest.t option =
 let submit_proof (t : t) ~(proof : Ledger_proof.t)
     ~(elapsed : Time.Stable.Span.V1.t) =
   Deque.enqueue_back t.pending_mergeable_proofs proof ;
-  t.merge_remaining <- t.merge_remaining - 1 ;
+  t.proofs_in_flights <- t.proofs_in_flights - 1 ;
   t.elapsed <- Time.Span.(t.elapsed + elapsed)

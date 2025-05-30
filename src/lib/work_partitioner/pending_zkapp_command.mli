@@ -7,7 +7,6 @@ val create :
      job:(Spec.Single.t, Id.Single.t) With_job_meta.t
   -> unscheduled_segments:Spec.Sub_zkapp.Stable.Latest.t Base.Queue.t
   -> pending_mergeable_proofs:Ledger_proof.t Deque.t
-  -> merge_remaining:int
   -> t
 
 val generate_job_spec : t -> Spec.Sub_zkapp.Stable.Latest.t option
