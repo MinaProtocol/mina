@@ -88,7 +88,7 @@ let toDebianName =
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
             , LogProc = "logproc"
-            , Archive = "archive"
+            , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
             , Rosetta = "rosetta_${Network.lowerName network}"
@@ -108,7 +108,7 @@ let toDebianNames =
                   (     \(a : Artifact)
                     ->  merge
                           { Daemon = [ toDebianName a network ]
-                          , Archive = [ "archive" ]
+                          , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]

@@ -50,7 +50,7 @@ let PromoteDebianSpec =
           , to_channel = DebianChannel.Type.Compatible
           , source_repo = DebianRepo.Type.Unstable
           , target_repo = DebianRepo.Type.Nightly
-          , profile = Profiles.Type.Standard
+          , profile = Profiles.Type.Devnet
           , remove_profile_from_name = False
           , step_key = "promote-debian-package"
           , if = None B/If
@@ -68,7 +68,7 @@ let promoteDebianStep =
 
                 then  "--new-name ${Package.debianName
                                       spec.package
-                                      Profiles.Type.Standard
+                                      Profiles.Type.Devnet
                                       spec.network}"
 
                 else  ""
