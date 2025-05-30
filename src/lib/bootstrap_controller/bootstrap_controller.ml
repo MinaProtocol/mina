@@ -208,7 +208,8 @@ let sync_ledger ({ context = (module Context); _ } as t) ~preferred
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
     response_writer ;
-  Reader.iter sync_ledger_reader ~f:(fun (b_or_h, `Valid_cb vc) ->
+  Pipe_lib.Choosable_synchronous_pipe.iter sync_ledger_reader
+    ~f:(fun (b_or_h, `Valid_cb vc) ->
       let header_with_hash, sender, transition_cache_element =
         match b_or_h with
         | `Block b_env ->
@@ -285,15 +286,11 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
 
 (** Run one bootstrap cycle *)
 let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
-    ~network ~consensus_local_state ~transition_reader ~preferred_peers
+    ~network ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
     previous_cycles =
   let open Context in
-  let sync_ledger_reader, sync_ledger_writer =
-    create ~name:"sync ledger pipe" Synchronous
-  in
-  don't_wait_for
-    (transfer_while_writer_alive transition_reader sync_ledger_writer ~f:Fn.id) ;
+  let%bind sync_ledger_reader = Swappable.swap_reader network_transition_pipe in
   let initial_root_transition =
     initial_root_transition |> Mina_block.Validated.remember
     |> Mina_block.Validation.reset_frontier_dependencies_validation
@@ -487,7 +484,6 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           ]
         "Failed to find scan state for the transition with hash $state_hash \
          from the peer or received faulty scan state: $error. Retry bootstrap" ;
-      Writer.close sync_ledger_writer ;
       let this_cycle =
         { cycle_result = "failed to download and construct scan state"
         ; sync_ledger_time
@@ -549,7 +545,6 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           [%log error]
             ~metadata:[ ("error", Error_json.error_to_yojson e) ]
             "Local state sync failed: $error. Retry bootstrap" ;
-          Writer.close sync_ledger_writer ;
           let this_cycle =
             { cycle_result = "failed to synchronize local state"
             ; sync_ledger_time
@@ -673,15 +668,16 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     5. Close the old frontier and reload a new one from disk.
  *)
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
-    ~consensus_local_state ~transition_reader ~preferred_peers ~persistent_root
-    ~persistent_frontier ~initial_root_transition ~catchup_mode =
+    ~consensus_local_state ~network_transition_pipe ~preferred_peers
+    ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
+    =
   let open Context in
   let run_cycle =
     run_cycle
       ~context:(module Context : CONTEXT)
-      ~trust_system ~verifier ~network ~consensus_local_state ~transition_reader
-      ~preferred_peers ~persistent_root ~persistent_frontier
-      ~initial_root_transition ~catchup_mode
+      ~trust_system ~verifier ~network ~consensus_local_state
+      ~network_transition_pipe ~preferred_peers ~persistent_root
+      ~persistent_frontier ~initial_root_transition ~catchup_mode
   in
   O1trace.thread "bootstrap"
   @@ fun () ->
@@ -700,8 +696,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
 
 let%test_module "Bootstrap_controller tests" =
   ( module struct
-    open Pipe_lib
-
     let max_frontier_length =
       Transition_frontier.global_max_length Genesis_constants.For_unit_tests.t
 
@@ -825,7 +819,7 @@ let%test_module "Bootstrap_controller tests" =
           in
           let transition_graph = Transition_cache.create () in
           let sync_ledger_reader, sync_ledger_writer =
-            Pipe_lib.Strict_pipe.create ~name:"sync_ledger_reader" Synchronous
+            Pipe_lib.Choosable_synchronous_pipe.create ()
           in
           let bootstrap =
             make_non_running_bootstrap ~genesis_root ~network:me.network
@@ -841,14 +835,15 @@ let%test_module "Bootstrap_controller tests" =
                 sync_ledger bootstrap ~root_sync_ledger ~transition_graph
                   ~preferred:[] ~sync_ledger_reader
               in
-              let%bind () =
-                Deferred.List.iter branch ~f:(fun breadcrumb ->
-                    Strict_pipe.Writer.write sync_ledger_writer
+              let%bind sync_ledger_writer' =
+                Deferred.List.fold ~init:sync_ledger_writer branch
+                  ~f:(fun sync_ledger_writer breadcrumb ->
+                    Pipe_lib.Choosable_synchronous_pipe.write sync_ledger_writer
                       ( `Block
                           (downcast_breadcrumb ~sender:other.peer breadcrumb)
                       , `Valid_cb None ) )
               in
-              Strict_pipe.Writer.close sync_ledger_writer ;
+              Pipe_lib.Choosable_synchronous_pipe.close sync_ledger_writer' ;
               sync_deferred ) ;
           let expected_transitions =
             List.map branch
@@ -878,7 +873,7 @@ let%test_module "Bootstrap_controller tests" =
             (E.Set.of_list saved_transitions)
             ~expect:(E.Set.of_list expected_transitions) )
 
-    let run_bootstrap ~timeout_duration ~my_net ~transition_reader =
+    let run_bootstrap ~timeout_duration ~my_net ~network_transition_pipe =
       let open Fake_network in
       let time_controller = Block_time.Controller.basic ~logger in
       let persistent_root =
@@ -900,7 +895,7 @@ let%test_module "Bootstrap_controller tests" =
            ~context:(module Context)
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
-           ~transition_reader ~persistent_root ~persistent_frontier
+           ~network_transition_pipe ~persistent_root ~persistent_frontier
            ~catchup_mode:`Super ~initial_root_transition )
 
     let assert_transitions_increasingly_sorted ~root
@@ -943,10 +938,6 @@ let%test_module "Bootstrap_controller tests" =
             ])
         ~f:(fun fake_network ->
           let [ my_net; peer_net ] = fake_network.peer_networks in
-          let transition_reader, transition_writer =
-            Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
-              (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
-          in
           let block =
             Envelope.Incoming.wrap
               ~data:
@@ -957,13 +948,16 @@ let%test_module "Bootstrap_controller tests" =
                 |> Mina_block.Validation.reset_staged_ledger_diff_validation )
               ~sender:(Envelope.Sender.Remote peer_net.peer)
           in
-          Pipe_lib.Strict_pipe.Writer.write transition_writer
-            (`Block block, `Valid_cb None) ;
+          let network_transition_pipe =
+            Swappable.create ~name:(__MODULE__ ^ __LOC__)
+              (Buffered (`Capacity 10, `Overflow (Drop_head ignore)))
+          in
+          Swappable.write network_transition_pipe (`Block block, `Valid_cb None) ;
           let new_frontier, sorted_external_transitions =
             Async.Thread_safe.block_on_async_exn (fun () ->
                 run_bootstrap
                   ~timeout_duration:(Block_time.Span.of_ms 30_000L)
-                  ~my_net ~transition_reader )
+                  ~my_net ~network_transition_pipe )
           in
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)

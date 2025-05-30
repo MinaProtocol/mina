@@ -103,36 +103,10 @@ let is_transition_for_bootstrap
 let start_transition_frontier_controller ~context:(module Context : CONTEXT)
     ~trust_system ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ~collected_transitions ~cache_exceptions ?transition_writer_ref ~frontier_w
-    frontier =
+    ~collected_transitions ~cache_exceptions ~network_transition_pipe
+    ~frontier_w frontier =
   let open Context in
   [%str_log info] Starting_transition_frontier_controller ;
-  let ( transition_frontier_controller_reader
-      , transition_frontier_controller_writer ) =
-    let name = "transition frontier controller pipe" in
-    create_buffered_pipe ~name
-      ~f:(fun (b_or_h, `Valid_cb valid_cb) ->
-        Mina_metrics.(
-          Counter.inc_one
-            Pipe.Drop_on_overflow.router_transition_frontier_controller) ;
-        Mina_block.handle_dropped_transition
-          (block_or_header_to_hash b_or_h)
-          ?valid_cb ~pipe_name:name ~logger )
-      ()
-  in
-  let transition_writer_ref =
-    (* If [transition_writer_ref] is None, it is set to
-       [ref transition_frontier_controller_writer].
-       If it already contains a reference, the value of
-       [transition_frontier_controller_writer] is assigned to it. This avoids
-       creating a new variable and allows the existing reference in
-       [transition_writer_ref] to be used each time a thread accesses this
-       variable. *)
-    Option.value_map transition_writer_ref
-      ~default:(ref transition_frontier_controller_writer) ~f:(fun r ->
-        r := transition_frontier_controller_writer ;
-        r )
-  in
   let producer_transition_reader, producer_transition_writer =
     Strict_pipe.create ~name:"transition frontier: producer transition"
       Synchronous
@@ -144,53 +118,37 @@ let start_transition_frontier_controller ~context:(module Context : CONTEXT)
      bootstrap controller is active *)
   producer_transition_writer_ref := Some producer_transition_writer ;
   Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
-  let new_verified_transition_reader =
-    Transition_frontier_controller.run
-      ~context:(module Context)
-      ~trust_system ~verifier ~network ~time_controller ~collected_transitions
-      ~frontier ~get_completed_work
-      ~network_transition_reader:transition_frontier_controller_reader
-      ~producer_transition_reader ~clear_reader ~cache_exceptions
+  let start_and_iterate =
+    let%bind transition_frontier_controller_reader =
+      Strict_pipe.Swappable.swap_reader network_transition_pipe
+    in
+    let new_verified_transition_reader =
+      Transition_frontier_controller.run
+        ~context:(module Context)
+        ~trust_system ~verifier ~network ~time_controller ~collected_transitions
+        ~frontier ~get_completed_work
+        ~network_transition_reader:transition_frontier_controller_reader
+        ~producer_transition_reader ~clear_reader ~cache_exceptions
+    in
+    Strict_pipe.Reader.iter new_verified_transition_reader
+      ~f:
+        (Fn.compose Deferred.return
+           (Strict_pipe.Writer.write verified_transition_writer) )
   in
-  Strict_pipe.Reader.iter new_verified_transition_reader
-    ~f:
-      (Fn.compose Deferred.return
-         (Strict_pipe.Writer.write verified_transition_writer) )
-  |> don't_wait_for ;
-  transition_writer_ref
+  don't_wait_for start_and_iterate
 
 let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~network ~time_controller ~get_completed_work
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
-    ?transition_writer_ref ~consensus_local_state ~frontier_w
+    ~network_transition_pipe ~consensus_local_state ~frontier_w
     ~initial_root_transition ~persistent_root ~persistent_frontier
     ~cache_exceptions ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
-  let bootstrap_controller_reader, bootstrap_controller_writer =
-    let name = "bootstrap controller pipe" in
-    create_buffered_pipe ~name
-      ~f:(fun (b_or_h, `Valid_cb valid_cb) ->
-        Mina_metrics.(
-          Counter.inc_one Pipe.Drop_on_overflow.router_bootstrap_controller) ;
-        Mina_block.handle_dropped_transition
-          (block_or_header_to_hash b_or_h)
-          ~pipe_name:name ~logger ?valid_cb )
-      ()
-  in
-  let transition_writer_ref =
-    (* The handling is the same as in the [start_transition_frontier_controller]
-       function, in order to reuse the reference already defined in
-       [transition_writer_ref]. *)
-    Option.value_map transition_writer_ref
-      ~default:(ref bootstrap_controller_writer) ~f:(fun r ->
-        r := bootstrap_controller_writer ;
-        r )
-  in
   producer_transition_writer_ref := None ;
   let f b_or_h =
-    Strict_pipe.Writer.write bootstrap_controller_writer (b_or_h, `Valid_cb None) ;
+    Strict_pipe.Swappable.write network_transition_pipe (b_or_h, `Valid_cb None) ;
     let sender =
       match b_or_h with
       | `Block b ->
@@ -207,18 +165,16 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     (Bootstrap_controller.run
        ~context:(module Context)
        ~trust_system ~verifier ~network ~consensus_local_state
-       ~transition_reader:bootstrap_controller_reader ~persistent_frontier
-       ~persistent_root ~initial_root_transition ~preferred_peers ~catchup_mode )
+       ~network_transition_pipe ~persistent_frontier ~persistent_root
+       ~initial_root_transition ~preferred_peers ~catchup_mode )
     (fun (new_frontier, collected_transitions) ->
-      Strict_pipe.Writer.kill bootstrap_controller_writer ;
       start_transition_frontier_controller
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
-        ~transition_writer_ref ~frontier_w new_frontier
-      |> Fn.const () ) ;
-  transition_writer_ref
+        ~network_transition_pipe ~frontier_w new_frontier
+      |> Fn.const () )
 
 let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
     ~network ~verifier ~trust_system ~most_recent_valid_block_writer
@@ -416,7 +372,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
     ~get_completed_work ~frontier_w ~producer_transition_writer_ref
     ~clear_reader ~verified_transition_writer ~cache_exceptions
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
-    ~consensus_local_state ~catchup_mode ~notify_online =
+    ~consensus_local_state ~catchup_mode ~notify_online ~network_transition_pipe
+    =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -449,7 +406,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
+        ~clear_reader ~network_transition_pipe ~consensus_local_state
         ~frontier_w ~persistent_root ~persistent_frontier ~cache_exceptions
         ~initial_root_transition ~catchup_mode
         ~best_seen_transition:
@@ -478,7 +435,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~context:(module Context)
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ?transition_writer_ref:None ~consensus_local_state
+        ~clear_reader ~network_transition_pipe ~consensus_local_state
         ~frontier_w ~initial_root_transition ~persistent_root
         ~persistent_frontier ~cache_exceptions ~catchup_mode
         ~best_seen_transition:(Some (`Block best_tip))
@@ -539,7 +496,7 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
         ~trust_system ~verifier ~network ~time_controller ~get_completed_work
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~collected_transitions ~cache_exceptions
-        ?transition_writer_ref:None ~frontier_w frontier
+        ~network_transition_pipe ~frontier_w frontier
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -662,7 +619,19 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~directory:persistent_root_location
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
-      let%map transition_writer_ref =
+      let network_transition_pipe : _ Strict_pipe.Swappable.t =
+        let name = "transition frontier controller pipe" in
+        let drop_f (b_or_h, `Valid_cb valid_cb) =
+          Mina_metrics.(
+            Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
+          Mina_block.handle_dropped_transition
+            (block_or_header_to_hash b_or_h)
+            ?valid_cb ~pipe_name:name ~logger
+        in
+        Strict_pipe.Swappable.create ~name
+          (Buffered (`Capacity 50, `Overflow (Drop_head drop_f)))
+      in
+      let%map () =
         initialize ~sync_local_state ~cache_exceptions
           ~context:(module Context)
           ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
@@ -670,7 +639,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~get_completed_work ~frontier_w ~catchup_mode
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~most_recent_valid_block_writer
-          ~consensus_local_state ~notify_online
+          ~consensus_local_state ~notify_online ~network_transition_pipe
       in
       Ivar.fill_if_empty initialization_finish_signal () ;
 
@@ -709,7 +678,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                           ~context:(module Context)
                           frontier header_with_hash
                       then (
-                        Strict_pipe.Writer.kill !transition_writer_ref ;
                         Option.iter ~f:Strict_pipe.Writer.kill
                           !producer_transition_writer_ref ;
                         let initial_root_transition =
@@ -728,7 +696,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                              ~trust_system ~verifier ~network ~time_controller
                              ~get_completed_work ~producer_transition_writer_ref
                              ~cache_exceptions ~verified_transition_writer
-                             ~clear_reader ~transition_writer_ref
+                             ~clear_reader ~network_transition_pipe
                              ~consensus_local_state ~frontier_w ~persistent_root
                              ~persistent_frontier ~initial_root_transition
                              ~best_seen_transition:(Some b_or_h) ~catchup_mode )
@@ -736,6 +704,6 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                   | None ->
                       Deferred.unit
                 in
-                Strict_pipe.Writer.write !transition_writer_ref
+                Strict_pipe.Swappable.write network_transition_pipe
                   (b_or_h, `Valid_cb (Some vc)) ) ) ;
   (verified_transition_reader, initialization_finish_signal)
