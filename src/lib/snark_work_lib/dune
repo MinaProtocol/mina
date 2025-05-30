@@ -19,6 +19,7 @@
   ppx_version.runtime
   signature_lib
   transaction_snark)
+ (modules_without_implementation combined_result)
   
  (preprocess
   (pps ppx_deriving_yojson ppx_jane ppx_version))
