@@ -20,7 +20,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -v|--version) VERSION="$2"; shift;;
   -p|--package) PACKAGE="$2"; shift;;
   -m|--codename) CODENAME="$2"; shift;;
-  -s|--signed) SIGNED=1; shift;;
+  -s|--signed) SIGNED=1; ;;
   -h|--help) usage; exit 0;;
   *) echo "❌  Unknown parameter passed: $1"; usage;  exit 1;;
 esac; shift; done
