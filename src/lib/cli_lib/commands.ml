@@ -106,13 +106,13 @@ let validate_keypair =
         exit 1 )
     in
     let validate_transaction keypair =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let dummy_payload = Mina_base.Signed_command_payload.dummy in
       let signature =
-        Mina_base.Signed_command.sign_payload keypair.Keypair.private_key
-          dummy_payload
+        Mina_base.Signed_command.sign_payload ~signature_kind
+          keypair.Keypair.private_key dummy_payload
       in
       let message = Mina_base.Signed_command.to_input_legacy dummy_payload in
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let verified =
         Schnorr.Legacy.verify ~signature_kind signature
           (Snark_params.Tick.Inner_curve.of_affine keypair.public_key)
@@ -152,6 +152,7 @@ let validate_transaction =
     (* TODO upgrade to yojson 2.0.0 when possible to use seq_from_channel
      * instead of the deprecated stream interface *)
     let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     ( match
         Or_error.try_with (fun () ->
             Streams.iter
@@ -160,8 +161,10 @@ let validate_transaction =
                   Rosetta_lib.Transaction.to_mina_signed transaction_json
                 with
                 | Ok cmd ->
-                    if Mina_base.Signed_command.check_signature cmd then
-                      Format.eprintf "Transaction was valid@."
+                    if
+                      Mina_base.Signed_command.check_signature ~signature_kind
+                        cmd
+                    then Format.eprintf "Transaction was valid@."
                     else (
                       incr num_fails ;
                       Format.eprintf "Transaction was invalid@." )

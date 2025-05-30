@@ -108,29 +108,11 @@ let update_of_id pool update_id =
     query_db ~f:(fun db -> Processor.Zkapp_updates.load db update_id)
   in
   let%bind app_state =
-    let%bind { element0
-             ; element1
-             ; element2
-             ; element3
-             ; element4
-             ; element5
-             ; element6
-             ; element7
-             } =
+    let%bind elements =
       query_db ~f:(fun db ->
           Processor.Zkapp_states_nullable.load db app_state_id )
     in
-    let field_ids =
-      [ element0
-      ; element1
-      ; element2
-      ; element3
-      ; element4
-      ; element5
-      ; element6
-      ; element7
-      ]
-    in
+    let field_ids = Pickles_types.Vector.to_list elements in
     let%map field_strs =
       Deferred.List.map field_ids ~f:(fun id_opt ->
           Option.value_map id_opt ~default:(return None) ~f:(fun id ->
@@ -527,29 +509,11 @@ let get_account_update_body ~pool body_id =
     in
     let%bind delegate = get_pk delegate_id in
     let%bind state =
-      let%bind { element0
-               ; element1
-               ; element2
-               ; element3
-               ; element4
-               ; element5
-               ; element6
-               ; element7
-               } =
+      let%bind elements =
         query_db ~f:(fun db ->
             Processor.Zkapp_states_nullable.load db state_id )
       in
-      let elements =
-        [ element0
-        ; element1
-        ; element2
-        ; element3
-        ; element4
-        ; element5
-        ; element6
-        ; element7
-        ]
-      in
+      let elements = Pickles_types.Vector.to_list elements in
       let%map fields =
         Deferred.List.map elements ~f:(fun id_opt ->
             Option.value_map id_opt ~default:(return None) ~f:(fun id ->
@@ -784,28 +748,10 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
            ; zkapp_uri_id
            }
          ->
-        let%bind { element0
-                 ; element1
-                 ; element2
-                 ; element3
-                 ; element4
-                 ; element5
-                 ; element6
-                 ; element7
-                 } =
+        let%bind elements =
           query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
         in
-        let elements =
-          [ element0
-          ; element1
-          ; element2
-          ; element3
-          ; element4
-          ; element5
-          ; element6
-          ; element7
-          ]
-        in
+        let elements = Pickles_types.Vector.to_list elements in
         let%bind app_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
@@ -844,11 +790,11 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           zkapp_version |> Unsigned.UInt32.of_int64
           |> Mina_numbers.Zkapp_version.of_uint32
         in
-        let%bind { element0; element1; element2; element3; element4 } =
+        let%bind elements =
           query_db ~f:(fun db ->
               Processor.Zkapp_action_states.load db action_state_id )
         in
-        let elements = [ element0; element1; element2; element3; element4 ] in
+        let elements = Pickles_types.Vector.to_list elements in
         let%bind action_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
