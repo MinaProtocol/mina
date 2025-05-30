@@ -13,10 +13,10 @@ val request_partitioned_work :
      sok_message:Mina_base.Sok_message.t
   -> work_from_selector:work_from_selector
   -> partitioner:t
-  -> Snark_work_lib.Spec.Partitioned.t option
+  -> Snark_work_lib.Spec.Partitioned.Stable.Latest.t option
 
 val submit_partitioned_work :
-     result:Snark_work_lib.Result.Partitioned.t
+     result:Snark_work_lib.Result.Partitioned.Stable.Latest.t
   -> callback:(Snark_work_lib.Result.Combined.t -> unit)
   -> partitioner:t
   -> [> `Ok | `SchemeUnmatched | `Slashed ]
