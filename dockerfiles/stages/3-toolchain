@@ -24,47 +24,24 @@ RUN apt-get update --yes \
     apt-transport-https \
     apt-utils \
     awscli \
-    ca-certificates \
-    cmake \
     fakeroot \
     gnupg2 \
     jq \
-    libboost-dev \
-    libboost-program-options-dev \
-    libbz2-dev \
-    libffi-dev \
-    libgmp-dev \
-    libgmp3-dev \
     libgmp10 \
     libgomp1 \
-    libjemalloc-dev \
-    libpq-dev \
-    libprocps-dev \
-    libsodium-dev \
-    libssl-dev \
     lsb-release \
-    m4 \
     pandoc \
     patchelf \
     postgresql \
     postgresql-contrib \
     perl \
-    pkg-config \
     python3-sexpdata \
+    python3-pip \
     rubygems \
     wget \
-    zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
-# -- Debian Bullseye python dependencies (largely installed above from apt)
-# Ocaml lints tool `scripts/require-ppxs.py` requires python3 sexpdata
-# but debian stretch does not have this package, so only install in bullseye
-RUN test "$deb_codename" = "bullseye" \
-      && apt-get update --yes \
-      && apt-get install --yes --no-install-recommends \
-          python3-sexpdata python3-pip \
-      && pip install readchar \
-      || exit 0
+RUN pip install readchar 
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
@@ -72,7 +49,7 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
     && gem install deb-s3-${DEBS3_VERSION}.gem \
     && rm -f deb-s3-${DEBS3_VERSION}.gem
 
-# --- deb-s3 tool
+# --- influx db tool
 # Custom version, with lock only on manifest upload
 RUN wget https://download.influxdata.com/influxdb/releases/influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-amd64.tar.gz \
     && mkdir -p "influx_dir" && tar xvzf influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-amd64.tar.gz -C influx_dir \
