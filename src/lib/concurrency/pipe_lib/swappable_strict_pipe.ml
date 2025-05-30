@@ -31,6 +31,17 @@ type ('data_in_pipe, 'write_return) state_t =
   { name : string
   ; long_lived_reader : 'data_in_pipe Strict_pipe.Reader.t
   ; exposed : ('data_in_pipe, 'write_return) t
+        (** [short_lived_pipe] is the short-lived pipe that is currently
+      used for writing.
+    
+      Invariant: there was no successful write to [short_lived_pipe]
+      since it was set to the value of [state_t]. I.e. every
+      [Choosable_synchronous_pipe.write_choice] that results in write
+      is followed by propagation of an updated short-lived pipe into
+      the field of state.
+      This invariant is required for termination and further writes
+      to work correctly.
+  *)
   ; short_lived_pipe : 'data_in_pipe short_lived_pipe_t option
   ; data_unconsumed : 'data_in_pipe option
   ; read_unfinished : [ `Eof | `Ok of 'data_in_pipe ] Deferred.t option

@@ -15,8 +15,17 @@ val create :
 val write : ('data_in_pipe, 'write_return) t -> 'data_in_pipe -> 'write_return
 
 module Iterator : sig
+  (** Iterator for a swappable strict pipe.
+
+      Unlike some conventional iterators, calling [iter] on the same iterator
+      multiple times will execute the callback on the same series of values. *)
   type 'data_in_pipe t
 
+  (** [iter] iterates over the pipe. The returned deferred is determined when the pipe
+      is closed.
+
+      Calling [iter] on the same pipe multiple times will execute the callback
+      on the same series of values. *)
   val iter :
        'data_in_pipe t
     -> f:('data_in_pipe -> unit Async_kernel.Deferred.t)

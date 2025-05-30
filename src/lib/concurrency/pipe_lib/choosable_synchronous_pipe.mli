@@ -21,10 +21,23 @@ open Async_kernel
    Pipe has a peculiar interface, returning the "updated pipe" on [read] and
    [write_choice] operations which should be used for all of the future
    operations. This is unlike other pipes, where the same pipe value is used
-   for all operations and there is no notion of "updated pipe". *)
+   for all operations and there is no notion of "updated pipe".
+   
+   Pipe is thread-safe for [iter] and [read] operations. Note that if updated
+   pipe is not shared among parallel threads, both threads will see the same
+   sequence of values read.
+   
+   It is not recommended to use the same pipe for writing from parallel threads.
+   While, behavior is well specified, it's unlikely to be a desired one. Same
+   applies to parallelism of [close] operation or some combination of [close]
+   and [write_choice]. *)
 type 'data_in_pipe t
 
-(** Closes the pipe. *)
+(** Closes the pipe. If the same pipe was already used by [write_choice]
+    and the write was completed, [close] operation will have no effect, and
+    the pipe won't be closed. Hence if the close is required, it's necessary
+    to call it on the updated pipe passed to [write_choice] in the
+    [on_chosen] callback. *)
 val close : 'a t -> unit
 
 (** Creates a new pipe. *)
