@@ -56,7 +56,6 @@ let keyId =
           \(repo : DebianRepo)
       ->  merge
             { Local = None Text
-            , PackagesO1Test = None Text
             , Unstable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             , Nightly = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             , Stable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
