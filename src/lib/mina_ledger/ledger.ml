@@ -39,6 +39,24 @@ module Ledger_inner = struct
       [@@deriving sexp, compare, hash, bin_io_unversioned]
     end
 
+    module type Intf = sig
+      type t [@@deriving sexp, of_sexp, hash, equal, compare, yojson]
+
+      type account
+
+      include Binable.S with type t := t
+
+      include module type of Hashable.Make_binable (Arg)
+
+      val to_base58_check : t -> string
+
+      val merge : height:int -> t -> t -> t
+
+      val hash_account : account -> t
+
+      val empty_account : t
+    end
+
     [%%versioned
     module Stable = struct
       module V1 = struct
@@ -61,9 +79,39 @@ module Ledger_inner = struct
           Ledger_hash.of_digest (Lazy.force Account.empty_digest)
       end
     end]
+
+    module Unstable = struct
+        type t = Ledger_hash.Stable.V1.t
+        [@@deriving sexp, compare, hash, equal, yojson, bin_io_unversioned]
+
+        include Hashable.Make_binable (Arg)
+
+        let to_base58_check = Ledger_hash.to_base58_check
+
+        let merge = Ledger_hash.merge
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Mina_base.Account.Unstable.digest
+
+        let empty_account =
+          Ledger_hash.of_digest (Lazy.force Account.Unstable.empty_digest)
+
+
+    end
   end
 
   module Account = struct
+
+    module type Intf = sig
+      type t [@@deriving sexp, of_sexp, equal, compare]
+
+      include Binable.S with type t := t
+
+      val balance : t -> Currency.Balance.t
+      val empty : t
+      val identifier : t -> Account_id.t
+      val token : t -> Token_id.t
+    end
+
     [%%versioned
     module Stable = struct
       module V2 = struct
@@ -84,9 +132,18 @@ module Ledger_inner = struct
     let empty = Stable.Latest.empty
 
     let initialize = Account.initialize
+
+    module Unstable = struct
+      include Mina_base.Account.Unstable
+
+      let token = token_id
+
+    end
   end
 
-  module Inputs = struct
+  module Make_inputs
+      (Account : Account.Intf)
+      (Hash : Hash.Intf with type account := Account.t) = struct
     module Key = Public_key.Compressed
     module Token_id = Token_id
     module Account_id = Account_id
@@ -97,15 +154,15 @@ module Ledger_inner = struct
       let to_int = to_nanomina_int
     end
 
-    module Account = Account.Stable.Latest
-    module Hash = Hash.Stable.Latest
+    module Account = Account
+    module Hash = Hash
     module Kvdb = Kvdb
     module Location = Location_at_depth
     module Location_binable = Location_binable
     module Storage_locations = Storage_locations
   end
 
-  module Db :
+  module type Account_Db =
     Merkle_ledger.Intf.Ledger.DATABASE
       with module Location = Location_at_depth
       with module Addr = Location_at_depth.Addr
@@ -114,10 +171,21 @@ module Ledger_inner = struct
        and type key := Public_key.Compressed.t
        and type token_id := Token_id.t
        and type token_id_set := Token_id.Set.t
-       and type account := Account.t
        and type account_id_set := Account_id.Set.t
-       and type account_id := Account_id.t =
+       and type account_id := Account_id.t
+
+  module Inputs = Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
+
+  module Unstable_inputs =
+    Make_inputs (Account.Unstable) (Hash.Unstable)
+
+  module Db : Account_Db
+    with type account := Account.t =
     Database.Make (Inputs)
+
+  module Unstable_db : Account_Db
+    with type account := Account.Unstable.t =
+    Database.Make (Unstable_inputs)
 
   module Null = Null_ledger.Make (Inputs)
 
@@ -180,6 +248,30 @@ module Ledger_inner = struct
 
   type maskable_ledger = t
 
+  module Converting_ledger =
+    Converting_merkle_tree.Make
+      (struct
+          type converted_account = Account.Unstable.t
+          let convert (account : Account.Stable.Latest.t) =
+                { Account.Unstable.public_key = account.public_key
+                ; token_id = account.token_id
+                ; token_symbol = account.token_symbol
+                ; balance = account.balance
+                ; nonce = account.nonce
+                ; receipt_chain_hash = account.receipt_chain_hash
+                ; delegate = account.delegate
+                ; voting_for = account.voting_for
+                ; timing = account.timing
+                ; permissions = account.permissions
+                ; zkapp = account.zkapp
+                ; unstable_field = account.nonce
+                }
+
+          include Inputs
+      end)
+      (Db)
+      (Unstable_db)
+
   let of_database db =
     let casted = Any_ledger.cast (module Db) db in
     let mask = Mask.create ~depth:(Db.depth db) () in
@@ -200,6 +292,36 @@ module Ledger_inner = struct
   let create_ephemeral ~depth () =
     let _base, mask = create_ephemeral_with_base ~depth () in
     mask
+
+  type config =
+    | SimpleLedger of { directory_name : string option }
+    | ConvertingLedger of
+        { primary_directory_name : string option
+        ; converting_directory_name : string option
+        }
+
+  let default_converting_directory_name primary_directory_name =
+    primary_directory_name ^ "_converting"
+
+  let create_converting ?(cfg = SimpleLedger { directory_name = None}) ~depth () =
+    let (db1, db2_opt) = match cfg with
+      | SimpleLedger { directory_name } ->
+          let db1 = Db.create ?directory_name ~depth () in
+          (db1, None)
+      | ConvertingLedger { primary_directory_name; converting_directory_name } ->
+          let db1 = Db.create ?directory_name:primary_directory_name ~depth () in
+          let db2 =
+            let directory_name = Option.first_some converting_directory_name @@
+                  Option.map (Db.get_directory db1) ~f:default_converting_directory_name
+            in Unstable_db.create ?directory_name  ~depth ()
+          in (db1, Some db2)
+    in
+    let cl = Converting_ledger.create db1 db2_opt
+    in
+    let casted = Any_ledger.cast (module Converting_ledger) cl
+    in
+    let mask = Mask.create ~depth ()
+    in (Maskable.register_mask casted mask, Converting_ledger.converting_ledger cl)
 
   (** Create a new empty ledger.
 
@@ -269,6 +391,15 @@ module Ledger_inner = struct
           masked_ledger
       in
       raise exn
+
+  let with_converting_ledger ~depth ~f =
+    let cfg = ConvertingLedger { primary_directory_name = None; converting_directory_name = None }
+    in
+    let ledger = create_converting ~cfg ~depth () in
+    try
+      let result = f ledger in
+      close (fst ledger) ; result
+    with exn -> close (fst ledger) ; raise exn
 
   let packed t = Any_ledger.cast (module Mask.Attached) t
 
@@ -737,3 +868,43 @@ let%test_unit "zkapp_command application on masked ledger" =
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;
           (*Parent updates reflected in child masks*)
           assert (Ledger_hash.equal (L.merkle_root l) (L.merkle_root m)) ) )
+
+let%test_unit "user_command application on converting ledger" =
+  let open Mina_transaction_logic.For_tests in
+  let module L = Ledger_inner in
+  let constraint_constants =
+    { Genesis_constants.For_unit_tests.Constraint_constants.t with
+      account_creation_fee = Currency.Fee.of_nanomina_int_exn 1
+    }
+  in
+  Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
+      let cmds = List.map specs ~f:command_send in
+      L.with_converting_ledger ~depth ~f:(fun (l,cl_opt) ->
+          let cl = Option.value_exn cl_opt in
+          Init_ledger.init (module L) init_ledger l ;
+          let init_merkle_root = L.merkle_root l in
+          let init_cl_merkle_root = Unstable_db.merkle_root cl in
+          let () =
+            iter_err cmds
+              ~f:
+                (apply_user_command_unchecked ~constraint_constants
+                   ~txn_global_slot l )
+            |> Or_error.ok_exn
+          in
+          (* Assert that the ledger and the converting ledger are non-empty *)
+          assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l)));
+          L.commit l;
+          assert (not (Ledger_hash.equal init_cl_merkle_root (Unstable_db.merkle_root cl)));
+          (* Assert that the converted ledger has the same accounts as the first one, up to the new field*)
+          L.iteri l ~f:(fun index account ->
+              let account_converted = Unstable_db.get_at_index_exn cl index in
+              assert Mina_base.Account.Key.(equal account.public_key account_converted.public_key) ;
+              assert Mina_base.Account.Nonce.(equal account_converted.nonce account_converted.unstable_field)
+          );
+          (* Assert that the converted ledger doesn't have anything "extra" compared to the primary ledger *)
+          Unstable_db.iteri cl ~f:(fun index account_converted ->
+              let account = L.get_at_index_exn l index in
+              assert Mina_base.Account.Key.(equal account.public_key account_converted.public_key) ;
+          )
+      )
+    )
