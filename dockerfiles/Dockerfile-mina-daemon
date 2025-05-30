@@ -27,12 +27,19 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libprocps8
 #    libjemalloc2
 
+# Install ca-certificates using HTTP
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Switch to HTTPS
+RUN sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list
+
 # Dependencies
 RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \
   && apt-get install --quiet --yes --no-install-recommends \
     apt-transport-https \
-    ca-certificates \
     curl \
     dnsutils \
     dumb-init \

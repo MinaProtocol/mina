@@ -12,3 +12,7 @@ module Result = struct
   module Single = Single_result
   module Combined = Combined_result
 end
+
+module Spec = struct
+  module Single = Single_spec
+end

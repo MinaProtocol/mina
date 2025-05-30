@@ -392,6 +392,7 @@ let%test_module "multisig_account" =
                   [ sender_account_update_data; snapp_account_update_data ]
                 |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
                 |> Zkapp_command.Call_forest.accumulate_hashes_predicated
+                     ~signature_kind
               in
               let account_updates_hash = Zkapp_command.Call_forest.hash ps in
               let transaction : Zkapp_command.Transaction_commitment.t =
@@ -442,6 +443,7 @@ let%test_module "multisig_account" =
                     ~memo_hash:(Signed_command_memo.hash memo)
                     ~fee_payer_hash:
                       (Zkapp_command.Digest.Account_update.create
+                         ~signature_kind
                          (Account_update.of_fee_payer fee_payer) )
                 in
                 { fee_payer with

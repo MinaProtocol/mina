@@ -171,7 +171,8 @@ module Rules = struct
   *)
   module Initialize_state = struct
     (** State to initialize the zkApp to after deployment. *)
-    let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
+    let initial_state =
+      lazy (List.init Zkapp_state.max_size_int ~f:(fun _ -> Field.Constant.zero))
 
     (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)

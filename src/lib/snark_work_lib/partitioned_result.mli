@@ -6,9 +6,8 @@ module Stable : sig
 
   module V1 : sig
     type t =
-      ( Transaction_witness.Stable.V2.t
-      , Ledger_proof.Stable.V2.t
-      , Sub_zkapp_spec.Stable.V1.t
+      ( unit
+      , unit
       , ( Core.Time.Stable.Span.V1.t
         , Ledger_proof.Stable.V2.t )
         Proof_carrying_data.Stable.V1.t )
@@ -19,9 +18,8 @@ module Stable : sig
 end]
 
 type t =
-  ( Transaction_witness.t
-  , Ledger_proof.Cached.t
-  , Sub_zkapp_spec.t
+  ( unit
+  , unit
   , (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t )
   Partitioned_spec.Poly.Stable.V1.t
 
