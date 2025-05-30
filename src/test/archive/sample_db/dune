@@ -1,0 +1,18 @@
+(rule
+ (alias archive_db)
+ (targets archive_db.sql precomputed_blocks.tar.xz)
+ (action
+  (progn
+   (run
+    curl
+    -L
+    -o
+    archive_db.sql
+    https://storage.googleapis.com/o1labs-ci-test-data/replay/v0/archive_db.sql)
+   (run
+    curl
+    -L
+    -o
+    precomputed_blocks.tar.xz
+    https://storage.googleapis.com/o1labs-ci-test-data/replay/v0/precomputed_blocks.tar.xz)
+   )))
