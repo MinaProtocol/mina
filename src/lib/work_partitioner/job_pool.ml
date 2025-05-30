@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 type ('accum, 'final) fold_action =
   | Continue of 'accum
