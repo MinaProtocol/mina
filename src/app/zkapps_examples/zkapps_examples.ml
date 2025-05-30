@@ -677,12 +677,11 @@ let compile :
               prover ?handler ()
             in
             let account_update : Account_update.t =
-              { body = account_update
-              ; authorization =
-                  Proof
-                    ( Proof_cache_tag.write_proof_to_disk proof_cache_db
-                    @@ Pickles.Side_loaded.Proof.of_proof proof )
-              }
+              Account_update.with_aux ~body:account_update
+                ~authorization:
+                  (Control.Poly.Proof
+                     ( Proof_cache_tag.write_proof_to_disk proof_cache_db
+                     @@ Pickles.Side_loaded.Proof.of_proof proof ) )
             in
             ( { Zkapp_command.Call_forest.Tree.account_update
               ; account_update_digest
@@ -768,9 +767,9 @@ module Deploy_account_update = struct
 
   let full ?balance_change ?access public_key token_id vk : Account_update.t =
     (* TODO: This is a pain. *)
-    { body = body ?balance_change ?access public_key token_id vk
-    ; authorization = Signature Signature.dummy
-    }
+    Account_update.with_aux
+      ~body:(body ?balance_change ?access public_key token_id vk)
+      ~authorization:(Control.Poly.Signature Signature.dummy)
 end
 
 let insert_signatures pk_compressed sk
@@ -805,6 +804,7 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Call_forest.map account_updates ~f:(function
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
+         ; aux = _
          } as account_update :
           Account_update.t )
         when Public_key.Compressed.equal public_key pk_compressed ->

@@ -124,7 +124,8 @@ let body_json_roundtrip () =
 let fee_payer_json_roundtrip () =
   let open Fee_payer in
   let dummy : t =
-    { body = Body.Fee_payer.dummy; authorization = Signature.dummy }
+    Account_update.Fee_payer.make ~body:Body.Fee_payer.dummy
+      ~authorization:Signature.dummy
   in
   let open Fields_derivers_zkapps.Derivers in
   let full = o () in
@@ -134,7 +135,8 @@ let fee_payer_json_roundtrip () =
 let json_roundtrip_dummy () =
   let dummy : Graphql_repr.t =
     to_graphql_repr ~call_depth:0
-      { body = Body.dummy; authorization = Control.dummy_of_tag Signature }
+    @@ Account_update.with_no_aux ~body:Body.dummy
+         ~authorization:(Control.dummy_of_tag Signature)
   in
   let module Fd = Fields_derivers_zkapps.Derivers in
   let full = Graphql_repr.deriver @@ Fd.o () in
