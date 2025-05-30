@@ -1,12 +1,10 @@
-open Async_kernel
-
 (** Choosable synchronous pipe: a pipe with read and write operations
     that are idempotent (calling them multiple times will return the same
     result) and return the updated pipe on each call.
 
     Pipe is specifically designed to work with [Deferred.choose]:
 
-    - [read] would return the same value for a ['data_in_pipe t],
+    - [read] would return the same value for a ['data_in_pipe reader_t],
         no matter how many times it is called.
     - [write_choice] would perform write only if the choice is selected.
 
@@ -31,20 +29,25 @@ open Async_kernel
    While, behavior is well specified, it's unlikely to be a desired one. Same
    applies to parallelism of [close] operation or some combination of [close]
    and [write_choice]. *)
-type 'data_in_pipe t
+
+open Async_kernel
+
+type 'data_in_pipe writer_t
+
+type 'data_in_pipe reader_t
 
 (** Closes the pipe. If the same pipe was already used by [write_choice]
     and the write was completed, [close] operation will have no effect, and
     the pipe won't be closed. Hence if the close is required, it's necessary
     to call it on the updated pipe passed to [write_choice] in the
     [on_chosen] callback. *)
-val close : 'a t -> unit
+val close : 'a writer_t -> unit
 
 (** Creates a new pipe. *)
-val create : unit -> 'data t
+val create : unit -> 'data reader_t * 'data writer_t
 
 (** Creates a new pipe that is already closed. *)
-val create_closed : unit -> 'data t
+val create_closed : unit -> 'data reader_t
 
 (** Returns a choice that writes data to the pipe if a read
     operation arrived and was chosen for the [Deferred.choose]
@@ -69,7 +72,10 @@ val create_closed : unit -> 'data t
     Calling [write_choice] on a closed pipe will have no effect, and
     will simply be ignored. *)
 val write_choice :
-  on_chosen:('data t -> 'b) -> 'data t -> 'data -> 'b Deferred.Choice.t
+     on_chosen:('data writer_t -> 'b)
+  -> 'data writer_t
+  -> 'data
+  -> 'b Deferred.Choice.t
 
 (** Reads data from the pipe.
 
@@ -80,11 +86,11 @@ val write_choice :
     
     Calling [read] on the same pipe multiple times will return the same
     result and will not make the pipe progress on future writes. *)
-val read : 'data t -> [ `Eof | `Ok of 'data * 'data t ] Deferred.t
+val read : 'data reader_t -> [ `Eof | `Ok of 'data * 'data reader_t ] Deferred.t
 
 (** Iterates over the pipe. The returned deferred is determined when the pipe
     is closed.
     
     Calling [iter] on the same pipe multiple times will execute the callback
     on the same series of values. *)
-val iter : 'data t -> f:('data -> unit Deferred.t) -> unit Deferred.t
+val iter : 'data reader_t -> f:('data -> unit Deferred.t) -> unit Deferred.t
