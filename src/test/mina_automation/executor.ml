@@ -6,11 +6,6 @@ open Integration_test_lib
 open Core_kernel
 open Async
 
-module DockerContext = struct
-  type t =
-    { image : string; workdir : string; volume : string; network : string }
-end
-
 module type AppPaths = sig
   (** The name of the application as it appears in the dune file. *)
   val dune_name : string
@@ -19,17 +14,29 @@ module type AppPaths = sig
   val official_name : string
 end
 
+module type PathFinder = sig
+  module Paths : AppPaths
+
+  val standalone_path : string option Deferred.t
+
+  val standalone_path_exn : string Deferred.t
+end
+
+(* application ran inside docker container *)
+module DockerContext = struct
+  type t =
+    { image : string; workdir : string; volume : string; network : string }
+end
+
 let logger = Logger.create ()
 
 module Make_PathFinder (P : AppPaths) = struct
-  let app_name_under_dune = P.dune_name
-
-  let official_name = P.official_name
+  module Paths = P
 
   let paths =
     Option.value_map ~f:(String.split ~on:':') ~default:[] (Sys.getenv "PATH")
 
-  let built_name = Printf.sprintf "_build/default/%s" app_name_under_dune
+  let built_name = Printf.sprintf "_build/default/%s" P.dune_name
 
   let exists_at_path path prefix =
     match%bind Sys.file_exists (prefix ^ "/" ^ path) with
@@ -44,12 +51,20 @@ module Make_PathFinder (P : AppPaths) = struct
         Deferred.return (Some built_name)
     | _ -> (
         match%bind
-          Deferred.List.find_map ~f:(exists_at_path official_name) paths
+          Deferred.List.find_map ~f:(exists_at_path P.official_name) paths
         with
         | Some _ ->
-            Deferred.return (Some official_name)
+            Deferred.return (Some P.official_name)
         | _ ->
             Deferred.return None )
+
+  let standalone_path_exn =
+    let%bind path = standalone_path in
+    match path with
+    | Some p ->
+        Deferred.return p
+    | None ->
+        failwithf "Cannot find %s in PATH or _build/default" P.official_name ()
 end
 
 module Make (P : AppPaths) = struct
@@ -69,49 +84,103 @@ module Make (P : AppPaths) = struct
     [%log debug] "Executing mina application"
       ~metadata:[ ("app", `String path) ]
 
-  let run_from_debian ?(prefix = "") ~(args : string list) ?env () =
+  let in_background ?(prefix = "") ~app ~(args : string list) ?env () =
     let full_path =
-      if String.is_empty prefix then PathFinder.official_name
-      else prefix ^ "/" ^ PathFinder.official_name
+      if String.is_empty prefix then app else prefix ^ "/" ^ app
     in
     log_executed_command full_path ;
-    Util.run_cmd_exn ?env "." full_path args
+    Util.create_process_exn ?env "." full_path args ()
+    |> Deferred.map ~f:(fun process -> (full_path, process))
 
-  let run_from_dune ~(args : string list) ?env () =
-    log_executed_command PathFinder.app_name_under_dune ;
-    Util.run_cmd_exn ?env "." "dune"
-      ([ "exec"; PathFinder.app_name_under_dune; "--" ] @ args)
+  let output_or_hard_error ~prog ~args output =
+    match%map Util.check_cmd_output ~prog ~args output with
+    | Ok output ->
+        output
+    | Error error ->
+        Error.raise error
 
-  let run_from_local ~(args : string list) ?env () =
-    log_executed_command PathFinder.built_name ;
-    Util.run_cmd_exn ?env "." PathFinder.built_name args
+  let ignore_or_hard_error ~prog ~args (output : Process.Output.t)
+      ~ignore_failure =
+    if ignore_failure then return output.stdout
+    else output_or_hard_error ~prog ~args output
 
-  let run t ~(args : string list) ?env () =
+  let run_from_local_in_background ~(args : string list) ?prefix ?env () =
+    in_background ?prefix ~app:PathFinder.built_name ~args ?env ()
+
+  let run_from_dune_in_background ~args ?prefix ?env () =
+    in_background ?prefix ~app:"dune"
+      ~args:([ "exec"; PathFinder.Paths.dune_name; "--" ] @ args)
+      ?env ()
+
+  let run_from_debian_in_background ?prefix ~(args : string list) ?env () =
+    in_background ?prefix ~app:PathFinder.Paths.official_name ~args ?env ()
+
+  let run_from_docker ~(ctx : DockerContext.t) ~args () =
+    let docker = Docker.Client.default in
+    let cmd = [ P.official_name ] @ args in
+    Docker.Client.run_cmd_in_image docker ~image:ctx.image ~cmd
+      ~workdir:ctx.workdir ~volume:ctx.volume ~network:ctx.network
+
+  let run_impl t ~(args : string list) ?env ~f_local ~f_debian ~f_dune ~f_docker
+      () =
     let open Deferred.Let_syntax in
     match t with
     | AutoDetect -> (
         match%bind Sys.file_exists PathFinder.built_name with
         | `Yes ->
-            run_from_local ~args ?env ()
+            f_local ~args ~prefix:PathFinder.built_name ?env ()
         | _ -> (
             match%bind
               Deferred.List.find_map
-                ~f:(PathFinder.exists_at_path PathFinder.official_name)
+                ~f:(PathFinder.exists_at_path PathFinder.Paths.official_name)
                 PathFinder.paths
             with
             | Some prefix ->
-                run_from_debian ~prefix ~args ?env ()
+                f_debian ~args ~prefix ?env ()
             | _ ->
-                run_from_dune ~args ?env () ) )
+                f_dune ~args ~prefix:"" ?env () ) )
     | Dune ->
-        run_from_dune ~args ?env ()
+        f_dune ~args ~prefix:"" ?env ()
     | Debian ->
-        run_from_debian ~args ?env ()
+        f_debian ~args ~prefix:"" ?env ()
     | Local ->
-        run_from_local ~args ?env ()
+        f_local ~args ~prefix:PathFinder.built_name ?env ()
     | Docker ctx ->
-        let docker = Docker.Client.default in
-        let cmd = [ P.official_name ] @ args in
-        Docker.Client.run_cmd_in_image docker ~image:ctx.image ~cmd
-          ~workdir:ctx.workdir ~volume:ctx.volume ~network:ctx.network
+        f_docker ~args ~ctx ()
+
+  let run_in_background t ~(args : string list) ?env () =
+    run_impl t ~args ?env
+      ~f_local:(fun ~args ~prefix ?env () ->
+        run_from_local_in_background ~args ~prefix ?env () )
+      ~f_debian:(fun ~args ~prefix ?env () ->
+        run_from_debian_in_background ~args ~prefix ?env () )
+      ~f_dune:(fun ~args ~prefix ?env () ->
+        run_from_dune_in_background ~args ~prefix ?env () )
+      ~f_docker:(fun ~args:_ ~ctx:_ () ->
+        raise
+          (Failure
+             "Cannot run docker in background yet. Maybe you need \
+              src/app/test_executive approach?" ) )
+      ()
+
+  let run t ~(args : string list) ?env ?ignore_failure () =
+    let open Deferred.Let_syntax in
+    let to_foreground_process (prog, process) =
+      let%bind output = Process.collect_output_and_wait process in
+      ignore_or_hard_error ~prog ~args output
+        ~ignore_failure:(Option.value ~default:false ignore_failure)
+    in
+
+    run_impl t ~args ?env
+      ~f_local:(fun ~args ~prefix ?env () ->
+        run_from_local_in_background ~args ~prefix ?env ()
+        >>= to_foreground_process )
+      ~f_debian:(fun ~args ~prefix ?env () ->
+        run_from_debian_in_background ~args ~prefix ?env ()
+        >>= to_foreground_process )
+      ~f_dune:(fun ~args ~prefix ?env () ->
+        run_from_dune_in_background ~args ~prefix ?env ()
+        >>= to_foreground_process )
+      ~f_docker:(fun ~args ~ctx () -> run_from_docker ~args ~ctx ())
+      ()
 end

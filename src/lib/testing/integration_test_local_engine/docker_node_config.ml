@@ -105,6 +105,7 @@ module Base_node_config = struct
       mina accounts import -config-directory /root/.mina-config -privkey-path "$key_file"
     fi
   done
+  rm /var/lib/coda/config*
   # Execute the puppeteer script
   exec /mina_daemon_puppeteer.py "$@"
   |}
