@@ -6,7 +6,7 @@
   lmdb
   ;; local libraries
   blake2
-  file_system)
+  mina_stdlib_unix)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

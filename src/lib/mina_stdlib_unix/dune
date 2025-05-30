@@ -1,0 +1,19 @@
+(library
+ (name mina_stdlib_unix)
+ (public_name mina_stdlib_unix)
+ (library_flags -linkall)
+ (libraries
+  ;; opam libraries
+  async
+  async_kernel
+  async_unix
+  core
+  core_kernel
+  ptime
+  ;; local libraries
+  logger)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_here ppx_jane ppx_let ppx_mina ppx_version))
+ (synopsis "Mina standard library Unix utilities"))
