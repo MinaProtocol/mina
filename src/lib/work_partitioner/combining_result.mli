@@ -1,6 +1,6 @@
 (* This is partial work to be combined into a Snark_work_lib.Result.Combined.t *)
 
-type half = [ `First | `Second ] [@@deriving equal]
+type half = [ `First | `Second ]
 
 type submitted_half = [ `First | `Second | `One ]
 
