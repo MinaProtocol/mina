@@ -59,6 +59,7 @@ let VerifyPackagesSpec =
               ->  List Text
           , remove_profile_from_name : Bool
           , published : Bool
+          , are_debian_signed : Bool
           }
       , default =
           { promote_step_name = None
@@ -72,6 +73,7 @@ let VerifyPackagesSpec =
           , channel = DebianChannel.Type.Compatible
           , remove_profile_from_name = False
           , published = False
+          , are_debian_signed = False
           }
       }
 
@@ -158,6 +160,8 @@ let verifyPackagesToDebianSpecs
                                     verify_packages.new_debian_version
                                 , target_repo = verify_packages.debian_repo
                                 , network = verify_packages.network
+                                , allow_signing =
+                                    verify_packages.are_debian_signed
                                 , codename = codename
                                 , to_channel = verify_packages.channel
                                 , remove_profile_from_name =

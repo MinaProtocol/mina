@@ -50,6 +50,7 @@ let PromotePackagesSpec =
           , to_channel : DebianChannel.Type
           , source_debian_repo : DebianRepo.Type
           , target_debian_repo : DebianRepo.Type
+          , allow_debian_signing : Bool
           , new_tags :
                   DebianVersions.DebVersion
               ->  DebianChannel.Type
@@ -69,6 +70,7 @@ let PromotePackagesSpec =
           , new_debian_version = ""
           , source_debian_repo = DebianRepo.Type.Unstable
           , target_debian_repo = DebianRepo.Type.Nightly
+          , allow_debian_signing = True
           , architecture = "amd64"
           , profile = Profiles.Type.Standard
           , network = Network.Type.Mainnet
@@ -109,6 +111,8 @@ let promotePackagesToDebianSpecs
                                     promote_packages.source_debian_repo
                                 , target_repo =
                                     promote_packages.target_debian_repo
+                                , allow_signing =
+                                    promote_packages.allow_debian_signing
                                 , remove_profile_from_name =
                                     promote_packages.remove_profile_from_name
                                 , deps = promote_packages.depends_on
