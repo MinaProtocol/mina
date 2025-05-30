@@ -1,5 +1,5 @@
-(test
-  (name swappable_strict_pipe_test)
+(tests
+  (names swappable_strict_pipe_test choosable_synchronous_pipe_test)
   (libraries
     ;; OPAM libraries
     alcotest
