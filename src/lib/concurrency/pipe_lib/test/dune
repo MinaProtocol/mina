@@ -1,0 +1,12 @@
+(tests
+  (names swappable_strict_pipe_test choosable_synchronous_pipe_test)
+  (libraries
+    ;; OPAM libraries
+    alcotest
+    alcotest-async
+    async
+    core_kernel
+    ;; Local libraries
+    pipe_lib)
+ (preprocess
+  (pps ppx_let)))
