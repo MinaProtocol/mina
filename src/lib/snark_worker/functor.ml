@@ -3,6 +3,8 @@ open Async
 open Events
 open Snark_work_lib
 
+let command_name = "snark-worker"
+
 module Make = struct
   module Rpcs = Rpcs.Make
   include Prod.Inputs

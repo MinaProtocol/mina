@@ -1,5 +1,11 @@
 module Prod = Prod
-module Intf = Intf
+
+module Intf = struct
+  include Intf
+
+  let command_name = Functor.command_name
+end
+
 module Inputs = Prod.Inputs
 module Events = Events
 
