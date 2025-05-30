@@ -246,13 +246,8 @@ let create (type data_in_pipe pipe_kind write_return) ?warn_on_drop ~name
 let write (Swappable { long_lived_writer; _ }) =
   Strict_pipe.Writer.write long_lived_writer
 
-module Iterator = struct
-  type 'a t = 'a Choosable_synchronous_pipe.reader_t
-
-  [%%define_locally Choosable_synchronous_pipe.(iter)]
-end
-
-let swap_reader (Swappable t) : _ Iterator.t Deferred.t =
+let swap_reader (Swappable t) : _ Choosable_synchronous_pipe.reader_t Deferred.t
+    =
   (* If the pipe is terminated, an immediately closed reader is returned.
      If [t.next_short_lived_pipe] is full, it means there was a race
      (within the same async cycle) between two calls to [swap_reader],

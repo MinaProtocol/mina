@@ -2,15 +2,15 @@ open Async_kernel
 open Core_kernel
 
 let read_all_values ~expected ?pipe iterator =
-  let open Pipe_lib.Strict_pipe.Swappable in
   let counter = ref 0 in
   let expected_length = List.length expected in
-  Iterator.iter iterator ~f:(fun x ->
+  Pipe_lib.Choosable_synchronous_pipe.iter iterator ~f:(fun x ->
       let expected_value = List.nth_exn expected !counter in
       counter := !counter + 1 ;
       if x <> expected_value then
         failwithf "unexpected read (expected: %d, got: %d)" expected_value x () ;
-      if !counter = expected_length then Option.iter ~f:kill pipe ;
+      if !counter = expected_length then
+        Option.iter ~f:Pipe_lib.Strict_pipe.Swappable.kill pipe ;
       return () )
   >>| fun () ->
   if !counter = expected_length then ()
@@ -87,7 +87,7 @@ let test_concurrent_iterators () =
     let first_iter_count = ref 0 in
     let next_reader_ref = ref None in
     let%map () =
-      Iterator.iter reader1 ~f:(fun _ ->
+      Pipe_lib.Choosable_synchronous_pipe.iter reader1 ~f:(fun _ ->
           incr first_iter_count ;
           if !first_iter_count = 2 then
             (* After reading two elements, create second iterator and write more elements *)
