@@ -62,8 +62,8 @@ let merge_single_result (current : t)
         ; in_pool_result
         ; sok_message = { fee; prover }
         }
-    , ((`First | `Second) as submitted_half) ) ->
-      assert (not (equal_half in_pool_half submitted_half)) ;
+    , ((`First | `Second) as submitted_half) )
+    when not (equal_half in_pool_half submitted_half) ->
       let submitted_result =
         Snark_work_lib.Result.Single.Poly.map ~f_spec:(const other_spec)
           ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
@@ -94,5 +94,5 @@ let merge_single_result (current : t)
     , ((`First | `Second) as submitted_half) )
   | Spec_only { spec = `Two _ as spec; _ }, (`One as submitted_half) ->
       NoSuchHalf { submitted_half; spec }
-  | One_of_two { in_pool_half = in_pool; _ }, (`One as submitted_half) ->
+  | One_of_two { in_pool_half = in_pool; _ }, submitted_half ->
       HalfMismatch { submitted_half; in_pool }
