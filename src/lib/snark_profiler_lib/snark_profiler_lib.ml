@@ -39,7 +39,8 @@ let create_ledger_and_transactions
         ~memo:Signed_command_memo.dummy ~valid_until:None
         ~body:(Payment { receiver_pk = to_pk; amount })
     in
-    Signed_command.sign from_kp payload
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    Signed_command.sign ~signature_kind from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
