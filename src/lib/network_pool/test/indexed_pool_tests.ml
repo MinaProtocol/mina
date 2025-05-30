@@ -509,15 +509,15 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
   let receiver_pk = Public_key.compress receiver.public_key in
   let zkapp_command_wire : Zkapp_command.Stable.Latest.t =
     { fee_payer =
-        { Account_update.Fee_payer.body =
-            { public_key = sender_pk; fee; nonce; valid_until = None }
-            (* Real signature added in below *)
-        ; authorization = Signature.dummy
-        }
+        (* Real signature added in below *)
+        Account_update.Fee_payer.make
+          ~body:{ public_key = sender_pk; fee; nonce; valid_until = None }
+          ~authorization:Signature.dummy
     ; account_updates =
         Zkapp_command.Call_forest.of_account_updates
           ~account_update_depth:(Fn.const 0)
-          [ { Account_update.Poly.body =
+          [ Account_update.with_no_aux
+              ~body:
                 { Account_update.Body.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
@@ -540,10 +540,10 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; authorization_kind =
                     Account_update.Authorization_kind.None_given
                 }
-            ; authorization = Control.Poly.None_given
-            }
-          ; { Account_update.Poly.body =
-                { public_key = receiver_pk
+              ~authorization:Control.Poly.None_given
+          ; Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.public_key = receiver_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.of_unsigned amount
@@ -562,8 +562,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; use_full_commitment = not increment_receiver
                 ; authorization_kind = None_given
                 }
-            ; authorization = None_given
-            }
+              ~authorization:Control.Poly.None_given
           ]
     ; memo = Signed_command_memo.empty
     }

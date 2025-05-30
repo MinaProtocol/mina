@@ -103,26 +103,44 @@ let read_all_proofs_from_disk : t -> Stable.Latest.t = function
   | Zkapp_command zc ->
       Zkapp_command (Zkapp_command.read_all_proofs_from_disk zc)
 
-type ('p, 'a, 'b) with_forest =
-  (Signed_command.t, ('p, 'a, 'b) Zkapp_command.with_forest) Poly.t
+type ('u, 'a, 'b) with_forest =
+  (Signed_command.t, ('u, 'a, 'b) Zkapp_command.with_forest) Poly.t
 [@@deriving equal]
 
-let forget_digests_and_proofs (t : (_, _, _) with_forest) :
-    (unit, unit, unit) with_forest =
+let forget_digests_and_proofs_and_aux (t : (_, _, _) with_forest) :
+    ( (_, (unit, _) Control.Poly.t, _) Account_update.Poly.t
+    , unit
+    , unit )
+    with_forest =
   match t with
   | Signed_command sc ->
       Signed_command sc
   | Zkapp_command zc ->
-      Zkapp_command (Zkapp_command.forget_digests_and_proofs zc)
+      Zkapp_command (Zkapp_command.forget_digests_and_proofs_and_aux zc)
 
-let equal_ignoring_proofs_and_hashes
-    (type proof_l account_update_digest_l forest_digest_l proof_r
-    account_update_digest_r forest_digest_r )
-    (t1 : (proof_l, account_update_digest_l, forest_digest_l) with_forest)
-    (t2 : (proof_r, account_update_digest_r, forest_digest_r) with_forest) =
+let equal_ignoring_proofs_and_hashes_and_aux
+    (type update_auth_proof_l update_aux_l update_auth_proof_r update_aux_r
+    account_update_digest_l forest_digest_l account_update_digest_r
+    forest_digest_r )
+    (t1 :
+      ( ( _
+        , (update_auth_proof_l, _) Control.Poly.t
+        , update_aux_l )
+        Account_update.Poly.t
+      , account_update_digest_l
+      , forest_digest_l )
+      with_forest )
+    (t2 :
+      ( ( _
+        , (update_auth_proof_r, _) Control.Poly.t
+        , update_aux_r )
+        Account_update.Poly.t
+      , account_update_digest_r
+      , forest_digest_r )
+      with_forest ) =
   let ignore2 _ _ = true in
-  let t1' = forget_digests_and_proofs t1 in
-  let t2' = forget_digests_and_proofs t2 in
+  let t1' = forget_digests_and_proofs_and_aux t1 in
+  let t2' = forget_digests_and_proofs_and_aux t2 in
   equal_with_forest ignore2 ignore2 ignore2 t1' t2'
 
 let to_base64 : Stable.Latest.t -> string = function
@@ -328,7 +346,7 @@ let valid_until (t : (_, _, _) with_forest) =
   | Signed_command x ->
       Signed_command.valid_until x
   | Zkapp_command { fee_payer; _ } -> (
-      match fee_payer.Account_update.Fee_payer.body.valid_until with
+      match fee_payer.body.valid_until with
       | Some valid_until ->
           valid_until
       | None ->
@@ -419,7 +437,9 @@ let is_incompatible_version = function
   | Zkapp_command p ->
       Zkapp_command.is_incompatible_version p
 
-let has_invalid_call_forest : (_, _, _) with_forest -> bool = function
+let has_invalid_call_forest :
+       ((Account_update.Body.t, _, _) Account_update.Poly.t, _, _) with_forest
+    -> bool = function
   | Signed_command _ ->
       false
   | Zkapp_command cmd ->
@@ -456,8 +476,9 @@ module Well_formedness_error = struct
         "Transaction type disabled"
 end
 
-let check_well_formedness ~(genesis_constants : Genesis_constants.t)
-    (t : (_, _, _) with_forest) : (unit, Well_formedness_error.t list) result =
+let check_well_formedness (type aux) ~(genesis_constants : Genesis_constants.t)
+    (t : ((_, _, aux) Account_update.Poly.t, _, _) with_forest) :
+    (unit, Well_formedness_error.t list) result =
   let preds =
     let open Well_formedness_error in
     [ ( has_insufficient_fee

@@ -1064,7 +1064,7 @@ let gen_account_update_from ?(no_account_precondition = false)
   in
   let account_id = Account_id.create body.public_key body.token_id in
   Hash_set.add account_ids_seen account_id ;
-  return { Account_update.Poly.body; authorization }
+  return @@ Account_update.with_no_aux ~body ~authorization
 
 (* takes an account id, if we want to sign this data *)
 let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
@@ -1108,7 +1108,7 @@ let gen_fee_payer ?global_slot ?fee_range ?failure ?permissions_auth ~account_id
   in
   (* real signature to be added when this data inserted into a Zkapp_command.t *)
   let authorization = Signature.dummy in
-  ({ body; authorization } : Account_update.Fee_payer.t)
+  Account_update.Fee_payer.make ~body ~authorization
 
 (* keep max_account_updates small, so zkApp integration tests don't need lots
    of block producers
@@ -1664,14 +1664,14 @@ let mk_account_update_body ~pk ~vk : Account_update.Body.Simple.t =
   }
 
 let mk_account_update ~pk ~vk : Account_update.Simple.t =
-  { body = mk_account_update_body ~pk ~vk
-  ; authorization = Control.(dummy_of_tag Proof)
-  }
+  Account_update.with_no_aux
+    ~body:(mk_account_update_body ~pk ~vk)
+    ~authorization:Control.(dummy_of_tag Proof)
 
 let mk_fee_payer ~fee ~pk ~nonce : Account_update.Fee_payer.t =
-  { body = { public_key = pk; fee; valid_until = None; nonce }
-  ; authorization = Signature.dummy
-  }
+  Account_update.Fee_payer.make
+    ~body:{ public_key = pk; fee; valid_until = None; nonce }
+    ~authorization:Signature.dummy
 
 let gen_max_cost_zkapp_command_from ?memo ?fee_range
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
