@@ -44,12 +44,12 @@ let read_only (t : (read_write flag, 'a) t) : (read_only flag, 'a) t =
 let%test_module "Agent" =
   ( module struct
     let%test "Doing an update will also affect read_only copies" =
-      let intial_value = 1 in
-      let agent = create ~f:Fn.id intial_value in
+      let initial_value = 1 in
+      let agent = create ~f:Fn.id initial_value in
       let read_only_agent = read_only agent in
       let is_touched = ref false in
       on_update read_only_agent ~f:(fun _ -> is_touched := true) ;
-      let new_value = intial_value + 2 in
+      let new_value = initial_value + 2 in
       update agent new_value ;
       let equal = [%equal: int * [ `Same | `Different ]] in
       !is_touched
