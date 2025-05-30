@@ -7,3 +7,7 @@ module Work = struct
 end
 
 module Selector = Selector
+
+module Spec = struct
+  module Single = Single_spec
+end

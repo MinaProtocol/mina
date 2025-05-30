@@ -329,6 +329,7 @@ module Values (S : Sample) = struct
     }
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer =
         { body =
             { public_key = public_key ()
@@ -341,7 +342,7 @@ module Values (S : Sample) = struct
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())
         |> List.fold_left ~init:[] ~f:(fun acc () ->
-               Mina_base.Zkapp_command.Call_forest.cons
+               Mina_base.Zkapp_command.Call_forest.cons ~signature_kind
                  (zkapp_account_update ()) acc )
     ; memo = signed_command_memo ()
     }

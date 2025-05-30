@@ -66,7 +66,7 @@ let deploy_account_update : Account_update.t =
 let account_updates =
   []
   |> Zkapp_command.Call_forest.cons_tree account_update
-  |> Zkapp_command.Call_forest.cons deploy_account_update
+  |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
 
 let memo = Signed_command_memo.empty
 
@@ -90,7 +90,7 @@ let full_commitment =
   Zkapp_command.Transaction_commitment.create_complete transaction_commitment
     ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:
-      (Zkapp_command.Digest.Account_update.create
+      (Zkapp_command.Digest.Account_update.create ~signature_kind
          (Account_update.of_fee_payer fee_payer) )
 
 (* TODO: Make this better. *)
