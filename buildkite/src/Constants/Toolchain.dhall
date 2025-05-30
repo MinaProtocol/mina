@@ -11,10 +11,10 @@ let SelectionMode
 let runner =
           \(debVersion : DebianVersions.DebVersion)
       ->  merge
-            { Bookworm = RunInToolchain.runInToolchainBookworm
-            , Bullseye = RunInToolchain.runInToolchainBullseye
-            , Jammy = RunInToolchain.runInToolchainBookworm
-            , Focal = RunInToolchain.runInToolchainBullseye
+            { Bookworm = RunInToolchain.runInToolchain
+            , Bullseye = RunInToolchain.runInToolchain
+            , Jammy = RunInToolchain.runInToolchain
+            , Focal = RunInToolchain.runInToolchain
             }
             debVersion
 
@@ -31,10 +31,10 @@ let select =
 let image =
           \(debVersion : DebianVersions.DebVersion)
       ->  merge
-            { Bookworm = ContainerImages.minaToolchainBookworm
-            , Bullseye = ContainerImages.minaToolchainBullseye
-            , Jammy = ContainerImages.minaToolchainBookworm
-            , Focal = ContainerImages.minaToolchainBullseye
+            { Bookworm = ContainerImages.minaToolchain
+            , Bullseye = ContainerImages.minaToolchain
+            , Jammy = ContainerImages.minaToolchain
+            , Focal = ContainerImages.minaToolchain
             }
             debVersion
 
