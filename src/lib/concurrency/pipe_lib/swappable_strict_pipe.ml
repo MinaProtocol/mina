@@ -43,6 +43,7 @@ type ('data_in_pipe, 'write_return) state_t =
   ; exposed : ('data_in_pipe, 'write_return) t
   ; short_lived_pipe : 'data_in_pipe short_lived_pipe_t option
   ; data_unconsumed : 'data_in_pipe option
+  ; read_unfinished : [ `Eof | `Ok of 'data_in_pipe ] Deferred.t option
   }
 
 (** Terminates the short-lived pipe.
@@ -153,21 +154,28 @@ let read_short_lived_pipe state =
     async cycle if any of the choices becomes determined.
 *)
 let read_long_lived state =
-  (* It's very important that there are two choices here: termination
-     and reading from the long-lived reader. If there were more choices,
-     then read from the long-lived pipe might have not been selected,
-     whereas the read would have happened, and the data received from the
-     long-lived pipe would have been lost. In case of termination that may
-     also happen, but it's not a problem, as the pipe is terminated.
-  *)
+  (* It's very important that we preserve the read that was started
+     but wasn't consumed yet. Otherwise, we may miss the data that was
+     written to the long-lived reader and was attempted to be read in
+     a choice that wasn't selected. *)
+  let read =
+    match state.read_unfinished with
+    | None ->
+        Strict_pipe.Reader.read state.long_lived_reader
+    | Some r ->
+        r
+  in
+  let state' = { state with read_unfinished = Some read } in
   choose
-    [ terminate_choice state
-    ; choice (Strict_pipe.Reader.read state.long_lived_reader) (function
-        (* Only may happen due to termination, repeating to exit gracefully *)
+    [ terminate_choice state'
+    ; read_short_lived_pipe_choice state'
+    ; choice read (function
         | `Eof ->
-            `Repeat state
+            (* Only may happen due to termination, repeating to exit gracefully *)
+            `Repeat { state' with read_unfinished = None }
         | `Ok x ->
-            `Repeat { state with data_unconsumed = Some x } )
+            `Repeat
+              { state with data_unconsumed = Some x; read_unfinished = None } )
     ]
 
 (** Step the background thread.
@@ -228,6 +236,7 @@ let create (type data_in_pipe pipe_kind write_return) ?warn_on_drop ~name
     ; exposed
     ; short_lived_pipe = None
     ; data_unconsumed = None
+    ; read_unfinished = None
     }
   in
   background_thread ~name state ;
