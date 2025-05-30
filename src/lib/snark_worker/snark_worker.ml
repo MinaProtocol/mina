@@ -6,11 +6,11 @@ module Intf = struct
   let command_name = Functor.command_name
 end
 
-module Inputs = Prod.Inputs
+module Inputs = Prod.Impl
 module Events = Events
 
 module Worker = struct
-  include Functor.Make
+  include Functor
 
   module Rpcs_versioned = struct
     module Get_work = Rpc_get_work.Stable
