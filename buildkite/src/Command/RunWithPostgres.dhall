@@ -24,7 +24,7 @@ let runInDockerWithPostgresConn
       ->  Text
       ->  Cmd.Type
     =     \(environment : List Text)
-      ->  \(initScript : Text)
+      ->  \(initUrl : Text)
       ->  \(docker : Artifacts.Type)
       ->  \(network : Optional Network.Type)
       ->  \(innerScript : Text)
@@ -78,7 +78,8 @@ let runInDockerWithPostgresConn
                 , "source buildkite/scripts/export-git-env-vars.sh"
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                 , "sleep 5"
-                , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}"
+                , "docker exec ${postgresDockerName} curl -L -o /workdir/initScript.sql ${initUrl}"
+                , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/initScript.sql"
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName
                                                                                                                                                     docker}:${minaDockerTag}${networkOrDefault} ${innerScript}"
                 ]
