@@ -153,6 +153,13 @@ let read_short_lived_pipe state =
     async cycle if any of the choices becomes determined.
 *)
 let read_long_lived state =
+  (* It's very important that there are two choices here: termination
+     and reading from the long-lived reader. If there were more choices,
+     then read from the long-lived pipe might have not been selected,
+     whereas the read would have happened, and the data received from the
+     long-lived pipe would have been lost. In case of termination that may
+     also happen, but it's not a problem, as the pipe is terminated.
+  *)
   choose
     [ terminate_choice state
     ; choice (Strict_pipe.Reader.read state.long_lived_reader) (function

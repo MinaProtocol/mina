@@ -31,6 +31,15 @@ let read_all_values_or_timeout ?pipe ~expected iterator =
         (fun () -> failwith "Swappable strict pipe hangs, timeout!")
     ]
 
+let test_readers_without_data () =
+  let open Pipe_lib.Strict_pipe.Swappable in
+  let swappable = create_buffered_swappable 5 in
+  let%bind _reader1 = swap_reader swappable in
+  let%bind reader2 = swap_reader swappable in
+  write swappable 1 ;
+  write swappable 2 ;
+  read_all_values_or_timeout reader2 ~pipe:swappable ~expected:[ 1; 2 ]
+
 let test_reader_hang () =
   let open Pipe_lib.Strict_pipe.Swappable in
   let swappable = create_buffered_swappable 5 in
@@ -133,6 +142,7 @@ let () =
       run "Pipe_lib"
         [ ( "Strict_pipe.Swappable"
           , [ test_case "reader hangs" `Quick test_reader_hang
+            ; test_case "two readers no write" `Quick test_readers_without_data
             ; test_case "buffered overflow drops head" `Quick
                 test_buffered_overflow
             ; test_case "multiple iterations return same elements" `Quick
