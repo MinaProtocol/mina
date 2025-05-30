@@ -3,7 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
-module Prod = Snark_worker__Prod.Inputs
+module Prod = Snark_worker.Inputs
 
 module Worker_state = struct
   module type S = sig

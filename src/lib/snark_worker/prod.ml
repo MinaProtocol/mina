@@ -19,9 +19,7 @@ module Cache = struct
   let find (t : t) statement = Option.map ~f:snd (T.find t statement)
 end
 
-module Inputs = struct
-  module Ledger_proof = Ledger_proof
-
+module Impl = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
 

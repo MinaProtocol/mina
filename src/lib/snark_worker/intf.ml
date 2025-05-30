@@ -2,8 +2,6 @@ open Core
 open Async
 open Snark_work_lib
 
-let command_name = "snark-worker"
-
 module type Rpc_master = sig
   module Master : sig
     module T : sig
