@@ -111,6 +111,15 @@ let write_sink_choice ~sink ~data state =
       `Repeat
         { state with data_unconsumed = None; short_lived_pipe = Some new_sink } )
 
+(** [reconfiguration_choices] returns a list of choices that reconfigure
+    the pipe: reset shot-lived pipe or terminate the pipe.
+    
+    These choices should appear in every [Deferred.choose] call to ensure
+    structure's invariants hold.
+    *)
+let reconfiguration_choices state =
+  [ terminate_choice state; read_short_lived_pipe_choice state ]
+
 (** Attempt to write data to the short-lived sink.
     
     If the pipe is terminated, [`Finished ()] is returned.
@@ -124,11 +133,7 @@ let write_sink_choice ~sink ~data state =
     async cycle if any of the choices becomes determined.
 *)
 let short_lived_write state (Short_lived_pipe sink) data =
-  choose
-    [ terminate_choice state
-    ; write_sink_choice ~sink ~data state
-    ; read_short_lived_pipe_choice state
-    ]
+  choose (write_sink_choice ~sink ~data state :: reconfiguration_choices state)
 
 (** Attempt to read next short-lived sink.
     
@@ -139,13 +144,18 @@ let short_lived_write state (Short_lived_pipe sink) data =
     There is no guarantee on the order of the choices. Behavior
     of [Deferred.choice] guarantees that the result is determined in the
     async cycle if any of the choices becomes determined.
+    
+    This function is expected to be called at most once over the structure's lifetime.
+    Once some short-lived pipe is obtained, structure should attempt to read data
+    from long-lived pipe or write to short-lived pipe.
 *)
-let read_short_lived_pipe state =
-  choose [ terminate_choice state; read_short_lived_pipe_choice state ]
+let read_short_lived_pipe state = choose (reconfiguration_choices state)
 
 (** Attempt to read from the long-lived reader.
     
     If the pipe is terminated, [`Finished ()] is returned.
+    If the next short-lived sink is available, [`Repeat] is returned with updated state
+    (with [short_lived_pipe] set to [Some sink]).
     If the long-lived reader has data, [`Repeat] is returned with updated state
     (with [data_unconsumed] set to [Some data]).
 
@@ -166,17 +176,16 @@ let read_long_lived state =
         r
   in
   let state' = { state with read_unfinished = Some read } in
-  choose
-    [ terminate_choice state'
-    ; read_short_lived_pipe_choice state'
-    ; choice read (function
-        | `Eof ->
-            (* Only may happen due to termination, repeating to exit gracefully *)
-            `Repeat { state' with read_unfinished = None }
-        | `Ok x ->
-            `Repeat
-              { state with data_unconsumed = Some x; read_unfinished = None } )
-    ]
+  let read_choice =
+    choice read (function
+      | `Eof ->
+          (* Only may happen due to termination, repeating to exit gracefully *)
+          `Repeat { state' with read_unfinished = None }
+      | `Ok x ->
+          `Repeat
+            { state with data_unconsumed = Some x; read_unfinished = None } )
+  in
+  choose (read_choice :: reconfiguration_choices state')
 
 (** Step the background thread.
     
