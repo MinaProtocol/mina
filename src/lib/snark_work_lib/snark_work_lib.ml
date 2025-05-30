@@ -7,7 +7,13 @@ module Work = struct
 end
 
 module Selector = Selector
+module With_job_meta = With_job_meta
 
 module Spec = struct
   module Single = Single_spec
+  module Sub_zkapp = Sub_zkapp_spec
+end
+
+module Id = struct
+  module Single = Id.Single
 end

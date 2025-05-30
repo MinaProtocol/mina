@@ -41,6 +41,7 @@
   perf_histograms
   signature_lib
   snark_work_lib
+  work_partitioner
   transaction_protocol_state
   transaction_snark
   transaction_snark_work
