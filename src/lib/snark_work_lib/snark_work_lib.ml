@@ -8,3 +8,7 @@ end
 
 module Selector = Selector
 module With_job_meta = With_job_meta
+
+module Spec = struct
+  module Single = Single_spec
+end

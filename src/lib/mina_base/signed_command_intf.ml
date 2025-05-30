@@ -16,7 +16,7 @@ module type Gen_intf = sig
      * and an amount $\in [1,max_amount]$
     *)
     val payment :
-         ?sign_type:[ `Fake | `Real ]
+         ?sign_type:[ `Fake | `Real of Mina_signature_kind.t ]
       -> key_gen:
            (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
@@ -34,7 +34,7 @@ module type Gen_intf = sig
      * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
-         ?sign_type:[ `Fake | `Real ]
+         ?sign_type:[ `Fake | `Real of Mina_signature_kind.t ]
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
       -> ?min_amount:int
@@ -66,7 +66,7 @@ module type Gen_intf = sig
     *)
     val sequence :
          ?length:int
-      -> ?sign_type:[ `Fake | `Real ]
+      -> ?sign_type:[ `Fake | `Real of Mina_signature_kind.t ]
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
          * Mina_numbers.Account_nonce.t
@@ -147,21 +147,21 @@ module type S = sig
   end
 
   val sign_payload :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature_lib.Private_key.t
     -> Signed_command_payload.t
     -> Signature.t
 
   val sign :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature_keypair.t
     -> Signed_command_payload.t
     -> With_valid_signature.t
 
-  val check_signature : ?signature_kind:Mina_signature_kind.t -> t -> bool
+  val check_signature : signature_kind:Mina_signature_kind.t -> t -> bool
 
   val create_with_signature_checked :
-       ?signature_kind:Mina_signature_kind.t
+       signature_kind:Mina_signature_kind.t
     -> Signature.t
     -> Public_key.Compressed.t
     -> Signed_command_payload.t
@@ -170,18 +170,16 @@ module type S = sig
   val check_valid_keys : t -> bool
 
   module For_tests : sig
-    (** the signature kind is an argument, to match `sign`, but ignored *)
     val fake_sign :
-         ?signature_kind:Mina_signature_kind.t
-      -> Signature_keypair.t
-      -> Signed_command_payload.t
-      -> With_valid_signature.t
+      Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
   end
 
   (** checks signature and keys *)
-  val check : t -> With_valid_signature.t option
+  val check :
+    signature_kind:Mina_signature_kind.t -> t -> With_valid_signature.t option
 
-  val check_only_for_signature : t -> With_valid_signature.t option
+  val check_only_for_signature :
+    signature_kind:Mina_signature_kind.t -> t -> With_valid_signature.t option
 
   val to_valid_unsafe :
        t
