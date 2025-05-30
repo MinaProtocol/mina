@@ -33,6 +33,13 @@ let write_choice ~on_chosen sink data =
       Ivar.fill_if_empty ivar (`Ok (data, new_sink)) ;
       on_chosen new_sink )
 
+let write sink data =
+  (* Implementation copies [write_choice] *)
+  let%map ivar = Ivar.read sink in
+  let new_sink = Ivar.create () in
+  Ivar.fill_if_empty ivar (`Ok (data, new_sink)) ;
+  new_sink
+
 let read (outer_ivar : _ t) =
   Ivar.fill_if_empty outer_ivar (Ivar.create ()) ;
   Ivar.read (Ivar.value_exn outer_ivar)

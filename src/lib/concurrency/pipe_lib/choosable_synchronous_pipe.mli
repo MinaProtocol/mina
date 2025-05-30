@@ -77,6 +77,14 @@ val write_choice :
   -> 'data
   -> 'b Deferred.Choice.t
 
+(** Write data to the pipe.
+
+    Returns a new pipe that can be used for future writes.
+    
+    If the pipe is closed, the write will have no effect and the
+    same pipe will be returned. *)
+val write : 'data writer_t -> 'data -> 'data writer_t Deferred.t
+
 (** Reads data from the pipe.
 
     Returns [`Eof] if the pipe is closed.

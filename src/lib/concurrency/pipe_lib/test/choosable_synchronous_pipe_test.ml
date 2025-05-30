@@ -2,8 +2,7 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib.Choosable_synchronous_pipe
 
-let write value pipe =
-  Deferred.choose [ write_choice ~on_chosen:Fn.id pipe value ]
+let write_ = Fn.flip write
 
 let expect_read_eof pipe =
   match%map read pipe with
@@ -27,7 +26,7 @@ let test_sync_pipe_close () =
 
 let test_read_write_sequence () =
   let reader, writer = create () in
-  don't_wait_for (write 42 writer >>= write 27 >>| close) ;
+  don't_wait_for (write_ 42 writer >>= write_ 27 >>| close) ;
   let%bind reader' = expect_read 42 reader in
   let%bind reader'' = expect_read 27 reader' in
   expect_read_eof reader''
@@ -35,14 +34,14 @@ let test_read_write_sequence () =
 let test_write_after_close () =
   let reader, writer = create () in
   close writer ;
-  let%bind _ = write 42 writer in
+  let%bind _ = write_ 42 writer in
   expect_read_eof reader
 
 let test_multiple_writes_on_same_pipe_closing_wrong_pipe () =
   let reader, writer = create () in
   let pending_write =
-    let%bind _ = write 42 writer in
-    write 27 writer >>| close
+    let%bind _ = write_ 42 writer in
+    write_ 27 writer >>| close
   in
   let%bind reader' = expect_read 42 reader in
   let%bind () = pending_write in
@@ -55,8 +54,8 @@ let test_multiple_writes_on_same_pipe_closing_wrong_pipe () =
 let test_multiple_writes_on_same_pipe () =
   let reader, writer = create () in
   let pending_write =
-    let%bind reader' = write 42 writer in
-    let%map _ = write 27 writer in
+    let%bind reader' = write_ 42 writer in
+    let%map _ = write_ 27 writer in
     close reader'
   in
   let%bind reader' = expect_read 42 reader in
@@ -65,7 +64,7 @@ let test_multiple_writes_on_same_pipe () =
 
 let test_idempotent_read () =
   let reader, writer = create () in
-  don't_wait_for (write 42 writer >>= write 27 >>| close) ;
+  don't_wait_for (write_ 42 writer >>= write_ 27 >>| close) ;
   let%bind reader1 = expect_read 42 reader in
   let%bind reader2 = expect_read 42 reader in
   let%bind reader1' = expect_read 27 reader1 in
@@ -74,7 +73,7 @@ let test_idempotent_read () =
   expect_read_eof reader2'
 
 let sequential_write values pipe =
-  Deferred.List.fold values ~init:pipe ~f:(Fn.flip write)
+  Deferred.List.fold values ~init:pipe ~f:(Fn.flip write_)
 
 let sequential_expect_read values pipe =
   Deferred.List.fold values ~init:pipe ~f:(Fn.flip expect_read)
@@ -132,7 +131,7 @@ let test_write_choice_not_selected () =
   (* Checking that writing 101 followed by pipe closure
      after the writer-choice on 42 was not selected results
      in read of 101 followed by EOF *)
-  don't_wait_for (write 101 writer >>| close) ;
+  don't_wait_for (write_ 101 writer >>| close) ;
   expect_read 101 reader >>= expect_read_eof
 
 let () =
