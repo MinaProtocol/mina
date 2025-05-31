@@ -594,9 +594,10 @@ values with possibly already existing):
 ```
 trusted-substituters = https://storage.googleapis.com/mina-nix-cache https://cache.nixos.org
 trusted-public-keys = nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= nix-cache.minaprotocol.org:fdcuDzmnM0Kbf7yU4yywBuUEJWClySc1WIF6t6Mm8h4= nix-cache.minaprotocol.org:D3B1W+V7ND1Fmfii8EhbAbF1JXoe2Ct4N34OKChwk2c= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+trusted-users = root your-username
 ```
 
-And then reload your `nix-daemon` service.
+Replace `your-username` with your actual username. If the `trusted-users` line already exists, add your username to the space-separated list (e.g., `trusted-users = root existing-user your-username`) and then reload your `nix-daemon` service.
 
 ### `gcc: Argument list too long`
 
