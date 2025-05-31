@@ -15,6 +15,8 @@ let%test_module "account timing check" =
   ( module struct
     open Mina_ledger.Ledger.For_tests
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
@@ -496,7 +498,7 @@ let%test_module "account timing check" =
           Quickcheck.Generator.all
           @@ List.map keypairss ~f:(fun (kp1, kp2) ->
                  let%map payment =
-                   Signed_command.Gen.payment ~sign_type:`Real
+                   Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
                      ~key_gen:(return (kp1, kp2))
                      ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
                  in
@@ -554,7 +556,7 @@ let%test_module "account timing check" =
         let amount = 100_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -612,7 +614,7 @@ let%test_module "account timing check" =
         in
         let amount = 100_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -664,7 +666,7 @@ let%test_module "account timing check" =
         let amount = 100_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -723,7 +725,7 @@ let%test_module "account timing check" =
         in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -772,7 +774,7 @@ let%test_module "account timing check" =
         let amount = 9_000_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -819,7 +821,7 @@ let%test_module "account timing check" =
         in
         let amount = 100_000_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -863,7 +865,7 @@ let%test_module "account timing check" =
         in
         let amount = 20 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:5 ()
         in
@@ -908,7 +910,7 @@ let%test_module "account timing check" =
         in
         let amount = 10_000_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -956,7 +958,7 @@ let%test_module "account timing check" =
         in
         let amount = 1_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -1006,7 +1008,7 @@ let%test_module "account timing check" =
         in
         let amount = 1_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -1151,7 +1153,7 @@ let%test_module "account timing check" =
                 (i, i)
           in
           let%bind cmd =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount ~max_amount ~fee_range:0 ()
           in

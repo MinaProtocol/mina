@@ -104,8 +104,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let body = Signed_command_payload.Body.Payment payment_payload in
       { Signed_command_payload.Poly.common; body }
     in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let raw_signature =
-      Signed_command.sign_payload sender.private_key payload
+      Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
     in
     match expected_failure with
@@ -605,12 +606,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          for the app state, we apply this principle element-wise
       *)
       let app_states_compat =
-        let fs_requested =
-          Pickles_types.Vector.Vector_8.to_list requested_update.app_state
-        in
-        let fs_ledger =
-          Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
-        in
+        let fs_requested = Zkapp_state.V.to_list requested_update.app_state in
+        let fs_ledger = Zkapp_state.V.to_list ledger_update.app_state in
         List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
             compatible req ledg ~equal:Pickles.Backend.Tick.Field.equal )
       in

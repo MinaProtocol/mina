@@ -113,8 +113,10 @@ let%test_module "transaction_status" =
 
     (* TODO: Generate zkApps txns *)
     let gen_user_command =
-      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
-        ~key_gen ~nonce:(Account_nonce.of_int 1) ()
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
+        ~max_amount:100 ~fee_range:10 ~key_gen ~nonce:(Account_nonce.of_int 1)
+        ()
 
     let create_pool ~frontier_broadcast_pipe =
       let config =

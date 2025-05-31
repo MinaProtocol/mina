@@ -955,9 +955,11 @@ module Make (L : Ledger_intf.S) :
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
       let full_commitment ~account_update ~memo_hash ~commitment =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         (* when called from Zkapp_command_logic.apply, the account_update is the fee payer *)
         let fee_payer_hash =
-          Zkapp_command.Digest.Account_update.create account_update
+          Zkapp_command.Digest.Account_update.create ~signature_kind
+            account_update
         in
         Zkapp_command.Transaction_commitment.create_complete commitment
           ~memo_hash ~fee_payer_hash
@@ -2410,7 +2412,8 @@ module For_tests = struct
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Signed_command.t =
     let sender_pk = Public_key.compress sender.public_key in
-    Signed_command.sign sender
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    Signed_command.sign ~signature_kind sender
       { common =
           { fee
           ; fee_payer_pk = sender_pk
@@ -2516,7 +2519,7 @@ module For_tests = struct
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
         ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create
+          (Zkapp_command.Digest.Account_update.create ~signature_kind
              (Account_update.of_fee_payer zkapp_command.fee_payer) )
     in
     let account_updates_signature =
