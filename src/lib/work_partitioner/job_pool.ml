@@ -16,40 +16,21 @@ module Make (Id : Map.Key) (Spec : T) = struct
   let first_job t : job option = IdMap.min_elt t |> Option.map ~f:Tuple2.get2
 
   let fold_until ~init ~f ~finish t =
-    let processed_items = Queue.create () in
-    let rec seq_fold_until acc seq =
-      match Sequence.next seq with
-      | Some ((k, v), seq_new) -> (
-          match f acc v with
-          | Continue acc_new ->
-              Queue.enqueue processed_items (k, v) ;
-              seq_fold_until acc_new seq_new
-          | Continue_remove acc_new ->
-              seq_fold_until acc_new seq_new
-          | Stop final ->
-              let map_new =
-                Array.append
-                  (Queue.to_array processed_items)
-                  (Sequence.to_array seq)
-                |> IdMap.of_sorted_array_unchecked
-              in
-              (final, map_new)
-          | Stop_remove final ->
-              let map_new =
-                Array.append
-                  (Queue.to_array processed_items)
-                  (Sequence.to_array seq_new)
-                |> IdMap.of_sorted_array_unchecked
-              in
-              (final, map_new) )
-      | None ->
-          let map_new =
-            Queue.to_array processed_items |> IdMap.of_sorted_array_unchecked
-          in
-          (finish acc, map_new)
-    in
     let seq = IdMap.to_sequence ~order:`Increasing_key t in
-    seq_fold_until init seq
+    let handle_item (acc, retained) (k, v) =
+      match f acc v with
+      | Continue acc_new ->
+          Continue_or_stop.Continue (acc_new, retained)
+      | Continue_remove acc_new ->
+          Continue (acc_new, IdMap.remove retained k)
+      | Stop final ->
+          Stop (final, retained)
+      | Stop_remove final ->
+          Stop (final, IdMap.remove retained k)
+    in
+
+    Sequence.fold_until seq ~init:(init, t) ~f:handle_item
+      ~finish:(Tuple2.map_fst ~f:finish)
 
   let add ~id ~job t = IdMap.add ~key:id ~data:job t
 
