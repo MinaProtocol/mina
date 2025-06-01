@@ -1733,7 +1733,7 @@ let internal_commands logger ~itn_features =
           with
           | `Ok sexp -> (
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
+                Snark_worker.Inputs.Worker_state.create ~proof_level
                   ~constraint_constants ()
               in
               let sok_message =
@@ -1748,7 +1748,7 @@ let internal_commands logger ~itn_features =
                   Snark_work_lib.Work.Single.Spec.t] sexp
               in
               match%map
-                Snark_worker.Prod.Inputs.perform_single worker_state
+                Snark_worker.Inputs.perform_single worker_state
                   ~message:sok_message spec
               with
               | Ok _ ->
