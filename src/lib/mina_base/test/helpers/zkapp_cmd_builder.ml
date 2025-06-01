@@ -16,6 +16,8 @@ type transaction = < updates : (account_update list, nonces) Monad_lib.State.t >
 
 let dummy_auth = Control.Poly.Signature Signature.dummy
 
+let signature_kind = Mina_signature_kind.Testnet
+
 let get_nonce_exn (pk : Public_key.Compressed.t) :
     ( Account_nonce.t
     , Account_nonce.t Public_key.Compressed.Map.t )
@@ -63,7 +65,6 @@ let update_body ?preconditions ?(update = Account_update.Update.noop) ~account
     }
 
 let update ?(calls = []) body =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open With_stack_hash in
   let open Zkapp_command.Call_forest.Tree in
   { elt =
