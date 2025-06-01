@@ -176,19 +176,20 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
              } ) ;
           let sender_pk = sender.public_key |> Public_key.compress in
           let fee_payer : Account_update.Fee_payer.t =
-            { Account_update.Fee_payer.body =
+            (* Real signature added in below *)
+            Account_update.Fee_payer.make
+              ~body:
                 { public_key = sender_pk
                 ; fee = Amount.to_fee fee
                 ; valid_until = None
                 ; nonce = sender_nonce
                 }
-                (* Real signature added in below *)
-            ; authorization = Signature.dummy
-            }
+              ~authorization:Signature.dummy
           in
           let sender_account_update_data : Account_update.Simple.t =
-            { body =
-                { public_key = sender_pk
+            Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.Simple.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.(Signed.(negate (of_unsigned amount)))
@@ -210,12 +211,12 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ; use_full_commitment = false
                 ; authorization_kind = Signature
                 }
-            ; authorization = Signature Signature.dummy
-            }
+              ~authorization:(Control.Poly.Signature Signature.dummy)
           in
           let snapp_account_update_data : Account_update.Simple.t =
-            { body =
-                { public_key = ringsig_account_pk
+            Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.Simple.public_key = ringsig_account_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(of_unsigned amount)
@@ -235,13 +236,14 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                 ; use_full_commitment = false
                 ; authorization_kind = Proof (With_hash.hash vk)
                 }
-            ; authorization =
-                Proof (Lazy.force Mina_base.Proof.transaction_dummy)
-            }
+              ~authorization:
+                (Control.Poly.Proof
+                   (Lazy.force Mina_base.Proof.transaction_dummy) )
           in
           let protocol_state = Zkapp_precondition.Protocol_state.accept in
           let ps =
             Zkapp_command.Call_forest.With_hashes.of_zkapp_command_simple_list
+              ~signature_kind
               [ sender_account_update_data; snapp_account_update_data ]
           in
           let account_updates_hash = Zkapp_command.Call_forest.hash ps in
@@ -280,7 +282,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
               Zkapp_command.Transaction_commitment.create_complete transaction
                 ~memo_hash
                 ~fee_payer_hash:
-                  (Zkapp_command.Digest.Account_update.create
+                  (Zkapp_command.Digest.Account_update.create ~signature_kind
                      (Account_update.of_fee_payer fee_payer) )
             in
             { fee_payer with
@@ -298,6 +300,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
             in
             { body = sender_account_update_data.body
             ; authorization = Signature sender_signature
+            ; aux = sender_account_update_data.aux
             }
           in
           let zkapp_command : Zkapp_command.t =
@@ -307,6 +310,7 @@ let%test_unit "ring-signature zkapp tx with 3 zkapp_command" =
                   [ sender
                   ; { body = snapp_account_update_data.body
                     ; authorization = Proof pi
+                    ; aux = snapp_account_update_data.aux
                     }
                   ]
               ; memo

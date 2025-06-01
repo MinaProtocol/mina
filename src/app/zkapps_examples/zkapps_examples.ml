@@ -32,15 +32,7 @@ module Account_update_under_construction = struct
             ; receipt_chain_hash = Ignore
             ; delegate = Ignore
             ; state =
-                [ Ignore
-                ; Ignore
-                ; Ignore
-                ; Ignore
-                ; Ignore
-                ; Ignore
-                ; Ignore
-                ; Ignore
-                ]
+                Zkapp_state.V.init ~f:(fun _ -> Zkapp_basic.Or_ignore.Ignore)
             ; action_state = Ignore
             ; proved_state = Ignore
             ; is_new = Ignore
@@ -117,24 +109,14 @@ module Account_update_under_construction = struct
         { default with app_state }
 
       let set_full_state app_state (_t : t) =
-        match app_state with
-        | [ a0; a1; a2; a3; a4; a5; a6; a7 ] ->
-            { app_state =
-                [ Some a0
-                ; Some a1
-                ; Some a2
-                ; Some a3
-                ; Some a4
-                ; Some a5
-                ; Some a6
-                ; Some a7
-                ]
-            }
-        | _ ->
-            failwith "Incorrect length of app_state"
+        { app_state =
+            Pickles_types.Vector.map ~f:(fun a -> Some a)
+            @@ Zkapp_state.V.of_list_exn app_state
+        }
 
       let set_state i value (t : t) =
-        if i < 0 || i >= 8 then failwith "Incorrect index" ;
+        if i < 0 || i >= Zkapp_state.max_size_int then
+          failwith "Incorrect index" ;
         { app_state =
             Pickles_types.Vector.mapi t.app_state ~f:(fun j old_value ->
                 if i = j then Some value else old_value )
@@ -486,6 +468,7 @@ type return_type =
 
 let to_account_update (account_update : account_update) :
     Zkapp_statement.Checked.t * return_type Prover_value.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   dummy_constraints () ;
   let account_update, calls =
     Account_update_under_construction.In_circuit.to_account_update_and_calls
@@ -493,7 +476,7 @@ let to_account_update (account_update : account_update) :
   in
   let account_update_digest =
     Zkapp_command.Call_forest.Digest.Account_update.Checked.create
-      account_update
+      ~signature_kind account_update
   in
   let public_output : Zkapp_statement.Checked.t =
     { account_update = (account_update_digest :> Field.t)
@@ -694,12 +677,11 @@ let compile :
               prover ?handler ()
             in
             let account_update : Account_update.t =
-              { body = account_update
-              ; authorization =
-                  Proof
-                    ( Proof_cache_tag.write_proof_to_disk proof_cache_db
-                    @@ Pickles.Side_loaded.Proof.of_proof proof )
-              }
+              Account_update.with_aux ~body:account_update
+                ~authorization:
+                  (Control.Poly.Proof
+                     ( Proof_cache_tag.write_proof_to_disk proof_cache_db
+                     @@ Pickles.Side_loaded.Proof.of_proof proof ) )
             in
             ( { Zkapp_command.Call_forest.Tree.account_update
               ; account_update_digest
@@ -785,9 +767,9 @@ module Deploy_account_update = struct
 
   let full ?balance_change ?access public_key token_id vk : Account_update.t =
     (* TODO: This is a pain. *)
-    { body = body ?balance_change ?access public_key token_id vk
-    ; authorization = Signature Signature.dummy
-    }
+    Account_update.with_aux
+      ~body:(body ?balance_change ?access public_key token_id vk)
+      ~authorization:(Control.Poly.Signature Signature.dummy)
 end
 
 let insert_signatures pk_compressed sk
@@ -803,7 +785,7 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Transaction_commitment.create_complete transaction_commitment
       ~memo_hash
       ~fee_payer_hash:
-        (Zkapp_command.Call_forest.Digest.Account_update.create
+        (Zkapp_command.Call_forest.Digest.Account_update.create ~signature_kind
            (Account_update.of_fee_payer fee_payer) )
   in
   let fee_payer =
@@ -822,6 +804,7 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Call_forest.map account_updates ~f:(function
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
+         ; aux = _
          } as account_update :
           Account_update.t )
         when Public_key.Compressed.equal public_key pk_compressed ->

@@ -279,19 +279,20 @@ let%test_module "Protocol state precondition tests" =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
                   let fee_payer =
-                    { Account_update.Fee_payer.body =
+                    Account_update.Fee_payer.make
+                      ~body:
                         { public_key = sender_pk
                         ; fee
                         ; valid_until = None
                         ; nonce = sender_nonce
                         }
                         (*To be updated later*)
-                    ; authorization = Signature.dummy
-                    }
+                      ~authorization:Signature.dummy
                   in
                   let sender_account_update : Account_update.Simple.t =
-                    { body =
-                        { public_key = sender_pk
+                    Account_update.with_no_aux
+                      ~body:
+                        { Account_update.Body.Simple.public_key = sender_pk
                         ; update = Account_update.Update.noop
                         ; token_id = Token_id.default
                         ; balance_change =
@@ -315,12 +316,12 @@ let%test_module "Protocol state precondition tests" =
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
-                    ; authorization = Control.Poly.Signature Signature.dummy
-                    }
+                      ~authorization:(Control.Poly.Signature Signature.dummy)
                   in
                   let snapp_account_update : Account_update.Simple.t =
-                    { body =
-                        { public_key = snapp_pk
+                    Account_update.with_no_aux
+                      ~body:
+                        { Account_update.Body.Simple.public_key = snapp_pk
                         ; update = snapp_update
                         ; token_id = Token_id.default
                         ; balance_change =
@@ -347,14 +348,12 @@ let%test_module "Protocol state precondition tests" =
                         ; may_use_token = No
                         ; authorization_kind = Signature
                         }
-                    ; authorization =
-                        Control.Poly.Signature Signature.dummy
                         (*To be updated later*)
-                    }
+                      ~authorization:(Control.Poly.Signature Signature.dummy)
                   in
                   let ps =
                     Zkapp_command.Call_forest.With_hashes
-                    .of_zkapp_command_simple_list
+                    .of_zkapp_command_simple_list ~signature_kind
                       [ sender_account_update; snapp_account_update ]
                   in
                   let account_updates_hash =
@@ -366,7 +365,7 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let memo_hash = Signed_command_memo.hash memo in
                   let fee_payer_hash =
-                    Zkapp_command.Digest.Account_update.create
+                    Zkapp_command.Digest.Account_update.create ~signature_kind
                       (Account_update.of_fee_payer fee_payer)
                   in
                   let full_commitment =
@@ -658,6 +657,7 @@ let%test_module "Account precondition tests" =
           else update )
 
     let%test_unit "delegate precondition on new account" =
+      let signature_kind = U.signature_kind in
       let gen = U.gen_snapp_ledger in
       Quickcheck.test ~trials:5 gen ~f:(fun ({ specs; _ }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -705,7 +705,7 @@ let%test_module "Account precondition tests" =
                           add_account_precondition ~at:1 delegate_precondition
                             zkapp_command0.account_updates
                           |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated
+                             .accumulate_hashes_predicated ~signature_kind
                       }
                     in
                     let keymap =
@@ -722,6 +722,7 @@ let%test_module "Account precondition tests" =
     let%test_unit "unsatisfied delegate precondition, custom token" =
       (* when new account has a custom token, it doesn't get a self-delegation *)
       let constraint_constants = U.constraint_constants in
+      let signature_kind = U.signature_kind in
       let account_creation_fee =
         Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
       in
@@ -784,7 +785,7 @@ let%test_module "Account precondition tests" =
                           add_account_precondition ~at:1 delegate_precondition
                             zkapp0.account_updates
                           |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated
+                             .accumulate_hashes_predicated ~signature_kind
                       }
                     in
                     replace_authorizations ~keymap zkapp_dummy_signatures
@@ -881,19 +882,20 @@ let%test_module "Account precondition tests" =
                 Signature_lib.Public_key.compress new_kp.public_key
               in
               let fee_payer =
-                { Account_update.Fee_payer.body =
+                Account_update.Fee_payer.make
+                  ~body:
                     { public_key = sender_pk
                     ; fee
                     ; valid_until = None
                     ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
                     }
                     (*To be updated later*)
-                ; authorization = Signature.dummy
-                }
+                  ~authorization:Signature.dummy
               in
               let sender_account_update : Account_update.Simple.t =
-                { body =
-                    { public_key = sender_pk
+                Account_update.with_no_aux
+                  ~body:
+                    { Account_update.Body.Simple.public_key = sender_pk
                     ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -917,12 +919,12 @@ let%test_module "Account precondition tests" =
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
-                ; authorization = Control.Poly.Signature Signature.dummy
-                }
+                  ~authorization:(Control.Poly.Signature Signature.dummy)
               in
               let snapp_account_update : Account_update.Simple.t =
-                { body =
-                    { public_key = snapp_pk
+                Account_update.with_no_aux
+                  ~body:
+                    { Account_update.Body.Simple.public_key = snapp_pk
                     ; update = snapp_update
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -947,14 +949,12 @@ let%test_module "Account precondition tests" =
                     ; may_use_token = No
                     ; authorization_kind = Signature
                     }
-                ; authorization =
-                    Control.Poly.Signature Signature.dummy
                     (*To be updated later*)
-                }
+                  ~authorization:(Control.Poly.Signature Signature.dummy)
               in
               let ps =
                 Zkapp_command.Call_forest.With_hashes
-                .of_zkapp_command_simple_list
+                .of_zkapp_command_simple_list ~signature_kind
                   [ sender_account_update; snapp_account_update ]
               in
               let account_updates_hash = Zkapp_command.Call_forest.hash ps in
@@ -964,7 +964,7 @@ let%test_module "Account precondition tests" =
               in
               let memo_hash = Signed_command_memo.hash memo in
               let fee_payer_hash =
-                Zkapp_command.Digest.Account_update.create
+                Zkapp_command.Digest.Account_update.create ~signature_kind
                   (Account_update.of_fee_payer fee_payer)
               in
               let full_commitment =

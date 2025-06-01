@@ -955,9 +955,11 @@ module Make (L : Ledger_intf.S) :
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
       let full_commitment ~account_update ~memo_hash ~commitment =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         (* when called from Zkapp_command_logic.apply, the account_update is the fee payer *)
         let fee_payer_hash =
-          Zkapp_command.Digest.Account_update.create account_update
+          Zkapp_command.Digest.Account_update.create ~signature_kind
+            account_update
         in
         Zkapp_command.Transaction_commitment.create_complete commitment
           ~memo_hash ~fee_payer_hash
@@ -1420,7 +1422,10 @@ module Make (L : Ledger_intf.S) :
           Zkapp_basic.Set_or_keep.map ~f:Option.some
             account_update.body.update.verification_key
 
-        let actions (account_update : t) = account_update.body.actions
+        let actions (account_update : t) =
+          { Zkapp_account.Actions.actions = account_update.body.actions
+          ; hash = account_update.aux.actions_hash
+          }
 
         let zkapp_uri (account_update : t) =
           account_update.body.update.zkapp_uri
@@ -2410,7 +2415,8 @@ module For_tests = struct
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Signed_command.t =
     let sender_pk = Public_key.compress sender.public_key in
-    Signed_command.sign sender
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    Signed_command.sign ~signature_kind sender
       { common =
           { fee
           ; fee_payer_pk = sender_pk
@@ -2446,18 +2452,19 @@ module For_tests = struct
     in
     let zkapp_command : Zkapp_command.Simple.t =
       { fee_payer =
-          { Account_update.Fee_payer.body =
+          (* Real signature added in below *)
+          Account_update.Fee_payer.make
+            ~body:
               { public_key = sender_pk
               ; fee
               ; valid_until = None
               ; nonce = actual_nonce
               }
-              (* Real signature added in below *)
-          ; authorization = Signature.dummy
-          }
+            ~authorization:Signature.dummy
       ; account_updates =
-          [ { body =
-                { public_key = sender_pk
+          [ Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.Simple.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(negate (of_unsigned amount))
@@ -2479,12 +2486,13 @@ module For_tests = struct
                     ( if use_full_commitment then Signature
                     else Proof Zkapp_basic.F.zero )
                 }
-            ; authorization =
-                ( if use_full_commitment then Signature Signature.dummy
+              ~authorization:
+                ( if use_full_commitment then
+                  Control.Poly.Signature Signature.dummy
                 else Proof (Lazy.force Mina_base.Proof.transaction_dummy) )
-            }
-          ; { body =
-                { public_key = receiver
+          ; Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.Simple.public_key = receiver
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.of_unsigned amount
@@ -2504,8 +2512,7 @@ module For_tests = struct
                 ; implicit_account_creation_fee = true
                 ; authorization_kind = None_given
                 }
-            ; authorization = None_given
-            }
+              ~authorization:Control.Poly.None_given
           ]
       ; memo = Signed_command_memo.empty
       }
@@ -2516,7 +2523,7 @@ module For_tests = struct
       Zkapp_command.Transaction_commitment.create_complete commitment
         ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
         ~fee_payer_hash:
-          (Zkapp_command.Digest.Account_update.create
+          (Zkapp_command.Digest.Account_update.create ~signature_kind
              (Account_update.of_fee_payer zkapp_command.fee_payer) )
     in
     let account_updates_signature =
@@ -2527,7 +2534,8 @@ module For_tests = struct
     let account_updates =
       Zkapp_command.Call_forest.map zkapp_command.account_updates
         ~f:(fun
-             (account_update : (Account_update.Body.t, _) Account_update.Poly.t)
+             (account_update :
+               (Account_update.Body.t, _, _) Account_update.Poly.t )
            ->
           match account_update.body.authorization_kind with
           | Signature ->

@@ -46,14 +46,14 @@ let mk_account_update_body ?preconditions ?(increment_nonce = false)
 let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
     Zkapp_command.t =
   let fee_payer : Account_update.Fee_payer.t =
-    { body =
+    Account_update.Fee_payer.make
+      ~body:
         { public_key = fee_payer_pk
         ; fee = Currency.Fee.of_nanomina_int_exn fee
         ; valid_until = None
         ; nonce = fee_payer_nonce
         }
-    ; authorization = Signature.dummy
-    }
+      ~authorization:Signature.dummy
   in
   let memo =
     Option.value_map memo ~default:Signed_command_memo.dummy
@@ -76,9 +76,9 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
               | Signature ->
                   Control.Poly.Signature Signature.dummy
             in
-            { Account_update.Poly.body = Account_update.Body.of_simple body
-            ; authorization
-            } )
+            Account_update.with_no_aux
+              ~body:(Account_update.Body.of_simple body)
+              ~authorization )
     }
 
 let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
@@ -112,7 +112,8 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
   let open Async_kernel.Deferred.Let_syntax in
   let%map account_updates_with_valid_authorizations =
     Zkapp_command.Call_forest.deferred_mapi zkapp_command.account_updates
-      ~f:(fun _ndx ({ body; authorization } : _ Account_update.Poly.t) tree ->
+      ~f:(fun _ndx ({ body; authorization; aux } : _ Account_update.Poly.t) tree
+         ->
         let%map valid_authorization =
           match authorization with
           | Control.Poly.Signature _dummy ->
@@ -150,7 +151,7 @@ let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
           | None_given ->
               return authorization
         in
-        { Account_update.Poly.body; authorization = valid_authorization } )
+        { Account_update.Poly.body; authorization = valid_authorization; aux } )
   in
   { zkapp_command with
     fee_payer = fee_payer_with_valid_signature

@@ -284,7 +284,7 @@ module Util = struct
     let app_state = List.map ~f:App_state.of_string lst in
     List.append app_state
       (List.init
-         (8 - List.length app_state)
+         (Zkapp_state.max_size_int - List.length app_state)
          ~f:(fun _ -> Zkapp_basic.Set_or_keep.Keep) )
     |> Zkapp_state.V.of_list_exn
 

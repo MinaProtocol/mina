@@ -22,7 +22,8 @@ module Rules = struct
       The app state is set to the initial state.
   *)
   module Initialize_state = struct
-    let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
+    let initial_state =
+      lazy (List.init Zkapp_state.max_size_int ~f:(fun _ -> Field.Constant.zero))
 
     let handler (public_key : Public_key.Compressed.t) (token_id : Token_id.t)
         (may_use_token : Account_update.May_use_token.t)
@@ -85,6 +86,7 @@ module Rules = struct
           respond Unhandled
 
     let main input =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let public_key =
         exists Public_key.Compressed.typ ~request:(fun () -> Public_key)
       in
@@ -125,7 +127,8 @@ module Rules = struct
                  .to_account_update_and_calls
             in
             let digest =
-              Zkapp_command.Digest.Account_update.Checked.create final_update
+              Zkapp_command.Digest.Account_update.Checked.create ~signature_kind
+                final_update
             in
             ( { Zkapp_call_forest.Checked.account_update =
                   { data = final_update; hash = digest }
@@ -157,10 +160,13 @@ module Rules = struct
   (** Rule to transfer tokens. *)
   module Transfer = struct
     let dummy_account_update_body =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       lazy
         (let dummy_body = Account_update.Body.dummy in
          { With_hash.data = dummy_body
-         ; hash = Zkapp_command.Digest.Account_update.create_body dummy_body
+         ; hash =
+             Zkapp_command.Digest.Account_update.create_body ~signature_kind
+               dummy_body
          } )
 
     let dummy_tree_hash =
@@ -327,9 +333,8 @@ module Rules = struct
       let dummy_account_update_body = Lazy.force dummy_account_update_body in
       let dummy : _ Zkapp_command.Call_forest.Tree.t =
         { account_update =
-            { Account_update.Poly.body = dummy_account_update_body.data
-            ; authorization = Control.Poly.None_given
-            }
+            Account_update.with_aux ~body:dummy_account_update_body.data
+              ~authorization:Control.Poly.None_given
         ; account_update_digest = dummy_account_update_body.hash
         ; calls = []
         }

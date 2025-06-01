@@ -341,29 +341,15 @@ end
 
 module Zkapp_states_nullable = struct
   type t =
-    { element0 : int option
-    ; element1 : int option
-    ; element2 : int option
-    ; element3 : int option
-    ; element4 : int option
-    ; element5 : int option
-    ; element6 : int option
-    ; element7 : int option
-    }
-  [@@deriving fields, hlist]
+    (int option, Mina_base.Zkapp_state.Max_state_size.n) Pickles_types.Vector.t
+
+  let names =
+    List.init Mina_base.Zkapp_state.max_size_int ~f:(fun n ->
+        sprintf "element%d" n )
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ]
+    Mina_caqti.Vector.typ
+      (Caqti_type.(option int), Mina_base.Zkapp_state.Max_state_size.n)
 
   let table_name = "zkapp_states_nullable"
 
@@ -377,56 +363,31 @@ module Zkapp_states_nullable = struct
           @@ Zkapp_field.add_if_doesn't_exist (module Conn) )
     in
     let t =
-      match element_ids with
-      | [ element0
-        ; element1
-        ; element2
-        ; element3
-        ; element4
-        ; element5
-        ; element6
-        ; element7
-        ] ->
-          { element0
-          ; element1
-          ; element2
-          ; element3
-          ; element4
-          ; element5
-          ; element6
-          ; element7
-          }
-      | _ ->
-          failwith "Invalid number of nullable app state elements"
+      Pickles_types.Vector.of_list_and_length_exn element_ids
+        Mina_base.Zkapp_state.Max_state_size.n
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
       id
 end
 
 module Zkapp_states = struct
-  type t =
-    { element0 : int
-    ; element1 : int
-    ; element2 : int
-    ; element3 : int
-    ; element4 : int
-    ; element5 : int
-    ; element6 : int
-    ; element7 : int
-    }
-  [@@deriving fields, hlist]
+  type t = (int, Mina_base.Zkapp_state.Max_state_size.n) Pickles_types.Vector.t
+
+  let names =
+    List.init Mina_base.Zkapp_state.max_size_int ~f:(fun n ->
+        sprintf "element%d" n )
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int; int; int; int ]
+    Mina_caqti.Vector.typ
+      (Caqti_type.int, Mina_base.Zkapp_state.Max_state_size.n)
 
   let table_name = "zkapp_states"
 
@@ -438,53 +399,32 @@ module Zkapp_states = struct
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
     in
     let t =
-      match element_ids with
-      | [ element0
-        ; element1
-        ; element2
-        ; element3
-        ; element4
-        ; element5
-        ; element6
-        ; element7
-        ] ->
-          { element0
-          ; element1
-          ; element2
-          ; element3
-          ; element4
-          ; element5
-          ; element6
-          ; element7
-          }
-      | _ ->
-          failwith "Invalid number of app state elements"
+      Pickles_types.Vector.of_list_and_length_exn element_ids
+        Mina_base.Zkapp_state.Max_state_size.n
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
       id
 end
 
 module Zkapp_action_states = struct
-  type t =
-    { element0 : int
-    ; element1 : int
-    ; element2 : int
-    ; element3 : int
-    ; element4 : int
-    }
-  [@@deriving fields, hlist]
+  (* TODO ideally don't hard code action_state length *)
+  module Len = Pickles_types.Nat.N5
 
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int ]
+  type t = (int, Len.n) Pickles_types.Vector.t
+
+  let typ = Mina_caqti.Vector.typ (Caqti_type.int, Len.n)
+
+  let names =
+    List.init (Pickles_types.Nat.to_int Len.n) ~f:(fun n ->
+        sprintf "element%d" n )
 
   let table_name = "zkapp_action_states"
 
@@ -496,21 +436,18 @@ module Zkapp_action_states = struct
           Zkapp_field.add_if_doesn't_exist (module Conn) field )
     in
     let t =
-      match element_ids with
-      | [ element0; element1; element2; element3; element4 ] ->
-          { element0; element1; element2; element3; element4 }
-      | _ ->
-          failwith "Invalid number of action state elements"
+      Pickles_types.Vector.of_list_and_length_exn element_ids
+        Pickles_types.Nat.N5.n
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
       id
 end
 
@@ -4233,7 +4170,8 @@ module Block = struct
           ~f:(fun acc ({ fee_payer; account_updates; memo; _ } as zkapp_cmd) ->
             (* add authorizations, not stored in the db *)
             let (fee_payer : Account_update.Fee_payer.t) =
-              { body = fee_payer; authorization = Signature.dummy }
+              Account_update.Fee_payer.make ~body:fee_payer
+                ~authorization:Signature.dummy
             in
             let (account_updates : Account_update.Simple.t list) =
               List.map account_updates
@@ -4241,7 +4179,9 @@ module Block = struct
                      (body : Account_update.Body.Simple.t)
                      :
                      Account_update.Simple.t
-                   -> { body; authorization = None_given } )
+                   ->
+                  Account_update.with_no_aux ~body
+                    ~authorization:Control.Poly.None_given )
             in
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
