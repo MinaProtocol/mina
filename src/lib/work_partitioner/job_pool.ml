@@ -13,7 +13,7 @@ module Make (Id : Map.Key) (Spec : T) = struct
 
   type t = job IdMap.t
 
-  let peek t : job option = IdMap.min_elt t |> Option.map ~f:Tuple2.get2
+  let first_job t : job option = IdMap.min_elt t |> Option.map ~f:Tuple2.get2
 
   let fold_until ~init ~f ~finish t =
     let processed_items = Queue.create () in
@@ -51,7 +51,7 @@ module Make (Id : Map.Key) (Spec : T) = struct
     let seq = IdMap.to_sequence ~order:`Increasing_key t in
     seq_fold_until init seq
 
-  let attempt_add ~id ~job t = IdMap.add ~key:id ~data:job t
+  let add ~id ~job t = IdMap.add ~key:id ~data:job t
 
   let change ~id ~f t = IdMap.change t id ~f
 

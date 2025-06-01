@@ -15,7 +15,7 @@ let next_id (t : t) () : Int64.t =
   let result = t.next_id in
   if equal t.next_id id_upper_bound then (
     let logger = t.logger in
-    [%log warn]
+    [%log error]
       "ID generator exceeded upper boundary %Ld, recuring from lower boundry \
        %Ld"
       id_upper_bound id_lower_bound ;
