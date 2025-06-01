@@ -208,6 +208,7 @@ module Account_update_under_construction = struct
 
     let to_account_update_and_calls (t : t) :
         Account_update.Body.Checked.t * Zkapp_call_forest.Checked.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
@@ -283,7 +284,8 @@ module Account_update_under_construction = struct
         | Rev_calls rev_calls ->
             List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) rev_calls
               ~f:(fun acc (account_update, calls) ->
-                Zkapp_call_forest.Checked.push ~account_update ~calls acc )
+                Zkapp_call_forest.Checked.push ~signature_kind ~account_update
+                  ~calls acc )
         | Calls calls ->
             calls
       in
