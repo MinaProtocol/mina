@@ -406,7 +406,7 @@ let%test_module "Protocol state precondition tests" =
                     ; account_updates =
                         [ sender_account_update; snapp_account_update ]
                     }
-                    |> Zkapp_command.of_simple ~proof_cache_db
+                    |> Zkapp_command.of_simple ~signature_kind ~proof_cache_db
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
@@ -1000,7 +1000,7 @@ let%test_module "Account precondition tests" =
                 }
               in
               let zkapp_command_with_invalid_fee_payer =
-                Zkapp_command.of_simple ~proof_cache_db
+                Zkapp_command.of_simple ~signature_kind ~proof_cache_db
                   { fee_payer
                   ; memo
                   ; account_updates =

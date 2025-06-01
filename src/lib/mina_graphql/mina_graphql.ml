@@ -397,6 +397,7 @@ module Mutations = struct
       , string )
       result
       Io.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     (* instead of adding the zkapp_command to the transaction pool, as we would for an actual zkapp,
        apply the zkapp using an ephemeral ledger
     *)
@@ -466,7 +467,7 @@ module Mutations = struct
                       |> Consensus.Data.Consensus_state
                          .global_slot_since_genesis )
                     ~state_view ledger
-                    (Zkapp_command.write_all_proofs_to_disk
+                    (Zkapp_command.write_all_proofs_to_disk ~signature_kind
                        ~proof_cache_db:(Mina_lib.proof_cache_db mina)
                        zkapp_command )
                 in
@@ -1656,6 +1657,7 @@ module Queries = struct
   (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~proof_cache_db ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
       =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
         Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
@@ -1709,7 +1711,7 @@ module Queries = struct
                           let user_cmd =
                             User_command.Zkapp_command
                               (Zkapp_command.write_all_proofs_to_disk
-                                 ~proof_cache_db zkapp_command )
+                                 ~signature_kind ~proof_cache_db zkapp_command )
                           in
                           (* The command gets piped through [forget_check]
                              below; this is just to make the types work

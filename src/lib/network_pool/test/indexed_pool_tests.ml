@@ -502,6 +502,8 @@ let commit_to_pool ledger pool cmd expected_drops =
 
 let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
+let signature_kind = Mina_signature_kind.Testnet
+
 let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ~double_increment_sender ~increment_receiver ~amount ~fee nonce_int =
   let nonce = Account.Nonce.of_int nonce_int in
@@ -568,7 +570,8 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     }
   in
   let zkapp_command =
-    Zkapp_command.write_all_proofs_to_disk ~proof_cache_db zkapp_command_wire
+    Zkapp_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+      zkapp_command_wire
   in
   (* We skip signing the commitment and updating the authorization as it is not necessary to have a valid transaction for these tests. *)
   let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =

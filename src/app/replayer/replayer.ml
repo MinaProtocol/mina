@@ -516,6 +516,7 @@ let get_parent_state_view ~pool block_id =
 
 let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
     (cmd : Sql.Zkapp_command.t) : Mina_transaction.Transaction.t Deferred.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let query_db = Mina_caqti.query pool in
   (* use dummy authorizations *)
   let%bind (fee_payer : Account_update.Fee_payer.t) =
@@ -551,7 +552,8 @@ let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
   in
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let zkapp_command =
-    Zkapp_command.of_simple ~proof_cache_db { fee_payer; account_updates; memo }
+    Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+      { fee_payer; account_updates; memo }
   in
   return
   @@ Mina_transaction.Transaction.Command
