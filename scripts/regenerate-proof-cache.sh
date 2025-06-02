@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # state in _build can cause non-determinism in proof_caches
 rm -rf _build
-for DIR in $(find ./src -name proof_cache.json | sed 's/\/proof_cache.json//'); do
+for DIR in $(find ./src -name proof_cache.json | xargs dirname); do
   # I'm not sure why but using proof_cache.json directly causes non-determinism
   # Initialize the target file
   echo [] > $DIR/proof_cache_new.json;
