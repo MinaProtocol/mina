@@ -54,9 +54,9 @@ let test_multiple_writes_on_same_pipe_closing_wrong_pipe () =
 let test_multiple_writes_on_same_pipe () =
   let reader, writer = create () in
   let pending_write =
-    let%bind reader' = write_ 42 writer in
+    let%bind writer' = write_ 42 writer in
     let%map _ = write_ 27 writer in
-    close reader'
+    close writer'
   in
   let%bind reader' = expect_read 42 reader in
   let%bind () = pending_write in
