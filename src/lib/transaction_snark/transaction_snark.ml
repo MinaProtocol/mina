@@ -1867,6 +1867,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let main ?(witness : Witness.t option) (spec : Spec.t)
           ~constraint_constants (statement : Statement.With_sok.var) =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let open Impl in
         run_checked (dummy_constraints ()) ;
         let ( ! ) x = Option.value_exn x in
@@ -1960,7 +1961,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                     | `Skip ->
                         []
                     | `Start p ->
-                        Zkapp_command.all_account_updates p.account_updates )
+                        Zkapp_command.all_account_updates ~signature_kind
+                          p.account_updates )
                 in
                 let h =
                   exists Zkapp_command.Digest.Forest.typ ~compute:(fun () ->
@@ -4561,7 +4563,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 s )
       in
       ( `Zkapp_command
-          (Zkapp_command.of_simple ~proof_cache_db
+          (Zkapp_command.of_simple ~signature_kind ~proof_cache_db
              { fee_payer; account_updates = other_receivers; memo } )
       , `Sender_account_update sender_account_update
       , `Proof_zkapp_command snapp_zkapp_command
@@ -4687,7 +4689,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let account_updates =
         Option.to_list sender_account_update @ snapp_zkapp_command
       in
-      Zkapp_command.of_simple ~proof_cache_db
+      Zkapp_command.of_simple ~signature_kind ~proof_cache_db
         { fee_payer; memo; account_updates }
 
     (* This spec is intended to build a zkapp command with only one account update
@@ -4986,7 +4988,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         @ snapp_zkapp_command @ receivers
       in
       let zkapp_command : Zkapp_command.t =
-        Zkapp_command.of_simple ~proof_cache_db
+        Zkapp_command.of_simple ~signature_kind ~proof_cache_db
           { fee_payer; account_updates; memo }
       in
       zkapp_command
@@ -5317,7 +5319,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           }
         ]
       in
-      Zkapp_command.of_simple ~proof_cache_db
+      Zkapp_command.of_simple ~signature_kind ~proof_cache_db
         { fee_payer; account_updates; memo }
   end
 end

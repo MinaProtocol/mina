@@ -1622,6 +1622,7 @@ module Make (L : Ledger_intf.S) :
       ( Transaction_partially_applied.Zkapp_command_partially_applied.t
       * user_acc )
       Or_error.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Or_error.Let_syntax in
     let previous_hash = merkle_root ledger in
     let original_first_pass_account_states =
@@ -1665,7 +1666,9 @@ module Make (L : Ledger_intf.S) :
         } )
     in
     let user_acc = f init initial_state in
-    let account_updates = Zkapp_command.all_account_updates command in
+    let account_updates =
+      Zkapp_command.all_account_updates ~signature_kind command
+    in
     let%map global_state, local_state =
       Or_error.try_with (fun () ->
           M.start ~constraint_constants
@@ -2517,7 +2520,9 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let zkapp_command = Zkapp_command.of_simple ~proof_cache_db zkapp_command in
+    let zkapp_command =
+      Zkapp_command.of_simple ~signature_kind ~proof_cache_db zkapp_command
+    in
     let commitment = Zkapp_command.commitment zkapp_command in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment

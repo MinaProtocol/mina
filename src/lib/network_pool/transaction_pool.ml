@@ -1126,6 +1126,7 @@ struct
           ( verified Envelope.Incoming.t
           , Intf.Verification_error.t )
           Deferred.Result.t =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let open Deferred.Result.Let_syntax in
         let open Intf.Verification_error in
         let%bind () =
@@ -1185,7 +1186,7 @@ struct
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
               List.map
                 ~f:
-                  (User_command.write_all_proofs_to_disk
+                  (User_command.write_all_proofs_to_disk ~signature_kind
                      ~proof_cache_db:t.config.proof_cache_db )
                 diff
               |> User_command.Unapplied_sequence.to_all_verifiable
@@ -1674,6 +1675,8 @@ let%test_module _ =
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let constraint_constants = precomputed_values.constraint_constants
 
     let consensus_constants = precomputed_values.consensus_constants
@@ -1868,7 +1871,8 @@ let%test_module _ =
             |> Map.map ~f:(fun vk ->
                    Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
         |> Or_error.bind ~f:(fun xs ->
-               List.map xs ~f:User_command.For_tests.check_verifiable
+               List.map xs
+                 ~f:(User_command.For_tests.check_verifiable ~signature_kind)
                |> Or_error.combine_errors )
       with
       | Ok cmds ->

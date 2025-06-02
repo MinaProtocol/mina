@@ -45,7 +45,7 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      Zkapp_command.of_simple ~proof_cache_db
+      Zkapp_command.of_simple ~signature_kind:U.signature_kind ~proof_cache_db
         { fee_payer =
             Account_update.Fee_payer.make
               ~body:

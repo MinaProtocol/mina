@@ -66,6 +66,7 @@ module Impl = struct
   let perform_single
       ({ cache; proof_level_snark; proof_cache_db; logger } : Worker_state.t)
       ~message (single : Snark_work_lib.Selector.Single.Spec.Stable.Latest.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Deferred.Or_error.Let_syntax in
     let sok_digest = Mina_base.Sok_message.digest message in
     match proof_level_snark with
@@ -104,7 +105,7 @@ module Impl = struct
                           extract_zkapp_segment_works ~m ~input ~witness:w
                             ~zkapp_command:
                               (Zkapp_command.write_all_proofs_to_disk
-                                 ~proof_cache_db zkapp_command )
+                                 ~signature_kind ~proof_cache_db zkapp_command )
                           |> Deferred.return
                         in
                         let log_base_snark f ~statement ~spec ~all_inputs =
