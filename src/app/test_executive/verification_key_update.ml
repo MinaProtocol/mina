@@ -186,9 +186,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-
       (* TODO: This is a pain. *)
-      { body = body vk; authorization = Signature Signature.dummy }
+      Account_update.with_aux ~body:(body vk)
+        ~authorization:(Control.Poly.Signature Signature.dummy)
     in
     let%bind zkapp_command_create_accounts =
       let memo =
@@ -217,14 +217,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
       in
       let fee_payer : Account_update.Fee_payer.t =
-        { body =
+        Account_update.Fee_payer.make
+          ~body:
             { Account_update.Body.Fee_payer.dummy with
               public_key = account_a_pk
             ; nonce
             ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
             }
-        ; authorization = Signature.dummy
-        }
+          ~authorization:Signature.dummy
       in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
@@ -254,6 +254,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = _
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key account_a_pk ->
