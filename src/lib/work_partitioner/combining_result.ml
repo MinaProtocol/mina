@@ -21,7 +21,7 @@ type t =
 type merge_outcome =
   | Pending of t
   | Done of Snark_work_lib.Result.Combined.t
-  | HalfAlreadyInPool of { in_pool : half }
+  | HalfAlreadyInPool
   | StructureMismatch of
       { spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t }
 
@@ -92,10 +92,11 @@ let merge_single_result (current : t)
         ; in_pool_result
         ; sok_message = { fee; prover }
         }
-    , ((`First | `Second) as submitted_half) )
-    when not (equal_half in_pool_half submitted_half) ->
-      finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
-        ~fee ~prover
+    , ((`First | `Second) as submitted_half) ) ->
+      if equal_half in_pool_half submitted_half then HalfAlreadyInPool
+      else
+        finalize_two ~submitted_result ~other_spec ~in_pool_result
+          ~submitted_half ~fee ~prover
   | Spec_only { spec = `One _ as spec; _ }, (`First | `Second)
   | Spec_only { spec = `Two _ as spec; _ }, `One ->
       StructureMismatch { spec }
@@ -108,5 +109,3 @@ let merge_single_result (current : t)
             `Two (other_spec, in_pool_result.spec)
       in
       StructureMismatch { spec }
-  | One_of_two { in_pool_half = in_pool; _ }, _ ->
-      HalfAlreadyInPool { in_pool }

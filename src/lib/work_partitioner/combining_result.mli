@@ -33,7 +33,7 @@ type merge_outcome =
   | Done of Snark_work_lib.Result.Combined.t
       (** [Done r] indicates that the result [r] is completed, and we should
           submit it to the work selector. *)
-  | HalfAlreadyInPool of { in_pool : half }
+  | HalfAlreadyInPool
       (** submitted work doesn't match what we have in pool. It happens when the
           submitting half is the same as the half in pool *)
   | StructureMismatch of
