@@ -31,7 +31,7 @@ module Make (Id : Map.Key) (Spec : T) : sig
       [`Duplicate] if the key [id] is already occupied in the pool. *)
   val add : id:Id.t -> job:job -> t -> t Map_intf.Or_duplicate.t
 
-  (** [add ~id ~f t] attempts to find an item with id [id] in the pool, and apply
+  (** [change ~id ~f t] attempts to find an item with id [id] in the pool, and apply
       [f] on it. *)
   val change : id:Id.t -> f:(job option -> job option) -> t -> t
 
