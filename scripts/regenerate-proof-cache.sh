@@ -12,5 +12,5 @@ for DIR in $(find ./src -name proof_cache.json | xargs dirname); do
   git add $PWD/$DIR/proof_cache.json
   # Re-run the tests using the cache. Throws an error if the test is
   # non-deterministic and caused a cache miss.
-  ERROR_ON_PROOF=true dune runtest $DIR;
+  ERROR_ON_PROOF=true dune runtest $DIR
 done
