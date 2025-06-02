@@ -17,7 +17,7 @@ in  { step =
               , commands =
                 [ RunWithPostgres.runInDockerWithPostgresConn
                     [ "PATCH_ARCHIVE_TEST_APP=mina-patch-archive-test"
-                    , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
+                    , "NETWORK_DATA_FOLDER=/workdir"
                     ]
                     "https://storage.googleapis.com/o1labs-ci-test-data/replay/v0/archive_db.sql"
                     Artifacts.Type.FunctionalTestSuite
