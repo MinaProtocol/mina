@@ -4,7 +4,7 @@ rm -rf _build
 for DIR in $(find ./src -name proof_cache.json | xargs dirname); do
   # I'm not sure why but using proof_cache.json directly causes non-determinism
   # Initialize the target file
-  echo [] > $DIR/proof_cache_new.json;
+  echo [] > $DIR/proof_cache_new.json
   # Generate the cache file by running the tests
   PROOF_CACHE_OUT=$PWD/$DIR/proof_cache_new.json dune runtest $DIR;
   mv $PWD/$DIR/proof_cache_new.json $PWD/$DIR/proof_cache.json
