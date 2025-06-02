@@ -6,7 +6,7 @@ for DIR in $(find ./src -name proof_cache.json | xargs dirname); do
   # Initialize the target file
   echo [] > $DIR/proof_cache_new.json
   # Generate the cache file by running the tests
-  PROOF_CACHE_OUT=$PWD/$DIR/proof_cache_new.json dune runtest $DIR;
+  PROOF_CACHE_OUT=$PWD/$DIR/proof_cache_new.json dune runtest $DIR
   mv $PWD/$DIR/proof_cache_new.json $PWD/$DIR/proof_cache.json
   # Stage the new file for a git commit
   git add $PWD/$DIR/proof_cache.json
