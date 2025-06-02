@@ -21,8 +21,9 @@ type t =
 type merge_outcome =
   | Pending of t
   | Done of Snark_work_lib.Result.Combined.t
-  | HalfMismatch of { in_pool : half }
-  | NoSuchHalf of { spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t }
+  | HalfAlreadyInPool of { in_pool : half }
+  | StructureMismatch of
+      { spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t }
 
 let merge_single_result (current : t)
     ~(submitted_result :
@@ -89,6 +90,15 @@ let merge_single_result (current : t)
             { proof; fee = { fee; prover } } )
   | Spec_only { spec = `One _ as spec; _ }, (`First | `Second)
   | Spec_only { spec = `Two _ as spec; _ }, `One ->
-      NoSuchHalf { spec }
+      StructureMismatch { spec }
+  | One_of_two { in_pool_half; in_pool_result; other_spec; _ }, `One ->
+      let spec =
+        match in_pool_half with
+        | `First ->
+            `Two (in_pool_result.spec, other_spec)
+        | `Second ->
+            `Two (other_spec, in_pool_result.spec)
+      in
+      StructureMismatch { spec }
   | One_of_two { in_pool_half = in_pool; _ }, _ ->
-      HalfMismatch { in_pool }
+      HalfAlreadyInPool { in_pool }
