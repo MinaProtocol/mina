@@ -4,6 +4,10 @@ open Mina_base
 open Mina_transaction
 open Work_partitioner.Snark_worker_shared
 
+open struct
+  module Work = Snark_work_lib
+end
+
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
 
@@ -63,11 +67,10 @@ module Impl = struct
       ({ cache; proof_level_snark; proof_cache_db; logger } : Worker_state.t)
       ~message (single : Snark_work_lib.Selector.Single.Spec.Stable.Latest.t) =
     let open Deferred.Or_error.Let_syntax in
-    let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
     match proof_level_snark with
     | Full ((module M) as m) -> (
-        let statement = Work.Single.Spec.statement single in
+        let statement = Work.Work.Single.Spec.statement single in
         let process k =
           let start = Time.now () in
           match%map.Async.Deferred
@@ -92,7 +95,7 @@ module Impl = struct
             Deferred.Or_error.return (proof, Time.Span.zero)
         | None -> (
             match single with
-            | Work.Single.Spec.Transition
+            | Work.Work.Single.Spec.Transition
                 (input, (w : Transaction_witness.Stable.Latest.t)) ->
                 process (fun () ->
                     match w.transaction with
@@ -249,7 +252,7 @@ module Impl = struct
         (* Use a dummy proof. *)
         let stmt =
           match single with
-          | Work.Single.Spec.Transition (stmt, _) ->
+          | Work.Work.Single.Spec.Transition (stmt, _) ->
               stmt
           | Merge (stmt, _, _) ->
               stmt
@@ -260,8 +263,7 @@ module Impl = struct
            , Time.Span.zero )
 
   let perform (s : Worker_state.t) public_key
-      ({ instances; fee } as spec : Snark_work_lib.Selector.Spec.Stable.Latest.t)
-      =
+      ({ instances; fee } as spec : Work.Selector.Spec.Stable.Latest.t) =
     One_or_two.Deferred_result.map instances ~f:(fun w ->
         let open Deferred.Or_error.Let_syntax in
         let%map proof, time =
@@ -274,13 +276,13 @@ module Impl = struct
         ) )
     |> Deferred.Or_error.map ~f:(function
          | `One (proof1, metrics1) ->
-             { Snark_work_lib.Work.Result.proofs = `One proof1
+             { Work.Work.Result.proofs = `One proof1
              ; metrics = `One metrics1
              ; spec
              ; prover = public_key
              }
          | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-             { Snark_work_lib.Work.Result.proofs = `Two (proof1, proof2)
+             { Work.Work.Result.proofs = `Two (proof1, proof2)
              ; metrics = `Two (metrics1, metrics2)
              ; spec
              ; prover = public_key

@@ -7,6 +7,12 @@ module Work = struct
 end
 
 module Selector = Selector
+
+module Result = struct
+  module Single = Single_result
+  module Combined = Combined_result
+end
+
 module With_job_meta = With_job_meta
 
 module Spec = struct
