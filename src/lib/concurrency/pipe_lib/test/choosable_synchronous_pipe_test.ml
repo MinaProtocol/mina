@@ -31,31 +31,27 @@ let test_read_write_sequence () =
   let%bind reader'' = expect_read 27 reader' in
   expect_read_eof reader''
 
+let check_raises_async msg exn op =
+  let%map thrown = Monitor.try_with op in
+  Alcotest.check_raises msg exn (fun () ->
+      ignore Result.(ok_exn @@ map_error ~f:Monitor.extract_exn thrown) )
+
 let test_write_after_close () =
   let reader, writer = create () in
   close writer ;
-  let%bind _ = write_ 42 writer in
-  expect_read_eof reader
-
-let test_multiple_writes_on_same_pipe_closing_wrong_pipe () =
-  let reader, writer = create () in
-  let pending_write =
-    let%bind _ = write_ 42 writer in
-    write_ 27 writer >>| close
+  let%bind () =
+    check_raises_async "pipe closed" Pipe_closed @@ fun () -> write_ 42 writer
   in
-  let%bind reader' = expect_read 42 reader in
-  let%bind () = pending_write in
-  Deferred.choose
-    [ Deferred.choice (expect_read_eof reader') (fun _ ->
-          failwith "Unexpected EOF" )
-    ; Deferred.choice (after (Time_ns.Span.of_sec 0.5)) ident
-    ]
+  expect_read_eof reader
 
 let test_multiple_writes_on_same_pipe () =
   let reader, writer = create () in
   let pending_write =
     let%bind writer' = write_ 42 writer in
-    let%map _ = write_ 27 writer in
+    let%map () =
+      check_raises_async "pipe handle used" Pipe_handle_used
+      @@ fun () -> write_ 27 writer
+    in
     close writer'
   in
   let%bind reader' = expect_read 42 reader in
@@ -107,6 +103,12 @@ let test_iter () =
 
 let test_create_closed () = expect_read_eof (create_closed ())
 
+let test_close_closed () =
+  let reader, writer = create () in
+  close writer ;
+  Alcotest.check_raises "pipe closed" Pipe_closed (fun () -> close writer) ;
+  expect_read_eof reader
+
 let test_write_choice_selected () =
   let reader, writer = create () in
   let%map writer_opt =
@@ -145,12 +147,10 @@ let () =
             ; test_case "write after close" `Quick test_write_after_close
             ; test_case "multiple writes on same pipe" `Quick
                 test_multiple_writes_on_same_pipe
-            ; test_case
-                "multiple writes on same pipe, closing wrong pipe, eof timeouts"
-                `Quick test_multiple_writes_on_same_pipe_closing_wrong_pipe
             ; test_case "sequential read" `Quick test_sequential_read
             ; test_case "iterate pipe" `Quick test_iter
             ; test_case "create closed" `Quick test_create_closed
+            ; test_case "close closed pipe" `Quick test_close_closed
             ; test_case "write choice selected" `Quick
                 test_write_choice_selected
             ; test_case "write choice not selected" `Quick
