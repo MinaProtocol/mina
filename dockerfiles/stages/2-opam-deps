@@ -39,10 +39,13 @@ RUN git clone \
 WORKDIR $HOME/$MINA_DIR
 
 ENV OPAMYES 1
+ENV OPAMVERBOSE 1
+ENV OPAMDEBUG 1
+ENV OPAMDOWNLOADJOBS=1
 
 # --- Import Opam Switch
 # TODO: handle this opam work without cloning the full repository (directly pull opam.export)
-RUN opam switch import opam.export --quiet
+RUN opam switch import opam.export --quiet --verbose
 
 # --- Pin external packages / submodules
 # TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
