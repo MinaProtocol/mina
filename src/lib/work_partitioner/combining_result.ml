@@ -21,11 +21,8 @@ type t =
 type merge_outcome =
   | Pending of t
   | Done of Snark_work_lib.Result.Combined.t
-  | HalfMismatch of { submitted_half : submitted_half; in_pool : half }
-  | NoSuchHalf of
-      { submitted_half : submitted_half
-      ; spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t
-      }
+  | HalfMismatch of { in_pool : half }
+  | NoSuchHalf of { spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t }
 
 let merge_single_result (current : t)
     ~(submitted_result :
@@ -90,9 +87,8 @@ let merge_single_result (current : t)
         ( statements
         , Mina_wire_types.Network_pool_priced_proof.V1.
             { proof; fee = { fee; prover } } )
-  | ( Spec_only { spec = `One _ as spec; _ }
-    , ((`First | `Second) as submitted_half) )
-  | Spec_only { spec = `Two _ as spec; _ }, (`One as submitted_half) ->
-      NoSuchHalf { submitted_half; spec }
-  | One_of_two { in_pool_half = in_pool; _ }, submitted_half ->
-      HalfMismatch { submitted_half; in_pool }
+  | Spec_only { spec = `One _ as spec; _ }, (`First | `Second)
+  | Spec_only { spec = `Two _ as spec; _ }, `One ->
+      NoSuchHalf { spec }
+  | One_of_two { in_pool_half = in_pool; _ }, _ ->
+      HalfMismatch { in_pool }

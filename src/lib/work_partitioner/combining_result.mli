@@ -33,13 +33,10 @@ type merge_outcome =
   | Done of Snark_work_lib.Result.Combined.t
       (** [Done r] indicates that the result [r] is completed, and we should
           submit it to the work selector. *)
-  | HalfMismatch of { submitted_half : submitted_half; in_pool : half }
+  | HalfMismatch of { in_pool : half }
       (** submitted work doesn't match what we have in pool. It happens when the
           submitting half is the same as the half in pool *)
-  | NoSuchHalf of
-      { submitted_half : submitted_half
-      ; spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t
-      }
+  | NoSuchHalf of { spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t }
       (** submitted work is doesn't match the spec, it happens when submitting a
           `One to a `Two spec, or `First/`Second to a `On spec *)
 
