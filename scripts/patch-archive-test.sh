@@ -12,6 +12,9 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
 CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${PG_PORT}
 
 
+# Download the archive data
+dune b "${NETWORK_DATA_FOLDER}"
+
 echo "Running patch archive test"
 "${PATCH_ARCHIVE_TEST_APP}" --source-uri "${CONN}" \
                             --network-data-folder "${NETWORK_DATA_FOLDER}"
