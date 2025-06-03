@@ -2141,6 +2141,7 @@ let receipt_chain_hash =
            "NN For a zkApp, 0 for fee payer or 1-based index of account update"
          (optional string)
      in
+     let signature_kind = Mina_signature_kind.t_DEPRECATED in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
@@ -2159,9 +2160,9 @@ let receipt_chain_hash =
              in
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =
-                 Zkapp_command.get_transaction_commitments
-                   (Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
-                      zkapp_cmd )
+                 Zkapp_command.get_transaction_commitments ~signature_kind
+                   (Zkapp_command.write_all_proofs_to_disk ~signature_kind
+                      ~proof_cache_db zkapp_cmd )
                in
                Receipt.Zkapp_command_elt.Zkapp_command_commitment
                  full_txn_commitment

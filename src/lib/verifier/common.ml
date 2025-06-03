@@ -46,7 +46,7 @@ let check_signed_command c =
         Result.Error (`Invalid_signature (Signed_command.public_keys c))
 
 let collect_vk_assumption
-    ( (p : (Account_update.Body.t, _ Control.Poly.t) Account_update.Poly.t)
+    ( (p : (Account_update.Body.t, _ Control.Poly.t, _) Account_update.Poly.t)
     , ( (vk_opt :
           (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
           option )
@@ -81,6 +81,7 @@ let collect_vk_assumptions zkapp_command =
 
 let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
     (unit, invalid) Result.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let account_updates_hash =
     Zkapp_command.Call_forest.hash
       zkapp_command.Zkapp_command.Poly.account_updates
@@ -93,7 +94,7 @@ let check_signatures_of_zkapp_command (zkapp_command : _ Zkapp_command.Poly.t) :
     Zkapp_command.Transaction_commitment.create_complete tx_commitment
       ~memo_hash:(Signed_command_memo.hash zkapp_command.memo)
       ~fee_payer_hash:
-        (Zkapp_command.Digest.Account_update.create
+        (Zkapp_command.Digest.Account_update.create ~signature_kind
            (Account_update.of_fee_payer fee_payer) )
   in
   let check_signature s pk msg =

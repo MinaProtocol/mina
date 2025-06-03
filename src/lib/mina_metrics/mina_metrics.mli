@@ -319,8 +319,6 @@ end
 
 module Pipe : sig
   module Drop_on_overflow : sig
-    val bootstrap_sync_ledger : Counter.t
-
     val verified_network_pool_diffs : Counter.t
 
     val transition_frontier_valid_transitions : Counter.t
