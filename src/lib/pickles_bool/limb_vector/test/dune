@@ -9,6 +9,6 @@
  (package pickles)
  (preprocess
   (pps ppx_jane))
- (libraries alcotest core_kernel pickles pickles.limb_vector)
+ (libraries alcotest core_kernel pickles pickles_bool.limb_vector)
  (action
   (run %{test})))

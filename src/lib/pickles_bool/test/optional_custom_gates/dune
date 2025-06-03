@@ -36,16 +36,16 @@
   snarky.backendless
   snarky_group_map
   sponge
-  pickles
-  pickles.pseudo
-  pickles.limb_vector
+  pickles_bool
+  pickles_bool.pseudo
+  pickles_bool.limb_vector
   pickles_base
   kimchi_backend
   base58_check
   codable
   random_oracle_input
-  pickles.composition_types
-  pickles.plonk_checks
+  pickles_bool.composition_types
+  pickles_bool.plonk_checks
   pickles_base.one_hot_vector
   snarky_log
   group_map
