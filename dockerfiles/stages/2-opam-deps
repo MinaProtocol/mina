@@ -38,11 +38,14 @@ RUN git clone \
 
 WORKDIR $HOME/$MINA_DIR
 
-ENV OPAMYES 1
+# Set environment variables *before* running OPAM commands
+ENV OPAMYES=1
 
-# --- Import Opam Switch
-# TODO: handle this opam work without cloning the full repository (directly pull opam.export)
-RUN opam switch import opam.export --quiet
+RUN opam pin add ocamlfind.1.9.3 http://157.180.13.160:8080/archives/ocamlfind.1.9.3+opam.tar.gz
+
+# Update repo and install the switch (sources must be available locally!)
+RUN opam update && \
+    opam switch import opam.export --yes
 
 # --- Pin external packages / submodules
 # TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
