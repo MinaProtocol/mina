@@ -24,7 +24,6 @@
   ;; local libraries
   bounded_types
   cache_dir
-  direction
   empty_hashes
   immutable_array
   key_value_database

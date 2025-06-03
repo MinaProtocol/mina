@@ -1,3 +1,6 @@
+(* WARN:
+   This file would be rewritten finally
+*)
 (*
    This file tracks the Work distributed by Work_selector, hence the name.
    A Work_selector is responsible for selecting works from a work pool, and send
@@ -12,36 +15,7 @@
 open Core_kernel
 
 module Single = struct
-  module Spec = struct
-    [%%versioned
-    module Stable = struct
-      [@@@no_toplevel_latest_type]
-
-      module V1 = struct
-        type t =
-          ( Transaction_witness.Stable.V2.t
-          , Ledger_proof.Stable.V2.t )
-          Work.Single.Spec.Stable.V2.t
-        [@@deriving sexp, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    type t = (Transaction_witness.t, Ledger_proof.Cached.t) Work.Single.Spec.t
-
-    let read_all_proofs_from_disk : t -> Stable.Latest.t =
-      Work.Single.Spec.map
-        ~f_witness:Transaction_witness.read_all_proofs_from_disk
-        ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-
-    let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-        Stable.Latest.t -> t =
-      Work.Single.Spec.map
-        ~f_witness:
-          (Transaction_witness.write_all_proofs_to_disk ~proof_cache_db)
-        ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
-  end
+  module Spec = Single_spec
 end
 
 module Spec = struct
@@ -77,6 +51,10 @@ module Result = struct
         (Spec.Stable.V1.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
 
       let to_latest = Fn.id
+
+      let transactions (t : t) =
+        One_or_two.map t.spec.instances ~f:(fun i ->
+            Single_spec.Stable.Latest.transaction i )
     end
   end]
 

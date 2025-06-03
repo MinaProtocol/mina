@@ -27,6 +27,13 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libprocps8
 #    libjemalloc2
 
+# Install ca-certificates using HTTP
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Switch to HTTPS
+RUN sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list
 
 # --- Dependencies across many platforms
 RUN apt-get update --quiet --yes \
@@ -35,7 +42,6 @@ RUN apt-get update --quiet --yes \
     apt-utils \
     apt-transport-https \
     curl \
-    ca-certificates \
     build-essential \
     dnsutils \
     dumb-init \
@@ -46,6 +52,7 @@ RUN apt-get update --quiet --yes \
     libssl1.1 \
     tzdata \
     jq \
+    git \
     sudo \
     procps \
     && rm -rf /var/lib/apt/lists/*
@@ -70,7 +77,7 @@ RUN export GOBIN="$(pwd)/bin" \
     && curl -L "https://github.com/coinbase/mesh-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
     && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp" \
     && cd "/tmp/mesh-cli-0.10.1" \
-    && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/mesh-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
+    && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/rosetta-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
     && /usr/lib/go/bin/go mod tidy \
     && /usr/lib/go/bin/go install
 

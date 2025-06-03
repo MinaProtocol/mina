@@ -19,7 +19,7 @@
   pipe_lib
   network_peer
   merkle_address
-  direction
+  mina_stdlib
   error_json
   ppx_version.runtime
   mina_compile_config)

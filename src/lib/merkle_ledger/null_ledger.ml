@@ -43,7 +43,7 @@ end = struct
       else
         let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
+        Mina_stdlib.Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)
     in
     loop location
@@ -63,7 +63,9 @@ end = struct
       else
         let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map dir ~left:(`Left (hash, hash)) ~right:(`Right (hash, hash))
+        Mina_stdlib.Direction.map dir
+          ~left:(`Left (hash, hash))
+          ~right:(`Right (hash, hash))
         :: loop (Location.parent k)
     in
     loop location

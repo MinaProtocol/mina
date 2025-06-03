@@ -1011,10 +1011,6 @@ module Pipe = struct
   module Drop_on_overflow = struct
     let subsystem = subsystem ^ "_overflow"
 
-    let bootstrap_sync_ledger : Counter.t =
-      let help = "Overflow in sync ledger pipe when bootstrapping" in
-      Counter.v "bootstrap_sync_ledger_pipe" ~help ~namespace ~subsystem
-
     let verified_network_pool_diffs : Counter.t =
       let help =
         "Overflow in verified network pool diffs pipe (transactions or snark \

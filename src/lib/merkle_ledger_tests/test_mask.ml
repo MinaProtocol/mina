@@ -82,7 +82,9 @@ module Make (Test : Test_intf) = struct
     let rec add_direction count b accum =
       if count >= Test.depth then accum
       else
-        let dir = if b then Direction.Right else Direction.Left in
+        let dir =
+          if b then Mina_stdlib.Direction.Right else Mina_stdlib.Direction.Left
+        in
         add_direction (count + 1) (not b) (dir :: accum)
     in
     add_direction 0 false []
@@ -320,6 +322,7 @@ module Make (Test : Test_intf) = struct
               in
               let account_ids = Account_id.gen_accounts num_accounts in
               let balances = gen_values Balance.gen in
+              let T = Account_id.eq in
               let accounts =
                 List.map2_exn account_ids balances ~f:(fun public_key balance ->
                     Account.create public_key balance )
@@ -350,6 +353,7 @@ module Make (Test : Test_intf) = struct
               in
               let account_ids = Account_id.gen_accounts num_accounts in
               let balances = gen_values Balance.gen num_accounts in
+              let T = Account_id.eq in
               let base_accounts =
                 List.map2_exn account_ids balances ~f:Account.create
               in
@@ -409,6 +413,7 @@ module Make (Test : Test_intf) = struct
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
             in
+            let T = Account_id.eq in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
@@ -444,6 +449,7 @@ module Make (Test : Test_intf) = struct
               List.init num_accounts ~f:(fun n ->
                   Balance.of_nanomina_int_exn (n + 1) )
             in
+            let T = Account_id.eq in
             let parent_accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
@@ -486,6 +492,7 @@ module Make (Test : Test_intf) = struct
               List.init num_accounts ~f:(fun n ->
                   Balance.of_nanomina_int_exn (n + 1) )
             in
+            let T = Account_id.eq in
             let parent_accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
@@ -539,6 +546,7 @@ module Make (Test : Test_intf) = struct
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
             in
+            let T = Account_id.eq in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
@@ -571,6 +579,7 @@ module Make (Test : Test_intf) = struct
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
             in
+            let T = Account_id.eq in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
@@ -612,6 +621,7 @@ module Make (Test : Test_intf) = struct
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let k = Account_id.gen_accounts 1 |> List.hd_exn in
+            let T = Account_id.eq in
             let acct1 = Account.create k (Balance.of_nanomina_int_exn 10) in
             let loc =
               Mask.Attached.get_or_create_account attached_mask k acct1

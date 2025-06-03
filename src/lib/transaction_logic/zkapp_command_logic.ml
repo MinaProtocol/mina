@@ -492,7 +492,8 @@ module type Call_forest_intf = sig
 
   val is_empty : t -> bool
 
-  val pop_exn : t -> (account_update * t) * t
+  val pop_exn :
+    signature_kind:Mina_signature_kind.t -> t -> (account_update * t) * t
 end
 
 module type Stack_frame_intf = sig
@@ -1012,6 +1013,7 @@ module Make (Inputs : Inputs_intf) = struct
       (* The stack for the most recent zkApp *)
         (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
       : get_next_account_update_result =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     (* If the current stack is complete, 'return' to the previous
        partially-completed one.
     *)
@@ -1030,7 +1032,7 @@ module Make (Inputs : Inputs_intf) = struct
       )
     in
     let (account_update, account_update_forest), remainder_of_current_forest =
-      Call_forest.pop_exn (Stack_frame.calls current_forest)
+      Call_forest.pop_exn ~signature_kind (Stack_frame.calls current_forest)
     in
     let may_use_parents_own_token =
       Account_update.may_use_parents_own_token account_update

@@ -106,6 +106,40 @@ module Zkapp_command_segment_witness = struct
     ; init_stack
     ; block_global_slot
     }
+
+  let write_all_proofs_to_disk ~proof_cache_db
+      ({ global_first_pass_ledger
+       ; global_second_pass_ledger
+       ; local_state_init
+       ; start_zkapp_command
+       ; state_body
+       ; init_stack
+       ; block_global_slot
+       } :
+        Stable.V1.t ) : t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    { global_first_pass_ledger
+    ; global_second_pass_ledger
+    ; local_state_init =
+        Mina_transaction_logic.Zkapp_command_logic.Local_state.map_with_hashes
+          ~f:
+            (Zkapp_command.Call_forest.With_hashes.write_all_proofs_to_disk
+               ~proof_cache_db )
+          local_state_init
+    ; start_zkapp_command =
+        List.map
+          ~f:(fun sd ->
+            Mina_transaction_logic.Zkapp_command_logic.Start_data.
+              { sd with
+                account_updates =
+                  Zkapp_command.write_all_proofs_to_disk ~signature_kind
+                    ~proof_cache_db sd.account_updates
+              } )
+          start_zkapp_command
+    ; state_body
+    ; init_stack
+    ; block_global_slot
+    }
 end
 
 [%%versioned
