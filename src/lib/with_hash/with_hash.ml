@@ -15,14 +15,48 @@ module Stable = struct
 end]
 
 type ('a, 'h) t = ('a, 'h) Stable.Latest.t = { data : 'a; hash : 'h }
-[@@deriving annot, sexp, equal, compare, hash, yojson]
-
-let data { data; _ } = data
-
-let hash { hash; _ } = hash
+[@@deriving annot, compare, equal, fields, hash, sexp, yojson]
 
 let map t ~f = { t with data = f t.data }
 
 let map_hash t ~f = { t with hash = f t.hash }
 
 let of_data data ~hash_data = { data; hash = hash_data data }
+
+(** Set for [('a, 'h) t] that assumes the hash ['h] is cryptographically sound, and data is ignored
+*)
+module Set (Hash : Comparable.S) = struct
+  type 'a t = 'a Hash.Map.t [@@deriving sexp_of]
+
+  let empty = Hash.Map.empty
+
+  let is_empty = Hash.Map.is_empty
+
+  let add t { data; hash } =
+    match Hash.Map.add t ~key:hash ~data with `Ok t' -> t' | `Duplicate -> t
+
+  let union =
+    Hash.Map.merge ~f:(fun ~key:_ -> function
+      | `Both (_, b) -> Some b | `Left a -> Some a | `Right b -> Some b )
+
+  let iter t ~f = Hash.Map.iteri t ~f:(fun ~key ~data -> f { data; hash = key })
+
+  (* Ignoring values, comparing just on keys *)
+  let equal a b = Hash.Map.equal (fun _ _ -> true) a b
+
+  let of_list = List.fold ~init:empty ~f:add
+
+  let length = Hash.Map.length
+
+  let singleton { data; hash } = Hash.Map.singleton hash data
+
+  let remove t { hash; _ } = Hash.Map.remove t hash
+
+  let min_elt_exn t =
+    let hash, data = Hash.Map.min_elt_exn t in
+    { data; hash }
+
+  let to_sequence t =
+    Hash.Map.to_sequence t
+    |> Sequence.map ~f:(fun (hash, data) -> { data; hash })
+end

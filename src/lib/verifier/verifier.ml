@@ -1,3 +1,4 @@
+module Common = Common
 module Failure = Verification_failure
 module Prod = Prod
 module Dummy = Dummy

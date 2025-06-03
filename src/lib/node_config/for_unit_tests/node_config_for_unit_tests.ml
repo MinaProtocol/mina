@@ -53,8 +53,6 @@ let (genesis_state_timestamp : string) = ("2019-01-30 12:00:00-08:00" : string)
 
 let (block_window_duration : int) = (2000 : int)
 
-let (itn_features : bool) = (true : bool)
-
 let compaction_interval = None
 
 let (network : string) = ("testnet" : string)

@@ -17,6 +17,6 @@ val get_status :
 val read_body :
      t
   -> Consensus.Body_reference.t
-  -> ( Mina_block.Body.t
+  -> ( Mina_block.Body.Stable.Latest.t
      , [> `Invalid_structure of Error.t | `Non_full | `Tx_failed ] )
      Result.t

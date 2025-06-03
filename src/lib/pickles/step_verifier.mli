@@ -85,8 +85,6 @@ val hash_messages_for_next_step_proof_opt :
              , 'b )
              Pickles_types.Vector.t )
            Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
-        -> widths:'d
-        -> max_width:'e
         -> proofs_verified_mask:
              ( Impl.Field.t Snarky_backendless.Boolean.t
              , 'b )

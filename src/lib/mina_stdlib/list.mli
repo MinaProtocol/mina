@@ -58,3 +58,15 @@ module Length : sig
     val ( < ) : 'a t
   end
 end
+
+val process_separately :
+     partitioner:('input -> ('left, 'right) Base.Either.t)
+  -> process_left:('left list -> 'left_output)
+  -> process_right:('right list -> 'right_output)
+  -> finalizer:
+       (   'left_output
+        -> 'right_output
+        -> f:('output_item list -> 'output_item list -> 'output_item list)
+        -> 'final_output )
+  -> 'input list
+  -> 'final_output

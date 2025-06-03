@@ -50,9 +50,11 @@ module Checked = struct
         * Zkapp_command.Digest.Account_update.typ)
       |> Typ.transport
            ~back:(fun ((body, authorization), hash) ->
-             { With_hash.data = { Account_update.body; authorization }; hash }
-             )
-           ~there:(fun { With_hash.data = { Account_update.body; authorization }
+             { With_hash.data = { Account_update.Poly.body; authorization }
+             ; hash
+             } )
+           ~there:(fun { With_hash.data =
+                           { Account_update.Poly.body; authorization }
                        ; hash
                        } -> ((body, authorization), hash) )
       |> Typ.transport_var

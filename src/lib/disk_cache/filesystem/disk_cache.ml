@@ -11,7 +11,7 @@ struct
   type id = { idx : int }
 
   let initialize path ~logger =
-    Async.Deferred.Result.map (Utils.initialize_dir path ~logger)
+    Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun path -> (path, ref 0))
 
   let path root i = root ^ Filename.dir_sep ^ Int.to_string i

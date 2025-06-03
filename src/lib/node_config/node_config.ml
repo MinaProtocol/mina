@@ -70,8 +70,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "block_window_duration", block_window_duration]
 
-[%%inject "itn_features", itn_features]
-
 [%%ifndef compaction_interval]
 
 let compaction_interval = None

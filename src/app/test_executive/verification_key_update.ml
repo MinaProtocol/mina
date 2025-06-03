@@ -118,7 +118,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let tag1, _, _, Pickles.Provers.[ trivial_prover1 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial1"
         ~choices:(fun ~self:_ -> [ Trivial_rule1.rule ])
@@ -129,7 +128,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let tag2, _, _, Pickles.Provers.[ trivial_prover2 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial2"
         ~choices:(fun ~self:_ -> [ Trivial_rule2.rule ])
@@ -243,8 +241,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             when Public_key.Compressed.equal public_key account_a_pk ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign account_a_kp.private_key
-                    (Random_oracle.Input.Chunked.field full_commitment)
+                  (let signature_kind = Mina_signature_kind.t_DEPRECATED in
+                   Schnorr.Chunked.sign ~signature_kind account_a_kp.private_key
+                     (Random_oracle.Input.Chunked.field full_commitment) )
               }
           | fee_payer ->
               fee_payer
@@ -262,9 +261,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 in
                 { account_update with
                   authorization =
-                    Signature
-                      (Schnorr.Chunked.sign account_a_kp.private_key
-                         (Random_oracle.Input.Chunked.field commitment) )
+                    (let signature_kind = Mina_signature_kind.t_DEPRECATED in
+                     Control.Poly.Signature
+                       (Schnorr.Chunked.sign ~signature_kind
+                          account_a_kp.private_key
+                          (Random_oracle.Input.Chunked.field commitment) ) )
                 }
             | account_update ->
                 account_update )

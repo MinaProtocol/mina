@@ -33,11 +33,11 @@ let account : Mina_base.Account.t =
   }
 
 (* beefy zkapp command with all proof updates *)
-let zkapp_command ~genesis_constants ~constraint_constants =
+let zkapp_command ~proof_cache_db ~genesis_constants ~constraint_constants =
   let num_updates = 16 in
   let%map.Async.Deferred _, zkapp_commands =
-    Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
-      ~constraint_constants ~min_num_updates:num_updates
+    Snark_profiler_lib.create_ledger_and_zkapps ~proof_cache_db
+      ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
       ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
   in
   List.hd_exn zkapp_commands
@@ -47,8 +47,8 @@ let zkapp_proof ~zkapp_command =
     (Mina_base.Zkapp_command.all_account_updates_list zkapp_command)
     ~init:None
     ~f:(fun _acc a ->
-      match a.Mina_base.Account_update.authorization with
-      | Proof proof ->
+      match a.Mina_base.Account_update.Poly.authorization with
+      | Mina_base.Control.Poly.Proof proof ->
           Stop (Some proof)
       | _ ->
           Continue None )
@@ -57,7 +57,7 @@ let zkapp_proof ~zkapp_command =
 
 let dummy_proof =
   Pickles.Proof.dummy Pickles_types.Nat.N2.n Pickles_types.Nat.N2.n
-    Pickles_types.Nat.N2.n ~domain_log2:16
+    ~domain_log2:16
 
 let dummy_vk = Mina_base.Side_loaded_verification_key.dummy
 

@@ -37,6 +37,8 @@ module Read_only : functor (F_func : F) -> sig
 
   val iter :
     env:t -> ('k, 'v) Db.t -> f:('k -> 'v -> [< `Continue | `Stop ]) -> unit
+
+  val close : t -> unit
 end
 
 module Read_write : functor (F_func : F) -> sig
@@ -76,4 +78,6 @@ module Read_write : functor (F_func : F) -> sig
              | `Update_continue of 'v
              | `Update_stop of 'v ] )
     -> unit
+
+  val close : t -> unit
 end

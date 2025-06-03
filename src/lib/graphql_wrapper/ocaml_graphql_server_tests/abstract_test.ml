@@ -74,7 +74,7 @@ let schema =
 
 let test_query = Test_common.test_query schema ()
 
-let%test_unit "dog as pet" =
+let dog_as_pet_test () =
   let query = "{ pet(type: \"DOG\") { ... on Dog { name puppies } } }" in
   test_query query
     (`Assoc
@@ -84,7 +84,7 @@ let%test_unit "dog as pet" =
             ] )
       ] )
 
-let%test_unit "cat as pet" =
+let cat_as_pet_test () =
   let query = "{ pet(type: \"CAT\") { ... on Cat { name kittens } } }" in
   test_query query
     (`Assoc
@@ -94,7 +94,7 @@ let%test_unit "cat as pet" =
             ] )
       ] )
 
-let%test_unit "pets" =
+let pets_test () =
   let query =
     "{ pets { ... on Dog { name puppies } ... on Cat { name kittens } } }"
   in
@@ -110,7 +110,7 @@ let%test_unit "pets" =
             ] )
       ] )
 
-let%test_unit "named_objects" =
+let named_objects_test () =
   let query =
     "{ named_objects { name ... on Dog { puppies } ... on Cat { kittens } } }"
   in
@@ -126,7 +126,7 @@ let%test_unit "named_objects" =
             ] )
       ] )
 
-let%test_unit "nested fragments with union and interface" =
+let nested_fragments_with_union_and_interface_test () =
   let query =
     "fragment NamedFragment on Named { ... on Dog { name } ... on Cat { name } \
      } fragment PetFragment on Pet { ... NamedFragment ... on Dog { puppies } \
@@ -144,7 +144,7 @@ let%test_unit "nested fragments with union and interface" =
             ] )
       ] )
 
-let%test_unit "introspection" =
+let introspection_test () =
   let query =
     "{ __schema { types { name kind possibleTypes { name kind } interfaces { \
      name kind } } } }"
@@ -241,3 +241,17 @@ let%test_unit "introspection" =
                   ] )
             ] )
       ] )
+
+(* Run tests *)
+let () =
+  Alcotest.run "GraphQL Abstract Tests"
+    [ ( "abstract type operations"
+      , [ Alcotest.test_case "dog as pet" `Quick dog_as_pet_test
+        ; Alcotest.test_case "cat as pet" `Quick cat_as_pet_test
+        ; Alcotest.test_case "pets" `Quick pets_test
+        ; Alcotest.test_case "named_objects" `Quick named_objects_test
+        ; Alcotest.test_case "nested fragments with union and interface" `Quick
+            nested_fragments_with_union_and_interface_test
+        ; Alcotest.test_case "introspection" `Quick introspection_test
+        ] )
+    ]

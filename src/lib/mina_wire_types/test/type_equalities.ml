@@ -140,7 +140,7 @@ module Pickles = struct
       (O.Side_loaded.Verification_key.Stable)
       (W.Side_loaded.Verification_key)
   include Assert_equal0V1 (O.Backend.Tick.Field.Stable) (W.Backend.Tick.Field)
-  include Assert_equal2 (O.Proof) (W.Proof)
+  include Assert_equal1 (O.Proof) (W.Proof)
   include
     Assert_equal0V2
       (O.Proof.Proofs_verified_2.Stable)
@@ -249,7 +249,6 @@ module Mina_base = struct
   include Assert_equal0V2 (O.Control.Stable) (W.Control)
   include Assert_equal0V1 (O.Account_update.Stable) (W.Account_update)
   include Assert_equal0V1 (O.Zkapp_command.Stable) (W.Zkapp_command)
-  include Assert_equal0V1 (O.Zkapp_command.Valid.Stable) (W.Zkapp_command.Valid)
   include Assert_equal0V2 (O.User_command.Stable) (W.User_command)
   include
     Assert_equal0V1
@@ -423,24 +422,4 @@ module Mina_block = struct
   module O = Mina_block
   module W = WT.Mina_block
   include Assert_equal0V2 (O.Header.Stable) (W.Header)
-end
-
-module Staged_ledger_diff = struct
-  module O = Staged_ledger_diff
-  module W = WT.Staged_ledger_diff
-  include Assert_equal1V1 (O.At_most_two.Stable) (W.At_most_two)
-  include Assert_equal1V1 (O.At_most_one.Stable) (W.At_most_one)
-  include Assert_equal2V2 (O.Pre_diff_two.Stable) (W.Pre_diff_two)
-  include Assert_equal2V2 (O.Pre_diff_one.Stable) (W.Pre_diff_one)
-  include
-    Assert_equal0V2
-      (O.Pre_diff_with_at_most_two_coinbase.Stable)
-      (W.Pre_diff_with_at_most_two_coinbase)
-  include
-    Assert_equal0V2
-      (O.Pre_diff_with_at_most_two_coinbase.Stable)
-      (W.Pre_diff_with_at_most_two_coinbase)
-  include Assert_equal0V2 (O.Diff.Stable) (W.Diff)
-  include Assert_equal0V2 (O.Stable) (W)
-  include Assert_equal0V1 (O.Body.Stable) (W.Body)
 end

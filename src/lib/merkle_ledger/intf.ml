@@ -228,8 +228,6 @@ module type SYNCABLE = sig
 
   val get_inner_hash_at_addr_exn : t -> addr -> hash
 
-  val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
-
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
   val set_batch_accounts : t -> (addr * account) list -> unit

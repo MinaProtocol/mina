@@ -22,11 +22,12 @@ let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let network = Network.Type.Mainnet
+
 let dependsOn =
-      Dockers.dependsOnStep
+      Dockers.dependsOn
         Dockers.Type.Bullseye
-        "MinaArtifactMainnet"
-        (Some Network.Type.Mainnet)
+        network
         Profiles.Type.Standard
         Artifacts.Type.Daemon
 
@@ -42,13 +43,17 @@ in  Pipeline.build
         , path = "Test"
         , name = "ConnectToMainnet"
         , mode = PipelineMode.Type.Stable
-        , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
         }
       , steps =
         [ ConnectToNetwork.step
             dependsOn
-            "mainnet"
-            "mainnet"
+            "${Network.lowerName network}"
+            "${Network.lowerName network}"
             "40s"
             "2m"
             (B/SoftFail.Boolean False)

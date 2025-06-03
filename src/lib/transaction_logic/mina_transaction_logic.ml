@@ -1085,7 +1085,7 @@ module Make (L : Ledger_intf.S) :
     module Actions = struct
       type t = Zkapp_account.Actions.t
 
-      let is_empty = List.is_empty
+      let is_empty = Zkapp_account.Actions.is_empty
 
       let push_events = Account_update.Actions.push_events
     end
@@ -2258,6 +2258,8 @@ module For_tests = struct
 
   let depth = Int.ceil_log2 (num_accounts + num_transactions)
 
+  let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
   module Init_ledger = struct
     type t = (Keypair.t * int64) array [@@deriving sexp]
 
@@ -2424,6 +2426,7 @@ module For_tests = struct
       ?(double_sender_nonce = true)
       { Transaction_spec.fee; sender = sender, sender_nonce; receiver; amount }
       : Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let sender_pk = Public_key.compress sender.public_key in
     let actual_nonce =
       (* Here, we double the spec'd nonce, because we bump the nonce a second
@@ -2507,7 +2510,7 @@ module For_tests = struct
       ; memo = Signed_command_memo.empty
       }
     in
-    let zkapp_command = Zkapp_command.of_simple zkapp_command in
+    let zkapp_command = Zkapp_command.of_simple ~proof_cache_db zkapp_command in
     let commitment = Zkapp_command.commitment zkapp_command in
     let full_commitment =
       Zkapp_command.Transaction_commitment.create_complete commitment
@@ -2518,22 +2521,24 @@ module For_tests = struct
     in
     let account_updates_signature =
       let c = if use_full_commitment then full_commitment else commitment in
-      Schnorr.Chunked.sign sender.private_key
+      Schnorr.Chunked.sign ~signature_kind sender.private_key
         (Random_oracle.Input.Chunked.field c)
     in
     let account_updates =
       Zkapp_command.Call_forest.map zkapp_command.account_updates
-        ~f:(fun (account_update : Account_update.t) ->
+        ~f:(fun
+             (account_update : (Account_update.Body.t, _) Account_update.Poly.t)
+           ->
           match account_update.body.authorization_kind with
           | Signature ->
               { account_update with
-                authorization = Control.Signature account_updates_signature
+                authorization = Control.Poly.Signature account_updates_signature
               }
           | _ ->
               account_update )
     in
     let signature =
-      Schnorr.Chunked.sign sender.private_key
+      Schnorr.Chunked.sign ~signature_kind sender.private_key
         (Random_oracle.Input.Chunked.field full_commitment)
     in
     { zkapp_command with

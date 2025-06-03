@@ -171,10 +171,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     assert (Addr.depth address <= mdb.depth) ;
     get_hash mdb (Location.Hash address)
 
-  let set_inner_hash_at_addr_exn mdb address hash =
-    assert (Addr.depth address <= mdb.depth) ;
-    set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
-
   let get_generic mdb location =
     assert (Location.is_generic location) ;
     get_raw mdb location

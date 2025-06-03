@@ -23,8 +23,10 @@ source buildkite/scripts/export-git-env-vars.sh
 
 pip3 install sexpdata==1.0.0
 
+source ./buildkite/scripts/refresh_code.sh
+
 base_branch=origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-compatible}
-pr_branch=${REMOTE}/${BUILDKITE_BRANCH}
+pr_branch=${BUILDKITE_BRANCH}
 release_branch=origin/$1
 
 echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} ${release_branch}"

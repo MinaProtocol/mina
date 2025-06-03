@@ -24,6 +24,7 @@ run_bench.add_argument("--format", type=Format, help="output file format [text,c
 run_bench.add_argument("--path", help="override path to benchmark")
 run_bench.add_argument("--branch", default="test", help="Required only if --format=csv. Add branch name to csv file")
 run_bench.add_argument("--genesis-ledger-path", default="./genesis_ledgers/devnet.json",  help="Applicable only for ledger-export benchmark. Location of genesis config file")
+run_bench.add_argument("--privkeys-path", default="./privkey",  help="Applicable only for test apply ledger. Location of privkeys")
 run_bench.add_argument("--k", default=1)
 run_bench.add_argument("--max-num-updates", default=4 , type=int)
 run_bench.add_argument("--min-num-updates", default=2, type=int)
@@ -53,7 +54,8 @@ upload_bench.add_argument("--benchmark", type=BenchmarkType, help="benchmark to 
 
 test_bench = subparsers.add_parser('test', help="Performs entire cycle of operations from run till upload")
 test_bench.add_argument("--benchmark", type=BenchmarkType, help="benchmark to test")
-test_bench.add_argument("--tmpfile", help="temporary location of result file")
+test_bench.add_argument("--tmpfile", help="temporary location of result file", default="/tmp/bench.tmp")
+test_bench.add_argument("--input-file", help="input file with raw benchmark", default="input.json")
 test_bench.add_argument("--path")
 test_bench.add_argument("--yellow-threshold",
                         help="defines how many percent current measurement can exceed average so app will trigger warning",
@@ -91,6 +93,8 @@ def select_benchmark(kind):
         return HeapUsageBenchmark()
     elif kind == BenchmarkType.snark:
         return SnarkBenchmark(args.k, args.max_num_updates, args.min_num_updates)
+    elif kind == BenchmarkType.ledger_apply:
+        return LedgerApplyBenchmark(args.input_file)
     elif kind == BenchmarkType.ledger_export:
         if args.genesis_ledger_path is None:
             print(

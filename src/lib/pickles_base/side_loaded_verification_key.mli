@@ -138,21 +138,3 @@ module Domains : sig
   type 'a t = { h : 'a }
   [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
 end
-
-(** [Max_branches] is mostly an alias for {!Pickles_types.Nat.N8} *)
-module Max_branches : sig
-  type 'a plus_n = 'a Pickles_types.Nat.N7.plus_n Pickles_types.Nat.s
-
-  type n = Pickles_types.Nat.z plus_n
-
-  val eq : (n, n) Base.Type_equal.t
-
-  val n : Pickles_types.Nat.z plus_n Pickles_types.Nat.nat
-
-  val add :
-       'm Pickles_types.Nat.nat
-    -> 'm plus_n Pickles_types.Nat.nat
-       * (Pickles_types.Nat.z plus_n, 'm, 'm plus_n) Pickles_types.Nat.Adds.t
-
-  module Log2 = Pickles_types.Nat.N3
-end

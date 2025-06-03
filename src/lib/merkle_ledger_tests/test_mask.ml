@@ -260,53 +260,6 @@ module Make (Test : Test_intf) = struct
             () ) )
 
   let () =
-    if Test.depth <= 8 then
-      add_test "root hash invariant if interior changes but not accounts"
-        (fun () ->
-          Test.with_instances (fun maskable mask ->
-              let attached_mask = Maskable.register_mask maskable mask in
-              let loc0 =
-                Test.Location.Addr.of_directions
-                  (List.init Test.depth ~f:(fun _ -> Direction.Left))
-              in
-              Mask.Attached.set attached_mask (Test.Location.Account loc0)
-                dummy_account ;
-              (* Make some accounts *)
-              let num_accounts = (1 lsl Test.depth) - 1 in
-              let gen_values gen =
-                Quickcheck.random_value
-                  (Quickcheck.Generator.list_with_length num_accounts gen)
-              in
-              let account_ids = Account_id.gen_accounts num_accounts in
-              let balances = gen_values Balance.gen in
-              let accounts =
-                List.map2_exn account_ids balances ~f:(fun public_key balance ->
-                    Account.create public_key balance )
-              in
-              List.iter accounts ~f:(fun account ->
-                  ignore @@ create_new_account_exn attached_mask account ) ;
-              (* Set some inner hashes *)
-              let reset_hash_of_parent_of_index i =
-                let a1 = List.nth_exn accounts i in
-                let aid = Account.identifier a1 in
-                let location =
-                  Mask.Attached.location_of_account attached_mask aid
-                  |> Option.value_exn
-                in
-                let addr = Test.Location.to_path_exn location in
-                let parent_addr =
-                  Test.Location.Addr.parent addr |> Or_error.ok_exn
-                in
-                Mask.Attached.set_inner_hash_at_addr_exn attached_mask
-                  parent_addr Hash.empty_account
-              in
-              let root_hash = Mask.Attached.merkle_root attached_mask in
-              reset_hash_of_parent_of_index 0 ;
-              reset_hash_of_parent_of_index 3 ;
-              let root_hash' = Mask.Attached.merkle_root attached_mask in
-              assert (Hash.equal root_hash root_hash') ) )
-
-  let () =
     add_test "mask and parent agree on Merkle path" (fun () ->
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in

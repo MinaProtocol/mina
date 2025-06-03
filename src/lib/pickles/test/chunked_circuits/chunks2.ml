@@ -10,7 +10,6 @@ let test () =
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~num_chunks:2 ~override_wrap_domain:N1 ~name:"chunked_circuits"
       ~choices:(fun ~self:_ ->
@@ -58,8 +57,7 @@ let test () =
   in
   let module Requests = struct
     type _ Snarky_backendless.Request.t +=
-      | Proof :
-          (Nat.N0.n, Nat.N0.n) Pickles.Proof.t Snarky_backendless.Request.t
+      | Proof : Nat.N0.n Pickles.Proof.t Snarky_backendless.Request.t
 
     let handler (proof : _ Pickles.Proof.t)
         (Snarky_backendless.Request.With { request; respond }) =
@@ -78,7 +76,6 @@ let test () =
       =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N1)
       ~name:"recursion over chunks"
       ~choices:(fun ~self:_ ->

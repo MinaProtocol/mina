@@ -6,10 +6,7 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  base.base_internalhash_types
   core
-  core_kernel
-  sexplib0
   yojson
   async_kernel
   ;; local libraries

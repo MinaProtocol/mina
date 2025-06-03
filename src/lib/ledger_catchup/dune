@@ -9,16 +9,8 @@
   (pps ppx_mina ppx_version ppx_jane))
  (libraries
   ;; opam libraries
-  integers
-  base.base_internalhash_types
   async
   core
-  core_kernel
-  ocamlgraph
-  async_kernel
-  sexplib0
-  ppx_inline_test.config
-  async_unix
   ;; local libraries
   bounded_types
   mina_wire_types
@@ -54,13 +46,11 @@
   network_peer
   logger
   trust_system
-  truth
   error_json
   rose_tree
   transition_frontier_base
   network_pool
   staged_ledger_diff
-  gadt_lib
   transaction_snark_work
   pickles
   snark_params

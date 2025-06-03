@@ -45,66 +45,66 @@ let of_yojson = function
   | _ ->
       Error "Transaction_hash.of_yojson: Expected a string"
 
-let ( hash_signed_command_v1
-    , hash_signed_command
-    , hash_zkapp_command
-    , hash_coinbase
-    , hash_fee_transfer ) =
-  let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a)
-      (cmd : a) =
-    cmd |> Binable.to_string (module M) |> digest_string
+let mk_hasher (type a) (module M : Bin_prot.Binable.S with type t = a) (cmd : a)
+    =
+  cmd |> Binable.to_string (module M) |> digest_string
+
+let signed_cmd_hasher_v1 =
+  mk_hasher
+    ( module struct
+      include Signed_command.Stable.V1
+    end )
+
+let signed_cmd_hasher = mk_hasher (module Signed_command.Stable.Latest)
+
+let zkapp_cmd_hasher = mk_hasher (module Zkapp_command.Stable.Latest)
+
+(* replace actual signatures, proofs with dummies for hashing, so we can
+   reproduce the transaction hashes if signatures, proofs omitted in
+   archive db
+*)
+let hash_signed_command_v1 (cmd : Signed_command.Stable.V1.t) =
+  let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
+  signed_cmd_hasher_v1 cmd_dummy_signature
+
+let hash_signed_command (cmd : Signed_command.t) =
+  let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
+  signed_cmd_hasher cmd_dummy_signature
+
+let hash_zkapp_command (type p)
+    ({ fee_payer; account_updates; memo } :
+      (p, unit, unit) Zkapp_command.with_forest ) =
+  let cmd_dummy_signatures_and_proofs =
+    { Zkapp_command.Poly.memo
+    ; fee_payer = { fee_payer with authorization = Signature.dummy }
+    ; account_updates =
+        Zkapp_command.Call_forest.map account_updates
+          ~f:(fun (acct_update : (_, _) Account_update.Poly.t) ->
+            let dummy_auth =
+              match acct_update.authorization with
+              | Control.Poly.Proof _ ->
+                  Control.Poly.Proof (Lazy.force Proof.transaction_dummy)
+              | Control.Poly.Signature _ ->
+                  Control.Poly.Signature Signature.dummy
+              | Control.Poly.None_given ->
+                  Control.Poly.None_given
+            in
+            { acct_update with authorization = dummy_auth } )
+    }
   in
-  let signed_cmd_hasher_v1 =
-    mk_hasher
-      ( module struct
-        include Signed_command.Stable.V1
-      end )
-  in
-  let signed_cmd_hasher = mk_hasher (module Signed_command.Stable.Latest) in
-  let zkapp_cmd_hasher = mk_hasher (module Zkapp_command.Stable.Latest) in
-  (* replace actual signatures, proofs with dummies for hashing, so we can
-     reproduce the transaction hashes if signatures, proofs omitted in
-     archive db
-  *)
-  let hash_signed_command_v1 (cmd : Signed_command.Stable.V1.t) =
-    let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
-    signed_cmd_hasher_v1 cmd_dummy_signature
-  in
-  let hash_signed_command (cmd : Signed_command.t) =
-    let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
-    signed_cmd_hasher cmd_dummy_signature
-  in
-  let hash_zkapp_command (cmd : Zkapp_command.t) =
-    let cmd_dummy_signatures_and_proofs =
-      { cmd with
-        fee_payer = { cmd.fee_payer with authorization = Signature.dummy }
-      ; account_updates =
-          Zkapp_command.Call_forest.map cmd.account_updates
-            ~f:(fun (acct_update : Account_update.t) ->
-              let dummy_auth =
-                match acct_update.authorization with
-                | Control.Proof _ ->
-                    Control.Proof (Lazy.force Proof.transaction_dummy)
-                | Control.Signature _ ->
-                    Control.Signature Signature.dummy
-                | Control.None_given ->
-                    Control.None_given
-              in
-              { acct_update with authorization = dummy_auth } )
-      }
-    in
-    zkapp_cmd_hasher cmd_dummy_signatures_and_proofs
-  in
-  (* no signatures to replace for internal commands *)
-  let hash_coinbase = mk_hasher (module Mina_base.Coinbase.Stable.Latest) in
-  let hash_fee_transfer =
-    mk_hasher (module Fee_transfer.Single.Stable.Latest)
-  in
-  ( hash_signed_command_v1
-  , hash_signed_command
-  , hash_zkapp_command
-  , hash_coinbase
-  , hash_fee_transfer )
+  zkapp_cmd_hasher cmd_dummy_signatures_and_proofs
+
+(* no signatures to replace for internal commands *)
+let hash_coinbase = mk_hasher (module Mina_base.Coinbase.Stable.Latest)
+
+let hash_fee_transfer = mk_hasher (module Fee_transfer.Single.Stable.Latest)
+
+let hash_zkapp_command_with_hashes
+    ({ account_updates; _ } as cmd : (_, _, _) Zkapp_command.with_forest) =
+  hash_zkapp_command
+    { cmd with
+      account_updates = Zkapp_command.Call_forest.forget_hashes account_updates
+    }
 
 let hash_command cmd =
   match cmd with
@@ -112,6 +112,13 @@ let hash_command cmd =
       hash_signed_command s
   | User_command.Zkapp_command p ->
       hash_zkapp_command p
+
+let hash_command_with_hashes cmd =
+  match cmd with
+  | User_command.Signed_command s ->
+      hash_signed_command s
+  | User_command.Zkapp_command p ->
+      hash_zkapp_command_with_hashes p
 
 let hash_signed_command_v2 = hash_signed_command
 
@@ -162,17 +169,23 @@ let hash_of_transaction_id (transaction_id : string) : t Or_error.t =
             "Could not decode transaction id as either Base58Check or Base64" )
 
 module User_command_with_valid_signature = struct
-  type hash = T.t [@@deriving sexp, compare, hash]
+  type hash = T.t [@@deriving equal, sexp, compare, hash]
 
   let hash_to_yojson = to_yojson
 
   let hash_of_yojson = of_yojson
 
   type t = (User_command.Valid.t, hash) With_hash.t
-  [@@deriving hash, sexp, compare, to_yojson]
+  [@@deriving sexp_of, to_yojson]
+
+  let equal ({ hash = h1; _ } : t) ({ hash = h2; _ } : t) = T.equal h1 h2
 
   let create (c : User_command.Valid.t) : t =
-    { data = c; hash = hash_command (User_command.forget_check c) }
+    { data = c
+    ; hash =
+        hash_command
+          (User_command.read_all_proofs_from_disk @@ User_command.forget_check c)
+    }
 
   let data ({ data; _ } : t) = data
 
@@ -183,18 +196,16 @@ module User_command_with_valid_signature = struct
   let forget_check ({ data; hash } : t) =
     { With_hash.data = User_command.forget_check data; hash }
 
-  include Comparable.Make (struct
-    type nonrec t = t
+  module Set = struct
+    type el = t
 
-    let sexp_of_t = sexp_of_t
+    module Generic_set = With_hash.Set (T)
+    include Generic_set
 
-    let t_of_sexp = t_of_sexp
+    type nonrec t = User_command.Valid.t Generic_set.t
 
-    (* Compare only on hashes, comparing on the data too would be slower and
-       add no value.
-    *)
-    let compare (x : t) (y : t) = T.compare x.hash y.hash
-  end)
+    let sexp_of_t = Generic_set.sexp_of_t User_command.Valid.sexp_of_t
+  end
 
   let make data hash : t = { data; hash }
 end
@@ -224,7 +235,8 @@ module User_command = struct
     end
   end]
 
-  let create (c : User_command.t) : t = { data = c; hash = hash_command c }
+  let create (c : User_command.Stable.Latest.t) : t =
+    { data = c; hash = hash_command c }
 
   let data ({ data; _ } : t) = data
 
@@ -233,7 +245,10 @@ module User_command = struct
   let hash ({ hash; _ } : t) = hash
 
   let of_checked ({ data; hash } : User_command_with_valid_signature.t) : t =
-    { With_hash.data = User_command.forget_check data; hash }
+    { With_hash.data =
+        User_command.(read_all_proofs_from_disk @@ forget_check data)
+    ; hash
+    }
 
   include Comparable.Make (Stable.Latest)
 end

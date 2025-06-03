@@ -6,6 +6,8 @@ val genesis_constants : Genesis_constants.t
 
 val proof_level : Genesis_constants.Proof_level.t
 
+val signature_kind : Mina_signature_kind.t
+
 val consensus_constants : Consensus.Constants.t
 
 val constraint_constants : Genesis_constants.Constraint_constants.t
@@ -74,10 +76,8 @@ val trivial_zkapp :
        , unit
        , unit
        , Zkapp_statement.t
-       , ( unit
-         * unit
-         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
-         Async.Deferred.t )
+       , (unit * unit * Pickles_types.Nat.N2.n Pickles.Proof.t) Async.Deferred.t
+       )
        Pickles.Prover.t ] )
   Lazy.t
 
@@ -97,10 +97,8 @@ val test_snapp_update :
        , unit
        , unit
        , Zkapp_statement.t
-       , ( unit
-         * unit
-         * (Pickles_types.Nat.N2.n, Pickles_types.Nat.N2.n) Pickles.Proof.t )
-         Async.Deferred.t )
+       , (unit * unit * Pickles_types.Nat.N2.n Pickles.Proof.t) Async.Deferred.t
+       )
        Pickles.Prover.t
   -> Transaction_snark.For_tests.Update_states_spec.t
   -> init_ledger:Mina_transaction_logic.For_tests.Init_ledger.t
