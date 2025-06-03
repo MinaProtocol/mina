@@ -178,14 +178,14 @@ let wrap_main
           let actual_proofs_verified_mask =
             Util.Wrap.ones_vector
               ~first_zero:
-                (Wrap_verifier.Pseudo.choose
+                (Wrap_verifier.Pseudo_bool.choose
                    (which_branch, step_widths)
                    ~f:Field.of_int )
               Max_proofs_verified.n
             |> Vector.rev
           in
           let domain_log2 =
-            Wrap_verifier.Pseudo.choose
+            Wrap_verifier.Pseudo_bool.choose
               ( which_branch
               , Vector.map ~f:(fun ds -> Domain.log2_size ds.h) step_domains )
               ~f:Field.of_int
@@ -375,7 +375,7 @@ let wrap_main
                           Wrap_verifier.One_hot_vector.of_index index
                             ~length:Wrap_verifier.num_possible_domains
                         in
-                        Wrap_verifier.Pseudo.Domain.to_domain ~shifts
+                        Wrap_verifier.Pseudo_bool.Domain.to_domain ~shifts
                           ~domain_generator
                           (which_branch, all_possible_domains) )
                   in

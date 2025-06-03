@@ -636,7 +636,7 @@ struct
         (Boolean.true_, Field.((finite :> t) * x, (finite :> t) * y)) )
       ty t
 
-  module Pseudo = Pseudo.Make (Impl)
+  module Pseudo_bool = Pseudo_bool.Make (Impl)
 
   let mask (type n) (lengths : (int, n) Vector.t) (choice : n One_hot_vector.t)
       : Boolean.var array =
@@ -644,7 +644,7 @@ struct
       Option.value_exn
         (List.max_elt ~compare:Int.compare (Vector.to_list lengths))
     in
-    let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
+    let length = Pseudo_bool.choose (choice, lengths) ~f:Field.of_int in
     let (T max) = Nat.of_int max in
     Vector.to_array (Util.Wrap.ones_vector ~first_zero:length max)
 

@@ -9,7 +9,7 @@ module Scalar_challenge :
       Scalar_challenge.Make (Impl) (Step_main_inputs.Inner_curve) (Challenge)
         (Endo.Step_inner_curve)
 
-module Pseudo = Pseudo.Step
+module Pseudo_bool = Pseudo_bool.Step
 
 module Inner_curve : sig
   type t = Step_main_inputs.Inner_curve.t

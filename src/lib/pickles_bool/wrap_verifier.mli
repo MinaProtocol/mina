@@ -31,7 +31,7 @@ end
 
 module One_hot_vector : module type of One_hot_vector.Make (Impl)
 
-module Pseudo : module type of Pseudo.Make (Impl)
+module Pseudo_bool : module type of Pseudo_bool.Make (Impl)
 
 module Opt : sig
   include module type of
