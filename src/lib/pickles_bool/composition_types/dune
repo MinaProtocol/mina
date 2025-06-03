@@ -1,6 +1,6 @@
 (library
- (name composition_types)
- (public_name pickles.composition_types)
+ (name composition_types_bool)
+ (public_name pickles_bool.composition_types)
  ; Deactivated warnings
  ; 40: name-out-scope (activate later)
  ;
@@ -40,9 +40,9 @@
   kimchi_pasta.basic
   snarky.backendless
   pickles_types
-  pickles.limb_vector
+  pickles_bool.limb_vector
   kimchi_backend
   pickles_base
-  pickles.backend
+  pickles_bool.backend
   kimchi_backend_common
   ppx_version.runtime))

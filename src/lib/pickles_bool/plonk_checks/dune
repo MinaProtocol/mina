@@ -1,6 +1,6 @@
 (library
- (name plonk_checks)
- (public_name pickles.plonk_checks)
+ (name plonk_checks_bool)
+ (public_name pickles_bool.plonk_checks)
  (instrumentation
   (backend bisect_ppx))
  (flags

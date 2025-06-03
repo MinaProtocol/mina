@@ -41,13 +41,13 @@
   kimchi_pasta_snarky_backend
   bitstring_lib
   snarky.intf
-  pickles.backend
+  pickles_bool.backend
   pickles_types
   snarky.backendless
   snarky_group_map
   sponge
-  pickles.pseudo
-  pickles.limb_vector
+  pickles_bool.pseudo
+  pickles_bool.limb_vector
   pickles_base
   plonkish_prelude
   kimchi_backend
