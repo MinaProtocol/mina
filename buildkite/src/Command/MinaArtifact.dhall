@@ -127,36 +127,6 @@ let build_artifacts
               ]
             }
 
-let publish_to_debian_repo =
-          \(spec : MinaBuildSpec.Type)
-      ->  \(dependsOn : List Command.TaggedKey.Type)
-      ->  Command.build
-            Command.Config::{
-            , commands =
-                Toolchain.select
-                  spec.toolchainSelectMode
-                  spec.debVersion
-                  (   [ "AWS_ACCESS_KEY_ID"
-                      , "AWS_SECRET_ACCESS_KEY"
-                      , "MINA_DEB_CODENAME=${DebianVersions.lowerName
-                                               spec.debVersion}"
-                      , "MINA_DEB_RELEASE=${DebianChannel.lowerName
-                                              spec.channel}"
-                      ]
-                    # DebianRepo.keyIdEnvList spec.debianRepo
-                    # DebianRepo.bucketEnvList spec.debianRepo
-                  )
-                  "./buildkite/scripts/debian/publish.sh"
-            , label =
-                "Publish Mina for ${DebianVersions.capitalName
-                                      spec.debVersion} ${Profiles.toSuffixUppercase
-                                                           spec.profile}"
-            , key =
-                "publish-${DebianVersions.lowerName spec.debVersion}-deb-pkg"
-            , depends_on = dependsOn
-            , target = Size.Small
-            }
-
 let docker_step
     : Artifacts.Type -> MinaBuildSpec.Type -> List DockerImage.ReleaseSpec.Type
     =     \(artifact : Artifacts.Type)
@@ -319,7 +289,6 @@ let pipeline
 
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
-    , publishToDebian = publish_to_debian_repo
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
     , keySuffix = keySuffix

@@ -12,7 +12,7 @@
 #      "docker#v3.5.0":
 #        environment:
 #          - BUILDKITE_AGENT_ACCESS_TOKEN
-#          - "DOCKERS=Archive,Daemon"
+#          - "ARTIFACTS=Archive,Daemon"
 #          - "REMOVE_PROFILE_FROM_NAME=1"
 #          - "PROFILE=Hardfork"
 #          - "NETWORK=Devnet"
@@ -26,8 +26,7 @@
 #        propagate-environment: true
 
 
-DEBIAN_DHALL_DEF="(./buildkite/src/Constants/DebianPackage.dhall)"
-DOCKER_DHALL_DEF="(./buildkite/src/Constants/Artifacts.dhall)"
+ARTIFACTS_DHALL_DEF="(./buildkite/src/Constants/Artifacts.dhall)"
 DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
 PROMOTE_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/PromotePackage.dhall)"
 PROFILES_DHALL_DEF="(./buildkite/src/Constants/Profiles.dhall)"
@@ -39,51 +38,34 @@ function usage() {
   if [[ -n "$1" ]]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
-  echo "  DEBIANS                     The comma delimitered debian names. For example: 'Daemon,Archive' "
-  echo "  DOCKERS                     The comma delimitered docker names. For example: 'Daemon,Archive' "
+  echo "  ARTIFACTS                   The comma delimitered artifacts names. For example: 'Daemon,Archive' "
   echo "  CODENAMES                   The Debian codenames (Bullseye, Focal etc.)"
-  echo "  FROM_VERSION                The Source Docker or Debian version "
-  echo "  NEW_VERSION                 The new Debian version or new Docker tag"
-  echo "  REMOVE_PROFILE_FROM_NAME    Should we remove profile suffix from debian name"
+  echo "  VERSION                     The new Debian version or new Docker tag"
   echo "  PROFILE                     The Docker and Debian profile (Standard, Lightnet)"
   echo "  NETWORK                     The Docker and Debian network (Devnet, Mainnet)"
-  echo "  FROM_CHANNEL                Source debian channel"
-  echo "  TO_CHANNEL                  Target debian channel"
-  echo "  FROM_REPO                   Source debian repository"
-  echo "  TO_REPO                     Target debian repository"
+  echo "  CHANNEL                     Target debian channel"
+  echo "  REPO                        Source debian repository"
+  echo "  BUILD_ID                    The Buildkite build ID. If defined, script will use it to generate debian package version"
   echo "  PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io"
+  echo "  VERIFY                      The Verify flag. If set, script will verify the artifacts before promoting them"
   echo ""
   exit 1
 }
 
-if [ -z "$DEBIANS" ] && [ -z "$DOCKERS" ]; then usage "No Debians nor Dockers defined for promoting!"; exit 1; fi;
-
-DHALL_DEBIANS="([] : List $DEBIAN_DHALL_DEF.Type)"
-
-if [[ -n "$DEBIANS" ]]; then 
-    if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
-    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-    if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
-    if [[ -z "$REMOVE_PROFILE_FROM_NAME" ]]; then REMOVE_PROFILE_FROM_NAME=0; fi;
-    if [[ -z "$PUBLISH" ]]; then PUBLISH=0; fi;
-    if [[ -z "$FROM_CHANNEL" ]]; then FROM_CHANNEL="Unstable"; fi;
-    if [[ -z "$TO_CHANNEL" ]]; then TO_CHANNEL="Unstable"; fi;
-    if [[ -z "$FROM_REPO" ]]; then FROM_REPO="PackagesO1Test"; fi;
-    if [[ -z "$TO_REPO" ]]; then TO_REPO="PackagesO1Test"; fi;
-    if [[ -z "$FROM_VERSION" ]]; then usage "Version is not set!"; exit 1; fi;
-    if [[ -z "$NEW_VERSION" ]]; then NEW_VERSION=$FROM_VERSION; fi;
-    
-
-  arr_of_debians=(${DEBIANS//,/ })
-  DHALL_DEBIANS=""
-  for i in "${arr_of_debians[@]}"; do
-    DHALL_DEBIANS="${DHALL_DEBIANS}, $DEBIAN_DHALL_DEF.Type.${i}"
-  done
-  DHALL_DEBIANS="[${DHALL_DEBIANS:1}]"
-fi
+if [[ -z "$ARTIFACTS" ]]; then usage "No artifacts defined for promoting!"; exit 1; fi;
+if [[ -z "$CODENAMES" ]]; then usage "Codenames is not set!"; exit 1; fi;
+if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
+if [[ -z "$NETWORK" ]]; then NETWORK="Devnet"; fi;
+if [[ -z "$PUBLISH" ]]; then PUBLISH=0; fi;
+if [[ -z "$CHANNEL" ]]; then CHANNEL="Unstable"; fi;
+if [[ -z "$REPO" ]]; then REPO="Nightly"; fi;
+if [[ -z "$VERIFY" ]]; then VERIFY=0; fi;
+if [[ -z "$VERSION" ]]; then usage "Version is not set!"; exit 1; fi;
+if [[ -z "$NEW_VERSION" ]];  then usage "New Version is not set!"; exit 1; fi;
+if [[ -z "$BUILD_ID" ]]; then usage "Build ID is not set!"; exit 1; fi;
 
 
-DHALL_DOCKERS="([] : List $DOCKER_DHALL_DEF.Type)"
+DHALL_ARTIFACTS="([] : List $ARTIFACTS_DHALL_DEF.Type)"
 
 if [[ $PUBLISH -eq 1 ]]; then
     DHALL_PUBLISH="True"
@@ -91,18 +73,18 @@ if [[ $PUBLISH -eq 1 ]]; then
     DHALL_PUBLISH="False"
 fi
 
-if [[ -n "$DOCKERS" ]]; then 
-    if [[ -z "$NEW_VERSION" ]]; then usage "New Tag is not set!"; fi;
-    if [[ -z "$FROM_VERSION" ]]; then usage "Version is not set!"; fi;
-    if [[ -z "$PROFILE" ]]; then PROFILE="Standard"; fi;
-
-  arr_of_dockers=(${DOCKERS//,/ })
-  DHALL_DOCKERS=""
-  for i in "${arr_of_dockers[@]}"; do
-    DHALL_DOCKERS="${DHALL_DOCKERS}, $DOCKER_DHALL_DEF.Type.${i}"
-  done
-  DHALL_DOCKERS="[${DHALL_DOCKERS:1}]"
+if [[ $VERIFY -eq 1 ]]; then
+    DHALL_VERIFY="True"
+  else 
+    DHALL_VERIFY="False"
 fi
+
+arr_of_artifacts=(${ARTIFACTS//,/ })
+for i in "${arr_of_artifacts[@]}"; do
+  DHALL_ARTIFACTS="${DHALL_ARTIFACTS}, $ARTIFACTS_DHALL_DEF.Type.${i}"
+done
+DHALL_ARTIFACTS="[${DHALL_ARTIFACTS:1}]"
+
 
 CODENAMES=(${CODENAMES//,/ })
 DHALL_CODENAMES=""
@@ -111,9 +93,4 @@ DHALL_CODENAMES=""
   done
   DHALL_CODENAMES="[${DHALL_CODENAMES:1}]"
 
-if [[ "${REMOVE_PROFILE_FROM_NAME}" -eq 0 ]]; then 
-  REMOVE_PROFILE_FROM_NAME="False"
-else 
-  REMOVE_PROFILE_FROM_NAME="True"
-fi 
-echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_DEBIANS"' '"$DHALL_DOCKERS"' "'"${FROM_VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${FROM_CHANNEL}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${TO_CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${FROM_REPO}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${TO_REPO}"' "'"${NEW_VERSION}"'" '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' ' | dhall-to-yaml --quoted 
+echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_ARTIFACTS"' "'"${VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${REPO}"' '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' '${DHALL_VERIFY}' '${BUILD_ID}' ' | dhall-to-yaml --quoted 

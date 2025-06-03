@@ -6,6 +6,7 @@ let Package
     : Type
     = < Daemon
       | Archive
+      | Rosetta
       | TestExecutive
       | BatchTxn
       | LogProc
@@ -13,7 +14,8 @@ let Package
       | FunctionalTestSuite
       >
 
-let MainPackages = [ Package.Daemon, Package.Archive, Package.LogProc ]
+let MainPackages =
+      [ Package.Daemon, Package.Archive, Package.LogProc, Package.Rosetta ]
 
 let AuxiliaryPackages =
       [ Package.TestExecutive
@@ -30,6 +32,7 @@ let capitalName =
             , TestExecutive = "TestExecutive"
             , BatchTxn = "BatchTxn"
             , LogProc = "Logproc"
+            , Rosetta = "Rosetta"
             , ZkappTestTransaction = "ZkappTestTransaction"
             , FunctionalTestSuite = "FunctionalTestSuite"
             }
@@ -43,6 +46,7 @@ let lowerName =
             , TestExecutive = "test_executive"
             , BatchTxn = "batch_txn"
             , LogProc = "logproc"
+            , Rosetta = "rosetta"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             }
@@ -56,6 +60,9 @@ let debianName =
             { Daemon =
                 "mina-${Network.lowerName network}${Profile.toLabelSegment
                                                       profile}"
+            , Rosetta =
+                "mina--rosetta-${Network.lowerName
+                                   network}${Profile.toLabelSegment profile}"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
             , BatchTxn = "mina-batch-txn"
