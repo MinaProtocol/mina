@@ -65,7 +65,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
       let all_shifts = Vector.map log2s ~f:(fun d -> shifts ~log2_size:d) in
       match all_shifts with
       | [] ->
-          failwith "Pseudo.Domain.shifts: no domains were given"
+          failwith "Pseudo_bool.Domain.shifts: no domains were given"
       | shifts :: other_shiftss ->
           (* Runtime check that the shifts across all domains are consistent.
              The optimisation below will not work if this is not true; if the
@@ -87,7 +87,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
           let disabled_not_the_same = true in
           if all_the_same then Array.map ~f:Field.constant shifts
           else if disabled_not_the_same then
-            failwith "Pseudo.Domain.shifts: found variable shifts"
+            failwith "Pseudo_bool.Domain.shifts: found variable shifts"
           else
             let get_ith_shift i =
               mask which
