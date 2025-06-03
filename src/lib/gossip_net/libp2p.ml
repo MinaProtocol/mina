@@ -949,7 +949,7 @@ module Make (Rpc_interface : RPC_INTERFACE) :
       let pfs = !(t.publish_functions) in
       let%bind () =
         guard_topic ?origin_topic v1_topic_block pfs.publish_v1_block
-          (Mina_block.header state)
+          (Mina_block.Stable.Latest.header state)
       in
       guard_topic ?origin_topic v0_topic pfs.publish_v0 (Message.New_state state)
 

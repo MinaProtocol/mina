@@ -249,13 +249,16 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ( "length"
                   , Length.to_yojson
-                      (Mina_block.blockchain_length peer_best_tip.data) )
+                      ( Mina_block.Stable.Latest.header peer_best_tip.data
+                      |> Mina_block.Header.blockchain_length ) )
                 ]
               "Successfully downloaded best tip with $length from $peer" ;
             (* TODO: Use batch verification instead *)
             match%bind
-              Best_tip_prover.verify ~verifier peer_best_tip ~genesis_constants
+              Best_tip_prover.verify ~verifier ~genesis_constants
                 ~precomputed_values
+              @@ Mina_block.Proof_carrying.to_header_data
+                   ~to_header:Mina_block.Stable.Latest.header peer_best_tip
             with
             | Error e ->
                 [%log warn]
@@ -277,10 +280,20 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
                 [%log debug]
                   ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ]
                   "Successfully verified best tip from $peer" ;
+                let body =
+                  Mina_block.Stable.Latest.body peer_best_tip.data
+                  |> Staged_ledger_diff.Body.write_all_proofs_to_disk
+                       ~proof_cache_db
+                in
                 return
                   (Some
                      (Envelope.Incoming.wrap_peer
-                        ~data:{ peer_best_tip with data = candidate_best_tip }
+                        ~data:
+                          { peer_best_tip with
+                            data =
+                              Mina_block.Validation.with_body candidate_best_tip
+                                body
+                          }
                         ~sender:peer ) ) ) )
   in
   [%log debug]
@@ -326,7 +339,7 @@ let download_best_tip ~context:(module Context : CONTEXT) ~notify_online
              { Proof_carrying_data.data =
                  Mina_block.Validation.block_with_hash data
                  |> Mina_base.State_hash.With_state_hashes.state_hash
-             ; proof = (path, Mina_block.header root)
+             ; proof = (path, Mina_block.Stable.Latest.header root)
              } ;
            data ) )
 
@@ -428,7 +441,8 @@ let initialize ~context:(module Context : CONTEXT) ~sync_local_state ~network
       [%log info] "Unable to load frontier; starting bootstrap" ;
       let%map initial_root_transition =
         Persistent_frontier.(
-          with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
+          with_instance_exn persistent_frontier
+            ~f:(Instance.get_root_transition ~proof_cache_db))
         >>| Result.ok_or_failwith
       in
       start_bootstrap_controller
@@ -625,8 +639,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       let () =
         let initial_validate =
           unstage
-            (Initial_validator.validate ~logger ~trust_system ~verifier
-               ~initialization_finish_signal ~precomputed_values )
+            (Initial_validator.validate ~proof_cache_db ~logger ~trust_system
+               ~verifier ~initialization_finish_signal ~precomputed_values )
         in
         O1trace.background_thread "initially_validate_blocks" (fun () ->
             Pipe_lib.Strict_pipe.Reader.iter network_transition_reader

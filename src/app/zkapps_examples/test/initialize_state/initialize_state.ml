@@ -27,7 +27,6 @@ let%test_module "Initialize state test" =
         , Pickles.Provers.[ initialize_prover; update_state_prover ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Nat.N2)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
         ~choices:(fun ~self:_ ->
@@ -139,7 +138,7 @@ let%test_module "Initialize state test" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -158,8 +157,8 @@ let%test_module "Initialize state test" =
                 in
                 { account_update with
                   authorization =
-                    Signature
-                      (Schnorr.Chunked.sign sk
+                    Control.Poly.Signature
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->

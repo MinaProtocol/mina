@@ -2,7 +2,7 @@ open Graphql
 module Schema = Graphql_wrapper.Make (Schema)
 open Test_common
 
-let%test_unit "nullable error" =
+let nullable_error_test () =
   let schema =
     Schema.(
       schema
@@ -24,7 +24,7 @@ let%test_unit "nullable error" =
       ; ("data", `Assoc [ ("nullable", `Null) ])
       ] )
 
-let%test_unit "non-nullable error" =
+let non_nullable_error_test () =
   let schema =
     Schema.(
       schema
@@ -46,7 +46,7 @@ let%test_unit "non-nullable error" =
       ; ("data", `Null)
       ] )
 
-let%test_unit "nested nullable error" =
+let nested_nullable_error_test () =
   let obj_with_non_nullable_field =
     Schema.(
       obj "obj" ~fields:(fun _ ->
@@ -76,7 +76,7 @@ let%test_unit "nested nullable error" =
       ; ("data", `Assoc [ ("nullable", `Null) ])
       ] )
 
-let%test_unit "error in list" =
+let error_in_list_test () =
   let foo =
     Schema.(
       obj "Foo" ~fields:(fun _ ->
@@ -115,3 +115,15 @@ let%test_unit "error in list" =
                   ] )
             ] )
       ] )
+
+(* Run tests *)
+let () =
+  Alcotest.run "GraphQL Error Tests"
+    [ ( "error handling"
+      , [ Alcotest.test_case "nullable error" `Quick nullable_error_test
+        ; Alcotest.test_case "non-nullable error" `Quick non_nullable_error_test
+        ; Alcotest.test_case "nested nullable error" `Quick
+            nested_nullable_error_test
+        ; Alcotest.test_case "error in list" `Quick error_in_list_test
+        ] )
+    ]

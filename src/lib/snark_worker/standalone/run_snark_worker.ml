@@ -1,13 +1,7 @@
 open Core_kernel
 open Async
 module Prod = Snark_worker__Prod.Inputs
-
-module Graphql_client = Graphql_lib.Client.Make (struct
-  let preprocess_variables_string = Fn.id
-
-  let headers = String.Map.empty
-end)
-
+module Graphql_client = Graphql_lib.Client
 module Encoders = Mina_graphql.Types.Input
 module Scalars = Graphql_lib.Scalars
 
@@ -24,18 +18,20 @@ let submit_graphql input graphql_endpoint =
   let obj = Send_proof_mutation.(make @@ makeVariables ~input ()) in
   match%bind Graphql_client.query obj graphql_endpoint with
   | Ok _s ->
-      Caml.Format.printf "Successfully generated proof bundle mutation.\n" ;
+      Format.printf "Successfully generated proof bundle mutation.\n" ;
       exit 0
   | Error (`Failed_request s) ->
-      Caml.Format.printf !"Request failed:  %s\n" s ;
+      Format.printf "Request failed:  %s\n" s ;
       exit 1
   | Error (`Graphql_error s) ->
-      Caml.Format.printf "Graphql error: %s\n" s ;
+      Format.printf "Graphql error: %s\n" s ;
       exit 1
 
 let perform (s : Prod.Worker_state.t) ~fee ~public_key
     (spec :
-      (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+      ( Transaction_witness.Stable.Latest.t
+      , Ledger_proof.t )
+      Snark_work_lib.Work.Single.Spec.t
       One_or_two.t ) =
   One_or_two.Deferred_result.map spec ~f:(fun w ->
       let open Deferred.Or_error.Let_syntax in
@@ -116,7 +112,8 @@ let command =
              Yojson.Safe.from_string json
              |> One_or_two.of_yojson
                   (Snark_work_lib.Work.Single.Spec.of_yojson
-                     Transaction_witness.of_yojson Ledger_proof.of_yojson )
+                     Transaction_witness.Stable.Latest.of_yojson
+                     Ledger_proof.of_yojson )
            with
            | Ok spec ->
                spec
@@ -138,7 +135,8 @@ let command =
                  | Some spec ->
                      One_or_two.t_of_sexp
                        (Snark_work_lib.Work.Single.Spec.t_of_sexp
-                          Transaction_witness.t_of_sexp Ledger_proof.t_of_sexp )
+                          Transaction_witness.Stable.Latest.t_of_sexp
+                          Ledger_proof.t_of_sexp )
                        (Sexp.of_string spec)
                  | None ->
                      failwith "Provide a spec either in json or sexp format" ) )
