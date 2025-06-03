@@ -99,7 +99,7 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
                       ; scalar = Shifted_value Field.zero
                       }
                   ; value =
-                      { challenge = Limb_vector.Challenge.Constant.zero
+                      { challenge = Limb_vector_bool.Challenge.Constant.zero
                       ; scalar =
                           Shifted_value.Type1.Shifted_value Field.Constant.zero
                       }

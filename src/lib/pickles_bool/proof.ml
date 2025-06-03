@@ -36,9 +36,9 @@ module Base = struct
       module V2 = struct
         type ('messages_for_next_wrap_proof, 'messages_for_next_step_proof) t =
           { statement :
-              ( Limb_vector.Constant.Hex64.Stable.V1.t
+              ( Limb_vector_bool.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
-              , Limb_vector.Constant.Hex64.Stable.V1.t
+              , Limb_vector_bool.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
               , Tick.Field.Stable.V1.t Shifted_value.Type1.Stable.V1.t
@@ -46,7 +46,7 @@ module Base = struct
               , 'messages_for_next_wrap_proof
               , Digest.Constant.Stable.V1.t
               , 'messages_for_next_step_proof
-              , Limb_vector.Constant.Hex64.Stable.V1.t
+              , Limb_vector_bool.Constant.Hex64.Stable.V1.t
                 Vector.Vector_2.Stable.V1.t
                 Scalar_challenge.Stable.V2.t
                 Bulletproof_challenge.Stable.V1.t
@@ -363,7 +363,8 @@ module Proofs_verified_2 = struct
             Types.Wrap.Proof_state.Messages_for_next_wrap_proof.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
-            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+            , Limb_vector_bool.Constant.Hex64.Stable.V1.t
+              Vector.Vector_2.Stable.V1.t
               Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
@@ -427,7 +428,8 @@ module Proofs_verified_max = struct
           , ( unit
             , Tock.Curve.Affine.t
               Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
-            , Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+            , Limb_vector_bool.Constant.Hex64.Stable.V1.t
+              Vector.Vector_2.Stable.V1.t
               Scalar_challenge.Stable.V2.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t

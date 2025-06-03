@@ -129,7 +129,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
       ~scalar_challenge:Challenge.typ
       ~dummy_scalar_challenge:
         (Kimchi_backend_common.Scalar_challenge.create
-           Limb_vector.Challenge.Constant.zero )
+           Limb_vector_bool.Challenge.Constant.zero )
       (Shifted_value.Type1.typ Field.typ)
       (Import.Branch_data.typ
          ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )

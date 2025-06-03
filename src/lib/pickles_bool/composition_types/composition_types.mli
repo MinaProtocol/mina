@@ -1199,10 +1199,10 @@ module Step : sig
              , Step_impl.Field.t
              , Step_impl.Boolean.var )
              In_circuit.t
-           , ( Limb_vector.Challenge.Constant.t
-             , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+           , ( Limb_vector_bool.Challenge.Constant.t
+             , Limb_vector_bool.Challenge.Constant.t Scalar_challenge.t
              , 'c
-             , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+             , ( Limb_vector_bool.Challenge.Constant.t Scalar_challenge.t
                  Bulletproof_challenge.t
                , Backend.Tock.Rounds.n )
                Vector.t
@@ -1247,10 +1247,10 @@ module Step : sig
              Vector.t
            , Wrap_impl.Field.t )
            t
-         , ( ( ( Limb_vector.Challenge.Constant.t
-               , Limb_vector.Challenge.Constant.t Scalar_challenge.t
+         , ( ( ( Limb_vector_bool.Challenge.Constant.t
+               , Limb_vector_bool.Challenge.Constant.t Scalar_challenge.t
                , 'a
-               , ( Limb_vector.Challenge.Constant.t Scalar_challenge.t
+               , ( Limb_vector_bool.Challenge.Constant.t Scalar_challenge.t
                    Bulletproof_challenge.t
                  , Backend.Tock.Rounds.n )
                  Vector.t

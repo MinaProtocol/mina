@@ -63,7 +63,7 @@ module Wrap : sig
     module Stable : sig
       module V2 : sig
         type t =
-          Limb_vector.Constant.Hex64.Stable.V1.t
+          Limb_vector_bool.Constant.Hex64.Stable.V1.t
           Pickles_types.Vector.Vector_2.Stable.V1.t
           Import.Scalar_challenge.Stable.V2.t
           Import.Bulletproof_challenge.Stable.V1.t

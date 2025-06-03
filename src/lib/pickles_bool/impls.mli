@@ -151,17 +151,19 @@ module Wrap : sig
            Pickles_types.Vector.t
          , Impl.Field.t )
          Import.Types.Wrap.Statement.In_circuit.t
-       , ( Limb_vector.Challenge.Constant.t
-         , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+       , ( Limb_vector_bool.Challenge.Constant.t
+         , Limb_vector_bool.Challenge.Constant.t
+           Composition_types.Scalar_challenge.t
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
          , Other_field.Constant.t Pickles_types.Shifted_value.Type1.t option
-         , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+         , Limb_vector_bool.Challenge.Constant.t
+           Composition_types.Scalar_challenge.t
            option
          , bool
          , Import.Types.Digest.Constant.t
          , Import.Types.Digest.Constant.t
          , Import.Types.Digest.Constant.t
-         , ( Limb_vector.Challenge.Constant.t
+         , ( Limb_vector_bool.Challenge.Constant.t
              Kimchi_backend_common.Scalar_challenge.t
              Composition_types.Bulletproof_challenge.t
            , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )

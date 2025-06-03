@@ -100,13 +100,13 @@ val typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : Branch_data.Checked.Step.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Limb_vector_bool.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
            Step_impl.Field.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
+       ; challenge1 : Limb_vector_bool.Challenge.Constant.t
        ; challenge2 : Step_impl.Field.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Step_impl.Field.t
@@ -126,13 +126,13 @@ val wrap_typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : Branch_data.Checked.Wrap.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Limb_vector_bool.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
            Wrap_impl.Field.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
+       ; challenge1 : Limb_vector_bool.Challenge.Constant.t
        ; challenge2 : Wrap_impl.Field.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Wrap_impl.Field.t
@@ -168,13 +168,13 @@ val packed_typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : Step_impl.Field.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Limb_vector_bool.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
            Step_impl.Field.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
+       ; challenge1 : Limb_vector_bool.Challenge.Constant.t
        ; challenge2 : Step_impl.Field.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Step_impl.Field.t
@@ -193,13 +193,13 @@ val wrap_packed_typ :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : Wrap_impl.Field.t
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Limb_vector_bool.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
            Wrap_impl.Field.t Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
+       ; challenge1 : Limb_vector_bool.Challenge.Constant.t
        ; challenge2 : Wrap_impl.Field.t
        ; digest1 : Digest.Constant.t
        ; digest2 : Wrap_impl.Field.t
@@ -219,12 +219,12 @@ val pack :
        ; branch_data1 : Branch_data.t
        ; branch_data2 : 'branch_data_checked
        ; bulletproof_challenge1 :
-           Limb_vector.Challenge.Constant.t
+           Limb_vector_bool.Challenge.Constant.t
            Kimchi_backend_common.Scalar_challenge.t
            Bulletproof_challenge.t
        ; bulletproof_challenge2 :
            'v Kimchi_backend_common.Scalar_challenge.t Bulletproof_challenge.t
-       ; challenge1 : Limb_vector.Challenge.Constant.t
+       ; challenge1 : Limb_vector_bool.Challenge.Constant.t
        ; challenge2 : 'v
        ; digest1 : Digest.Constant.t
        ; digest2 : 'v

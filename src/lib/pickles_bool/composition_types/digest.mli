@@ -21,7 +21,7 @@ module Constant : sig
   module Stable : sig
     module V1 : sig
       type t =
-        Limb_vector.Constant.Hex64.Stable.V1.t
+        Limb_vector_bool.Constant.Hex64.Stable.V1.t
         Pickles_types.Vector.Vector_4.Stable.V1.t
       [@@deriving compare, sexp, yojson, hash, equal]
 

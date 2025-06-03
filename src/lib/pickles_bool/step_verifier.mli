@@ -100,7 +100,7 @@ val verify :
   -> sg_old:(Impls.Step.Field.t Tuple_lib.Double.t, 'a) Pickles_types.Vector.t
   -> sponge_after_index:Step_main_inputs.Sponge.t
   -> lookup_parameters:
-       ( Limb_vector.Challenge.Constant.t
+       ( Limb_vector_bool.Challenge.Constant.t
        , Impl.Field.t
        , 'b
        , Impl.Field.t Pickles_types.Shifted_value.Type1.t )

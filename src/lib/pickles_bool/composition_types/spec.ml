@@ -178,7 +178,7 @@ module Common
                              with type field_var := Impl.Field.t) =
 struct
   module Digest = D.Make (Impl)
-  module Challenge = Limb_vector.Challenge.Make (Impl)
+  module Challenge = Limb_vector_bool.Challenge.Make (Impl)
   open Impl
 
   module Env = struct

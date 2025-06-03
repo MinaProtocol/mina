@@ -146,7 +146,8 @@ let typ (type n avar aval) ~feature_flags ~num_chunks
     ; Wrap_proof.typ
     ; Types.Wrap.Proof_state.In_circuit.typ ~challenge:Challenge.typ
         ~scalar_challenge:Challenge.typ ~feature_flags
-        ~dummy_scalar_challenge:(Sc.create Limb_vector.Challenge.Constant.zero)
+        ~dummy_scalar_challenge:
+          (Sc.create Limb_vector_bool.Challenge.Constant.zero)
         (Shifted_value.Type1.typ Field.typ)
         Impls.Step.Typ.unit Digest.typ
         (Branch_data.typ ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16))

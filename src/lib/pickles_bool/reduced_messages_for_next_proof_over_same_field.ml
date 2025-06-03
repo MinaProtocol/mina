@@ -54,7 +54,8 @@ module Wrap = struct
 
       module V2 = struct
         type t =
-          Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+          Limb_vector_bool.Constant.Hex64.Stable.V1.t
+          Vector.Vector_2.Stable.V1.t
           Scalar_challenge.Stable.V2.t
           Bulletproof_challenge.Stable.V1.t
           Wrap_bp_vec.Stable.V1.t

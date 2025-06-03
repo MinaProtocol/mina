@@ -163,18 +163,20 @@ val tick_public_input_of_statement :
 val tock_public_input_of_statement :
      feature_flags:
        Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
-  -> ( Limb_vector.Challenge.Constant.t
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+  -> ( Limb_vector_bool.Challenge.Constant.t
+     , Limb_vector_bool.Challenge.Constant.t
+       Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
        option
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+     , Limb_vector_bool.Challenge.Constant.t
+       Composition_types.Scalar_challenge.t
        option
      , bool
      , Import.Types.Digest.Constant.t
      , Import.Types.Digest.Constant.t
      , Import.Types.Digest.Constant.t
-     , ( Limb_vector.Challenge.Constant.t
+     , ( Limb_vector_bool.Challenge.Constant.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
@@ -186,18 +188,20 @@ val tock_public_input_of_statement :
 val tock_unpadded_public_input_of_statement :
      feature_flags:
        Pickles_types.Opt.Flag.t Pickles_types.Plonk_types.Features.Full.t
-  -> ( Limb_vector.Challenge.Constant.t
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+  -> ( Limb_vector_bool.Challenge.Constant.t
+     , Limb_vector_bool.Challenge.Constant.t
+       Composition_types.Scalar_challenge.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
      , Impls.Wrap.Other_field.Constant.t Pickles_types.Shifted_value.Type1.t
        option
-     , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
+     , Limb_vector_bool.Challenge.Constant.t
+       Composition_types.Scalar_challenge.t
        option
      , bool
      , Import.Types.Digest.Constant.t
      , Import.Types.Digest.Constant.t
      , Import.Types.Digest.Constant.t
-     , ( Limb_vector.Challenge.Constant.t
+     , ( Limb_vector_bool.Challenge.Constant.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
