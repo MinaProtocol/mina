@@ -380,9 +380,9 @@ struct
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
-       ?(num_chunks = Plonk_checks.num_chunks_by_default) ?(lazy_mode = false)
-       ~branches ~prev_varss_length ~max_proofs_verified ~name
-       ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+       ?(num_chunks = Plonk_checks_bool.num_chunks_by_default)
+       ?(lazy_mode = false) ~branches ~prev_varss_length ~max_proofs_verified
+       ~name ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
         match constraint_constants with
@@ -868,8 +868,8 @@ struct
       ; num_chunks
       ; zk_rows =
           ( match num_chunks with
-          | 1 (* cannot match with Plonk_checks.num_chunks_by_default *) ->
-              Plonk_checks.zk_rows_by_default
+          | 1 (* cannot match with Plonk_checks_bool.num_chunks_by_default *) ->
+              Plonk_checks_bool.zk_rows_by_default
           | num_chunks ->
               let permuts = 7 in
               ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
@@ -922,8 +922,8 @@ module Side_loaded = struct
       ; public_input = typ
       ; feature_flags =
           Plonk_types.Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags
-      ; num_chunks = Plonk_checks.num_chunks_by_default
-      ; zk_rows = Plonk_checks.zk_rows_by_default
+      ; num_chunks = Plonk_checks_bool.num_chunks_by_default
+      ; zk_rows = Plonk_checks_bool.zk_rows_by_default
       }
 
   module Proof = struct

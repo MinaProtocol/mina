@@ -197,8 +197,9 @@ module Make (Inductive_rule : Inductive_rule.Intf) = struct
           ; num_chunks
           ; zk_rows =
               ( match num_chunks with
-              | 1 (* cannot match with Plonk_checks.num_chunks_by_default *) ->
-                  Plonk_checks.zk_rows_by_default
+              | 1
+              (* cannot match with Plonk_checks_bool.num_chunks_by_default *) ->
+                  Plonk_checks_bool.zk_rows_by_default
               | num_chunks ->
                   let permuts = 7 in
                   ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )

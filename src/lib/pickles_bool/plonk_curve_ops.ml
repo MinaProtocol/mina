@@ -208,7 +208,7 @@ struct
 
   module type Scalar_field_intf = sig
     module Constant : sig
-      include Plonk_checks.Field_intf
+      include Plonk_checks_bool.Field_intf
 
       val to_bigint : t -> Impl.Bigint.t
     end

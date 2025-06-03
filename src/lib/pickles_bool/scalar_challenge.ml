@@ -129,7 +129,7 @@ let to_field_checked (type f) ?num_bits
   Field.(scale a endo + b)
 
 let to_field_constant (type f) ~endo
-    (module F : Plonk_checks.Field_intf with type t = f) { SC.inner = c } =
+    (module F : Plonk_checks_bool.Field_intf with type t = f) { SC.inner = c } =
   let bits = Array.of_list (Challenge.Constant.to_bits c) in
   let a = ref (F.of_int 2) in
   let b = ref (F.of_int 2) in

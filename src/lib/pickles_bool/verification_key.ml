@@ -197,7 +197,7 @@ module Stable = struct
              } )
         ; shifts = Common.tock_shifts ~log2_size
         ; lookup_index = None
-        ; zk_rows = Plonk_checks.zk_rows_by_default
+        ; zk_rows = Plonk_checks_bool.zk_rows_by_default
         }
       in
       { commitments = c; data = d; index = t }

@@ -776,21 +776,21 @@ struct
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
-  module Plonk_checks = struct
-    include Plonk_checks
+  module Plonk_checks_bool = struct
+    include Plonk_checks_bool
 
     include
-      Plonk_checks.Make
+      Plonk_checks_bool.Make
         (Shifted_value.Type1)
         (struct
-          let constant_term = Plonk_checks.Scalars.Tick.constant_term
+          let constant_term = Plonk_checks_bool.Scalars.Tick.constant_term
         end)
   end
 
   let domain_for_compiled (type branches)
       (domains : (Domains.t, branches) Vector.t)
       (branch_data : Branch_data.Checked.Step.t) :
-      Field.t Plonk_checks.plonk_domain =
+      Field.t Plonk_checks_bool.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
       |> List.dedup_and_sort ~compare:(fun d1 d2 ->
@@ -864,7 +864,7 @@ struct
           domain_for_compiled ds branch_data
       | `Side_loaded ->
           ( side_loaded_domain ~log2_size:branch_data.domain_log2
-            :> _ Plonk_checks.plonk_domain )
+            :> _ Plonk_checks_bool.plonk_domain )
     in
     let zetaw = Field.mul domain#generator plonk.zeta in
     let sg_olds =
@@ -986,7 +986,7 @@ struct
               | None ->
                   if_ b ~then_:(then_ ()) ~else_:(else_ ())
           end in
-          Plonk_checks.scalars_env
+          Plonk_checks_bool.scalars_env
             (module Env_bool)
             (module Env_field)
             ~srs_length_log2:Common.Max_degree.step_log2 ~zk_rows
@@ -1004,7 +1004,7 @@ struct
       in
       let ft_eval0 : Field.t =
         with_label "ft_eval0" (fun () ->
-            Plonk_checks.ft_eval0
+            Plonk_checks_bool.ft_eval0
               (module Field)
               ~env ~domain plonk_minimal combined_evals evals1.public_input )
       in
@@ -1069,7 +1069,7 @@ struct
     in
     let plonk_checks_passed =
       with_label "plonk_checks_passed" (fun () ->
-          Plonk_checks.checked
+          Plonk_checks_bool.checked
             (module Impl)
             ~env ~shift:shift1 plonk combined_evals )
     in

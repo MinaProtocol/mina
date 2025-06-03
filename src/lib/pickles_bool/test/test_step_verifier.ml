@@ -26,7 +26,7 @@ let test_side_loaded_domains () =
   let pt = Field.Constant.random () in
   List.iter domains ~f:(fun ds ->
       let d_unchecked =
-        Plonk_checks.domain
+        Plonk_checks_bool.domain
           (module Field.Constant)
           (Pow_2_roots_of_unity ds.h) ~shifts:Common.tick_shifts
           ~domain_generator:Backend.Tick.Field.domain_generator

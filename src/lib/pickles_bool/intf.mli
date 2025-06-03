@@ -25,7 +25,7 @@ module Group (Impl : Snarky_backendless.Snark_intf.Run) : sig
 
       (** The scalar field of the elliptic curve *)
       module Scalar : sig
-        include Plonk_checks.Field_intf
+        include Plonk_checks_bool.Field_intf
 
         include Sexpable.S with type t := t
 

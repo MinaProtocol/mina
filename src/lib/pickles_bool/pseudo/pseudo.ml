@@ -1,6 +1,6 @@
 open Core_kernel
 open Pickles_types
-module Domain = Plonk_checks.Domain
+module Domain = Plonk_checks_bool.Domain
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
   open Impl
@@ -101,7 +101,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
     type nonrec 'n t = (Domain.t, 'n) t
 
     let to_domain ~shifts:s ~domain_generator (type n) (t : n t) :
-        Field.t Plonk_checks.plonk_domain =
+        Field.t Plonk_checks_bool.plonk_domain =
       let log2_sizes = Vector.map (snd t) ~f:Domain.log2_size in
       let shifts = shifts (fst t, log2_sizes) ~shifts:s in
       let generator = generator (fst t, log2_sizes) ~domain_generator in

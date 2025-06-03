@@ -254,8 +254,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
         ; public_input = typ
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
-        ; num_chunks = Plonk_checks.num_chunks_by_default
-        ; zk_rows = Plonk_checks.zk_rows_by_default
+        ; num_chunks = Plonk_checks_bool.num_chunks_by_default
+        ; zk_rows = Plonk_checks_bool.zk_rows_by_default
         }
 
     module Proof = struct
@@ -1550,14 +1550,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
                         }
                       in
                       let tick_combined_evals =
-                        Plonk_checks.evals_of_split_evals
+                        Plonk_checks_bool.evals_of_split_evals
                           (module Tick.Field)
                           proof.proof.openings.evals
                           ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta:As_field.zeta
                           ~zetaw
                       in
                       let tick_domain =
-                        Plonk_checks.domain
+                        Plonk_checks_bool.domain
                           (module Tick.Field)
                           domain ~shifts:Common.tick_shifts
                           ~domain_generator:Backend.Tick.Field.domain_generator
@@ -1587,7 +1587,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                           let if_ (b : bool) ~then_ ~else_ =
                             if b then then_ () else else_ ()
                         end in
-                        Plonk_checks.scalars_env
+                        Plonk_checks_bool.scalars_env
                           (module Env_bool)
                           (module Env_field)
                           ~endo:Endo.Step_inner_curve.base
@@ -1857,8 +1857,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
                 Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
             ; wrap_domains
             ; step_domains
-            ; num_chunks = Plonk_checks.num_chunks_by_default
-            ; zk_rows = Plonk_checks.zk_rows_by_default
+            ; num_chunks = Plonk_checks_bool.num_chunks_by_default
+            ; zk_rows = Plonk_checks_bool.zk_rows_by_default
             }
           in
           Types_map.add_exn self data ;

@@ -4,7 +4,7 @@
 
 val to_field_constant :
      endo:'f
-  -> (module Plonk_checks.Field_intf with type t = 'f)
+  -> (module Plonk_checks_bool.Field_intf with type t = 'f)
   -> Import.Challenge.Constant.t Import.Scalar_challenge.t
   -> 'f
 
