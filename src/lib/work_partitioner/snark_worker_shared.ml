@@ -43,8 +43,9 @@ let extract_zkapp_segment_works ~m:(module M : S)
     ~(input : Mina_state.Snarked_ledger_state.t)
     ~(witness : Transaction_witness.Stable.Latest.t)
     ~(zkapp_command : Zkapp_command.t) : Zkapp_command_inputs.t Or_error.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Or_error.try_with (fun () ->
-      Transaction_snark.zkapp_command_witnesses_exn
+      Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
         ~constraint_constants:M.constraint_constants
         ~global_slot:witness.block_global_slot
         ~state_body:witness.protocol_state_body

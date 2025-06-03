@@ -38,6 +38,8 @@ let ledger_depth = constraint_constants.ledger_depth
 let snark_module =
   lazy
     ( module Transaction_snark.Make (struct
+      let signature_kind = Mina_signature_kind.t_DEPRECATED
+
       let constraint_constants = constraint_constants
 
       let proof_level = proof_level
@@ -143,7 +145,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
            ->
           match
             Or_error.try_with (fun () ->
-                Transaction_snark.zkapp_command_witnesses_exn
+                Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
                   ~constraint_constants ~global_slot ~state_body
                   ~fee_excess:Amount.Signed.zero
                   [ ( `Pending_coinbase_init_stack init_stack

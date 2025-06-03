@@ -37,7 +37,7 @@ let%test_module "Account update network id tests" =
                   in
                   let%bind zkapp_command =
                     Transaction_snark.For_tests.single_account_update
-                      ~signature_kind:
+                      ~other_signature_kind:
                         Mina_signature_kind.(Other_network "invalid")
                       ~constraint_constants:U.constraint_constants spec
                   in

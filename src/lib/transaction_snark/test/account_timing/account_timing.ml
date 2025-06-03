@@ -446,13 +446,14 @@ let%test_module "account timing check" =
                             "Transaction expected to be applied successfully \
                              but failed with %s"
                             failures_str () ) ) ;
-                  check_transaction_snark ~txn_global_slot:slot
+                  check_transaction_snark ~signature_kind ~txn_global_slot:slot
                     sparse_ledger_before txn ~constraint_constants
               | Error err -> (
                   (*transaction snark should fail as well*)
                   try
-                    check_transaction_snark ~txn_global_slot:slot
-                      sparse_ledger_before txn ~constraint_constants ;
+                    check_transaction_snark ~signature_kind
+                      ~txn_global_slot:slot sparse_ledger_before txn
+                      ~constraint_constants ;
                     failwith
                       "transaction snark successful for a failing transaction"
                   with _exn ->
