@@ -41,7 +41,8 @@ WORKDIR $HOME/$MINA_DIR
 # Set environment variables *before* running OPAM commands
 ENV OPAMYES=1
 
-RUN opam pin add ocamlfind.1.9.3 http://157.180.13.160:8080/archives/ocamlfind.1.9.3+opam.tar.gz
+# --- Use alternative ocamlfind location since download.camlcity.org is not available
+RUN opam pin add ocamlfind.1.9.3 http://download2.camlcity.org/download/findlib-1.9.3.tar.gz
 
 # Update repo and install the switch (sources must be available locally!)
 RUN opam update && \
