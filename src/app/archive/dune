@@ -4,12 +4,7 @@
  (public_name archive)
  (modules archive)
  (modes native)
- (libraries
-  archive_cli
-  async
-  async_unix
-  core_kernel
-  mina_version)
+ (libraries archive_cli async async_unix core_kernel mina_version)
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))
  (preprocess
