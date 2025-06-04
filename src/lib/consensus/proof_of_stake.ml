@@ -3082,21 +3082,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~candidate:
               (Consensus_state.blockchain_length (With_hash.data candidate))
 
-    let%test "should_bootstrap is sane" =
-      let module Context = struct
-        let logger = Logger.create ()
-
-        let constraint_constants =
-          Genesis_constants.For_unit_tests.Constraint_constants.t
-
-        let consensus_constants = Lazy.force Constants.for_unit_tests
-      end in
-      (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
-      should_bootstrap_len
-        ~context:(module Context)
-        ~existing:Length.zero
-        ~candidate:(Length.of_int 100_000_000)
-
     let to_unix_timestamp recieved_time =
       recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
       |> Mina_stdlib.Unix_timestamp.of_int64

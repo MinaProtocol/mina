@@ -1,0 +1,23 @@
+(tests
+ (names test_proof_of_stake)
+ (libraries
+  ;; opam libraries
+  alcotest
+  async
+  async_kernel
+  core
+  ;; local libraries
+  block_time
+  consensus
+  genesis_ledger
+  genesis_constants
+  logger
+  mina_base
+  mina_ledger
+  mina_numbers
+  mina_stdlib
+  test_util)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_let ppx_jane)))
