@@ -10,11 +10,11 @@ module Types = struct
       end
 
       module Value : sig
-        module V2 : sig
+        module V3 : sig
           type t =
             ( Mina_base_state_hash.V1.t
             , Mina_state_blockchain_state.Value.V2.t
-            , Consensus.Data.Consensus_state.Value.V2.t
+            , Consensus.Data.Consensus_state.Value.V3.t
             , Mina_base_protocol_constants_checked.Value.V1.t )
             Poly.V1.t
         end
@@ -29,8 +29,8 @@ module Types = struct
     end
 
     module Value : sig
-      module V2 : sig
-        type t = (Mina_base.State_hash.V1.t, Body.Value.V2.t) Poly.V1.t
+      module V3 : sig
+        type t = (Mina_base.State_hash.V1.t, Body.Value.V3.t) Poly.V1.t
       end
     end
   end
@@ -50,11 +50,11 @@ module type Concrete = sig
     end
 
     module Value : sig
-      module V2 : sig
+      module V3 : sig
         type t =
           ( Mina_base_state_hash.V1.t
           , Mina_state_blockchain_state.Value.V2.t
-          , Consensus.Data.Consensus_state.Value.V2.t
+          , Consensus.Data.Consensus_state.Value.V3.t
           , Mina_base_protocol_constants_checked.Value.V1.t )
           Poly.V1.t
       end
@@ -69,8 +69,8 @@ module type Concrete = sig
   end
 
   module Value : sig
-    module V2 : sig
-      type t = (Mina_base.State_hash.V1.t, Body.Value.V2.t) Poly.V1.t
+    module V3 : sig
+      type t = (Mina_base.State_hash.V1.t, Body.Value.V3.t) Poly.V1.t
     end
   end
 end
@@ -89,11 +89,11 @@ module M = struct
     end
 
     module Value = struct
-      module V2 = struct
+      module V3 = struct
         type t =
           ( Mina_base_state_hash.V1.t
           , Mina_state_blockchain_state.Value.V2.t
-          , Consensus.Data.Consensus_state.Value.V2.t
+          , Consensus.Data.Consensus_state.Value.V3.t
           , Mina_base_protocol_constants_checked.Value.V1.t )
           Poly.V1.t
       end
@@ -108,8 +108,8 @@ module M = struct
   end
 
   module Value = struct
-    module V2 = struct
-      type t = (Mina_base.State_hash.V1.t, Body.Value.V2.t) Poly.V1.t
+    module V3 = struct
+      type t = (Mina_base.State_hash.V1.t, Body.Value.V3.t) Poly.V1.t
     end
   end
 end

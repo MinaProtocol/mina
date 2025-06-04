@@ -250,7 +250,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = State_hash.Stable.V1.t
 
@@ -258,7 +258,7 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
         ( Staged_ledger.Scan_state.Stable.V2.t
         * Ledger_hash.Stable.V1.t
         * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V2.t list )
+        * Mina_state.Protocol_state.Value.Stable.V3.t list )
         option
 
       let query_of_caller_model = Fn.id
@@ -362,13 +362,13 @@ module Answer_sync_ledger_query = struct
     include Master
   end)
 
-  module V4 = struct
+  module V5 = struct
     module T = struct
       type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V2.t
       [@@deriving sexp]
 
       type response =
-        (( Sync_ledger.Answer.Stable.V3.t
+        (( Sync_ledger.Answer.Stable.V4.t
          , Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
@@ -395,7 +395,7 @@ module Answer_sync_ledger_query = struct
     include Register (T')
   end
 
-  module V3 = struct
+  module V4 = struct
     module T = struct
       type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
       [@@deriving sexp]
@@ -415,7 +415,7 @@ module Answer_sync_ledger_query = struct
 
       let response_of_callee_model : Master.T.response -> response = function
         | Ok a ->
-            Sync_ledger.Answer.Stable.V2.from_v3 a
+            Sync_ledger.Answer.Stable.V2.from_v4 a
         | Error e ->
             Error e
 
@@ -925,10 +925,10 @@ module Get_ancestry = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query =
-        ( Consensus.Data.Consensus_state.Value.Stable.V2.t
+        ( Consensus.Data.Consensus_state.Value.Stable.V3.t
         , State_hash.Stable.V1.t )
         With_hash.Stable.V1.t
       [@@deriving sexp]

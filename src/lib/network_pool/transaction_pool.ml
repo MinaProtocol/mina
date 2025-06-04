@@ -41,8 +41,8 @@ module Diff_versioned = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
-      type t = User_command.Stable.V2.t list [@@deriving sexp, yojson, hash]
+    module V3 = struct
+      type t = User_command.Stable.V3.t list [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -165,7 +165,7 @@ module Diff_versioned = struct
       [@@@no_toplevel_latest_type]
 
       module V3 = struct
-        type t = (User_command.Stable.V2.t * Diff_error.Stable.V3.t) list
+        type t = (User_command.Stable.V3.t * Diff_error.Stable.V3.t) list
         [@@deriving sexp, yojson, compare]
 
         let to_latest = Fn.id
@@ -3434,7 +3434,7 @@ let%test_module _ =
               ~receiver_idx ~amount ()
     end
 
-    (** appends a and b to the end of c, taking an element of a or b at random, 
+    (** appends a and b to the end of c, taking an element of a or b at random,
        continuing until both a and b run out of elements
     *)
     let rec gen_merge (a : 'a list) (b : 'a list) (c : 'a list) =

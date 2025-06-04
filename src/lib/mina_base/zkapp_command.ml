@@ -4,9 +4,9 @@ open Signature_lib
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type 'account_updates t =
-            'account_updates Mina_wire_types.Mina_base.Zkapp_command.V1.T.t =
+            'account_updates Mina_wire_types.Mina_base.Zkapp_command.V3.T.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates : 'account_updates
         ; memo : Signed_command_memo.Stable.V1.t
@@ -21,8 +21,8 @@ end
 module Graphql_repr = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Account_update.Graphql_repr.Stable.V1.t list Poly.Stable.V1.t
+    module V2 = struct
+      type t = Account_update.Graphql_repr.Stable.V2.t list Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -34,8 +34,8 @@ module Simple = struct
   (* For easily constructing values *)
   [%%versioned
   module Stable = struct
-    module V1 = struct
-      type t = Account_update.Simple.Stable.V1.t list Poly.Stable.V1.t
+    module V2 = struct
+      type t = Account_update.Simple.Stable.V2.t list Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
@@ -76,10 +76,10 @@ module T = struct
        add hash_zkapp_command_vn for that version
     *)
 
-    module V1 = struct
+    module V3 = struct
       type t =
-        (Account_update.Stable.V1.t, unit, unit) Call_forest.Stable.V1.t
-        Poly.Stable.V1.t
+        (Account_update.Stable.V2.t, unit, unit) Call_forest.Stable.V1.t
+        Poly.Stable.V2.t
       [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id

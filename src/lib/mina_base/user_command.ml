@@ -78,9 +78,9 @@ let gen = Gen.to_signed_command gen_signed
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
-      (Signed_command.Stable.V2.t, Zkapp_command.Stable.V1.t) Poly.Stable.V2.t
+      (Signed_command.Stable.V2.t, Zkapp_command.Stable.V3.t) Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id

@@ -485,7 +485,7 @@ module type S = sig
       module Value : sig
         [%%versioned:
         module Stable : sig
-          module V2 : sig
+          module V3 : sig
             type t [@@deriving hash, equal, compare, sexp, yojson]
           end
         end]
@@ -616,7 +616,7 @@ module type S = sig
     module Epoch_data_for_vrf : sig
       [%%versioned:
       module Stable : sig
-        module V2 : sig
+        module V3 : sig
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -625,7 +625,7 @@ module type S = sig
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; delegatee_table :
-                Mina_base.Account.Stable.V2.t
+                Mina_base.Account.Stable.V3.t
                 Mina_base.Account.Index.Stable.V1.Table.t
                 Public_key.Compressed.Stable.V1.Table.t
             }

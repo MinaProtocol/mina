@@ -23,7 +23,7 @@ module Transaction_with_witness = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       (* TODO: The statement is redundant here - it can be computed from the
          witness and the transaction
       *)
@@ -36,9 +36,9 @@ module Transaction_with_witness = struct
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
         ; first_pass_ledger_witness :
-            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
         ; second_pass_ledger_witness :
-            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+            (Mina_ledger.Sparse_ledger.Stable.V3.t[@sexp.opaque])
         ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp, to_yojson]
@@ -205,10 +205,10 @@ module Stable = struct
     type t =
       { scan_state :
           ( Ledger_proof_with_sok_message.Stable.V2.t
-          , Transaction_with_witness.Stable.V2.t )
+          , Transaction_with_witness.Stable.V3.t )
           Parallel_scan.State.Stable.V1.t
       ; previous_incomplete_zkapp_updates :
-          Transaction_with_witness.Stable.V2.t list
+          Transaction_with_witness.Stable.V3.t list
           * [ `Border_block_continued_in_the_next_tree of bool ]
       }
 
@@ -218,7 +218,7 @@ module Stable = struct
       let state_hash =
         Parallel_scan.State.hash t.scan_state
           (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V2))
-          (Binable.to_string (module Transaction_with_witness.Stable.V2))
+          (Binable.to_string (module Transaction_with_witness.Stable.V3))
       in
       let ( previous_incomplete_zkapp_updates
           , `Border_block_continued_in_the_next_tree continue_in_next_tree ) =
@@ -228,7 +228,7 @@ module Stable = struct
         List.fold ~init:(Digestif.SHA256.init ())
           previous_incomplete_zkapp_updates ~f:(fun h t ->
             Digestif.SHA256.feed_string h
-            @@ Binable.to_string (module Transaction_with_witness.Stable.V2) t )
+            @@ Binable.to_string (module Transaction_with_witness.Stable.V3) t )
         |> Digestif.SHA256.get
       in
       let continue_in_next_tree =

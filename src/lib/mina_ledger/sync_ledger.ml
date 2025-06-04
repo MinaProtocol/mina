@@ -54,10 +54,10 @@ module Answer = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
-        , Account.Stable.V2.t )
+        , Account.Stable.V3.t )
         Syncable_ledger.Answer.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
@@ -76,7 +76,7 @@ module Answer = struct
       (* Not a standard versioning function *)
 
       (** Attempts to downgrade v3 -> v2 *)
-      let from_v3 : V3.t -> t Or_error.t =
+      let from_v4 : V4.t -> t Or_error.t =
        fun x -> Syncable_ledger.Answer.Stable.V1.from_v2 x
     end
   end]
