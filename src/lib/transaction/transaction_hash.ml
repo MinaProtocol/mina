@@ -71,15 +71,21 @@ let hash_signed_command (cmd : Signed_command.t) =
   let cmd_dummy_signature = { cmd with signature = Signature.dummy } in
   signed_cmd_hasher cmd_dummy_signature
 
-let hash_zkapp_command (type p)
+let hash_zkapp_command (type p aux)
     ({ fee_payer; account_updates; memo } :
-      (p, unit, unit) Zkapp_command.with_forest ) =
+      ( ( Account_update.Body.t
+        , (p, Signature.t) Control.Poly.t
+        , aux )
+        Account_update.Poly.t
+      , unit
+      , unit )
+      Zkapp_command.with_forest ) =
   let cmd_dummy_signatures_and_proofs =
     { Zkapp_command.Poly.memo
     ; fee_payer = { fee_payer with authorization = Signature.dummy }
     ; account_updates =
         Zkapp_command.Call_forest.map account_updates
-          ~f:(fun (acct_update : (_, _) Account_update.Poly.t) ->
+          ~f:(fun (acct_update : (_, _, _) Account_update.Poly.t) ->
             let dummy_auth =
               match acct_update.authorization with
               | Control.Poly.Proof _ ->
@@ -89,7 +95,8 @@ let hash_zkapp_command (type p)
               | Control.Poly.None_given ->
                   Control.Poly.None_given
             in
-            { acct_update with authorization = dummy_auth } )
+            Account_update.forget_aux
+              { acct_update with authorization = dummy_auth } )
     }
   in
   zkapp_cmd_hasher cmd_dummy_signatures_and_proofs

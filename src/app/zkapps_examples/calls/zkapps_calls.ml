@@ -132,11 +132,12 @@ type _ Snarky_backendless.Request.t +=
     for the [Execute_call] request.
 *)
 let execute_call ~may_use_token account_update old_state =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let call_inputs = { Call_data.Input.Circuit.old_state } in
   let call_outputs, called_account_update, sub_calls =
     exists
       (Typ.tuple3 Call_data.Output.typ
-         (Zkapp_call_forest.Checked.account_update_typ ())
+         (Zkapp_call_forest.Checked.account_update_typ ~signature_kind ())
          Zkapp_call_forest.typ )
       ~request:(fun () ->
         let may_use_token =
@@ -171,7 +172,8 @@ module Rules = struct
   *)
   module Initialize_state = struct
     (** State to initialize the zkApp to after deployment. *)
-    let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
+    let initial_state =
+      lazy (List.init Zkapp_state.max_size_int ~f:(fun _ -> Field.Constant.zero))
 
     (** The request handler for the rule. *)
     let handler (public_key : Public_key.Compressed.t)

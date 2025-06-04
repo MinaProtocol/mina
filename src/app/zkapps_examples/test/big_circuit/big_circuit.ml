@@ -36,9 +36,9 @@ let account_update : Account_update.t =
   let ({ account_update; _ } : _ Zkapp_command.Call_forest.tree), () =
     Async.Thread_safe.block_on_async_exn prover
   in
-  { body = { account_update.body with authorization_kind = Proof vk_hash }
-  ; authorization = account_update.authorization
-  }
+  Account_update.with_aux
+    ~body:{ account_update.body with authorization_kind = Proof vk_hash }
+    ~authorization:account_update.authorization
 
 let deploy_account_update_body : Account_update.Body.t =
   { Account_update.Body.dummy with
@@ -59,14 +59,13 @@ let deploy_account_update_body : Account_update.Body.t =
   }
 
 let deploy_account_update : Account_update.t =
-  { body = deploy_account_update_body
-  ; authorization = Signature Signature.dummy
-  }
+  Account_update.with_aux ~body:deploy_account_update_body
+    ~authorization:(Control.Poly.Signature Signature.dummy)
 
 let account_updates =
   []
-  |> Zkapp_command.Call_forest.cons account_update
-  |> Zkapp_command.Call_forest.cons deploy_account_update
+  |> Zkapp_command.Call_forest.cons ~signature_kind account_update
+  |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
 
 let memo = Signed_command_memo.empty
 
@@ -75,19 +74,19 @@ let transaction_commitment : Zkapp_command.Transaction_commitment.t =
   Zkapp_command.Transaction_commitment.create ~account_updates_hash
 
 let fee_payer =
-  { Account_update.Fee_payer.body =
+  Account_update.Fee_payer.make
+    ~body:
       { Account_update.Body.Fee_payer.dummy with
         public_key = pk_compressed
       ; fee = Currency.Fee.(of_nanomina_int_exn 100)
       }
-  ; authorization = Signature.dummy
-  }
+    ~authorization:Signature.dummy
 
 let full_commitment =
   Zkapp_command.Transaction_commitment.create_complete transaction_commitment
     ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:
-      (Zkapp_command.Digest.Account_update.create
+      (Zkapp_command.Digest.Account_update.create ~signature_kind
          (Account_update.of_fee_payer fee_payer) )
 
 let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
@@ -108,6 +107,7 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
     Zkapp_command.Call_forest.map account_updates ~f:(function
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
+         ; aux = _
          } as account_update :
           Account_update.t )
         when Public_key.Compressed.equal public_key pk_compressed ->
