@@ -296,8 +296,10 @@ let update_state =
        and app_state =
          Param.flag "--zkapp-state"
            ~doc:
-             "String(hash)|Integer(field element) a list of 8 elements that \
-              represent the zkApp state (Use empty string for no-op)"
+             (sprintf
+                "String(hash)|Integer(field element) a list of %d elements \
+                 that represent the zkApp state (Use empty string for no-op)"
+                Mina_base.Zkapp_state.max_size_int )
            Param.(listed string)
        in
        let fee = Option.value ~default:Flags.default_fee fee in
