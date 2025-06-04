@@ -734,6 +734,13 @@ module type S = sig
            Consensus_state.Value.t Mina_base.State_hash.With_state_hashes.t
       -> bool
 
+    (** Same as [should_bootstrap] but uses lengths instead of consensus states *)
+    val should_bootstrap_len :
+         context:(module CONTEXT)
+      -> existing:Unsigned.UInt32.t
+      -> candidate:Unsigned.UInt32.t
+      -> bool
+
     val get_epoch_ledger :
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
