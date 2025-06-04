@@ -162,25 +162,29 @@ RUN mkdir --mode=700 ~/.gnupg \
 ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # --- Ocaml install of a given OCAML_VERSION via opam switch
-# additionally initializes opam with sandboxing disabled, as we did not install bubblewrap above.
+# additionally initializes opam with sandboxing disabled, as we did not install
+# bubblewrap above.
 RUN git clone \
   https://github.com/ocaml/opam-repository.git \
   --depth 1 \
-  /home/opam/opam-repository \
-  && opam init --disable-sandboxing \
+  /home/opam/opam-repository
+RUN opam init --disable-sandboxing \
     -k git \
     -a ~/opam-repository \
-    --bare \
-  && opam repository add --yes \
+    --bare
+RUN opam repository add --yes \
     --all \
     --set-default o1-labs \
-    https://github.com/o1-labs/opam-repository.git \
-  && opam switch create "${OCAML_VERSION}${OCAML_REVISION}" "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
-  && opam switch "${OCAML_VERSION}${OCAML_REVISION}"
+    https://github.com/o1-labs/opam-repository.git
+RUN opam switch create "${OCAML_VERSION}${OCAML_REVISION}" \
+    "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}"
+RUN opam switch "${OCAML_VERSION}${OCAML_REVISION}"
 
 # --- Build and install capnproto go compiler
-# This package was particularly tricky to get to install correctly because of how the package's source code is structured.
-# To work around this, we install it as a dependency for a local go module and build the binary from the GOPATH.
+# This package was particularly tricky to get to install correctly because of
+# how the package's source code is structured.
+# To work around this, we install it as a dependency for a local go module and
+# build the binary from the GOPATH.
 RUN mkdir go-tmp \
   && cd go-tmp \
   && /usr/lib/go/bin/go mod init local/build \
