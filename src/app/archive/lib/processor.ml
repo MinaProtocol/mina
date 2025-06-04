@@ -4004,6 +4004,7 @@ module Block = struct
 
   let add_from_extensional (module Conn : CONNECTION) ~proof_cache_db
       ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
       match%bind find_opt (module Conn) ~state_hash:block.state_hash with
@@ -4170,7 +4171,8 @@ module Block = struct
           ~f:(fun acc ({ fee_payer; account_updates; memo; _ } as zkapp_cmd) ->
             (* add authorizations, not stored in the db *)
             let (fee_payer : Account_update.Fee_payer.t) =
-              { body = fee_payer; authorization = Signature.dummy }
+              Account_update.Fee_payer.make ~body:fee_payer
+                ~authorization:Signature.dummy
             in
             let (account_updates : Account_update.Simple.t list) =
               List.map account_updates
@@ -4178,12 +4180,14 @@ module Block = struct
                      (body : Account_update.Body.Simple.t)
                      :
                      Account_update.Simple.t
-                   -> { body; authorization = None_given } )
+                   ->
+                  Account_update.with_no_aux ~body
+                    ~authorization:Control.Poly.None_given )
             in
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
-                (Zkapp_command.of_simple ~proof_cache_db
+                (Zkapp_command.of_simple ~signature_kind ~proof_cache_db
                    { fee_payer; account_updates; memo } )
             in
             (zkapp_cmd, cmd_id) :: acc )
