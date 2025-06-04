@@ -635,30 +635,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let staking_epoch_ledger (t : t) =
         Snapshot.ledger @@ get_snapshot t Staking_epoch_snapshot
 
-      let _seen_slot (t : t) epoch slot =
-        let module Table = Public_key.Compressed.Table in
-        let unseens =
-          Table.to_alist !t.last_checked_slot_and_epoch
-          |> List.filter_map ~f:(fun (pk, last_checked_epoch_and_slot) ->
-                 let i =
-                   Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
-                     last_checked_epoch_and_slot (epoch, slot)
-                 in
-                 if i > 0 then None
-                 else if i = 0 then
-                   (*vrf evaluation was stopped at this point because it was either the end of the epoch or the key won this slot; re-check this slot when staking keys are reset so that we don't skip producing block. This will not occur in the normal flow because [slot] will be greater than the last-checked-slot*)
-                   Some pk
-                 else (
-                   Table.set !t.last_checked_slot_and_epoch ~key:pk
-                     ~data:(epoch, slot) ;
-                   Some pk ) )
-        in
-        match unseens with
-        | [] ->
-            `All_seen
-        | nel ->
-            `Unseen (Public_key.Compressed.Set.of_list nel)
-
       module For_tests = struct
         type nonrec snapshot_identifier = snapshot_identifier =
           | Staking_epoch_snapshot
