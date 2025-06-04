@@ -1,0 +1,7 @@
+(tests
+ (names test_consensus_vrf)
+ (libraries alcotest consensus_vrf core_kernel signature_lib snark_params)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_let)))
