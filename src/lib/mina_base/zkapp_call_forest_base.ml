@@ -147,7 +147,7 @@ module type Digest_intf = sig
 
     val create :
          signature_kind:Mina_signature_kind.t
-      -> (Account_update.Body.t, _) Account_update.Poly.t
+      -> (Account_update.Body.t, _, _) Account_update.Poly.t
       -> t
 
     val create_body :
@@ -262,7 +262,7 @@ module Make_digest_str
     end
 
     let create ~signature_kind :
-        (Account_update.Body.t, _) Account_update.Poly.t -> t =
+        (Account_update.Body.t, _, _) Account_update.Poly.t -> t =
       Account_update.digest ~signature_kind
 
     let create_body ~signature_kind : Account_update.Body.t -> t =
@@ -470,7 +470,8 @@ let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
   let tree : _ Tree.t = { account_update; account_update_digest; calls } in
   cons_tree tree xs
 
-let cons ~signature_kind ?calls (account_update : Account_update.t) xs =
+let cons (type aux) ~signature_kind ?calls
+    (account_update : (_, _, aux) Account_update.Poly.t) xs =
   cons_aux
     ~digest_account_update:(Digest.Account_update.create ~signature_kind)
     ?calls account_update xs
@@ -516,18 +517,15 @@ let forget_hashes =
   in
   impl
 
-let forget_hashes_and_proofs p =
-  forget_hashes @@ map ~f:Account_update.forget_proofs p
+let forget_hashes_and_proofs_and_aux p =
+  forget_hashes @@ map ~f:Account_update.forget_proofs_and_aux p
 
 module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('proof, 'data) t =
-        ( ( Account_update.Body.Stable.V1.t
-          , ('proof, Signature.Stable.V1.t) Control.Poly.Stable.V1.t )
-          Account_update.Poly.Stable.V1.t
-          * 'data
+      type ('update, 'data) t =
+        ( 'update * 'data
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t
