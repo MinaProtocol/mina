@@ -7,4 +7,5 @@ RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
     libssl-dev \
+    libprocps-dev \
   && rm -rf /var/lib/apt/lists/*
