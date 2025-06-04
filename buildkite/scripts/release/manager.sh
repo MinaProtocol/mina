@@ -188,6 +188,9 @@ function storage_list() {
     local path=$2
 
     case $backend in
+        local)
+            ls "$path"
+            ;;
         gs)
             gsutil list "$path"
             ;;
@@ -207,6 +210,9 @@ function storage_md5() {
     local path=$2
 
     case $backend in
+        local)
+            md5sum "$path" | awk '{print $1}'
+            ;;
         gs)
             gsutil hash -h -m "$path" | grep "Hash (md5)" | awk '{print $3}'
             ;;
@@ -226,6 +232,9 @@ function storage_download() {
     local local_path=$3
 
     case $backend in
+        local)
+            cp "$remote_path" "$local_path"
+            ;;
         gs)
             gsutil cp "$remote_path" "$local_path"
             ;;
@@ -288,10 +297,20 @@ function publish_debian() {
     local __verify=$7
     local __dry_run=$8
     local __backend=$9
+    local __debian_repo=${10}
+    local __debian_sign_key=${11}
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network"
     local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
+
+    if [[ $__debian_sign_key != "" ]]; then
+        local __sign_arg=("--sign" "$__debian_sign_key")
+        local __signed_arg="--signed"
+    else
+        local __sign_arg=()
+        local __signed_arg=""
+    fi
 
     if [[ $__source_version != "$__target_version" ]]; then
         echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__target_version"
@@ -309,11 +328,14 @@ function publish_debian() {
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
     echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" )"
     if [[ $__dry_run == 0 ]]; then
+        # shellcheck disable=SC2068
         prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
             --names "$DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}_${__target_version}.deb" \
             --version $__target_version \
+            --bucket $__debian_repo \
             -c $__codename \
-            -r $__channel
+            -r $__channel \
+            ${__sign_arg[@]}
 
         if [[ $__verify == 1 ]]; then
 
@@ -323,7 +345,8 @@ function publish_debian() {
                 -p $__artifact_full_name \
                 --version $__target_version \
                 -m $__codename \
-                -c $__channel 
+                -r $__debian_repo \
+                -c $__channel ${__signed_arg}
         fi
     fi
 }
@@ -392,6 +415,16 @@ function promote_debian() {
     local __network=$7
     local __verify=$8
     local __dry_run=$9
+    local __debian_repo=${10}
+    local __debian_sign_key=${11}
+
+    if [[ $__debian_sign_key != "" ]]; then
+        local __sign_arg=("--sign" "$__debian_sign_key")
+        local __signed_arg="--signed"
+    else
+        local __sign_arg=()
+        local __signed_arg=""
+    fi
 
     echo " 🍥 Promoting $__artifact debian from $__source_channel to $__target_channel, from $__source_version to $__target_version"
     echo "    📦 Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network")"
@@ -407,11 +440,11 @@ function promote_debian() {
                 --release ${__source_channel} \
                 --new-version ${__target_version} \
                 --suite ${__source_channel} \
-                --repo ${DEBIAN_REPO} \
+                --repo ${__debian_repo} \
                 --new-suite ${__target_channel} \
                 --new-name ${__artifact_full_name} \
                 --new-release ${__target_channel} \
-                --codename ${__codename} \
+                --codename ${__codename}
 
         if [[ $__verify == 1 ]]; then
             echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
@@ -420,7 +453,8 @@ function promote_debian() {
                 -p $__artifact_full_name \
                 --version $__target_version \
                 -m $__codename \
-                -c $__target_channel 
+                -r $__debian_repo \
+                -c $__target_channel ${__signed_arg}
         fi
     fi
 }
@@ -451,6 +485,8 @@ function publish_help(){
     printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed"; 
     printf "  %-25s %s\n" "--dry-run" "[bool] doesn't publish anything. Just print what would be published"; 
     printf "  %-25s %s\n" "--backend" "[string] backend to use for storage. e.g gs,hetzner. default: gs";
+    printf "  %-25s %s\n" "--debian-repo" "[string] debian repository to publish to. default: $DEBIAN_REPO";
+    printf "  %-25s %s\n" "--debian-sign-key" "[string] debian signing key to use. default: lack of presence = no signing";
     echo ""
     echo "Example:"
     echo ""
@@ -479,6 +515,8 @@ function publish(){
     local __verify=0
     local __dry_run=0
     local __backend="gs"
+    local __debian_repo=$DEBIAN_REPO
+    local __debian_sign_key=""
 
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
@@ -538,6 +576,14 @@ function publish(){
                 __backend=${2:?$error_message}
                 shift 2;
             ;;
+            --debian-repo )
+                __debian_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --debian-sign-key )
+                __debian_sign_key=${2:?$error_message}
+                shift 2;
+            ;;
             * )     
                 echo -e "❌ ${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -580,6 +626,9 @@ function publish(){
     echo " - Only debians: $__only_debians"
     echo " - Verify: $__verify"
     echo " - Dry run: $__dry_run"
+    echo " - Backend: $__backend"
+    echo " - Debian repo: $__debian_repo"
+    echo " - Debian sign key: $__debian_sign_key"
     echo ""
 
     if [[ $__backend != "gs" && $__backend != "hetzner" ]]; then
@@ -617,7 +666,9 @@ function publish(){
                                         "" \
                                         $__verify \
                                         $__dry_run \
-                                        $__backend
+                                        $__backend \
+                                        $__debian_repo \
+                                        $__debian_sign_key
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
@@ -635,7 +686,9 @@ function publish(){
                                             "" \
                                             $__verify \
                                             $__dry_run \
-                                            $__backend
+                                            $__backend \
+                                            $__debian_repo \
+                                            $__debian_sign_key
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -653,7 +706,9 @@ function publish(){
                                             $network \
                                             $__verify \
                                             $__dry_run \
-                                            $__backend
+                                            $__backend \
+                                            $__debian_repo \
+                                            $__debian_sign_key
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -672,8 +727,9 @@ function publish(){
                                             $network \
                                             $__verify \
                                             $__dry_run \
-                                            $__backend
-                                    
+                                            $__backend \
+                                            $__debian_repo \
+                                            $__debian_sign_key
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -717,6 +773,8 @@ function promote_help(){
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages"; 
     printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed"; 
     printf "  %-25s %s\n" "--dry-run" "[bool] doesn't publish anything. Just print what would be published"; 
+    printf "  %-25s %s\n" "--debian-repo" "[string] debian repository to publish to. default: $DEBIAN_REPO";
+    printf "  %-25s %s\n" "--debian-sign-key" "[string] debian signing key to use. default: lack of presence = no signing";
     echo ""
     echo "Example:"
     echo ""
@@ -744,6 +802,8 @@ function promote(){
     local __only_debians=0
     local __verify=0
     local __dry_run=0
+    local __debian_repo=$DEBIAN_REPO
+    local __debian_sign_key=""
 
 
     while [ ${#} -gt 0 ]; do
@@ -800,7 +860,15 @@ function promote(){
                 __dry_run=1
                 shift 1;
             ;;
-            * )     
+            --debian-repo )
+                __debian_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --debian-sign-key )
+                __debian_sign_key=${2:?$error_message}
+                shift 2;
+            ;;
+            * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
                 promote_help; exit 1;
@@ -813,7 +881,7 @@ function promote(){
         promote_help; exit 1;
     fi
 
-    if [[ -z ${__source_version+x} ]]; then
+    if [[ -z ${__source_version+x} ]]; then 
         echo -e "❌ ${RED} !! Source version (--source-version) is required${CLEAR}\n";
         promote_help; exit 1;
     fi
@@ -884,7 +952,9 @@ function promote(){
                                     $__target_channel \
                                     "" \
                                     $__verify \
-                                    $__dry_run
+                                    $__dry_run \
+                                    $__debian_repo \
+                                    $__debian_sign_key
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
@@ -903,7 +973,9 @@ function promote(){
                                         $__target_channel \
                                         "" \
                                         $__verify \
-                                        $__dry_run
+                                        $__dry_run \
+                                        $__debian_repo \
+                                        $__debian_sign_key
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -921,7 +993,9 @@ function promote(){
                                             $__target_channel \
                                             $network \
                                             $__verify \
-                                            $__dry_run
+                                            $__dry_run \
+                                            $__debian_repo \
+                                            $__debian_sign_key
                                     
                                 fi
 
@@ -941,8 +1015,9 @@ function promote(){
                                             $__target_channel \
                                             $network \
                                             $__verify \
-                                            $__dry_run
-                                    
+                                            $__dry_run \
+                                            $__debian_repo \
+                                            $__debian_sign_key
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1087,6 +1162,7 @@ function verify(){
                                         -p $artifact \
                                         --version $__version \
                                         -m $__codename \
+                                        -r $__debian_repo \
                                         -c $__channel
                             fi
 
@@ -1104,6 +1180,7 @@ function verify(){
                                         -p $artifact \
                                         --version $__version \
                                         -m $__codename \
+                                        -r $__debian_repo \
                                         -c $__channel
 
                                     echo ""
@@ -1135,6 +1212,7 @@ function verify(){
                                         -p $__artifact_full_name \
                                         --version $__version \
                                         -m $__codename \
+                                        -r $__debian_repo \
                                         -c $__channel
 
                                     echo ""
@@ -1166,6 +1244,7 @@ function verify(){
                                         -p $__artifact_full_name \
                                         --version $__version \
                                         -m $__codename \
+                                        -r $__debian_repo \
                                         -c $__channel
                                     echo ""
                                 fi
