@@ -7,7 +7,7 @@
     dune exec src/lib/pickles/test/main.exe -- test "Step verifier"
 *)
 
-module Step_main_inputs = Pickles__Step_main_inputs
+module Step_main_inputs = Pickles_bool__Step_main_inputs
 open Step_main_inputs.Impl
 
 let run k =
@@ -21,7 +21,7 @@ let run k =
 
 let test_side_loaded_domains () =
   let module O = One_hot_vector.Make (Impl) in
-  let open Pickles__Side_loaded_verification_key in
+  let open Pickles_bool__Side_loaded_verification_key in
   let domains = [ { Domains.h = 10 }; { h = 15 } ] in
   let pt = Field.Constant.random () in
   List.iter domains ~f:(fun ds ->
@@ -32,7 +32,7 @@ let test_side_loaded_domains () =
           ~domain_generator:Backend.Tick.Field.domain_generator
       in
       let checked_domain () =
-        Pickles__Step_verifier.For_tests_only.side_loaded_domain
+        Pickles_bool__Step_verifier.For_tests_only.side_loaded_domain
           ~log2_size:(Field.of_int ds.h)
       in
       let pp ppf cst =

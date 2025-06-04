@@ -7,7 +7,7 @@
     dune exec src/lib/pickles/test/main.exe -- test "Side-loaded verification key"
 *)
 
-module SLV_key = Pickles__Side_loaded_verification_key
+module SLV_key = Pickles_bool__Side_loaded_verification_key
 open Pickles_types
 
 let input_size w =

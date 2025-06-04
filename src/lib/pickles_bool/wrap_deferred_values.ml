@@ -30,7 +30,9 @@ let expand_deferred (type n most_recent_width) ~zk_rows
        , Challenge.Constant.t Scalar_challenge.t
        , Backend.Tick.Field.t Pickles_types.Shifted_value.Type1.t
        , bool
-       , n Pickles__.Proof.Base.Messages_for_next_proof_over_same_field.Wrap.t
+       , n
+         Pickles_bool__.Proof.Base.Messages_for_next_proof_over_same_field.Wrap
+         .t
        , Digest.Constant.t
        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
          Step_bp_vec.t

@@ -1,6 +1,6 @@
 open Core_kernel
 open Pickles_types
-open Pickles.Impls.Step
+open Pickles_bool.Impls.Step
 
 let add_constraint c = assert_ c
 

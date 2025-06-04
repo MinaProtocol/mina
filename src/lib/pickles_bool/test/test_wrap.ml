@@ -7,8 +7,8 @@
     dune exec src/lib/pickles/test/main.exe -- test "Gate:"
 *)
 open Pickles_types
-module Wrap = Pickles__Wrap
-module Import = Pickles__Import
+module Wrap = Pickles_bool__Wrap
+module Import = Pickles_bool__Import
 
 (* Type to list test configurations, that is, how to interpret feature flags in
    the tests. *)

@@ -6,13 +6,14 @@
    Invocation: dune exec src/lib/pickles/test/main.exe -- test "scalar challenge"
 *)
 
-module SC = Pickles__Import.Scalar_challenge
-module Scalar_challenge = Pickles__Scalar_challenge
+module SC = Pickles_bool__Import.Scalar_challenge
+module Scalar_challenge = Pickles_bool__Scalar_challenge
 
 module Test_make
     (Impl : Kimchi_pasta_snarky_backend.Snark_intf)
-    (G : Pickles__Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t)
-    (Challenge : Pickles__Import.Challenge.S with module Impl := Impl)
+    (G : Pickles_bool__Intf.Group(Impl).S
+           with type t = Impl.Field.t * Impl.Field.t)
+    (Challenge : Pickles_bool__Import.Challenge.S with module Impl := Impl)
     (Endo : sig
       val base : Impl.Field.Constant.t
 
@@ -20,7 +21,7 @@ module Test_make
     end) =
 struct
   open Impl
-  include Pickles__Scalar_challenge.Make (Impl) (G) (Challenge) (Endo)
+  include Pickles_bool__Scalar_challenge.Make (Impl) (G) (Challenge) (Endo)
   module T = Internal_Basic
 
   let test_endo () =
@@ -80,13 +81,13 @@ struct
           raise e )
 end
 
-module Endo = Pickles__Endo
+module Endo = Pickles_bool__Endo
 module Wrap =
-  Test_make (Impls.Wrap) (Pickles__Wrap_main_inputs.Inner_curve)
+  Test_make (Impls.Wrap) (Pickles_bool__Wrap_main_inputs.Inner_curve)
     (Impls.Wrap.Challenge)
     (Endo.Wrap_inner_curve)
 module Step =
-  Test_make (Impls.Step) (Pickles__Step_main_inputs.Inner_curve)
+  Test_make (Impls.Step) (Pickles_bool__Step_main_inputs.Inner_curve)
     (Impls.Step.Challenge)
     (Endo.Step_inner_curve)
 

@@ -8,7 +8,7 @@ let test_bits_random_oracle_consistency_check () =
     List.init (String.length exp_output_str) ~f:(fun i ->
         Char.equal exp_output_str.[i] '1' )
   in
-  let output = Pickles.Ro.bits_random_oracle ~length:128 s in
+  let output = Pickles_bool.Ro.bits_random_oracle ~length:128 s in
   assert (
     match List.for_all2 ~f:Bool.equal exp_output output with
     | Ok bool ->

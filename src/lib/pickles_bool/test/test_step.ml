@@ -7,9 +7,9 @@
     dune exec src/lib/pickles/test/main.exe -- test "Step curve operations"
 *)
 
-module Impl = Pickles__Impls.Step
-module Inner_curve = Pickles__Step_main_inputs.Inner_curve
-module Ops = Pickles__Step_main_inputs.Ops
+module Impl = Pickles_bool__Impls.Step
+module Inner_curve = Pickles_bool__Step_main_inputs.Inner_curve
+module Ops = Pickles_bool__Step_main_inputs.Ops
 
 let test_scale_fast_2 () =
   let open Impl in

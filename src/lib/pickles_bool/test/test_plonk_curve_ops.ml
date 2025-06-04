@@ -9,11 +9,12 @@
 
 module Test_make
     (Impl : Kimchi_pasta_snarky_backend.Snark_intf)
-    (G : Pickles__Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
+    (G : Pickles_bool__Intf.Group(Impl).S
+           with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Impl
   module T = Internal_Basic
-  include Pickles__Plonk_curve_ops.Make (Impl) (G)
+  include Pickles_bool__Plonk_curve_ops.Make (Impl) (G)
 
   let random_point =
     let rec pt x =
@@ -91,9 +92,13 @@ struct
 end
 
 module Wrap =
-  Test_make (Pickles__Impls.Wrap) (Pickles__Wrap_main_inputs.Inner_curve)
+  Test_make
+    (Pickles_bool__Impls.Wrap)
+    (Pickles_bool__Wrap_main_inputs.Inner_curve)
 module Step =
-  Test_make (Pickles__Impls.Step) (Pickles__Step_main_inputs.Inner_curve)
+  Test_make
+    (Pickles_bool__Impls.Step)
+    (Pickles_bool__Step_main_inputs.Inner_curve)
 
 let tests =
   [ ("Plonk curve operations:Wrap", Wrap.tests)

@@ -22,7 +22,8 @@ let log2_size ~feature_flags main =
   let main' () = main () ; Promise.return () in
   let domains =
     Promise.block_on_async_exn (fun () ->
-        Pickles__Fix_domains.domains ~feature_flags etyp_unit etyp_unit main' )
+        Pickles_bool__Fix_domains.domains ~feature_flags etyp_unit etyp_unit
+          main' )
   in
   Pickles_base.Domain.log2_size domains.h
 

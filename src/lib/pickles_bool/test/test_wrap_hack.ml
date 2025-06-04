@@ -9,13 +9,13 @@
 
 open Pickles_types
 open Backend
-module Wrap_main_inputs = Pickles__Wrap_main_inputs
-module Wrap_hack = Pickles__Wrap_hack
+module Wrap_main_inputs = Pickles_bool__Wrap_main_inputs
+module Wrap_hack = Pickles_bool__Wrap_hack
 
 (* Check that the pre-absorbing technique works. I.e., that it's consistent with
    the actual definition of hash_messages_for_next_wrap_proof. *)
 let test_hash_messages_for_next_wrap_proof (type n) (n : n Nat.t) () =
-  let open Pickles.Impls.Wrap in
+  let open Pickles_bool.Impls.Wrap in
   let messages_for_next_wrap_proof :
       _ Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t =
     let g = Wrap_main_inputs.Inner_curve.Constant.random () in

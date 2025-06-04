@@ -44,20 +44,20 @@ struct
 end
 
 module Step =
-  Test (Impls.Step) (Pickles__Tick_field_sponge.Field)
-    (Pickles__Step_main_inputs.Sponge.S)
+  Test (Impls.Step) (Pickles_bool__Tick_field_sponge.Field)
+    (Pickles_bool__Step_main_inputs.Sponge.S)
 module Wrap =
-  Test (Impls.Wrap) (Pickles__Tock_field_sponge.Field)
-    (Pickles__Wrap_main_inputs.Sponge.S)
+  Test (Impls.Wrap) (Pickles_bool__Tock_field_sponge.Field)
+    (Pickles_bool__Wrap_main_inputs.Sponge.S)
 
 let tests =
   let open Alcotest in
   [ ( "Sponge:Step"
     , [ test_case "sponge" `Quick (fun () ->
-            Step.test Pickles__Tick_field_sponge.params )
+            Step.test Pickles_bool__Tick_field_sponge.params )
       ] )
   ; ( "Sponge:Wrap"
     , [ test_case "sponge" `Quick (fun () ->
-            Wrap.test Pickles__Tock_field_sponge.params )
+            Wrap.test Pickles_bool__Tock_field_sponge.params )
       ] )
   ]
