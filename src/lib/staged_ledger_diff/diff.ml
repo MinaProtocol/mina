@@ -158,11 +158,14 @@ module Pre_diff_with_at_most_two_coinbase = struct
     (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_two.t
 
   let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     Pre_diff_two.map
       ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
       ~f2:
         (With_status.map
-           ~f:(User_command.write_all_proofs_to_disk ~proof_cache_db) )
+           ~f:
+             (User_command.write_all_proofs_to_disk ~signature_kind
+                ~proof_cache_db ) )
 
   let read_all_proofs_from_disk : t -> Stable.Latest.t =
     Pre_diff_two.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
@@ -189,11 +192,14 @@ module Pre_diff_with_at_most_one_coinbase = struct
     (Transaction_snark_work.t, User_command.t With_status.t) Pre_diff_one.t
 
   let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     Pre_diff_one.map
       ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
       ~f2:
         (With_status.map
-           ~f:(User_command.write_all_proofs_to_disk ~proof_cache_db) )
+           ~f:
+             (User_command.write_all_proofs_to_disk ~signature_kind
+                ~proof_cache_db ) )
 
   let read_all_proofs_from_disk : t -> Stable.Latest.t =
     Pre_diff_one.map ~f1:Transaction_snark_work.read_all_proofs_from_disk
