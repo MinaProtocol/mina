@@ -99,11 +99,14 @@ let account_update_or_stack_of_zkapp_command_list () =
 
 let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
+let signature_kind = Mina_signature_kind.Testnet
+
 let wire_embedded_in_t () =
   let open Stable.Latest in
   Quickcheck.test ~trials:10 ~shrinker gen ~f:(fun w ->
       [%test_eq: t]
-        (read_all_proofs_from_disk (write_all_proofs_to_disk ~proof_cache_db w))
+        (read_all_proofs_from_disk
+           (write_all_proofs_to_disk ~signature_kind ~proof_cache_db w) )
         w )
 
 let wire_embedded_in_graphql () =
@@ -123,7 +126,10 @@ end = struct
   let full = deriver @@ Fd.o ()
 
   let json_roundtrip_dummy () =
-    let dummy = Lazy.force dummy |> Zkapp_command.read_all_proofs_from_disk in
+    let dummy =
+      Lazy.force (dummy ~signature_kind)
+      |> Zkapp_command.read_all_proofs_from_disk
+    in
     [%test_eq: Stable.Latest.t] dummy
       (dummy |> Fd.to_json full |> Fd.of_json full)
 
@@ -131,5 +137,6 @@ end = struct
     Run_in_thread.block_on_async_exn
     @@ fun () ->
     Fields_derivers_zkapps.Test.Loop.run full
-      (Zkapp_command.read_all_proofs_from_disk @@ Lazy.force dummy)
+      ( Zkapp_command.read_all_proofs_from_disk
+      @@ Lazy.force (dummy ~signature_kind) )
 end

@@ -16,7 +16,8 @@ let if_ = Zkapp_command.value_if
 
 let is_empty = List.is_empty
 
-let pop_exn : t -> (Account_update.t * t) * t = function
+let pop_exn ~signature_kind:(_ : Mina_signature_kind.t) :
+    t -> (Account_update.t * t) * t = function
   | { stack_hash = _
     ; elt = { account_update; calls; account_update_digest = _ }
     }
@@ -39,23 +40,22 @@ module Checked = struct
     ; control : Control.t Prover_value.t
     }
 
-  let account_update_typ () :
+  let account_update_typ ~signature_kind () :
       ( account_update
       , (Account_update.t, Zkapp_command.Digest.Account_update.t) With_hash.t
       )
       Typ.t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let (Typ typ) =
       Typ.(
         Account_update.Body.typ () * Prover_value.typ ()
         * Zkapp_command.Digest.Account_update.typ)
       |> Typ.transport
            ~back:(fun ((body, authorization), hash) ->
-             { With_hash.data = { Account_update.Poly.body; authorization }
+             { With_hash.data = Account_update.with_aux ~body ~authorization
              ; hash
              } )
            ~there:(fun { With_hash.data =
-                           { Account_update.Poly.body; authorization }
+                           { Account_update.Poly.body; authorization; aux = _ }
                        ; hash
                        } -> ((body, authorization), hash) )
       |> Typ.transport_var
@@ -102,8 +102,8 @@ module Checked = struct
 
   let empty () : t = { hash = empty; data = V.create (fun () -> []) }
 
-  let pop_exn ({ hash = h; data = r } : t) : (account_update * t) * t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let pop_exn ~signature_kind ({ hash = h; data = r } : t) :
+      (account_update * t) * t =
     with_label "Zkapp_call_forest.pop_exn" (fun () ->
         let hd_r =
           V.create (fun () -> V.get r |> List.hd_exn |> With_stack_hash.elt)
@@ -148,9 +148,8 @@ module Checked = struct
             } )
           : (account_update * t) * t ) )
 
-  let pop ~dummy ~dummy_tree_hash ({ hash = h; data = r } : t) :
+  let pop ~signature_kind ~dummy ~dummy_tree_hash ({ hash = h; data = r } : t) :
       (account_update * t) * t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     with_label "Zkapp_call_forest.pop" (fun () ->
         let hd_r =
           V.create (fun () ->
@@ -215,13 +214,12 @@ module Checked = struct
           : (account_update * t) * t ) )
 
   (* TODO Consider moving out of mina_base *)
-  let push
+  let push ~signature_kind
       ~account_update:
         { account_update = { hash = account_update_hash; data = account_update }
         ; control = auth
         } ~calls:({ hash = calls_hash; data = calls } : t)
       ({ hash = tl_hash; data = tl_data } : t) : t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     with_label "Zkapp_call_forest.push" (fun () ->
         let tree_hash =
           Zkapp_command.Digest.Tree.Checked.create
@@ -237,7 +235,9 @@ module Checked = struct
               in
               let authorization = V.get auth in
               let tl = V.get tl_data in
-              let account_update : Account_update.t = { body; authorization } in
+              let account_update : Account_update.t =
+                Account_update.with_aux ~body ~authorization
+              in
               let calls = V.get calls in
               let res =
                 Zkapp_command.Call_forest.cons ~signature_kind ~calls
