@@ -116,7 +116,6 @@ RUN curl --proto '=https' \
     --component rust-src \
     --target wasm32-unknown-unknown \
     --no-self-update \
-  && cargo install cargo-xtask \
   && $HOME/.cargo/bin/cargo install cargo-xtask \
   && rm /tmp/rustup-init
 USER root

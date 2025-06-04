@@ -502,6 +502,8 @@ let commit_to_pool ledger pool cmd expected_drops =
 
 let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
+let signature_kind = Mina_signature_kind.Testnet
+
 let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ~double_increment_sender ~increment_receiver ~amount ~fee nonce_int =
   let nonce = Account.Nonce.of_int nonce_int in
@@ -509,15 +511,15 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
   let receiver_pk = Public_key.compress receiver.public_key in
   let zkapp_command_wire : Zkapp_command.Stable.Latest.t =
     { fee_payer =
-        { Account_update.Fee_payer.body =
-            { public_key = sender_pk; fee; nonce; valid_until = None }
-            (* Real signature added in below *)
-        ; authorization = Signature.dummy
-        }
+        (* Real signature added in below *)
+        Account_update.Fee_payer.make
+          ~body:{ public_key = sender_pk; fee; nonce; valid_until = None }
+          ~authorization:Signature.dummy
     ; account_updates =
         Zkapp_command.Call_forest.of_account_updates
           ~account_update_depth:(Fn.const 0)
-          [ { Account_update.Poly.body =
+          [ Account_update.with_no_aux
+              ~body:
                 { Account_update.Body.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
@@ -540,10 +542,10 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; authorization_kind =
                     Account_update.Authorization_kind.None_given
                 }
-            ; authorization = Control.Poly.None_given
-            }
-          ; { Account_update.Poly.body =
-                { public_key = receiver_pk
+              ~authorization:Control.Poly.None_given
+          ; Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.public_key = receiver_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.of_unsigned amount
@@ -562,14 +564,14 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; use_full_commitment = not increment_receiver
                 ; authorization_kind = None_given
                 }
-            ; authorization = None_given
-            }
+              ~authorization:Control.Poly.None_given
           ]
     ; memo = Signed_command_memo.empty
     }
   in
   let zkapp_command =
-    Zkapp_command.write_all_proofs_to_disk ~proof_cache_db zkapp_command_wire
+    Zkapp_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+      zkapp_command_wire
   in
   (* We skip signing the commitment and updating the authorization as it is not necessary to have a valid transaction for these tests. *)
   let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =

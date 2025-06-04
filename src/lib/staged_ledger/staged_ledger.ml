@@ -2889,7 +2889,8 @@ let%test_module "staged ledger tests" =
                   |> Sequence.to_list
                 in
                 assert (
-                  List.equal User_command.equal_ignoring_proofs_and_hashes
+                  List.equal
+                    User_command.equal_ignoring_proofs_and_hashes_and_aux
                     commands_in_ledger commands_applied )
             | None ->
                 () ) ;
@@ -4593,7 +4594,7 @@ let%test_module "staged ledger tests" =
                        User_command.forget_check data )
               in
               assert (
-                List.equal User_command.equal_ignoring_proofs_and_hashes
+                List.equal User_command.equal_ignoring_proofs_and_hashes_and_aux
                   valid_commands
                   ( [ valid_command_1
                     ; valid_command_2

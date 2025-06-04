@@ -208,6 +208,7 @@ module Account_update_under_construction = struct
 
     let to_account_update_and_calls (t : t) :
         Account_update.Body.Checked.t * Zkapp_call_forest.Checked.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
@@ -283,7 +284,8 @@ module Account_update_under_construction = struct
         | Rev_calls rev_calls ->
             List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) rev_calls
               ~f:(fun acc (account_update, calls) ->
-                Zkapp_call_forest.Checked.push ~account_update ~calls acc )
+                Zkapp_call_forest.Checked.push ~signature_kind ~account_update
+                  ~calls acc )
         | Calls calls ->
             calls
       in
@@ -677,12 +679,11 @@ let compile :
               prover ?handler ()
             in
             let account_update : Account_update.t =
-              { body = account_update
-              ; authorization =
-                  Proof
-                    ( Proof_cache_tag.write_proof_to_disk proof_cache_db
-                    @@ Pickles.Side_loaded.Proof.of_proof proof )
-              }
+              Account_update.with_aux ~body:account_update
+                ~authorization:
+                  (Control.Poly.Proof
+                     ( Proof_cache_tag.write_proof_to_disk proof_cache_db
+                     @@ Pickles.Side_loaded.Proof.of_proof proof ) )
             in
             ( { Zkapp_command.Call_forest.Tree.account_update
               ; account_update_digest
@@ -768,9 +769,9 @@ module Deploy_account_update = struct
 
   let full ?balance_change ?access public_key token_id vk : Account_update.t =
     (* TODO: This is a pain. *)
-    { body = body ?balance_change ?access public_key token_id vk
-    ; authorization = Signature Signature.dummy
-    }
+    Account_update.with_aux
+      ~body:(body ?balance_change ?access public_key token_id vk)
+      ~authorization:(Control.Poly.Signature Signature.dummy)
 end
 
 let insert_signatures pk_compressed sk
@@ -805,6 +806,7 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Call_forest.map account_updates ~f:(function
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
+         ; aux = _
          } as account_update :
           Account_update.t )
         when Public_key.Compressed.equal public_key pk_compressed ->
