@@ -129,6 +129,9 @@ case "${SERVICE}" in
           bullseye|focal)
             DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye-and-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
+          noble)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
           *)
             DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
