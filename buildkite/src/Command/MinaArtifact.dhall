@@ -267,20 +267,7 @@ let pipelineBuilder
 let onlyDebianPipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  pipelineBuilder
-            spec
-            [ build_artifacts spec
-            , publish_to_debian_repo
-                spec
-                ( DebianVersions.dependsOnStep
-                    (Some spec.prefix)
-                    spec.debVersion
-                    spec.network
-                    spec.profile
-                    spec.buildFlags
-                    "build"
-                )
-            ]
+      ->  pipelineBuilder spec [ build_artifacts spec ]
 
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
