@@ -266,7 +266,7 @@ module Wrap = struct
                    Kimchi_pasta.Pallas_based_plonk.Keypair.vk_commitments vk
                ; data =
                    (let open Kimchi_bindings.Protocol.Index.Fq in
-                   { constraints = domain_d1_size pk.index })
+                    { constraints = domain_d1_size pk.index } )
                }
              in
              ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t) ;
