@@ -47,7 +47,6 @@
 (package (name generate_keypair))
 (package (name genesis_constants))
 (package (name genesis_ledger_helper))
-(package (name global_signer_private_key))
 (package (name gossip_net))
 (package (name graph_algorithms))
 (package (name graphql_basic_scalars))
