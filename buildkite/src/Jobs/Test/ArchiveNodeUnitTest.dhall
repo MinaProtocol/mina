@@ -31,6 +31,7 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src")
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/ArchiveNodeUnitTest")
+          , S.exactly "buildkite/scripts/tests/archive-node-unit-tests" "sh"
           ]
         , path = "Test"
         , name = "ArchiveNodeUnitTest"
