@@ -23,6 +23,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     let%bind.Option job_id = Deque.dequeue_front t.timeline in
     match Hashtbl.find t.index job_id with
     | Some job when f job ->
+        Deque.enqueue_front t.timeline job_id ;
         Some job
     | _ ->
         remove_until ~f t
