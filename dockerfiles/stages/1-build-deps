@@ -45,6 +45,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
+  adduser \
   libboost-dev \
   libboost-program-options-dev \
   libbz2-dev \
