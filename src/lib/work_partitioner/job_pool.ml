@@ -19,13 +19,13 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
 
   let set_inplace ~id ~job t = Hashtbl.change t.index id ~f:(const (Some job))
 
-  let rec remove_until_first ~pred t =
+  let rec remove_until ~f t =
     let%bind.Option job_id = Deque.dequeue_front t.timeline in
     match Hashtbl.find t.index job_id with
-    | Some job when pred job ->
+    | Some job when f job ->
         Some job
     | _ ->
-        remove_until_first ~pred t
+        remove_until ~f t
 
   let iter_until ~f t =
     let rec loop ((_, preserved_jobs) as acc) : job option * Id.t list =

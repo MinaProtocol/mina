@@ -26,10 +26,9 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
       occupied or not. The order of this item in the timeline is unchanged. *)
   val set_inplace : id:Id.t -> job:job -> t -> unit
 
-  (** [remove_until_first_change ~pred t] iterates through the timeline, remove
-      all jobs unsatisfying [pred], and returns first job satisfying [pred] if
-      it does exit. *)
-  val remove_until_first : pred:(job -> bool) -> t -> job option
+  (** [remove_until ~f t] iterates through the timeline, remove all jobs
+      unsatisfying [f], and returns first job satisfying [f] if it does exit. *)
+  val remove_until : pred:(job -> bool) -> t -> job option
 
   (** [iter_until ~f t] iterates through the timeline, and returns first job
       satisfying [f] if it does exist. *)
