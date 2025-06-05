@@ -53,7 +53,7 @@ in  Pipeline.build
                   , "COVERALLS_TOKEN"
                   ]
                   ( WithCargo.withCargo
-                      "./buildkite/scripts/tests/archive-node-unit-tests.sh"
+                      "./buildkite/scripts/tests/archive-node-unit-tests.sh ${user} ${password} ${db} ${command_key}"
                   )
             , label = "Archive node unit tests"
             , key = command_key

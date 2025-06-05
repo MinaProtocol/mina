@@ -14,4 +14,4 @@ echo "Setting up database for archive node tests..."
 echo "Database setup complete, accessible via $MINA_TEST_POSTGRES . Running archive node unit tests..."
 dune runtest src/app/archive 
 
-./buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
+./buildkite/scripts/upload-partial-coverage-data.sh ${command_key} "dev"
