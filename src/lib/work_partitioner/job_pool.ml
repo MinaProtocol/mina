@@ -29,7 +29,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
         remove_until ~f t
 
   let iter_until ~f t =
-    let rec loop ((_, preserved_jobs) as acc) : job option * Id.t list =
+    let rec loop ((_, preserved_jobs) as acc) =
       match Deque.dequeue_front t.timeline with
       | None ->
           (None, preserved_jobs)
