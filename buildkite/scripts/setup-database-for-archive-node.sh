@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -euox pipefail
 
 user=$1
 password=$2
@@ -14,14 +14,27 @@ service postgresql status
 sudo -u postgres createdb -O "${user}" "${db}"
 
 # detects up a PostgreSQL database for an archive node.
-port=$(sudo -u postgres psql -t -c "SHOW port;" | xargs)
-if [[ -z "$port" ]]; then
-  echo "Failed to detect PostgreSQL port."
-  exit 1
+# Postgresql Environment Variables
+PGVERSION="${PGVERSION:-12}"
+PGPORT_DEFAULT="${PGPORT:-5432}"
+
+psql_config_file="/etc/postgresql/${PGVERSION}/main/postgresql.conf"
+if [[ ! -f "$psql_config_file" ]]; then
+    echo "Error: PostgreSQL configuration file not found"
+    echo "Using PGPORT_DEFAULT: ${PGPORT_DEFAULT}"
+    PGPORT="${PGPORT_DEFAULT}"
+else
+    PGPORT=$(grep -Po 'port = \K.*' "/etc/postgresql/${PGVERSION}/main/postgresql.conf" | awk -F" " '{print $1F}' || echo "error")
+    if [[ $PGPORT == 'error' ]]; then
+        echo "Error: Failed to retrieve PGPORT"
+        echo "Using PGPORT_DEFAULT: ${PGPORT_DEFAULT}"
+        PGPORT="${PGPORT_DEFAULT}"
+    fi
 fi
-  echo "$port"
 
+PGPASSWORD="${password}" psql -h localhost -p "${PGPORT}" -U "${user}" -d "${db}" -a -f src/app/archive/create_schema.sql
 
-PGPASSWORD="${password}" psql -h localhost -p "${port}" -U "${user}" -d "${db}" -a -f src/app/archive/create_schema.sql
+MINA_TEST_POSTGRES="postgres://${user}:${password}@localhost:${PGPORT}/${db}"
 
-export MINA_TEST_POSTGRES="postgres://${user}:${password}@localhost:${port}/${db}"
+export MINA_TEST_POSTGRES
+export PGPORT
