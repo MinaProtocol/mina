@@ -64,9 +64,6 @@ if [[ -z "$VERSION" ]]; then usage "Version is not set!"; exit 1; fi;
 if [[ -z "$NEW_VERSION" ]];  then usage "New Version is not set!"; exit 1; fi;
 if [[ -z "$BUILD_ID" ]]; then usage "Build ID is not set!"; exit 1; fi;
 
-
-DHALL_ARTIFACTS="([] : List $ARTIFACTS_DHALL_DEF.Type)"
-
 if [[ $PUBLISH -eq 1 ]]; then
     DHALL_PUBLISH="True"
   else 
@@ -80,10 +77,15 @@ if [[ $VERIFY -eq 1 ]]; then
 fi
 
 arr_of_artifacts=(${ARTIFACTS//,/ })
-for i in "${arr_of_artifacts[@]}"; do
-  DHALL_ARTIFACTS="${DHALL_ARTIFACTS}, $ARTIFACTS_DHALL_DEF.Type.${i}"
-done
-DHALL_ARTIFACTS="[${DHALL_ARTIFACTS:1}]"
+if [[ ${#arr_of_artifacts[@]} -eq 0 || -z "${arr_of_artifacts[0]}" ]]; then
+  DHALL_ARTIFACTS="([] : List $ARTIFACTS_DHALL_DEF.Type)"
+else
+  DHALL_ARTIFACTS=""
+  for i in "${arr_of_artifacts[@]}"; do
+    DHALL_ARTIFACTS="${DHALL_ARTIFACTS}, $ARTIFACTS_DHALL_DEF.Type.${i}"
+  done
+  DHALL_ARTIFACTS="[${DHALL_ARTIFACTS:1}]"
+fi
 
 
 CODENAMES=(${CODENAMES//,/ })
