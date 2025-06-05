@@ -30,7 +30,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
 
   (** [remove_until ~f t] iterates through the timeline, remove all jobs
       unsatisfying [f], and returns first job satisfying [f] if it does exit. *)
-  val remove_until : pred:(job -> bool) -> t -> job option
+  val remove_until : f:(job -> bool) -> t -> job option
 
   (** [iter_until ~f t] iterates through the timeline, and returns first job
       satisfying [f] if it does exist. *)
