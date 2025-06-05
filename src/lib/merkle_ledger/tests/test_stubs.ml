@@ -128,8 +128,6 @@ module Account_id : sig
 
   val eq :
     (Mina_wire_types.Mina_base_account_id.M.V2.t, t) Core_kernel.Type_equal.t
-
-  val eq2 : (Mina_base.Account_id.t, t) Core_kernel.Type_equal.t
 end = struct
   [%%versioned
   module Stable = struct
@@ -163,8 +161,6 @@ end = struct
       (Quickcheck.Generator.list_with_length num_accounts gen)
 
   let eq = Core_kernel.Type_equal.T
-
-  let eq2 = Core_kernel.Type_equal.T
 end
 
 module Account : sig
