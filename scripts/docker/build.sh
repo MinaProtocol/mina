@@ -128,8 +128,11 @@ case "${SERVICE}" in
         DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"
         DOCKERFILE_PATH_SCRIPT_2_AND_MORE="dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
         case "${INPUT_CODENAME}" in 
-          bullseye|focal)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye-and-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+          bullseye)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
+          focal)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
           noble)
             DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
