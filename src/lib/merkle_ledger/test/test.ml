@@ -3,7 +3,7 @@
 
    Component: Merkle ledger tests
    Subject: Run all Merkle ledger tests
-   Invocation: dune exec src/lib/merkle_ledger_tests/main.exe
+   Invocation: dune exec src/lib/merkle_ledger/test/test.exe
 *)
 
 let () =
