@@ -3,7 +3,8 @@
 
    Component: Merkle ledger
    Subject: Database integration testing
-   Invocation: dune exec src/lib/merkle_ledger_tests/main.exe -- test "Databases"
+   Invocation: \
+     dune exec src/lib/merkle_ledger/test/test.exe -- test "Databases"
 *)
 
 open Core

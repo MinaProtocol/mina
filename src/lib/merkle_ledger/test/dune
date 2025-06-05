@@ -1,5 +1,6 @@
-(test
- (name test_merkle_ledger)
+(executable
+ (public_name test_merkle_ledger)
+ (name test)
  (package merkle_ledger)
  (flags
   (:standard -warn-error +a)
@@ -45,3 +46,9 @@
   signature_lib)
  (instrumentation
   (backend bisect_ppx)))
+
+(rule
+ (alias runtest)
+ (package merkle_ledger)
+ (action
+  (run %{dep:test.exe})))

@@ -4,7 +4,7 @@
    Component: Merkle masks
    Subject: Test Merkle mask connected to underlying Merkle tree
    Invocation: \
-      dune exec src/lib/merkle_ledger_tests/main.exe -- \
+      dune exec src/lib/merkle_ledger/test/test.exe -- \
       test "Mask with underlying Merkle tree"
 *)
 
