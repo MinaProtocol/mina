@@ -1,7 +1,19 @@
 #!/bin/bash
 
+set -euo pipefail
+
 if [[ ! -f dune-project ]]; then
     echo "Error: This script must be run from the root of the repository (where 'dune-project' exists)."
+    exit 1
+fi
+
+user="$1"
+password="$2"
+db="$3"
+command_key="$4"
+
+if [[ -z "$user" || -z "$password" || -z "$db" || -z "$command_key" ]]; then
+    echo "Usage: $0 <user> <password> <db> <command_key>"
     exit 1
 fi
 
