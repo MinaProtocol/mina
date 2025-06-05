@@ -27,20 +27,22 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     | _ ->
         remove_until_first ~pred t
 
-  let first ~pred t =
-    let preserved = ref [] in
-    let rec loop () =
-      let%bind.Option job_id = Deque.dequeue_front t.timeline in
-      match Hashtbl.find t.index job_id with
+  let iter_until ~f t =
+    let rec loop ((_, preserved_jobs) as acc) : job option * Id.t list =
+      match Deque.dequeue_front t.timeline with
       | None ->
-          loop ()
-      | Some job ->
-          preserved := job_id :: !preserved ;
-          if pred job then Some job else loop ()
+          (None, preserved_jobs)
+      | Some job_id -> (
+          match Hashtbl.find t.index job_id with
+          | None ->
+              loop acc
+          | Some job ->
+              if f job then (Some job, job_id :: preserved_jobs)
+              else loop (None, job_id :: preserved_jobs) )
     in
-    let result = loop () in
-    List.iter ~f:(fun item -> Deque.enqueue_front t.timeline item) !preserved ;
-    result
+    let job_found, preserved_jobs = loop (None, []) in
+    List.iter ~f:(Deque.enqueue_front t.timeline) preserved_jobs ;
+    job_found
 
   let add ~id ~job t =
     match Hashtbl.add ~key:id ~data:job t.index with
@@ -50,7 +52,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
            more frequently than insertion, we iterates through the pool to clean
            up removed IDs whenever there's too many of them *)
         if Deque.length t.timeline > 4 * Hashtbl.length t.index then
-          ignore (first ~pred:(const false) t) ;
+          ignore (iter_until ~f:(const false) t) ;
         `Ok
     | `Duplicate ->
         `Duplicate
