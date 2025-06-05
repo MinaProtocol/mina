@@ -47,10 +47,12 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     match Hashtbl.add ~key:id ~data:job t.index with
     | `Ok ->
         Deque.enqueue_back t.timeline id ;
-        (* NOTE: to ensure there's no memleak where removal of job happens much
-           more frequently than insertion, we iterates through the pool to clean
-           up removed IDs whenever there's too many of them *)
+        (* NOTE: removal of jobs from the [t.timeline] happens much less
+           frequently than removal from [t.index], we iterate through the
+           [t.timeline] to remove IDs that are no longer present in the
+           [t.index] *)
         if Deque.length t.timeline > 4 * Hashtbl.length t.index then
+          (* ignoring the result because it will be [None] *)
           ignore (iter_until ~f:(const false) t) ;
         `Ok
     | `Duplicate ->
