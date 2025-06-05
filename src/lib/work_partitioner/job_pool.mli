@@ -23,11 +23,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
       unchanged (hence "inplace" in the name). *)
   val change_inplace : id:Id.t -> f:(job option -> job option) -> t -> unit
 
-  (** [set_inplace ~id ~job t] sets the index [id] to [job] in [t] no matter if [id] is
-      occupied or not. The order of this item in the timeline is unchanged (hence
-      "inplace" in the name). *)
-  val set_inplace : id:Id.t -> job:job -> t -> unit
-
   (** [remove_until ~f t] iterates through the timeline, remove all jobs
       unsatisfying [f], and returns first job satisfying [f] if it does exit. *)
   val remove_until : f:(job -> bool) -> t -> job option
