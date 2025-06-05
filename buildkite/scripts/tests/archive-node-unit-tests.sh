@@ -21,7 +21,7 @@ eval $(opam config env)
 
 echo "Setting up database for archive node tests..."
 
-./buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} 
+source ./buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} 
 
 echo "Database setup complete, accessible via $MINA_TEST_POSTGRES . Running archive node unit tests..."
 dune runtest src/app/archive 
