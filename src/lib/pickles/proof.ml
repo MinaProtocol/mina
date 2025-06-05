@@ -111,8 +111,8 @@ end
 
 type 'mlmb t = (unit, 'mlmb) With_data.t
 
-let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
-    h t =
+let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2
+    ~feature_flags : h t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -146,7 +146,7 @@ let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
                     ; gamma = chal ()
                     ; zeta = scalar_chal ()
                     ; joint_combiner = None
-                    ; feature_flags = Plonk_types.Features.none_bool
+                    ; feature_flags
                     }
                 }
             ; sponge_digest_before_evaluations =
