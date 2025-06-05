@@ -7,6 +7,7 @@ RUN sudo apt-get update --quiet \
   && sudo apt-get install --no-install-recommends --quiet --yes \
     libssl3t64 \
     libproc2-0 \
+    snapd \
   && sudo rm -rf /var/lib/apt/lists/*
 
 RUN snap install aws-cli --classic
