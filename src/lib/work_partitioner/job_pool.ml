@@ -27,19 +27,19 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
         remove_until ~f t
 
   let iter_until ~f t =
-    let rec loop ((_, preserved_jobs) as acc) =
+    let rec loop preserved_jobs =
       match Deque.dequeue_front t.timeline with
       | None ->
           (None, preserved_jobs)
       | Some job_id -> (
           match Hashtbl.find t.index job_id with
           | None ->
-              loop acc
+              loop preserved_jobs
           | Some job ->
               if f job then (Some job, job_id :: preserved_jobs)
-              else loop (None, job_id :: preserved_jobs) )
+              else loop (job_id :: preserved_jobs) )
     in
-    let job_found, preserved_jobs = loop (None, []) in
+    let job_found, preserved_jobs = loop [] in
     List.iter ~f:(Deque.enqueue_front t.timeline) preserved_jobs ;
     job_found
 
