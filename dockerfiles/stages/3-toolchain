@@ -21,7 +21,6 @@ RUN apt-get update --yes \
     aptly \
     apt-transport-https \
     apt-utils \
-    awscli \
     fakeroot \
     gnupg2 \
     jq \
