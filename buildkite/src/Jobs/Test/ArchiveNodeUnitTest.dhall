@@ -61,7 +61,7 @@ in  Pipeline.build
                       " && "
                       [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} ${port}"
                       , WithCargo.withCargo
-                          "eval \\\$(opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
+                          "eval \\\$(/usr/bin/opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                       ]
                   )
             , label = "Archive node unit tests"
