@@ -8,4 +8,4 @@ RUN sudo apt-get update --quiet \
     libssl-dev \
     libprocps-dev \
     '(^lld-10$|^lld-11$)' \
-  && rm -rf /var/lib/apt/lists/*
+  && sudo rm -rf /var/lib/apt/lists/*
