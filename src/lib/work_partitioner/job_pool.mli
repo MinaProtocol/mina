@@ -19,11 +19,12 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
 
   (** [change_inplace ~id ~f t] attempts to find an item with id [id] in the
       pool, and apply [f] on it. The order of this item in the timeline is
-      unchanged. *)
+      unchanged (hence "inplace" in the name). *)
   val change_inplace : id:Id.t -> f:(job option -> job option) -> t -> unit
 
-  (** [set ~id ~job t] sets the index [id] to [job] in [t] no matter if [id] is
-      occupied or not. The order of this item in the timeline is unchanged. *)
+  (** [set_inplace ~id ~job t] sets the index [id] to [job] in [t] no matter if [id] is
+      occupied or not. The order of this item in the timeline is unchanged (hence
+      "inplace" in the name). *)
   val set_inplace : id:Id.t -> job:job -> t -> unit
 
   (** [remove_until ~f t] iterates through the timeline, remove all jobs
