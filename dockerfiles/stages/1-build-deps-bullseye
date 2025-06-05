@@ -1,10 +1,10 @@
-FROM build-deps AS build-deps-noble
+FROM build-deps AS build-deps-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
-    libssl3t64 \
-    libproc2-0 \
+    libssl-dev \
+    libprocps-dev \
   && rm -rf /var/lib/apt/lists/*

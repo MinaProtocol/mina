@@ -1,5 +1,4 @@
-ARG image=ubuntu:focal
-FROM ${image} AS build-deps-bullseye-and-focal
+FROM build-deps AS build-deps-focal
 
 ENV DEBIAN_FRONTEND=noninteractive
 
