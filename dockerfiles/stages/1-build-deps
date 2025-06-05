@@ -4,6 +4,12 @@
 #################################################################################################
 # Supports debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
+# Use the image argument to select the base image for this stage
+# This allows us to use the same Dockerfile for different base images
+# This arg is defined here globally and does not need to be redefined in
+# any other stages.
+ARG deb_codename
+
 FROM ${image} AS build-deps
 
 # Ocaml Version
