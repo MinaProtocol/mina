@@ -113,6 +113,8 @@ fi
 
 if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
+export_base_image
+
 case "${SERVICE}" in
     mina-archive)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
@@ -168,7 +170,6 @@ case "${SERVICE}" in
 esac
 
 export_version
-export_base_image
 export_docker_tag
 
 BUILD_NETWORK="--network=host"

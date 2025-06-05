@@ -9,7 +9,7 @@ function export_base_image () {
     bionic|focal|impish|jammy)
         IMAGE="ubuntu:${DEB_CODENAME##*=}"
     ;;
-    stretch|buster|bullseye|bookworm|sid)
+    stretch|buster|bullseye|bookworm|noble|sid)
         IMAGE="debian:${DEB_CODENAME##*=}-slim"
     ;;
     esac
