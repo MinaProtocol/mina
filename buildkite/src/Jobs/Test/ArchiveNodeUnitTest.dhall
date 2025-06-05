@@ -1,5 +1,3 @@
-let Prelude = ../../External/Prelude.dhall
-
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -54,9 +52,8 @@ in  Pipeline.build
                   , "DUNE_INSTRUMENT_WITH=bisect_ppx"
                   , "COVERALLS_TOKEN"
                   ]
-                      [ WithCargo.withCargo
-                          "eval \\\$(opam config env) && ./buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
-                      ]
+                  ( WithCargo.withCargo
+                      "eval \\\$(opam config env) && ./buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
                   )
             , label = "Archive node unit tests"
             , key = command_key
