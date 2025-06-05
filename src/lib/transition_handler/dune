@@ -54,6 +54,7 @@
   internal_tracing
   transition_frontier_extensions
   staged_ledger_diff
+  staged_ledger
   mina_runtime_config)
  (instrumentation
   (backend bisect_ppx))
