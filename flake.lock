@@ -342,11 +342,11 @@
     "o1-opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1715294616,
-        "narHash": "sha256-W2p9Vs8PqpKGvMByxVqpxAljjpEMqNcuNnjMBAAKicI=",
+        "lastModified": 1749055102,
+        "narHash": "sha256-JEeAGWyzlWbUoYwav7mpFY/aYuZ/qay7xirnp+2pWGs=",
         "owner": "o1-labs",
         "repo": "opam-repository",
-        "rev": "38d6995e307c82b3c0b3bc86a867213db724d1c5",
+        "rev": "677657206d9da47987a4eff8087c1f3a258908f3",
         "type": "github"
       },
       "original": {
