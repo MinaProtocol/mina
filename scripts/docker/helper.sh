@@ -6,7 +6,7 @@ export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-su
 function export_base_image () {
     # Determine the proper image for ubuntu or debian
     case "${DEB_CODENAME##*=}" in
-    bionic|focal|impish|jammy)
+    bionic|focal|impish|jammy|noble)
         IMAGE="ubuntu:${DEB_CODENAME##*=}"
     ;;
     stretch|buster|bullseye|bookworm|sid)

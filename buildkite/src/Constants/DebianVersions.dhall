@@ -10,7 +10,7 @@ let BuildFlags = ./BuildFlags.dhall
 
 let S = ../Lib/SelectFiles.dhall
 
-let DebVersion = < Bookworm | Bullseye | Jammy | Focal >
+let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
 let capitalName =
           \(debVersion : DebVersion)
@@ -19,6 +19,7 @@ let capitalName =
             , Bullseye = "Bullseye"
             , Jammy = "Jammy"
             , Focal = "Focal"
+            , Noble = "Noble"
             }
             debVersion
 
@@ -29,6 +30,7 @@ let lowerName =
             , Bullseye = "bullseye"
             , Jammy = "jammy"
             , Focal = "focal"
+            , Noble = "noble"
             }
             debVersion
 
@@ -49,13 +51,7 @@ let dependsOnStep =
                                              network}${profileSuffix}${BuildFlags.toSuffixUppercase
                                                                          buildFlag}"
 
-          in  merge
-                { Bookworm = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Bullseye = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Jammy = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Focal = [ { name = name, key = "${step}-deb-pkg" } ]
-                }
-                debVersion
+          in  [ { name = name, key = "${step}-deb-pkg" } ]
 
 let dependsOn =
           \(debVersion : DebVersion)
@@ -113,6 +109,7 @@ let dirtyWhen =
             , Bullseye = bullseyeDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
+            , Noble = minimalDirtyWhen
             }
             debVersion
 
