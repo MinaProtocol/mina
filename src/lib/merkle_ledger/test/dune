@@ -1,7 +1,6 @@
-(library
- (name merkle_ledger_tests)
- (public_name merkle_ledger_tests)
- (library_flags -linkall)
+(test
+ (name test_merkle_ledger)
+ (package merkle_ledger)
  (flags
   (:standard -warn-error +a)
   -open
