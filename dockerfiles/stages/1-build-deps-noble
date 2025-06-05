@@ -7,7 +7,9 @@ RUN sudo apt-get update --quiet \
   && sudo apt-get install --no-install-recommends --quiet --yes \
     libssl3t64 \
     libproc2-0 \
-    snapd \
   && sudo rm -rf /var/lib/apt/lists/*
 
-RUN snap install aws-cli --classic
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+  && unzip awscliv2.zip \
+  && ./aws/install \
+  && rm -rf awscliv2.zip aws
