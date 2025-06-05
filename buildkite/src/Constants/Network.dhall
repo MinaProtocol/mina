@@ -23,8 +23,8 @@ let lowerName =
             { Devnet = "devnet"
             , Mainnet = "mainnet"
             , Berkeley = "berkeley"
-            , DevnetLegacy = "devnet-legacy"
-            , MainnetLegacy = "mainnet-legacy"
+            , DevnetLegacy = "devnet_legacy"
+            , MainnetLegacy = "mainnet_legacy"
             }
             network
 
