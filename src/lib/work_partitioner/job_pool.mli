@@ -10,11 +10,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
   (** [create ()] creates an empty job pool *)
   val create : unit -> t
 
-  (** [add ~id ~job t] attempts to add a job [job] with id [id] to [t]. It
-      returns [`Ok] on successful, and [`Duplicate] if the key [id] is already
-      occupied in the pool. *)
-  val add : id:Id.t -> job:job -> t -> [> `Duplicate | `Ok ]
-
   (** [remove ~id t] removes job corresponding to [id] in [t] and returns it if
       it does exist *)
   val remove : id:Id.t -> t -> job option
@@ -36,7 +31,12 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
       it does exit. *)
   val remove_until_first : pred:(job -> bool) -> t -> job option
 
-  (** [first ~pred t] iterates through the timeline, and returns first job
-      satisfying [pred] if it does exist. *)
-  val first : pred:(job -> bool) -> t -> job option
+  (** [iter_until ~f t] iterates through the timeline, and returns first job
+      satisfying [f] if it does exist. *)
+  val iter_until : f:(job -> bool) -> t -> job option
+
+  (** [add ~id ~job t] attempts to add a job [job] with id [id] to [t]. It
+      returns [`Ok] on successful, and [`Duplicate] if the key [id] is already
+      occupied in the pool. *)
+  val add : id:Id.t -> job:job -> t -> [> `Duplicate | `Ok ]
 end
