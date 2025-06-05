@@ -11,14 +11,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
   let create () =
     { timeline = Deque.create (); index = Hashtbl.create (module Id) }
 
-  let add ~id ~job t =
-    match Hashtbl.add ~key:id ~data:job t.index with
-    | `Ok ->
-        Deque.enqueue_back t.timeline id ;
-        `Ok
-    | `Duplicate ->
-        `Duplicate
-
   let remove ~id t = Hashtbl.find_and_remove t.index id
 
   let find ~id t = Hashtbl.find t.index id
@@ -49,4 +41,17 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     let result = loop () in
     List.iter ~f:(fun item -> Deque.enqueue_front t.timeline item) !preserved ;
     result
+
+  let add ~id ~job t =
+    match Hashtbl.add ~key:id ~data:job t.index with
+    | `Ok ->
+        Deque.enqueue_back t.timeline id ;
+        (* NOTE: to ensure there's no memleak where removal of job happens much
+           more frequently than insertion, we iterates through the pool to clean
+           up removed IDs whenever there's too many of them *)
+        if Deque.length t.timeline > 4 * Hashtbl.length t.index then
+          ignore (first ~pred:(const false) t) ;
+        `Ok
+    | `Duplicate ->
+        `Duplicate
 end
