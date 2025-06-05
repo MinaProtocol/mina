@@ -54,12 +54,12 @@ module Migrated = struct
 end
 
 module Inputs_migrated =
-  Test_database.Make_inputs (Migrated.Account) (Migrated.Hash)
+  Test_database_in_mem.Make_inputs (Migrated.Account) (Migrated.Hash)
 
 module type DB_migrated =
-  Test_database.Account_Db with type account := Migrated.Account.t
+  Test_database_in_mem.Account_Db with type account := Migrated.Account.t
 
-module Db = Database.Make (Test_database.Inputs)
+module Db = Database.Make (Test_database_in_mem.Inputs)
 module Db_migrated = Database.Make (Inputs_migrated)
 
 module Db_converting =
@@ -82,7 +82,7 @@ module Db_converting =
         ; unstable_field = account.nonce
         }
 
-      include Test_database.Inputs
+      include Test_database_in_mem.Inputs
     end)
     (Db)
     (Db_migrated)
