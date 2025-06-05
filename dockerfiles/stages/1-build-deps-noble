@@ -1,4 +1,4 @@
-ARG image=ubuntu:focal
+ARG image=debian:noble
 FROM ${image} AS build-deps-noble
 
 ENV DEBIAN_FRONTEND=noninteractive
