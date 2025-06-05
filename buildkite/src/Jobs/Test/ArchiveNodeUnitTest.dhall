@@ -53,7 +53,7 @@ in  Pipeline.build
                   , "COVERALLS_TOKEN"
                   ]
                   ( WithCargo.withCargo
-                      "eval \\\$(opam config env) && ./buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} && MINA_TEST_POSTGRES=\\\$MINA_TEST_POSTGRES dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
+                      "./buildkite/scripts/tests/archive-node-unit-tests.sh"
                   )
             , label = "Archive node unit tests"
             , key = command_key
