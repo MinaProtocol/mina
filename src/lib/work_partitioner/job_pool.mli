@@ -3,8 +3,9 @@ open Core_kernel
 module Make (Id : Hashtbl.Key) (Spec : T) : sig
   type job = (Spec.t, Id.t) Snark_work_lib.With_job_meta.t
 
-  (** [t] is a immutable job pool, it differs from a normal Map in that jobs
-      could be canceled with [fold_until]. *)
+  (** [t] is a structure based on a hashmap that also keeps a queue of elements
+      in the order they were added to the pool and allows to iterate in that
+      order using iter_until and remove_until functions. *)
   type t
 
   (** [create ()] creates an empty job pool *)
