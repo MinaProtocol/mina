@@ -24,6 +24,15 @@ let runInToolchainBookworm
             environment
             innerScript
 
+let runInToolchainNoble
+    : List Text -> Text -> List Cmd.Type
+    =     \(environment : List Text)
+      ->  \(innerScript : Text)
+      ->  runInToolchainImage
+            ContainerImages.minaToolchainNoble
+            environment
+            innerScript
+
 let runInToolchainBullseye
     : List Text -> Text -> List Cmd.Type
     =     \(environment : List Text)
@@ -46,4 +55,5 @@ in  { runInToolchain = runInToolchain
     , runInToolchainImage = runInToolchainImage
     , runInToolchainBookworm = runInToolchainBookworm
     , runInToolchainBullseye = runInToolchainBullseye
+    , runInToolchainNoble = runInToolchainNoble
     }
