@@ -325,10 +325,6 @@ module Pipe : sig
 
     val transition_frontier_primary_transitions : Counter.t
 
-    val router_transition_frontier_controller : Counter.t
-
-    val router_bootstrap_controller : Counter.t
-
     val router_verified_transitions : Counter.t
 
     val router_transitions : Counter.t
