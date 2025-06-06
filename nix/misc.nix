@@ -3,6 +3,9 @@ final: prev: {
   sodium-static =
     final.libsodium.overrideAttrs (o: { dontDisableStatic = true; });
 
+  # Even if rocksdb is in o1-labs/opam-repository, we rely on a version from
+  # nixpkgs. Previous attempts to use the opam version failed.
+  # See https://github.com/MinaProtocol/mina/pull/17343
   rocksdb = (prev.rocksdb.override {
     snappy = null;
     lz4 = null;
