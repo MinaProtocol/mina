@@ -261,12 +261,6 @@
         };
     } // utils.lib.eachDefaultSystem (system:
       let
-        rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isx86_64 then {
-            rocksdb-mina = pkgs.rocksdb511;
-          } else {
-            rocksdb-mina = pkgs.rocksdb;
-          };
         go119Overlay = (_: _: {
           inherit (nixpkgs-old.legacyPackages.${system})
             go_1_19 buildGo119Module;
@@ -286,7 +280,7 @@
                 };
             })
           ] ++ builtins.attrValues self.overlays
-            ++ [ rocksdbOverlay go119Overlay ]));
+            ++ [ go119Overlay ]));
 
         checks = import ./nix/checks.nix inputs pkgs;
 
