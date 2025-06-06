@@ -1,10 +1,10 @@
-(* Testing
-   -------
+(** Testing
+    -------
 
-   Component: Pickles
-   Subject: Test side-loaded verification key
-   Invocation: \
-    dune exec src/lib/pickles/test/main.exe -- test "Side-loaded verification key"
+    Component: Pickles
+    Subject: Test side-loaded verification key
+    Invocation: \
+     dune exec src/lib/pickles/test/test_side_loaded_verification_key.exe
 *)
 
 module SLV_key = Pickles__Side_loaded_verification_key
@@ -34,8 +34,9 @@ let test_input_size () =
          in
          typ.size_in_field_elements ) )
 
-let tests =
+let () =
   let open Alcotest in
-  [ ( "Side-loaded verification key"
-    , [ test_case "test_input_size" `Quick test_input_size ] )
-  ]
+  run "Side-loaded verification key"
+    [ ( "Side-loaded verification key"
+      , [ test_case "test_input_size" `Quick test_input_size ] )
+    ]

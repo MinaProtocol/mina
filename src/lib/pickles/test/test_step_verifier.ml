@@ -1,10 +1,10 @@
-(* Testing
-   -------
+(** Testing
+    -------
 
-   Component: Pickles
-   Subject: Test Step_verifier
-   Invocation: \
-    dune exec src/lib/pickles/test/main.exe -- test "Step verifier"
+    Component: Pickles
+    Subject: Test Step_verifier
+    Invocation: \
+     dune exec src/lib/pickles/test/test_step_verifier.exe
 *)
 
 module Step_main_inputs = Pickles__Step_main_inputs
@@ -44,8 +44,9 @@ let test_side_loaded_domains () =
         (run (fun () ->
              (checked_domain ())#vanishing_polynomial (Field.constant pt) ) ) )
 
-let tests =
+let () =
   let open Alcotest in
-  [ ( "Step verifier"
-    , [ test_case "side loaded domains" `Quick test_side_loaded_domains ] )
-  ]
+  run "Step verifier"
+    [ ( "Step verifier tests"
+      , [ test_case "side loaded domains" `Quick test_side_loaded_domains ] )
+    ]
