@@ -5,7 +5,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
 
   (** [t] is a structure based on a hashmap that also keeps a queue of elements
       in the order they were added to the pool and allows to iterate in that
-      order using iter_until and remove_until functions. *)
+      order using [iter_until] and [remove_until_reschedule] functions. *)
   type t
 
   (** [create ()] creates an empty job pool *)
@@ -24,9 +24,17 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
       unchanged (hence "inplace" in the name). *)
   val change_inplace : id:Id.t -> f:(job option -> job option) -> t -> unit
 
-  (** [remove_until ~f t] iterates through the timeline, remove all jobs
-      unsatisfying [f], and returns first job satisfying [f] if it does exit. *)
-  val remove_until : f:(job -> bool) -> t -> job option
+  (** [remove_until_reschedule ~keep_condition ~should_reschedule t] iterates through the
+      timeline, remove all jobs unsatisfying [keep_condition], and reschedule
+      satisfying [should_reschedule j], where [j] is the first job satisfying
+      [keep_condition], if it does exit. If [should_reschedule j] returns
+      [Some _], that job is rescheduled at the end of the queue, o.w. the job is
+      left unchanged at queue head. *)
+  val remove_until_reschedule :
+       keep_condition:(job -> bool)
+    -> should_reschedule:(job -> job option)
+    -> t
+    -> job option
 
   (** [iter_until ~f t] iterates through the timeline, and returns first job
       satisfying [f] if it does exist. *)

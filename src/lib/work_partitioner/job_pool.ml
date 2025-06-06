@@ -17,14 +17,20 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
 
   let change_inplace ~id ~f t = Hashtbl.change t.index id ~f
 
-  let rec remove_until ~f t =
+  let rec remove_until_reschedule ~keep_condition ~should_reschedule t =
     let%bind.Option job_id = Deque.dequeue_front t.timeline in
     match Hashtbl.find t.index job_id with
-    | Some job when f job ->
-        Deque.enqueue_front t.timeline job_id ;
-        Some job
+    | Some job when keep_condition job -> (
+        match should_reschedule job with
+        | Some rescheduled_job ->
+            Hashtbl.set t.index ~key:job_id ~data:rescheduled_job ;
+            Deque.enqueue_back t.timeline job_id ;
+            Some rescheduled_job
+        | None ->
+            Deque.enqueue_front t.timeline job_id ;
+            None )
     | _ ->
-        remove_until ~f t
+        remove_until_reschedule ~keep_condition ~should_reschedule t
 
   let iter_until ~f t =
     let rec loop preserved_jobs =
