@@ -4,7 +4,7 @@
    Component: In memory database
    Subject: Merkle ledger tests for in-memory database
    Invocation: \
-     dune exec src/lib/merkle_ledger_tests/main.exe -- test "In-memory db"
+     dune exec src/lib/merkle_ledger/test/test.exe -- test "In-memory db"
 *)
 
 open Core
