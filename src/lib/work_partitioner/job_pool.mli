@@ -36,9 +36,10 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
     -> t
     -> job option
 
-  (** [iter_until ~f t] iterates through the timeline, and returns first job
-      satisfying [f] if it does exist. *)
-  val iter_until : f:(job -> bool) -> t -> job option
+  (** [iter_until ~f t] iterates through the timeline, and returns first [Some _]
+      when applying each encountered job to [f]. If there's no such job, return
+      [None] *)
+  val iter_until : f:(job -> 'result option) -> t -> 'result option
 
   (** [add ~id ~job t] attempts to add a job [job] with id [id] to [t]. It
       returns [`Ok] on successful, and [`Duplicate] if the key [id] is already

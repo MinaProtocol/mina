@@ -41,13 +41,16 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
           match Hashtbl.find t.index job_id with
           | None ->
               loop preserved_jobs
-          | Some job ->
-              if f job then (Some job, job_id :: preserved_jobs)
-              else loop (job_id :: preserved_jobs) )
+          | Some job -> (
+              match f job with
+              | Some _ as result ->
+                  (result, job_id :: preserved_jobs)
+              | None ->
+                  loop (job_id :: preserved_jobs) ) )
     in
-    let job_found, preserved_jobs = loop [] in
+    let result, preserved_jobs = loop [] in
     List.iter ~f:(Deque.enqueue_front t.timeline) preserved_jobs ;
-    job_found
+    result
 
   let add ~id ~job t =
     match Hashtbl.add ~key:id ~data:job t.index with
@@ -59,7 +62,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
            [t.index] *)
         if Deque.length t.timeline > 4 * Hashtbl.length t.index then
           (* ignoring the result because it will be [None] *)
-          ignore (iter_until ~f:(const false) t) ;
+          ignore (iter_until ~f:(const None) t) ;
         `Ok
     | `Duplicate ->
         `Duplicate
