@@ -53,7 +53,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     match Hashtbl.add ~key:id ~data:job t.index with
     | `Ok ->
         Deque.enqueue_back t.timeline id ;
-        (* NOTE: removal of jobs from the [t.timeline] happens much less
+        (* NOTE: when removal of jobs from the [t.timeline] happens much less
            frequently than removal from [t.index], we iterate through the
            [t.timeline] to remove IDs that are no longer present in the
            [t.index] *)
