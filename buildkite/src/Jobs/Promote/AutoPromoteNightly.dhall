@@ -53,7 +53,7 @@ let promotePackages =
       , version = "\\\${FROM_VERSION_MANUAL:-\\\${MINA_DEB_VERSION}}"
       , architecture = "amd64"
       , new_debian_version = "\\\$(date \"+%Y%m%d\")"
-      , profile = Profiles.Type.Standard
+      , profile = Profiles.Type.Devnet
       , network = Network.Type.Devnet
       , codenames =
         [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
@@ -70,7 +70,7 @@ let verifyPackages =
       , debians = [] : List DebianPackage.Type
       , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
       , new_debian_version = "\\\$(date \"+%Y%m%d\")"
-      , profile = Profiles.Type.Standard
+      , profile = Profiles.Type.Devnet
       , network = Network.Type.Devnet
       , codenames =
         [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]

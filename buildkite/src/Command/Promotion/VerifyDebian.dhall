@@ -23,7 +23,7 @@ let promoteDebianVerificationStep =
 
                 then  "${Package.debianName
                            spec.package
-                           Profiles.Type.Standard
+                           Profiles.Type.Devnet
                            spec.network}"
 
                 else  Package.debianName spec.package spec.profile spec.network

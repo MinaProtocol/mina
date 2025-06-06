@@ -54,7 +54,7 @@ let MinaBuildSpec =
           { prefix = "MinaArtifact"
           , artifacts = Artifacts.AllButTests
           , debVersion = DebianVersions.DebVersion.Bullseye
-          , profile = Profiles.Type.Standard
+          , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
@@ -82,12 +82,6 @@ let nameSuffix
                                    spec.network}${Profiles.toSuffixUppercase
                                                     spec.profile}${BuildFlags.toSuffixUppercase
                                                                      spec.buildFlags}"
-
-let keySuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
-      ->  "${Profiles.toLabelSegment spec.profile}${BuildFlags.toLabelSegment
-                                                      spec.buildFlags}"
 
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
@@ -179,7 +173,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.Daemon
-                    , network = Network.lowerName spec.network
+                    , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
@@ -193,7 +187,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.BatchTxn
-                    , network = Network.lowerName spec.network
+                    , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , build_flags = spec.buildFlags
@@ -216,7 +210,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.Rosetta
-                    , network = Network.lowerName spec.network
+                    , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
                     , docker_publish = docker_publish
@@ -238,7 +232,7 @@ let docker_step
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
                     , service = Artifacts.Type.FunctionalTestSuite
-                    , network = Network.lowerName Network.Type.Berkeley
+                    , network = spec.network
                     , deb_codename = spec.debVersion
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
@@ -322,5 +316,4 @@ in  { pipeline = pipeline
     , publishToDebian = publish_to_debian_repo
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
-    , keySuffix = keySuffix
     }

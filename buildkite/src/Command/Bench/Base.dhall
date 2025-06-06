@@ -14,6 +14,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let Network = ../../Constants/Network.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 
 let Command = ../../Command/Base.dhall
@@ -49,10 +51,13 @@ let Spec =
           { mode = PipelineMode.Type.PullRequest
           , size = Size.Perf
           , dependsOn =
-              DebianVersions.dependsOn
+              DebianVersions.dependsOnStep
+                (None Text)
                 DebianVersions.DebVersion.Bullseye
                 Network.Type.Berkeley
-                Profiles.Type.Standard
+                Profiles.Type.Devnet
+                BuildFlags.Type.Instrumented
+                "build"
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2
