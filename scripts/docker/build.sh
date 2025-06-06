@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
 
-set -x 
+# Enable debug output only in CI environments
+if [[ -n "$CI" || -n "$BUILDKITE" || -n "$GITHUB_ACTIONS" ]]; then
+  set -x
+fi
+
 # Author's Note: Because the structure of this repo is inconsistent (Dockerfiles and build contexts placed willy-nilly)
 # we have to trustlist and configure image builds individually because each one is going to be slightly different.
 # This is needed as opposed to trusting the structure of the each project to be consistent for every deployable.
@@ -9,8 +13,8 @@ set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-source ${SCRIPTPATH}/helper.sh
+SCRIPTPATH="$( cd "$(dirname "$0")" || exit ; pwd -P )"
+source "${SCRIPTPATH}"/helper.sh
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -47,7 +51,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
-  --deb-repo-key) DEB_REPO_KEY="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -56,13 +59,13 @@ if [[ -z "$SERVICE" ]]; then usage "Service is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
 
 NETWORK="--build-arg network=$INPUT_NETWORK"
-if [[ -z "$INPUT_NETWORK" ]]; then 
+if [[ -z "$INPUT_NETWORK" ]]; then
   echo "Network is not set. Using the default (devnet)"
   NETWORK="--build-arg network=devnet"
 fi
 
 BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
-if [[ -z "$INPUT_BRANCH" ]]; then 
+if [[ -z "$INPUT_BRANCH" ]]; then
   echo "Branch is not set. Using the default (compatible)"
   BRANCH="--build-arg MINA_BRANCH=compatible"
 fi
@@ -74,44 +77,44 @@ if [[ -z "${MINA_REPO}" ]]; then
 fi
 
 DEB_CODENAME="--build-arg deb_codename=$INPUT_CODENAME"
-if [[ -z "$INPUT_CODENAME" ]]; then 
+if [[ -z "$INPUT_CODENAME" ]]; then
   echo "Debian codename is not set. Using the default (bullseye)"
   DEB_CODENAME="--build-arg deb_codename=bullseye"
 fi
 
 DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
-if [[ -z "$INPUT_RELEASE" ]]; then 
+if [[ -z "$INPUT_RELEASE" ]]; then
   echo "Debian release is not set. Using the default (unstable)"
   DEB_RELEASE="--build-arg deb_release=unstable"
 fi
 
 DEB_VERSION="--build-arg deb_version=$INPUT_VERSION"
-if [[ -z "$INPUT_VERSION" ]]; then 
+if [[ -z "$INPUT_VERSION" ]]; then
   echo "Debian version is not set. Using the default ($VERSION)"
   DEB_VERSION="--build-arg deb_version=$VERSION"
 fi
 
-if [[ -z "$DEB_PROFILE" ]]; then 
+if [[ -z "$DEB_PROFILE" ]]; then
   echo "Debian profile is not set. Using the default (standard)"
   DEB_PROFILE="standard"
 fi
 
-if [[ -z "$DEB_BUILD_FLAGS" ]]; then 
+if [[ -z "$DEB_BUILD_FLAGS" ]]; then
   DEB_BUILD_FLAGS=""
 fi
 
 CACHE="--cache-from $INPUT_CACHE"
-if [[ -z "$INPUT_CACHE" ]]; then 
+if [[ -z "$INPUT_CACHE" ]]; then
   CACHE=""
 fi
 
 DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
-if [[ -z "$INPUT_REPO" ]]; then 
+if [[ -z "$INPUT_REPO" ]]; then
   echo "Debian repository is not set. Using the default (http://localhost:8080)"
   DEB_REPO="--build-arg deb_repo=http://localhost:8080"
 fi
 
-if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
+if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
 export_base_image
 
@@ -127,7 +130,7 @@ case "${SERVICE}" in
     mina-toolchain)
         DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"
         DOCKERFILE_PATH_SCRIPT_2_AND_MORE="dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
-        case "${INPUT_CODENAME}" in 
+        case "${INPUT_CODENAME}" in
           bullseye)
             DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
@@ -184,7 +187,7 @@ docker system prune --all --force --filter until=24h
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO -t "$TAG" -
+  docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO -t "$TAG" - - < ${DOCKER_CONTEXT}
 else
   docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
