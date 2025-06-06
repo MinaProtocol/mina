@@ -8,7 +8,6 @@ type t
 val create :
      job:(Spec.Single.t, Id.Single.t) With_job_meta.t
   -> unscheduled_segments:Spec.Sub_zkapp.Stable.Latest.t Base.Queue.t
-  -> pending_mergeable_proofs:Ledger_proof.t Deque.t
   -> t
 
 (** [next_job_spec t] extracts another job spec from t, mutating the internal
