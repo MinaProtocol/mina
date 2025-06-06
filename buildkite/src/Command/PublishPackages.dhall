@@ -83,6 +83,7 @@ let Spec =
           , depends_on = [] : List Command.TaggedKey.Type
           , publish_to_docker_io = False
           , verify = True
+          , branch = ""
           }
       }
 

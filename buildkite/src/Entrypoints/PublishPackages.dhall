@@ -32,7 +32,6 @@ let promote_artifacts =
       ->  \(repo : DebianRepo.Type)
       ->  \(publish : Bool)
       ->  \(verify : Bool)
-      ->  \(branch : Text)
       ->  \(build_id : Text)
       ->  let spec =
                 PublishPackages.Spec::{
@@ -45,7 +44,6 @@ let promote_artifacts =
                 , backend = "local"
                 , verify = True
                 , source_version = version
-                , branch = branch
                 , build_id = build_id
                 , new_docker_tags =
                         \(codename : DebianVersions.DebVersion)
