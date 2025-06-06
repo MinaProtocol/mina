@@ -142,9 +142,8 @@ copy_common_daemon_configs() {
   echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
 
   # Copy shared binaries
-  cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+  cp ./default/src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
   cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
-  cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
   cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
   # Copy signature-based Binaries (based on signature type $2 passed into the function)
@@ -184,22 +183,6 @@ copy_common_daemon_configs() {
   mkdir -p "${BUILDDIR}/etc/bash_completion.d"
   env COMMAND_OUTPUT_INSTALLATION_BASH=1 "${BUILDDIR}/usr/local/bin/mina" > "${BUILDDIR}/etc/bash_completion.d/mina"
 }
-
-##################################### GENERATE KEYPAIR PACKAGE #######################################
-build_keypair_deb() {
-  echo "------------------------------------------------------------"
-  echo "--- Building generate keypair deb:"
-
-  create_control_file mina-generate-keypair "${SHARED_DEPS}" 'Utility to regenerate mina private public keys in new format' "${SUGGESTED_DEPS}"
-
-  # Binaries
-  cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
-  cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-
-  build_deb mina-generate-keypair
-}
-##################################### END GENERATE KEYPAIR PACKAGE #######################################
-
 
 ##################################### LOGPROC PACKAGE #######################################
 build_logproc_deb() {
