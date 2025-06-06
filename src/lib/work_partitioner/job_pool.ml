@@ -1,42 +1,71 @@
 open Core_kernel
 
-type ('accum, 'final) fold_action =
-  | Continue of 'accum
-  | Continue_remove of 'accum
-  | Stop of 'final
-  | Stop_remove of 'final
-
-module Make (Id : Map.Key) (Spec : T) = struct
+module Make (Id : Hashtbl.Key) (Spec : T) = struct
   type job = (Spec.t, Id.t) Snark_work_lib.With_job_meta.t
 
-  module IdMap = Map.Make (Id)
+  type t =
+    { timeline : Id.t Deque.t (* For iteration *)
+    ; index : (Id.t, job) Hashtbl.t (* For marking job as done *)
+    }
 
-  type t = job IdMap.t
+  let create () =
+    { timeline = Deque.create (); index = Hashtbl.create (module Id) }
 
-  let first_job t : job option = IdMap.min_elt t |> Option.map ~f:Tuple2.get2
+  let remove ~id t = Hashtbl.find_and_remove t.index id
 
-  let fold_until ~init ~f ~finish t =
-    let seq = IdMap.to_sequence ~order:`Increasing_key t in
-    let handle_item (acc, retained) (k, v) =
-      match f acc v with
-      | Continue acc_new ->
-          Continue_or_stop.Continue (acc_new, retained)
-      | Continue_remove acc_new ->
-          Continue (acc_new, IdMap.remove retained k)
-      | Stop final ->
-          Stop (final, retained)
-      | Stop_remove final ->
-          Stop (final, IdMap.remove retained k)
+  let find ~id t = Hashtbl.find t.index id
+
+  let change_inplace ~id ~f t = Hashtbl.change t.index id ~f
+
+  let rec remove_until_reschedule ~f t =
+    let%bind.Option job_id = Deque.dequeue_front t.timeline in
+    match Hashtbl.find t.index job_id with
+    | Some job -> (
+        match f job with
+        | `Remove ->
+            remove_until_reschedule ~f t
+        | `Stop_keep ->
+            Deque.enqueue_front t.timeline job_id ;
+            None
+        | `Stop_reschedule rescheduled_job ->
+            Hashtbl.set t.index ~key:job_id ~data:rescheduled_job ;
+            Deque.enqueue_back t.timeline job_id ;
+            Some rescheduled_job )
+    | _ ->
+        remove_until_reschedule ~f t
+
+  let iter_until ~f t =
+    let rec loop preserved_jobs =
+      match Deque.dequeue_front t.timeline with
+      | None ->
+          (None, preserved_jobs)
+      | Some job_id -> (
+          match Hashtbl.find t.index job_id with
+          | None ->
+              loop preserved_jobs
+          | Some job -> (
+              match f job with
+              | Some _ as result ->
+                  (result, job_id :: preserved_jobs)
+              | None ->
+                  loop (job_id :: preserved_jobs) ) )
     in
+    let result, preserved_jobs = loop [] in
+    List.iter ~f:(Deque.enqueue_front t.timeline) preserved_jobs ;
+    result
 
-    Sequence.fold_until seq ~init:(init, t) ~f:handle_item
-      ~finish:(Tuple2.map_fst ~f:finish)
-
-  let add ~id ~job t = IdMap.add ~key:id ~data:job t
-
-  let change ~id ~f t = IdMap.change t id ~f
-
-  let set ~id ~job t = IdMap.set ~key:id ~data:job t
-
-  let find ~id t = IdMap.find t id
+  let add ~id ~job t =
+    match Hashtbl.add ~key:id ~data:job t.index with
+    | `Ok ->
+        Deque.enqueue_back t.timeline id ;
+        (* NOTE: when removal of jobs from the [t.timeline] happens much less
+           frequently than removal from [t.index], we iterate through the
+           [t.timeline] to remove IDs that are no longer present in the
+           [t.index] *)
+        if Deque.length t.timeline > 4 * Hashtbl.length t.index then
+          (* ignoring the result because it will be [None] *)
+          ignore (iter_until ~f:(const None) t) ;
+        `Ok
+    | `Duplicate ->
+        `Duplicate
 end
