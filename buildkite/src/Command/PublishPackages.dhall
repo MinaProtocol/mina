@@ -143,6 +143,8 @@ let publish
 
           let keyArg = Optional/default Text "" maybeKey
 
+          let indexedAdditionalTags = Prelude.List.indexed Text additional_tags
+
           in    [ Command.build
                     Command.Config::{
                     , commands =
@@ -167,15 +169,15 @@ let publish
                             ++  "${keyArg}"
                           )
                     , label = "Debian Packages Publishing"
-                    , key = "publish_debians"
+                    , key = "publish-debians"
                     , target = Size.Small
                     , depends_on = spec.depends_on
                     }
                 ]
               # Prelude.List.map
-                  Text
+                  { index : Natural, value : Text }
                   Command.Type
-                  (     \(tag : Text)
+                  (     \(r : { index : Natural, value : Text })
                     ->  Command.build
                           Command.Config::{
                           , commands =
@@ -192,16 +194,16 @@ let publish
                                                      spec.channel} "
                                   ++  "--verify "
                                   ++  "--source-version ${spec.source_version} "
-                                  ++  "--target-version ${tag} "
+                                  ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
                                 )
                           , label = "Docker Packages Publishing"
-                          , key = "publish_dockers_${tag}"
+                          , key = "publish-dockers-${Natural/show r.index}"
                           , target = Size.Small
                           , depends_on = spec.depends_on
                           }
                   )
-                  additional_tags
+                  indexedAdditionalTags
 
 in  { publish = publish, Spec = Spec }
