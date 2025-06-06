@@ -1,5 +1,5 @@
 (tests
- (names main)
+ (names main test_no_sideloaded)
  (flags
   (:standard -warn-error +a)
   -open
@@ -36,6 +36,4 @@
   snark_keys_header
   snarky.backendless
   sponge
-  tuple_lib)
- (action
-  (run %{test})))
+  tuple_lib))
