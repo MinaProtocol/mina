@@ -262,7 +262,7 @@
     } // utils.lib.eachDefaultSystem (system:
       let
         rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isx86_64 then {
+          if prev.stdenv.isx86_64 && prev.stdenv.isLinux then {
             rocksdb-mina = pkgs.rocksdb511;
           } else {
             rocksdb-mina = pkgs.rocksdb;
