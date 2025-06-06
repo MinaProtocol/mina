@@ -24,15 +24,14 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
       unchanged (hence "inplace" in the name). *)
   val change_inplace : id:Id.t -> f:(job option -> job option) -> t -> unit
 
-  (** [remove_until_reschedule ~keep_condition ~should_reschedule t] iterates
-      through the timeline, remove all jobs unsatisfying [keep_condition], and
-      reschedule satisfying [should_reschedule j], where [j] is the first job
-      satisfying [keep_condition], if it does exit. If [should_reschedule j]
-      returns [Some _], that job is rescheduled at the end of the queue,
-      otherwise the job is left unchanged at queue head. *)
+  (** [remove_until_reschedule ~f t] iterates through the timeline, for each
+      encountered job [j], pattern match on [f j]:
+      - If it's [`Remove], remove [j] and continue iteration;
+      - If it's [`Stop_keep], stop the iteration and return [None];
+      - If it's [`Stop_reschedule j'], reschedule [j'] at the end of timeline,
+        and returns [Some j']. *)
   val remove_until_reschedule :
-       keep_condition:(job -> bool)
-    -> should_reschedule:(job -> job option)
+       f:(job -> [< `Remove | `Stop_keep | `Stop_reschedule of job ])
     -> t
     -> job option
 
