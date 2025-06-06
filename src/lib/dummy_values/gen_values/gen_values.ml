@@ -4,7 +4,10 @@ open Async
 open Pickles_types
 
 let proof_string prev_width domain_log2 =
-  let dummy = Pickles.Proof.dummy Nat.N2.n prev_width ~domain_log2 in
+  let dummy =
+    Pickles.Proof.dummy Nat.N2.n prev_width ~domain_log2
+      ~feature_flags:Pickles_types.Plonk_types.Features.none_bool
+  in
   Binable.to_string (module Pickles.Proof.Proofs_verified_2.Stable.Latest) dummy
 
 let blockchain_proof_string = proof_string Nat.N2.n 16

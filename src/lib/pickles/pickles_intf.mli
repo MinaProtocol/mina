@@ -81,7 +81,7 @@ module type S = sig
   module Proof : sig
     type 'mlmb t
 
-    val dummy : 'm Nat.t -> _ Nat.t -> domain_log2:int -> 'm t
+    val dummy : 'm Nat.t -> _ Nat.t -> domain_log2:int -> feature_flags:Pickles_types.Plonk_types.Features.flags -> 'm t
 
     module Make (MLMB : Nat.Intf) : sig
       type nonrec t = MLMB.n t [@@deriving sexp, compare, yojson, hash]

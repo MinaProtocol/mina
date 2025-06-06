@@ -55,9 +55,8 @@ let pad_messages_for_next_wrap_proof
     in
     sub maxes_len messages_len
   in
-  let rec go :
-      type len ms ns. len Nat.t -> ms Maxes.t -> ns Messages.t -> ms Messages.t
-      =
+  let rec go : type len ms ns.
+      len Nat.t -> ms Maxes.t -> ns Messages.t -> ms Messages.t =
    fun pad maxes messages_for_next_wrap_proofs ->
     match (pad, maxes, messages_for_next_wrap_proofs) with
     | S pad, m :: maxes, _ ->
@@ -316,8 +315,8 @@ struct
                     Nat.to_int M.n
               end)
 
-          let f :
-              type a b c d. (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
+          let f : type a b c d.
+              (a, b, c, d) IR.t -> Local_max_proofs_verifieds.t =
            fun rule ->
             let (T (_, l)) = HT.length rule.prevs in
             Vector.extend_front_exn
@@ -412,8 +411,8 @@ struct
       }
     in
     Timer.start __LOC__ ;
-    let module Max_proofs_verified = ( val max_proofs_verified : Nat.Add.Intf
-                                         with type n = max_proofs_verified )
+    let module Max_proofs_verified =
+      (val max_proofs_verified : Nat.Add.Intf with type n = max_proofs_verified)
     in
     let T = Max_proofs_verified.eq in
     let padded, (module Maxes) =
@@ -426,8 +425,7 @@ struct
     let full_signature = { Full_signature.padded; maxes = (module Maxes) } in
     Timer.clock __LOC__ ;
     let feature_flags =
-      let rec go :
-          type a b c d.
+      let rec go : type a b c d.
           (a, b, c, d) H4.T(IR).t -> Opt.Flag.t Plonk_types.Features.Full.t =
        fun rules ->
         match rules with
@@ -504,8 +502,7 @@ struct
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
-      let rec f :
-          type a b c d.
+      let rec f : type a b c d.
              (a, b, c, d) H4.T(IR).t * unit Promise.t
           -> (a, b, c, d) H4.T(Branch_data).t = function
         | [], _ ->
@@ -744,8 +741,7 @@ struct
           Impls.Step.Typ.(input_typ * output_typ)
     in
     let provers =
-      let f :
-          type prev_vars prev_values local_widths local_heights.
+      let f : type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
           -> Lazy_keys.t
           -> ?handler:
@@ -771,10 +767,8 @@ struct
         let wrap ?handler next_state =
           let%bind.Promise step_vk, _ = Lazy.force step_vk in
           let%bind.Promise wrap_vk = Lazy.force wrap_vk in
-          let%bind.Promise ( proof
-                           , return_value
-                           , auxiliary_value
-                           , actual_wrap_domains ) =
+          let%bind.Promise
+              proof, return_value, auxiliary_value, actual_wrap_domains =
             step ~proof_cache handler ~maxes:(module Maxes) next_state
           in
           let proof =
@@ -831,8 +825,7 @@ struct
         in
         wrap
       in
-      let rec go :
-          type xs1 xs2 xs3 xs4.
+      let rec go : type xs1 xs2 xs3 xs4.
              (xs1, xs2, xs3, xs4) H4.T(Branch_data).t
           -> (xs1, xs2, xs3, xs4) H4.T(E04(Lazy_keys)).t
           -> ( xs2
@@ -860,7 +853,8 @@ struct
             ~f:
               (Promise.map ~f:(fun x ->
                    Plonk_verification_key_evals.map
-                     (Verification_key.commitments x) ~f:(fun x -> [| x |]) ) )
+                     (Verification_key.commitments x) ~f:(fun x -> [| x |] ) )
+              )
       ; wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:Verification_key.index)
       ; wrap_domains
       ; step_domains
@@ -946,7 +940,7 @@ module Side_loaded = struct
     in
     (* TODO: This should be the actual max width on a per proof basis *)
     let max_proofs_verified =
-      (module Verification_key.Max_width : Nat.Intf
+      ( module Verification_key.Max_width : Nat.Intf
         with type n = Verification_key.Max_width.n )
     in
     with_return (fun { return } ->
@@ -1084,8 +1078,7 @@ let compile_with_wrap_main_override_promise :
     Make (A_var) (A_value) (Ret_var) (Ret_value) (Auxiliary_var)
       (Auxiliary_value)
   in
-  let rec conv_irs :
-      type branches v1ss v2ss wss hss.
+  let rec conv_irs : type branches v1ss v2ss wss hss.
          ( branches
          , v1ss
          , v2ss
@@ -1144,9 +1137,9 @@ let compile_with_wrap_main_override_promise :
           domains
           |> Vector.reduce_exn
                ~f:(fun
-                    { h = Pow_2_roots_of_unity d1 }
-                    { h = Pow_2_roots_of_unity d2 }
-                  -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
+                   { h = Pow_2_roots_of_unity d1 }
+                   { h = Pow_2_roots_of_unity d2 }
+                 -> { h = Pow_2_roots_of_unity (Int.max d1 d2) } )
         in
         Some
           { Verify.Instance.num_chunks
@@ -1308,7 +1301,8 @@ struct
         (fun { public_input = () } ->
           let dummy_proof =
             exists (Typ.prover_value ()) ~compute:(fun () ->
-                Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:15 )
+                Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:15
+                  ~feature_flags:Plonk_types.Features.none_bool )
           in
           Promise.return
             { Inductive_rule.previous_proof_statements =
@@ -1404,8 +1398,8 @@ struct
     module Proof = (val p)
   end
 
-  let%test "should not be able to create a recursive proof from an invalid \
-            proof" =
+  let%test
+      "should not be able to create a recursive proof from an invalid proof" =
     try
       let (), (), proof =
         Promise.block_on_async_exn (fun () ->
