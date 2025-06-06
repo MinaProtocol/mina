@@ -22,10 +22,10 @@ type t =
             as the final proof, provided [unscheduled_segments] being empty. *)
   }
 
-let create ~job ~unscheduled_segments ~pending_mergeable_proofs =
+let create ~job ~unscheduled_segments =
   { job
   ; unscheduled_segments
-  ; pending_mergeable_proofs
+  ; pending_mergeable_proofs = Deque.create ()
   ; elapsed = Time.Span.zero
   ; proofs_in_flights = 0
   }
