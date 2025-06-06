@@ -20,6 +20,4 @@ module Spec = struct
   module Sub_zkapp = Sub_zkapp_spec
 end
 
-module Id = struct
-  module Single = Id.Single
-end
+module Id = Id
