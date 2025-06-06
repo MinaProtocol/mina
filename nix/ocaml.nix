@@ -38,13 +38,7 @@ let
   };
 
   implicit-deps-overlay = self: super:
-    (if pkgs.stdenv.isDarwin then {
-      async_ssl = super.async_ssl.overrideAttrs {
-        NIX_CFLAGS_COMPILE =
-          "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types";
-      };
-    } else
-      { }) // {
+      {
         # https://github.com/Drup/ocaml-lmdb/issues/41
         lmdb = super.lmdb.overrideAttrs
           (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
