@@ -4,8 +4,6 @@
 #################################################################################################
 FROM opam-deps AS toolchain
 
-ARG deb_codename=focal
-
 ARG DOCKER_VERSION=19.03.4
 ARG DEBS3_VERSION=0.11.7
 ARG DHALL_VERSION=1.41.1

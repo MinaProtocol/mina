@@ -1,0 +1,12 @@
+FROM build-deps AS build-deps-focal
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN sudo apt-get update --quiet \
+  && sudo apt-get upgrade --quiet --yes \
+  && sudo apt-get install --no-install-recommends --quiet --yes \
+    libssl-dev \
+    libprocps-dev \
+    awscli \
+    '(^lld-10$|^lld-11$)' \
+  && sudo rm -rf /var/lib/apt/lists/*
