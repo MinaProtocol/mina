@@ -12,7 +12,8 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
   val create : unit -> t
 
   (** [remove ~id t] removes job corresponding to [id] in [t] and returns it if
-      it does exist *)
+      it does exist. It's assumed that such ID would never be reused again,
+      because the underlying queue is not cleaned for that [id]. *)
   val remove : id:Id.t -> t -> job option
 
   (** [find ~id t] finds the job corresponding to id [id] in [t]. *)
