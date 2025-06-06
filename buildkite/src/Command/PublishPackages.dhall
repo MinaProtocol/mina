@@ -167,7 +167,7 @@ let publish
                             ++  "${keyArg}"
                           )
                     , label = "Debian Packages Publishing"
-                    , key = "publish-debians"
+                    , key = "publish_debians"
                     , target = Size.Small
                     , depends_on = spec.depends_on
                     }
@@ -197,7 +197,7 @@ let publish
                                   ++  "--only-dockers "
                                 )
                           , label = "Docker Packages Publishing"
-                          , key = "publish-dockers-${tag}"
+                          , key = "publish_dockers_${tag}"
                           , target = Size.Small
                           , depends_on = spec.depends_on
                           }
