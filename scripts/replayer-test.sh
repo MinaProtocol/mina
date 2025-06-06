@@ -1,5 +1,6 @@
 #!/bin/bash
 
+
 # test replayer on known archive db
 set -x
 

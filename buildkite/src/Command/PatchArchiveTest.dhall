@@ -16,10 +16,8 @@ in  { step =
               Command.Config::{
               , commands =
                 [ RunWithPostgres.runInDockerWithPostgresConn
-                    [ "PATCH_ARCHIVE_TEST_APP=mina-patch-archive-test"
-                    , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
-                    ]
-                    "./src/test/archive/sample_db/archive_db.sql"
+                    [ "PATCH_ARCHIVE_TEST_APP=mina-patch-archive-test" ]
+                    "https://storage.googleapis.com/o1labs-ci-test-data/replay/v0/archive_db.sql"
                     Artifacts.Type.FunctionalTestSuite
                     (None Network.Type)
                     "./scripts/patch-archive-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
