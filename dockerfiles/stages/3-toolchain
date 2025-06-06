@@ -34,13 +34,12 @@ RUN apt-get update --yes \
     perl \
     python3-sexpdata \
     python3-pip \
+    python3-readchar \
     rubygems \
     wget \
   && rm -rf /var/lib/apt/lists/*
 
-RUN pip install readchar 
-
-# --- deb-s3 tool
+ # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
 RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_VERSION}/deb-s3-${DEBS3_VERSION}.gem \
     && gem install deb-s3-${DEBS3_VERSION}.gem \
