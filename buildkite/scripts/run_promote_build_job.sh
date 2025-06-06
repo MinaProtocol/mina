@@ -28,7 +28,7 @@
 
 ARTIFACTS_DHALL_DEF="(./buildkite/src/Constants/Artifacts.dhall)"
 DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
-PROMOTE_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/PromotePackage.dhall)"
+PROMOTE_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/PublishPackages.dhall)"
 PROFILES_DHALL_DEF="(./buildkite/src/Constants/Profiles.dhall)"
 NETWORK_DHALL_DEF="(./buildkite/src/Constants/Network.dhall)"
 DEBIAN_CHANNEL_DHALL_DEF="(./buildkite/src/Constants/DebianChannel.dhall)"
