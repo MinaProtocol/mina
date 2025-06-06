@@ -666,6 +666,7 @@ let get_ledger t state_hash_opt =
 
 let get_snarked_ledger_full t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind state_hash =
     Option.value_map state_hash_opt ~f:Deferred.Or_error.return
       ~default:
@@ -702,7 +703,7 @@ let get_snarked_ledger_full t state_hash_opt =
                       (State_hash.to_base58_check state_hash)
               in
               let apply_first_pass =
-                Ledger.apply_transaction_first_pass
+                Ledger.apply_transaction_first_pass ~signature_kind
                   ~constraint_constants:
                     t.config.precomputed_values.constraint_constants
               in

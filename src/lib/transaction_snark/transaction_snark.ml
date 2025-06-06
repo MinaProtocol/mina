@@ -704,8 +704,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             Zkapp_command.Transaction_commitment.Checked.create
               ~account_updates_hash
 
-          let full_commitment ~account_update:{ account_update; _ } ~memo_hash
-              ~commitment =
+          let full_commitment ~signature_kind:_
+              ~account_update:{ account_update; _ } ~memo_hash ~commitment =
             Zkapp_command.Transaction_commitment.Checked.create_complete
               commitment ~memo_hash ~fee_payer_hash:account_update.hash
         end
@@ -1989,7 +1989,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 in
                 let global_state, local_state =
                   with_label "apply" (fun () ->
-                      S.apply ~constraint_constants
+                      S.apply ~signature_kind ~constraint_constants
                         ~is_start:
                           ( match account_update_spec.is_start with
                           | `No ->
@@ -2007,7 +2007,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                 match account_update_spec.is_start with
                 | `No ->
                     let global_state, local_state =
-                      S.apply ~constraint_constants ~is_start:`No
+                      S.apply ~signature_kind ~constraint_constants
+                        ~is_start:`No
                         S.{ perform }
                         acc
                     in
@@ -3645,9 +3646,9 @@ module Make_str (A : Wire_types.Concrete) = struct
           let txn_applied, states =
             let partial_txn, states =
               Sparse_ledger.apply_zkapp_first_pass_unchecked_with_states
-                ~first_pass_ledger ~second_pass_ledger ~constraint_constants
-                ~global_slot ~state_view ~fee_excess ~supply_increase
-                zkapp_command
+                ~signature_kind ~first_pass_ledger ~second_pass_ledger
+                ~constraint_constants ~global_slot ~state_view ~fee_excess
+                ~supply_increase zkapp_command
               |> Or_error.ok_exn
             in
             Sparse_ledger.apply_zkapp_second_pass_unchecked_with_states
