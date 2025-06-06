@@ -21,10 +21,8 @@ pkgs.mkShell {
     wasm-pack
     lmdb
     rosetta-cli
-    rocksdb.tools
   ];
   OPAMSWITCH = "mina";
-  MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
   shellHook = ''
     eval $(opam env)
     if ! opam switch list --short 2>&1 | grep -w mina 2>&1 > /dev/null; then

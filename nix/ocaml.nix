@@ -62,21 +62,6 @@ let
           '';
         };
 
-        rocksdb_stubs = super.rocksdb_stubs.overrideAttrs (oa: {
-          MINA_ROCKSDB = let
-            mainPath = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
-            staticPath = "${
-                pkgs.rocksdb-mina.static or pkgs.rocksdb-mina
-              }/lib/librocksdb.a";
-          in if builtins.pathExists mainPath then
-            mainPath
-          else if builtins.pathExists staticPath then
-            staticPath
-          else
-            throw
-            "Could not find librocksdb.a in either ${mainPath} or ${staticPath}";
-        });
-
         # This is needed because
         # - lld package is not wrapped to pick up the correct linker flags
         # - bintools package also includes as which is incompatible with gcc
@@ -341,8 +326,6 @@ let
           pkgs.fd
         ] ++ ocaml-libs;
 
-        # todo: slimmed rocksdb
-        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
         GO_CAPNP_STD = "${pkgs.go-capnproto2.src}/std";
 
         # this is used to retrieve the path of the built static library
@@ -453,8 +436,6 @@ let
       mainnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "mainnet";
         DUNE_PROFILE = "mainnet";
-        # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
       });
 
       mainnet = wrapMina self.mainnet-pkg { };
@@ -462,8 +443,6 @@ let
       devnet-pkg = self.mina-dev.overrideAttrs (s: {
         version = "devnet";
         DUNE_PROFILE = "devnet";
-        # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
       });
 
       devnet = wrapMina self.devnet-pkg { };
