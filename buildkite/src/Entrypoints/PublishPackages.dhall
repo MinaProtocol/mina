@@ -65,15 +65,18 @@ let promote_artifacts =
                     ->  "${new_version}"
                 }
 
-          in  Pipeline.build
-                Pipeline.Config::{
-                , spec = JobSpec::{
-                  , dirtyWhen = [ S.everything ]
-                  , path = "Publish"
-                  , tags = [] : List PipelineTag.Type
-                  , name = "PublishPackages"
+          let pipeline =
+                Pipeline.build
+                  Pipeline.Config::{
+                  , spec = JobSpec::{
+                    , dirtyWhen = [ S.everything ]
+                    , path = "Publish"
+                    , tags = [] : List PipelineTag.Type
+                    , name = "PublishPackages"
+                    }
+                  , steps = PublishPackages.publish spec
                   }
-                , steps = PublishPackages.publish spec
-                }
+
+          in  pipeline.pipeline
 
 in  { promote_artifacts = promote_artifacts }
