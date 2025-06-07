@@ -17,6 +17,16 @@ module type CONTEXT = sig
   val proof_cache_db : Proof_cache_tag.cache_db
 end
 
+type t =
+  { context : (module CONTEXT)
+  ; trust_system : Trust_system.t
+  ; verifier : Verifier.t
+  ; mutable best_seen_transition : Mina_block.initial_valid_block
+  ; mutable current_root : Mina_block.initial_valid_block
+  ; network : Mina_networking.t
+  ; mutable num_of_root_snarked_ledger_retargeted : int
+  }
+
 type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
 
 (** The entry point function for bootstrap controller. When bootstrap finished
