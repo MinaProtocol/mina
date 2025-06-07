@@ -40,7 +40,9 @@ module Make (Inputs : Intf.Graphviz.I) :
     |> Visualization.display_short_sexp (module Account_id)
 
   let empty_hash =
-    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+    Mina_stdlib.Empty_hashes.extensible_cache
+      (module Hash)
+      ~init_hash:Hash.empty_account
 
   let visualize t ~(initial_address : Ledger.Addr.t) =
     let ledger_depth = Inputs.Ledger.depth t in

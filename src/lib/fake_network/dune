@@ -9,7 +9,7 @@
   core.uuid
   ;; local libraries
   block_time
-  bounded_types
+  mina_stdlib
   coda_genesis_proof
   consensus
   data_hash_lib

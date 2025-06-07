@@ -26,8 +26,8 @@ let rec of_list_exn ?(subtrees = []) = function
   | [] ->
       raise
         (Invalid_argument
-           "Rose_tree.of_list_exn: cannot construct rose tree from empty list"
-        )
+           "Mina_stdlib.Rose_tree.of_list_exn: cannot construct rose tree from \
+            empty list" )
   | [ h ] ->
       T (h, subtrees)
   | h :: t ->
@@ -36,7 +36,7 @@ let rec of_list_exn ?(subtrees = []) = function
 let of_non_empty_list ?(subtrees = []) =
   Fn.compose
     (fun l ->
-      Mina_stdlib.Nonempty_list.fold ~init:None
+      Nonempty_list.fold ~init:None
         ~f:(fun acc x ->
           match acc with
           | None ->
@@ -45,7 +45,7 @@ let of_non_empty_list ?(subtrees = []) =
               Some (T (x, [ acc ])) )
         l
       |> Stdlib.Option.get )
-    Mina_stdlib.Nonempty_list.rev
+    Nonempty_list.rev
 
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
   f value1 value2 && List.equal (equal ~f) children1 children2

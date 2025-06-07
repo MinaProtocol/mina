@@ -36,7 +36,7 @@
   staged_ledger_diff
   ppx_version.runtime
   consensus
-  bounded_types)
+  mina_stdlib)
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation

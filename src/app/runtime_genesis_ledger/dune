@@ -17,7 +17,7 @@
   mina_runtime_config
   mina_ledger
   genesis_ledger_helper
-  bounded_types
+  mina_stdlib
   logger
   cache_dir
   precomputed_values

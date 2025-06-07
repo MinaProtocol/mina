@@ -51,7 +51,6 @@
   integers
   user_command_input
   participating_state
-  graph_algorithms
   visualization
   sgn
   zkapp_command_builder
@@ -59,7 +58,6 @@
   zkapps_examples
   cache_dir
   snarky.backendless
-  bounded_types
   block_time)
  (instrumentation
   (backend bisect_ppx))
