@@ -79,7 +79,6 @@
   staged_ledger
   mina_state
   network_pool
-  timeout_lib
   prover
   verifier
   snark_work_lib
