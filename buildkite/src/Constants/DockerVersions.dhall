@@ -62,16 +62,14 @@ let dependsOnStep =
                 , Jammy =
                   [ { name =
                         "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
+                                      docker}${network}${profileSuffix}"
                     , key = key
                     }
                   ]
                 , Focal =
                   [ { name =
                         "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
+                                      docker}${network}${profileSuffix}"
                     , key = key
                     }
                   ]

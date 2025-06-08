@@ -37,7 +37,12 @@ let AllButTests =
 let Main =
       [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All = AllButTests # [ Artifact.FunctionalTestSuite, Artifact.Toolchain, Artifact.DaemonHardfork ]
+let All =
+        AllButTests
+      # [ Artifact.FunctionalTestSuite
+        , Artifact.Toolchain
+        , Artifact.DaemonHardfork
+        ]
 
 let capitalName =
           \(artifact : Artifact)

@@ -191,13 +191,13 @@ let docker_step
                   ]
                 , DaemonHardfork =
                   [ DockerImage.ReleaseSpec::{
-                    , deps = deps # [
-                          DockerVersions.dependsOn
+                    , deps =
+                          deps
+                        # DockerVersions.dependsOn
                             (DockerVersions.ofDebian spec.debVersion)
                             spec.network
                             spec.profile
                             Artifacts.Type.Daemon
-                    ]
                     , service = Artifacts.Type.DaemonHardfork
                     , network = Network.lowerName spec.network
                     , deb_codename = spec.debVersion
