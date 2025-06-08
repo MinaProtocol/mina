@@ -76,6 +76,16 @@ let dependsOnStep =
                 }
                 docker
 
+let ofDebian =
+          \(debian : DebianVersions.DebVersion)
+      ->  merge
+            { Bookworm = Docker.Bookworm
+            , Bullseye = Docker.Bullseye
+            , Jammy = Docker.Jammy
+            , Focal = Docker.Focal
+            }
+            debian
+
 let dependsOn =
           \(docker : Docker)
       ->  \(network : Network.Type)
@@ -86,6 +96,7 @@ let dependsOn =
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName
+    , ofDebian = ofDebian
     , dependsOn = dependsOn
     , dependsOnStep = dependsOnStep
     }

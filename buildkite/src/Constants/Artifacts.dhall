@@ -11,6 +11,7 @@ let Network = ./Network.dhall
 let Artifact
     : Type
     = < Daemon
+      | DaemonHardfork
       | LogProc
       | Archive
       | TestExecutive
@@ -23,6 +24,7 @@ let Artifact
 
 let AllButTests =
       [ Artifact.Daemon
+      , Artifact.DaemonHardfork
       , Artifact.LogProc
       , Artifact.Archive
       , Artifact.BatchTxn
@@ -35,12 +37,13 @@ let AllButTests =
 let Main =
       [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All = AllButTests # [ Artifact.FunctionalTestSuite, Artifact.Toolchain ]
+let All = AllButTests # [ Artifact.FunctionalTestSuite, Artifact.Toolchain, Artifact.DaemonHardfork ]
 
 let capitalName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "Daemon"
+            , DaemonHardfork = "DaemonHardfork"
             , LogProc = "LogProc"
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
@@ -56,6 +59,7 @@ let lowerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "daemon"
+            , DaemonHardfork = "daemon_hardfork"
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
@@ -71,6 +75,7 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
+            , DaemonHardfork = "mina-daemon-hardfork"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
@@ -87,6 +92,7 @@ let toDebianName =
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
+            , DaemonHardfork = "daemon_hardfork_${Network.lowerName network}"
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
@@ -108,6 +114,7 @@ let toDebianNames =
                   (     \(a : Artifact)
                     ->  merge
                           { Daemon = [ toDebianName a network ]
+                          , DaemonHardfork = [ toDebianName a network ]
                           , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
@@ -150,6 +157,9 @@ let dockerTag =
 
           in  merge
                 { Daemon =
+                    "${version_and_codename}-${Network.lowerName
+                                                 network}${profile_part}"
+                , DaemonHardfork =
                     "${version_and_codename}-${Network.lowerName
                                                  network}${profile_part}"
                 , Archive = "${version_and_codename}"
