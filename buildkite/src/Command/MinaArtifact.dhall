@@ -20,8 +20,6 @@ let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
-let DockerVersion = ../Constants/DockerVersion.dhall
-
 let DebianRepo = ../Constants/DebianRepo.dhall
 
 let DockerPublish = ../Constants/DockerPublish.dhall
@@ -192,8 +190,8 @@ let docker_step
                 , DaemonHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps # [
-                          DockerVersion.dependsOn
-                            (DockerVersion.ofDebian spec.debVersion)
+                          DockerVersions.dependsOn
+                            (DockerVersions.ofDebian spec.debVersion)
                             spec.network
                             spec.profile
                             Artifacts.Type.Daemon
