@@ -97,7 +97,7 @@ let toDebianName =
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonHardfork = "daemon_hardfork_${Network.lowerName network}"
+            , DaemonHardfork = ""
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
