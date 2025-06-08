@@ -4,6 +4,8 @@ let Artifacts = ./Artifacts.dhall
 
 let Network = ./Network.dhall
 
+let DebianVersions = ./DebianVersions.dhall
+
 let Docker
     : Type
     = < Bookworm | Bullseye | Jammy | Focal >
