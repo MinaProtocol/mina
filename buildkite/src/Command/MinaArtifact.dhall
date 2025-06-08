@@ -24,6 +24,8 @@ let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
+let DockerVersion = ../Constants/DockerVersions.dhall
+
 let DebianRepo = ../Constants/DebianRepo.dhall
 
 let DockerPublish = ../Constants/DockerPublish.dhall
@@ -194,6 +196,24 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , if = spec.if
+                    }
+                  ]
+                , DaemonHardfork =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            (DockerVersion.ofDebian spec.debVersion)
+                            spec.network
+                            spec.profile
+                            Artifacts.Type.Daemon
+                    , service = Artifacts.Type.DaemonHardfork
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
+                    , deb_repo = DebianRepo.Type.Local
                     }
                   ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
