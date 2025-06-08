@@ -1,0 +1,17 @@
+ARG deb_version
+ARG deb_release=unstable
+ARG deb_legacy_version
+ARG deb_codename=bullseye
+ARG network=mainnet
+ARG deb_repo="http://packages.o1test.net"
+
+FROM mina-daemon:${deb_version}-${deb_codename}-${network} AS mina-daemon-legacy
+# Run with `docker build --build-arg deb_version=<version>`
+
+# Mina daemon package
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
+RUN echo "Building legacy image with version $deb_version from repo $deb_release $deb_codename for network $network" \
+  && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --allow-downgrades "mina-${network}-legacy=$deb_legacy_version" \
+  && rm -rf /var/lib/apt/lists/*
