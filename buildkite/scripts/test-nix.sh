@@ -44,8 +44,6 @@ fi
 # run chown to the current user to fix it
 chown -R "${USER}" /workdir
 
-nix-env -i git-lfs
-
 git config --global --add safe.directory /workdir
 
 # We are in buildkite context so all buildkite related envs are available
