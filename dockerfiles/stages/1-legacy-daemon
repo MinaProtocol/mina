@@ -4,7 +4,7 @@ ARG deb_legacy_version
 ARG deb_codename=bullseye
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
-ARG docker_repo="gcr.io/o1labs-192920/"
+ARG docker_repo="gcr.io/o1labs-192920"
 
 FROM ${docker_repo}/mina-daemon:${deb_version}-${deb_codename}-${network} AS mina-daemon-legacy
 
