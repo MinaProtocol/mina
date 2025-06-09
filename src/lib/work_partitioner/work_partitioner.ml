@@ -99,10 +99,11 @@ let register_pending_zkapp_command_job ~(partitioner : t) ~sub_zkapp_spec
       ; sok_message
       }
   in
-  assert (
-    phys_equal `Ok
-      (Sent_zkapp_job_pool.add ~id:job_id ~job
-         partitioner.zkapp_jobs_sent_by_partitioner ) ) ;
+  Sent_zkapp_job_pool.add_exn ~id:job_id ~job
+    ~message:
+      "Work Partitioner generated a duplicated ID for a subzkapp job that \
+       happens to be still used by another job."
+    partitioner.zkapp_jobs_sent_by_partitioner ;
 
   Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () }
 
@@ -217,7 +218,7 @@ let consume_job_from_selector ~(partitioner : t)
       convert_single_work_from_selector ~partitioner ~single_spec ~pairing
         ~sok_message
   | `Two (spec1, spec2) ->
-      assert (phys_equal None partitioner.tmp_slot) ;
+      assert (Option.is_none partitioner.tmp_slot) ;
       let pairing1 : Work.Id.Single.t = { which_one = `First; pairing_id } in
       let pairing2 : Work.Id.Single.t = { which_one = `Second; pairing_id } in
       partitioner.tmp_slot <- Some (spec1, pairing1, sok_message) ;
