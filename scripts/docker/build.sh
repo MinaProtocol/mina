@@ -123,7 +123,21 @@ case "${SERVICE}" in
         DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-toolchain)
-        DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
+        DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"
+        DOCKERFILE_PATH_SCRIPT_2_AND_MORE="dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
+        case "${INPUT_CODENAME}" in 
+          bullseye|focal)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye-and-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
+          noble)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
+          *)
+            echo "Unsupported debian codename: $INPUT_CODENAME"
+            echo "Supported codenames are: bullseye, focal, noble"
+            exit 1
+            ;;
+        esac
         ;;
     mina-batch-txn)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"

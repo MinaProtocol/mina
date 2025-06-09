@@ -1,6 +1,7 @@
 (tests
  (names
   test_impls
+  test_no_sideloaded
   test_opt_sponge
   test_plonk_curve_ops
   test_ro

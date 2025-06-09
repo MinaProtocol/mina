@@ -82,7 +82,6 @@ help:
 	@echo "ocaml_version             - Check OCaml version"
 	@echo "ocaml_word_size           - Check OCaml word size"
 	@echo "patch_archive_test        - Build the patch archive test"
-	@echo "publish-macos             - Publish macOS artifacts"
 	@echo "reformat                  - Reformat all OCaml code"
 	@echo "reformat-diff             - Reformat only modified OCaml files"
 	@echo "replayer                  - Build the replayer tool"
@@ -342,12 +341,6 @@ check-format: ocaml_checks
 .PHONY: check-snarky-submodule
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
-
-#######################################
-## Environment setup
-
-macos-setup:
-	./scripts/macos-setup-brew.sh
 
 #######################################
 ## Bash checks
