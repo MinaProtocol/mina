@@ -254,9 +254,10 @@ type submit_result =
 
 let submit_single ~partitioner
     ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
-    ~(submitted_half : [ `One | `First | `Second ]) ~id =
+    ~job_id =
+  let Work.Id.Single.{ which_one; pairing_id } = job_id in
   let result = ref SchemeUnmatched in
-  Hashtbl.change partitioner.pairing_pool id ~f:(function
+  Hashtbl.change partitioner.pairing_pool pairing_id ~f:(function
     | Some pending_combined_result -> (
         let submitted_result =
           Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
@@ -265,7 +266,7 @@ let submit_single ~partitioner
         in
         match
           Combining_result.merge_single_result pending_combined_result
-            ~submitted_result ~submitted_half
+            ~submitted_result ~submitted_half:which_one
         with
         | Pending pending ->
             result := Processed None ;
@@ -299,9 +300,7 @@ let submit_into_pending_zkapp_command ~partitioner
             =
           Work.Result.Single.Poly.{ spec = (); proof; elapsed }
         in
-        returns :=
-          submit_single ~partitioner ~submitted_result
-            ~submitted_half:job_id.which_one ~id:job_id.pairing_id
+        returns := submit_single ~partitioner ~submitted_result ~job_id
   in
 
   let remove_or_process :
@@ -341,13 +340,10 @@ let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
         { job = Work.With_job_meta.{ job_id; spec; _ }
         ; data = { proof; data = elapsed }
         } ->
-        let Work.Id.Single.{ which_one = submitted_half; pairing_id = id } =
-          job_id
-        in
         let submitted_result =
           Work.Result.Single.Poly.{ spec; proof; elapsed }
         in
-        submit_single ~partitioner ~submitted_result ~submitted_half ~id
+        submit_single ~partitioner ~submitted_result ~job_id
     | Work.Spec.Partitioned.Poly.Sub_zkapp_command
         { job = Work.With_job_meta.{ job_id; _ }; data } ->
         submit_into_pending_zkapp_command ~partitioner ~job_id ~data
