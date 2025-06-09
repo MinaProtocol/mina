@@ -633,8 +633,8 @@ function publish(){
     echo " - Debian sign key: $__debian_sign_key"
     echo ""
 
-    if [[ $__backend != "gs" && $__backend != "hetzner" ]]; then
-        echo -e "❌ ${RED} !! Backend (--backend) can be only gs or hetzner${CLEAR}\n";
+    if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
+        echo -e "❌ ${RED} !! Backend (--backend) can be only gs, hetzner or local ${CLEAR}\n";
         publish_help; exit 1;
     fi
 
