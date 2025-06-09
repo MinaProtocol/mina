@@ -4,12 +4,10 @@ ARG deb_legacy_version
 ARG deb_codename=bullseye
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
+ARG docker_repo="gcr.io/o1labs-192920/"
 
-FROM mina-daemon:${deb_version}-${deb_codename}-${network} AS mina-daemon-legacy
-# Run with `docker build --build-arg deb_version=<version>`
+FROM ${docker_repo}/mina-daemon:${deb_version}-${deb_codename}-${network} AS mina-daemon-legacy
 
-# Mina daemon package
-# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building legacy image with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
