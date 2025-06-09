@@ -37,12 +37,15 @@ val run :
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
   -> network:Mina_networking.t
-  -> consensus_local_state:Consensus.Data.Local_state.t
+  -> consensus_local_state:
+       Consensus.Data.Local_state.t
+       (* 'write_return is abstract variable because bootstrap
+           controller won't write to the pipe *)
   -> network_transition_pipe:
        ( [ `Block of Mina_block.initial_valid_block Envelope.Incoming.t
          | `Header of Mina_block.initial_valid_header Envelope.Incoming.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t option ]
-       , 'a )
+       , 'write_return )
        Strict_pipe.Swappable.t
   -> preferred_peers:Network_peer.Peer.t list
   -> persistent_root:Transition_frontier.Persistent_root.t

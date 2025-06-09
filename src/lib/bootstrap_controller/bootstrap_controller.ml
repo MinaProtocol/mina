@@ -290,6 +290,14 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
     previous_cycles =
   let open Context in
+  (* The short-lived pipe allocated here will be closed
+     when a follow-up pipe is allocated: in the next cycle of bootstrap
+     or when controll is passed to the transition frontier controller.staged_ledger_construction_time
+     Because [Choosable_synchronous_pipe.t] is used, no data will be lost: any
+     successful read is followed by mom-blocking handling, and if the read/write
+     pair is not consumed, it will continue in a follow-up pipe allocated in the
+     next call to [Swappable.swap_reader].
+  *)
   let%bind sync_ledger_reader = Swappable.swap_reader network_transition_pipe in
   let initial_root_transition =
     initial_root_transition |> Mina_block.Validated.remember
