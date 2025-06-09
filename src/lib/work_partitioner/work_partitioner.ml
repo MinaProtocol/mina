@@ -71,7 +71,6 @@ let reschedule_old_zkapp_job
       ~f:(reschedule_if_old ~reassignment_timeout)
       zkapp_jobs_sent_by_partitioner
   in
-
   Ok (Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () })
 
 let reschedule_old_single_job
