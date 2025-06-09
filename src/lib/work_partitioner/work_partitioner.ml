@@ -83,10 +83,8 @@ let reschedule_old_single_job
   in
   Work.Spec.Partitioned.Poly.Single { job; data = () }
 
-let schedule_from_pending_zkapp_command ~(partitioner : t)
-    ({ spec = pending; job_id = zkapp_id; sok_message; _ } :
-      Zkapp_command_job_pool.job ) =
-  let%map.Option spec = Pending_zkapp_command.next_job_spec pending in
+let register_pending_zkapp_command_job ~(partitioner : t) ~sub_zkapp_spec
+    ({ job_id = zkapp_id; sok_message; _ } : Zkapp_command_job_pool.job) =
   let job_id =
     Work.Id.Sub_zkapp.of_single
       ~job_id:(Id_generator.next_id partitioner.subzkapp_id_gen ())
@@ -94,7 +92,11 @@ let schedule_from_pending_zkapp_command ~(partitioner : t)
   in
   let job =
     Work.With_job_meta.
-      { spec; job_id; scheduled_since_unix_epoch = epoch_now (); sok_message }
+      { spec = sub_zkapp_spec
+      ; job_id
+      ; scheduled_since_unix_epoch = epoch_now ()
+      ; sok_message
+      }
   in
   assert (
     phys_equal `Ok
@@ -102,6 +104,11 @@ let schedule_from_pending_zkapp_command ~(partitioner : t)
          partitioner.zkapp_jobs_sent_by_partitioner ) ) ;
 
   Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () }
+
+let schedule_from_pending_zkapp_command ~(partitioner : t)
+    ({ spec = pending; _ } as job : Zkapp_command_job_pool.job) =
+  let%map.Option sub_zkapp_spec = Pending_zkapp_command.next_job_spec pending in
+  register_pending_zkapp_command_job ~partitioner ~sub_zkapp_spec job
 
 let schedule_from_zkapp_command_work_pool ~(partitioner : t) () :
     Work.Spec.Partitioned.Stable.Latest.t option =
@@ -129,16 +136,18 @@ let convert_single_work_from_selector ~(partitioner : t)
             Snark_worker_shared.extract_zkapp_segment_works
               ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
           with
-          | Ok (_ :: _ as all) ->
+          | Ok (hd :: rest) ->
               let unscheduled_segments =
-                all
-                |> List.map ~f:(fun (witness, spec, statement) ->
-                       Work.Spec.Sub_zkapp.Segment { statement; witness; spec }
-                       |> Work.Spec.Sub_zkapp.read_all_proofs_from_disk )
-                |> Queue.of_list
+                Mina_stdlib.Nonempty_list.(
+                  init hd rest
+                  |> map ~f:(fun (witness, spec, statement) ->
+                         Work.Spec.Sub_zkapp.Segment
+                           { statement; witness; spec }
+                         |> Work.Spec.Sub_zkapp.read_all_proofs_from_disk ))
               in
-              let pending_zkapp_command =
-                Pending_zkapp_command.create ~job ~unscheduled_segments
+              let pending_zkapp_command, first_segment =
+                Pending_zkapp_command.create_and_yield_segment ~job
+                  ~unscheduled_segments
               in
               let pending_zkapp_command_job =
                 Work.With_job_meta.
@@ -148,18 +157,14 @@ let convert_single_work_from_selector ~(partitioner : t)
                   ; sok_message
                   }
               in
-              assert (
-                phys_equal `Ok
-                  (Zkapp_command_job_pool.add ~id:pairing
-                     ~job:pending_zkapp_command_job
-                     partitioner.zkapp_command_jobs ) ) ;
-              schedule_from_pending_zkapp_command ~partitioner
-                pending_zkapp_command_job
-              |> Option.value_exn
-                   ~message:
-                     "FATAL: No specs could be generated from a newly created \
-                      pending zkapp command instance, this should be \
-                      impossible"
+              Zkapp_command_job_pool.add_exn ~id:pairing
+                ~job:pending_zkapp_command_job
+                ~message:
+                  "Id generater generated a repeated Id that happens to be \
+                   occupied by a job in zkapp command pool"
+                partitioner.zkapp_command_jobs ;
+              register_pending_zkapp_command_job ~partitioner
+                ~sub_zkapp_spec:first_segment pending_zkapp_command_job
           | Ok [] ->
               (* TODO: erase this branch by refactor underlying
                  [Transaction_snark.zkapp_command_witnesses_exn] using nonempty

@@ -22,13 +22,19 @@ type t =
             as the final proof, provided [unscheduled_segments] being empty. *)
   }
 
-let create ~job ~unscheduled_segments =
-  { job
-  ; unscheduled_segments
-  ; pending_mergeable_proofs = Deque.create ()
-  ; elapsed = Time.Span.zero
-  ; proofs_in_flights = 0
-  }
+let create_and_yield_segment ~job
+    ~(unscheduled_segments :
+       Spec.Sub_zkapp.Stable.Latest.t Mina_stdlib.Nonempty_list.t ) =
+  let first_segment, unscheduled_segments =
+    Mina_stdlib.Nonempty_list.uncons unscheduled_segments
+  in
+  ( { job
+    ; unscheduled_segments = Queue.of_list unscheduled_segments
+    ; pending_mergeable_proofs = Deque.create ()
+    ; elapsed = Time.Span.zero
+    ; proofs_in_flights = 1
+    }
+  , first_segment )
 
 let try_take2 (q : 'a Deque.t) : ('a * 'a) option =
   match Deque.dequeue_front q with

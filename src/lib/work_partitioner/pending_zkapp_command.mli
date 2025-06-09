@@ -5,10 +5,13 @@ open Snark_work_lib
     single zkapp transaction. *)
 type t
 
-val create :
+(** [create_and_yield_segment ~job ~unscheduled_segments] creates a pending
+    zkapp command instance, and immediately generate a segment subzkapp spec. *)
+val create_and_yield_segment :
      job:(Spec.Single.t, Id.Single.t) With_job_meta.t
-  -> unscheduled_segments:Spec.Sub_zkapp.Stable.Latest.t Base.Queue.t
-  -> t
+  -> unscheduled_segments:
+       Spec.Sub_zkapp.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
+  -> t * Spec.Sub_zkapp.Stable.V1.t
 
 (** [next_job_spec t] extracts another job spec from t, mutating the internal
     state of [t]. Once any job spec returned is completed, it's expected to be
