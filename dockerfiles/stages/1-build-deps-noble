@@ -1,0 +1,11 @@
+ARG image=ubuntu:focal
+FROM ${image} AS build-deps
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update --quiet \
+  && apt-get upgrade --quiet --yes \
+  && apt-get install --no-install-recommends --quiet --yes \
+    libssl3t64 \
+    libproc2-0 \
+  && rm -rf /var/lib/apt/lists/*

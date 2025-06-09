@@ -1,6 +1,9 @@
 (library
  (name graphql_basic_scalars)
  (public_name graphql_basic_scalars)
+ ;; This should be removed when the effort of moving from inline tests to
+ ;; alcotest is finished. The library in graphql_lib still uses Make_test and
+ ;; relies on an inline test definition in testing.ml.
  (inline_tests
   (flags -verbose -show-counts))
  (libraries
@@ -16,10 +19,9 @@
   graphql_parser
   yojson
   sexplib0
-  ppx_inline_test.config
   ;; local libraries
-  graphql_wrapper
   base_quickcheck
+  graphql_wrapper
   quickcheck_lib
   unix)
  (instrumentation
