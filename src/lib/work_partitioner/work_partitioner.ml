@@ -180,12 +180,22 @@ let convert_single_work_from_selector ~(partitioner : t)
             Work.With_job_meta.map
               ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
           in
+          Sent_single_job_pool.add_exn ~id:pairing ~job
+            ~message:
+              "Id generator generated a repeated Id that happens to be \
+               occupied by a job in sent single job pool"
+            partitioner.single_jobs_sent_by_partitioner ;
           Ok (Single { job; data = () }) )
   | Merge _ ->
       let job =
         Work.With_job_meta.map
           ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
       in
+      Sent_single_job_pool.add_exn ~id:pairing ~job
+        ~message:
+          "Id generator generated a repeated Id that happens to be occupied by \
+           a job in sent single job pool"
+        partitioner.single_jobs_sent_by_partitioner ;
       Ok (Single { job; data = () })
 
 let schedule_from_tmp_slot ~(partitioner : t) =
