@@ -121,6 +121,24 @@ struct
     let public_key = Account.identifier account in
     Db.get_or_create_account db public_key account |> existing_account_exn
 
+  let random_primary_accounts max_height =
+    let num_accounts = 1 lsl max_height in
+    Quickcheck.random_value
+      (Quickcheck.Generator.list_with_length num_accounts Account.gen)
+
+  let populate_primary_db mdb max_height =
+    random_primary_accounts max_height
+    |> List.iter ~f:(fun account ->
+           let action, location =
+             Db.get_or_create_account mdb (Account.identifier account) account
+             |> Or_error.ok_exn
+           in
+           match action with
+           | `Added ->
+               ()
+           | `Existed ->
+               Db.set mdb location account )
+
   let test_section_name =
     Printf.sprintf "In-memory converting db (depth %d)" Cfg.depth
 
@@ -160,6 +178,25 @@ struct
                 in
                 [%test_eq: Migrated.Account.t] stored_migrated_account
                   (Db_converting.convert account) ) ) )
+
+  let () =
+    add_test "create random ledger, migrate, test iteration order" (fun () ->
+        with_primary ~f:(fun primary ->
+            let depth = Db.depth primary in
+            let max_height = Int.min 5 depth in
+            populate_primary_db primary max_height ;
+            with_migrated ~f:(fun migrated ->
+                let _converting =
+                  Db_converting.create_with_migration primary migrated
+                in
+                assert (
+                  Db.num_accounts primary = Db_migrated.num_accounts migrated ) ;
+                Db.iteri primary ~f:(fun idx primary_account ->
+                    let stored_migrated_account =
+                      Db_migrated.get_at_index_exn migrated idx
+                    in
+                    [%test_eq: Migrated.Account.t] stored_migrated_account
+                      (Db_converting.convert primary_account) ) ) ) )
 
   let tests =
     let actual_tests = Stack.fold test_stack ~f:(fun l t -> t :: l) ~init:[] in
