@@ -5,6 +5,9 @@ open struct
 end
 
 module Snark_worker_shared = Snark_worker_shared
+
+(* TODO:
+   Replace this with simpler structure if confirmed the queue is not needed *)
 module Zkapp_command_job_pool =
   Job_pool.Make (Work.Id.Single) (Pending_zkapp_command)
 module Sent_zkapp_job_pool =
@@ -50,7 +53,8 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
 
 let epoch_now () = Time.(now () |> to_span_since_epoch)
 
-(* TODO: Consider remove all works no longer relevant for current frontier *)
+(* TODO: Consider remove all works no longer relevant for current frontier,
+   this may need changes from underlying work selector. *)
 let reschedule_if_old ~reassignment_timeout
     (job : _ Work.With_job_meta.Stable.Latest.t) =
   let scheduled = Time.of_span_since_epoch job.scheduled_since_unix_epoch in
@@ -115,6 +119,8 @@ let schedule_from_pending_zkapp_command ~(partitioner : t)
 let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
+    (* TODO: Consider remove all works no longer relevant for current frontier,
+       this may need changes from underlying work selector. *)
     Zkapp_command_job_pool.iter_until
       ~f:(schedule_from_pending_zkapp_command ~partitioner)
       partitioner.zkapp_command_jobs
