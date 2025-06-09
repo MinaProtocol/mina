@@ -49,7 +49,8 @@ module Make (P : AppPaths) : sig
   (** [default] is the default context to use when running the application. *)
   val default : t
 
-  (** [run t args] runs the application in the given context [t] with the provided arguments [args].
+  (** [run t args ?env ?ignore_failure] runs the application in the given context [t] with the provided arguments [args].
+    It uses the default environment if [env] is not provided, and it ignores failures if [ignore_failure] is set to true.
     It returns a deferred string containing the output of the command. *)
   val run :
        t
@@ -59,8 +60,11 @@ module Make (P : AppPaths) : sig
     -> unit
     -> string Deferred.t
 
-  (** [run_in_background t args] runs the application in the given context [t] with the provided arguments [args].
-    It returns a deferred string containing the output of the command. *)
+  (** [run_in_background t args ?env] runs the application in the given context [t] with the provided arguments [args].
+    It uses the default environment if [env] is not provided.
+    It runs the command in the background and does not wait for it to finish.
+    If the command fails, it does not raise an exception unless [ignore_failure] is set to false.
+    It return name of app which is launched (as user can provide combination of possible app location) and handle to process*)
   val run_in_background :
        t
     -> args:string list
