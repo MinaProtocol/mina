@@ -316,6 +316,22 @@ update-rust-vendors:
 	@echo "Updating Rust vendors in src/lib/crypto/kimchi_bindings/stubs..."
 	@cd src/lib/crypto/kimchi_bindings/stubs && cargo vendor kimchi-stubs-vendors
 
+.PHONY: install
+install:
+	@dune build @install
+	@dune install
+	@echo "--------------------------------------------------------------"
+	@echo "All binaries (resp. libraries) have been installed into $(OPAM_SWITCH_PREFIX)/bin"
+	@echo "(resp. ${OPAM_SWITCH_PREFIX}/lib) and the binaries are available in the path."
+	@echo "You can list the installed binaries with:"
+	@echo "> ls -al ${OPAM_SWITCH_PREFIX}/bin"
+	@echo "In particular, you should be able to run the command 'mina'"
+	@echo "'logproc', 'rosetta', 'generate_keypair', etc from this shell"
+
+.PHONY: uninstall
+uninstall:
+	@dune uninstall
+
 ########################################
 ## Lint
 
