@@ -161,6 +161,9 @@ let convert_single_work_from_selector ~(partitioner : t)
                       pending zkapp command instance, this should be \
                       impossible"
           | Ok [] ->
+              (* TODO: erase this branch by refactor underlying
+                 [Transaction_snark.zkapp_command_witnesses_exn] using nonempty
+                 list *)
               failwith "No witness generated"
           | Error e ->
               failwith (Error.to_string_hum e) )
