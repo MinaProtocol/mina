@@ -12,9 +12,6 @@ module Sent_zkapp_job_pool =
 module Sent_single_job_pool =
   Job_pool.Make (Work.Id.Single) (Work.Spec.Single.Stable.Latest)
 
-(* TODO: use proper cache DB later *)
-let _proof_cache_db = Proof_cache_tag.create_identity_db ()
-
 (* WARN: we're mixing ID for `pairing_pool` and `zkapp_command_jobs. *)
 type t =
   { logger : Logger.t
