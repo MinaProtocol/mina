@@ -187,15 +187,11 @@ let convert_single_work_from_selector ~(partitioner : t)
       Ok (Single { job; data = () })
 
 let schedule_from_tmp_slot ~(partitioner : t) () =
-  match partitioner.tmp_slot with
-  | Some spec ->
-      partitioner.tmp_slot <- None ;
-      let single_spec, pairing, sok_message = spec in
-      Some
-        (convert_single_work_from_selector ~partitioner ~single_spec ~pairing
-           ~sok_message )
-  | None ->
-      None
+  let%map.Option spec = partitioner.tmp_slot in
+  partitioner.tmp_slot <- None ;
+  let single_spec, pairing, sok_message = spec in
+  convert_single_work_from_selector ~partitioner ~single_spec ~pairing
+    ~sok_message
 
 let schedule_job_from_partitioner ~(partitioner : t) () :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
