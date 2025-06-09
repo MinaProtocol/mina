@@ -13,3 +13,9 @@ val request_partitioned_work :
   -> work_from_selector:work_from_selector
   -> partitioner:t
   -> Snark_work_lib.Spec.Partitioned.Stable.V1.t Or_error.t option
+
+val submit_partitioned_work :
+     result:Snark_work_lib.Result.Partitioned.Stable.V1.t
+  -> callback:(Snark_work_lib.Result.Combined.t -> unit)
+  -> partitioner:t
+  -> [> `Ok | `Removed | `SchemeUnmatched ]

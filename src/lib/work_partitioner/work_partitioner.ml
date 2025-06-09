@@ -242,3 +242,122 @@ let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
         (request_from_selector_and_consume_by_partitioner ~partitioner
            ~work_from_selector ~sok_message )
     ]
+
+(* TODO: figure out the correct cache DB *)
+let proof_cache_db = Proof_cache_tag.create_identity_db ()
+
+type submit_result =
+  | SchemeUnmatched
+  | Removed
+  | Processed of Work.Result.Combined.t option
+      (** If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
+
+let submit_single ~partitioner
+    ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
+    ~(submitted_half : [ `One | `First | `Second ]) ~id =
+  let result = ref SchemeUnmatched in
+  Hashtbl.change partitioner.pairing_pool id ~f:(function
+    | Some pending_combined_result -> (
+        let submitted_result =
+          Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
+            ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
+            submitted_result
+        in
+        match
+          Combining_result.merge_single_result pending_combined_result
+            ~submitted_result ~submitted_half
+        with
+        | Pending pending ->
+            result := Processed None ;
+            Some pending
+        | Done combined ->
+            result := Processed (Some combined) ;
+            None
+        | HalfAlreadyInPool | StructureMismatch _ ->
+            result := SchemeUnmatched ;
+            Some pending_combined_result )
+    | None ->
+        (* We should always at least having a Spec_only in the pool, this branch
+           hence would be SchemeUnmatched indeed *)
+        None ) ;
+  !result
+
+let submit_into_pending_zkapp_command ~partitioner
+    ~(job_id : Work.Id.Sub_zkapp.t)
+    ~data:
+      ({ proof; data = elapsed } :
+        (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
+  let returns = ref SchemeUnmatched in
+  let process (pending : Pending_zkapp_command.t) =
+    Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
+
+    match Pending_zkapp_command.try_finalize pending with
+    | None ->
+        returns := Processed None
+    | Some ({ job_id; _ }, proof, elapsed) ->
+        let submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t
+            =
+          Work.Result.Single.Poly.{ spec = (); proof; elapsed }
+        in
+        returns :=
+          submit_single ~partitioner ~submitted_result
+            ~submitted_half:job_id.which_one ~id:job_id.pairing_id
+  in
+
+  let remove_or_process :
+      Sent_zkapp_job_pool.job option -> Sent_zkapp_job_pool.job option =
+    function
+    | None ->
+        printf
+          "Worker submit a work that's already removed from sent job pool, \
+           meaning it's completed, ignoring" ;
+        returns := Removed ;
+        None
+    | Some _ -> (
+        let single_id = Work.Id.Sub_zkapp.to_single job_id in
+        match
+          Zkapp_command_job_pool.find ~id:single_id
+            partitioner.zkapp_command_jobs
+        with
+        | None ->
+            printf
+              "Worker submit a work that's already removed from pending zkapp \
+               command pool, meaning it's completed, ignoring " ;
+            returns := Removed ;
+            None
+        | Some pending ->
+            process pending.spec ; None )
+  in
+
+  Sent_zkapp_job_pool.change_inplace ~id:job_id ~f:remove_or_process
+    partitioner.zkapp_jobs_sent_by_partitioner ;
+  !returns
+
+let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
+    ~(callback : Work.Result.Combined.t -> unit) ~(partitioner : t) =
+  let rpc_result =
+    match result with
+    | Work.Spec.Partitioned.Poly.Single
+        { job = Work.With_job_meta.{ job_id; spec; _ }
+        ; data = { proof; data = elapsed }
+        } ->
+        let Work.Id.Single.{ which_one = submitted_half; pairing_id = id } =
+          job_id
+        in
+        let submitted_result =
+          Work.Result.Single.Poly.{ spec; proof; elapsed }
+        in
+        submit_single ~partitioner ~submitted_result ~submitted_half ~id
+    | Work.Spec.Partitioned.Poly.Sub_zkapp_command
+        { job = Work.With_job_meta.{ job_id; _ }; data } ->
+        submit_into_pending_zkapp_command ~partitioner ~job_id ~data
+  in
+  match rpc_result with
+  | SchemeUnmatched ->
+      `SchemeUnmatched
+  | Removed ->
+      `Removed
+  | Processed (Some result) ->
+      callback result ; `Ok
+  | Processed None ->
+      `Ok
