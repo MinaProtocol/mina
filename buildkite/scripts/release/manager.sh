@@ -261,7 +261,7 @@ function get_cached_debian_or_download() {
     elif [[ $backend == "hetzner" ]]; then
         remote_path="/home/o1labs-generic/pvc-4d294645-6466-4260-b933-1b909ff9c3a1/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
     elif [[ $backend == "local" ]]; then
-        remote_path="/var/storagebox/$BUILDKITE_BUILD_ID/$codename/debians/${artifact_full_name}_*"
+        remote_path="/var/storagebox/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
     else
         echo "❌ Unsupported backend: $backend"
         exit 1
