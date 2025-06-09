@@ -19,7 +19,7 @@ let zkapp_signed_pair_update_cost = 10.08
 
 let zkapp_signed_single_update_cost = 9.14
 
-let zkapp_transaction_cost_limit = 69.45
+let zkapp_transaction_cost_limit = 150.0
 
 let max_event_elements = 100
 
