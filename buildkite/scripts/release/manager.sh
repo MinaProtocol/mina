@@ -261,7 +261,7 @@ function storage_upload() {
             gsutil cp "$local_path" "$remote_path"
             ;;
         hetzner)
-           rsync -avz -e "ssh -p 23 -i $HETZNER_KEY" "$local_path" "$HETZNER_USER@$HETZNER_HOST:$remote_path"
+           rsync -avz -e "ssh -p 23 -i $HETZNER_KEY" $local_path "$HETZNER_USER@$HETZNER_HOST:$remote_path"
             ;;
         *)
             echo "❌ Unsupported backend: $backend"
@@ -1498,7 +1498,7 @@ function persist(){
 
     for __artifact in "${__artifacts_arr[@]}"; do
         storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*" "$tmp_dir"
-        storage_upload "$__backend" "$tmp_dir" "$(storage_root "$__backend")/$__target/debians/$__codename/"
+        storage_upload "$__backend" "$tmp_dir/${__artifact}_*" "$(storage_root "$__backend")/$__target/debians/$__codename/"
     done
     
     echo " ✅  Done."
