@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 
-set -x 
+set -x
 # Author's Note: Because the structure of this repo is inconsistent (Dockerfiles and build contexts placed willy-nilly)
 # we have to trustlist and configure image builds individually because each one is going to be slightly different.
 # This is needed as opposed to trusting the structure of the each project to be consistent for every deployable.
@@ -56,13 +56,13 @@ if [[ -z "$SERVICE" ]]; then usage "Service is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
 
 NETWORK="--build-arg network=$INPUT_NETWORK"
-if [[ -z "$INPUT_NETWORK" ]]; then 
+if [[ -z "$INPUT_NETWORK" ]]; then
   echo "Network is not set. Using the default (devnet)"
   NETWORK="--build-arg network=devnet"
 fi
 
 BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
-if [[ -z "$INPUT_BRANCH" ]]; then 
+if [[ -z "$INPUT_BRANCH" ]]; then
   echo "Branch is not set. Using the default (compatible)"
   BRANCH="--build-arg MINA_BRANCH=compatible"
 fi
@@ -74,39 +74,39 @@ if [[ -z "${MINA_REPO}" ]]; then
 fi
 
 DEB_CODENAME="--build-arg deb_codename=$INPUT_CODENAME"
-if [[ -z "$INPUT_CODENAME" ]]; then 
+if [[ -z "$INPUT_CODENAME" ]]; then
   echo "Debian codename is not set. Using the default (bullseye)"
   DEB_CODENAME="--build-arg deb_codename=bullseye"
 fi
 
 DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
-if [[ -z "$INPUT_RELEASE" ]]; then 
+if [[ -z "$INPUT_RELEASE" ]]; then
   echo "Debian release is not set. Using the default (unstable)"
   DEB_RELEASE="--build-arg deb_release=unstable"
 fi
 
 DEB_VERSION="--build-arg deb_version=$INPUT_VERSION"
-if [[ -z "$INPUT_VERSION" ]]; then 
+if [[ -z "$INPUT_VERSION" ]]; then
   echo "Debian version is not set. Using the default ($VERSION)"
   DEB_VERSION="--build-arg deb_version=$VERSION"
 fi
 
-if [[ -z "$DEB_PROFILE" ]]; then 
+if [[ -z "$DEB_PROFILE" ]]; then
   echo "Debian profile is not set. Using the default (standard)"
   DEB_PROFILE="standard"
 fi
 
-if [[ -z "$DEB_BUILD_FLAGS" ]]; then 
+if [[ -z "$DEB_BUILD_FLAGS" ]]; then
   DEB_BUILD_FLAGS=""
 fi
 
 CACHE="--cache-from $INPUT_CACHE"
-if [[ -z "$INPUT_CACHE" ]]; then 
+if [[ -z "$INPUT_CACHE" ]]; then
   CACHE=""
 fi
 
 DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
-if [[ -z "$INPUT_REPO" ]]; then 
+if [[ -z "$INPUT_REPO" ]]; then
   echo "Debian repository is not set. Using the default (http://localhost:8080)"
   DEB_REPO="--build-arg deb_repo=http://localhost:8080"
 fi
