@@ -112,7 +112,7 @@ type ('s, 'mlmb) with_data =
 type 'mlmb t = (unit, 'mlmb) with_data
 
 val dummy :
-  'h Pickles_types.Nat.t -> 'r Pickles_types.Nat.t -> domain_log2:int -> 'h t
+  'h Pickles_types.Nat.t -> 'r Pickles_types.Nat.t -> domain_log2:int -> feature_flags:Pickles_types.Plonk_types.Features.flags -> 'h t
 
 module Make (MLMB : Pickles_types.Nat.Intf) : sig
   module Max_proofs_verified_at_most :
