@@ -11,7 +11,13 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
 
 CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${PG_PORT}
 
-dune b "${NETWORK_DATA_FOLDER}"
+# Build the directory and the archive_db alias to download the SQL file
+# Note: In CI, the SQL file is already downloaded by RunWithPostgres.dhall
+# but we keep this here for local development
+if [ ! -f "_build/default/${NETWORK_DATA_FOLDER}/archive_db.sql" ]; then
+  dune b "${NETWORK_DATA_FOLDER}"
+  dune b @"${NETWORK_DATA_FOLDER}/archive_db"
+fi
 
 
 echo "Running patch archive test"

@@ -79,6 +79,8 @@ let runInDockerWithPostgresConn
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                 , "sleep 5"
                 , "curl -L -o ${outerDir}/initScript.sql ${initUrl}"
+                , "mkdir -p ${outerDir}/_build/default/src/test/archive/sample_db"
+                , "cp ${outerDir}/initScript.sql ${outerDir}/_build/default/src/test/archive/sample_db/archive_db.sql"
                 , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/initScript.sql"
                 , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} gcr.io/o1labs-192920/${Artifacts.dockerName
                                                                                                                                                     docker}:${minaDockerTag}${networkOrDefault} ${innerScript}"
