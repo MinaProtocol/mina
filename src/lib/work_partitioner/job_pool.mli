@@ -44,4 +44,8 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
       returns [`Ok] on successful, and [`Duplicate] if the key [id] is already
       occupied in the pool. *)
   val add : id:Id.t -> job:job -> t -> [> `Duplicate | `Ok ]
+
+  (** [add_exn ~id ~job ~message t] add a job [job] with id [id] to [t]. If that
+      job is already in the pool failwith [message] *)
+  val add_exn : id:Id.t -> job:job -> message:string -> t -> unit
 end

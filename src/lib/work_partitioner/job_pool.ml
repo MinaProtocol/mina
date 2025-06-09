@@ -68,4 +68,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
         `Ok
     | `Duplicate ->
         `Duplicate
+
+  let add_exn ~id ~job ~message t =
+    match add ~id ~job t with `Ok -> () | `Duplicate -> failwith message
 end
