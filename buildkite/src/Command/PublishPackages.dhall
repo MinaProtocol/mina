@@ -4,6 +4,12 @@ let Optional/map = Prelude.Optional.map
 
 let Optional/default = Prelude.Optional.default
 
+let List/drop = Prelude.List.drop
+
+let List/concatMap = Prelude.List.concatMap
+
+let Text/concat = Prelude.Text.concat
+
 let Artifacts = ../Constants/Artifacts.dhall
 
 let Size = ../Command/Size.dhall
@@ -29,12 +35,12 @@ let Command = ./Base.dhall
 let join =
           \(sep : Text)
       ->  \(xs : List Text)
-      ->  List/fold
-            Text
-            xs
-            Text
-            (\(x : Text) -> \(acc : Text) -> acc ++ sep ++ x)
-            ""
+      ->  let concatWithSepAtStart =
+                List/concatMap Text Text (\(item : Text) -> [ sep, item ]) xs
+
+          let concat = List/drop 1 Text concatWithSepAtStart
+
+          in  Text/concat concat
 
 let Spec =
       { Type =
@@ -110,7 +116,7 @@ let publish
                   "\\\${GITTAG}"
                   "\\\$(date \"+%Y%m%d\")"
 
-          let artifacts = join ", " (Artifacts.dockerNames spec.artifacts)
+          let artifacts = join "," (Artifacts.dockerNames spec.artifacts)
 
           let networks =
                 join

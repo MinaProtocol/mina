@@ -26,6 +26,8 @@
 #        propagate-environment: true
 
 
+set -x
+
 ARTIFACTS_DHALL_DEF="(./buildkite/src/Constants/Artifacts.dhall)"
 DEBIAN_VERSION_DHALL_DEF="(./buildkite/src/Constants/DebianVersions.dhall)"
 PROMOTE_PACKAGE_DHALL_DEF="(./buildkite/src/Entrypoints/PublishPackages.dhall)"
@@ -76,23 +78,27 @@ if [[ $VERIFY -eq 1 ]]; then
     DHALL_VERIFY="False"
 fi
 
-arr_of_artifacts=(${ARTIFACTS//,/ })
-if [[ ${#arr_of_artifacts[@]} -eq 0 || -z "${arr_of_artifacts[0]}" ]]; then
-  DHALL_ARTIFACTS="([] : List $ARTIFACTS_DHALL_DEF.Type)"
-else
-  DHALL_ARTIFACTS=""
-  for i in "${arr_of_artifacts[@]}"; do
-    DHALL_ARTIFACTS="${DHALL_ARTIFACTS}, $ARTIFACTS_DHALL_DEF.Type.${i}"
-  done
-  DHALL_ARTIFACTS="[${DHALL_ARTIFACTS:1}]"
-fi
+function to_dhall_list() {
+  local input_str="$1"
+  local dhall_type="$2"
+  local arr=(${input_str//,/ })
+  local dhall_list=""
 
+  if [[ ${#arr[@]} -eq 0 || -z "${arr[0]}" ]]; then
+    dhall_list="([] : List $dhall_type)"
+  elif [[ ${#arr[@]} -eq 1 ]]; then
+    dhall_list="[$dhall_type.${arr[0]}]"
+  else
+    for i in "${arr[@]}"; do
+      dhall_list="${dhall_list}, $dhall_type.${i}"
+    done
+    dhall_list="[${dhall_list:1}]"
+  fi
 
-CODENAMES=(${CODENAMES//,/ })
-DHALL_CODENAMES=""
-  for i in "${CODENAMES[@]}"; do
-    DHALL_CODENAMES="${DHALL_CODENAMES}, $DEBIAN_VERSION_DHALL_DEF.DebVersion.${i}"
-  done
-  DHALL_CODENAMES="[${DHALL_CODENAMES:1}]"
+  echo "$dhall_list"
+}
+
+DHALL_ARTIFACTS=$(to_dhall_list "$ARTIFACTS" "$ARTIFACTS_DHALL_DEF.Type")
+DHALL_CODENAMES=$(to_dhall_list "$CODENAMES" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
 
 echo $PROMOTE_PACKAGE_DHALL_DEF'.promote_artifacts '"$DHALL_ARTIFACTS"' "'"${VERSION}"'" "'"${NEW_VERSION}"'" "amd64" '$PROFILES_DHALL_DEF'.Type.'"${PROFILE}"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '"${DHALL_CODENAMES}"' '$DEBIAN_CHANNEL_DHALL_DEF'.Type.'"${CHANNEL}"' '$DEBIAN_REPO_DHALL_DEF'.Type.'"${REPO}"' '${REMOVE_PROFILE_FROM_NAME}' '${DHALL_PUBLISH}' '${DHALL_VERIFY}' "'"${BUILD_ID}"'" ' | dhall-to-yaml --quoted 
