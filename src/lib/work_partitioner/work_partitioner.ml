@@ -12,11 +12,11 @@ module Sent_zkapp_job_pool =
 module Sent_single_job_pool =
   Job_pool.Make (Work.Id.Single) (Work.Spec.Single.Stable.Latest)
 
-(* WARN: we're mixing ID for `pairing_pool` and `zkapp_command_jobs. *)
 type t =
   { logger : Logger.t
   ; transaction_snark : (module Transaction_snark.S)
-  ; id_generator : Id_generator.t
+  ; single_id_gen : Id_generator.t
+  ; subzkapp_id_gen : Id_generator.t
   ; pairing_pool : (int64, Combining_result.t) Hashtbl.t
         (** if one single work from underlying Work_selector is completed but
            not the other. throw it here. *)
@@ -27,7 +27,7 @@ type t =
   ; mutable tmp_slot :
       (Work.Spec.Single.t * Work.Id.Single.t * Mina_base.Sok_message.t) option
         (** When receving a `Two works from the underlying Work_selector, store
-            one of them here, so we could issue them to another worker. *)
+            one of them here, so we could schedule them to another worker. *)
   }
 
 let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
@@ -38,7 +38,8 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   end) in
   { logger
   ; transaction_snark = (module M)
-  ; id_generator = Id_generator.create ~logger
+  ; single_id_gen = Id_generator.create ~logger
+  ; subzkapp_id_gen = Id_generator.create ~logger
   ; pairing_pool = Hashtbl.create (module Int64)
   ; zkapp_command_jobs = Zkapp_command_job_pool.create ()
   ; reassignment_timeout
@@ -49,51 +50,51 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
 
 let epoch_now () = Time.(now () |> to_span_since_epoch)
 
-let resissue_if_old ~reassignment_timeout
+let reschedule_if_old ~reassignment_timeout
     (job : _ Work.With_job_meta.Stable.Latest.t) =
-  let issued = Time.of_span_since_epoch job.issued_since_unix_epoch in
-  let delta = Time.(diff (now ()) issued) in
+  let scheduled = Time.of_span_since_epoch job.scheduled_since_unix_epoch in
+  let delta = Time.(diff (now ()) scheduled) in
   if Time.Span.( > ) delta reassignment_timeout then
     `Stop_reschedule
       Work.With_job_meta.Stable.Latest.
-        { job with issued_since_unix_epoch = epoch_now () }
+        { job with scheduled_since_unix_epoch = epoch_now () }
   else `Stop_keep
 
 (* NOTE: below are logics for work requesting *)
-let reissue_old_zkapp_job
+let reschedule_old_zkapp_job
     ~partitioner:
       ({ reassignment_timeout; zkapp_jobs_sent_by_partitioner; _ } : t) () :
     Work.Spec.Partitioned.Stable.Latest.t option =
   let%map.Option job =
     Sent_zkapp_job_pool.remove_until_reschedule
-      ~f:(resissue_if_old ~reassignment_timeout)
+      ~f:(reschedule_if_old ~reassignment_timeout)
       zkapp_jobs_sent_by_partitioner
   in
   Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () }
 
-let reissue_old_single_job
+let reschedule_old_single_job
     ~partitioner:
       ({ reassignment_timeout; single_jobs_sent_by_partitioner; _ } : t) () :
     Work.Spec.Partitioned.Stable.Latest.t option =
   let%map.Option job =
     Sent_single_job_pool.remove_until_reschedule
-      ~f:(resissue_if_old ~reassignment_timeout)
+      ~f:(reschedule_if_old ~reassignment_timeout)
       single_jobs_sent_by_partitioner
   in
   Work.Spec.Partitioned.Poly.Single { job; data = () }
 
-let issue_from_pending_zkapp_command ~(partitioner : t)
+let schedule_from_pending_zkapp_command ~(partitioner : t)
     ({ spec = pending; job_id = zkapp_id; sok_message; _ } :
       Zkapp_command_job_pool.job ) =
   let%map.Option spec = Pending_zkapp_command.next_job_spec pending in
   let job_id =
     Work.Id.Sub_zkapp.of_single
-      ~job_id:(Id_generator.next_id partitioner.id_generator ())
+      ~job_id:(Id_generator.next_id partitioner.subzkapp_id_gen ())
       zkapp_id
   in
   let job =
     Work.With_job_meta.
-      { spec; job_id; issued_since_unix_epoch = epoch_now (); sok_message }
+      { spec; job_id; scheduled_since_unix_epoch = epoch_now (); sok_message }
   in
   assert (
     phys_equal `Ok
@@ -102,10 +103,10 @@ let issue_from_pending_zkapp_command ~(partitioner : t)
 
   Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () }
 
-let issue_from_zkapp_command_work_pool ~(partitioner : t) () :
+let schedule_from_zkapp_command_work_pool ~(partitioner : t) () :
     Work.Spec.Partitioned.Stable.Latest.t option =
   Zkapp_command_job_pool.iter_until
-    ~f:(issue_from_pending_zkapp_command ~partitioner)
+    ~f:(schedule_from_pending_zkapp_command ~partitioner)
     partitioner.zkapp_command_jobs
 
 let convert_single_work_from_selector ~(partitioner : t)
@@ -115,7 +116,7 @@ let convert_single_work_from_selector ~(partitioner : t)
     Work.With_job_meta.
       { spec = single_spec
       ; job_id = pairing
-      ; issued_since_unix_epoch = epoch_now ()
+      ; scheduled_since_unix_epoch = epoch_now ()
       ; sok_message
       }
   in
@@ -143,7 +144,7 @@ let convert_single_work_from_selector ~(partitioner : t)
                 Work.With_job_meta.
                   { spec = pending_zkapp_command
                   ; job_id = pairing
-                  ; issued_since_unix_epoch = epoch_now ()
+                  ; scheduled_since_unix_epoch = epoch_now ()
                   ; sok_message
                   }
               in
@@ -152,7 +153,7 @@ let convert_single_work_from_selector ~(partitioner : t)
                   (Zkapp_command_job_pool.add ~id:pairing
                      ~job:pending_zkapp_command_job
                      partitioner.zkapp_command_jobs ) ) ;
-              issue_from_pending_zkapp_command ~partitioner
+              schedule_from_pending_zkapp_command ~partitioner
                 pending_zkapp_command_job
               |> Option.value_exn
                    ~message:
@@ -176,7 +177,7 @@ let convert_single_work_from_selector ~(partitioner : t)
       in
       Single { job; data = () }
 
-let issue_from_tmp_slot ~(partitioner : t) () =
+let schedule_from_tmp_slot ~(partitioner : t) () =
   match partitioner.tmp_slot with
   | Some spec ->
       partitioner.tmp_slot <- None ;
@@ -187,14 +188,14 @@ let issue_from_tmp_slot ~(partitioner : t) () =
   | None ->
       None
 
-let issue_job_from_partitioner ~(partitioner : t) () :
+let schedule_job_from_partitioner ~(partitioner : t) () :
     Work.Spec.Partitioned.Stable.Latest.t option =
   List.find_map
     ~f:(fun f -> f ())
-    [ reissue_old_zkapp_job ~partitioner
-    ; reissue_old_single_job ~partitioner
-    ; issue_from_zkapp_command_work_pool ~partitioner
-    ; issue_from_tmp_slot ~partitioner
+    [ reschedule_old_zkapp_job ~partitioner
+    ; reschedule_old_single_job ~partitioner
+    ; schedule_from_zkapp_command_work_pool ~partitioner
+    ; schedule_from_tmp_slot ~partitioner
     ]
 
 (* WARN: this should only be called if [partitioner.tmp_slot] is None *)
@@ -202,7 +203,7 @@ let consume_job_from_selector ~(partitioner : t)
     ~(sok_message : Mina_base.Sok_message.t)
     ~(instances : Work.Spec.Single.t One_or_two.t) () :
     Work.Spec.Partitioned.Stable.Latest.t =
-  let pairing_id = Id_generator.next_id partitioner.id_generator () in
+  let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
     ~data:(Spec_only { spec = instances; sok_message }) ;
 
@@ -233,7 +234,7 @@ let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
     Work.Spec.Partitioned.Stable.Latest.t option =
   List.find_map
     ~f:(fun f -> f ())
-    [ issue_job_from_partitioner ~partitioner
+    [ schedule_job_from_partitioner ~partitioner
     ; request_from_selector_and_consume_by_partitioner ~partitioner
         ~work_from_selector ~sok_message
     ]
