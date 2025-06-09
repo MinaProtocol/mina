@@ -14,7 +14,7 @@ module Snark_worker_shared = Snark_worker_shared
       - [zkapp_jobs_sent_by_partitioner] holds already scheduled subzkapp jobs,
         where a subzkapp job is a [Snark_work_lib.Spec.Sub_zkapp.t] with some
         metadata;
-      - [zkapp_command_jobs] holds [Pending_zkapp_command], where each of them
+      - [pending_zkapp_commands] holds [Pending_zkapp_command.t], where each of them
         could generate several [Snark_work_lib.Spec.Sub_zkapp.t];
       - [tmp_slot] holds a single spec received from Work Selector that is
         unprocessed yet. It's here so we could simplify the implementation;

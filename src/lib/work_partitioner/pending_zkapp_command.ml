@@ -36,6 +36,8 @@ let create_and_yield_segment ~job
     }
   , first_segment )
 
+let zkapp_job t = t.job
+
 let try_take2 (q : 'a Deque.t) : ('a * 'a) option =
   match Deque.dequeue_front q with
   | None ->
@@ -63,7 +65,7 @@ let next_segment (t : t) =
   t.proofs_in_flight <- t.proofs_in_flight + 1 ;
   segment
 
-let next_job_spec (t : t) : Spec.Sub_zkapp.Stable.Latest.t option =
+let next_subzkapp_job_spec (t : t) : Spec.Sub_zkapp.Stable.Latest.t option =
   match next_merge t with Some _ as ret -> ret | None -> next_segment t
 
 let submit_proof (t : t) ~(proof : Ledger_proof.t)
