@@ -12,10 +12,15 @@ module type S = sig
 
   type network
 
-  type ('q, 'r) rpc_mock = 'q Envelope.Incoming.t -> 'r Deferred.t
+  type ('query, 'response) rpc_mock =
+    'query Envelope.Incoming.t -> 'response Deferred.t
 
   type rpc_mocks =
-    { get_mock : 'q 'r. ('q, 'r) Rpc_interface.rpc -> ('q, 'r) rpc_mock option }
+    { get_mock :
+        'query 'response.
+           ('query, 'response) Rpc_interface.rpc
+        -> ('query, 'response) rpc_mock option
+    }
 
   val create_network : Peer.t list -> network
 
