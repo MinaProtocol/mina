@@ -85,7 +85,6 @@
 (package (name logproc_lib))
 (package (name merkle_address))
 (package (name merkle_ledger))
-(package (name merkle_ledger_tests))
 (package (name merkle_list_prover))
 (package (name merkle_list_verifier))
 (package (name merkle_mask))
