@@ -63,7 +63,7 @@ let reschedule_if_old ~reassignment_timeout
 (* NOTE: below are logics for work requesting *)
 let reschedule_old_zkapp_job
     ~partitioner:
-      ({ reassignment_timeout; zkapp_jobs_sent_by_partitioner; _ } : t) () :
+      ({ reassignment_timeout; zkapp_jobs_sent_by_partitioner; _ } : t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
     Sent_zkapp_job_pool.remove_until_reschedule
@@ -75,7 +75,7 @@ let reschedule_old_zkapp_job
 
 let reschedule_old_single_job
     ~partitioner:
-      ({ reassignment_timeout; single_jobs_sent_by_partitioner; _ } : t) () :
+      ({ reassignment_timeout; single_jobs_sent_by_partitioner; _ } : t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
     Sent_single_job_pool.remove_until_reschedule
@@ -111,7 +111,7 @@ let schedule_from_pending_zkapp_command ~(partitioner : t)
   let%map.Option sub_zkapp_spec = Pending_zkapp_command.next_job_spec pending in
   register_pending_zkapp_command_job ~partitioner ~sub_zkapp_spec job
 
-let schedule_from_zkapp_command_work_pool ~(partitioner : t) () :
+let schedule_from_zkapp_command_work_pool ~(partitioner : t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
     Zkapp_command_job_pool.iter_until
@@ -186,27 +186,26 @@ let convert_single_work_from_selector ~(partitioner : t)
       in
       Ok (Single { job; data = () })
 
-let schedule_from_tmp_slot ~(partitioner : t) () =
+let schedule_from_tmp_slot ~(partitioner : t) =
   let%map.Option spec = partitioner.tmp_slot in
   partitioner.tmp_slot <- None ;
   let single_spec, pairing, sok_message = spec in
   convert_single_work_from_selector ~partitioner ~single_spec ~pairing
     ~sok_message
 
-let schedule_job_from_partitioner ~(partitioner : t) () :
+let schedule_job_from_partitioner ~(partitioner : t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
-  List.find_map
-    ~f:(fun f -> f ())
-    [ reschedule_old_zkapp_job ~partitioner
-    ; reschedule_old_single_job ~partitioner
-    ; schedule_from_zkapp_command_work_pool ~partitioner
-    ; schedule_from_tmp_slot ~partitioner
+  List.find_map ~f:Lazy.force
+    [ lazy (reschedule_old_zkapp_job ~partitioner)
+    ; lazy (reschedule_old_single_job ~partitioner)
+    ; lazy (schedule_from_zkapp_command_work_pool ~partitioner)
+    ; lazy (schedule_from_tmp_slot ~partitioner)
     ]
 
 (* WARN: this should only be called if [partitioner.tmp_slot] is None *)
 let consume_job_from_selector ~(partitioner : t)
     ~(sok_message : Mina_base.Sok_message.t)
-    ~(instances : Work.Spec.Single.t One_or_two.t) () :
+    ~(instances : Work.Spec.Single.t One_or_two.t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t =
   let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
@@ -225,21 +224,20 @@ let consume_job_from_selector ~(partitioner : t)
       convert_single_work_from_selector ~partitioner ~single_spec:spec2
         ~sok_message ~pairing:pairing2
 
-type work_from_selector = unit -> Work.Spec.Single.t One_or_two.t option
+type work_from_selector = Work.Spec.Single.t One_or_two.t option Lazy.t
 
 let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
     ~(work_from_selector : work_from_selector)
-    ~(sok_message : Mina_base.Sok_message.t) () =
-  let%map.Option instances = work_from_selector () in
-
-  consume_job_from_selector ~partitioner ~instances ~sok_message ()
+    ~(sok_message : Mina_base.Sok_message.t) =
+  let%map.Option instances = Lazy.force work_from_selector in
+  consume_job_from_selector ~partitioner ~instances ~sok_message
 
 let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
     ~(work_from_selector : work_from_selector) ~(partitioner : t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
-  List.find_map
-    ~f:(fun f -> f ())
-    [ schedule_job_from_partitioner ~partitioner
-    ; request_from_selector_and_consume_by_partitioner ~partitioner
-        ~work_from_selector ~sok_message
+  List.find_map ~f:Lazy.force
+    [ lazy (schedule_job_from_partitioner ~partitioner)
+    ; lazy
+        (request_from_selector_and_consume_by_partitioner ~partitioner
+           ~work_from_selector ~sok_message )
     ]

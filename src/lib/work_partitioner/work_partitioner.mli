@@ -6,7 +6,7 @@ type t
 val create : reassignment_timeout:Time.Span.t -> logger:Logger.t -> t
 
 type work_from_selector =
-  unit -> Snark_work_lib.Spec.Single.t One_or_two.t option
+  Snark_work_lib.Spec.Single.t One_or_two.t option Lazy.t
 
 val request_partitioned_work :
      sok_message:Mina_base.Sok_message.t
