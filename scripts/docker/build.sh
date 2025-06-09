@@ -127,7 +127,7 @@ case "${SERVICE}" in
     mina-toolchain)
         DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"
         DOCKERFILE_PATH_SCRIPT_2_AND_MORE="dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
-        case "${INPUT_CODENAME}" in 
+        case "${INPUT_CODENAME}" in
           bullseye)
             DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
@@ -135,7 +135,7 @@ case "${SERVICE}" in
             DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
           noble)
-            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            DOCKERFILE_PATH="dockerfiles/stages/1-base-image-noble $DOCKERFILE_PATH_SCRIPT_2_BUILD_DEPS $DOCKERFILE_PATH_SCRIPT_3_OPAM_DEPS $DOCKERFILE_PATH_SCRIPT_4_TOOLCHAIN"
             ;;
           *)
             echo "Unsupported debian codename: $INPUT_CODENAME"
