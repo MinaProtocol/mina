@@ -12,4 +12,4 @@ val request_partitioned_work :
      sok_message:Mina_base.Sok_message.t
   -> work_from_selector:work_from_selector
   -> partitioner:t
-  -> Snark_work_lib.Spec.Partitioned.Stable.Latest.t option
+  -> Snark_work_lib.Spec.Partitioned.Stable.V1.t Or_error.t option

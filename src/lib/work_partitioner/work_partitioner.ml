@@ -64,24 +64,25 @@ let reschedule_if_old ~reassignment_timeout
 let reschedule_old_zkapp_job
     ~partitioner:
       ({ reassignment_timeout; zkapp_jobs_sent_by_partitioner; _ } : t) () :
-    Work.Spec.Partitioned.Stable.Latest.t option =
+    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
     Sent_zkapp_job_pool.remove_until_reschedule
       ~f:(reschedule_if_old ~reassignment_timeout)
       zkapp_jobs_sent_by_partitioner
   in
-  Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () }
+
+  Ok (Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () })
 
 let reschedule_old_single_job
     ~partitioner:
       ({ reassignment_timeout; single_jobs_sent_by_partitioner; _ } : t) () :
-    Work.Spec.Partitioned.Stable.Latest.t option =
+    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
     Sent_single_job_pool.remove_until_reschedule
       ~f:(reschedule_if_old ~reassignment_timeout)
       single_jobs_sent_by_partitioner
   in
-  Work.Spec.Partitioned.Poly.Single { job; data = () }
+  Ok (Work.Spec.Partitioned.Poly.Single { job; data = () })
 
 let register_pending_zkapp_command_job ~(partitioner : t) ~sub_zkapp_spec
     ({ job_id = zkapp_id; sok_message; _ } : Zkapp_command_job_pool.job) =
@@ -111,14 +112,17 @@ let schedule_from_pending_zkapp_command ~(partitioner : t)
   register_pending_zkapp_command_job ~partitioner ~sub_zkapp_spec job
 
 let schedule_from_zkapp_command_work_pool ~(partitioner : t) () :
-    Work.Spec.Partitioned.Stable.Latest.t option =
-  Zkapp_command_job_pool.iter_until
-    ~f:(schedule_from_pending_zkapp_command ~partitioner)
-    partitioner.zkapp_command_jobs
+    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+  let%map.Option job =
+    Zkapp_command_job_pool.iter_until
+      ~f:(schedule_from_pending_zkapp_command ~partitioner)
+      partitioner.zkapp_command_jobs
+  in
+  Ok job
 
 let convert_single_work_from_selector ~(partitioner : t)
     ~(single_spec : Work.Spec.Single.t) ~sok_message ~pairing :
-    Work.Spec.Partitioned.Stable.Latest.t =
+    Work.Spec.Partitioned.Stable.Latest.t Or_error.t =
   let job =
     Work.With_job_meta.
       { spec = single_spec
@@ -130,60 +134,57 @@ let convert_single_work_from_selector ~(partitioner : t)
   match single_spec with
   | Transition (input, witness) -> (
       match witness.transaction with
-      | Command (Zkapp_command zkapp_command) -> (
+      | Command (Zkapp_command zkapp_command) ->
           let witness = Transaction_witness.read_all_proofs_from_disk witness in
-          match
-            Snark_worker_shared.extract_zkapp_segment_works
-              ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
-          with
-          | Ok (hd :: rest) ->
-              let unscheduled_segments =
-                Mina_stdlib.Nonempty_list.(
-                  init hd rest
-                  |> map ~f:(fun (witness, spec, statement) ->
-                         Work.Spec.Sub_zkapp.Segment
-                           { statement; witness; spec }
-                         |> Work.Spec.Sub_zkapp.read_all_proofs_from_disk ))
-              in
-              let pending_zkapp_command, first_segment =
-                Pending_zkapp_command.create_and_yield_segment ~job
-                  ~unscheduled_segments
-              in
-              let pending_zkapp_command_job =
-                Work.With_job_meta.
-                  { spec = pending_zkapp_command
-                  ; job_id = pairing
-                  ; scheduled_since_unix_epoch = epoch_now ()
-                  ; sok_message
-                  }
-              in
-              Zkapp_command_job_pool.add_exn ~id:pairing
-                ~job:pending_zkapp_command_job
-                ~message:
-                  "Id generater generated a repeated Id that happens to be \
-                   occupied by a job in zkapp command pool"
-                partitioner.zkapp_command_jobs ;
-              register_pending_zkapp_command_job ~partitioner
-                ~sub_zkapp_spec:first_segment pending_zkapp_command_job
-          | Ok [] ->
-              (* TODO: erase this branch by refactor underlying
-                 [Transaction_snark.zkapp_command_witnesses_exn] using nonempty
-                 list *)
-              failwith "No witness generated"
-          | Error e ->
-              failwith (Error.to_string_hum e) )
+          Snark_worker_shared.extract_zkapp_segment_works
+            ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
+          |> Result.map ~f:(function
+               | first_segment :: rest_segments ->
+                   let unscheduled_segments =
+                     Mina_stdlib.Nonempty_list.(
+                       init first_segment rest_segments
+                       |> map ~f:(fun (witness, spec, statement) ->
+                              Work.Spec.Sub_zkapp.Segment
+                                { statement; witness; spec }
+                              |> Work.Spec.Sub_zkapp.read_all_proofs_from_disk ))
+                   in
+                   let pending_zkapp_command, first_segment =
+                     Pending_zkapp_command.create_and_yield_segment ~job
+                       ~unscheduled_segments
+                   in
+                   let pending_zkapp_command_job =
+                     Work.With_job_meta.
+                       { spec = pending_zkapp_command
+                       ; job_id = pairing
+                       ; scheduled_since_unix_epoch = epoch_now ()
+                       ; sok_message
+                       }
+                   in
+                   Zkapp_command_job_pool.add_exn ~id:pairing
+                     ~job:pending_zkapp_command_job
+                     ~message:
+                       "Id generater generated a repeated Id that happens to \
+                        be occupied by a job in zkapp command pool"
+                     partitioner.zkapp_command_jobs ;
+                   register_pending_zkapp_command_job ~partitioner
+                     ~sub_zkapp_spec:first_segment pending_zkapp_command_job
+               | [] ->
+                   (* TODO: erase this branch by refactor underlying
+                      [Transaction_snark.zkapp_command_witnesses_exn] using nonempty
+                      list *)
+                   failwith "No witness generated" )
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
           let job =
             Work.With_job_meta.map
               ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
           in
-          Single { job; data = () } )
+          Ok (Single { job; data = () }) )
   | Merge _ ->
       let job =
         Work.With_job_meta.map
           ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
       in
-      Single { job; data = () }
+      Ok (Single { job; data = () })
 
 let schedule_from_tmp_slot ~(partitioner : t) () =
   match partitioner.tmp_slot with
@@ -197,7 +198,7 @@ let schedule_from_tmp_slot ~(partitioner : t) () =
       None
 
 let schedule_job_from_partitioner ~(partitioner : t) () :
-    Work.Spec.Partitioned.Stable.Latest.t option =
+    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   List.find_map
     ~f:(fun f -> f ())
     [ reschedule_old_zkapp_job ~partitioner
@@ -210,7 +211,7 @@ let schedule_job_from_partitioner ~(partitioner : t) () :
 let consume_job_from_selector ~(partitioner : t)
     ~(sok_message : Mina_base.Sok_message.t)
     ~(instances : Work.Spec.Single.t One_or_two.t) () :
-    Work.Spec.Partitioned.Stable.Latest.t =
+    Work.Spec.Partitioned.Stable.Latest.t Or_error.t =
   let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
     ~data:(Spec_only { spec = instances; sok_message }) ;
@@ -239,7 +240,7 @@ let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
 
 let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
     ~(work_from_selector : work_from_selector) ~(partitioner : t) :
-    Work.Spec.Partitioned.Stable.Latest.t option =
+    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   List.find_map
     ~f:(fun f -> f ())
     [ schedule_job_from_partitioner ~partitioner
