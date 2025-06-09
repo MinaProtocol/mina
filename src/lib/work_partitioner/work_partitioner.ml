@@ -139,41 +139,35 @@ let convert_single_work_from_selector ~(partitioner : t)
           let witness = Transaction_witness.read_all_proofs_from_disk witness in
           Snark_worker_shared.extract_zkapp_segment_works
             ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
-          |> Result.map ~f:(function
-               | first_segment :: rest_segments ->
-                   let unscheduled_segments =
-                     Mina_stdlib.Nonempty_list.(
-                       init first_segment rest_segments
-                       |> map ~f:(fun (witness, spec, statement) ->
-                              Work.Spec.Sub_zkapp.Segment
-                                { statement; witness; spec }
-                              |> Work.Spec.Sub_zkapp.read_all_proofs_from_disk ))
-                   in
-                   let pending_zkapp_command, first_segment =
-                     Pending_zkapp_command.create_and_yield_segment ~job
-                       ~unscheduled_segments
-                   in
-                   let pending_zkapp_command_job =
-                     Work.With_job_meta.
-                       { spec = pending_zkapp_command
-                       ; job_id = pairing
-                       ; scheduled_since_unix_epoch = epoch_now ()
-                       ; sok_message
-                       }
-                   in
-                   Zkapp_command_job_pool.add_exn ~id:pairing
-                     ~job:pending_zkapp_command_job
-                     ~message:
-                       "Id generator generated a repeated Id that happens to \
-                        be occupied by a job in zkapp command pool"
-                     partitioner.zkapp_command_jobs ;
-                   register_pending_zkapp_command_job ~partitioner
-                     ~sub_zkapp_spec:first_segment pending_zkapp_command_job
-               | [] ->
-                   (* TODO: erase this branch by refactor underlying
-                      [Transaction_snark.zkapp_command_witnesses_exn] using nonempty
-                      list *)
-                   failwith "No witness generated" )
+          |> Result.map ~f:(fun unscheduled_segments ->
+                 let unscheduled_segments =
+                   Snark_worker_shared.Zkapp_command_inputs
+                   .read_all_proofs_from_disk unscheduled_segments
+                   |> Mina_stdlib.Nonempty_list.map
+                        ~f:(fun (witness, spec, statement) ->
+                          Work.Spec.Sub_zkapp.Stable.Latest.Segment
+                            { statement; witness; spec } )
+                 in
+                 let pending_zkapp_command, first_segment =
+                   Pending_zkapp_command.create_and_yield_segment ~job
+                     ~unscheduled_segments
+                 in
+                 let pending_zkapp_command_job =
+                   Work.With_job_meta.
+                     { spec = pending_zkapp_command
+                     ; job_id = pairing
+                     ; scheduled_since_unix_epoch = epoch_now ()
+                     ; sok_message
+                     }
+                 in
+                 Zkapp_command_job_pool.add_exn ~id:pairing
+                   ~job:pending_zkapp_command_job
+                   ~message:
+                     "Id generator generated a repeated Id that happens to be \
+                      occupied by a job in zkapp command pool"
+                   partitioner.zkapp_command_jobs ;
+                 register_pending_zkapp_command_job ~partitioner
+                   ~sub_zkapp_spec:first_segment pending_zkapp_command_job )
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
           let job =
             Work.With_job_meta.map

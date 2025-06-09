@@ -159,14 +159,13 @@ module Impl = struct
                                   ] ;
                               Error e
                         in
-                        match witnesses_specs_stmts with
-                        | [] ->
-                            Deferred.Or_error.error_string
-                              "no witnesses generated"
-                        | (witness, spec, stmt) :: rest as inputs ->
+                        match
+                          Mina_stdlib.Nonempty_list.uncons witnesses_specs_stmts
+                        with
+                        | (witness, spec, stmt), rest ->
                             let%bind (p1 : Ledger_proof.t) =
                               log_base_snark ~statement:{ stmt with sok_digest }
-                                ~spec ~all_inputs:inputs
+                                ~spec ~all_inputs:witnesses_specs_stmts
                                 (M.of_zkapp_command_segment_exn ~witness)
                             in
 
@@ -179,11 +178,11 @@ module Impl = struct
                                   let%bind (curr : Ledger_proof.t) =
                                     log_base_snark
                                       ~statement:{ stmt with sok_digest } ~spec
-                                      ~all_inputs:inputs
+                                      ~all_inputs:witnesses_specs_stmts
                                       (M.of_zkapp_command_segment_exn ~witness)
                                   in
                                   log_merge_snark ~sok_digest prev curr
-                                    ~all_inputs:inputs )
+                                    ~all_inputs:witnesses_specs_stmts )
                             in
                             if
                               Transaction_snark.Statement.equal
@@ -203,7 +202,8 @@ module Impl = struct
                                         input )
                                   ; ( "inputs"
                                     , Zkapp_command_inputs.(
-                                        inputs |> read_all_proofs_from_disk
+                                        witnesses_specs_stmts
+                                        |> read_all_proofs_from_disk
                                         |> Stable.Latest.to_yojson) )
                                   ] ;
                               Deferred.return
