@@ -7,4 +7,5 @@ RUN apt-get update --quiet \
   && apt-get install --no-install-recommends --quiet --yes \
     libssl3t64 \
     libproc2-0 \
+    adduser \
   && rm -rf /var/lib/apt/lists/*
