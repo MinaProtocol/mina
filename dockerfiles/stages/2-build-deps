@@ -40,11 +40,6 @@ ARG RUST_NIGHTLY=2024-09-05
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Removing the hashicorp apt source list as it is:
-# - not needed for this image
-# - causes issues on focal as there is no hashicorp package for focal
-RUN rm -f /etc/apt/sources.list.d/hashicorp.list
-
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
