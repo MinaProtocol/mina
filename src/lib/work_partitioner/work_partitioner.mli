@@ -1,10 +1,10 @@
 open Core_kernel
 module Snark_worker_shared = Snark_worker_shared
 
-(** [t] is type of a instance of a Work Partitioner, sitting between a Work
+(** [t] is type of a Work Partitioner data structure, sitting between a Work
     Selector and the RPC endpoints. It has 2 main responsibility:
       - Partition works received from Work Selector, so SNARK workers could
-        process them under the new RPC protocl;
+        process them under the new RPC protocol;
       - Combine partitoned works so Work Selector could accept them;
 
     [t] holds several pools:
@@ -28,7 +28,7 @@ type work_from_selector =
   Snark_work_lib.Spec.Single.t One_or_two.t option Lazy.t
 
 (** [request_partitioned_work ~sok_message ~work_from_selector ~partitioner]
-    returns a partitioned job from [partitioner], if we there exist one.
+    returns a partitioned job from [partitioner], if there is one available.
 
     [sok_message] is a pair of (prover, fee). These are the metadatas needed for
     SNARK worker to generate a proof. In additional, the fee would be used to
