@@ -1,5 +1,4 @@
-ARG image=ubuntu:noble
-FROM ${image} AS base-image
+FROM ubuntu:noble AS base-image
 
 ENV DEBIAN_FRONTEND=noninteractive
 
