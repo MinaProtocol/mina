@@ -50,6 +50,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
 
 let epoch_now () = Time.(now () |> to_span_since_epoch)
 
+(* TODO: Consider remove all works no longer relevant for current frontier *)
 let reschedule_if_old ~reassignment_timeout
     (job : _ Work.With_job_meta.Stable.Latest.t) =
   let scheduled = Time.of_span_since_epoch job.scheduled_since_unix_epoch in
@@ -164,6 +165,9 @@ let convert_single_work_from_selector ~(partitioner : t)
   | Transition (input, witness) -> (
       match witness.transaction with
       | Command (Zkapp_command zkapp_command) ->
+          (* TODO: we have read from disk followed by write to disk in shared
+             function followed by read from disk again. Should consider refactor
+             this. *)
           let witness = Transaction_witness.read_all_proofs_from_disk witness in
           Snark_worker_shared.extract_zkapp_segment_works
             ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
