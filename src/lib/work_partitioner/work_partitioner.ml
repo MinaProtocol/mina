@@ -113,7 +113,7 @@ let schedule_from_pending_zkapp_command ~(partitioner : t)
   let%map.Option sub_zkapp_spec = Pending_zkapp_command.next_job_spec pending in
   register_pending_zkapp_command_job ~partitioner ~sub_zkapp_spec job
 
-let schedule_from_zkapp_command_work_pool ~(partitioner : t) :
+let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
     Zkapp_command_job_pool.iter_until
@@ -210,7 +210,7 @@ let schedule_job_from_partitioner ~(partitioner : t) :
   List.find_map ~f:Lazy.force
     [ lazy (reschedule_old_zkapp_job ~partitioner)
     ; lazy (reschedule_old_single_job ~partitioner)
-    ; lazy (schedule_from_zkapp_command_work_pool ~partitioner)
+    ; lazy (schedule_from_any_pending_zkapp_command ~partitioner)
     ; lazy (schedule_from_tmp_slot ~partitioner)
     ]
 
