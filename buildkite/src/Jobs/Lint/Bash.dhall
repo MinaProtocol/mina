@@ -38,7 +38,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBullseye
+                RunInToolchain.runInToolchain
                   ([] : List Text)
                   (     "sudo apt-get update"
                     ++  " && sudo apt-get install shellcheck"

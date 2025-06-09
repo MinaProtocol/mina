@@ -18,7 +18,7 @@ in  { step =
         ->  Command.build
               Command.Config::{
               , commands =
-                  RunInToolchain.runInToolchainBullseye
+                  RunInToolchain.runInToolchain
                     ([] : List Text)
                     "./buildkite/scripts/connect/connect-to-network.sh ${mina_suffix} ${testnet} ${wait_between_graphql_poll} ${wait_before_final_check} "
               , label = "Connect to ${testnet}"

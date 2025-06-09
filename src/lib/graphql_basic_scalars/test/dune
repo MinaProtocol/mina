@@ -1,0 +1,27 @@
+(test
+ (name test_graphql_basic_scalars)
+ (package graphql_basic_scalars)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  ; opam libraries
+  alcotest
+  async
+  async_unix
+  async_kernel
+  core_kernel
+  integers
+  core
+  graphql
+  graphql-async
+  graphql_parser
+  yojson
+  sexplib0
+  ; local libraries
+  base_quickcheck
+  graphql_basic_scalars
+  graphql_wrapper
+  quickcheck_lib
+  unix))
