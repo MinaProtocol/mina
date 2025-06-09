@@ -77,5 +77,6 @@ let extract_zkapp_segment_works ~m:(module M : S)
   | Ok [] ->
       (* TODO: erase this branch by refactor underlying
          [Transaction_snark.zkapp_command_witnesses_exn] using nonempty
-         list *)
+         list. Also, should consider fusing this function with that to one,
+         as this is the only callsite. *)
       failwith "No witness generated"
