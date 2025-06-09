@@ -164,7 +164,7 @@ let convert_single_work_from_selector ~(partitioner : t)
                    Zkapp_command_job_pool.add_exn ~id:pairing
                      ~job:pending_zkapp_command_job
                      ~message:
-                       "Id generater generated a repeated Id that happens to \
+                       "Id generator generated a repeated Id that happens to \
                         be occupied by a job in zkapp command pool"
                      partitioner.zkapp_command_jobs ;
                    register_pending_zkapp_command_job ~partitioner
