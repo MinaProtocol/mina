@@ -1,5 +1,17 @@
 (tests
- (names main test_no_sideloaded)
+ (names
+  test_impls
+  test_no_sideloaded
+  test_opt_sponge
+  test_plonk_curve_ops
+  test_ro
+  test_scalar_challenge
+  test_sponge
+  test_side_loaded_verification_key
+  test_step
+  test_step_verifier
+  test_wrap
+  test_wrap_hack)
  (flags
   (:standard -warn-error +a)
   -open
