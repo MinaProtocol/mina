@@ -37,13 +37,11 @@ fi
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get update
-apt-get install -y git apt-transport-https ca-certificates aptly tzdata curl
-
 git config --global --add safe.directory /workdir
 
 apt-get update
-apt-get install -y "docker" "docker-compose-plugin" "docker-ce"
+apt-get install -y git apt-transport-https ca-certificates aptly tzdata curl
+apt-get install -y docker docker-compose-plugin docker-ce
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
