@@ -31,6 +31,6 @@ WORKDIR /root/
 USER 0
 ARG UID=0
 
-COPY --chown=${UID} scripts/hardfork-entrypoint.sh /hardfork-entrypoint.sh
+COPY --chown=${UID} scripts/daemon-hardfork-entrypoint.sh /hardfork-entrypoint.sh
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/hardfork-entrypoint.sh"]
