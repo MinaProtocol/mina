@@ -14,7 +14,10 @@ module Connection_with_state = struct
     match t with Allowed c -> when_allowed c | _ -> when_banned
 end
 
-type pubsub_topic_mode_t = RO | RW | N
+type pubsub_topic_mode_t =
+  | RO  (** Readonly *)
+  | RW  (** Readwrite *)
+  | N  (** Neither *)
 
 let v1_topic_block = "mina/block/1.0.0"
 
