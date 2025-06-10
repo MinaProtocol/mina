@@ -189,7 +189,7 @@ function storage_list() {
 
     case $backend in
         local)
-            ls "$path"
+            ls $path
             ;;
         gs)
             gsutil list "$path"
