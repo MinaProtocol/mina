@@ -1,7 +1,5 @@
 open Core_kernel
 
-[@@@warning "-4-27"]
-
 module Yojson_map = Map.Make (struct
   type t =
     [ `Null
