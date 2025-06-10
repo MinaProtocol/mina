@@ -48,6 +48,7 @@ let%test_unit "invalid transactions do not dirty the ledger" =
   let constraint_constants =
     Genesis_constants.For_unit_tests.Constraint_constants.t
   in
+  let signature_kind = Mina_signature_kind.Testnet in
   let ledger = Ledger.create_ephemeral ~depth:4 () in
   let sender_sk, receiver_sk =
     Quickcheck.Generator.generate ~size:0
@@ -87,7 +88,6 @@ let%test_unit "invalid transactions do not dirty the ledger" =
         ~memo:Signed_command_memo.dummy
         ~body:(Signed_command_payload.Body.Payment payment)
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     Option.value_exn
       (Signed_command.create_with_signature_checked ~signature_kind
          (Signed_command.sign_payload ~signature_kind sender_sk payload)
