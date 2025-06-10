@@ -1098,4 +1098,19 @@ module Unstable = struct
       (Random_oracle.pack_input (to_input t))
 
   let empty_digest = lazy (digest empty)
+
+  let of_stable (account : Stable.Latest.t) : t =
+    { public_key = account.public_key
+    ; token_id = account.token_id
+    ; token_symbol = account.token_symbol
+    ; balance = account.balance
+    ; nonce = account.nonce
+    ; receipt_chain_hash = account.receipt_chain_hash
+    ; delegate = account.delegate
+    ; voting_for = account.voting_for
+    ; timing = account.timing
+    ; permissions = account.permissions
+    ; zkapp = account.zkapp
+    ; unstable_field = account.nonce
+    }
 end
