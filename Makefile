@@ -40,69 +40,18 @@ GITLONGHASH := $(shell git rev-parse HEAD)
 LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ########################################
-## Help
 .PHONY: help
-help:
-	@echo "Mina Makefile Targets:"
-	@echo "======================="
-	@echo "all                       - Clean and build the project"
-	@echo "archive_blocks            - Build the archive_blocks executable"
-	@echo "benchmarks                - Build benchmarking tools"
-	@echo "build                     - Build the main project executables"
-	@echo "build_all_sigs            - Build all signature variants of the daemon"
-	@echo "build_archive             - Build the archive node"
-	@echo "build_archive_utils       - Build archive node and related utilities"
-	@echo "build_intgtest            - Build integration test tools"
-	@echo "build_or_download_pv_keys - Build or download proving/verification keys"
-	@echo "build_pv_keys             - Build proving/verification keys"
-	@echo "build_rosetta             - Build Rosetta API components"
-	@echo "build_rosetta_all_sigs    - Build all signature variants of Rosetta"
-	@echo "check                     - Check that all OCaml packages build without issues"
-	@echo "check-format              - Check formatting of OCaml code"
-	@echo "check_opam_switch         - Verify the opam switch has correct packages"
-	@echo "check-snarky-submodule    - Check the snarky submodule"
-	@echo "clean                     - Remove build artifacts"
-	@echo "coverage-html             - Generate HTML report from coverage data"
-	@echo "coverage-summary          - Generate coverage summary report"
-	@echo "deb                       - Build Debian package"
-	@echo "dev                       - Alias for build"
-	@echo "doc_diagrams              - Generate documentation diagrams"
-	@echo "extract_blocks            - Build the extract_blocks executable"
-	@echo "genesiskeys               - Generate and copy genesis keys"
-	@echo "genesis_ledger            - Build runtime genesis ledger"
-	@echo "genesis-ledger-ocaml      - Generate OCaml genesis ledger from daemon"
-	@echo "heap_usage                - Build heap usage analysis tool"
-	@echo "help                      - Display this help information"
-	@echo "install                   - Install all the binaries and libraries to the"
-	@echo "                            opam switch, and make it available in the PATH"
-	@echo "libp2p_helper             - Build libp2p helper"
-	@echo "missing_blocks_auditor    - Build missing blocks auditor tool"
-	@echo "ml-docs                   - Generate OCaml documentation"
-	@echo "ocaml_checks              - Run OCaml version and config checks"
-	@echo "ocaml_version             - Check OCaml version"
-	@echo "ocaml_word_size           - Check OCaml word size"
-	@echo "patch_archive_test        - Build the patch archive test"
-	@echo "publish-macos             - Publish macOS artifacts"
-	@echo "reformat                  - Reformat all OCaml code"
-	@echo "reformat-diff             - Reformat only modified OCaml files"
-	@echo "replayer                  - Build the replayer tool"
-	@echo "rosetta_lib_encodings     - Test Rosetta library encodings"
-	@echo "switch                    - Set up the opam switch"
-	@echo "test-coverage             - Run tests with coverage instrumentation"
-	@echo "test-ppx                  - Test PPX extensions"
-	@echo "uninstall                 - Uninstall all binaries and libraries from the opam switch"
-	@echo "update-graphql            - Update GraphQL schema"
-	@echo "update-rust-vendors       - Update the Rust vendors"
-	@echo "zkapp_limits              - Build ZkApp limits tool"
+help: ## Display this help information
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 ########################################
 ## Code
 
 .PHONY: all
-all: clean build
+all: clean build ## Clean and build the project
 
 .PHONY: clean
-clean:
+clean: ## Remove build artifacts
 	$(info Removing previous build artifacts)
 	@rm -rf _build
 	@rm -rf Cargo.lock target
@@ -110,40 +59,36 @@ clean:
 	@rm -rf src/app/libp2p_helper/result src/libp2p_ipc/libp2p_ipc.capnp.go
 
 .PHONY: switch
-switch:
+switch: ## Set up the opam switch
 	./scripts/update-opam-switch.sh
 
-# enforces the OCaml version being used
 .PHONY: ocaml_version
-ocaml_version: switch
+ocaml_version: switch ## Check OCaml version
 	@if ! ocamlopt -config | grep "version:" | grep $(OCAML_VERSION); then echo "incorrect OCaml version, expected version $(OCAML_VERSION)" ; exit 1; fi
 
-# enforce machine word size
 .PHONY: ocaml_word_size
-ocaml_word_size: switch
+ocaml_word_size: switch ## Check OCaml word size
 	@if ! ocamlopt -config | grep "word_size:" | grep $(WORD_SIZE); then echo "invalid machine word size, expected $(WORD_SIZE)" ; exit 1; fi
 
 
-# Checks that the current opam switch contains the packages from opam.export at the same version.
-# This check is disabled in the pure nix environment (that does not use opam).
 .PHONY: check_opam_switch
-check_opam_switch: switch
+check_opam_switch: switch ## Verify the opam switch has correct packages
 ifneq ($(DISABLE_CHECK_OPAM_SWITCH), true)
 	@which check_opam_switch 2>/dev/null >/dev/null || ( echo "The check_opam_switch binary was not found in the PATH, try: opam switch import opam.export" >&2 && exit 1 )
 	@check_opam_switch opam.export
 endif
 
 .PHONY: ocaml_checks
-ocaml_checks: switch ocaml_version ocaml_word_size check_opam_switch
+ocaml_checks: switch ocaml_version ocaml_word_size check_opam_switch ## Run OCaml version and config checks
 
 .PHONY: libp2p_helper
-libp2p_helper:
+libp2p_helper: ## Build libp2p helper
 ifeq (, $(MINA_LIBP2P_HELPER_PATH))
 	make -C src/app/libp2p_helper
 endif
 
 .PHONY: genesis_ledger
-genesis_ledger: ocaml_checks
+genesis_ledger: ocaml_checks ## Build runtime genesis ledger
 	$(info Building runtime_genesis_ledger)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
@@ -153,13 +98,12 @@ genesis_ledger: ocaml_checks
 		--genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
-# Checks that every OCaml packages in the project build without issues
 .PHONY: check
-check: ocaml_checks libp2p_helper
+check: ocaml_checks libp2p_helper ## Check that all OCaml packages build without issues
 	dune build @src/check
 
 .PHONY: build
-build: ocaml_checks reformat-diff libp2p_helper
+build: ocaml_checks reformat-diff libp2p_helper ## Build the main project executables
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
@@ -173,7 +117,7 @@ build: ocaml_checks reformat-diff libp2p_helper
 	$(info Build complete)
 
 .PHONY: build_all_sigs
-build_all_sigs: ocaml_checks reformat-diff libp2p_helper build
+build_all_sigs: ocaml_checks reformat-diff libp2p_helper build ## Build all signature variants of the daemon
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
@@ -184,7 +128,7 @@ build_all_sigs: ocaml_checks reformat-diff libp2p_helper build
 	$(info Build complete)
 
 .PHONY: build_archive
-build_archive: ocaml_checks reformat-diff
+build_archive: ocaml_checks reformat-diff ## Build the archive node
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -193,7 +137,7 @@ build_archive: ocaml_checks reformat-diff
 	$(info Build complete)
 
 .PHONY: build_archive_utils
-build_archive_utils: ocaml_checks reformat-diff
+build_archive_utils: ocaml_checks reformat-diff ## Build archive node and related utilities
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -206,7 +150,7 @@ build_archive_utils: ocaml_checks reformat-diff
 	$(info Build complete)
 
 .PHONY: build_rosetta
-build_rosetta: ocaml_checks
+build_rosetta: ocaml_checks ## Build Rosetta API components
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -217,13 +161,13 @@ build_rosetta: ocaml_checks
 	$(info Build complete)
 
 .PHONY: build_rosetta_all_sigs
-build_rosetta_all_sigs: ocaml_checks
+build_rosetta_all_sigs: ocaml_checks ## Build all signature variants of Rosetta
 	$(info Starting Build)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_intgtest
-build_intgtest: ocaml_checks
+build_intgtest: ocaml_checks ## Build integration test tools
 	$(info Starting Build)
 	@dune build \
 		--profile=$(DUNE_PROFILE) \
@@ -232,7 +176,7 @@ build_intgtest: ocaml_checks
 	$(info Build complete)
 
 .PHONY: rosetta_lib_encodings
-rosetta_lib_encodings: ocaml_checks
+rosetta_lib_encodings: ocaml_checks ## Test Rosetta library encodings
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -241,7 +185,7 @@ rosetta_lib_encodings: ocaml_checks
 	$(info Build complete)
 
 .PHONY: replayer
-replayer: ocaml_checks
+replayer: ocaml_checks ## Build the replayer tool
 	$(info Starting Build)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
@@ -250,7 +194,7 @@ replayer: ocaml_checks
 	$(info Build complete)
 
 .PHONY: missing_blocks_auditor
-missing_blocks_auditor: ocaml_checks
+missing_blocks_auditor: ocaml_checks ## Build missing blocks auditor tool
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -259,7 +203,7 @@ missing_blocks_auditor: ocaml_checks
 	$(info Build complete)
 
 .PHONY: extract_blocks
-extract_blocks: ocaml_checks
+extract_blocks: ocaml_checks ## Build the extract_blocks executable
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -268,7 +212,7 @@ extract_blocks: ocaml_checks
 	$(info Build complete)
 
 .PHONY: archive_blocks
-archive_blocks: ocaml_checks
+archive_blocks: ocaml_checks ## Build the archive_blocks executable
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -277,7 +221,7 @@ archive_blocks: ocaml_checks
 	$(info Build complete)
 
 .PHONY: patch_archive_test
-patch_archive_test: ocaml_checks
+patch_archive_test: ocaml_checks ## Build the patch archive test
 	$(info Starting Build)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
@@ -286,7 +230,7 @@ patch_archive_test: ocaml_checks
 	$(info Build complete)
 
 .PHONY: heap_usage
-heap_usage: ocaml_checks
+heap_usage: ocaml_checks ## Build heap usage analysis tool
 	$(info Starting Build)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
@@ -295,7 +239,7 @@ heap_usage: ocaml_checks
 	$(info Build complete)
 
 .PHONY: zkapp_limits
-zkapp_limits: ocaml_checks
+zkapp_limits: ocaml_checks ## Build ZkApp limits tool
 	$(info Starting Build)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
@@ -304,55 +248,65 @@ zkapp_limits: ocaml_checks
 	$(info Build complete)
 
 .PHONY: dev
-dev: build
+dev: build ## Alias for build
 
 .PHONY: update-graphql
-update-graphql:
+update-graphql: ## Update GraphQL schema
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		--profile=$(DUNE_PROFILE) \
 		graphql_schema.json
 
-update-rust-vendors:
+update-rust-vendors: ## Update the Rust vendors
 	@echo "Updating Rust vendors in src/lib/crypto/kimchi_bindings/stubs..."
 	@cd src/lib/crypto/kimchi_bindings/stubs && cargo vendor kimchi-stubs-vendors
+
+.PHONY: install
+install:
+	@dune build @install
+	@dune install
+	@echo "--------------------------------------------------------------"
+	@echo "All binaries (resp. libraries) have been installed into $(OPAM_SWITCH_PREFIX)/bin"
+	@echo "(resp. ${OPAM_SWITCH_PREFIX}/lib) and the binaries are available in the path."
+	@echo "You can list the installed binaries with:"
+	@echo "> ls -al ${OPAM_SWITCH_PREFIX}/bin"
+	@echo "In particular, you should be able to run the command 'mina'"
+	@echo "'logproc', 'rosetta', 'generate_keypair', etc from this shell"
+
+.PHONY: uninstall
+uninstall:
+	@dune uninstall
 
 ########################################
 ## Lint
 
 .PHONY: reformat
-reformat: ocaml_checks
+reformat: ocaml_checks ## Reformat all OCaml code
 	dune exec \
 		--profile=$(DUNE_PROFILE) \
 	  src/app/reformat/reformat.exe -- \
 		-path .
 
 .PHONY: reformat-diff
-reformat-diff:
+reformat-diff: ## Reformat only modified OCaml files
 	@FILES=$$(git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done); \
 	if [ -n "$$FILES" ]; then ocamlformat --doc-comments=before --inplace $$FILES; fi
 
 .PHONY: check-format
-check-format: ocaml_checks
+check-format: ocaml_checks ## Check formatting of OCaml code
 	dune exec \
 		--profile=$(DUNE_PROFILE) \
 	  src/app/reformat/reformat.exe -- \
 		-path . -check
 
 .PHONY: check-snarky-submodule
-check-snarky-submodule:
+check-snarky-submodule: ## Check the snarky submodule
 	./scripts/check-snarky-submodule.sh
-
-#######################################
-## Environment setup
-
-macos-setup:
-	./scripts/macos-setup-brew.sh
 
 #######################################
 ## Bash checks
 
-check-bash:
+check-bash: ## Run shellcheck on bash scripts
 	shellcheck ./scripts/**/*.sh -S warning
 	shellcheck ./buildkite/scripts/**/*.sh -S warning
 
@@ -360,7 +314,7 @@ check-bash:
 ## Artifacts
 
 .PHONY: build_pv_keys
-build_pv_keys: ocaml_checks
+build_pv_keys: ocaml_checks ## Build proving/verification keys
 	$(info Building keys)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
@@ -371,7 +325,7 @@ build_pv_keys: ocaml_checks
 	$(info Keys built)
 
 .PHONY: build_or_download_pv_keys
-build_or_download_pv_keys: ocaml_checks
+build_or_download_pv_keys: ocaml_checks ## Build or download proving/verification keys
 	$(info Building keys)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
@@ -382,7 +336,7 @@ build_or_download_pv_keys: ocaml_checks
 	$(info Keys built)
 
 .PHONY: genesiskeys
-genesiskeys:
+genesiskeys: ## Generate and copy genesis keys
 	@mkdir -p /tmp/artifacts
 	@cp _build/default/src/lib/key_gen/sample_keypairs.ml /tmp/artifacts/.
 	@cp _build/default/src/lib/key_gen/sample_keypairs.json /tmp/artifacts/.
@@ -392,21 +346,21 @@ genesiskeys:
 ## Genesis ledger in OCaml from running daemon
 
 .PHONY: genesis-ledger-ocaml
-genesis-ledger-ocaml:
+genesis-ledger-ocaml: ## Generate OCaml genesis ledger from daemon
 	@./scripts/generate-genesis-ledger.py .genesis-ledger.ml.jinja
 
 ########################################
 ## Tests
 
 .PHONY: test-ppx
-test-ppx:
+test-ppx: ## Test PPX extensions
 	$(MAKE) -C src/lib/ppx_mina/tests
 
 ########################################
 ## Benchmarks
 
 .PHONY: benchmarks
-benchmarks: ocaml_checks
+benchmarks: ocaml_checks ## Build benchmarking tools
 	dune build src/app/benchmarks/benchmarks.exe
 
 ########################################
@@ -414,12 +368,11 @@ benchmarks: ocaml_checks
 
 .PHONY: test-coverage
 test-coverage: SHELL := /bin/bash
-test-coverage: libp2p_helper
+test-coverage: libp2p_helper ## Run tests with coverage instrumentation
 	scripts/create_coverage_profiles.sh
 
-# we don't depend on test-coverage, which forces a run of all unit tests
 .PHONY: coverage-html
-coverage-html:
+coverage-html: ## Generate HTML report from coverage data
 ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
@@ -427,7 +380,7 @@ else
 endif
 
 .PHONY: coverage-summary
-coverage-summary:
+coverage-summary: ## Generate coverage summary report
 ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
@@ -456,11 +409,11 @@ doc_diagram_sources+=$(addprefix rfcs/res/,*.dot *.tex *.conv.tex)
 doc_diagram_sources+=$(addprefix src/lib/transition_frontier/res/,*.dot *.tex *.conv.tex)
 
 .PHONY: doc_diagrams
-doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources)))
+doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources))) ## Generate documentation diagrams
 
 ########################################
 # Generate odoc documentation
 
 .PHONY: ml-docs
-ml-docs: ocaml_checks
+ml-docs: ocaml_checks ## Generate OCaml documentation
 	dune build --profile=$(DUNE_PROFILE) @doc
