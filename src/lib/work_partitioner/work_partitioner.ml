@@ -258,7 +258,7 @@ let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
     ]
 
 type submit_result =
-  | SchemeUnmatched
+  | SpecUnmatched
   | Removed
   | Processed of Work.Result.Combined.t option
       (** If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
@@ -267,7 +267,7 @@ let submit_single ~partitioner
     ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
     ~job_id =
   let Work.Id.Single.{ which_one; pairing_id } = job_id in
-  let result = ref SchemeUnmatched in
+  let result = ref SpecUnmatched in
   Hashtbl.change partitioner.pairing_pool pairing_id ~f:(function
     | Some pending_combined_result -> (
         let submitted_result =
@@ -288,11 +288,11 @@ let submit_single ~partitioner
             result := Processed (Some combined) ;
             None
         | HalfAlreadyInPool | StructureMismatch _ ->
-            result := SchemeUnmatched ;
+            result := SpecUnmatched ;
             Some pending_combined_result )
     | None ->
         (* We should always at least having a Spec_only in the pool, this branch
-           hence would be SchemeUnmatched indeed *)
+           hence would be SpecUnmatched indeed *)
         None ) ;
   !result
 
@@ -301,7 +301,7 @@ let submit_into_pending_zkapp_command ~partitioner
     ~data:
       ({ proof; data = elapsed } :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
-  let returns = ref SchemeUnmatched in
+  let returns = ref SpecUnmatched in
   let process (pending : Pending_zkapp_command.t) =
     Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
 
@@ -361,8 +361,8 @@ let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
         submit_into_pending_zkapp_command ~partitioner ~job_id ~data
   in
   match rpc_result with
-  | SchemeUnmatched ->
-      `SchemeUnmatched
+  | SpecUnmatched ->
+      `SpecUnmatched
   | Removed ->
       `Removed
   | Processed (Some result) ->

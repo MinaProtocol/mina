@@ -61,4 +61,4 @@ val submit_partitioned_work :
      result:Snark_work_lib.Result.Partitioned.Stable.V1.t
   -> callback:(Snark_work_lib.Result.Combined.t -> unit)
   -> partitioner:t
-  -> [> `Ok | `Removed | `SchemeUnmatched ]
+  -> [> `Ok | `Removed | `SpecUnmatched ]
