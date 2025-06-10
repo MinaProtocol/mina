@@ -14,8 +14,8 @@ module Snark_worker_shared = Snark_worker_shared
       - [zkapp_jobs_sent_by_partitioner] holds already scheduled subzkapp jobs,
         where a subzkapp job is a [Snark_work_lib.Spec.Sub_zkapp.t] with some
         metadata;
-      - [pending_zkapp_commands] holds [Pending_zkapp_command.t], where each of them
-        could generate several [Snark_work_lib.Spec.Sub_zkapp.t];
+      - [pending_zkapp_commands] holds [Pending_zkapp_command.t], where each of
+        them could generate several [Snark_work_lib.Spec.Sub_zkapp.t];
       - [tmp_slot] holds a single spec received from Work Selector that is
         unprocessed yet. It's here so we could simplify the implementation;
       *)
@@ -57,8 +57,18 @@ val request_partitioned_work :
   -> partitioner:t
   -> Snark_work_lib.Spec.Partitioned.Stable.V1.t Or_error.t option
 
+type submit_result =
+  | SpecUnmatched  (** Submitted work doesn't match the scheme in pool *)
+  | Removed
+      (** Submitted work is already removed from pool, no longer needed or
+          already completed *)
+  | Processed of Snark_work_lib.Result.Combined.t option
+      (** [Processed None] indicates submitted work is accepted, nothing to
+          submit to work selector;
+          [Processed (Some w)] indicates submitted work is accepted, resulting
+          in [w] to be submitted to the work selector *)
+
 val submit_partitioned_work :
      result:Snark_work_lib.Result.Partitioned.Stable.V1.t
-  -> callback:(Snark_work_lib.Result.Combined.t -> unit)
   -> partitioner:t
-  -> [> `Ok | `Removed | `SpecUnmatched ]
+  -> submit_result

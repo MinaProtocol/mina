@@ -322,7 +322,7 @@ let submit_into_pending_zkapp_command ~partitioner
     | None ->
         printf
           "Worker submit a work that's already removed from sent job pool, \
-           meaning it's completed, ignoring" ;
+           meaning it's completed/no longer needed, ignoring" ;
         returns := Removed ;
         None
     | Some _ -> (
@@ -333,7 +333,8 @@ let submit_into_pending_zkapp_command ~partitioner
         | None ->
             printf
               "Worker submit a work that's already removed from pending zkapp \
-               command pool, meaning it's completed, ignoring " ;
+               command pool, meaning it's completed/no longer needed, \
+               ignoring " ;
             returns := Removed ;
             None
         | Some pending ->
@@ -345,27 +346,14 @@ let submit_into_pending_zkapp_command ~partitioner
   !returns
 
 let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
-    ~(callback : Work.Result.Combined.t -> unit) ~(partitioner : t) =
-  let rpc_result =
-    match result with
-    | Work.Spec.Partitioned.Poly.Single
-        { job = Work.With_job_meta.{ job_id; spec; _ }
-        ; data = { proof; data = elapsed }
-        } ->
-        let submitted_result =
-          Work.Result.Single.Poly.{ spec; proof; elapsed }
-        in
-        submit_single ~partitioner ~submitted_result ~job_id
-    | Work.Spec.Partitioned.Poly.Sub_zkapp_command
-        { job = Work.With_job_meta.{ job_id; _ }; data } ->
-        submit_into_pending_zkapp_command ~partitioner ~job_id ~data
-  in
-  match rpc_result with
-  | SpecUnmatched ->
-      `SpecUnmatched
-  | Removed ->
-      `Removed
-  | Processed (Some result) ->
-      callback result ; `Ok
-  | Processed None ->
-      `Ok
+    ~(partitioner : t) =
+  match result with
+  | Work.Spec.Partitioned.Poly.Single
+      { job = Work.With_job_meta.{ job_id; spec; _ }
+      ; data = { proof; data = elapsed }
+      } ->
+      let submitted_result = Work.Result.Single.Poly.{ spec; proof; elapsed } in
+      submit_single ~partitioner ~submitted_result ~job_id
+  | Work.Spec.Partitioned.Poly.Sub_zkapp_command
+      { job = Work.With_job_meta.{ job_id; _ }; data } ->
+      submit_into_pending_zkapp_command ~partitioner ~job_id ~data
