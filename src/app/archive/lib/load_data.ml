@@ -541,7 +541,7 @@ let get_account_update_body ~pool body_id =
         ; nonce
         ; receipt_chain_hash
         ; delegate
-        ; state
+        ; state = { eq_data = state }
         ; action_state
         ; proved_state
         ; is_new
