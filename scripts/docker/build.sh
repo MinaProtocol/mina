@@ -137,7 +137,8 @@ case "${SERVICE}" in
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi
-        DOCKERFILE_PATH="dockerfiles/stages/1-legacy-daemon"
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-hardfork"
+        DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-toolchain)
         DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"
