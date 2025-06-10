@@ -315,7 +315,13 @@ let submit_single ~partitioner
   | None ->
       [%log' debug partitioner.logger]
         "Worker submit a work that's already removed from pairing pool, \
-         meaning it's completed/no longer needed, ignoring" ;
+         meaning it's completed/no longer needed, ignoring"
+        ~metadata:
+          [ ( "result"
+            , Work.Result.Single.Poly.to_yojson
+                (fun () -> `Null)
+                Ledger_proof.to_yojson submitted_result )
+          ] ;
       Removed
   | Some combining_result -> (
       match
@@ -336,49 +342,50 @@ let submit_into_pending_zkapp_command ~partitioner
     ~data:
       ({ proof; data = elapsed } :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
-  let returns = ref SpecUnmatched in
-  let process (pending : Pending_zkapp_command.t) =
-    Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
-
-    match Pending_zkapp_command.try_finalize pending with
-    | None ->
-        returns := Processed None
-    | Some ({ job_id; _ }, proof, elapsed) ->
-        let submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t
-            =
-          Work.Result.Single.Poly.{ spec = (); proof; elapsed }
-        in
-        returns := submit_single ~partitioner ~submitted_result ~job_id
-  in
-
-  let remove_or_process :
-      Sent_zkapp_job_pool.job option -> Sent_zkapp_job_pool.job option =
-    function
-    | None ->
-        [%log' debug partitioner.logger]
-          "Worker submit a work that's already removed from sent job pool, \
-           meaning it's completed/no longer needed, ignoring" ;
-        returns := Removed ;
-        None
-    | Some _ -> (
-        let single_id = Work.Id.Sub_zkapp.to_single job_id in
-        match
-          Single_id_map.find partitioner.pending_zkapp_commands single_id
-        with
-        | None ->
-            [%log' debug partitioner.logger]
-              "Worker submit a work that's already removed from pending zkapp \
-               command pool, meaning it's completed/no longer needed, \
-               ignoring " ;
-            returns := Removed ;
-            None
-        | Some pending ->
-            process pending ; None )
-  in
-
-  Sent_zkapp_job_pool.change_inplace ~id:job_id ~f:remove_or_process
-    partitioner.zkapp_jobs_sent_by_partitioner ;
-  !returns
+  match
+    Sent_zkapp_job_pool.find ~id:job_id
+      partitioner.zkapp_jobs_sent_by_partitioner
+  with
+  | None ->
+      [%log' debug partitioner.logger]
+        "Worker submit a work that's already removed from sent sub-zkapp job \
+         pool, meaning it's completed/no longer needed, ignoring"
+        ~metadata:
+          [ ("job_id", Work.Id.Sub_zkapp.to_yojson job_id)
+          ; ("proof", Ledger_proof.to_yojson proof)
+          ; ("elapsed", Mina_stdlib.Time.Span.to_yojson elapsed)
+          ] ;
+      Removed
+  | Some _ -> (
+      Sent_zkapp_job_pool.remove_exn ~id:job_id
+        ~message:
+          "This must be a concurrency bug: found a job in the pool, but it's \
+           gone when attempting to erase it."
+        partitioner.zkapp_jobs_sent_by_partitioner ;
+      let single_id = Work.Id.Sub_zkapp.to_single job_id in
+      match Single_id_map.find partitioner.pending_zkapp_commands single_id with
+      | None ->
+          [%log' debug partitioner.logger]
+            "Worker submit a work that's already removed from pending zkapp \
+             command pool, meaning it's completed/no longer needed, ignoring"
+            ~metadata:
+              [ ("job_id", Work.Id.Sub_zkapp.to_yojson job_id)
+              ; ("proof", Ledger_proof.to_yojson proof)
+              ; ("elapsed", Mina_stdlib.Time.Span.to_yojson elapsed)
+              ] ;
+          Removed
+      | Some pending -> (
+          Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
+          match Pending_zkapp_command.try_finalize pending with
+          | None ->
+              Processed None
+          | Some ({ job_id; _ }, proof, elapsed) ->
+              partitioner.pending_zkapp_commands <-
+                Single_id_map.remove partitioner.pending_zkapp_commands
+                  single_id ;
+              submit_single ~partitioner
+                ~submitted_result:{ spec = (); proof; elapsed }
+                ~job_id ) )
 
 let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
     ~(partitioner : t) =

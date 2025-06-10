@@ -16,6 +16,11 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
       because the underlying queue is not cleaned for that [id]. *)
   val remove : id:Id.t -> t -> job option
 
+  (** [remove_exn ~id t] removes job corresponding to [id] in [t]. It's assumed
+      that such ID would never be reused again. If no such job is in [t],
+      failwith [message]. *)
+  val remove_exn : id:Id.t -> message:string -> t -> unit
+
   (** [find ~id t] finds the job corresponding to id [id] in [t]. *)
   val find : id:Id.t -> t -> job option
 

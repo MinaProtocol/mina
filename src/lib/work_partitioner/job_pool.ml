@@ -13,6 +13,9 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
 
   let remove ~id t = Hashtbl.find_and_remove t.index id
 
+  let remove_exn ~id ~message t =
+    match remove ~id t with Some _ -> () | None -> failwith message
+
   let find ~id t = Hashtbl.find t.index id
 
   let change_inplace ~id ~f t = Hashtbl.change t.index id ~f
