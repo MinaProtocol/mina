@@ -211,7 +211,7 @@ function storage_md5() {
 
     case $backend in
         local)
-            md5sum "$path" | awk '{print $1}'
+            md5sum $path | awk '{print $1}'
             ;;
         gs)
             gsutil hash -h -m "$path" | grep "Hash (md5)" | awk '{print $3}'
@@ -233,7 +233,7 @@ function storage_download() {
 
     case $backend in
         local)
-            cp "$remote_path" "$local_path"
+            cp $remote_path $local_path
             ;;
         gs)
             gsutil cp "$remote_path" "$local_path"
