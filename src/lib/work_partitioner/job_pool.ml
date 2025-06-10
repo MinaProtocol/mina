@@ -34,6 +34,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     | _ ->
         remove_until_reschedule ~f t
 
+  (* TODO: this seems unused, except in [add] we might want simplify it *)
   let iter_until ~f t =
     let rec loop preserved_jobs =
       match Deque.dequeue_front t.timeline with

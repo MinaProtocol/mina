@@ -51,9 +51,7 @@ RUN apt-get update --quiet \
   liblmdb-dev \
   liblmdb0 \
   libpq-dev \
-  libprocps-dev \
   libsodium-dev \
-  libssl-dev \
   build-essential \
   ca-certificates \
   capnproto \

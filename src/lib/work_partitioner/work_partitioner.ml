@@ -5,8 +5,7 @@ open struct
 end
 
 module Snark_worker_shared = Snark_worker_shared
-module Zkapp_command_job_pool =
-  Job_pool.Make (Work.Id.Single) (Pending_zkapp_command)
+module Single_id_map = Map.Make (Work.Id.Single)
 module Sent_zkapp_job_pool =
   Job_pool.Make (Work.Id.Sub_zkapp) (Work.Spec.Sub_zkapp.Stable.Latest)
 module Sent_single_job_pool =
@@ -20,7 +19,8 @@ type t =
   ; pairing_pool : (int64, Combining_result.t) Hashtbl.t
         (** if one single work from underlying Work_selector is completed but
            not the other. throw it here. *)
-  ; zkapp_command_jobs : Zkapp_command_job_pool.t
+  ; mutable pending_zkapp_commands : Pending_zkapp_command.t Single_id_map.t
+        (** This is a map because we need [iteri_until]  *)
   ; reassignment_timeout : Time.Span.t
   ; zkapp_jobs_sent_by_partitioner : Sent_zkapp_job_pool.t
   ; single_jobs_sent_by_partitioner : Sent_single_job_pool.t
@@ -41,7 +41,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   ; single_id_gen = Id_generator.create ~logger
   ; subzkapp_id_gen = Id_generator.create ~logger
   ; pairing_pool = Hashtbl.create (module Int64)
-  ; zkapp_command_jobs = Zkapp_command_job_pool.create ()
+  ; pending_zkapp_commands = Single_id_map.empty
   ; reassignment_timeout
   ; zkapp_jobs_sent_by_partitioner = Sent_zkapp_job_pool.create ()
   ; single_jobs_sent_by_partitioner = Sent_single_job_pool.create ()
@@ -50,6 +50,8 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
 
 let epoch_now () = Time.(now () |> to_span_since_epoch)
 
+(* TODO: Consider remove all works no longer relevant for current frontier,
+   this may need changes from underlying work selector. *)
 let reschedule_if_old ~reassignment_timeout
     (job : _ Work.With_job_meta.Stable.Latest.t) =
   let scheduled = Time.of_span_since_epoch job.scheduled_since_unix_epoch in
@@ -70,7 +72,6 @@ let reschedule_old_zkapp_job
       ~f:(reschedule_if_old ~reassignment_timeout)
       zkapp_jobs_sent_by_partitioner
   in
-
   Ok (Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () })
 
 let reschedule_old_single_job
@@ -84,19 +85,19 @@ let reschedule_old_single_job
   in
   Ok (Work.Spec.Partitioned.Poly.Single { job; data = () })
 
-let register_pending_zkapp_command_job ~(partitioner : t) ~sub_zkapp_spec
-    ({ job_id = zkapp_id; sok_message; _ } : Zkapp_command_job_pool.job) =
+let register_pending_zkapp_command_job ~(id : Work.Id.Single.t)
+    ~(partitioner : t) ~sub_zkapp_spec ~(pending : Pending_zkapp_command.t) =
   let job_id =
     Work.Id.Sub_zkapp.of_single
       ~job_id:(Id_generator.next_id partitioner.subzkapp_id_gen ())
-      zkapp_id
+      id
   in
   let job =
     Work.With_job_meta.
       { spec = sub_zkapp_spec
       ; job_id
       ; scheduled_since_unix_epoch = epoch_now ()
-      ; sok_message
+      ; sok_message = (Pending_zkapp_command.zkapp_job pending).sok_message
       }
   in
   Sent_zkapp_job_pool.add_exn ~id:job_id ~job
@@ -107,19 +108,48 @@ let register_pending_zkapp_command_job ~(partitioner : t) ~sub_zkapp_spec
 
   Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () }
 
-let schedule_from_pending_zkapp_command ~(partitioner : t)
-    ({ spec = pending; _ } as job : Zkapp_command_job_pool.job) =
-  let%map.Option sub_zkapp_spec = Pending_zkapp_command.next_job_spec pending in
-  register_pending_zkapp_command_job ~partitioner ~sub_zkapp_spec job
-
-let schedule_from_zkapp_command_work_pool ~(partitioner : t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
-  let%map.Option job =
-    Zkapp_command_job_pool.iter_until
-      ~f:(schedule_from_pending_zkapp_command ~partitioner)
-      partitioner.zkapp_command_jobs
+let schedule_from_pending_zkapp_command ~(id : Work.Id.Single.t)
+    ~(partitioner : t) (pending : Pending_zkapp_command.t) =
+  let%map.Option sub_zkapp_spec =
+    Pending_zkapp_command.next_subzkapp_job_spec pending
   in
-  Ok job
+  register_pending_zkapp_command_job ~id ~partitioner ~sub_zkapp_spec ~pending
+
+let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
+    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+  let spec_generated = ref None in
+  (* TODO: Consider remove all works no longer relevant for current frontier,
+     this may need changes from underlying work selector. *)
+  ignore
+    (Single_id_map.iteri_until
+       ~f:(fun ~key:id ~data ->
+         match schedule_from_pending_zkapp_command ~id ~partitioner data with
+         | None ->
+             Continue
+         | Some spec ->
+             spec_generated := Some spec ;
+             Stop )
+       partitioner.pending_zkapp_commands ) ;
+  let%map.Option result = !spec_generated in
+  Ok result
+
+let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
+    unscheduled_segments =
+  let unscheduled_segments =
+    Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
+      unscheduled_segments
+    |> Mina_stdlib.Nonempty_list.map ~f:(fun (witness, spec, statement) ->
+           Work.Spec.Sub_zkapp.Stable.Latest.Segment
+             { statement; witness; spec } )
+  in
+  let pending_zkapp_command, first_segment =
+    Pending_zkapp_command.create_and_yield_segment ~job ~unscheduled_segments
+  in
+  partitioner.pending_zkapp_commands <-
+    Single_id_map.add_exn ~key:pairing ~data:pending_zkapp_command
+      partitioner.pending_zkapp_commands ;
+  register_pending_zkapp_command_job ~id:pairing ~partitioner
+    ~sub_zkapp_spec:first_segment ~pending:pending_zkapp_command
 
 let convert_single_work_from_selector ~(partitioner : t)
     ~(single_spec : Work.Spec.Single.t) ~sok_message ~pairing :
@@ -136,55 +166,36 @@ let convert_single_work_from_selector ~(partitioner : t)
   | Transition (input, witness) -> (
       match witness.transaction with
       | Command (Zkapp_command zkapp_command) ->
+          (* TODO: we have read from disk followed by write to disk in shared
+             function followed by read from disk again. Should consider refactor
+             this. *)
           let witness = Transaction_witness.read_all_proofs_from_disk witness in
           Snark_worker_shared.extract_zkapp_segment_works
             ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
-          |> Result.map ~f:(function
-               | first_segment :: rest_segments ->
-                   let unscheduled_segments =
-                     Mina_stdlib.Nonempty_list.(
-                       init first_segment rest_segments
-                       |> map ~f:(fun (witness, spec, statement) ->
-                              Work.Spec.Sub_zkapp.Segment
-                                { statement; witness; spec }
-                              |> Work.Spec.Sub_zkapp.read_all_proofs_from_disk ))
-                   in
-                   let pending_zkapp_command, first_segment =
-                     Pending_zkapp_command.create_and_yield_segment ~job
-                       ~unscheduled_segments
-                   in
-                   let pending_zkapp_command_job =
-                     Work.With_job_meta.
-                       { spec = pending_zkapp_command
-                       ; job_id = pairing
-                       ; scheduled_since_unix_epoch = epoch_now ()
-                       ; sok_message
-                       }
-                   in
-                   Zkapp_command_job_pool.add_exn ~id:pairing
-                     ~job:pending_zkapp_command_job
-                     ~message:
-                       "Id generater generated a repeated Id that happens to \
-                        be occupied by a job in zkapp command pool"
-                     partitioner.zkapp_command_jobs ;
-                   register_pending_zkapp_command_job ~partitioner
-                     ~sub_zkapp_spec:first_segment pending_zkapp_command_job
-               | [] ->
-                   (* TODO: erase this branch by refactor underlying
-                      [Transaction_snark.zkapp_command_witnesses_exn] using nonempty
-                      list *)
-                   failwith "No witness generated" )
+          |> Result.map
+               ~f:
+                 (convert_zkapp_command_from_selector ~partitioner ~job ~pairing)
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
           let job =
             Work.With_job_meta.map
               ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
           in
+          Sent_single_job_pool.add_exn ~id:pairing ~job
+            ~message:
+              "Id generator generated a repeated Id that happens to be \
+               occupied by a job in sent single job pool"
+            partitioner.single_jobs_sent_by_partitioner ;
           Ok (Single { job; data = () }) )
   | Merge _ ->
       let job =
         Work.With_job_meta.map
           ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
       in
+      Sent_single_job_pool.add_exn ~id:pairing ~job
+        ~message:
+          "Id generator generated a repeated Id that happens to be occupied by \
+           a job in sent single job pool"
+        partitioner.single_jobs_sent_by_partitioner ;
       Ok (Single { job; data = () })
 
 let schedule_from_tmp_slot ~(partitioner : t) =
@@ -199,7 +210,7 @@ let schedule_job_from_partitioner ~(partitioner : t) :
   List.find_map ~f:Lazy.force
     [ lazy (reschedule_old_zkapp_job ~partitioner)
     ; lazy (reschedule_old_single_job ~partitioner)
-    ; lazy (schedule_from_zkapp_command_work_pool ~partitioner)
+    ; lazy (schedule_from_any_pending_zkapp_command ~partitioner)
     ; lazy (schedule_from_tmp_slot ~partitioner)
     ]
 
