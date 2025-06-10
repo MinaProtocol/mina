@@ -31,13 +31,14 @@ RUN apt-get update --yes \
     postgresql \
     postgresql-contrib \
     perl \
-    python3-sexpdata \
-    python3-pip \
     rubygems \
     wget \
   && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir readchar 
+# --- python tools
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir readchar==4.2.1 sexpdata==1.0.2
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
