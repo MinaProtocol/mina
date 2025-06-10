@@ -286,10 +286,10 @@ let submit_into_combining_result ~submitted_result ~partitioner
         ~metadata:
           [ ( "result"
             , Work.Result.Single.Poly.to_yojson
-                (fun () -> `Null)
+                (const `Null)
                 Ledger_proof.to_yojson submitted_result )
           ] ;
-      `SpecUnmatched
+      `Removed
   | StructureMismatch { spec } ->
       [%log' warn partitioner.logger]
         "Worker submit $result that doesn't match the $spec in the pairing \
@@ -307,6 +307,14 @@ let submit_into_combining_result ~submitted_result ~partitioner
           ] ;
       `SpecUnmatched
 
+(** Submits a result of a single job.
+    If job was part of the pairing, stores the half submitted in the pairing
+    pool and returns [Processed None];
+    If the other part was available in the pool, returns
+    [Processed (Some result)] and removes the pairing from the pool;
+    If pairing pool doesn't contain the job, it's most likely that another
+    worker have submitted it previously and it was removed. In this case,
+    [Spec_unmatched] is returned. *)
 let submit_single ~partitioner
     ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
     ~job_id =
@@ -334,58 +342,54 @@ let submit_single ~partitioner
       | `Done result ->
           Hashtbl.remove partitioner.pairing_pool pairing_id ;
           Processed (Some result)
+      | `Removed ->
+          Removed
       | `SpecUnmatched ->
           SpecUnmatched )
 
+(** Submits a sub-zkapp job result to the pool. It removes the job id from
+    [zkapp_jobs_sent_by_partitioner] pool.
+    If the job id was present before the removal, and the pending zkapp command
+    is still present in [pending_zkapp_commands], then it attempts to finalize
+    the zkapp and returns [Processed None];
+    If pending zkapp is not yet finalized, or invokes [submit_single] if
+    finalization succeeded (also removing the pending zkapp command's record
+    from the [pending_zkapp_commands]);
+    If either sub-zkapp job spec or pending zkapp command aren't present,
+    returns [Removed]. *)
 let submit_into_pending_zkapp_command ~partitioner
     ~(job_id : Work.Id.Sub_zkapp.t)
     ~data:
       ({ proof; data = elapsed } :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
+  let single_id = Work.Id.Sub_zkapp.to_single job_id in
   match
-    Sent_zkapp_job_pool.find ~id:job_id
-      partitioner.zkapp_jobs_sent_by_partitioner
+    ( Sent_zkapp_job_pool.remove ~id:job_id
+        partitioner.zkapp_jobs_sent_by_partitioner
+    , Single_id_map.find partitioner.pending_zkapp_commands single_id )
   with
-  | None ->
+  | Some _, Some pending -> (
+      Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
+      match Pending_zkapp_command.try_finalize pending with
+      | None ->
+          Processed None
+      | Some ({ job_id; _ }, proof, elapsed) ->
+          partitioner.pending_zkapp_commands <-
+            Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
+          submit_single ~partitioner
+            ~submitted_result:{ spec = (); proof; elapsed }
+            ~job_id )
+  | None, _ | _, None ->
       [%log' debug partitioner.logger]
         "Worker submit a work that's already removed from sent sub-zkapp job \
-         pool, meaning it's completed/no longer needed, ignoring"
+         pool or pending zkapp command pool, meaning it's completed/no longer \
+         needed, ignoring"
         ~metadata:
           [ ("job_id", Work.Id.Sub_zkapp.to_yojson job_id)
           ; ("proof", Ledger_proof.to_yojson proof)
           ; ("elapsed", Mina_stdlib.Time.Span.to_yojson elapsed)
           ] ;
       Removed
-  | Some _ -> (
-      Sent_zkapp_job_pool.remove_exn ~id:job_id
-        ~message:
-          "This must be a concurrency bug: found a job in the pool, but it's \
-           gone when attempting to erase it."
-        partitioner.zkapp_jobs_sent_by_partitioner ;
-      let single_id = Work.Id.Sub_zkapp.to_single job_id in
-      match Single_id_map.find partitioner.pending_zkapp_commands single_id with
-      | None ->
-          [%log' debug partitioner.logger]
-            "Worker submit a work that's already removed from pending zkapp \
-             command pool, meaning it's completed/no longer needed, ignoring"
-            ~metadata:
-              [ ("job_id", Work.Id.Sub_zkapp.to_yojson job_id)
-              ; ("proof", Ledger_proof.to_yojson proof)
-              ; ("elapsed", Mina_stdlib.Time.Span.to_yojson elapsed)
-              ] ;
-          Removed
-      | Some pending -> (
-          Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
-          match Pending_zkapp_command.try_finalize pending with
-          | None ->
-              Processed None
-          | Some ({ job_id; _ }, proof, elapsed) ->
-              partitioner.pending_zkapp_commands <-
-                Single_id_map.remove partitioner.pending_zkapp_commands
-                  single_id ;
-              submit_single ~partitioner
-                ~submitted_result:{ spec = (); proof; elapsed }
-                ~job_id ) )
 
 let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
     ~(partitioner : t) =
