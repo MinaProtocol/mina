@@ -540,8 +540,8 @@ let get_account_update_body ~pool body_id =
       ( { balance
         ; nonce
         ; receipt_chain_hash
-        ; delegate
-        ; state = { eq_data = state }
+        ; delegate (* TODO: add first_numeric_id *)
+        ; state = { eq_data = state; first_numeric = Ignore }
         ; action_state
         ; proved_state
         ; is_new

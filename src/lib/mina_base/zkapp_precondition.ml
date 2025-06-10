@@ -83,6 +83,19 @@ module Numeric = struct
 
     let ( !! ) f = Fn.compose Impl.run_checked f
 
+    let field =
+      Field.
+        { zero
+        ; max_value = failwith "not implemented"
+        ; compare
+        ; lte_checked = failwith "not implemented"
+        ; eq_checked = failwith "not implemented"
+        ; equal
+        ; typ
+        ; to_input = failwith "not implemented"
+        ; to_input_checked = failwith "not implemented"
+        }
+
     let length =
       Length.
         { zero
@@ -456,6 +469,7 @@ module State = struct
     module V1 = struct
       type t =
         { eq_data : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; first_numeric : F.Stable.V1.t Numeric.Stable.V1.t
         }
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -464,7 +478,10 @@ module State = struct
   end]
 
   module Checked = struct
-    type t = { eq_data : Field.Var.t Eq_data.Checked.t Zkapp_state.V.t }
+    type t =
+      { eq_data : Field.Var.t Eq_data.Checked.t Zkapp_state.V.t
+      ; first_numeric : Field.Var.t Numeric.Checked.t
+      }
     [@@deriving hlist]
   end
 end
@@ -503,6 +520,9 @@ module Account = struct
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
     in
+    let%bind first_numeric =
+      Numeric.gen Snark_params.Tick.Field.gen F.compare
+    in
     let%bind action_state =
       let%bind n = Int.gen_uniform_incl Int.min_value Int.max_value in
       let field_gen = Quickcheck.Generator.return (F.of_int n) in
@@ -514,7 +534,7 @@ module Account = struct
     ; nonce
     ; receipt_chain_hash
     ; delegate
-    ; state = State.{ eq_data = state }
+    ; state = State.{ eq_data = state; first_numeric }
     ; action_state
     ; proved_state
     ; is_new
@@ -530,6 +550,7 @@ module Account = struct
           { eq_data =
               Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
                   Or_ignore.Ignore )
+          ; first_numeric = Ignore
           }
     ; action_state = Ignore
     ; proved_state = Ignore
@@ -600,6 +621,7 @@ module Account = struct
       ; Eq_data.(to_input (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
           (Vector.map state.eq_data ~f:Eq_data.(to_input Tc.field))
+      ; Numeric.(to_input Tc.field state.first_numeric)
       ; Eq_data.(to_input (Lazy.force Tc.action_state)) action_state
       ; Eq_data.(to_input Tc.boolean) proved_state
       ; Eq_data.(to_input Tc.boolean) is_new
@@ -642,6 +664,7 @@ module Account = struct
         ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
         ; Vector.reduce_exn ~f:append
             (Vector.map state.eq_data ~f:Eq_data.(to_input_checked Tc.field))
+        ; Numeric.(Checked.to_input Tc.field state.first_numeric)
         ; Eq_data.(to_input_checked (Lazy.force Tc.action_state)) action_state
         ; Eq_data.(to_input_checked Tc.boolean) proved_state
         ; Eq_data.(to_input_checked Tc.boolean) is_new
@@ -693,6 +716,12 @@ module Account = struct
                    i
                in
                (failure, check) ) )
+      @ [ ( Transaction_status.Failure.Account_app_state_precondition_unsatisfied
+              0
+          , Numeric.(
+              Checked.check Tc.field state.first_numeric
+                (Vector.nth_exn a.zkapp.app_state 0)) )
+        ]
       @ [ ( Transaction_status.Failure
             .Account_proved_state_precondition_unsatisfied
           , Eq_data.(check_checked Tc.boolean proved_state a.zkapp.proved_state)
@@ -779,6 +808,11 @@ module Account = struct
           in
           (failure, Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v))
           )
+    @ [ ( Transaction_status.Failure.Account_app_state_precondition_unsatisfied 0
+        , Numeric.(
+            check Tc.field ~label:"state[0]" state.first_numeric
+              (Vector.nth_exn zkapp.app_state 0)) )
+      ]
     @ [ ( Transaction_status.Failure
           .Account_proved_state_precondition_unsatisfied
         , Eq_data.(
