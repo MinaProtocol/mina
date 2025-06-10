@@ -158,9 +158,9 @@ let publish
                           DebianVersions.DebVersion.Bullseye
                           [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                           (     ". ./buildkite/scripts/export-git-env-vars.sh && "
-                            ++  "chown -R opam:opam /home/opam/.gnupg &&"
-                            ++  "chmod 700 /home/opam/.gnupg && "
-                            ++  "chmod 600 /home/opam/.gnupg/* && "
+                            ++  "sudo chown -R opam:opam /home/opam/.gnupg &&"
+                            ++  "sudo chmod 700 /home/opam/.gnupg && "
+                            ++  "sudo chmod 600 /home/opam/.gnupg/* && "
                             ++  "./buildkite/scripts/release/manager.sh publish "
                             ++  "--artifacts ${artifacts} "
                             ++  "--networks ${networks} "
