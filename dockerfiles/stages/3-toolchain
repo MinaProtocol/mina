@@ -30,10 +30,10 @@ RUN apt-get update --yes \
     postgresql \
     postgresql-contrib \
     perl \
-    rubygems \
-    wget \
     python3 \
     python3-sexpdata \
+    rubygems \
+    wget \
   && rm -rf /var/lib/apt/lists/*
 
 # --- deb-s3 tool
