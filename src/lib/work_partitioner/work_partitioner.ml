@@ -270,7 +270,7 @@ let submit_single ~partitioner
   let result = ref SpecUnmatched in
   Hashtbl.change partitioner.pairing_pool pairing_id ~f:(function
     | Some pending_combined_result -> (
-        let submitted_result =
+        let submitted_result_cached =
           Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
             ~f_proof:
               (Ledger_proof.Cached.write_proof_to_disk
@@ -279,7 +279,7 @@ let submit_single ~partitioner
         in
         match
           Combining_result.merge_single_result pending_combined_result
-            ~submitted_result ~submitted_half:which_one
+            ~submitted_result:submitted_result_cached ~submitted_half:which_one
         with
         | Pending pending ->
             result := Processed None ;
@@ -287,7 +287,34 @@ let submit_single ~partitioner
         | Done combined ->
             result := Processed (Some combined) ;
             None
-        | HalfAlreadyInPool | StructureMismatch _ ->
+        | HalfAlreadyInPool ->
+            [%log' debug partitioner.logger]
+              "Worker submit a work that's already in the pairing job pool, \
+               meaning it's completed by another worker, ignoring"
+              ~metadata:
+                [ ( "submitted_result"
+                  , Work.Result.Single.Poly.to_yojson
+                      (fun () -> `Null)
+                      Ledger_proof.to_yojson submitted_result )
+                ] ;
+            result := SpecUnmatched ;
+            Some pending_combined_result
+        | StructureMismatch { spec } ->
+            [%log' warn partitioner.logger]
+              "Worker submit a work that doesn't match the $spec in the \
+               pairing pool, ignoring "
+              ~metadata:
+                [ ( "spec"
+                  , One_or_two.to_yojson
+                      Work.Spec.Single.(
+                        Fn.compose Stable.Latest.to_yojson
+                          read_all_proofs_from_disk)
+                      spec )
+                ; ( "submitted_result"
+                  , Work.Result.Single.Poly.to_yojson
+                      (fun () -> `Null)
+                      Ledger_proof.to_yojson submitted_result )
+                ] ;
             result := SpecUnmatched ;
             Some pending_combined_result )
     | None ->
@@ -320,7 +347,7 @@ let submit_into_pending_zkapp_command ~partitioner
       Sent_zkapp_job_pool.job option -> Sent_zkapp_job_pool.job option =
     function
     | None ->
-        printf
+        [%log' debug partitioner.logger]
           "Worker submit a work that's already removed from sent job pool, \
            meaning it's completed/no longer needed, ignoring" ;
         returns := Removed ;
@@ -331,7 +358,7 @@ let submit_into_pending_zkapp_command ~partitioner
           Single_id_map.find partitioner.pending_zkapp_commands single_id
         with
         | None ->
-            printf
+            [%log' debug partitioner.logger]
               "Worker submit a work that's already removed from pending zkapp \
                command pool, meaning it's completed/no longer needed, \
                ignoring " ;
