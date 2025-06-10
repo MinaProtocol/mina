@@ -18,7 +18,7 @@ end
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~collected_transitions ~frontier ~get_completed_work
     ~network_transition_reader ~producer_transition_reader ~clear_reader
-    ~cache_exceptions =
+    ~cache_exceptions ?transaction_pool_proxy =
   let open Context in
   let valid_transition_pipe_capacity = 50 in
   let start_time = Time.now () in
@@ -136,7 +136,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~time_controller ~trust_system ~verifier ~frontier ~get_completed_work
     ~primary_transition_reader ~producer_transition_reader
     ~clean_up_catchup_scheduler ~catchup_job_writer ~catchup_breadcrumbs_reader
-    ~catchup_breadcrumbs_writer ~processed_transition_writer ;
+    ~catchup_breadcrumbs_writer ~processed_transition_writer
+    ?transaction_pool_proxy ;
   Ledger_catchup.run
     ~context:(module Context)
     ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
