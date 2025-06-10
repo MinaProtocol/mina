@@ -20,7 +20,6 @@ RUN apt-get update --yes \
     aptly \
     apt-transport-https \
     apt-utils \
-    awscli \
     fakeroot \
     gnupg2 \
     jq \
@@ -38,7 +37,7 @@ RUN apt-get update --yes \
     wget \
   && rm -rf /var/lib/apt/lists/*
 
-RUN pip install readchar 
+RUN pip install --no-cache-dir readchar 
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload

@@ -5,6 +5,8 @@
 { toolchainBase = "codaprotocol/ci-toolchain-base:v3"
 , minaToolchainBullseye =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:53732429b9ef431ea968095196dbd2ad64ac5b6b67c3fa3183b731be9208e734"
+, minaToolchainNoble =
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:53732429b9ef431ea968095196dbd2ad64ac5b6b67c3fa3183b731be9208e734"
 , minaToolchain =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:53732429b9ef431ea968095196dbd2ad64ac5b6b67c3fa3183b731be9208e734"
 , elixirToolchain = "elixir:1.10-alpine"

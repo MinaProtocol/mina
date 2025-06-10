@@ -15,6 +15,7 @@ let runner =
             , Bullseye = RunInToolchain.runInToolchain
             , Jammy = RunInToolchain.runInToolchain
             , Focal = RunInToolchain.runInToolchain
+            , Noble = RunInToolchain.runInToolchainNoble
             }
             debVersion
 
@@ -35,6 +36,7 @@ let image =
             , Bullseye = ContainerImages.minaToolchain
             , Jammy = ContainerImages.minaToolchain
             , Focal = ContainerImages.minaToolchain
+            , Noble = ContainerImages.minaToolchainNoble
             }
             debVersion
 
