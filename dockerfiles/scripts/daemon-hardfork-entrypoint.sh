@@ -26,4 +26,4 @@ else
     MINA_APP=${MINA_LEGACY}
 fi
 
-MINA_APP="${MINA_APP}" ./entrypoint.sh "$@"
+MINA_APP="${MINA_APP}" /entrypoint.sh "$@"
