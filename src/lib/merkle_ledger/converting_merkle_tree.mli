@@ -51,6 +51,11 @@ end)
 
   val create : Primary_ledger.t -> Converting_ledger.t -> t
 
+  (** Create a converting ledger with an already-existing [Primary_ledger.t] and
+      an empty [Converting_ledger.t] that will be initialized with the migrated
+      account data. *)
+  val create_with_migration : Primary_ledger.t -> Converting_ledger.t -> t
+
   val primary_ledger : t -> Primary_ledger.t
 
   val converting_ledger : t -> Converting_ledger.t
