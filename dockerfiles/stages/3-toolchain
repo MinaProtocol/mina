@@ -39,7 +39,7 @@ RUN apt-get update --yes \
 # --- python dependencies
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir readchar==4.2.1 sexpdata==1.0.2
+RUN pip install --no-cache-dir sexpdata==1.0.2
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
