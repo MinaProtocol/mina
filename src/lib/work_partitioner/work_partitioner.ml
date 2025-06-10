@@ -326,8 +326,7 @@ let submit_into_pending_zkapp_command ~partitioner
     | Some _ -> (
         let single_id = Work.Id.Sub_zkapp.to_single job_id in
         match
-          Zkapp_command_job_pool.find ~id:single_id
-            partitioner.zkapp_command_jobs
+          Single_id_map.find partitioner.pending_zkapp_commands single_id
         with
         | None ->
             printf
@@ -336,7 +335,7 @@ let submit_into_pending_zkapp_command ~partitioner
             returns := Removed ;
             None
         | Some pending ->
-            process pending.spec ; None )
+            process pending ; None )
   in
 
   Sent_zkapp_job_pool.change_inplace ~id:job_id ~f:remove_or_process
