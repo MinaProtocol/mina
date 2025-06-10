@@ -261,67 +261,75 @@ type submit_result =
   | SpecUnmatched
   | Removed
   | Processed of Work.Result.Combined.t option
-      (** If the `option` in Processed is present, it indicates we need to submit to the underlying selector *)
+
+let submit_into_combining_result ~submitted_result ~partitioner
+    ~combining_result ~submitted_half =
+  let submitted_result_cached =
+    Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
+      ~f_proof:
+        (Ledger_proof.Cached.write_proof_to_disk
+           ~proof_cache_db:partitioner.proof_cache_db )
+      submitted_result
+  in
+  match
+    Combining_result.merge_single_result combining_result
+      ~submitted_result:submitted_result_cached ~submitted_half
+  with
+  | Pending new_combining_result ->
+      `Pending new_combining_result
+  | Done combined ->
+      `Done combined
+  | HalfAlreadyInPool ->
+      [%log' debug partitioner.logger]
+        "Worker submit $result, which is already in the pairing job pool, \
+         meaning it's completed by another worker, ignoring"
+        ~metadata:
+          [ ( "result"
+            , Work.Result.Single.Poly.to_yojson
+                (fun () -> `Null)
+                Ledger_proof.to_yojson submitted_result )
+          ] ;
+      `SpecUnmatched
+  | StructureMismatch { spec } ->
+      [%log' warn partitioner.logger]
+        "Worker submit $result that doesn't match the $spec in the pairing \
+         pool, ignoring"
+        ~metadata:
+          [ ( "spec"
+            , One_or_two.to_yojson
+                Work.Spec.Single.(
+                  Fn.compose Stable.Latest.to_yojson read_all_proofs_from_disk)
+                spec )
+          ; ( "result"
+            , Work.Result.Single.Poly.to_yojson
+                (fun () -> `Null)
+                Ledger_proof.to_yojson submitted_result )
+          ] ;
+      `SpecUnmatched
 
 let submit_single ~partitioner
     ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
     ~job_id =
-  let Work.Id.Single.{ which_one; pairing_id } = job_id in
-  let result = ref SpecUnmatched in
-  Hashtbl.change partitioner.pairing_pool pairing_id ~f:(function
-    | Some pending_combined_result -> (
-        let submitted_result_cached =
-          Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-            ~f_proof:
-              (Ledger_proof.Cached.write_proof_to_disk
-                 ~proof_cache_db:partitioner.proof_cache_db )
-            submitted_result
-        in
-        match
-          Combining_result.merge_single_result pending_combined_result
-            ~submitted_result:submitted_result_cached ~submitted_half:which_one
-        with
-        | Pending pending ->
-            result := Processed None ;
-            Some pending
-        | Done combined ->
-            result := Processed (Some combined) ;
-            None
-        | HalfAlreadyInPool ->
-            [%log' debug partitioner.logger]
-              "Worker submit a work that's already in the pairing job pool, \
-               meaning it's completed by another worker, ignoring"
-              ~metadata:
-                [ ( "submitted_result"
-                  , Work.Result.Single.Poly.to_yojson
-                      (fun () -> `Null)
-                      Ledger_proof.to_yojson submitted_result )
-                ] ;
-            result := SpecUnmatched ;
-            Some pending_combined_result
-        | StructureMismatch { spec } ->
-            [%log' warn partitioner.logger]
-              "Worker submit a work that doesn't match the $spec in the \
-               pairing pool, ignoring "
-              ~metadata:
-                [ ( "spec"
-                  , One_or_two.to_yojson
-                      Work.Spec.Single.(
-                        Fn.compose Stable.Latest.to_yojson
-                          read_all_proofs_from_disk)
-                      spec )
-                ; ( "submitted_result"
-                  , Work.Result.Single.Poly.to_yojson
-                      (fun () -> `Null)
-                      Ledger_proof.to_yojson submitted_result )
-                ] ;
-            result := SpecUnmatched ;
-            Some pending_combined_result )
-    | None ->
-        (* We should always at least having a Spec_only in the pool, this branch
-           hence would be SpecUnmatched indeed *)
-        None ) ;
-  !result
+  let Work.Id.Single.{ which_one = submitted_half; pairing_id } = job_id in
+  match Hashtbl.find partitioner.pairing_pool pairing_id with
+  | None ->
+      [%log' debug partitioner.logger]
+        "Worker submit a work that's already removed from pairing pool, \
+         meaning it's completed/no longer needed, ignoring" ;
+      Removed
+  | Some combining_result -> (
+      match
+        submit_into_combining_result ~submitted_result ~partitioner
+          ~combining_result ~submitted_half
+      with
+      | `Pending pending ->
+          Hashtbl.set ~key:pairing_id ~data:pending partitioner.pairing_pool ;
+          Processed None
+      | `Done result ->
+          Hashtbl.remove partitioner.pairing_pool pairing_id ;
+          Processed (Some result)
+      | `SpecUnmatched ->
+          SpecUnmatched )
 
 let submit_into_pending_zkapp_command ~partitioner
     ~(job_id : Work.Id.Sub_zkapp.t)
