@@ -22,7 +22,11 @@ module Snark_worker_shared = Snark_worker_shared
 
 type t
 
-val create : reassignment_timeout:Time.Span.t -> logger:Logger.t -> t
+val create :
+     reassignment_timeout:Time.Span.t
+  -> logger:Logger.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
+  -> t
 
 type work_from_selector =
   Snark_work_lib.Spec.Single.t One_or_two.t option Lazy.t

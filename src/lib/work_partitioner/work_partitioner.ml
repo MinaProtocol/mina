@@ -28,9 +28,11 @@ type t =
       (Work.Spec.Single.t * Work.Id.Single.t * Mina_base.Sok_message.t) option
         (** When receving a `Two works from the underlying Work_selector, store
             one of them here, so we could schedule them to another worker. *)
+  ; proof_cache_db : Proof_cache_tag.cache_db
   }
 
-let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
+let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
+    ~(proof_cache_db : Proof_cache_tag.cache_db) : t =
   let module M = Transaction_snark.Make (struct
     let constraint_constants = Genesis_constants.Compiled.constraint_constants
 
@@ -46,6 +48,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   ; zkapp_jobs_sent_by_partitioner = Sent_zkapp_job_pool.create ()
   ; single_jobs_sent_by_partitioner = Sent_single_job_pool.create ()
   ; tmp_slot = None
+  ; proof_cache_db
   }
 
 let epoch_now () = Time.(now () |> to_span_since_epoch)
@@ -254,9 +257,6 @@ let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
            ~work_from_selector ~sok_message )
     ]
 
-(* TODO: figure out the correct cache DB *)
-let proof_cache_db = Proof_cache_tag.create_identity_db ()
-
 type submit_result =
   | SchemeUnmatched
   | Removed
@@ -272,7 +272,9 @@ let submit_single ~partitioner
     | Some pending_combined_result -> (
         let submitted_result =
           Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-            ~f_proof:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
+            ~f_proof:
+              (Ledger_proof.Cached.write_proof_to_disk
+                 ~proof_cache_db:partitioner.proof_cache_db )
             submitted_result
         in
         match
