@@ -7,9 +7,6 @@
     "gcr.io/o1labs-192920/mina-toolchain@sha256:53732429b9ef431ea968095196dbd2ad64ac5b6b67c3fa3183b731be9208e734"
 , minaToolchain =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:53732429b9ef431ea968095196dbd2ad64ac5b6b67c3fa3183b731be9208e734"
-, elixirToolchain = "elixir:1.10-alpine"
-, nodeToolchain = "node:14.13.1-stretch-slim"
-, ubuntu2004 = "ubuntu:20.04"
 , postgres = "postgres:12.4-alpine"
 , xrefcheck =
     "dkhamsing/awesome_bot@sha256:a8adaeb3b3bd5745304743e4d8a6d512127646e420544a6d22d9f58a07f35884"
