@@ -128,7 +128,7 @@ build_deb() {
 
   # Build the package
   echo "------------------------------------------------------------"
-  fakeroot dpkg-deb --build "${BUILDDIR}" "${1}"_"${MINA_DEB_VERSION}".deb
+  fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" "${1}"_"${MINA_DEB_VERSION}".deb
   echo "build_deb outputs:"
   ls -lh "${1}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
