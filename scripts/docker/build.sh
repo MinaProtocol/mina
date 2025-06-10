@@ -138,7 +138,6 @@ case "${SERVICE}" in
           exit 1
         fi
         DOCKERFILE_PATH="dockerfiles/stages/1-legacy-daemon"
-        DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-toolchain)
         DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"

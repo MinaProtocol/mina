@@ -25,3 +25,12 @@ RUN echo "Building legacy image with version $deb_version from repo $deb_release
   && apt-get update --quiet --yes \
   && apt-get install --quiet --yes --allow-downgrades "mina-${network}-legacy=$deb_legacy_version" \
   && rm -rf /var/lib/apt/lists/*
+
+## Reset workdir, USER, and ${UID} for root-owned version
+WORKDIR /root/
+USER 0
+ARG UID=0
+
+COPY --chown=${UID} scripts/hardfork-entrypoint.sh /hardfork-entrypoint.sh
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/hardfork-entrypoint.sh"]
