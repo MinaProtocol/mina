@@ -42,39 +42,11 @@ let dependsOnStep =
 
           let key = "${Artifacts.lowerName binary}-${suffix}"
 
-          in  merge
-                { Bookworm =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Bullseye =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Jammy =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Focal =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
+          in  [ { name =
+                    "${prefix}${capitalName docker}${network}${profileSuffix}"
+                , key = key
                 }
-                docker
+              ]
 
 let dependsOn =
           \(docker : Docker)

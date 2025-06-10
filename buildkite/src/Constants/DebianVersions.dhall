@@ -49,13 +49,7 @@ let dependsOnStep =
                                              network}${profileSuffix}${BuildFlags.toSuffixUppercase
                                                                          buildFlag}"
 
-          in  merge
-                { Bookworm = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Bullseye = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Jammy = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Focal = [ { name = name, key = "${step}-deb-pkg" } ]
-                }
-                debVersion
+          in  [ { name = name, key = "${step}-deb-pkg" } ]
 
 let dependsOn =
           \(debVersion : DebVersion)
