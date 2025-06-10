@@ -308,6 +308,7 @@ function publish_debian() {
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__debian_sign_key != "" ]]; then
+        gpg --list-secret-keys 
         local __sign_arg=("--sign" "$__debian_sign_key")
         local __signed_arg="--signed"
     else
