@@ -171,9 +171,7 @@ let publish
                               }
                               (     ". ./buildkite/scripts/export-git-env-vars.sh && "
                                 ++  "whoami && "
-                                ++  "sudo chown -R opam:opam /home/opam/.gnupg &&"
-                                ++  "sudo chmod 700 /home/opam/.gnupg && "
-                                ++  "sudo chmod 600 /home/opam/.gnupg/* && "
+                                ++  "git config --global --add safe.directory /workdir && "
                                 ++  "./buildkite/scripts/release/manager.sh publish "
                                 ++  "--artifacts ${artifacts} "
                                 ++  "--networks ${networks} "
