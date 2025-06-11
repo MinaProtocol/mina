@@ -167,6 +167,7 @@ let publish
                               , extraEnv =
                                 [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
                               , privileged = True
+                              , useRoot = True
                               }
                               (     ". ./buildkite/scripts/export-git-env-vars.sh && "
                                 ++  "whoami && "
