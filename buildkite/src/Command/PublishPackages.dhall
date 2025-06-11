@@ -30,13 +30,9 @@ let DebianRepo = ../Constants/DebianRepo.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
 
-let ContainerImages = ../Constants/ContainerImages.dhall
-
 let Command = ./Base.dhall
 
 let Cmd = ../Lib/Cmds.dhall
-
-let Mina = ./Mina.dhall
 
 let join =
           \(sep : Text)
@@ -160,36 +156,24 @@ let publish
           in    [ Command.build
                     Command.Config::{
                     , commands =
-                          [ Mina.fixPermissionsCommand ]
-                        # [ Cmd.runInDocker
-                              Cmd.Docker::{
-                              , image = ContainerImages.minaToolchain
-                              , extraEnv =
-                                [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
-                              , privileged = True
-                              , useRoot = True
-                              }
-                              ( 
-                                "git config --global --add safe.directory /workdir && "
-                                ++  ". ./buildkite/scripts/export-git-env-vars.sh && "
-                                ++  "whoami && "
-                                ++  "./buildkite/scripts/release/manager.sh publish "
-                                ++  "--artifacts ${artifacts} "
-                                ++  "--networks ${networks} "
-                                ++  "--buildkite-build-id ${spec.build_id} "
-                                ++  "--backend ${spec.backend} "
-                                ++  "--channel ${DebianChannel.lowerName
-                                                   spec.channel} "
-                                ++  "--verify "
-                                ++  "--source-version ${spec.source_version} "
-                                ++  "--target-version ${target_version} "
-                                ++  "--codenames ${codenames} "
-                                ++  "--debian-repo ${DebianRepo.bucket_or_default
-                                                       spec.debian_repo} "
-                                ++  "--only-debians "
-                                ++  "${keyArg}"
-                              )
-                          ]
+                      [ Cmd.run
+                          (     ". ./buildkite/scripts/release/manager.sh publish "
+                            ++  "--artifacts ${artifacts} "
+                            ++  "--networks ${networks} "
+                            ++  "--buildkite-build-id ${spec.build_id} "
+                            ++  "--backend ${spec.backend} "
+                            ++  "--channel ${DebianChannel.lowerName
+                                               spec.channel} "
+                            ++  "--verify "
+                            ++  "--source-version ${spec.source_version} "
+                            ++  "--target-version ${target_version} "
+                            ++  "--codenames ${codenames} "
+                            ++  "--debian-repo ${DebianRepo.bucket_or_default
+                                                   spec.debian_repo} "
+                            ++  "--only-debians "
+                            ++  "${keyArg}"
+                          )
+                      ]
                     , label = "Debian Packages Publishing"
                     , key = "publish-debians"
                     , target = Size.Small
