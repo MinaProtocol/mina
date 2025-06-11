@@ -1126,6 +1126,7 @@ struct
           ( verified Envelope.Incoming.t
           , Intf.Verification_error.t )
           Deferred.Result.t =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let open Deferred.Result.Let_syntax in
         let open Intf.Verification_error in
         let%bind () =
@@ -1185,7 +1186,7 @@ struct
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
               List.map
                 ~f:
-                  (User_command.write_all_proofs_to_disk
+                  (User_command.write_all_proofs_to_disk ~signature_kind
                      ~proof_cache_db:t.config.proof_cache_db )
                 diff
               |> User_command.Unapplied_sequence.to_all_verifiable
@@ -1674,6 +1675,8 @@ let%test_module _ =
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let constraint_constants = precomputed_values.constraint_constants
 
     let consensus_constants = precomputed_values.consensus_constants
@@ -1868,7 +1871,8 @@ let%test_module _ =
             |> Map.map ~f:(fun vk ->
                    Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
         |> Or_error.bind ~f:(fun xs ->
-               List.map xs ~f:User_command.For_tests.check_verifiable
+               List.map xs
+                 ~f:(User_command.For_tests.check_verifiable ~signature_kind)
                |> Or_error.combine_errors )
       with
       | Ok cmds ->
@@ -1964,7 +1968,8 @@ let%test_module _ =
         if n < Array.length test_keys then
           let%bind cmd =
             let sender = test_keys.(n) in
-            User_command.Valid.Gen.payment ~sign_type:`Real
+            let signature_kind = Mina_signature_kind.t_DEPRECATED in
+            User_command.Valid.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
                    (Quickcheck_lib.of_array test_keys) )
@@ -1977,8 +1982,9 @@ let%test_module _ =
 
     let mk_payment' ?valid_until ~sender_idx ~receiver_idx ~fee ~nonce ~amount
         () =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
-      Signed_command.sign test_keys.(sender_idx)
+      Signed_command.sign ~signature_kind test_keys.(sender_idx)
         (Signed_command_payload.create
            ~fee:(Currency.Fee.of_nanomina_int_exn fee)
            ~fee_payer_pk:(get_pk sender_idx) ~valid_until
@@ -2662,6 +2668,7 @@ let%test_module _ =
           Deferred.unit )
 
     let%test_unit "transaction replacement works" =
+      let signature_kind = Mina_signature_kind.Testnet in
       Thread_safe.block_on_async_exn
       @@ fun () ->
       let%bind t = setup_test () in
@@ -2679,7 +2686,8 @@ let%test_module _ =
               ; body = Stake_delegation (Set_delegate payload)
               }
         in
-        User_command.Signed_command (Signed_command.sign sender_kp payload)
+        User_command.Signed_command
+          (Signed_command.sign ~signature_kind sender_kp payload)
       in
       let txs0 =
         [ mk_payment' ~sender_idx:0 ~fee:minimum_fee ~nonce:0 ~receiver_idx:9
@@ -2768,6 +2776,7 @@ let%test_module _ =
       Deferred.unit
 
     let%test_unit "max size is maintained" =
+      let signature_kind = Mina_signature_kind.Testnet in
       Quickcheck.test ~trials:500
         (let open Quickcheck.Generator.Let_syntax in
         let%bind init_ledger_state =
@@ -2775,8 +2784,8 @@ let%test_module _ =
         in
         let%bind cmds_count = Int.gen_incl pool_max_size (pool_max_size * 2) in
         let%bind cmds =
-          User_command.Valid.Gen.sequence ~sign_type:`Real ~length:cmds_count
-            init_ledger_state
+          User_command.Valid.Gen.sequence ~sign_type:(`Real signature_kind)
+            ~length:cmds_count init_ledger_state
         in
         return (init_ledger_state, cmds))
         ~f:(fun (init_ledger_state, cmds) ->

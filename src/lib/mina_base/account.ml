@@ -1069,3 +1069,66 @@ let deriver obj =
        ~permissions:!.Permissions.deriver
        ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
        obj
+
+module Unstable = struct
+  type t =
+    { public_key : Public_key.Compressed.Stable.V1.t
+    ; token_id : Token_id.Stable.V2.t
+    ; token_symbol : Token_symbol.Stable.V1.t
+    ; balance : Balance.Stable.V1.t
+    ; nonce : Nonce.Stable.V1.t
+    ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
+    ; delegate : Public_key.Compressed.Stable.V1.t option
+    ; voting_for : State_hash.Stable.V1.t
+    ; timing : Timing.Stable.V2.t
+    ; permissions : Permissions.Stable.V2.t
+    ; zkapp : Zkapp_account.Stable.V3.t option
+    ; unstable_field : Nonce.Stable.V1.t
+    }
+  [@@deriving
+    sexp, equal, hash, compare, yojson, hlist, fields, bin_io_unversioned]
+
+  let balance { balance; _ } = balance
+
+  let empty =
+    { public_key = Public_key.Compressed.empty
+    ; token_id = Token_id.default
+    ; token_symbol = Token_symbol.default
+    ; balance = Balance.zero
+    ; nonce = Nonce.zero
+    ; receipt_chain_hash = Receipt.Chain_hash.empty
+    ; delegate = None
+    ; voting_for = State_hash.dummy
+    ; timing = Timing.Untimed
+    ; permissions =
+        Permissions.user_default
+        (* TODO: This should maybe be Permissions.empty *)
+    ; zkapp = None
+    ; unstable_field = Nonce.zero
+    }
+
+  let identifier ({ public_key; token_id; _ } : t) =
+    Account_id.create public_key token_id
+
+  let token_id ({ token_id; _ } : t) = token_id
+
+  let to_input (t : t) =
+    let open Random_oracle.Input.Chunked in
+    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    Fields.fold ~init:[]
+      ~public_key:(f Public_key.Compressed.to_input)
+      ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
+      ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
+      ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
+      ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
+      ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
+      ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
+      ~permissions:(f Permissions.to_input) ~unstable_field:(f Nonce.to_input)
+    |> List.reduce_exn ~f:append
+
+  let digest t =
+    Random_oracle.hash ~init:crypto_hash_prefix
+      (Random_oracle.pack_input (to_input t))
+
+  let empty_digest = lazy (digest empty)
+end

@@ -38,7 +38,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
         |> Mina_block.Validated.valid_commands
         |> List.exists ~f:(fun { data = found; _ } ->
                let found' = User_command.forget_check found in
-               User_command.equal_ignoring_proofs_and_hashes cmd found' )
+               User_command.equal_ignoring_proofs_and_hashes_and_aux cmd found' )
       in
       if List.exists ~f:in_breadcrumb best_tip_path then State.Included
       else if
@@ -113,8 +113,10 @@ let%test_module "transaction_status" =
 
     (* TODO: Generate zkApps txns *)
     let gen_user_command =
-      Signed_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~fee_range:10
-        ~key_gen ~nonce:(Account_nonce.of_int 1) ()
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
+        ~max_amount:100 ~fee_range:10 ~key_gen ~nonce:(Account_nonce.of_int 1)
+        ()
 
     let create_pool ~frontier_broadcast_pipe =
       let config =

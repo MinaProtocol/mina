@@ -331,17 +331,11 @@ end
 
 module Pipe = struct
   module Drop_on_overflow = struct
-    let bootstrap_sync_ledger : Counter.t = ()
-
     let verified_network_pool_diffs : Counter.t = ()
 
     let transition_frontier_valid_transitions : Counter.t = ()
 
     let transition_frontier_primary_transitions : Counter.t = ()
-
-    let router_transition_frontier_controller : Counter.t = ()
-
-    let router_bootstrap_controller : Counter.t = ()
 
     let router_verified_transitions : Counter.t = ()
 

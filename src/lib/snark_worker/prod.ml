@@ -2,6 +2,11 @@ open Core
 open Async
 open Mina_base
 open Mina_transaction
+open Work_partitioner.Snark_worker_shared
+
+open struct
+  module Work = Snark_work_lib
+end
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
@@ -19,9 +24,7 @@ module Cache = struct
   let find (t : t) statement = Option.map ~f:snd (T.find t statement)
 end
 
-module Inputs = struct
-  module Ledger_proof = Ledger_proof
-
+module Impl = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
 
@@ -60,44 +63,15 @@ module Inputs = struct
     let worker_wait_time = 5.
   end
 
-  (* bin_io is for uptime service SNARK worker *)
-  type single_spec =
-    ( Transaction_witness.Stable.Latest.t
-    , Transaction_snark.Stable.Latest.t )
-    Snark_work_lib.Work.Single.Spec.Stable.Latest.t
-  [@@deriving bin_io_unversioned, sexp]
-
-  let zkapp_command_inputs_to_yojson =
-    let convert =
-      List.map
-        ~f:(fun
-             ( (witness : Transaction_witness.Zkapp_command_segment_witness.t)
-             , segment
-             , statement )
-           ->
-          ( Transaction_witness.Zkapp_command_segment_witness
-            .read_all_proofs_from_disk witness
-          , segment
-          , statement ) )
-    in
-    let impl =
-      [%to_yojson:
-        ( Transaction_witness.Zkapp_command_segment_witness.Stable.Latest.t
-        * Transaction_snark.Zkapp_command_segment.Basic.t
-        * Transaction_snark.Statement.With_sok.t )
-        list]
-    in
-    Fn.compose impl convert
-
   let perform_single
       ({ cache; proof_level_snark; proof_cache_db; logger } : Worker_state.t)
-      ~message (single : single_spec) =
+      ~message (single : Snark_work_lib.Selector.Single.Spec.Stable.Latest.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Deferred.Or_error.Let_syntax in
-    let open Snark_work_lib in
     let sok_digest = Mina_base.Sok_message.digest message in
     match proof_level_snark with
-    | Full (module M) -> (
-        let statement = Work.Single.Spec.statement single in
+    | Full ((module M) as m) -> (
+        let statement = Work.Work.Single.Spec.statement single in
         let process k =
           let start = Time.now () in
           match%map.Async.Deferred
@@ -108,10 +82,8 @@ module Inputs = struct
                 ~metadata:
                   [ ("error", Error_json.error_to_yojson e)
                   ; ( "spec"
-                      (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
-                         so we use the less-desirable sexp here
-                      *)
-                    , `String (Sexp.to_string (sexp_of_single_spec single)) )
+                    , Snark_work_lib.Selector.Single.Spec.Stable.Latest
+                      .to_yojson single )
                   ] ;
               Error e
           | Ok res ->
@@ -124,43 +96,16 @@ module Inputs = struct
             Deferred.Or_error.return (proof, Time.Span.zero)
         | None -> (
             match single with
-            | Work.Single.Spec.Transition
+            | Work.Work.Single.Spec.Transition
                 (input, (w : Transaction_witness.Stable.Latest.t)) ->
                 process (fun () ->
                     match w.transaction with
                     | Command (Zkapp_command zkapp_command) -> (
                         let%bind witnesses_specs_stmts =
-                          Or_error.try_with (fun () ->
-                              Transaction_snark.zkapp_command_witnesses_exn
-                                ~constraint_constants:M.constraint_constants
-                                ~global_slot:w.block_global_slot
-                                ~state_body:w.protocol_state_body
-                                ~fee_excess:Currency.Amount.Signed.zero
-                                [ ( `Pending_coinbase_init_stack w.init_stack
-                                  , `Pending_coinbase_of_statement
-                                      { Transaction_snark
-                                        .Pending_coinbase_stack_state
-                                        .source =
-                                          input.source.pending_coinbase_stack
-                                      ; target =
-                                          input.target.pending_coinbase_stack
-                                      }
-                                  , `Sparse_ledger w.first_pass_ledger
-                                  , `Sparse_ledger w.second_pass_ledger
-                                  , `Connecting_ledger_hash
-                                      input.connecting_ledger_left
-                                  , Zkapp_command.write_all_proofs_to_disk
-                                      ~proof_cache_db zkapp_command )
-                                ]
-                              |> List.rev )
-                          |> Result.map_error ~f:(fun e ->
-                                 Error.createf
-                                   !"Failed to generate inputs for \
-                                     zkapp_command : %s: %s"
-                                   ( Zkapp_command.Stable.Latest.to_yojson
-                                       zkapp_command
-                                   |> Yojson.Safe.to_string )
-                                   (Error.to_string_hum e) )
+                          extract_zkapp_segment_works ~m ~input ~witness:w
+                            ~zkapp_command:
+                              (Zkapp_command.write_all_proofs_to_disk
+                                 ~signature_kind ~proof_cache_db zkapp_command )
                           |> Deferred.return
                         in
                         let log_base_snark f ~statement ~spec ~all_inputs =
@@ -185,8 +130,9 @@ module Inputs = struct
                                       .to_yojson statement )
                                   ; ("error", `String (Error.to_string_hum e))
                                   ; ( "inputs"
-                                    , zkapp_command_inputs_to_yojson all_inputs
-                                    )
+                                    , Zkapp_command_inputs.(
+                                        all_inputs |> read_all_proofs_from_disk
+                                        |> Stable.Latest.to_yojson) )
                                   ] ;
                               Error e
                         in
@@ -207,19 +153,19 @@ module Inputs = struct
                                         (Ledger_proof.statement curr) )
                                   ; ("error", `String (Error.to_string_hum e))
                                   ; ( "inputs"
-                                    , zkapp_command_inputs_to_yojson all_inputs
-                                    )
+                                    , Zkapp_command_inputs.(
+                                        all_inputs |> read_all_proofs_from_disk
+                                        |> Stable.Latest.to_yojson) )
                                   ] ;
                               Error e
                         in
-                        match witnesses_specs_stmts with
-                        | [] ->
-                            Deferred.Or_error.error_string
-                              "no witnesses generated"
-                        | (witness, spec, stmt) :: rest as inputs ->
+                        match
+                          Mina_stdlib.Nonempty_list.uncons witnesses_specs_stmts
+                        with
+                        | (witness, spec, stmt), rest ->
                             let%bind (p1 : Ledger_proof.t) =
                               log_base_snark ~statement:{ stmt with sok_digest }
-                                ~spec ~all_inputs:inputs
+                                ~spec ~all_inputs:witnesses_specs_stmts
                                 (M.of_zkapp_command_segment_exn ~witness)
                             in
 
@@ -232,11 +178,11 @@ module Inputs = struct
                                   let%bind (curr : Ledger_proof.t) =
                                     log_base_snark
                                       ~statement:{ stmt with sok_digest } ~spec
-                                      ~all_inputs:inputs
+                                      ~all_inputs:witnesses_specs_stmts
                                       (M.of_zkapp_command_segment_exn ~witness)
                                   in
                                   log_merge_snark ~sok_digest prev curr
-                                    ~all_inputs:inputs )
+                                    ~all_inputs:witnesses_specs_stmts )
                             in
                             if
                               Transaction_snark.Statement.equal
@@ -255,7 +201,10 @@ module Inputs = struct
                                     , Transaction_snark.Statement.to_yojson
                                         input )
                                   ; ( "inputs"
-                                    , zkapp_command_inputs_to_yojson inputs )
+                                    , Zkapp_command_inputs.(
+                                        witnesses_specs_stmts
+                                        |> read_all_proofs_from_disk
+                                        |> Stable.Latest.to_yojson) )
                                   ] ;
                               Deferred.return
                                 (Or_error.error_string
@@ -268,7 +217,12 @@ module Inputs = struct
                           (* Validate the received transaction *)
                           match w.transaction with
                           | Command (Signed_command cmd) -> (
-                              match Signed_command.check cmd with
+                              let signature_kind =
+                                Mina_signature_kind.t_DEPRECATED
+                              in
+                              match
+                                Signed_command.check ~signature_kind cmd
+                              with
                               | Some cmd ->
                                   ( Ok (Command (Signed_command cmd))
                                     : Transaction.Valid.t Or_error.t )
@@ -299,7 +253,7 @@ module Inputs = struct
         (* Use a dummy proof. *)
         let stmt =
           match single with
-          | Work.Single.Spec.Transition (stmt, _) ->
+          | Work.Work.Single.Spec.Transition (stmt, _) ->
               stmt
           | Merge (stmt, _, _) ->
               stmt
@@ -308,4 +262,30 @@ module Inputs = struct
         @@ ( Transaction_snark.create ~statement:{ stmt with sok_digest }
                ~proof:(Lazy.force Proof.transaction_dummy)
            , Time.Span.zero )
+
+  let perform (s : Worker_state.t) public_key
+      ({ instances; fee } as spec : Work.Selector.Spec.Stable.Latest.t) =
+    One_or_two.Deferred_result.map instances ~f:(fun w ->
+        let open Deferred.Or_error.Let_syntax in
+        let%map proof, time =
+          perform_single s
+            ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
+            w
+        in
+        ( proof
+        , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
+        ) )
+    |> Deferred.Or_error.map ~f:(function
+         | `One (proof1, metrics1) ->
+             { Work.Work.Result.proofs = `One proof1
+             ; metrics = `One metrics1
+             ; spec
+             ; prover = public_key
+             }
+         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
+             { Work.Work.Result.proofs = `Two (proof1, proof2)
+             ; metrics = `Two (metrics1, metrics2)
+             ; spec
+             ; prover = public_key
+             } )
 end

@@ -873,7 +873,7 @@ let request_work t =
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_worker_lib.Work.Result.t) =
+let add_work t (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -2148,6 +2148,17 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_most_recent_valid_block () =
             Broadcast_pipe.Reader.peek most_recent_valid_block_reader
           in
+
+          let transaction_resource_pool =
+            Network_pool.Transaction_pool.resource_pool transaction_pool
+          in
+          let transaction_pool_proxy : Staged_ledger.transaction_pool_proxy =
+            { find_by_hash =
+                Network_pool.Transaction_pool.Resource_pool.find_by_hash
+                  transaction_resource_pool
+            }
+          in
+
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2164,7 +2175,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ()
+              ~notify_online ~transaction_pool_proxy ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

@@ -1640,27 +1640,86 @@ module Body = struct
 end
 
 module Poly = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      (** An account update in a zkApp transaction *)
-      type ('body, 'authorization) t =
-            ( 'body
-            , 'authorization )
-            Mina_wire_types.Mina_base.Account_update.Poly.V1.t =
-        { body : 'body; authorization : 'authorization }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
-    end
-  end]
+  (** This is a helper module to make writing the sexp/yojson/binable instances
+      of types in this module easier. By going through this, the aux field of
+      the Account_update types is properly ignored when serializing and
+      deserializing.
+
+      The to_yojson and sexp_of_t functions created with this module will ignore
+      the aux field entirely when writing their respective formats. The
+      of_yojson and t_of_sexp functions will expect the aux field to be absent
+      when parsing. *)
+  module Wire = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('body, 'authorization) t =
+              ( 'body
+              , 'authorization )
+              Mina_wire_types.Mina_base.Account_update.Poly.V1.t =
+          { body : 'body; authorization : 'authorization }
+        [@@deriving yojson, sexp]
+      end
+    end]
+  end
+
+  (** An account update in a zkApp transaction *)
+  type ('body, 'authorization, 'aux) t =
+    { body : 'body; authorization : 'authorization; aux : 'aux }
+  [@@deriving annot, equal, hash, compare, fields]
+
+  let of_wire (w : _ Wire.Stable.V1.t) : _ t =
+    { body = w.body; authorization = w.authorization; aux = () }
+
+  let to_wire (t : _ t) : _ Wire.Stable.V1.t =
+    { body = t.body; authorization = t.authorization }
+
+  let to_yojson body authorization =
+    Fn.compose (Wire.Stable.V1.to_yojson body authorization) to_wire
+
+  let of_yojson body authorization =
+    let of_wire' = Result.map ~f:of_wire in
+    Fn.compose of_wire' (Wire.Stable.V1.of_yojson body authorization)
+
+  let sexp_of_t body authorization =
+    Fn.compose (Wire.Stable.V1.sexp_of_t body authorization) to_wire
+
+  let t_of_sexp body authorization =
+    Fn.compose of_wire (Wire.Stable.V1.t_of_sexp body authorization)
 end
 
 module T = struct
+  module Without_aux = struct
+    [%%versioned_binable
+    module Stable = struct
+      module V1 = struct
+        type ('body, 'authorization) t = ('body, 'authorization, unit) Poly.t
+        [@@deriving equal, hash, compare]
+
+        [%%define_locally Poly.(to_yojson, of_yojson, sexp_of_t, t_of_sexp)]
+
+        include
+          Binable.Of_binable2_without_uuid
+            (Poly.Wire.Stable.V1)
+            (struct
+              type nonrec ('x, 'y) t = ('x, 'y) t
+
+              let of_binable t = Poly.of_wire t
+
+              let to_binable = Poly.to_wire
+            end)
+      end
+    end]
+  end
+
   module Graphql_repr = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
         type t =
-          (Body.Graphql_repr.Stable.V2.t, Control.Stable.V2.t) Poly.Stable.V1.t
+          ( Body.Graphql_repr.Stable.V2.t
+          , Control.Stable.V2.t )
+          Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1670,10 +1729,11 @@ module T = struct
     let deriver obj =
       let open Poly in
       let open Fields_derivers_zkapps.Derivers in
-      let ( !. ) = ( !. ) ~t_fields_annots in
+      let ( !. ) ?skip_data = ( !. ) ?skip_data ~t_fields_annots in
       Fields.make_creator obj
         ~body:!.Body.Graphql_repr.deriver
         ~authorization:!.Control.deriver
+        ~aux:(( !. ) ~skip_data:() skip)
       |> finish "ZkappAccountUpdate" ~t_toplevel_annots
   end
 
@@ -1681,7 +1741,8 @@ module T = struct
     [%%versioned
     module Stable = struct
       module V2 = struct
-        type t = (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Poly.Stable.V1.t
+        type t =
+          (Body.Simple.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
         [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -1695,33 +1756,61 @@ module T = struct
 
     module V2 = struct
       (** A account_update to a zkApp transaction *)
-      type t = (Body.Stable.V2.t, Control.Stable.V2.t) Poly.Stable.V1.t
+      type t = (Body.Stable.V2.t, Control.Stable.V2.t) Without_aux.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = (Body.t, Control.t) Poly.t [@@deriving sexp_of, to_yojson]
+  (** Auxiliary data in an [Account_update.t], not intended for serialization.
+      The [to_yojson] and [sexp_of_t] instances here are written to be
+      compatible with [Account_update.Poly.Without_aux.t], so that types of the
+      form [(_, _, Aux_data.t) Account_update.Poly.t] can still have [@@deriving
+      sexp_of, to_yojson] applied to them. *)
+  module Aux_data = struct
+    type t =
+      { actions_hash : Field.t
+            (** The cached hash of the actions in an account update body *)
+      }
 
-  let of_graphql_repr ({ Poly.body; authorization } : Graphql_repr.t) :
-      Stable.Latest.t =
-    { authorization; body = Body.of_graphql_repr body }
+    let of_body ~body : t =
+      let actions = Zkapp_account.Actions.of_event_list body.Body.actions in
+      { actions_hash = actions.hash }
+  end
 
-  let to_graphql_repr ({ body; authorization } : Stable.Latest.t) ~call_depth :
-      Graphql_repr.t =
-    { authorization; body = Body.to_graphql_repr ~call_depth body }
+  module With_aux = struct
+    type ('body, 'authorization) t = ('body, 'authorization, Aux_data.t) Poly.t
+
+    [%%define_locally Poly.(to_yojson, sexp_of_t)]
+  end
+
+  type t = (Body.t, Control.t) With_aux.t [@@deriving sexp_of, to_yojson]
+
+  let of_graphql_repr ({ Poly.body; authorization; aux = () } : Graphql_repr.t)
+      : Stable.Latest.t =
+    { authorization; body = Body.of_graphql_repr body; aux = () }
+
+  let to_graphql_repr ({ body; authorization; aux = () } : Stable.Latest.t)
+      ~call_depth : Graphql_repr.t =
+    { authorization; body = Body.to_graphql_repr ~call_depth body; aux = () }
+
+  let with_no_aux ~body ~authorization : _ Poly.t =
+    { body; authorization; aux = () }
+
+  let with_aux ~body ~authorization : _ Poly.t =
+    { body; authorization; aux = Aux_data.of_body ~body }
 
   let gen : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen and authorization = Control.gen_with_dummies in
-    { Poly.body; authorization }
+    { Poly.body; authorization; aux = () }
 
   let gen_with_events_and_actions : Stable.Latest.t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%map body = Body.gen_with_events_and_actions
     and authorization = Control.gen_with_dummies in
-    { Poly.body; authorization }
+    { Poly.body; authorization; aux = () }
 
   let quickcheck_generator : Stable.Latest.t Quickcheck.Generator.t = gen
 
@@ -1732,7 +1821,7 @@ module T = struct
     Quickcheck.Shrinker.empty ()
 
   let of_simple (p : Simple.t) : Stable.Latest.t =
-    { body = Body.of_simple p.body; authorization = p.authorization }
+    { body = Body.of_simple p.body; authorization = p.authorization; aux = () }
 
   let digest ~signature_kind t = Body.digest ~signature_kind t.Poly.body
 
@@ -1752,9 +1841,19 @@ let map_proofs ~f p =
     | None_given ->
         None_given
   in
-  { Poly.authorization = map_auth p.Poly.authorization; body = p.Poly.body }
+  { Poly.authorization = map_auth p.Poly.authorization
+  ; body = p.Poly.body
+  ; aux = p.Poly.aux
+  }
 
 let forget_proofs p = map_proofs ~f:(const ()) p
+
+let reset_aux (p : _ Poly.t) =
+  T.with_aux ~body:p.body ~authorization:p.authorization
+
+let forget_aux (p : _ Poly.t) = { p with aux = () }
+
+let forget_proofs_and_aux p = forget_proofs @@ forget_aux p
 
 module Fee_payer = struct
   [%%versioned
@@ -1764,17 +1863,19 @@ module Fee_payer = struct
         { body : Body.Fee_payer.Stable.V1.t
         ; authorization : Signature.Stable.V1.t
         }
-      [@@deriving annot, sexp, equal, yojson, hash, compare, fields]
+      [@@deriving sexp, annot, equal, hash, compare, fields, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
+  let make ~body ~authorization : t = { body; authorization }
+
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let%map body = Body.Fee_payer.gen in
     let authorization = Signature.dummy in
-    { body; authorization }
+    make ~body ~authorization
 
   let quickcheck_generator : t Quickcheck.Generator.t = gen
 
@@ -1788,9 +1889,8 @@ module Fee_payer = struct
     Account_id.create t.body.public_key Token_id.default
 
   let to_account_update (t : t) : T.t =
-    { authorization = Control.Poly.Signature t.authorization
-    ; body = Body.of_fee_payer t.body
-    }
+    T.with_aux ~body:(Body.of_fee_payer t.body)
+      ~authorization:(Control.Poly.Signature t.authorization)
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
@@ -1803,21 +1903,22 @@ end
 include T
 
 let read_all_proofs_from_disk (p : t) : Stable.Latest.t =
-  map_proofs ~f:Proof_cache_tag.read_proof_from_disk p
+  forget_aux @@ map_proofs ~f:Proof_cache_tag.read_proof_from_disk p
 
 let write_all_proofs_to_disk ~proof_cache_db (p : Stable.Latest.t) : t =
-  map_proofs ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) p
+  reset_aux
+  @@ map_proofs ~f:(Proof_cache_tag.write_proof_to_disk proof_cache_db) p
 
-let account_id (t : (Body.t, _) Poly.t) : Account_id.t =
+let account_id (t : (Body.t, _, _) Poly.t) : Account_id.t =
   Account_id.create t.body.public_key t.body.token_id
 
-let verification_key_update_to_option (t : (Body.t, _) Poly.t) :
+let verification_key_update_to_option (t : (Body.t, _, _) Poly.t) :
     Verification_key_wire.t option Zkapp_basic.Set_or_keep.t =
   Zkapp_basic.Set_or_keep.map ~f:Option.some t.body.update.verification_key
 
-let check_authorization (type proof)
-    (p : (Body.t, (proof, Signature.t) Control.Poly.t) Poly.t) : unit Or_error.t
-    =
+let check_authorization (type proof aux)
+    (p : (Body.t, (proof, Signature.t) Control.Poly.t, aux) Poly.t) :
+    unit Or_error.t =
   match (p.authorization, p.body.authorization_kind) with
   | None_given, None_given | Proof _, Proof _ | Signature _, Signature ->
       Ok ()
@@ -1833,9 +1934,12 @@ let check_authorization (type proof)
       in
       Error err
 
-let of_fee_payer ({ body; authorization } : Fee_payer.t) :
-    (Body.t, (_, Signature.t) Control.Poly.t) Poly.t =
-  { authorization = Signature authorization; body = Body.of_fee_payer body }
+let of_fee_payer_no_aux ({ body; authorization } : Fee_payer.t) :
+    (Body.t, (_, Signature.t) Control.Poly.t, _) Poly.t =
+  with_no_aux ~body:(Body.of_fee_payer body)
+    ~authorization:(Control.Poly.Signature authorization)
+
+let of_fee_payer t = reset_aux @@ of_fee_payer_no_aux t
 
 (** The change in balance to apply to the target account of this account_update.
       When this is negative, the amount will be withdrawn from the account and

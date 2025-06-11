@@ -77,10 +77,13 @@ module Zkapp_command_applied = struct
 
   let write_all_proofs_to_disk ~proof_cache_db
       { Stable.Latest.accounts; command; new_accounts } : t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { accounts
     ; command =
         With_status.map
-          ~f:(Zkapp_command.write_all_proofs_to_disk ~proof_cache_db)
+          ~f:
+            (Zkapp_command.write_all_proofs_to_disk ~signature_kind
+               ~proof_cache_db )
           command
     ; new_accounts
     }

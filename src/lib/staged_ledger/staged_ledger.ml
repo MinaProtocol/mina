@@ -2889,7 +2889,8 @@ let%test_module "staged ledger tests" =
                   |> Sequence.to_list
                 in
                 assert (
-                  List.equal User_command.equal_ignoring_proofs_and_hashes
+                  List.equal
+                    User_command.equal_ignoring_proofs_and_hashes_and_aux
                     commands_in_ledger commands_applied )
             | None ->
                 () ) ;
@@ -2931,9 +2932,10 @@ let%test_module "staged ledger tests" =
       let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
       let num_cmds = transaction_capacity * iters in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:num_cmds ~sign_type:`Real
-          ledger_init_state
+        User_command.Valid.Gen.sequence ~length:num_cmds
+          ~sign_type:(`Real signature_kind) ledger_init_state
       in
       assert (List.length cmds = num_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
@@ -3032,9 +3034,10 @@ let%test_module "staged ledger tests" =
       let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
       let iters = max_blocks_for_coverage extra_block_count in
       let total_cmds = transaction_capacity * iters in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
-          ledger_init_state
+        User_command.Valid.Gen.sequence ~length:total_cmds
+          ~sign_type:(`Real signature_kind) ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
@@ -3058,9 +3061,10 @@ let%test_module "staged ledger tests" =
           (Int.gen_incl 1 ((transaction_capacity / 2) - 1))
       in
       let total_cmds = List.fold cmds_per_iter ~init:0 ~f:( + ) in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
-          ledger_init_state
+        User_command.Valid.Gen.sequence ~length:total_cmds
+          ~sign_type:(`Real signature_kind) ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)
@@ -4243,8 +4247,10 @@ let%test_module "staged ledger tests" =
         Signed_command.Payload.create ~fee ~fee_payer_pk:source_pk ~nonce
           ~memo:Signed_command_memo.dummy ~valid_until:None ~body
       in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let signed_command =
-        User_command.Signed_command (Signed_command.sign kp payload)
+        User_command.Signed_command
+          (Signed_command.sign ~signature_kind kp payload)
       in
       (ledger_init_state, signed_command, global_slot)
 
@@ -4318,7 +4324,9 @@ let%test_module "staged ledger tests" =
             Signed_command.Payload.create ~fee ~fee_payer_pk ~nonce
               ~memo:Signed_command_memo.dummy ~valid_until:None ~body
           in
-          User_command.Signed_command (Signed_command.sign kp payload)
+          let signature_kind = Mina_signature_kind.t_DEPRECATED in
+          User_command.Signed_command
+            (Signed_command.sign ~signature_kind kp payload)
         in
         let signed_command =
           let kp, balance, nonce, _ = ledger_init_state.(0) in
@@ -4416,6 +4424,7 @@ let%test_module "staged ledger tests" =
       (test_spec, kp, global_slot)
 
     let%test_unit "When creating diff, invalid commands would be skipped" =
+      let signature_kind = Mina_signature_kind.Testnet in
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind spec_keypair_and_slot = gen_spec_keypair_and_global_slot in
@@ -4465,7 +4474,8 @@ let%test_module "staged ledger tests" =
                 ~fee_payer_pk:Public_key.(compress fee_payer.public_key)
                 ~nonce ~memo:Signed_command_memo.dummy ~valid_until:None ~body
             in
-            User_command.Signed_command (Signed_command.sign fee_payer payload)
+            User_command.Signed_command
+              (Signed_command.sign ~signature_kind fee_payer payload)
           in
           let mk_zkapp_command ~(fee_payer : Keypair.t) ?(fee = default_fee)
               ~(nonce : Account.Nonce.t) () =
@@ -4584,7 +4594,7 @@ let%test_module "staged ledger tests" =
                        User_command.forget_check data )
               in
               assert (
-                List.equal User_command.equal_ignoring_proofs_and_hashes
+                List.equal User_command.equal_ignoring_proofs_and_hashes_and_aux
                   valid_commands
                   ( [ valid_command_1
                     ; valid_command_2

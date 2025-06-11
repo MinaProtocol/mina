@@ -39,6 +39,8 @@ module Stable : sig
     [@@deriving sexp, yojson]
 
     val to_latest : t -> t
+
+    val transaction : t -> Mina_transaction.Transaction.Stable.V3.t option
   end
 end]
 

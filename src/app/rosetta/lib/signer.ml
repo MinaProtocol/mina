@@ -65,7 +65,8 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
       unsigned_transaction.random_oracle_input
   in
   let signature' =
-    Signed_command.sign_payload keys.keypair.private_key user_command_payload
+    Signed_command.sign_payload ~signature_kind keys.keypair.private_key
+      user_command_payload
   in
   [%test_eq: Signature.t] signature signature' ;
   signature |> Signature.Raw.encode

@@ -1,12 +1,13 @@
-(* Testing
-   -------
+(** Testing
+    -------
 
-   Component: Pickles
-   Subject: Test Wrap
-   Invocation: \
-    dune exec src/lib/pickles/test/main.exe -- test "Gate:"
+    Component: Pickles
+    Subject: Test Wrap
+    Invocation: \
+     dune exec src/lib/pickles/test/test_wrap.exe
 *)
 open Pickles_types
+
 module Wrap = Pickles__Wrap
 module Import = Pickles__Import
 
@@ -253,18 +254,18 @@ end
 (* Small combinators to lift gate example signatures to the expected
    signatures for the tests. This amounts to generating the list of public
    inputs from either no public inputs, a single one or a pair of inputs
-   returned by the gate example. *)
+   returned by the gate example. In all cases, it uses lazy_mode = false. *)
 
 let without_public_input gate_example srs =
-  let index, proof = gate_example srs in
+  let index, proof = gate_example srs false in
   (index, [], proof)
 
 let with_one_public_input gate_example srs =
-  let index, public_input, proof = gate_example srs in
+  let index, public_input, proof = gate_example srs false in
   (index, [ public_input ], proof)
 
 let with_two_public_inputs gate_example srs =
-  let index, (public_input1, public_input2), proof = gate_example srs in
+  let index, (public_input1, public_input2), proof = gate_example srs false in
   (index, [ public_input1; public_input2 ], proof)
 
 module Lookup = Make (struct
@@ -323,11 +324,13 @@ module FFAdd = Make (struct
     }
 end)
 
-let tests =
-  [ ("Gate:Lookup", Lookup.tests)
-  ; ("Gate:Foreign field addition", FFAdd.tests)
-  ; ("Gate:Rot", Rot.tests)
-  ; ("Gate:Xor", Xor.tests)
-  ; ("Gate:Range check", Range_check.tests)
-  ; ("Gate:Range_check 64 bits", Range_check_64.tests)
-  ]
+let () =
+  let open Alcotest in
+  run "Gate tests"
+    [ ("Gate:Lookup", Lookup.tests)
+    ; ("Gate:Foreign field addition", FFAdd.tests)
+    ; ("Gate:Rot", Rot.tests)
+    ; ("Gate:Xor", Xor.tests)
+    ; ("Gate:Range check", Range_check.tests)
+    ; ("Gate:Range_check 64 bits", Range_check_64.tests)
+    ]
