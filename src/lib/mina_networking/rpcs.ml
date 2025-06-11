@@ -395,7 +395,7 @@ module Answer_sync_ledger_query = struct
     include Register (T')
   end
 
-  module V4 = struct
+  module V3 = struct
     module T = struct
       type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
       [@@deriving sexp]
