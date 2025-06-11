@@ -63,6 +63,10 @@ module Impl = struct
     let worker_wait_time = 5.
   end
 
+  (* NOTE: the reason witnesses_specs_stmts is optional in
+     [log_subzkapp_base_snark] and [log_subzkapp_merge_snark] is that when
+     receiving a partitioned spec holding a subzkapp merge/segment, we don't
+     know all of [witnesses_specs_stmts]. *)
   let log_subzkapp_base_snark ?witnesses_specs_stmts ~logger ~statement ~spec f
       () =
     match%map.Deferred
@@ -91,8 +95,7 @@ module Impl = struct
               :: metadata_without_all_inputs
         in
         [%log fatal]
-          "Transaction snark failed for input $spec $statement. All inputs: \
-           $inputs. Error: $error"
+          "Transaction snark failed for input $spec $statement. Error: $error"
           ~metadata ;
         Error e
 
@@ -124,9 +127,7 @@ module Impl = struct
               :: metadata_without_all_inputs
         in
 
-        [%log fatal]
-          "Merge snark failed for $stmt1 $stmt2. All inputs: $inputs. Error: \
-           $error"
+        [%log fatal] "Merge snark failed for $stmt1 $stmt2. Error: $error"
           ~metadata ;
         Error e
 
