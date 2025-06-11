@@ -38,7 +38,7 @@ RUN apt-get update --yes \
     wget \
   && rm -rf /var/lib/apt/lists/*
 
-RUN pip install readchar 
+RUN pip install readchar
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
