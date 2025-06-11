@@ -63,6 +63,10 @@ module Impl = struct
     let worker_wait_time = 5.
   end
 
+  (* NOTE: the reason witnesses_specs_stmts is optional in
+     [log_subzkapp_base_snark] and [log_subzkapp_merge_snark] is that when
+     receiving a partitioned spec holding a subzkapp merge/segment, we don't
+     know all of [witnesses_specs_stmts]. *)
   let log_subzkapp_base_snark ?witnesses_specs_stmts ~logger ~statement ~spec f
       () =
     match%map.Deferred
