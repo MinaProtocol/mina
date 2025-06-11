@@ -30,7 +30,13 @@ let DebianRepo = ../Constants/DebianRepo.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
 
+let ContainerImages = ../Constants/ContainerImages.dhall
+
 let Command = ./Base.dhall
+
+let Cmd = ../Lib/Cmds.dhall
+
+let Mina = ./Mina.dhall
 
 let join =
           \(sep : Text)
@@ -154,9 +160,9 @@ let publish
           in    [ Command.build
                     Command.Config::{
                     , commands =
-                        Toolchain.runner
-                          DebianVersions.DebVersion.Bullseye
-                          [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+                      [ Mina.fixPermissionsCommand ]
+                      # [ Cmd.runInDocker
+                            Cmd.Docker::{ image = ContainerImages.minaToolchain, extraEnv =  [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ], privileged = True }
                           (     ". ./buildkite/scripts/export-git-env-vars.sh && "
                             ++  "whoami && "
                             ++  "sudo chown -R opam:opam /home/opam/.gnupg &&"
@@ -178,6 +184,8 @@ let publish
                             ++  "--only-debians "
                             ++  "${keyArg}"
                           )
+                        ]
+                       
                     , label = "Debian Packages Publishing"
                     , key = "publish-debians"
                     , target = Size.Small
