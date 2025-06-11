@@ -44,6 +44,8 @@ end)
 
   val create : Primary_ledger.t -> Converting_ledger.t -> t
 
+  val create_with_migration : Primary_ledger.t -> Converting_ledger.t -> t
+
   val primary_ledger : t -> Primary_ledger.t
 
   val converting_ledger : t -> Converting_ledger.t
@@ -66,6 +68,15 @@ end = struct
     }
 
   let create primary_ledger converting_ledger =
+    { primary_ledger; converting_ledger }
+
+  let create_with_migration primary_ledger converting_ledger =
+    assert (Converting_ledger.num_accounts converting_ledger = 0) ;
+    let accounts =
+      Primary_ledger.foldi primary_ledger ~init:[] ~f:(fun addr acc account ->
+          (addr, convert account) :: acc )
+    in
+    Converting_ledger.set_batch_accounts converting_ledger accounts ;
     { primary_ledger; converting_ledger }
 
   let primary_ledger { primary_ledger; _ } = primary_ledger

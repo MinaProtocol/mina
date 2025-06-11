@@ -15,8 +15,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
 
   let find ~id t = Hashtbl.find t.index id
 
-  let change_inplace ~id ~f t = Hashtbl.change t.index id ~f
-
   let rec remove_until_reschedule ~f t =
     let%bind.Option job_id = Deque.dequeue_front t.timeline in
     match Hashtbl.find t.index job_id with
@@ -34,6 +32,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     | _ ->
         remove_until_reschedule ~f t
 
+  (* TODO: this seems unused, except in [add] we might want simplify it *)
   let iter_until ~f t =
     let rec loop preserved_jobs =
       match Deque.dequeue_front t.timeline with
@@ -68,4 +67,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
         `Ok
     | `Duplicate ->
         `Duplicate
+
+  let add_exn ~id ~job ~message t =
+    match add ~id ~job t with `Ok -> () | `Duplicate -> failwith message
 end
