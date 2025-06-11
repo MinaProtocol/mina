@@ -249,6 +249,7 @@ let start_custom :
       Deferred.map ~f:Or_error.return
       @@ Async.Writer.save lock_path
            ~contents:(Pid.to_string @@ Process.pid process)
+           ~fsync:true
   in
   let terminated_ivar = Ivar.create () in
   let stdout_pipe = reader_to_strict_pipe (Process.stdout process) stdout in
