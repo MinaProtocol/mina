@@ -1,19 +1,22 @@
 (library
  (name blake2)
  (public_name blake2)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_mina ppx_version ppx_compare ppx_deriving_yojson))
- (inline_tests (flags -verbose -show-counts))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_compare ppx_deriving_yojson ppx_jane ppx_mina ppx_version))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-   ;; opam libraries
-   base.base_internalhash_types
-   bigarray-compat
-   bin_prot.shape
-   core_kernel
-   digestif
-   sexplib0
-   base.caml
-   ppx_inline_test.config
-   ;; local libraries
-   bounded_types
-   ppx_version.runtime))
+  ;; opam libraries
+  base.base_internalhash_types
+  base.caml
+  bigarray-compat
+  bin_prot.shape
+  core_kernel
+  digestif
+  ppx_inline_test.config
+  sexplib0
+  ;; local libraries
+  bounded_types
+  ppx_version.runtime))

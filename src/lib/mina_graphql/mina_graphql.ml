@@ -380,7 +380,7 @@ module Mutations = struct
                   in
                   Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
                       { With_hash.data = cmd
-                      ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
+                      ; hash = Transaction_hash.hash_zkapp_command cmd
                       } ) )
             in
             Ok cmds_with_hash
@@ -391,12 +391,13 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let mock_zkapp_command mina zkapp_command :
-      ( (Zkapp_command.t, Transaction_hash.t) With_hash.t
+  let mock_zkapp_command mina (zkapp_command : Zkapp_command.Stable.Latest.t) :
+      ( (Zkapp_command.Stable.Latest.t, Transaction_hash.t) With_hash.t
         Types.Zkapp_command.With_status.t
       , string )
       result
       Io.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     (* instead of adding the zkapp_command to the transaction pool, as we would for an actual zkapp,
        apply the zkapp using an ephemeral ledger
     *)
@@ -465,19 +466,18 @@ module Mutations = struct
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
                       |> Consensus.Data.Consensus_state
                          .global_slot_since_genesis )
-                    ~state_view ledger zkapp_command
+                    ~state_view ledger
+                    (Zkapp_command.write_all_proofs_to_disk ~signature_kind
+                       ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+                       zkapp_command )
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
                 let applied_ok =
                   Result.map applied
                     ~f:(fun (zkapp_command_applied, _local_state_and_amount) ->
-                      let ({ data = zkapp_command; status }
-                            : Zkapp_command.t With_status.t ) =
-                        zkapp_command_applied.command
-                      in
+                      let status = zkapp_command_applied.command.status in
                       let hash =
-                        Transaction_hash.hash_command
-                          (Zkapp_command zkapp_command)
+                        Transaction_hash.hash_zkapp_command zkapp_command
                       in
                       let (with_hash : _ With_hash.t) =
                         { data = zkapp_command; hash }
@@ -1084,7 +1084,7 @@ module Mutations = struct
           in
           let%bind.Result () =
             let open Currency.Fee in
-            Result.ok_if_true ~error:"Maximum fee less than mininum fee"
+            Result.ok_if_true ~error:"Maximum fee less than minimum fee"
               (payment_details.max_fee >= payment_details.min_fee)
           in
           let logger = Mina_lib.top_level_logger mina in
@@ -1171,7 +1171,10 @@ module Mutations = struct
                 ~memo:(Signed_command_memo.create_from_string_exn memo)
                 ~body
             in
-            let signature = Ok (Signed_command.sign_payload sender payload) in
+            let signature_kind = Mina_signature_kind.t_DEPRECATED in
+            let signature =
+              Ok (Signed_command.sign_payload ~signature_kind sender payload)
+            in
             [%log info]
               "Payment scheduler with handle %s is sending a payment from \
                sender %s"
@@ -1652,7 +1655,9 @@ module Queries = struct
   open Schema
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
-  let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
+  let get_commands ~proof_cache_db ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+      =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
         Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
@@ -1704,7 +1709,9 @@ module Queries = struct
                       match Zkapp_command.of_base64 serialized_txn with
                       | Ok zkapp_command ->
                           let user_cmd =
-                            User_command.Zkapp_command zkapp_command
+                            User_command.Zkapp_command
+                              (Zkapp_command.write_all_proofs_to_disk
+                                 ~signature_kind ~proof_cache_db zkapp_command )
                           in
                           (* The command gets piped through [forget_check]
                              below; this is just to make the types work
@@ -1756,7 +1763,11 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        let cmds =
+          get_commands
+            ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+            ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
         List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
@@ -1792,11 +1803,16 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        let cmds =
+          get_commands
+            ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+            ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
         List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
                 txn
+              |> With_hash.map ~f:User_command.read_all_proofs_from_disk
             in
             match cmd_with_hash.data with
             | Signed_command _ ->
@@ -2050,6 +2066,7 @@ module Queries = struct
         in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
         let transaction_pool = Mina_lib.transaction_pool mina in
+        (* TODO: do not compute hashes to just get the status *)
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
           ~transaction_pool txn.data )
 
@@ -2205,7 +2222,7 @@ module Queries = struct
                           when Transaction_status.Stable.V2.(
                                  equal user_cmd.status Applied) -> (
                             let actions =
-                              c |> Zkapp_command.account_updates
+                              c.Zkapp_command.Poly.account_updates
                               |> Zkapp_command.Call_forest.fold ~init:(0, [])
                                    ~f:(fun acc au ->
                                      let action_seq, acc = acc in
@@ -2373,6 +2390,13 @@ module Queries = struct
         let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
         let to_bundle_specs =
           List.map ~f:(fun (spec, fee_prover) ->
+              let spec =
+                One_or_two.map spec
+                  ~f:
+                    (Snark_work_lib.Work.Single.Spec.map
+                       ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                       ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+              in
               { Types.Snark_work_bundle.spec; fee_prover } )
         in
         match end_idx with
@@ -2545,7 +2569,8 @@ module Queries = struct
             user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        Signed_command.check_signature user_command )
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
+        Signed_command.check_signature ~signature_kind user_command )
 
   let runtime_config =
     field "runtimeConfig"
@@ -2865,7 +2890,7 @@ module Queries = struct
       ~typ:(non_null string)
       ~args:Arg.[]
       ~resolve:(fun _ () ->
-        match Mina_signature_kind.t with
+        match Mina_signature_kind.t_DEPRECATED with
         | Mainnet ->
             "mainnet"
         | Testnet ->

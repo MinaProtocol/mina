@@ -31,7 +31,7 @@ sh <(curl -L https://nixos.org/nix/install) --daemon
 ```
 
 You may also install Nix from your distribution's official repository;
-Note however that it is preferrable you get a relatively recent
+Note however that it is preferable you get a relatively recent
 version (⩾ 2.5), and the version from the repository may be rather old.
 
 **warning for macOS users**: macOS updates will often break your nix
@@ -129,7 +129,7 @@ OCaml LSP server. You might need to configure your editor appropriately;
 See [Per-editor instructions](#per-editor-instructions).
 
 However, for LSP to work its magic, you will need to have to make type
-informations available. They can for example be obtained by running `dune build
+information available. They can for example be obtained by running `dune build
 @check` in `src/app/cli`, which might take a while, or by compiling the project.
 
 Don't forget to exit and re-enter the editor using this command after switching
@@ -464,14 +464,14 @@ If you get an error like this:
 File "src/lib/crypto/kimchi_bindings/stubs/dune", line 77, characters 0-237:
 77 | (rule
 78 |  (enabled_if
-79 |   (<> %{env:MARLIN_PLONK_STUBS=n} n))
+79 |   (<> %{env:KIMCHI_STUBS=n} n))
 80 |  (targets libwires_15_stubs.a)
 81 |  (deps
-82 |   (env_var MARLIN_PLONK_STUBS))
+82 |   (env_var KIMCHI_STUBS))
 83 |  (action
 84 |   (progn
 85 |    (copy
-86 |     %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a
+86 |     %{env:KIMCHI_STUBS=n}/lib/libwires_15_stubs.a
 87 |     libwires_15_stubs.a))))
 Error: File unavailable:
 /nix/store/2i0iqm48p20mrn69nbgr0pf76vdzjxj6-marlin_plonk_bindings_stubs-0.1.0/lib/lib/libwires_15_stubs.a
@@ -658,7 +658,7 @@ CLI commands below assume to be executed from a directory with Mina repository c
 | Plot dependency graph of Mina repository | `nix build mina#info.deps-graph` |
 | Extract json description of dependencies | `nix build mina#info.deps` |
 
-Dependency description generated via `nix build mina#info.deps --out-link deps.json` is useful for investigation of depencies in a semi-automated way. E.g. to check which executables implicitly depend on `mina_lib`, just run the following `jq` command:
+Dependency description generated via `nix build mina#info.deps --out-link deps.json` is useful for investigation of dependencies in a semi-automated way. E.g. to check which executables implicitly depend on `mina_lib`, just run the following `jq` command:
 
 ```bash
 $ jq '[.units | to_entries | .[] | { key: .key, value: [ .value.exe? | to_entries? | .[]? | select(.value.pkgs? | contains(["mina_lib"])?) | .key ] } | select (.value != []) | .key ]' <deps.json

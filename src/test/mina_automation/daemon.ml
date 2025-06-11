@@ -43,7 +43,7 @@ module Client = struct
   *)
   let daemon_status t =
     Executor.run t.executor
-      ~args:[ "client"; "status"; "-daemon-port"; sprintf "%d" t.port ]
+      ~args:[ "client"; "status"; "-daemon-port"; string_of_int t.port ]
       ~ignore_failure:true ()
 
   (** [wait_for_bootstrap t ?client_delay ?retry_delay ?retry_attempts ()] waits for the daemon to bootstrap.
@@ -104,8 +104,14 @@ module Config = struct
   type t = { port : int; dirs : ConfigDirs.t }
 
   let default ?dirs =
+    let root_path = Filename.temp_dir ~in_dir:"/tmp" "mina_automation" "" in
     { port = 3085
-    ; dirs = (match dirs with Some dirs -> dirs | None -> ConfigDirs.create ())
+    ; dirs =
+        ( match dirs with
+        | Some dirs ->
+            dirs
+        | None ->
+            ConfigDirs.create ~root_path () )
     }
 
   let libp2p_keypair_folder t = ConfigDirs.libp2p_keypair_folder t.dirs
@@ -128,9 +134,7 @@ module Process = struct
     @param t The daemon instance containing the process to be killed.
     @return A deferred result indicating the success or failure of the operation.
   *)
-  let force_kill t =
-    Process.send_signal t.process Core.Signal.kill ;
-    Deferred.map (Process.wait t.process) ~f:Or_error.return
+  let force_kill t = Utils.force_kill t.process
 end
 
 let archive_blocks t ~archive_address ~(format : Archive_blocks.format) blocks =
@@ -157,27 +161,27 @@ let client t ~(config : Config.t) = Client.create ~port:config.port t
 let start t (config : Config.t) =
   let args =
     [ "daemon"
-    ; "-seed"
+    ; "--seed"
     ; "--demo-mode"
     ; "-background"
-    ; "-working-dir"
+    ; "--working-dir"
     ; "."
-    ; "-client-port"
+    ; "--client-port"
     ; sprintf "%d" config.port
-    ; "-config-directory"
+    ; "--config-directory"
     ; config.dirs.conf
-    ; "-genesis-ledger-dir"
+    ; "--genesis-ledger-dir"
     ; config.dirs.genesis
-    ; "-external-ip"
+    ; "--external-ip"
     ; "0.0.0.0"
-    ; "-libp2p-keypair"
+    ; "--libp2p-keypair"
     ; Config.libp2p_keypair_folder config
     ]
   in
 
   [%log debug] "Starting daemon" ;
 
-  let%bind process = Executor.run_in_background t ~args () in
+  let%bind _, process = Executor.run_in_background t ~args () in
 
   let mina_process : Process.t =
     { config; process; client = Client.create ~port:config.port ~executor:t () }

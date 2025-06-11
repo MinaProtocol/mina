@@ -1,3 +1,6 @@
+open Async
+open Core
+
 (**
 Module to run missing_block_auditor scripts which finds gaps in given Postgresql database
 *)
@@ -10,4 +13,9 @@ end
 
 module PathFinder = Executor.Make_PathFinder (Paths)
 
-let path = PathFinder.standalone_path_exn
+let path =
+  Deferred.map PathFinder.standalone_path ~f:(fun opt ->
+      Option.value_exn opt
+        ~message:
+          "Could not find standalone path. App is not executable outside the \
+           dune" )

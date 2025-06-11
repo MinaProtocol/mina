@@ -12,9 +12,12 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
+let Network = ../../Constants/Network.dhall
+
 let dependsOn =
       DebianVersions.dependsOn
         DebianVersions.DebVersion.Bullseye
+        Network.Type.Berkeley
         Profiles.Type.Standard
 
 in  Pipeline.build

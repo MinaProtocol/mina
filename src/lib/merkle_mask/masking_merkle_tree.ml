@@ -16,15 +16,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       issues with bin_io to do so *)
   module Parent = struct
     type t = (Base.t, string (* Location where null was set *)) Result.t
-    [@@deriving sexp]
   end
 
   module Detached_parent_signal = struct
     type t = unit Async.Ivar.t
-
-    let sexp_of_t (_ : t) = Sexp.List []
-
-    let t_of_sexp (_ : Sexp.t) : t = Async.Ivar.create ()
   end
 
   type maps_t =
@@ -34,7 +29,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; locations : Location.t Account_id.Map.t
     ; non_existent_accounts : Account_id.Set.t
     }
-  [@@deriving sexp]
 
   (** Merges second maps object into the first one,
       potentially overwriting some keys *)
@@ -51,7 +45,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   (** Structure managing cache accumulated since the "base" ledger.
 
-    Its purpose is to optimize lookups through a few consequitive masks
+    Its purpose is to optimize lookups through a few consecutive masks
     (by using just one map lookup instead of [O(number of masks)] map lookups).
 
     With a number of mask around 290, this trick gives a sizeable performance improvement.
@@ -91,12 +85,11 @@ module Make (Inputs : Inputs_intf.S) = struct
           (* If present, contains maps containing changes both for this mask
              and for a few ancestors.
              This is used as a lookup cache. *)
-    ; mutable accumulated : (accumulated_t[@sexp.opaque]) option
+    ; mutable accumulated : accumulated_t option
     ; mutable is_committing : bool
     }
-  [@@deriving sexp]
 
-  type unattached = t [@@deriving sexp]
+  type unattached = t
 
   let empty_maps =
     { accounts = Location_binable.Map.empty
@@ -120,9 +113,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   let get_uuid { uuid; _ } = uuid
 
   module Attached = struct
-    type parent = Base.t [@@deriving sexp]
-
-    type t = unattached [@@deriving sexp]
+    type t = unattached
 
     module Path = Base.Path
     module Addr = Location.Addr
@@ -213,11 +204,6 @@ module Make (Inputs : Inputs_intf.S) = struct
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->
           { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
-
-    let set_inner_hash_at_addr_exn t address hash =
-      assert_is_attached t ;
-      assert (Addr.depth address <= t.depth) ;
-      self_set_hash t address hash
 
     let self_set_location t account_id location =
       update_maps t ~f:(fun maps ->
@@ -348,7 +334,8 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option sibling_hash =
           self_path_get_hash ~hashes ~current_location height sibling
         in
-        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
+        Mina_stdlib.Direction.map dir ~left:(`Left sibling_hash)
+          ~right:(`Right sibling_hash)
       in
       self_path_impl ~element
 
@@ -362,7 +349,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option self_hash =
           self_path_get_hash ~hashes ~current_location height address
         in
-        Direction.map dir
+        Mina_stdlib.Direction.map dir
           ~left:(`Left (self_hash, sibling_hash))
           ~right:(`Right (sibling_hash, self_hash))
       in
@@ -984,7 +971,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let first_location ~ledger_depth =
       Location.Account
         ( Addr.of_directions
-        @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
+        @@ List.init ledger_depth ~f:(fun _ -> Mina_stdlib.Direction.Left) )
 
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =

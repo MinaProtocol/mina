@@ -49,12 +49,8 @@ module T = struct
     let hash ~ledger_depth depth = UInt8.of_int (ledger_depth - depth)
   end
 
-  [@@@warning "-4"] (* disabled because of deriving sexp *)
-
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
   [@@deriving hash, sexp, compare]
-
-  [@@@warning "+4"]
 
   let is_generic = function Generic _ -> true | Account _ | Hash _ -> false
 
@@ -73,7 +69,7 @@ module T = struct
   let root_hash : t = Hash (Addr.root ())
 
   let last_direction path =
-    Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
+    Mina_stdlib.Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
 
   let build_generic (data : Bigstring.t) : t = Generic data
 
@@ -150,9 +146,9 @@ module T = struct
 
   let order_siblings (location : t) (base : 'a) (sibling : 'a) : 'a * 'a =
     match last_direction (to_path_exn location) with
-    | Left ->
+    | Mina_stdlib.Direction.Left ->
         (base, sibling)
-    | Right ->
+    | Mina_stdlib.Direction.Right ->
         (sibling, base)
 
   (* Returns a reverse of traversal path from top of the tree to the location
@@ -161,7 +157,8 @@ module T = struct
      By reverse it means that head of returned list contains direction from
      location's parent to the location along with the location's sibling.
   *)
-  let merkle_path_dependencies_exn (location : t) : (t * Direction.t) list =
+  let merkle_path_dependencies_exn (location : t) :
+      (t * Mina_stdlib.Direction.t) list =
     let rec loop k =
       if Addr.depth k = 0 then []
       else

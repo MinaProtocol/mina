@@ -4,27 +4,33 @@
  (library_flags -linkall)
  (flags :standard -short-paths)
  (libraries
-   ;; opam libraries
-   async_kernel
-   core_kernel
-   bin_prot.shape
-   base.caml
-   sexplib0
-   core
-   async
-   ;; local libraries
-   trust_system
-   logger
-   merkle_ledger
-   pipe_lib
-   network_peer
-   merkle_address
-   direction
-   error_json
-   ppx_version.runtime
-   mina_compile_config
- )
+  ;; opam libraries
+  async_kernel
+  core_kernel
+  bin_prot.shape
+  base.caml
+  sexplib0
+  core
+  async
+  ;; local libraries
+  trust_system
+  logger
+  merkle_ledger
+  pipe_lib
+  network_peer
+  merkle_address
+  mina_stdlib
+  error_json
+  ppx_version.runtime
+  mina_compile_config)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_compare ppx_deriving_yojson ppx_register_event))
- (instrumentation (backend bisect_ppx))
+  (pps
+   ppx_mina
+   ppx_version
+   ppx_jane
+   ppx_compare
+   ppx_deriving_yojson
+   ppx_register_event))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Synchronization of Merkle-tree backed ledgers"))

@@ -341,29 +341,15 @@ end
 
 module Zkapp_states_nullable = struct
   type t =
-    { element0 : int option
-    ; element1 : int option
-    ; element2 : int option
-    ; element3 : int option
-    ; element4 : int option
-    ; element5 : int option
-    ; element6 : int option
-    ; element7 : int option
-    }
-  [@@deriving fields, hlist]
+    (int option, Mina_base.Zkapp_state.Max_state_size.n) Pickles_types.Vector.t
+
+  let names =
+    List.init Mina_base.Zkapp_state.max_size_int ~f:(fun n ->
+        sprintf "element%d" n )
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.
-        [ option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ; option int
-        ]
+    Mina_caqti.Vector.typ
+      (Caqti_type.(option int), Mina_base.Zkapp_state.Max_state_size.n)
 
   let table_name = "zkapp_states_nullable"
 
@@ -377,56 +363,31 @@ module Zkapp_states_nullable = struct
           @@ Zkapp_field.add_if_doesn't_exist (module Conn) )
     in
     let t =
-      match element_ids with
-      | [ element0
-        ; element1
-        ; element2
-        ; element3
-        ; element4
-        ; element5
-        ; element6
-        ; element7
-        ] ->
-          { element0
-          ; element1
-          ; element2
-          ; element3
-          ; element4
-          ; element5
-          ; element6
-          ; element7
-          }
-      | _ ->
-          failwith "Invalid number of nullable app state elements"
+      Pickles_types.Vector.of_list_and_length_exn element_ids
+        Mina_base.Zkapp_state.Max_state_size.n
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
       id
 end
 
 module Zkapp_states = struct
-  type t =
-    { element0 : int
-    ; element1 : int
-    ; element2 : int
-    ; element3 : int
-    ; element4 : int
-    ; element5 : int
-    ; element6 : int
-    ; element7 : int
-    }
-  [@@deriving fields, hlist]
+  type t = (int, Mina_base.Zkapp_state.Max_state_size.n) Pickles_types.Vector.t
+
+  let names =
+    List.init Mina_base.Zkapp_state.max_size_int ~f:(fun n ->
+        sprintf "element%d" n )
 
   let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int; int; int; int ]
+    Mina_caqti.Vector.typ
+      (Caqti_type.int, Mina_base.Zkapp_state.Max_state_size.n)
 
   let table_name = "zkapp_states"
 
@@ -438,53 +399,32 @@ module Zkapp_states = struct
         ~f:(Zkapp_field.add_if_doesn't_exist (module Conn))
     in
     let t =
-      match element_ids with
-      | [ element0
-        ; element1
-        ; element2
-        ; element3
-        ; element4
-        ; element5
-        ; element6
-        ; element7
-        ] ->
-          { element0
-          ; element1
-          ; element2
-          ; element3
-          ; element4
-          ; element5
-          ; element6
-          ; element7
-          }
-      | _ ->
-          failwith "Invalid number of app state elements"
+      Pickles_types.Vector.of_list_and_length_exn element_ids
+        Mina_base.Zkapp_state.Max_state_size.n
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
       id
 end
 
 module Zkapp_action_states = struct
-  type t =
-    { element0 : int
-    ; element1 : int
-    ; element2 : int
-    ; element3 : int
-    ; element4 : int
-    }
-  [@@deriving fields, hlist]
+  (* TODO ideally don't hard code action_state length *)
+  module Len = Pickles_types.Nat.N5
 
-  let typ =
-    Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-      Caqti_type.[ int; int; int; int; int ]
+  type t = (int, Len.n) Pickles_types.Vector.t
+
+  let typ = Mina_caqti.Vector.typ (Caqti_type.int, Len.n)
+
+  let names =
+    List.init (Pickles_types.Nat.to_int Len.n) ~f:(fun n ->
+        sprintf "element%d" n )
 
   let table_name = "zkapp_action_states"
 
@@ -496,21 +436,18 @@ module Zkapp_action_states = struct
           Zkapp_field.add_if_doesn't_exist (module Conn) field )
     in
     let t =
-      match element_ids with
-      | [ element0; element1; element2; element3; element4 ] ->
-          { element0; element1; element2; element3; element4 }
-      | _ ->
-          failwith "Invalid number of action state elements"
+      Pickles_types.Vector.of_list_and_length_exn element_ids
+        Pickles_types.Nat.N5.n
     in
     Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
-      ~table_name ~cols:(Fields.names, typ)
+      ~table_name ~cols:(names, typ)
       (module Conn)
       t
 
   let load (module Conn : CONNECTION) id =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
       id
 end
 
@@ -2079,7 +2016,7 @@ module User_command = struct
       in
       let memo = ps.memo |> Signed_command_memo.to_base58_check in
       let hash =
-        Transaction_hash.hash_command (Zkapp_command ps)
+        Transaction_hash.hash_zkapp_command_with_hashes ps
         |> Transaction_hash.to_base58_check
       in
       Mina_caqti.select_insert_into_cols ~select:("id", Caqti_type.int)
@@ -3304,9 +3241,14 @@ module Block = struct
         (Header.proposed_protocol_version_opt @@ Mina_block.header t)
       ~hash ~v1_transaction_hash:false
 
-  let add_from_precomputed conn ~constraint_constants (t : Precomputed.t) =
+  let add_from_precomputed conn ~proof_cache_db ~constraint_constants
+      (t : Precomputed.t) =
+    let staged_ledger_diff =
+      Staged_ledger_diff.write_all_proofs_to_disk ~proof_cache_db
+        t.staged_ledger_diff
+    in
     add_parts_if_doesn't_exist conn ~constraint_constants
-      ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
+      ~protocol_state:t.protocol_state ~staged_ledger_diff
       ~protocol_version:t.protocol_version
       ~proposed_protocol_version:t.proposed_protocol_version
       ~hash:(Protocol_state.hashes t.protocol_state).state_hash
@@ -4060,8 +4002,9 @@ module Block = struct
     in
     return ()
 
-  let add_from_extensional (module Conn : CONNECTION)
+  let add_from_extensional (module Conn : CONNECTION) ~proof_cache_db
       ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
       match%bind find_opt (module Conn) ~state_hash:block.state_hash with
@@ -4228,7 +4171,8 @@ module Block = struct
           ~f:(fun acc ({ fee_payer; account_updates; memo; _ } as zkapp_cmd) ->
             (* add authorizations, not stored in the db *)
             let (fee_payer : Account_update.Fee_payer.t) =
-              { body = fee_payer; authorization = Signature.dummy }
+              Account_update.Fee_payer.make ~body:fee_payer
+                ~authorization:Signature.dummy
             in
             let (account_updates : Account_update.Simple.t list) =
               List.map account_updates
@@ -4236,12 +4180,15 @@ module Block = struct
                      (body : Account_update.Body.Simple.t)
                      :
                      Account_update.Simple.t
-                   -> { body; authorization = None_given } )
+                   ->
+                  Account_update.with_no_aux ~body
+                    ~authorization:Control.Poly.None_given )
             in
             let%map cmd_id =
               User_command.Zkapp_command.add_if_doesn't_exist
                 (module Conn)
-                (Zkapp_command.of_simple { fee_payer; account_updates; memo })
+                (Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+                   { fee_payer; account_updates; memo } )
             in
             (zkapp_cmd, cmd_id) :: acc )
       in
@@ -4680,10 +4627,11 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
 (* used by `archive_blocks` app *)
-let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
-    ~delete_older_than block =
+let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
+    ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:(Block.add_from_precomputed ~constraint_constants)
+    ~add_block:
+      (Block.add_from_precomputed ~proof_cache_db ~constraint_constants)
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~accounts_accessed:block.Precomputed.accounts_accessed
@@ -4691,23 +4639,30 @@ let add_block_aux_precomputed ~constraint_constants ~logger ?retries ~pool
     ~tokens_used:block.Precomputed.tokens_used block
 
 (* used by `archive_blocks` app *)
-let add_block_aux_extensional ~logger ?retries ~pool ~delete_older_than block =
+let add_block_aux_extensional ~proof_cache_db ~logger ?retries ~pool
+    ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
-    ~add_block:(Block.add_from_extensional ~v1_transaction_hash:false)
+    ~add_block:
+      (Block.add_from_extensional ~proof_cache_db ~v1_transaction_hash:false)
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~accounts_accessed:block.Extensional.Block.accounts_accessed
     ~accounts_created:block.Extensional.Block.accounts_created
     ~tokens_used:block.Extensional.Block.tokens_used block
 
 (* receive blocks from a daemon, write them to the database *)
-let run pool reader ~genesis_constants ~constraint_constants ~logger
-    ~delete_older_than : unit Deferred.t =
+let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
+    ~logger ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
           { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash = State_hash.With_state_hashes.state_hash in
+        let block =
+          With_hash.map
+            ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+            block
+        in
         match%bind
           add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than
             ~hash ~add_block ~accounts_accessed ~accounts_created ~tokens_used
@@ -4872,7 +4827,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
       go ()
 
 (* for running the archive process *)
-let setup_server ~(genesis_constants : Genesis_constants.t)
+let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
@@ -4908,14 +4863,15 @@ let setup_server ~(genesis_constants : Genesis_constants.t)
         add_genesis_accounts pool ~logger ~genesis_constants
           ~constraint_constants ~runtime_config_opt
       in
-      run ~constraint_constants ~genesis_constants pool reader ~logger
-        ~delete_older_than
+      run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
+        ~logger ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~logger ~pool ~genesis_constants
-              ~constraint_constants ~delete_older_than precomputed_block
+            add_block_aux_precomputed ~proof_cache_db ~logger ~pool
+              ~genesis_constants ~constraint_constants ~delete_older_than
+              precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -4932,8 +4888,8 @@ let setup_server ~(genesis_constants : Genesis_constants.t)
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~genesis_constants ~logger ~pool
-              ~delete_older_than extensional_block
+            add_block_aux_extensional ~proof_cache_db ~genesis_constants ~logger
+              ~pool ~delete_older_than extensional_block
           with
           | Error e ->
               [%log warn]

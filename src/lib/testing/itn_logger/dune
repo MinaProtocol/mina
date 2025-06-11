@@ -1,0 +1,15 @@
+(library
+ (name itn_logger)
+ (public_name itn_logger)
+ (libraries
+  ;; opam libraries
+  async
+  async.async_rpc
+  core
+  yojson
+  ;; local libraries
+  mina_node_config.unconfigurable_constants)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_mina ppx_jane)))

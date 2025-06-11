@@ -12,7 +12,7 @@ git config --global --add safe.directory /workdir
 source buildkite/scripts/handle-fork.sh
 source buildkite/scripts/export-git-env-vars.sh
 
-release_branch=${REMOTE}/$1
+release_branch=origin/$1
 
 RELEASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 $release_branch)
 
@@ -34,12 +34,20 @@ function checkout_and_dump() {
     source buildkite/scripts/gsutil-upload.sh /tmp/${TYPE_SHAPE_FILE} gs://mina-type-shapes
 }
 
-if ! gsutil ls "gs://mina-type-shapes/${RELEASE_BRANCH_COMMIT}*" >/dev/null; then
+
+source ./buildkite/scripts/handle-fork.sh
+
+if [[ $FORK == 1 ]]; then 
+    echo "⏩  Skipping type shape patching on a forked repository" 
+    exit 0
+fi
+
+if ! $(source buildkite/scripts/cache/manager.sh read mina-type-shapes/"$RELEASE_BRANCH_COMMIT"* . 2>/dev/null); then
     checkout_and_dump $RELEASE_BRANCH_COMMIT
 fi
 
 if [[ -n "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}" ]]; then 
-    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
+    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
     if ! gsutil ls "gs://mina-type-shapes/${BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT}*"; then
         checkout_and_dump $BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT
     fi

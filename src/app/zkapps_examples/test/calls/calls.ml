@@ -68,7 +68,6 @@ let%test_module "Composability test" =
             ] ) =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:(option_typ Zkapps_calls.Call_data.Output.typ)
-        ~branches:(module Nat.N4)
         ~max_proofs_verified:(module Nat.N0)
         ~name:"empty_update"
         ~choices:(fun ~self:_ ->
@@ -137,9 +136,8 @@ let%test_module "Composability test" =
 
       let account_update : Account_update.t =
         (* TODO: This is a pain. *)
-        { body = account_update_body
-        ; authorization = Signature Signature.dummy
-        }
+        Account_update.with_aux ~body:account_update_body
+          ~authorization:(Control.Poly.Signature Signature.dummy)
     end
 
     module Initialize_account_update = struct
@@ -223,13 +221,13 @@ let%test_module "Composability test" =
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
       in
       let fee_payer : Account_update.Fee_payer.t =
-        { body =
+        Account_update.Fee_payer.make
+          ~body:
             { Account_update.Body.Fee_payer.dummy with
               public_key = pk_compressed
             ; fee = Currency.Fee.(of_nanomina_int_exn 100)
             }
-        ; authorization = Signature.dummy
-        }
+          ~authorization:Signature.dummy
       in
       let memo = Signed_command_memo.empty in
       let memo_hash = Signed_command_memo.hash memo in
@@ -238,6 +236,7 @@ let%test_module "Composability test" =
           transaction_commitment ~memo_hash
           ~fee_payer_hash:
             (Zkapp_command.Call_forest.Digest.Account_update.create
+               ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
@@ -248,7 +247,7 @@ let%test_module "Composability test" =
             when Public_key.Compressed.equal public_key pk_compressed ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign sk
+                  Schnorr.Chunked.sign ~signature_kind sk
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -258,6 +257,7 @@ let%test_module "Composability test" =
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = _
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key pk_compressed ->
@@ -267,8 +267,8 @@ let%test_module "Composability test" =
                 in
                 { account_update with
                   authorization =
-                    Signature
-                      (Schnorr.Chunked.sign sk
+                    Control.Poly.Signature
+                      (Schnorr.Chunked.sign ~signature_kind sk
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->
@@ -316,7 +316,8 @@ let%test_module "Composability test" =
              (Update_state_account_update.account_update calls_kind call_kind)
         |> Zkapp_command.Call_forest.cons_tree
              Initialize_account_update.account_update
-        |> Zkapp_command.Call_forest.cons Deploy_account_update.account_update
+        |> Zkapp_command.Call_forest.cons ~signature_kind
+             Deploy_account_update.account_update
         |> test_zkapp_command
       in
       let (first_state :: zkapp_state) =

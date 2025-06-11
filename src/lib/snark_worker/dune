@@ -2,62 +2,62 @@
  (name snark_worker)
  (public_name snark_worker)
  (library_flags -linkall)
- (inline_tests (flags -verbose -show-counts))
  (libraries
-   ;; opam libraries
-   async_rpc_kernel
-   sexplib0
-   async_kernel
-   base
-   base.caml
-   async
-   core
-   core_kernel.hash_heap
-   core_kernel
-   async.async_rpc
-   async.async_command
-   base.base_internalhash_types
-   ppx_hash.runtime-lib
-   result
-   async_unix
-   bin_prot.shape
-   ;; local libraries
-   bounded_types
-   one_or_two
-   mina_metrics
-   logger
-   signature_lib
-   logger.file_system
-   mina_base.import
-   cli_lib
-   genesis_constants
-   transaction_witness
-   perf_histograms
-   snark_work_lib
-   currency
-   mina_base
-   mina_transaction
-   transaction_snark
-   ledger_proof
-   mina_ledger
-   transaction_snark_work
-   error_json
-   mina_node_config.unconfigurable_constants
-   mina_state
-   transaction_protocol_state
-   ppx_version.runtime
- )
+  ;; opam libraries
+  async
+  async.async_command
+  async.async_rpc
+  async_kernel
+  async_rpc_kernel
+  async_unix
+  base
+  base.base_internalhash_types
+  base.caml
+  bin_prot.shape
+  core
+  core_kernel
+  core_kernel.hash_heap
+  ppx_hash.runtime-lib
+  ppx_version.runtime
+  result
+  sexplib0
+  ;; local libraries
+  bounded_types
+  cli_lib
+  currency
+  error_json
+  genesis_constants
+  ledger_proof
+  logger
+  logger.file_system
+  mina_base
+  mina_base.import
+  mina_ledger
+  mina_metrics
+  mina_node_config.unconfigurable_constants
+  mina_state
+  mina_transaction
+  one_or_two
+  perf_histograms
+  signature_lib
+  snark_work_lib
+  work_partitioner
+  transaction_protocol_state
+  transaction_snark
+  transaction_snark_work
+  transaction_witness)
  (preprocess
   (pps
-    ppx_bin_prot
-    ppx_mina
-    ppx_here
-    ppx_custom_printf
-    ppx_deriving_yojson
-    ppx_inline_test
-    ppx_let
-    ppx_register_event
-    ppx_sexp_conv
-    ppx_version))
- (instrumentation (backend bisect_ppx))
+   ppx_bin_prot
+   ppx_mina
+   ppx_here
+   ppx_custom_printf
+   ppx_deriving_yojson
+   ppx_inline_test
+   ppx_let
+   ppx_register_event
+   ppx_sexp_conv
+   ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
  (synopsis "Lib powering the snark_worker interactions with the daemon"))

@@ -184,11 +184,11 @@ module type Best_tip_prover_intf = sig
        verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> precomputed_values:Precomputed_values.t
-    -> ( Mina_block.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Mina_block.Header.t
+       , State_body_hash.t list * Mina_block.Header.t )
        Proof_carrying_data.t
-    -> ( [ `Root of Mina_block.initial_valid_block ]
-       * [ `Best_tip of Mina_block.initial_valid_block ] )
+    -> ( [ `Root of Mina_block.initial_valid_header ]
+       * [ `Best_tip of Mina_block.initial_valid_header ] )
        Deferred.Or_error.t
 end
 
@@ -211,11 +211,11 @@ module type Consensus_best_tip_prover_intf = sig
        context:(module CONTEXT)
     -> verifier:Verifier.t
     -> Consensus.Data.Consensus_state.Value.t State_hash.With_state_hashes.t
-    -> ( Mina_block.t
-       , State_body_hash.t list * Mina_block.t )
+    -> ( Mina_block.Header.t
+       , State_body_hash.t list * Mina_block.Header.t )
        Proof_carrying_data.t
-    -> ( [ `Root of Mina_block.initial_valid_block ]
-       * [ `Best_tip of Mina_block.initial_valid_block ] )
+    -> ( [ `Root of Mina_block.initial_valid_header ]
+       * [ `Best_tip of Mina_block.initial_valid_header ] )
        Deferred.Or_error.t
 end
 
@@ -307,6 +307,7 @@ module type Transition_router_intf = sig
   val run :
        ?sync_local_state:bool
     -> ?cache_exceptions:bool
+    -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
     -> context:(module CONTEXT)
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
@@ -321,8 +322,9 @@ module type Transition_router_intf = sig
     -> frontier_broadcast_writer:
          transition_frontier option Pipe_lib.Broadcast_pipe.Writer.t
     -> network_transition_reader:
-         ( [ `Block of Mina_block.t Envelope.Incoming.t
-           | `Header of Mina_block.Header.t Envelope.Incoming.t ]
+         ( [ `Block of Mina_block.Stable.Latest.t Envelope.Incoming.t
+           | `Header of Mina_block.Header.Stable.Latest.t Envelope.Incoming.t
+           ]
          * [ `Time_received of Block_time.t ]
          * [ `Valid_cb of Mina_net2.Validation_callback.t ] )
          Strict_pipe.Reader.t
@@ -333,7 +335,7 @@ module type Transition_router_intf = sig
     -> get_completed_work:
          (   Transaction_snark_work.Statement.t
           -> Transaction_snark_work.Checked.t option )
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:[ `Super ]
     -> notify_online:(unit -> unit Deferred.t)
     -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]

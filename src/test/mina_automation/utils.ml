@@ -1,6 +1,6 @@
 open Integration_test_lib
-open Core_kernel
 open Async
+open Core_kernel
 
 let wget ~url ~target = Util.run_cmd_exn "." "wget" [ "-c"; url; "-O"; target ]
 
@@ -25,3 +25,7 @@ let sort_archive_files files : string list =
          let right_height = scan_height right in
 
          Int.compare left_height right_height )
+
+let force_kill process =
+  Process.send_signal process Core.Signal.kill ;
+  Deferred.map (Process.wait process) ~f:Or_error.return

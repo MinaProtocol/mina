@@ -113,21 +113,36 @@ fi
 
 if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
+export_base_image
+
 case "${SERVICE}" in
     mina-archive)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
         DOCKER_CONTEXT="dockerfiles/"
-        ;;
-    bot)
-        DOCKERFILE_PATH="frontend/bot/Dockerfile"
-        DOCKER_CONTEXT="frontend/bot"
         ;;
     mina-daemon)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-toolchain)
-        DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
+        DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"
+        DOCKERFILE_PATH_SCRIPT_2_AND_MORE="dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
+        case "${INPUT_CODENAME}" in 
+          bullseye)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bullseye $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
+          focal)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-focal $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
+          noble)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
+          *)
+            echo "Unsupported debian codename: $INPUT_CODENAME"
+            echo "Supported codenames are: bullseye, focal, noble"
+            exit 1
+            ;;
+        esac
         ;;
     mina-batch-txn)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-txn-burst"
@@ -151,10 +166,6 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-delegation-backend-toolchain"
         DOCKER_CONTEXT="src/app/delegation_backend"
         ;;
-    itn-orchestrator)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-itn-orchestrator"
-        DOCKER_CONTEXT="src/app/itn_orchestrator"
-        ;;
     mina-test-suite)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-test-suite"
         DOCKER_CONTEXT="dockerfiles/"
@@ -162,10 +173,14 @@ case "${SERVICE}" in
 esac
 
 export_version
-export_base_image
 export_docker_tag
 
 BUILD_NETWORK="--network=host"
+
+# Prune old docker images (24 hours) from the cache
+# This is a temporary solution to keep the cache from growing too large.
+# We will also need to evaluate the impact of this on the build process and adjust as necessary.
+docker system prune --all --force --filter until=24h
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then

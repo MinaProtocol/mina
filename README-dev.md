@@ -59,15 +59,6 @@ You can build Mina using Docker. Using Docker works in any dev environment. See 
     xcode-select --install
     ```
 
-3. Invoke `make macos-setup`.
-
-   - When prompted, confirm that you want to add a number of exports in your shell config file.
-   - Make sure to `source` your shell config file or create a new terminal.
-   - If this is your first time using OCaml, be sure to run:
-
-        ```sh
-        eval $(opam config env)
-        ```
 
 1. Install [rustup](https://rustup.rs/).
 2. Add o1-opam-repository with `opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git`
@@ -261,7 +252,7 @@ Debian package can be build locally by using below commands:
 ```
 make build
 ```
-2. Build debian for mina-devet (example for ubuntu 18.04):
+2. Build debian for mina-devnet (example for ubuntu 18.04):
 ```
 ./scripts/debian/build.sh daemon_devnet
 ```
@@ -340,7 +331,6 @@ the submodule's repository, it is automatically re-pinned in CI.
 
 If you add a new package in the Mina repository or as a submodule, you must do all of the following:
 
-1. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
 2. Update [`dockerfiles/stages/`](dockerfiles/stages) with the required packages
 
 ## Common Dune tasks

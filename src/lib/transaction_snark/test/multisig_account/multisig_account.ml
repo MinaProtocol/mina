@@ -16,6 +16,8 @@ let%test_module "multisig_account" =
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     module M_of_n_predicate = struct
       type _witness = (Schnorr.Chunked.Signature.t * Public_key.t) list
 
@@ -47,7 +49,7 @@ let%test_module "multisig_account" =
       (* check a signature on msg against a public key *)
       let check_sig pk msg sigma : Boolean.var Checked.t =
         let%bind (module S) = Inner_curve.Checked.Shifted.create () in
-        Schnorr.Chunked.Checked.verifies (module S) sigma pk msg
+        Schnorr.Chunked.Checked.verifies ~signature_kind (module S) sigma pk msg
 
       (* verify witness signatures against public keys *)
       let%snarkydef_ verify_sigs pubkeys commitment witness =
@@ -86,7 +88,7 @@ let%test_module "multisig_account" =
             (let%bind pk_var =
                exists Inner_curve.typ ~compute:(As_prover.return pk)
              in
-             let sigma = Schnorr.Chunked.sign sk msg in
+             let sigma = Schnorr.Chunked.sign ~signature_kind sk msg in
              let%bind sigma_var =
                exists Schnorr.Chunked.Signature.typ
                  ~compute:(As_prover.return sigma)
@@ -118,8 +120,8 @@ let%test_module "multisig_account" =
              let%bind pk1_var =
                exists Inner_curve.typ ~compute:(As_prover.return pk1)
              in
-             let sigma0 = Schnorr.Chunked.sign sk0 msg in
-             let sigma1 = Schnorr.Chunked.sign sk1 msg in
+             let sigma0 = Schnorr.Chunked.sign ~signature_kind sk0 msg in
+             let sigma1 = Schnorr.Chunked.sign ~signature_kind sk1 msg in
              let%bind sigma0_var =
                exists Schnorr.Chunked.Signature.typ
                  ~compute:(As_prover.return sigma0)
@@ -221,7 +223,6 @@ let%test_module "multisig_account" =
                   ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                   ~public_input:(Input Zkapp_statement.typ)
                   ~auxiliary_typ:Typ.unit
-                  ~branches:(module Nat.N2)
                   ~max_proofs_verified:(module Nat.N2)
                     (* You have to put 2 here... *)
                   ~name:"multisig"
@@ -318,19 +319,20 @@ let%test_module "multisig_account" =
               in
               let sender_pk = sender.public_key |> Public_key.compress in
               let fee_payer : Account_update.Fee_payer.t =
-                { body =
+                Account_update.Fee_payer.make
+                  ~body:
                     { public_key = sender_pk
                     ; fee
                     ; valid_until = None
                     ; nonce = sender_nonce
                     }
                     (* Real signature added in below *)
-                ; authorization = Signature.dummy
-                }
+                  ~authorization:Signature.dummy
               in
               let sender_account_update_data : Account_update.Simple.t =
-                { body =
-                    { public_key = sender_pk
+                Account_update.with_no_aux
+                  ~body:
+                    { Account_update.Body.Simple.public_key = sender_pk
                     ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -353,12 +355,13 @@ let%test_module "multisig_account" =
                     ; may_use_token = No
                     ; authorization_kind = Signature
                     }
-                ; authorization = Signature Signature.dummy
-                }
+                  ~authorization:(Control.Poly.Signature Signature.dummy)
               in
               let snapp_account_update_data : Account_update.Simple.t =
-                { body =
-                    { public_key = multisig_account_pk
+                Account_update.with_no_aux
+                  ~body:
+                    { Account_update.Body.Simple.public_key =
+                        multisig_account_pk
                     ; update = update_empty_permissions
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -379,9 +382,9 @@ let%test_module "multisig_account" =
                     ; may_use_token = No
                     ; authorization_kind = Proof (With_hash.hash vk)
                     }
-                ; authorization =
-                    Proof (Lazy.force Mina_base.Proof.transaction_dummy)
-                }
+                  ~authorization:
+                    (Control.Poly.Proof
+                       (Lazy.force Mina_base.Proof.transaction_dummy) )
               in
               let memo = Signed_command_memo.empty in
               let ps =
@@ -391,6 +394,7 @@ let%test_module "multisig_account" =
                   [ sender_account_update_data; snapp_account_update_data ]
                 |> Zkapp_command.Call_forest.map ~f:Account_update.of_simple
                 |> Zkapp_command.Call_forest.accumulate_hashes_predicated
+                     ~signature_kind
               in
               let account_updates_hash = Zkapp_command.Call_forest.hash ps in
               let transaction : Zkapp_command.Transaction_commitment.t =
@@ -400,7 +404,7 @@ let%test_module "multisig_account" =
               in
               let tx_statement : Zkapp_statement.t =
                 { account_update =
-                    Account_update.Body.digest
+                    Account_update.Body.digest ~signature_kind
                       (Account_update.of_simple snapp_account_update_data).body
                 ; calls = (Zkapp_command.Digest.Forest.empty :> field)
                 }
@@ -409,9 +413,9 @@ let%test_module "multisig_account" =
                 tx_statement |> Zkapp_statement.to_field_elements
                 |> Random_oracle_input.Chunked.field_elements
               in
-              let sigma0 = Schnorr.Chunked.sign sk0 msg in
-              let sigma1 = Schnorr.Chunked.sign sk1 msg in
-              let sigma2 = Schnorr.Chunked.sign sk2 msg in
+              let sigma0 = Schnorr.Chunked.sign ~signature_kind sk0 msg in
+              let sigma1 = Schnorr.Chunked.sign ~signature_kind sk1 msg in
+              let sigma2 = Schnorr.Chunked.sign ~signature_kind sk2 msg in
               let handler (Snarky_backendless.Request.With { request; respond })
                   =
                 match request with
@@ -441,11 +445,13 @@ let%test_module "multisig_account" =
                     ~memo_hash:(Signed_command_memo.hash memo)
                     ~fee_payer_hash:
                       (Zkapp_command.Digest.Account_update.create
+                         ~signature_kind
                          (Account_update.of_fee_payer fee_payer) )
                 in
                 { fee_payer with
                   authorization =
-                    Signature_lib.Schnorr.Chunked.sign sender.private_key
+                    Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                      sender.private_key
                       (Random_oracle.Input.Chunked.field txn_comm)
                 }
               in
@@ -453,17 +459,20 @@ let%test_module "multisig_account" =
                 { body = sender_account_update_data.body
                 ; authorization =
                     Signature
-                      (Signature_lib.Schnorr.Chunked.sign sender.private_key
+                      (Signature_lib.Schnorr.Chunked.sign ~signature_kind
+                         sender.private_key
                          (Random_oracle.Input.Chunked.field transaction) )
+                ; aux = sender_account_update_data.aux
                 }
               in
               let zkapp_command : Zkapp_command.t =
-                Zkapp_command.of_simple
+                Zkapp_command.of_simple ~signature_kind ~proof_cache_db
                   { fee_payer
                   ; account_updates =
                       [ sender
                       ; { body = snapp_account_update_data.body
                         ; authorization = Proof pi
+                        ; aux = snapp_account_update_data.aux
                         }
                       ]
                   ; memo
