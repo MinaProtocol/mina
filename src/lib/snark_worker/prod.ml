@@ -110,12 +110,13 @@ module Impl = struct
           ~metadata ;
         Error e
 
-  let measure_runtime ~logger ~(spec_json : string * Yojson.Safe.t) k =
+  let measure_runtime ~logger ~(spec_json : (string * Yojson.Safe.t) Lazy.t) k =
     let start = Time.now () in
     match%map.Async.Deferred Monitor.try_with_join_or_error ~here:[%here] k with
     | Error e ->
         [%log error] "SNARK worker failed: $error"
-          ~metadata:[ ("error", Error_json.error_to_yojson e); spec_json ] ;
+          ~metadata:
+            [ ("error", Error_json.error_to_yojson e); Lazy.force spec_json ] ;
         Error e
     | Ok res ->
         let elapsed = Time.abs_diff (Time.now ()) start in
@@ -225,7 +226,9 @@ module Impl = struct
     | Full ((module M) as m) ->
         measure_runtime ~logger
           ~spec_json:
-            ("single_spec", Work.Spec.Single.Stable.Latest.to_yojson single_spec)
+            ( lazy
+              ( "single_spec"
+              , Work.Spec.Single.Stable.Latest.to_yojson single_spec ) )
           (perform_single_untimed ~m ~logger ~proof_cache_db ~single_spec
              ~sok_digest ~signature_kind )
     | Check | No_check ->
@@ -287,8 +290,9 @@ module Impl = struct
             let%map proof, elapsed =
               measure_runtime ~logger
                 ~spec_json:
-                  ( "single_spec"
-                  , Work.Spec.Single.Stable.Latest.to_yojson single_spec )
+                  ( lazy
+                    ( "single_spec"
+                    , Work.Spec.Single.Stable.Latest.to_yojson single_spec ) )
                 (perform_single_untimed ~m ~logger ~proof_cache_db ~single_spec
                    ~sok_digest ~signature_kind )
             in
@@ -316,9 +320,10 @@ module Impl = struct
                 (M.of_zkapp_command_segment_exn ~witness)
               |> measure_runtime ~logger
                    ~spec_json:
-                     ( "subzkapp_spec"
-                     , Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
-                         sub_zkapp_spec )
+                     ( lazy
+                       ( "subzkapp_spec"
+                       , Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
+                           sub_zkapp_spec ) )
             in
 
             Work.Spec.Partitioned.Poly.Sub_zkapp_command
@@ -338,9 +343,10 @@ module Impl = struct
               log_subzkapp_merge_snark ~m ~logger ~sok_digest proof1 proof2
               |> measure_runtime ~logger
                    ~spec_json:
-                     ( "subzkapp_spec"
-                     , Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
-                         sub_zkapp_spec )
+                     ( lazy
+                       ( "subzkapp_spec"
+                       , Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
+                           sub_zkapp_spec ) )
             in
             Work.Spec.Partitioned.Poly.Sub_zkapp_command
               { job = { job with spec = () }
