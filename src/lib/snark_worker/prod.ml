@@ -130,6 +130,31 @@ module Impl = struct
           ~metadata ;
         Error e
 
+  let cache_and_time_partitioned ~logger ~cache ~statement
+      ~(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) k =
+    match (Cache.find cache) statement with
+    | Some proof ->
+        Deferred.Or_error.return (proof, Time.Span.zero)
+    | None -> (
+        let start = Time.now () in
+        match%map.Async.Deferred
+          Monitor.try_with_join_or_error ~here:[%here] k
+        with
+        | Error e ->
+            [%log error] "SNARK worker failed: $error"
+              ~metadata:
+                [ ("error", Error_json.error_to_yojson e)
+                ; ( "partitioned_spec"
+                  , Work.Spec.Partitioned.Stable.Latest.to_yojson
+                      partitioned_spec )
+                ] ;
+            Error e
+        | Ok res ->
+            Cache.add cache ~statement ~proof:res ;
+            let elapsed = Time.abs_diff (Time.now ()) start in
+            Ok (res, elapsed) )
+
+  (* TODO: remove below after Snark Worker optimization has been fully merged *)
   let cache_and_time ~logger ~cache ~statement
       ~(single_spec : Work.Spec.Single.Stable.Latest.t) k =
     match (Cache.find cache) statement with
@@ -272,6 +297,7 @@ module Impl = struct
                ~proof:(Lazy.force Proof.transaction_dummy)
            , Time.Span.zero )
 
+  (* TODO: remove this after whole snark worker PR series had been merged *)
   let perform (s : Worker_state.t) public_key
       ({ instances; fee } as spec : Work.Selector.Spec.Stable.Latest.t) =
     One_or_two.Deferred_result.map instances ~f:(fun w ->
@@ -297,4 +323,105 @@ module Impl = struct
              ; spec
              ; prover = public_key
              } )
+
+  let perform_partitioned
+      ~state:
+        ({ proof_level_snark; cache; proof_cache_db; logger } : Worker_state.t)
+      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) :
+      Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t =
+    let open Deferred.Or_error.Let_syntax in
+    let sok_digest =
+      Work.Spec.Partitioned.Poly.sok_message partitioned_spec
+      |> Sok_message.digest
+    in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    match proof_level_snark with
+    | Worker_state.Full ((module M) as m) -> (
+        match partitioned_spec with
+        | Work.Spec.Partitioned.Poly.Single
+            { job = { spec = single_spec; _ } as job; data = () } ->
+            let statement = Work.Spec.Single.Poly.statement single_spec in
+            let%map proof, elapsed =
+              cache_and_time ~logger ~cache ~statement ~single_spec
+                (perform_single_uncached ~m ~logger ~proof_cache_db ~single_spec
+                   ~sok_digest ~signature_kind )
+            in
+            Work.Spec.Partitioned.Poly.Single
+              { job = { job with spec = () }
+              ; data = { Proof_carrying_data.data = elapsed; proof }
+              }
+        | Work.Spec.Partitioned.Poly.Sub_zkapp_command
+            { job =
+                { spec =
+                    Work.Spec.Sub_zkapp.Stable.Latest.Segment
+                      { statement; witness; spec = segment_spec; _ } as
+                    sub_zkapp_spec
+                ; _
+                } as job
+            ; data = ()
+            } ->
+            let witness =
+              Transaction_witness.Zkapp_command_segment_witness
+              .write_all_proofs_to_disk ~proof_cache_db witness
+            in
+
+            let statement_without_sok =
+              Work.Spec.Sub_zkapp.Stable.Latest.statement sub_zkapp_spec
+            in
+
+            let%map proof, elapsed =
+              log_subzkapp_base_snark ~logger ~statement ~spec:segment_spec
+                (M.of_zkapp_command_segment_exn ~witness)
+              |> cache_and_time_partitioned ~logger ~cache
+                   ~statement:statement_without_sok ~partitioned_spec
+            in
+
+            Work.Spec.Partitioned.Poly.Sub_zkapp_command
+              { job = { job with spec = () }
+              ; data = { Proof_carrying_data.data = elapsed; proof }
+              }
+        | Work.Spec.Partitioned.Poly.Sub_zkapp_command
+            { job =
+                { spec =
+                    Work.Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
+                    as spec
+                ; _
+                } as job
+            ; data = ()
+            } ->
+            let statement_without_sok =
+              Work.Spec.Sub_zkapp.Stable.Latest.statement spec
+            in
+
+            let%map proof, elapsed =
+              log_subzkapp_merge_snark ~m ~logger ~sok_digest proof1 proof2
+              |> cache_and_time_partitioned ~logger ~cache
+                   ~statement:statement_without_sok ~partitioned_spec
+            in
+            Work.Spec.Partitioned.Poly.Sub_zkapp_command
+              { job = { job with spec = () }
+              ; data = { Proof_carrying_data.data = elapsed; proof }
+              } )
+    | Worker_state.Check | Worker_state.No_check ->
+        let elapsed = Time.Span.zero in
+        let statement =
+          Work.Spec.Partitioned.Stable.Latest.statement partitioned_spec
+        in
+        (* NOTE: use a dummy proof *)
+        let proof =
+          Transaction_snark.create
+            ~statement:{ statement with sok_digest }
+            ~proof:(Lazy.force Proof.transaction_dummy)
+        in
+        let data = { Proof_carrying_data.data = elapsed; proof } in
+        let result =
+          match partitioned_spec with
+          | Work.Spec.Partitioned.Poly.Single { job; _ } ->
+              Work.Spec.Partitioned.Poly.Single
+                { job = { job with spec = () }; data }
+          | Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; _ } ->
+              Work.Spec.Partitioned.Poly.Sub_zkapp_command
+                { job = { job with spec = () }; data }
+        in
+        Deferred.Or_error.return result
 end
