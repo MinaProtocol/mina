@@ -17,6 +17,7 @@ let Filter
       | Promote
       | DebianBuild
       | DockerBuild
+      | Replayer
       >
 
 let tags
@@ -39,6 +40,7 @@ let tags
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
             , HardforkPackageGeneration = [ Tag.Type.Hardfork ]
+            , Replayer = [ Tag.Type.Replayer ]
             }
             filter
 
@@ -57,6 +59,7 @@ let show
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
             , HardforkPackageGeneration = "HardforkPackageGeneration"
+            , Replayer = "Replayer"
             }
             filter
 
