@@ -91,8 +91,7 @@ module Impl = struct
               :: metadata_without_all_inputs
         in
         [%log fatal]
-          "Transaction snark failed for input $spec $statement. All inputs: \
-           $inputs. Error: $error"
+          "Transaction snark failed for input $spec $statement. Error: $error"
           ~metadata ;
         Error e
 
@@ -124,9 +123,7 @@ module Impl = struct
               :: metadata_without_all_inputs
         in
 
-        [%log fatal]
-          "Merge snark failed for $stmt1 $stmt2. All inputs: $inputs. Error: \
-           $error"
+        [%log fatal] "Merge snark failed for $stmt1 $stmt2. Error: $error"
           ~metadata ;
         Error e
 
