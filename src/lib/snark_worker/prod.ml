@@ -8,22 +8,6 @@ open struct
   module Work = Snark_work_lib
 end
 
-module Cache = struct
-  module T = Hash_heap.Make (Transaction_snark.Statement)
-
-  type t = (Time.t * Transaction_snark.t) T.t
-
-  let max_size = 100
-
-  let create () : t = T.create (fun (t1, _) (t2, _) -> Time.compare t1 t2)
-
-  let add t ~statement ~proof =
-    T.push_exn t ~key:statement ~data:(Time.now (), proof) ;
-    if Int.( > ) (T.length t) max_size then ignore (T.pop_exn t)
-
-  let find (t : t) statement = Option.map ~f:snd (T.find t statement)
-end
-
 module Impl = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
@@ -32,7 +16,6 @@ module Impl = struct
 
     type t =
       { proof_level_snark : proof_level_snark
-      ; cache : Cache.t
       ; proof_cache_db : Proof_cache_tag.cache_db
       ; logger : Logger.t
       }
@@ -54,11 +37,7 @@ module Impl = struct
             No_check
       in
       Deferred.return
-        { proof_level_snark
-        ; cache = Cache.create ()
-        ; proof_cache_db
-        ; logger = Logger.create ()
-        }
+        { proof_level_snark; proof_cache_db; logger = Logger.create () }
 
     let worker_wait_time = 5.
   end
@@ -131,54 +110,18 @@ module Impl = struct
           ~metadata ;
         Error e
 
-  let cache_and_time_partitioned ~logger ~cache ~statement
-      ~(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) k =
-    match (Cache.find cache) statement with
-    | Some proof ->
-        Deferred.Or_error.return (proof, Time.Span.zero)
-    | None -> (
-        let start = Time.now () in
-        match%map.Async.Deferred
-          Monitor.try_with_join_or_error ~here:[%here] k
-        with
-        | Error e ->
-            [%log error] "SNARK worker failed: $error"
-              ~metadata:
-                [ ("error", Error_json.error_to_yojson e)
-                ; ( "partitioned_spec"
-                  , Work.Spec.Partitioned.Stable.Latest.to_yojson
-                      partitioned_spec )
-                ] ;
-            Error e
-        | Ok res ->
-            Cache.add cache ~statement ~proof:res ;
-            let elapsed = Time.abs_diff (Time.now ()) start in
-            Ok (res, elapsed) )
+  let measure_runtime ~logger ~(spec_json : string * Yojson.Safe.t) k =
+    let start = Time.now () in
+    match%map.Async.Deferred Monitor.try_with_join_or_error ~here:[%here] k with
+    | Error e ->
+        [%log error] "SNARK worker failed: $error"
+          ~metadata:[ ("error", Error_json.error_to_yojson e); spec_json ] ;
+        Error e
+    | Ok res ->
+        let elapsed = Time.abs_diff (Time.now ()) start in
+        Ok (res, elapsed)
 
-  (* TODO: remove below after Snark Worker optimization has been fully merged *)
-  let cache_and_time ~logger ~cache ~statement
-      ~(single_spec : Work.Spec.Single.Stable.Latest.t) k =
-    match (Cache.find cache) statement with
-    | Some proof ->
-        Deferred.Or_error.return (proof, Time.Span.zero)
-    | None -> (
-        let start = Time.now () in
-        match%map.Async.Deferred
-          Monitor.try_with_join_or_error ~here:[%here] k
-        with
-        | Error e ->
-            [%log error] "SNARK worker failed: $error"
-              ~metadata:
-                [ ("error", Error_json.error_to_yojson e)
-                ; ("spec", Work.Spec.Single.Stable.Latest.to_yojson single_spec)
-                ] ;
-            Error e
-        | Ok res ->
-            Cache.add cache ~statement ~proof:res ;
-            let elapsed = Time.abs_diff (Time.now ()) start in
-            Ok (res, elapsed) )
-
-  let perform_single_uncached ~(m : (module Worker_state.S)) ~logger
+  let perform_single_untimed ~(m : (module Worker_state.S)) ~logger
       ~proof_cache_db ~single_spec ~signature_kind ~sok_digest () =
     let open Deferred.Or_error.Let_syntax in
     let (module M) = m in
@@ -274,15 +217,16 @@ module Impl = struct
         M.merge ~sok_digest proof1 proof2
 
   let perform_single
-      ({ cache; proof_level_snark; proof_cache_db; logger } : Worker_state.t)
-      ~message (single_spec : Work.Selector.Single.Spec.Stable.Latest.t) =
+      ({ proof_level_snark; proof_cache_db; logger } : Worker_state.t) ~message
+      (single_spec : Work.Selector.Single.Spec.Stable.Latest.t) =
     let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let sok_digest = Mina_base.Sok_message.digest message in
     match proof_level_snark with
     | Full ((module M) as m) ->
-        let statement = Work.Spec.Single.Poly.statement single_spec in
-        cache_and_time ~logger ~cache ~statement ~single_spec
-          (perform_single_uncached ~m ~logger ~proof_cache_db ~single_spec
+        measure_runtime ~logger
+          ~spec_json:
+            ("single_spec", Work.Spec.Single.Stable.Latest.to_yojson single_spec)
+          (perform_single_untimed ~m ~logger ~proof_cache_db ~single_spec
              ~sok_digest ~signature_kind )
     | Check | No_check ->
         (* Use a dummy proof. *)
@@ -326,8 +270,7 @@ module Impl = struct
              } )
 
   let perform_partitioned
-      ~state:
-        ({ proof_level_snark; cache; proof_cache_db; logger } : Worker_state.t)
+      ~state:({ proof_level_snark; proof_cache_db; logger } : Worker_state.t)
       ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) :
       Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
@@ -341,10 +284,12 @@ module Impl = struct
         match partitioned_spec with
         | Work.Spec.Partitioned.Poly.Single
             { job = { spec = single_spec; _ } as job; data = () } ->
-            let statement = Work.Spec.Single.Poly.statement single_spec in
             let%map proof, elapsed =
-              cache_and_time ~logger ~cache ~statement ~single_spec
-                (perform_single_uncached ~m ~logger ~proof_cache_db ~single_spec
+              measure_runtime ~logger
+                ~spec_json:
+                  ( "single_spec"
+                  , Work.Spec.Single.Stable.Latest.to_yojson single_spec )
+                (perform_single_untimed ~m ~logger ~proof_cache_db ~single_spec
                    ~sok_digest ~signature_kind )
             in
             Work.Spec.Partitioned.Poly.Single
@@ -366,15 +311,14 @@ module Impl = struct
               .write_all_proofs_to_disk ~proof_cache_db witness
             in
 
-            let statement_without_sok =
-              Work.Spec.Sub_zkapp.Stable.Latest.statement sub_zkapp_spec
-            in
-
             let%map proof, elapsed =
               log_subzkapp_base_snark ~logger ~statement ~spec:segment_spec
                 (M.of_zkapp_command_segment_exn ~witness)
-              |> cache_and_time_partitioned ~logger ~cache
-                   ~statement:statement_without_sok ~partitioned_spec
+              |> measure_runtime ~logger
+                   ~spec_json:
+                     ( "subzkapp_spec"
+                     , Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
+                         sub_zkapp_spec )
             in
 
             Work.Spec.Partitioned.Poly.Sub_zkapp_command
@@ -385,19 +329,18 @@ module Impl = struct
             { job =
                 { spec =
                     Work.Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
-                    as spec
+                    as sub_zkapp_spec
                 ; _
                 } as job
             ; data = ()
             } ->
-            let statement_without_sok =
-              Work.Spec.Sub_zkapp.Stable.Latest.statement spec
-            in
-
             let%map proof, elapsed =
               log_subzkapp_merge_snark ~m ~logger ~sok_digest proof1 proof2
-              |> cache_and_time_partitioned ~logger ~cache
-                   ~statement:statement_without_sok ~partitioned_spec
+              |> measure_runtime ~logger
+                   ~spec_json:
+                     ( "subzkapp_spec"
+                     , Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
+                         sub_zkapp_spec )
             in
             Work.Spec.Partitioned.Poly.Sub_zkapp_command
               { job = { job with spec = () }
