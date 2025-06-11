@@ -6,6 +6,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineMode = ../../Pipeline/Mode.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
@@ -21,6 +23,6 @@ in  Pipeline.build
             ]
           , network = Network.Type.DevnetLegacy
           , debVersion = DebianVersions.DebVersion.Focal
-          , if = Some "build.branch == 'dkijania/build_legacy_debian_on_comp'"
+          , mode = PipelineMode.Type.Stable
           }
       )
