@@ -14,7 +14,6 @@ ARG INFLUXDB_CLI_VERSION=2.7.5
 USER root
 
 # OS package dependencies
-# afaict this is the last python dependency of any kind in CI
 RUN apt-get update --yes \
   && apt-get install --yes \
     aptly \
@@ -31,13 +30,12 @@ RUN apt-get update --yes \
     postgresql \
     postgresql-contrib \
     perl \
-    python3-sexpdata \
+    python3 \
     python3-pip \
+    python3-sexpdata \
     rubygems \
     wget \
   && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --no-cache-dir readchar 
 
 # --- deb-s3 tool
 # Custom version, with lock only on manifest upload
