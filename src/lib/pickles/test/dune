@@ -4,6 +4,7 @@
   test_no_sideloaded
   test_opt_sponge
   test_plonk_curve_ops
+  ; test_regtest
   test_ro
   test_scalar_challenge
   test_sponge
