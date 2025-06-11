@@ -251,7 +251,6 @@ module Impl = struct
       ({ cache; proof_level_snark; proof_cache_db; logger } : Worker_state.t)
       ~message (single_spec : Work.Selector.Single.Spec.Stable.Latest.t) =
     let signature_kind = Mina_signature_kind.t_DEPRECATED in
-    let open Deferred.Or_error.Let_syntax in
     let sok_digest = Mina_base.Sok_message.digest message in
     match proof_level_snark with
     | Full ((module M) as m) ->
