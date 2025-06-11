@@ -157,7 +157,7 @@ let publish
                     Command.Config::{
                     , commands =
                       [ Cmd.run
-                          (     ". ./buildkite/scripts/release/manager.sh publish "
+                          (     "./buildkite/scripts/release/manager.sh publish "
                             ++  "--artifacts ${artifacts} "
                             ++  "--networks ${networks} "
                             ++  "--buildkite-build-id ${spec.build_id} "
