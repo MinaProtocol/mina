@@ -13,13 +13,7 @@
   The method used to estimate the cost was linear least squares.
 *)
 
-let zkapp_proof_update_cost = 10.26
-
-let zkapp_signed_pair_update_cost = 10.08
-
-let zkapp_signed_single_update_cost = 9.14
-
-let zkapp_transaction_cost_limit = 69.45
+let max_zkapp_segment_per_transaction = 16
 
 let max_event_elements = 100
 
