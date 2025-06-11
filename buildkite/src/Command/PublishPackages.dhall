@@ -160,32 +160,36 @@ let publish
           in    [ Command.build
                     Command.Config::{
                     , commands =
-                      [ Mina.fixPermissionsCommand ]
-                      # [ Cmd.runInDocker
-                            Cmd.Docker::{ image = ContainerImages.minaToolchain, extraEnv =  [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ], privileged = True }
-                          (     ". ./buildkite/scripts/export-git-env-vars.sh && "
-                            ++  "whoami && "
-                            ++  "sudo chown -R opam:opam /home/opam/.gnupg &&"
-                            ++  "sudo chmod 700 /home/opam/.gnupg && "
-                            ++  "sudo chmod 600 /home/opam/.gnupg/* && "
-                            ++  "./buildkite/scripts/release/manager.sh publish "
-                            ++  "--artifacts ${artifacts} "
-                            ++  "--networks ${networks} "
-                            ++  "--buildkite-build-id ${spec.build_id} "
-                            ++  "--backend ${spec.backend} "
-                            ++  "--channel ${DebianChannel.lowerName
-                                               spec.channel} "
-                            ++  "--verify "
-                            ++  "--source-version ${spec.source_version} "
-                            ++  "--target-version ${target_version} "
-                            ++  "--codenames ${codenames} "
-                            ++  "--debian-repo ${DebianRepo.bucket_or_default
-                                                   spec.debian_repo} "
-                            ++  "--only-debians "
-                            ++  "${keyArg}"
-                          )
-                        ]
-                       
+                          [ Mina.fixPermissionsCommand ]
+                        # [ Cmd.runInDocker
+                              Cmd.Docker::{
+                              , image = ContainerImages.minaToolchain
+                              , extraEnv =
+                                [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+                              , privileged = True
+                              }
+                              (     ". ./buildkite/scripts/export-git-env-vars.sh && "
+                                ++  "whoami && "
+                                ++  "sudo chown -R opam:opam /home/opam/.gnupg &&"
+                                ++  "sudo chmod 700 /home/opam/.gnupg && "
+                                ++  "sudo chmod 600 /home/opam/.gnupg/* && "
+                                ++  "./buildkite/scripts/release/manager.sh publish "
+                                ++  "--artifacts ${artifacts} "
+                                ++  "--networks ${networks} "
+                                ++  "--buildkite-build-id ${spec.build_id} "
+                                ++  "--backend ${spec.backend} "
+                                ++  "--channel ${DebianChannel.lowerName
+                                                   spec.channel} "
+                                ++  "--verify "
+                                ++  "--source-version ${spec.source_version} "
+                                ++  "--target-version ${target_version} "
+                                ++  "--codenames ${codenames} "
+                                ++  "--debian-repo ${DebianRepo.bucket_or_default
+                                                       spec.debian_repo} "
+                                ++  "--only-debians "
+                                ++  "${keyArg}"
+                              )
+                          ]
                     , label = "Debian Packages Publishing"
                     , key = "publish-debians"
                     , target = Size.Small
