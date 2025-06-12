@@ -81,6 +81,8 @@ let runInDockerWithPostgresConn
                 , "curl -L -o ${outerDir}/initScript.sql ${initUrl}"
                 , "mkdir -p ${outerDir}/_build/default/src/test/archive/sample_db"
                 , "cp ${outerDir}/initScript.sql ${outerDir}/_build/default/src/test/archive/sample_db/archive_db.sql"
+                , "cp ${outerDir}/src/test/archive/sample_db/replayer_input_file.json ${outerDir}/_build/default/src/test/archive/sample_db/"
+                , "cp ${outerDir}/etc/mina/test/archive/sample_db/replayer_input_file.json ${outerDir}/_build/default/src/test/archive/sample_db/"
                 , "cp src/test/archive/sample_db/replayer_input_file.json ${outerDir}/_build/default/src/test/archive/sample_db/"
                 , "ls -l ${outerDir}/_build/default/src/test/archive/sample_db/"
                 , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/initScript.sql"
