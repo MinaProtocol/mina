@@ -25,7 +25,7 @@ function usage() {
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
   echo "  -b, --branch              The branch of the mina repository to use for staged docker builds. Default=compatible"
   echo "  -r, --repo                The currently used mina repository"
-  echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
+  echo "      --deb-codename        The debian codename to build the docker image from. Default=bullseye"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"

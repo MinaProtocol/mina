@@ -12,7 +12,6 @@
 , minaToolchain =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:224be4d785c8adbcf4961ba61a850eee6a46f1282bfd77314edbb08e242088e1"
 , elixirToolchain = "elixir:1.10-alpine"
-, nodeToolchain = "node:14.13.1-stretch-slim"
 , ubuntu2004 = "ubuntu:20.04"
 , postgres = "postgres:12.4-alpine"
 , xrefcheck =

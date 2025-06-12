@@ -6,10 +6,10 @@ export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-hardfork' 'mina
 function export_base_image () {
     # Determine the proper image for ubuntu or debian
     case "${DEB_CODENAME##*=}" in
-    bionic|focal|impish|jammy|noble)
+    focal|noble)
         IMAGE="ubuntu:${DEB_CODENAME##*=}"
     ;;
-    stretch|buster|bullseye|sid)
+    bullseye|jammy)
         IMAGE="debian:${DEB_CODENAME##*=}-slim"
     ;;
     bookworm)
