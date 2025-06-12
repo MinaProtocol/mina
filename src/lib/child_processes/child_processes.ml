@@ -116,6 +116,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
     | `Yes | `Unknown -> (
         match%bind try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
         | Ok () ->
+            [%log debug] "Deleted existing lock file %s" lockpath ;
             Deferred.unit
         | Error exn ->
             [%log warn]
@@ -129,6 +130,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
                 ] ;
             Deferred.unit )
     | `No ->
+        [%log debug] "Lock file %s does not exist" lockpath ;
         Deferred.unit
   in
   match%bind Sys.file_exists lockpath with
