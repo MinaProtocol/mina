@@ -147,7 +147,8 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~time_controller
   let module Lru = Core_extended_cache.Lru in
   let outdated_root_cache = Lru.create ~destruct:None 1000 in
   O1trace.background_thread "validate_blocks_against_frontier" (fun () ->
-      Reader.iter transition_reader ~f:(fun (b_or_h, `Valid_cb vc) ->
+      Pipe_lib.Choosable_synchronous_pipe.iter transition_reader
+        ~f:(fun (b_or_h, `Valid_cb vc) ->
           let header_with_hash, sender =
             match b_or_h with
             | `Block b ->

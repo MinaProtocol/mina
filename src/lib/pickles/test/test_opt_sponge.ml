@@ -1,10 +1,10 @@
-(* Testing
-   -------
+(** Testing
+    -------
 
-   Component: Pickles
-   Subject: Test opt_sponge
-   Invocation: \
-    dune exec src/lib/pickles/test/main.exe -- test "Opt_sponge"
+    Component: Pickles
+    Subject: Test opt_sponge
+    Invocation: \
+     dune exec src/lib/pickles/test/test_opt_sponge.exe
 *)
 
 module Wrap_main_inputs = Pickles__Wrap_main_inputs
@@ -91,10 +91,11 @@ end
 module Wrap = Test_make (Impls.Wrap) (Wrap_main_inputs.Sponge.Permutation)
 module Step = Test_make (Impls.Step) (Step_main_inputs.Sponge.Permutation)
 
-let tests =
+let () =
   let open Alcotest in
-  [ ( "Opt_sponge"
-    , [ test_case "wrap correct" `Quick Wrap.test_correctness
-      ; test_case "step correct" `Quick Step.test_correctness
-      ] )
-  ]
+  run "Pickles Opt_sponge"
+    [ ( "Correctness"
+      , [ test_case "wrap" `Quick Wrap.test_correctness
+        ; test_case "step" `Quick Step.test_correctness
+        ] )
+    ]

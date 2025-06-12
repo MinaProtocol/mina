@@ -1,3 +1,12 @@
+(** Testing
+    -------
+
+    Component: Pickles
+    Subject: Test random oracle
+    Invocation: \
+     dune exec src/lib/pickles/test/test_ro.exe
+*)
+
 (* initially written to see the consistency between updates of digestif *)
 let test_bits_random_oracle_consistency_check () =
   let s = "BitsRandomOracle" in
@@ -24,11 +33,3 @@ let () =
             test_bits_random_oracle_consistency_check
         ] )
     ]
-
-let tests =
-  let open Alcotest in
-  [ ( "test random oracle"
-    , [ test_case "test random oracle" `Quick
-          test_bits_random_oracle_consistency_check
-      ] )
-  ]
