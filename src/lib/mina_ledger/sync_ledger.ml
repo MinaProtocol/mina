@@ -63,7 +63,6 @@ module Answer = struct
 
       let to_latest = Fn.id
     end
-
   end]
 
   (* unused `rec` flag warning *)
