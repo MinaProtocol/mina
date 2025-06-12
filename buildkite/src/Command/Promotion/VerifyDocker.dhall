@@ -28,12 +28,15 @@ let promoteDockerVerificationStep =
                   (     \(tag : Text)
                     ->  let new_tag =
                               Artifact.dockerTag
-                                spec.name
-                                tag
-                                spec.codename
-                                spec.profile
-                                spec.network
-                                spec.remove_profile_from_name
+                                Artifact.Tag::{
+                                , artifact = spec.name
+                                , version = tag
+                                , codename = spec.codename
+                                , profile = spec.profile
+                                , network = spec.network
+                                , remove_profile_from_name =
+                                    spec.remove_profile_from_name
+                                }
 
                         in  Cmd.run
                               ". ./buildkite/scripts/export-git-env-vars.sh && NEW_TAG=\$(echo \"${new_tag}\" | sed 's/[^a-zA-Z0-9_.-]/-/g') && docker pull ${repo}/${Artifact.dockerName

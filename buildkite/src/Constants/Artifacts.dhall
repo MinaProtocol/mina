@@ -8,6 +8,8 @@ let DebianVersions = ./DebianVersions.dhall
 
 let Network = ./Network.dhall
 
+let Repo = ./DockerRepo.dhall
+
 let Artifact
     : Type
     = < Daemon
@@ -131,46 +133,67 @@ let toDebianNames =
 
           in  Text/concatSep " " items
 
+let Tag =
+      { Type =
+          { artifact : Artifact
+          , version : Text
+          , codename : DebianVersions.DebVersion
+          , profile : Profiles.Type
+          , network : Network.Type
+          , remove_profile_from_name : Bool
+          }
+      , default =
+          { artifact = Artifact.Daemon
+          , version = "\\\${MINA_DOCKER_TAG}"
+          , codename = DebianVersions.DebVersion.Bullseye
+          , profile = Profiles.Type.Standard
+          , network = Network.Type.Berkeley
+          , remove_profile_from_name = False
+          }
+      }
+
 let dockerTag =
-          \(artifact : Artifact)
-      ->  \(version : Text)
-      ->  \(codename : DebianVersions.DebVersion)
-      ->  \(profile : Profiles.Type)
-      ->  \(network : Network.Type)
-      ->  \(remove_profile_from_name : Bool)
+          \(spec : Tag.Type)
       ->  let version_and_codename =
-                "${version}-${DebianVersions.lowerName codename}"
+                "${spec.version}-${DebianVersions.lowerName spec.codename}"
 
           let profile_part =
-                      if remove_profile_from_name
+                      if spec.remove_profile_from_name
 
                 then  ""
 
-                else  "${Profiles.toLabelSegment profile}"
+                else  "${Profiles.toLabelSegment spec.profile}"
 
           in  merge
                 { Daemon =
                     "${version_and_codename}-${Network.lowerName
-                                                 network}${profile_part}"
+                                                 spec.network}${profile_part}"
                 , Archive = "${version_and_codename}"
                 , LogProc = "${version_and_codename}"
                 , TestExecutive = "${version_and_codename}"
                 , BatchTxn = "${version_and_codename}"
                 , Rosetta =
-                    "${version_and_codename}-${Network.lowerName network}"
+                    "${version_and_codename}-${Network.lowerName spec.network}"
                 , ZkappTestTransaction = "${version_and_codename}"
                 , FunctionalTestSuite = "${version_and_codename}"
                 , Toolchain = "${version_and_codename}"
                 }
-                artifact
+                spec.artifact
+
+let fullDockerTag =
+          \(spec : Tag.Type)
+      ->  "${Repo.show Repo.Type.Internal}/${dockerName
+                                               spec.artifact}:${dockerTag spec}"
 
 in  { Type = Artifact
+    , Tag = Tag
     , capitalName = capitalName
     , lowerName = lowerName
     , toDebianName = toDebianName
     , toDebianNames = toDebianNames
     , dockerName = dockerName
     , dockerTag = dockerTag
+    , fullDockerTag = fullDockerTag
     , All = All
     , AllButTests = AllButTests
     , Main = Main
