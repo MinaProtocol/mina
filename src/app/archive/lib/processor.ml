@@ -401,7 +401,7 @@ module Zkapp_states_nullable = struct
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
       (find_req Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -462,7 +462,7 @@ module Zkapp_states = struct
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
       (find_req Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
@@ -504,7 +504,7 @@ module Zkapp_action_states = struct
   let load (module Conn : Mina_caqti.CONNECTION) id =
     Conn.find
       (find_req Caqti_type.int typ
-         (Mina_caqti.select_cols_from_id ~table_name ~cols:names) )
+         (Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names) )
       id
 end
 
