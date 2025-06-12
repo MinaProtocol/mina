@@ -16,6 +16,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let Network = ../../Constants/Network.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let Docker = ../../Command/Docker/Type.dhall
 
 let Size = ../../Command/Size.dhall
@@ -25,10 +27,13 @@ let dependsOn =
           DebianVersions.DebVersion.Bullseye
           Network.Type.Berkeley
           Profiles.Type.Lightnet
-      # DebianVersions.dependsOn
+      # DebianVersions.dependsOnStep
+          (None Text)
           DebianVersions.DebVersion.Bullseye
           Network.Type.Berkeley
-          Profiles.Type.Standard
+          Profiles.Type.Devnet
+          BuildFlags.Type.Instrumented
+          "build"
 
 let buildTestCmd
     : Size -> Command.Type

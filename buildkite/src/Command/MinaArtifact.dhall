@@ -54,7 +54,7 @@ let MinaBuildSpec =
           { prefix = "MinaArtifact"
           , artifacts = Artifacts.AllButTests
           , debVersion = DebianVersions.DebVersion.Bullseye
-          , profile = Profiles.Type.Standard
+          , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
@@ -82,12 +82,6 @@ let nameSuffix
                                    spec.network}${Profiles.toSuffixUppercase
                                                     spec.profile}${BuildFlags.toSuffixUppercase
                                                                      spec.buildFlags}"
-
-let keySuffix
-    : MinaBuildSpec.Type -> Text
-    =     \(spec : MinaBuildSpec.Type)
-      ->  "${Profiles.toLabelSegment spec.profile}${BuildFlags.toLabelSegment
-                                                      spec.buildFlags}"
 
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
@@ -322,5 +316,4 @@ in  { pipeline = pipeline
     , publishToDebian = publish_to_debian_repo
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
-    , keySuffix = keySuffix
     }
