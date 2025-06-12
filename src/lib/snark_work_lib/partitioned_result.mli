@@ -8,10 +8,11 @@ module Stable : sig
     type t =
       ( unit
       , unit
-      , ( Core.Time.Stable.Span.V1.t
+      , ( Mina_stdlib.Time.Span.Stable.V1.t
         , Ledger_proof.Stable.V2.t )
         Proof_carrying_data.Stable.V1.t )
       Partitioned_spec.Poly.Stable.V1.t
+    [@@deriving to_yojson]
 
     val to_latest : t -> t
   end
