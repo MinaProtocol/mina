@@ -4,8 +4,6 @@ let Text/concatSep = Prelude.Text.concatSep
 
 let Profiles = ./Profiles.dhall
 
-let DebianVersions = ./DebianVersions.dhall
-
 let Network = ./Network.dhall
 
 let Repo = ./DockerRepo.dhall
@@ -137,7 +135,6 @@ let Tag =
       { Type =
           { artifact : Artifact
           , version : Text
-          , codename : DebianVersions.DebVersion
           , profile : Profiles.Type
           , network : Network.Type
           , remove_profile_from_name : Bool
@@ -145,7 +142,6 @@ let Tag =
       , default =
           { artifact = Artifact.Daemon
           , version = "\\\${MINA_DOCKER_TAG}"
-          , codename = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Standard
           , network = Network.Type.Berkeley
           , remove_profile_from_name = False
@@ -154,10 +150,7 @@ let Tag =
 
 let dockerTag =
           \(spec : Tag.Type)
-      ->  let version_and_codename =
-                "${spec.version}-${DebianVersions.lowerName spec.codename}"
-
-          let profile_part =
+      ->  let profile_part =
                       if spec.remove_profile_from_name
 
                 then  ""
@@ -166,17 +159,16 @@ let dockerTag =
 
           in  merge
                 { Daemon =
-                    "${version_and_codename}-${Network.lowerName
-                                                 spec.network}${profile_part}"
-                , Archive = "${version_and_codename}"
-                , LogProc = "${version_and_codename}"
-                , TestExecutive = "${version_and_codename}"
-                , BatchTxn = "${version_and_codename}"
-                , Rosetta =
-                    "${version_and_codename}-${Network.lowerName spec.network}"
-                , ZkappTestTransaction = "${version_and_codename}"
-                , FunctionalTestSuite = "${version_and_codename}"
-                , Toolchain = "${version_and_codename}"
+                    "${spec.version}-${Network.lowerName
+                                         spec.network}${profile_part}"
+                , Archive = "${spec.version}"
+                , LogProc = "${spec.version}"
+                , TestExecutive = "${spec.version}"
+                , BatchTxn = "${spec.version}"
+                , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
+                , ZkappTestTransaction = "${spec.version}"
+                , FunctionalTestSuite = "${spec.version}"
+                , Toolchain = "${spec.version}"
                 }
                 spec.artifact
 

@@ -56,7 +56,6 @@ let promoteDockerStep =
                   Artifact.Tag::{
                   , artifact = spec.name
                   , version = spec.version
-                  , codename = spec.codename
                   , profile = spec.profile
                   , network = spec.network
                   }
@@ -73,7 +72,6 @@ let promoteDockerStep =
                                 Artifact.Tag::{
                                 , artifact = spec.name
                                 , version = tag
-                                , codename = spec.codename
                                 , profile = spec.profile
                                 , network = spec.network
                                 , remove_profile_from_name =

@@ -31,7 +31,6 @@ let promoteDockerVerificationStep =
                                 Artifact.Tag::{
                                 , artifact = spec.name
                                 , version = tag
-                                , codename = spec.codename
                                 , profile = spec.profile
                                 , network = spec.network
                                 , remove_profile_from_name =
