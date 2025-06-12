@@ -11,9 +11,9 @@ module Master = struct
   let name = "submit_work"
 
   module T = struct
-    type query = Selector.Result.Stable.Latest.t
+    type query = Result.Partitioned.Stable.Latest.t
 
-    type response = unit
+    type response = [ `SpecUnmatched | `Removed | `Ok ]
   end
 
   module Caller = T
@@ -24,11 +24,11 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 
 [%%versioned_rpc
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     module T = struct
-      type query = Selector.Result.Stable.V1.t
+      type query = Result.Partitioned.Stable.V1.t
 
-      type response = unit
+      type response = [ `SpecUnmatched | `Removed | `Ok ]
 
       let query_of_caller_model = Fn.id
 
@@ -43,5 +43,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]
