@@ -64,21 +64,6 @@ module Answer = struct
       let to_latest = Fn.id
     end
 
-    module V2 = struct
-      type t =
-        ( Ledger_hash.Stable.V1.t
-        , Account.Stable.V2.t )
-        Syncable_ledger.Answer.Stable.V1.t
-      [@@deriving sexp, to_yojson]
-
-      let to_latest x = Syncable_ledger.Answer.Stable.V1.to_latest Fn.id x
-
-      (* Not a standard versioning function *)
-
-      (** Attempts to downgrade v3 -> v2 *)
-      let from_v4 : V4.t -> t Or_error.t =
-       fun x -> Syncable_ledger.Answer.Stable.V1.from_v2 x
-    end
   end]
 
   (* unused `rec` flag warning *)

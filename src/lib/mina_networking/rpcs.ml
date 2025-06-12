@@ -395,49 +395,6 @@ module Answer_sync_ledger_query = struct
     include Register (T')
   end
 
-  module V3 = struct
-    module T = struct
-      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
-      [@@deriving sexp]
-
-      type response =
-        (( Sync_ledger.Answer.Stable.V2.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
-         Result.t
-        [@version_asserted] )
-      [@@deriving sexp]
-
-      let query_of_caller_model : Master.T.query -> query =
-       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.from_v2 q)
-
-      let callee_model_of_query : query -> Master.T.query =
-       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.to_latest q)
-
-      let response_of_callee_model : Master.T.response -> response = function
-        | Ok a ->
-            Sync_ledger.Answer.Stable.V2.from_v4 a
-        | Error e ->
-            Error e
-
-      let caller_model_of_response : response -> Master.T.response = function
-        | Ok a ->
-            Ok (Sync_ledger.Answer.Stable.V2.to_latest a)
-        | Error e ->
-            Error e
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
   let receipt_trust_action_message (_, query) =
     ( "Answer_sync_ledger_query: $query"
     , [ ("query", Sync_ledger.Query.to_yojson query) ] )
