@@ -2353,7 +2353,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null Types.pending_work)
       ~resolve:(fun { ctx = mina; _ } () ->
-        let snark_job_state = Mina_lib.snark_job_state mina in
+        let snark_job_state = Mina_lib.work_selector mina in
         let snark_pool = Mina_lib.snark_pool mina in
         let fee_opt =
           Mina_lib.(
@@ -2383,7 +2383,7 @@ module Queries = struct
           ]
       ~typ:(non_null @@ list @@ non_null Types.pending_work_spec)
       ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
-        let snark_job_state = Mina_lib.snark_job_state mina in
+        let snark_job_state = Mina_lib.work_selector mina in
         let snark_pool = Mina_lib.snark_pool mina in
         let all_work = Work_selector.all_work ~snark_pool snark_job_state in
         let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
