@@ -441,12 +441,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   ] ;
 
               Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-              Some spec |> Deferred.return
+              Deferred.return (Some spec)
           | Some (Error e) ->
               [%log error] "Mina_lib.request_work failed"
                 ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
-              Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-              None |> Deferred.return )
+              Deferred.return None )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
           [%log trace] "received completed work from a snark worker"
