@@ -1,0 +1,7 @@
+(test
+ (name test_child_processes)
+ (libraries alcotest async_kernel child_processes core core_kernel pipe_lib)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_let)))
