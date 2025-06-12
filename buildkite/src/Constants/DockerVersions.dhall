@@ -4,6 +4,8 @@ let Artifacts = ./Artifacts.dhall
 
 let Network = ./Network.dhall
 
+let DebianVersions = ./DebianVersions.dhall
+
 let Docker
     : Type
     = < Bookworm | Bullseye | Jammy | Focal >
@@ -60,21 +62,29 @@ let dependsOnStep =
                 , Jammy =
                   [ { name =
                         "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
+                                      docker}${network}${profileSuffix}"
                     , key = key
                     }
                   ]
                 , Focal =
                   [ { name =
                         "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
+                                      docker}${network}${profileSuffix}"
                     , key = key
                     }
                   ]
                 }
                 docker
+
+let ofDebian =
+          \(debian : DebianVersions.DebVersion)
+      ->  merge
+            { Bookworm = Docker.Bookworm
+            , Bullseye = Docker.Bullseye
+            , Jammy = Docker.Jammy
+            , Focal = Docker.Focal
+            }
+            debian
 
 let dependsOn =
           \(docker : Docker)
@@ -86,6 +96,7 @@ let dependsOn =
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName
+    , ofDebian = ofDebian
     , dependsOn = dependsOn
     , dependsOnStep = dependsOnStep
     }

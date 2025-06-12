@@ -38,6 +38,9 @@ else
         # Downaload mina-logproc too
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
+      mina-devnet-legacy|mina-mainnet-legacy)
+        # Download mina-logproc legacy too
+        ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
     esac
     ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}_*" $LOCAL_DEB_FOLDER
   done
