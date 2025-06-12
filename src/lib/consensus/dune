@@ -66,7 +66,7 @@
   crypto_params
   data_hash_lib
   currency
-  file_system
+  mina_stdlib_unix
   coda_genesis_ledger
   interruptible
   network_peer
