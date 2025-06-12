@@ -75,7 +75,6 @@ let dependsOn =
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
-      , S.exactly "buildkite/src/Command/HardforkPackageGeneration" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
       , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
       , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
@@ -87,7 +86,6 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "scripts/debian")
       , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
-      , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
