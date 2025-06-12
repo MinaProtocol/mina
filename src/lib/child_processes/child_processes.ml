@@ -111,49 +111,60 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
     =
  fun name lockpath logger ->
   let open Deferred.Let_syntax in
-  match%bind Sys.file_exists lockpath with
-  | `Yes -> (
-      let%bind pid_str = Reader.file_contents lockpath in
-      let pid = Pid.of_string pid_str in
-      [%log debug] "Found PID file for %s %s with contents %s" name lockpath
-        pid_str ;
-      let%bind () =
-        match Signal.send Signal.term (`Pid pid) with
-        | `No_such_process ->
-            [%log debug] "Couldn't kill %s with PID %s, does not exist" name
-              pid_str ;
+  let try_cleanup_lock_file ~pid_metadata () =
+    match%bind Sys.file_exists lockpath with
+    | `Yes | `Unknown -> (
+        match%bind try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
+        | Ok () ->
             Deferred.unit
-        | `Ok -> (
-            [%log debug] "Successfully sent TERM signal to %s (%s)" name pid_str ;
-            let%bind () = after (Time.Span.of_sec 0.5) in
-            match Signal.send Signal.kill (`Pid pid) with
-            | `No_such_process ->
-                Deferred.unit
-            | `Ok ->
-                [%log error]
-                  "helper process %s (%s) didn't die after being sent TERM, \
-                   KILLed it"
-                  name pid_str ;
-                Deferred.unit )
-      in
-      match%bind Sys.file_exists lockpath with
-      | `Yes | `Unknown -> (
-          match%bind try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
-          | Ok () ->
+        | Error exn ->
+            [%log warn]
+              !"Couldn't delete lock file for %s (pid $childPid). If another \
+                Mina daemon was already running it may have cleaned it up for \
+                us. ($exn)"
+              name
+              ~metadata:
+                [ ("childPid", pid_metadata)
+                ; ("exn", `String (Exn.to_string exn))
+                ] ;
+            Deferred.unit )
+    | `No ->
+        Deferred.unit
+  in
+  match%bind Sys.file_exists lockpath with
+  | `Yes ->
+      let%bind pid_str = Reader.file_contents lockpath in
+      if String.is_empty pid_str then (
+        [%log warn]
+          "Found empty PID file for %s %s, unable to clean up leftover process \
+           if it still exists"
+          name lockpath ;
+        try_cleanup_lock_file ~pid_metadata:(`String "<empty>") () )
+      else
+        let pid = Pid.of_string pid_str in
+        [%log debug] "Found PID file for %s %s with contents %s" name lockpath
+          pid_str ;
+        let%bind () =
+          match Signal.send Signal.term (`Pid pid) with
+          | `No_such_process ->
+              [%log debug] "Couldn't kill %s with PID %s, does not exist" name
+                pid_str ;
               Deferred.unit
-          | Error exn ->
-              [%log warn]
-                !"Couldn't delete lock file for %s (pid $childPid) after \
-                  killing it. If another Mina daemon was already running it \
-                  may have cleaned it up for us. ($exn)"
-                name
-                ~metadata:
-                  [ ("childPid", `Int (Pid.to_int pid))
-                  ; ("exn", `String (Exn.to_string exn))
-                  ] ;
-              Deferred.unit )
-      | `No ->
-          Deferred.unit )
+          | `Ok -> (
+              [%log debug] "Successfully sent TERM signal to %s (%s)" name
+                pid_str ;
+              let%bind () = after (Time.Span.of_sec 0.5) in
+              match Signal.send Signal.kill (`Pid pid) with
+              | `No_such_process ->
+                  Deferred.unit
+              | `Ok ->
+                  [%log error]
+                    "helper process %s (%s) didn't die after being sent TERM, \
+                     KILLed it"
+                    name pid_str ;
+                  Deferred.unit )
+        in
+        try_cleanup_lock_file ~pid_metadata:(`Int (Pid.to_int pid)) ()
   | `Unknown | `No ->
       [%log debug] "No PID file for %s" name ;
       Deferred.unit
