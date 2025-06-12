@@ -70,7 +70,7 @@ module T = struct
        add hash_zkapp_command_vn for that version
     *)
 
-    module V3 = struct
+    module V2 = struct
       type t =
         (Account_update.Stable.V2.t, unit, unit) Call_forest.Stable.V1.t
         Poly.Stable.V2.t

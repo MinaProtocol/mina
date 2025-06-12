@@ -60,7 +60,7 @@ module Zkapp_command_applied = struct
     module V2 = struct
       type t =
         { accounts : (Account_id.Stable.V2.t * Account.Stable.V3.t option) list
-        ; command : Zkapp_command.Stable.V3.t With_status.Stable.V2.t
+        ; command : Zkapp_command.Stable.V2.t With_status.Stable.V2.t
         ; new_accounts : Account_id.Stable.V2.t list
         }
       [@@deriving sexp, to_yojson]

@@ -33,7 +33,7 @@ module Zkapp_command_segment_witness : sig
             , Transaction_status.Failure.Collection.Stable.V1.t )
             Mina_transaction_logic.Zkapp_command_logic.Local_state.Stable.V1.t
         ; start_zkapp_command :
-            ( Zkapp_command.Stable.V3.t
+            ( Zkapp_command.Stable.V2.t
             , Kimchi_backend.Pasta.Basic.Fp.Stable.V1.t
             , bool )
             Mina_transaction_logic.Zkapp_command_logic.Start_data.Stable.V1.t
