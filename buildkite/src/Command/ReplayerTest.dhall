@@ -17,7 +17,7 @@ in  { step =
               , commands =
                 [ RunWithPostgres.runInDockerWithPostgresConn
                     ([] : List Text)
-                    "https://storage.googleapis.com/o1labs-ci-test-data/replay/v0/archive_db.sql"
+                    "https://storage.googleapis.com/o1labs-ci-test-data/replay/v1/archive_db.sql"
                     Artifacts.Type.FunctionalTestSuite
                     (None Network.Type)
                     "./buildkite/scripts/replayer-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
