@@ -38,6 +38,7 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Replayer
           ]
         }
       , steps = [ ReplayerTest.step dependsOn ]
