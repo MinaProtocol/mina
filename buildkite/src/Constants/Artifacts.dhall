@@ -82,6 +82,14 @@ let dockerName =
             }
             artifact
 
+let dockerNames =
+          \(artifacts : List Artifact)
+      ->  Prelude.List.map
+            Artifact
+            Text
+            (\(a : Artifact) -> dockerName a)
+            artifacts
+
 let toDebianName =
           \(artifact : Artifact)
       ->  \(network : Network.Type)
@@ -170,6 +178,7 @@ in  { Type = Artifact
     , toDebianName = toDebianName
     , toDebianNames = toDebianNames
     , dockerName = dockerName
+    , dockerNames = dockerNames
     , dockerTag = dockerTag
     , All = All
     , AllButTests = AllButTests

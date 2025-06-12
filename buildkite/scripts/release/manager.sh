@@ -7,6 +7,7 @@ set -E # inherit -e
 set -e # exit immediately on errors
 set -u # exit on not assigned variables
 set -o pipefail # exit on pipe failure
+set -x 
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -189,7 +190,7 @@ function storage_list() {
 
     case $backend in
         local)
-            ls "$path"
+            ls $path
             ;;
         gs)
             gsutil list "$path"
@@ -211,7 +212,7 @@ function storage_md5() {
 
     case $backend in
         local)
-            md5sum "$path" | awk '{print $1}'
+            md5sum $path | awk '{print $1}'
             ;;
         gs)
             gsutil hash -h -m "$path" | grep "Hash (md5)" | awk '{print $3}'
@@ -233,7 +234,7 @@ function storage_download() {
 
     case $backend in
         local)
-            cp "$remote_path" "$local_path"
+            cp $remote_path $local_path
             ;;
         gs)
             gsutil cp "$remote_path" "$local_path"
@@ -260,6 +261,8 @@ function get_cached_debian_or_download() {
         remote_path="gs://buildkite_k8s/coda/shared/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
     elif [[ $backend == "hetzner" ]]; then
         remote_path="/home/o1labs-generic/pvc-4d294645-6466-4260-b933-1b909ff9c3a1/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
+    elif [[ $backend == "local" ]]; then
+        remote_path="/var/storagebox/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
     else
         echo "❌ Unsupported backend: $backend"
         exit 1
@@ -305,6 +308,7 @@ function publish_debian() {
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__debian_sign_key != "" ]]; then
+        gpg --list-secret-keys 
         local __sign_arg=("--sign" "$__debian_sign_key")
         local __signed_arg="--signed"
     else
@@ -631,8 +635,8 @@ function publish(){
     echo " - Debian sign key: $__debian_sign_key"
     echo ""
 
-    if [[ $__backend != "gs" && $__backend != "hetzner" ]]; then
-        echo -e "❌ ${RED} !! Backend (--backend) can be only gs or hetzner${CLEAR}\n";
+    if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
+        echo -e "❌ ${RED} !! Backend (--backend) can be only gs, hetzner or local ${CLEAR}\n";
         publish_help; exit 1;
     fi
 
