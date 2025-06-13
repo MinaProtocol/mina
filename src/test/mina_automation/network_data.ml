@@ -51,4 +51,4 @@ let untar_precomputed_blocks t output =
   let precomputed_blocks_zip = precomputed_blocks_zip t in
   let%bind _ = Utils.untar ~archive:precomputed_blocks_zip ~output in
   let%bind array = Sys.readdir output in
-  Deferred.return (Array.to_list array |> Utils.sort_archive_files)
+  Deferred.return (Array.to_list array |> Utils.dedup_and_sort_archive_files)
