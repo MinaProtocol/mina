@@ -391,13 +391,21 @@ module type S = sig
       system for proving membership in that set, with a prover corresponding
       to each inductive rule.
 
-      @param cache A list of paths/locations where the proving/verification keys are stored.
+      @param cache A list of paths/locations where the proving/verification keys
+      are stored.
       @param storables A swappable underlying implementation of the cache.
-      @param proof_cache Cache that allows us to pass in precomputed proofs. Useful for CI.
+      @param proof_cache Cache that allows us to pass in precomputed proofs.
+      Useful for CI.
       @param disk_keys Caches for the individial keys
-      @param override_wrap_domain This let you tell pickles that the wrap circuit will be smaller/bigger than it's expecting's. At the moment, we map 0 proofs verified to 2^13, 1 proofs verified to 2^14, and 2 to 2^15. However, you'll usually see this used with 2 proofs, which actually only requires 2^14 (so we set this as N1).
-      @param num_chunks Configurable parameter enabling circuits larger than maximum
-      @param max_proofs_verified Number of different circuits that Tick(i.e. Step) accepts as inputs
+      @param override_wrap_domain This let you tell pickles that the wrap
+      circuit will be smaller/bigger than it's expecting's. At the moment, we
+      map 0 proofs verified to 2^13, 1 proofs verified to 2^14, and 2 to 2^15.
+      However, you'll usually see this used with 2 proofs, which actually only
+      requires 2^14 (so we set this as N1).
+      @param num_chunks Configurable parameter enabling circuits larger than
+      maximum
+      @param max_proofs_verified Number of different circuits that Tick(i.e.
+      Step) accepts as inputs
   *)
   val compile_promise :
        ?self:('var, 'value, 'max_proofs_verified, 'branches) Tag.t
