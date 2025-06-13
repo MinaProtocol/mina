@@ -53,12 +53,12 @@ let promoteDockerStep =
           \(spec : PromoteDockerSpec.Type)
       ->  let old_tag =
                 Artifact.dockerTag
-                  spec.name
-                  spec.version
-                  spec.codename
-                  spec.profile
-                  spec.network
-                  False
+                  Artifact.Tag::{
+                  , artifact = spec.name
+                  , version = spec.version
+                  , profile = spec.profile
+                  , network = spec.network
+                  }
 
           let publish = if spec.publish then "-p" else ""
 
@@ -69,12 +69,14 @@ let promoteDockerStep =
                   (     \(tag : Text)
                     ->  let new_tag =
                               Artifact.dockerTag
-                                spec.name
-                                tag
-                                spec.codename
-                                spec.profile
-                                spec.network
-                                spec.remove_profile_from_name
+                                Artifact.Tag::{
+                                , artifact = spec.name
+                                , version = tag
+                                , profile = spec.profile
+                                , network = spec.network
+                                , remove_profile_from_name =
+                                    spec.remove_profile_from_name
+                                }
 
                         in  Cmd.run
                               ". ./buildkite/scripts/export-git-env-vars.sh && ./scripts/docker/promote.sh --name ${Artifact.dockerName

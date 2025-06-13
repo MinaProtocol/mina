@@ -112,11 +112,11 @@ populate_db() {
   
   if [ $? -ne 0 ]; then
     echo $'[ERROR] mina-archive-blocks failed. The database remains unhealthy.\n Make sure the environment variables are set correctly and the database is accessible.'
-    rm "${2}" tempfile
+    rm "${2}" "$tempfile"
     exit 1
   fi
   jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"' < tempfile
-  rm tempfile
+  rm "$tempfile"
   rm "${2}"
   if [ $? -ne 0 ]; then
     echo $'[ERROR] Failed to remove block file. The database remains unhealthy.\n Make sure the environment variables PRECOMPUTED_BLOCKS_URL and MINA_NETWORK are set correctly.'

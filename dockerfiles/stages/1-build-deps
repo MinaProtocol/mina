@@ -4,11 +4,17 @@
 #################################################################################################
 # Supports debian:bullseye-slim, and ubuntu:focal
 ARG image=ubuntu:focal
+# Use the image argument to select the base image for this stage
+# This allows us to use the same Dockerfile for different base images
+# This arg is defined here globally and does not need to be redefined in
+# any other stages.
+ARG deb_codename
+
 FROM ${image} AS build-deps
 
 # Ocaml Version
 ARG OCAML_VERSION=4.14
-ARG OCAML_REVISION=.0
+ARG OCAML_REVISION=.2
 ARG OCAML_VARIANT=
 ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
@@ -30,15 +36,13 @@ ARG RUST_VERSION=1.81.0
 # - src/lib/crypto/proof-systems/Makefile
 ARG RUST_NIGHTLY=2024-09-05
 
-# Rocksdb commit tag/branch to clone
-ARG ROCKSDB_VERSION=v5.18.4
-
 # --- OS package dependencies
 # Organized as two alphabetized lists, first libraries and then tools/other packages
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
+  adduser \
   libboost-dev \
   libboost-program-options-dev \
   libbz2-dev \
@@ -60,7 +64,6 @@ RUN apt-get update --quiet \
   file \
   git \
   git-lfs \
-  '(^lld-10$|^lld-11$)' \
   m4 \
   pkg-config \
   rsync \
@@ -119,24 +122,6 @@ RUN curl --proto '=https' \
   && $HOME/.cargo/bin/cargo install cargo-xtask \
   && rm /tmp/rustup-init
 USER root
-
-# --- RocksDB Installation of a given ROCKSDB_VERSION
-# These flags turn some errors into warnings for running with G++ 9 or higher
-# The build command below checks for the g++ major version and removes CXXFLAGS if its less than 9
-ENV CXXFLAGS '-Wno-error=deprecated-copy -Wno-error=pessimizing-move -Wno-error=class-memaccess'
-# This builds and installs just the rocksdb static lib for us, and cleans up after itself
-# Send error output to /dev/null as its noisy with compiler warnings
-RUN git clone https://github.com/facebook/rocksdb \
-  --depth 1 --shallow-submodules \
-  -b "${ROCKSDB_VERSION}" /rocksdb \
-  && test $(g++ -dumpversion | cut -c 1 -) -lt 9 \
-  && CXXFLAGS='' make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
-  || make -C /rocksdb static_lib PORTABLE=1 -j$(nproc) 2>/dev/null \
-  && cp /rocksdb/librocksdb.a /usr/local/lib/librocksdb_coda.a \
-  && rm -rf /rocksdb \
-  && strip -S /usr/local/lib/librocksdb_coda.a
-# Clear CXXFLAGS afterwards to avoid affecting other code
-ENV CXXFLAGS=""
 
 ###########################################################################################
 # Initialize opam in a minimal fashion
