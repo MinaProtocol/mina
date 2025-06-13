@@ -4,7 +4,8 @@ open Core_kernel
 open Async_kernel
 open Async_unix
 
-(* register a Deferred.t thunk to be called at Async shutdown; log registration and execution *)
+(* register a Deferred.t thunk to be called at Async shutdown; log registration
+   and execution *)
 let register_async_shutdown_handler ~logger ~description
     (f : unit -> unit Deferred.t) =
   [%log debug] "Registering async shutdown handler: $description"
