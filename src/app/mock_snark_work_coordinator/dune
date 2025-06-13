@@ -2,7 +2,7 @@
  (package mock_snark_work_coordinater)
  (name mock_snark_work_coordinater)
  (public_name mock_snark_work_coordinater)
- (libraries snark_worker work_partitioner)
+ (libraries core_unix.command_unix snark_worker work_partitioner)
  (preprocess
   (pps
    ppx_compare

@@ -12,13 +12,10 @@ let proof_cache_db = Proof_cache_tag.create_identity_db ()
 (* NOTE:
    The code here is adapt from Mina_lib & Mina_run.
 *)
-let start ~prover
+let start ~sok_message
     ~(predefined_specs : Work.Spec.Single.Stable.Latest.t One_or_two.t Queue.t)
-    ~partitioner ~snark_work_fee ~logger ~port ~rpc_handshake_timeout
-    ~rpc_heartbeat_send_every ~rpc_heartbeat_timeout =
-  let selector_work_pool : (Selector_work_id.t, Time.t) Hashtbl_intf.Hashtbl.t =
-    Hashtbl.create (module Selector_work_id)
-  in
+    ~partitioner ~logger ~port ~rpc_handshake_timeout ~rpc_heartbeat_send_every
+    ~rpc_heartbeat_timeout ~completed_snark_work_sink =
   let work_from_selector () =
     let%map.Option spec = Queue.dequeue predefined_specs in
     let spec =
@@ -27,13 +24,11 @@ let start ~prover
         spec
     in
     let id = One_or_two.map ~f:Work.Spec.Single.Poly.statement spec in
-    Hashtbl.add_exn selector_work_pool ~key:id ~data:(Time.now ()) ;
     let work_ids_json = id |> Transaction_snark_work.Statement.compact_json in
     [%log info] "Selector work distributed to partitioner"
       ~metadata:[ ("work_ids", work_ids_json) ] ;
     spec
   in
-  let sok_message = Mina_base.Sok_message.create ~fee:snark_work_fee ~prover in
 
   let implement rpc f =
     Rpc.Rpc.implement rpc (fun () input ->
@@ -78,27 +73,10 @@ let start ~prover
               Deferred.return `Removed
           | Processed None ->
               Deferred.return `Ok
-          | Processed (Some (key, { proof = _; fee = { fee; prover } })) ->
-              let distributed =
-                Hashtbl.find_and_remove selector_work_pool key
-                |> Option.value_exn
-                     ~message:
-                       "Partitioner trying to submit non-existent selector \
-                        work result"
-              in
-              let elapsed_json =
-                `Float Time.(diff (now ()) distributed |> Span.to_sec)
-              in
-              [%log info] "Selector work combined by partitioner"
-                ~metadata:
-                  [ ( "work_ids"
-                    , Transaction_snark_work.Statement.compact_json key )
-                  ; ("elapsed", elapsed_json)
-                  ; ("fee", Currency.Fee.to_yojson fee)
-                  ; ( "prover"
-                    , Signature_lib.Public_key.Compressed.to_yojson prover )
-                  ] ;
-              failwith "TODO: verify the result is valid" )
+          | Processed (Some combined) ->
+              Pipe_lib.Strict_pipe.Writer.write completed_snark_work_sink
+                combined ;
+              Deferred.return `Ok )
     ]
   in
   let where_to_listen =
@@ -119,15 +97,11 @@ let start ~prover
        (fun address reader writer ->
          let address = Socket.Address.Inet.addr address in
          Rpc.Connection.server_with_close
-           ~handshake_timeout:rpc_handshake_timeout
+           ~handshake_timeout:(Time.Span.of_sec rpc_handshake_timeout)
            ~heartbeat_config:
              (Rpc.Connection.Heartbeat_config.create
-                ~timeout:
-                  (Time_ns.Span.of_sec
-                     (Time.Span.to_sec rpc_heartbeat_timeout) )
-                ~send_every:
-                  (Time_ns.Span.of_sec
-                     (Time.Span.to_sec rpc_heartbeat_send_every) )
+                ~timeout:(Time_ns.Span.of_sec rpc_heartbeat_timeout)
+                ~send_every:(Time_ns.Span.of_sec rpc_heartbeat_send_every)
                 () )
            reader writer
            ~implementations:
