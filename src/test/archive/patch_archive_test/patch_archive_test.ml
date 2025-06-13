@@ -57,6 +57,9 @@ let main ~db_uri ~network_data_folder () =
             Deferred.return (output_folder ^ "/" ^ e) )
   in
 
+  if List.length extensional_files < 3 then
+    failwith "No enough extensional files found in output folder" ;
+
   let n =
     List.init missing_blocks_count ~f:(fun _ ->
         (* never remove last or first block as missing-block-guardian can have issues when patching it
@@ -68,7 +71,7 @@ let main ~db_uri ~network_data_folder () =
   let unpatched_extensional_files =
     List.filteri extensional_files ~f:(fun i _ ->
         not (List.mem n i ~equal:Int.equal) )
-    |> Utils.sort_archive_files
+    |> Utils.dedup_and_sort_archive_files
   in
 
   let%bind _ =
