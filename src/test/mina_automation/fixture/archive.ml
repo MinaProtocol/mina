@@ -28,12 +28,11 @@ let setup_connection ~network_data ~postgres_uri ?(server_port = 3030)
     ?(prefix = "random_db") () =
   let open Deferred.Let_syntax in
   let connection = Psql.Conn_str postgres_uri in
-  let%bind db_name = Psql.create_random_mina_db ~connection ~prefix in
-  return
-    (Archive.Config.create
-       ~config_file:(Network_data.genesis_ledger_path network_data)
-       ~postgres_uri:(postgres_uri ^ "/" ^ db_name)
-       ~server_port )
+  let%map db_name = Psql.create_random_mina_db ~connection ~prefix in
+  Archive.Config.create
+    ~config_file:(Network_data.genesis_ledger_path network_data)
+    ~postgres_uri:(postgres_uri ^ "/" ^ db_name)
+    ~server_port
 
 module type TestCaseWithBootstrap = TestCase with type t = after_bootstrap
 
@@ -67,9 +66,9 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
 
   let on_test_fail (t : t) =
     let open Deferred.Let_syntax in
-    let%bind contents = Process.stdout t.archive.process |> Reader.contents in
+    let%map contents = Process.stdout t.archive.process |> Reader.contents in
     [%log debug] "Archive process output: %s" contents ;
-    return ()
+    ()
 end
 
 module Make_FixtureWithoutBootstrap (M : TestCaseWithoutBootstrap) :

@@ -24,8 +24,8 @@ let run (module F : Intf.Fixture) =
       | Ok result ->
           return result
       | Error err ->
-          let%bind _ = F.on_test_fail test_case_after_setup in
-          return (Intf.Failed (Error.to_string_hum err)) )
+          let%map _ = F.on_test_fail test_case_after_setup in
+          Intf.Failed (Error.to_string_hum err) )
 
 let run_blocking test_case () =
   let (_ : Intf.test_result) =
