@@ -621,7 +621,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       let network_transition_pipe : _ Strict_pipe.Swappable.t =
-        let name = "transition frontier controller pipe" in
+        let name = "transition_frontier_controller_pipe" in
         let drop_f (b_or_h, `Valid_cb valid_cb) =
           Mina_metrics.(
             Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;
