@@ -18,9 +18,8 @@ in  Pipeline.build
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
-            , Artifacts.Type.ZkappTestTransaction
             ]
-          , network = Network.Type.Devnet
+          , network = Network.Type.Mainnet
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
