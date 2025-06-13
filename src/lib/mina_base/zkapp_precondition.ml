@@ -83,6 +83,19 @@ module Numeric = struct
 
     let ( !! ) f = Fn.compose Impl.run_checked f
 
+    let field =
+      Field.
+        { zero
+        ; max_value = failwith "not implemented"
+        ; compare
+        ; lte_checked = failwith "not implemented"
+        ; eq_checked = failwith "not implemented"
+        ; equal
+        ; typ
+        ; to_input = failwith "not implemented"
+        ; to_input_checked = failwith "not implemented"
+        }
+
     let length =
       Length.
         { zero
@@ -450,16 +463,39 @@ module Leaf_typs = struct
   let token_id = Hash.typ token_id
 end
 
+module State = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { eq_data : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; first_numeric : F.Stable.V1.t Numeric.Stable.V1.t
+        }
+      [@@deriving sexp, equal, yojson, hash, compare]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  module Checked = struct
+    type t =
+      { eq_data : Field.Var.t Eq_data.Checked.t Zkapp_state.V.t
+      ; first_numeric : Field.Var.t Numeric.Checked.t
+      }
+    [@@deriving hlist]
+  end
+end
+
 module Account = struct
   [%%versioned
   module Stable = struct
     module V2 = struct
-      type t = Mina_wire_types.Mina_base.Zkapp_precondition.Account.V2.t =
+      type t =
         { balance : Balance.Stable.V1.t Numeric.Stable.V1.t
         ; nonce : Account_nonce.Stable.V1.t Numeric.Stable.V1.t
         ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t Hash.Stable.V1.t
         ; delegate : Public_key.Compressed.Stable.V1.t Eq_data.Stable.V1.t
-        ; state : F.Stable.V1.t Eq_data.Stable.V1.t Zkapp_state.V.Stable.V1.t
+        ; state : State.Stable.V1.t
         ; action_state : F.Stable.V1.t Eq_data.Stable.V1.t
         ; proved_state : bool Eq_data.Stable.V1.t
         ; is_new : bool Eq_data.Stable.V1.t
@@ -484,6 +520,9 @@ module Account = struct
       (* won't raise because length is correct *)
       Quickcheck.Generator.return (Zkapp_state.V.of_list_exn fields)
     in
+    let%bind first_numeric =
+      Numeric.gen Snark_params.Tick.Field.gen F.compare
+    in
     let%bind action_state =
       let%bind n = Int.gen_uniform_incl Int.min_value Int.max_value in
       let field_gen = Quickcheck.Generator.return (F.of_int n) in
@@ -495,7 +534,7 @@ module Account = struct
     ; nonce
     ; receipt_chain_hash
     ; delegate
-    ; state
+    ; state = State.{ eq_data = state; first_numeric }
     ; action_state
     ; proved_state
     ; is_new
@@ -507,7 +546,12 @@ module Account = struct
     ; receipt_chain_hash = Ignore
     ; delegate = Ignore
     ; state =
-        Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ -> Or_ignore.Ignore)
+        State.
+          { eq_data =
+              Vector.init Zkapp_state.Max_state_size.n ~f:(fun _ ->
+                  Or_ignore.Ignore )
+          ; first_numeric = Ignore
+          }
     ; action_state = Ignore
     ; proved_state = Ignore
     ; is_new = Ignore
@@ -538,7 +582,8 @@ module Account = struct
       ~nonce:!.Numeric.Derivers.nonce
       ~receipt_chain_hash:!.(Or_ignore.deriver field)
       ~delegate:!.(Or_ignore.deriver public_key)
-      ~state:!.(Zkapp_state.deriver @@ Or_ignore.deriver field)
+      ~state:!.(failwith "bla")
+        (* @@ Zkapp_state.deriver @@ Or_ignore.deriver field) *)
       ~action_state:!.(Or_ignore.deriver action_state)
       ~proved_state:!.(Or_ignore.deriver bool)
       ~is_new:!.(Or_ignore.deriver bool)
@@ -575,7 +620,8 @@ module Account = struct
       ; Hash.(to_input Tc.receipt_chain_hash receipt_chain_hash)
       ; Eq_data.(to_input (Tc.public_key ()) delegate)
       ; Vector.reduce_exn ~f:append
-          (Vector.map state ~f:Eq_data.(to_input Tc.field))
+          (Vector.map state.eq_data ~f:Eq_data.(to_input Tc.field))
+      ; Numeric.(to_input Tc.field state.first_numeric)
       ; Eq_data.(to_input (Lazy.force Tc.action_state)) action_state
       ; Eq_data.(to_input Tc.boolean) proved_state
       ; Eq_data.(to_input Tc.boolean) is_new
@@ -592,7 +638,7 @@ module Account = struct
       ; nonce : Account_nonce.Checked.t Numeric.Checked.t
       ; receipt_chain_hash : Receipt.Chain_hash.var Hash.Checked.t
       ; delegate : Public_key.Compressed.var Eq_data.Checked.t
-      ; state : Field.Var.t Eq_data.Checked.t Zkapp_state.V.t
+      ; state : State.Checked.t
       ; action_state : Field.Var.t Eq_data.Checked.t
       ; proved_state : Boolean.var Eq_data.Checked.t
       ; is_new : Boolean.var Eq_data.Checked.t
@@ -617,7 +663,8 @@ module Account = struct
         ; Hash.(to_input_checked Tc.receipt_chain_hash receipt_chain_hash)
         ; Eq_data.(to_input_checked (Tc.public_key ()) delegate)
         ; Vector.reduce_exn ~f:append
-            (Vector.map state ~f:Eq_data.(to_input_checked Tc.field))
+            (Vector.map state.eq_data ~f:Eq_data.(to_input_checked Tc.field))
+        ; Numeric.(Checked.to_input Tc.field state.first_numeric)
         ; Eq_data.(to_input_checked (Lazy.force Tc.action_state)) action_state
         ; Eq_data.(to_input_checked Tc.boolean) proved_state
         ; Eq_data.(to_input_checked Tc.boolean) is_new
@@ -660,7 +707,8 @@ module Account = struct
         ]
       @ ( Vector.(
             to_list
-              (map2 state a.zkapp.app_state ~f:Eq_data.(check_checked Tc.field)))
+              (map2 state.eq_data a.zkapp.app_state
+                 ~f:Eq_data.(check_checked Tc.field) ))
         |> List.mapi ~f:(fun i check ->
                let failure =
                  Transaction_status.Failure
@@ -668,6 +716,12 @@ module Account = struct
                    i
                in
                (failure, check) ) )
+      @ [ ( Transaction_status.Failure.Account_app_state_precondition_unsatisfied
+              0
+          , Numeric.(
+              Checked.check Tc.field state.first_numeric
+                (Vector.nth_exn a.zkapp.app_state 0)) )
+        ]
       @ [ ( Transaction_status.Failure
             .Account_proved_state_precondition_unsatisfied
           , Eq_data.(check_checked Tc.boolean proved_state a.zkapp.proved_state)
@@ -689,20 +743,21 @@ module Account = struct
   end
 
   let typ () : (Checked.t, t) Typ.t =
-    let open Leaf_typs in
-    Typ.of_hlistable
-      [ balance
-      ; nonce
-      ; receipt_chain_hash
-      ; public_key ()
-      ; Zkapp_state.typ (Or_ignore.typ Field.typ ~ignore:Field.zero)
-      ; Or_ignore.typ Field.typ
-          ~ignore:Zkapp_account.Actions.empty_state_element
-      ; Or_ignore.typ Boolean.typ ~ignore:false
-      ; Or_ignore.typ Boolean.typ ~ignore:false
-      ]
-      ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    (* let open Leaf_typs in
+       Typ.of_hlistable
+         [ balance
+         ; nonce
+         ; receipt_chain_hash
+         ; public_key ()
+         ; Zkapp_state.typ (Or_ignore.typ Field.typ ~ignore:Field.zero)
+         ; Or_ignore.typ Field.typ
+             ~ignore:Zkapp_account.Actions.empty_state_element
+         ; Or_ignore.typ Boolean.typ ~ignore:false
+         ; Or_ignore.typ Boolean.typ ~ignore:false
+         ]
+         ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
+         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist *)
+    failwith "not implemented"
 
   let checks ~new_account
       { balance
@@ -744,7 +799,7 @@ module Account = struct
             Ok () )
     ]
     @ List.mapi
-        Vector.(to_list (zip state zkapp.app_state))
+        Vector.(to_list (zip state.eq_data zkapp.app_state))
         ~f:(fun i (c, v) ->
           let failure =
             Transaction_status.Failure
@@ -753,6 +808,11 @@ module Account = struct
           in
           (failure, Eq_data.(check Tc.field ~label:(sprintf "state[%d]" i) c v))
           )
+    @ [ ( Transaction_status.Failure.Account_app_state_precondition_unsatisfied 0
+        , Numeric.(
+            check Tc.field ~label:"state[0]" state.first_numeric
+              (Vector.nth_exn zkapp.app_state 0)) )
+      ]
     @ [ ( Transaction_status.Failure
           .Account_proved_state_precondition_unsatisfied
         , Eq_data.(

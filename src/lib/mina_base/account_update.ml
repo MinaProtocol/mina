@@ -939,12 +939,12 @@ module Account_precondition = struct
       type t = Zkapp_precondition.Account.Stable.V2.t
       [@@deriving sexp, yojson, hash]
 
-      let (_ :
-            ( t
-            , Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t
-            )
-            Type_equal.t ) =
-        Type_equal.T
+      (* let (_ :
+             ( t
+             , Mina_wire_types.Mina_base.Account_update.Account_precondition.V1.t
+             )
+             Type_equal.t ) =
+         Type_equal.T *)
 
       let to_latest = Fn.id
 
@@ -1006,7 +1006,7 @@ module Preconditions = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Account_update.Preconditions.V1.t =
+      type t =
         { network : Zkapp_precondition.Protocol_state.Stable.V1.t
         ; account : Account_precondition.Stable.V1.t
         ; valid_while :
@@ -1189,7 +1189,7 @@ module Body = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Mina_wire_types.Mina_base.Account_update.Body.V1.t =
+      type t =
         { public_key : Public_key.Compressed.Stable.V1.t
         ; token_id : Token_id.Stable.V2.t
         ; update : Update.Stable.V1.t

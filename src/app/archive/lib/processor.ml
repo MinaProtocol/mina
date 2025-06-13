@@ -922,8 +922,9 @@ module Zkapp_account_precondition = struct
         (Public_key.add_if_doesn't_exist (module Conn))
         acct.delegate
     in
+    (* TODO: add first_numeric_id *)
     let%bind state_id =
-      Vector.map ~f:Zkapp_basic.Or_ignore.to_option acct.state
+      Vector.map ~f:Zkapp_basic.Or_ignore.to_option acct.state.eq_data
       |> Zkapp_states_nullable.add_if_doesn't_exist (module Conn)
     in
     let%bind action_state_id =
