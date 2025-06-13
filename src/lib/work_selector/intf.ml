@@ -116,10 +116,8 @@ module type Lib_intf = sig
     include
       State_intf with type transition_frontier := Inputs.Transition_frontier.t
 
-    val remove_old_assignments : t -> logger:Logger.t -> unit
-
-    (**Jobs that have not been assigned yet*)
-    val all_unseen_works :
+    (**Jobs that have not been scheduled yet*)
+    val all_unscheduled_works :
          t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
@@ -127,9 +125,7 @@ module type Lib_intf = sig
          One_or_two.t
          list
 
-    val remove : t -> Transaction_snark.Statement.t One_or_two.t -> unit
-
-    val set :
+    val set_as_scheduled :
          t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )

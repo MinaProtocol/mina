@@ -903,20 +903,10 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
   | Processed None ->
       `Ok
   | Processed (Some (stmts, priced_proof)) ->
-      let cb _ =
-        (* NOTE: remove it from seen jobs after attempting to adding it to the
-           pool to avoid this work being reassigned.
-           - If the diff is accepted, then remove it from the seen jobs;
-           - If not then the work should have already been in the pool with a
-           lower fee or the statement isn't referenced anymore or any other
-           error. In any case remove it from the seen jobs so that it can be
-           picked up if needed. *)
-        Work_selector.remove t.work_selector stmts
-      in
       ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
       Network_pool.Snark_pool.(
         Local_sink.push t.pipes.snark_local_sink
-          (Add_solved_work (stmts, priced_proof), cb))
+          (Add_solved_work (stmts, priced_proof), Fn.const ()))
       |> Deferred.don't_wait_for ;
       `Ok
 

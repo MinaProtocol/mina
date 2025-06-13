@@ -6,24 +6,12 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Inputs = Inputs
   module Work_spec = Snark_work_lib.Work.Single.Spec
 
-  module Job_status = struct
-    type t = Assigned of Time.t
-
-    let is_old (Assigned at_time) ~now ~reassignment_wait =
-      let max_age = Time.Span.of_ms (Float.of_int reassignment_wait) in
-      let delta = Time.diff now at_time in
-      Time.Span.( > ) delta max_age
-  end
-
   module State = struct
-    module Seen_key = struct
-      module T = struct
-        type t = Transaction_snark.Statement.t One_or_two.t
-        [@@deriving compare, sexp, to_yojson, hash]
-      end
-
-      include T
-      include Comparable.Make (T)
+    (* TODO: maybe factor out job numbering mechanism from partitioner to here,
+       so we don't waste time calculate hashes *)
+    module Job_key = struct
+      type t = Transaction_snark.Statement.t One_or_two.t
+      [@@deriving compare, sexp, to_yojson, hash]
     end
 
     type t =
@@ -37,7 +25,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                 whenever the pipe has broadcasted new frontier. The works
                 between consecutive frontier broadcasts should be largely
                 identical. *)
-      ; mutable jobs_seen : Job_status.t Seen_key.Map.t
+      ; jobs_scheduled : Job_key.t Hash_set.t
       ; reassignment_wait : int
       }
 
@@ -51,7 +39,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
      fun ~reassignment_wait ~frontier_broadcast_pipe ~logger ->
       let t =
         { available_jobs = []
-        ; jobs_seen = Seen_key.Map.empty
+        ; jobs_scheduled = Hash_set.create (module Job_key)
         ; reassignment_wait
         }
       in
@@ -94,37 +82,15 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       |> Deferred.don't_wait_for ;
       t
 
-    let all_unseen_works t =
-      O1trace.sync_thread "work_lib_all_unseen_works" (fun () ->
+    let all_unscheduled_works t =
+      O1trace.sync_thread "work_lib_all_unscheduled_works" (fun () ->
           List.filter t.available_jobs ~f:(fun js ->
               not
-              @@ Map.mem t.jobs_seen (One_or_two.map ~f:Work_spec.statement js) ) )
+              @@ Hash_set.mem t.jobs_scheduled
+                   (One_or_two.map ~f:Work_spec.statement js) ) )
 
-    let remove_old_assignments t ~logger =
-      O1trace.sync_thread "work_lib_remove_old_assignments" (fun () ->
-          let now = Time.now () in
-          t.jobs_seen <-
-            Map.filteri t.jobs_seen ~f:(fun ~key:work ~data:status ->
-                if
-                  Job_status.is_old status ~now
-                    ~reassignment_wait:t.reassignment_wait
-                then (
-                  [%log info]
-                    ~metadata:[ ("work", Seen_key.to_yojson work) ]
-                    "Waited too long to get work for $work. Ready to be \
-                     reassigned" ;
-                  Mina_metrics.(
-                    Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
-                  false )
-                else true ) )
-
-    let remove t statement = t.jobs_seen <- Map.remove t.jobs_seen statement
-
-    let set t x =
-      t.jobs_seen <-
-        Map.set t.jobs_seen
-          ~key:(One_or_two.map ~f:Work_spec.statement x)
-          ~data:(Job_status.Assigned (Time.now ()))
+    let set_as_scheduled t x =
+      Hash_set.add t.jobs_scheduled (One_or_two.map ~f:Work_spec.statement x)
   end
 
   let does_not_have_better_fee ~snark_pool ~fee
