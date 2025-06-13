@@ -145,7 +145,6 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~cache_exceptions ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
-  [%log info] "Starting Bootstrap Controller phase" ;
   producer_transition_writer_ref := None ;
   let f b_or_h =
     Strict_pipe.Swappable.write network_transition_pipe (b_or_h, `Valid_cb None) ;
