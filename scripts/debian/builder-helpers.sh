@@ -354,6 +354,36 @@ build_daemon_devnet_deb() {
 }
 ##################################### END DEVNET PACKAGE ########################################
 
+##################################### MAINNET LEGACY PACKAGE #######################################
+build_daemon_mainnet_legacy_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mainnet legacy deb without keys:"
+
+  create_control_file mina-mainnet-legacy "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  # Copy legacy binary
+  cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-legacy"
+
+  build_deb mina-mainnet-legacy
+}
+##################################### END MAINNET LEGACY PACKAGE #######################################
+
+##################################### DEVNET LEGACY PACKAGE ############################################
+build_daemon_devnet_legacy_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building testnet signatures legacy deb without keys:"
+
+  create_control_file mina-devnet-legacy "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+
+  # Copy legacy binary
+  cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-legacy"
+
+  build_deb mina-devnet-legacy
+}
+##################################### END DEVNET LEGACY PACKAGE ########################################
+
 ##################################### BERKELEY PACKAGE ##########################################
 build_daemon_berkeley_deb() {
 
