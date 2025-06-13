@@ -3,8 +3,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   open Inputs
 
   module Db_error = struct
-    [@@@warning "-4"] (* due to deriving sexp below *)
-
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
   end
