@@ -31,6 +31,12 @@ RUN apt-get update --quiet --yes \
 # Switch to HTTPS
 RUN sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list
 
+RUN if [ -f /etc/apt/sources.list ]; then \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
+else \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
+fi
+
 # Dependencies
 RUN apt-get update --quiet --yes \
     && apt-get upgrade --quiet --yes \
@@ -39,6 +45,7 @@ RUN apt-get update --quiet --yes \
         curl \
         jq \
         dumb-init \
+        libssl1.1 \
         libgomp1 \
         libpq-dev \
         gnupg2 \
