@@ -11,7 +11,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
        so we don't waste time calculate hashes *)
     module Job_key = struct
       type t = Transaction_snark.Statement.t One_or_two.t
-      [@@deriving compare, sexp, to_yojson, hash]
+      [@@deriving compare, equal, sexp, to_yojson, hash]
+
+      let of_job x = One_or_two.map ~f:Work_spec.statement x
     end
 
     type t =
@@ -75,7 +77,14 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                                 ( Time.diff end_time start_time
                                 |> Time.Span.to_ms ) )
                           ] ;
-                      t.available_jobs <- new_available_jobs ) ;
+                      t.available_jobs <- new_available_jobs ;
+                      let new_job_keys =
+                        List.map ~f:Job_key.of_job t.available_jobs
+                        |> Hash_set.of_list (module Job_key)
+                      in
+                      Hash_set.filter_inplace
+                        ~f:(Hash_set.mem new_job_keys)
+                        t.jobs_scheduled ) ;
                   Deferred.unit )
               |> Deferred.don't_wait_for ) ;
           Deferred.unit )
@@ -85,9 +94,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     let all_unscheduled_works t =
       O1trace.sync_thread "work_lib_all_unscheduled_works" (fun () ->
           List.filter t.available_jobs ~f:(fun js ->
-              not
-              @@ Hash_set.mem t.jobs_scheduled
-                   (One_or_two.map ~f:Work_spec.statement js) ) )
+              not @@ Hash_set.mem t.jobs_scheduled (Job_key.of_job js) ) )
 
     let set_as_scheduled t x =
       Hash_set.add t.jobs_scheduled (One_or_two.map ~f:Work_spec.statement x)
