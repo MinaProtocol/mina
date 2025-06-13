@@ -15,8 +15,8 @@ module Wire_types = Mina_wire_types.Consensus_proof_of_stake
 module Make_sig (A : Wire_types.Types.S) = struct
   module type S =
     Proof_of_stake_intf.Full
-      with type Data.Consensus_state.Value.Stable.V2.t =
-        A.Data.Consensus_state.Value.V2.t
+      with type Data.Consensus_state.Value.Stable.V3.t =
+        A.Data.Consensus_state.Value.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct
@@ -200,7 +200,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Stable = struct
         [@@@no_toplevel_latest_type]
 
-        module V2 = struct
+        module V3 = struct
           type t =
             { epoch_ledger : Mina_base.Epoch_ledger.Value.Stable.V1.t
             ; epoch_seed : Mina_base.Epoch_seed.Stable.V1.t
@@ -209,7 +209,7 @@ module Make_str (A : Wire_types.Concrete) = struct
             ; global_slot_since_genesis :
                 Mina_numbers.Global_slot_since_genesis.Stable.V1.t
             ; delegatee_table :
-                Mina_base.Account.Stable.V2.t
+                Mina_base.Account.Stable.V3.t
                 Mina_base.Account.Index.Stable.V1.Table.t
                 Public_key.Compressed.Stable.V1.Table.t
             }
@@ -1686,7 +1686,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Value = struct
         [%%versioned
         module Stable = struct
-          module V2 = struct
+          module V3 = struct
             type t =
               ( Length.Stable.V1.t
               , Vrf.Output.Truncated.Stable.V1.t

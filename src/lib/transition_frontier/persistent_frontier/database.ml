@@ -65,7 +65,7 @@ module Schema = struct
     | Root_common : Root_data.Common.Stable.V2.t t
     | Best_tip : State_hash.Stable.V1.t t
     | Protocol_states_for_root_scan_state
-        : Mina_state.Protocol_state.Value.Stable.V2.t list t
+        : Mina_state.Protocol_state.Value.Stable.V3.t list t
 
   [@@@warning "+22"]
 

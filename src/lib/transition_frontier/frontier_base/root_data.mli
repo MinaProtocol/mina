@@ -49,7 +49,7 @@ module Limited : sig
 
       val protocol_states :
            t
-        -> Mina_state.Protocol_state.Value.Stable.V2.t
+        -> Mina_state.Protocol_state.Value.Stable.V3.t
            Mina_base.State_hash.With_state_hashes.Stable.V1.t
            list
 

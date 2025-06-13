@@ -10,12 +10,12 @@ module Stable : sig
 
     val header : t -> Header.Stable.V2.t
 
-    val body : t -> Staged_ledger_diff.Body.Stable.V1.t
+    val body : t -> Staged_ledger_diff.Body.Stable.V2.t
 
     val transactions :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> t
-      -> Transaction.Stable.V2.t With_status.t list
+      -> Transaction.Stable.V3.t With_status.t list
   end
 end]
 

@@ -77,7 +77,7 @@ module Call_forest = struct
   end
 end
 
-module V1 = struct
+module V3 = struct
   module T = struct
     type 'a t =
       { fee_payer : Mina_base_account_update.Fee_payer.V1.t
@@ -86,7 +86,7 @@ module V1 = struct
       }
   end
 
-  type t = (Mina_base_account_update.V1.t, unit, unit) Call_forest.V1.t T.t
+  type t = (Mina_base_account_update.V2.t, unit, unit) Call_forest.V1.t T.t
 end
 
 module Valid = struct
@@ -96,8 +96,8 @@ module Valid = struct
     end
   end
 
-  module V1 = struct
-    type t = { zkapp_command : V1.t }
+  module V2 = struct
+    type t = { zkapp_command : V3.t }
   end
 end
 
