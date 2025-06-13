@@ -128,6 +128,10 @@ build_deb() {
 
   # Build the package
   echo "------------------------------------------------------------"
+  # NOTE: the reason for `-Zgzip` is we might be building on newer Ubuntu, e.g. 
+  # Noble. The default packaging format is `zstd`, but then when we're building
+  # Docker image, we're examining those packages in buildkite's agent, where 
+  # `zstd` might not be available.
   fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" "${1}"_"${MINA_DEB_VERSION}".deb
   echo "build_deb outputs:"
   ls -lh "${1}"_*.deb
