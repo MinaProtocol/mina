@@ -66,7 +66,6 @@ module Make (T : sig
 
   val proof_level : Genesis_constants.Proof_level.t
 end) : S
-[@@warning "-67"]
 
 val constraint_system_digests :
      proof_level:Genesis_constants.Proof_level.t

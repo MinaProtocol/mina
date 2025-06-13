@@ -1,5 +1,7 @@
 (library
  (name blockchain_snark)
+ (flags
+  (:standard -warn-error +a))
  (public_name blockchain_snark)
  (library_flags -linkall)
  (libraries
