@@ -138,6 +138,9 @@ module type Lib_intf = sig
       -> unit
   end
 
+  (** [get_expensive_work ~snark_pool ~fee works] filters out all works in the
+      list that satisfy the predicate
+      [does_not_have_better_fee ~snark_pool ~fee] *)
   val get_expensive_work :
        snark_pool:Snark_pool.t
     -> fee:Fee.t
@@ -160,6 +163,11 @@ module type Lib_intf = sig
     -> Transaction_snark.Statement.t One_or_two.t list
 
   module For_tests : sig
+    (** [does_not_have_better_fee ~snark_pool ~fee stmt] returns true iff the
+        statement [stmt] haven't already been proved already in [snark_pool] or
+        it's been proved with a fee higher than ~fee. The reason for the later
+        condition is that the whole protocol would drop proofs with higher fees
+        if there's a equivalent proof with lower fees *)
     val does_not_have_better_fee :
          snark_pool:Snark_pool.t
       -> fee:Fee.t

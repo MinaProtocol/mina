@@ -80,3 +80,4 @@ else
     echo "Network id incorrect (expected: $EXPECTED_NETWORK got: $NETWORK_ID)"
     exit 1
 fi
+
