@@ -104,7 +104,7 @@ function boot_and_sync {
         # "connection refused" until GraphQL server up
         GOT_SYNC_STATUS=$(echo ${SYNC_STATUS} | grep "syncStatus")
         if [ ! -z $GOT_SYNC_STATUS ]; then
-            echo $(date +'%Y-%m-%d %H:%M:%S') ". Sync status:" $GOT_SYNC_STATUS
+            echo "$(date +'%Y-%m-%d %H:%M:%S')" ". Sync status:" $GOT_SYNC_STATUS
         fi
 
         SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")

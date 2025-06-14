@@ -31,6 +31,10 @@ let dirtyWhen =
       , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
       ]
 
+let rosettaDocker =
+      Artifacts.fullDockerTag
+        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network = network }
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -51,15 +55,10 @@ in  Pipeline.build
                   "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
-                  Artifacts.Type.Rosetta
-                  (Some network)
+                  rosettaDocker
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
-                  Cmd.Docker::{
-                  , image =
-                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-${Network.lowerName
-                                                                                   network}"
-                  }
+                  Cmd.Docker::{ image = rosettaDocker }
                   "buildkite/scripts/rosetta-integration-tests-fast.sh"
               ]
             , label = "Rosetta integration tests Bullseye"
