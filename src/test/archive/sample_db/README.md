@@ -10,6 +10,8 @@ It expects success
 
 ### Regenerate data
 
+_Note_: After regenerating the data, it will need to be uploaded to GCP in order to be accessible for replayer tests in CI. See <b> Uploading data to GCP </b>
+
 The data can be regenerated with the script `./scripts/regenerate-archive.sh`
 
 You can also regenerate it manually.
@@ -20,6 +22,7 @@ Mina local network script (./script/mina-local-network/mina-local-network.sh) ca
 ```
 
 where:
+
 - `-a` run archive (it will automatically create 'archive' schema)
 - `-r` removes any artifacts from previous run to have clear situation
 - `-pu -ppw` are database connection parameters
@@ -57,7 +60,7 @@ rm _tmp.json
 
 #### Alternatives
 
-As mentioned in previous section we need to have some canonical blocks in archive database. The more the better. However, with current value of K parameter (responsible for converting pending block into canonical) this process can take a lot of time (> 7hours). Fortunately there are alternative solutions  for this problem.
+As mentioned in previous section we need to have some canonical blocks in archive database. The more the better. However, with current value of K parameter (responsible for converting pending block into canonical) this process can take a lot of time (> 7hours). Fortunately there are alternative solutions for this problem.
 
 a) We can alter input config and use `target_epoch_ledgers_state_hash` property in replayer input file to inform replayer that we want to replay also pending blocks. Example:
 
@@ -80,8 +83,15 @@ b) Convert pending chain to canonical blocks using helper script:
 
 As a result archive database will now have blocks which are a part of chain from genesis block to target block, converted to canonical. All blocks which are not a part of mentioned chain and have height smaller than target blocks will be orphaned. Rest will be left intact as pending. DO NOT USE on production.
 
+### Uploading data to GCP
+
+Use the script in `scripts/upload-achive-replayer-data.sh` or manually upload `precomputed_blocks.tar.xz` and `archive_db.sql` to GCP bucket [here](https://console.cloud.google.com/storage/browser/o1labs-ci-test-data/replay).
+
+You will need to install `gcloud` CLI as prerequisite for the script and login with your o1labs GCP account.
+
+In order to do so, check the version in `src/test/archive/sample_db/latest_version` file and increment it by 1.
+Create a new folder in the bucket with name `v<version>` and upload `precomputed_blocks.tar.xz` and `archive_db.sql` to it.
+
 ### Dependencies
 
 Replayer component tests uses postgres database only. It need to be accessible from host machine
-
-
