@@ -73,8 +73,6 @@ let runInDockerWithPostgresConn
 
           -- read the latest archive data version from the version file 
           let version = ../../../src/test/archive/sample_db/latest_version as Text
-             -- : Text
-             -- = ./../../../src/test/archive/sample_db/latest_version as Text
           
 
           let initUrl
