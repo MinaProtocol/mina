@@ -18,13 +18,11 @@ let Network = ../Constants/Network.dhall
 
 let runInDockerWithPostgresConn
     :     List Text
-      ->  Text
       ->  Artifacts.Type
       ->  Optional Network.Type
       ->  Text
       ->  Cmd.Type
     =     \(environment : List Text)
-      ->  \(initUrl : Text)
       ->  \(docker : Artifacts.Type)
       ->  \(network : Optional Network.Type)
       ->  \(innerScript : Text)
@@ -72,6 +70,17 @@ let runInDockerWithPostgresConn
                   network
 
           let networkOrDefault = Optional/default Text "" maybeNetwork
+
+          -- read the latest archive data version from the version file 
+          let version
+              : Text
+              = ./src/test/archive/sample_db/latest_version
+          
+
+          let initUrl
+              : Text
+              = "https://storage.googleapis.com/o1labs-ci-test-data/replay/"++ version ++"/archive_db.sql"
+
 
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
