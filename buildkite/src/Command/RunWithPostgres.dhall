@@ -72,14 +72,14 @@ let runInDockerWithPostgresConn
           let networkOrDefault = Optional/default Text "" maybeNetwork
 
           -- read the latest archive data version from the version file 
-          let version
-             : Text
-             = ./../../../src/test/archive/sample_db/latest_version
+          let version = "2"
+             -- : Text
+             -- = ./../../../src/test/archive/sample_db/latest_version as Text
           
 
           let initUrl
               : Text
-              = "https://storage.googleapis.com/o1labs-ci-test-data/replay/v2/archive_db.sql"
+              = "https://storage.googleapis.com/o1labs-ci-test-data/replay/v${version}/archive_db.sql"
 
 
           in  Cmd.chain
