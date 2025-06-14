@@ -79,7 +79,7 @@ let runInDockerWithPostgresConn
 
           let initUrl
               : Text
-              = "https://storage.googleapis.com/o1labs-ci-test-data/replay/v${postgresDockerName}/archive_db.sql"
+              = "https://storage.googleapis.com/o1labs-ci-test-data/replay/v2/archive_db.sql"
 
 
           in  Cmd.chain
