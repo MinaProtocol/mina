@@ -72,7 +72,7 @@ let runInDockerWithPostgresConn
           let networkOrDefault = Optional/default Text "" maybeNetwork
 
           -- read the latest archive data version from the version file 
-          let version = "2"
+          let version = ../../../src/test/archive/sample_db/latest_version as Text
              -- : Text
              -- = ./../../../src/test/archive/sample_db/latest_version as Text
           
