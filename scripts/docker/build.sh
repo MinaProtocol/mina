@@ -137,6 +137,9 @@ case "${SERVICE}" in
           noble)
             DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-noble $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
             ;;
+          bookworm)
+            DOCKERFILE_PATH="$DOCKERFILE_PATH_SCRIPT_1 dockerfiles/stages/1-build-deps-bookworm $DOCKERFILE_PATH_SCRIPT_2_AND_MORE"
+            ;;
           *)
             echo "Unsupported debian codename: $INPUT_CODENAME"
             echo "Supported codenames are: bullseye, focal, noble"
