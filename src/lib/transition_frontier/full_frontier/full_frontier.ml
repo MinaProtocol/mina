@@ -481,10 +481,11 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         Ledger.Maskable.register_mask s
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       (* STEP 5 *)
       (*Validate transactions against the protocol state associated with the transaction*)
       let apply_first_pass =
-        Ledger.apply_transaction_first_pass
+        Ledger.apply_transaction_first_pass ~signature_kind
           ~constraint_constants:Context.constraint_constants
       in
       let apply_second_pass = Ledger.apply_transaction_second_pass in

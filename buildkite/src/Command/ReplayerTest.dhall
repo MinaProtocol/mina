@@ -6,8 +6,6 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
-let Network = ../Constants/Network.dhall
-
 let key = "replayer-test"
 
 in  { step =
