@@ -51,7 +51,6 @@ in  Pipeline.build
                   "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
-                  "https://storage.googleapis.com/o1labs-ci-test-data/replay/v0/archive_db.sql"
                   Artifacts.Type.Rosetta
                   (Some network)
                   "./buildkite/scripts/rosetta-indexer-test.sh"
