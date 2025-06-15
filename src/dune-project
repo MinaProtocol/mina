@@ -120,6 +120,7 @@
 (package (name mina_version))
 (package (name mina_wire_types))
 (package (name missing_blocks_auditor))
+(package (name mock_snark_work_coordinater))
 (package (name monad_lib))
 (package (name network_peer))
 (package (name network_pool))
