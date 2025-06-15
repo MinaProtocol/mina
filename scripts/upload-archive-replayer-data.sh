@@ -19,7 +19,7 @@ echo "Current data version: $CURRENT_VERSION"
 NEW_VERSION=$((CURRENT_VERSION + 1))
 echo "New data version: $NEW_VERSION"
 
-echo "$NEW_VERSION" > "$VERSION_FILE_PATH"
+printf "$NEW_VERSION" > "$VERSION_FILE_PATH"
 
 # Upload the archive data to the replayer
 echo "Uploading archive data to GCP bucket..."
