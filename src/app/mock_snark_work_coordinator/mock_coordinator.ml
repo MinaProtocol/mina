@@ -1,10 +1,8 @@
 open Async
 open Core
-module Work = Snark_work_lib
 
-module Selector_work_id = struct
-  type t = Transaction_snark.Statement.t One_or_two.t
-  [@@deriving compare, sexp, to_yojson, hash]
+open struct
+  module Work = Snark_work_lib
 end
 
 let proof_cache_db = Proof_cache_tag.create_identity_db ()
