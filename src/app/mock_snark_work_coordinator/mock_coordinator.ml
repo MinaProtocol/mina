@@ -14,6 +14,8 @@ let start ~sok_message
     ~(predefined_specs : Work.Spec.Single.Stable.Latest.t One_or_two.t Queue.t)
     ~partitioner ~logger ~port ~rpc_handshake_timeout ~rpc_heartbeat_send_every
     ~rpc_heartbeat_timeout ~completed_snark_work_sink =
+  [%log info] "Starting mock snark work coordinator"
+    ~metadata:[ ("port", `Int port) ] ;
   let work_from_selector () =
     let%map.Option spec = Queue.dequeue predefined_specs in
     let spec =

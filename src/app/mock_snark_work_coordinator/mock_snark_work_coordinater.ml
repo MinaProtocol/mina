@@ -53,9 +53,11 @@ let read_all_specs_in_folder ~logger dir =
 
 let start_verifier ~specs_to_process ~input_sok_message ~logger
     ~(source : Snark_work_lib.Result.Combined.t Strict_pipe.Reader.t) =
+  [%log info] "Starting verifier" ;
+  let precomputed_values = Lazy.force Precomputed_values.for_unit_tests in
   let%bind verifier =
     Verifier.For_tests.default ~logger
-      ~constraint_constants:Genesis_constants.Compiled.constraint_constants
+      ~constraint_constants:precomputed_values.constraint_constants
       ~proof_level:Genesis_constants.Proof_level.Full ()
   in
   let rec loop remaining_specs =
@@ -70,7 +72,7 @@ let start_verifier ~specs_to_process ~input_sok_message ~logger
              on mock coordinator's side"
             ~metadata:[ ("remaining_proofs_to_verify", `Int remaining_specs) ] ;
           exit 1
-      | `Ok (stmt, { proof; fee = { fee; prover } }) -> (
+      | `Ok (stmt, { proof; fee = { fee; prover } }) ->
           let actual_sok_message = Sok_message.create ~fee ~prover in
           if not (Sok_message.equal input_sok_message actual_sok_message) then (
             [%log fatal]
@@ -82,7 +84,15 @@ let start_verifier ~specs_to_process ~input_sok_message ~logger
                   , Sok_message.to_yojson actual_sok_message )
                 ] ;
             exit 1 )
-          else
+          else (
+            [%log info] "Received proof to verify"
+              ~metadata:
+                [ ("proof", One_or_two.to_yojson Ledger_proof.to_yojson proof)
+                ; ("sok_message", Sok_message.to_yojson input_sok_message)
+                ; ( "statement"
+                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                      stmt )
+                ] ;
             let verification_inputs =
               One_or_two.to_list proof
               |> List.map ~f:(fun proof -> (proof, actual_sok_message))
@@ -136,6 +146,8 @@ let command =
     fun () ->
       let open Deferred.Let_syntax in
       let logger = Logger.create () in
+      [%log info] "Reading specs from folder"
+        ~metadata:[ ("dumped_spec_path", `String dumped_spec_path) ] ;
       let%bind prover, predefined_specs =
         read_all_specs_in_folder ~logger dumped_spec_path
       in
