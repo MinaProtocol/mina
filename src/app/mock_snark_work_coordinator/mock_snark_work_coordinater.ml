@@ -53,11 +53,15 @@ let read_all_specs_in_folder ~logger dir =
 
 let start_verifier ~specs_to_process ~input_sok_message ~logger
     ~(source : Snark_work_lib.Result.Combined.t Strict_pipe.Reader.t) =
-  let%bind verifier =
-    Verifier.For_tests.default ~logger
-      ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-      ~proof_level:Genesis_constants.Proof_level.Full ()
+  [%log info] "Starting verifier" ;
+  let Genesis_proof.{ constraint_constants; _ } =
+    Lazy.force Precomputed_values.for_unit_tests
   in
+  let%bind verifier =
+    Verifier.For_tests.default ~constraint_constants ~logger ~proof_level:Full
+      ()
+  in
+  [%log info] "Verifier initialized" ;
   let rec loop remaining_specs =
     if remaining_specs = 0 then (
       [%log info] "Verified all proofs" ;
@@ -91,6 +95,16 @@ let start_verifier ~specs_to_process ~input_sok_message ~logger
               Verifier.verify_transaction_snarks verifier verification_inputs
             with
             | Ok (Ok ()) ->
+                [%log info] "Proof verified"
+                  ~metadata:
+                    [ ( "proof"
+                      , One_or_two.to_yojson Ledger_proof.to_yojson proof )
+                    ; ("sok_message", Sok_message.to_yojson input_sok_message)
+                    ; ( "statement"
+                      , One_or_two.to_yojson
+                          Transaction_snark.Statement.to_yojson stmt )
+                    ; ("remaining_proofs", `Int (remaining_specs - 1))
+                    ] ;
                 loop (remaining_specs - 1)
             | Error e | Ok (Error e) ->
                 [%log fatal] "Verification of proofs failed"
@@ -136,6 +150,8 @@ let command =
     fun () ->
       let open Deferred.Let_syntax in
       let logger = Logger.create () in
+      [%log info] "Reading specs from folder"
+        ~metadata:[ ("dumped_spec_path", `String dumped_spec_path) ] ;
       let%bind prover, predefined_specs =
         read_all_specs_in_folder ~logger dumped_spec_path
       in
