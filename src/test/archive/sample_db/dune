@@ -1,14 +1,18 @@
 (rule
  (alias archive_db)
- (deps latest_version)
  (targets archive_db.sql precomputed_blocks.tar.xz)
  (action
   (progn
-   (run bash -c "
-    curl -L -o archive_db.sql \
-    https://storage.googleapis.com/o1labs-ci-test-data/replay/v$(cat %{deps})/archive_db.sql
-   " latest_version)
-   (run bash -c "
-    curl -L -o precomputed_blocks.tar.xz \
-    https://storage.googleapis.com/o1labs-ci-test-data/replay/v$(cat %{deps})/precomputed_blocks.tar.xz
-   " latest_version))))
+   (run
+    curl
+    -L
+    -o
+    archive_db.sql
+    https://storage.googleapis.com/o1labs-ci-test-data/replay/v2/archive_db.sql)
+   (run
+    curl
+    -L
+    -o
+    precomputed_blocks.tar.xz
+    https://storage.googleapis.com/o1labs-ci-test-data/replay/v2/precomputed_blocks.tar.xz)
+   )))
