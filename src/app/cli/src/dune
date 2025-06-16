@@ -6,7 +6,7 @@
  (public_name mina)
  (modules mina)
  (modes native)
- (libraries mina_cli_entrypoint disk_cache.lmdb)
+ (libraries mina_cli_entrypoint)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -18,7 +18,7 @@
  (public_name mina-testnet)
  (modules mina_testnet_signatures)
  (modes native)
- (libraries mina_cli_entrypoint mina_signature_kind.testnet disk_cache.lmdb)
+ (libraries mina_cli_entrypoint mina_signature_kind.testnet)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
@@ -30,7 +30,7 @@
  (public_name mina-mainnet)
  (modules mina_mainnet_signatures)
  (modes native)
- (libraries mina_cli_entrypoint mina_signature_kind.mainnet disk_cache.lmdb)
+ (libraries mina_cli_entrypoint mina_signature_kind.mainnet)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
