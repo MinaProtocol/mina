@@ -1,14 +1,21 @@
 open Async
+open Core
 open Mina_automation
 open Intf
 
 let logger = Logger.create ()
 
 type after_bootstrap =
-  { archive : Archive.Process.t; network_data : Network_data.t }
+  { archive : Archive.Process.t
+  ; network_data : Network_data.t
+  ; temp_dir : string
+  }
 
 type before_bootstrap =
-  { config : Archive.Config.t; network_data : Network_data.t }
+  { config : Archive.Config.t
+  ; network_data : Network_data.t
+  ; temp_dir : string
+  }
 
 let read_network_data_from_env_var () =
   match Sys.getenv "MINA_TEST_NETWORK_DATA" with
@@ -50,10 +57,10 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
 
   let test_case = M.test_case
 
-  
   (** 
     Sets up the archive by performing the following steps:
-    1. Retrieves the network data folder path from the environment variable "NETWORK_DATA_FOLDER".
+    1. Retrieves the network data folder path from the environment variable "NETWORK_DATA_FOLDER". 
+      (This variable must be set before running the test.)
     2. Creates network data using the retrieved folder path.
     3. Sets up a connection using the created network data.
 
@@ -68,8 +75,9 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
     in
     let executor = Archive.of_config config in
     let%bind.Deferred archive = Archive.start executor in
-    [%log info] "Archive started successfully with " ;
-    return { archive; network_data }
+    [%log info] "Archive started successfully" ;
+    return
+      { archive; network_data; temp_dir = Filename.temp_dir "archive_test" "" }
 
   let teardown t =
     let open Deferred.Or_error.Let_syntax in
@@ -113,7 +121,8 @@ module Make_FixtureWithoutBootstrap (M : TestCaseWithoutBootstrap) :
     let%bind.Deferred config =
       setup_connection ~network_data ~postgres_uri ()
     in
-    return { config; network_data }
+    return
+      { config; network_data; temp_dir = Filename.temp_dir "archive_test" "" }
 
   let teardown _t = Deferred.Or_error.ok_unit
 

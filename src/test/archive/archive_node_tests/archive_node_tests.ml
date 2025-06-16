@@ -29,7 +29,7 @@ module ArchivePrecomputedBlocksFromDaemon = struct
     let open Deferred.Let_syntax in
     let daemon = Daemon.default in
     let archive_uri = test_data.archive.config.postgres_uri in
-    let output = Filename.temp_dir "precomputed_blocks" "" in
+    let output = test_data.temp_dir in
     let%bind precomputed_blocks =
       Network_data.untar_precomputed_blocks test_data.network_data output
     in
