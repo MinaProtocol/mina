@@ -301,7 +301,7 @@ module Ledger_inner = struct
       in
       Unstable_db.create ?directory_name ~depth ()
     in
-    let%bind cl =
+    let%bind converting_ledger =
       if Unstable_db.num_accounts db2 = 0 then
         Or_error.return @@ Converting_ledger.create_with_migration db1 db2
       else if not (Db.num_accounts db1 = Unstable_db.num_accounts db2) then (
@@ -311,11 +311,11 @@ module Ledger_inner = struct
           "create_converting: primary and converting database desync" )
       else Or_error.return @@ Converting_ledger.create db1 db2
     in
-    let casted = Any_ledger.cast (module Converting_ledger) cl in
+    let casted = Any_ledger.cast (module Converting_ledger) converting_ledger in
     let mask = Mask.create ~depth () in
     Or_error.return
       ( Maskable.register_mask casted mask
-      , Converting_ledger.converting_ledger cl )
+      , Converting_ledger.converting_ledger converting_ledger )
 
   (** Create a new empty ledger.
 
