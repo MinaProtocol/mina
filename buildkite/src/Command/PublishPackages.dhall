@@ -171,7 +171,7 @@ let publish
                               }
                               (     "git config --global --add safe.directory /workdir && "
                                 ++  ". ./buildkite/scripts/export-git-env-vars.sh && "
-                                ++  " gpg --import /var/secrets/debian && "
+                                ++  " gpg --import /var/secrets/debian/key.gpg && "
                                 ++  "./buildkite/scripts/release/manager.sh publish "
                                 ++  "--artifacts ${artifacts} "
                                 ++  "--networks ${networks} "
