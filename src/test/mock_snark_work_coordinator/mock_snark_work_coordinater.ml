@@ -51,17 +51,8 @@ let read_all_specs_in_folder ~logger dir =
       in
       (assumed_prover, spec_queue)
 
-let start_verifier ~specs_to_process ~input_sok_message ~logger
+let start_verifier ~verifier ~num_specs_to_process ~input_sok_message ~logger
     ~(source : Snark_work_lib.Result.Combined.t Strict_pipe.Reader.t) =
-  [%log info] "Starting verifier" ;
-  let Genesis_proof.{ constraint_constants; _ } =
-    Lazy.force Precomputed_values.for_unit_tests
-  in
-  let%bind verifier =
-    Verifier.For_tests.default ~constraint_constants ~logger ~proof_level:Full
-      ()
-  in
-  [%log info] "Verifier initialized" ;
   let rec loop remaining_specs =
     if remaining_specs = 0 then (
       [%log info] "Verified all proofs" ;
@@ -119,10 +110,10 @@ let start_verifier ~specs_to_process ~input_sok_message ~logger
                     ] ;
                 exit 1 )
   in
-  loop specs_to_process
+  loop num_specs_to_process
 
 let command =
-  Command.async ~summary:"Mock coordinator test"
+  Command.basic ~summary:"Mock coordinator test"
     (let open Command.Let_syntax in
     let%map_open dumped_spec_path =
       flag "--dumped-spec-path" (required string)
@@ -148,35 +139,49 @@ let command =
         ~doc:"Timeout for Work partitioner to reassign a job (seconds)"
     in
     fun () ->
-      let open Deferred.Let_syntax in
+      let Genesis_proof.{ constraint_constants; _ } =
+        Lazy.force Precomputed_values.for_unit_tests
+      in
       let logger = Logger.create () in
-      [%log info] "Reading specs from folder"
-        ~metadata:[ ("dumped_spec_path", `String dumped_spec_path) ] ;
-      let%bind prover, predefined_specs =
-        read_all_specs_in_folder ~logger dumped_spec_path
+      [%log info] "Starting verifier" ;
+      (* HACK: this has to run in its own thread to avoid some weird bug *)
+      let verifier =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Verifier.For_tests.default ~constraint_constants ~logger
+              ~proof_level:Full () )
       in
-      let specs_to_process = Queue.length predefined_specs in
-      [%log info] "Read %d specs to generate proof" specs_to_process
-        ~metadata:[ ("specs_to_process", `Int specs_to_process) ] ;
-      let proof_cache_db = Proof_cache_tag.create_identity_db () in
-      let partitioner =
-        Work_partitioner.create
-          ~reassignment_timeout:(Time.Span.of_sec reassignment_timeout)
-          ~logger ~proof_cache_db
+      [%log info] "Verifier initialized" ;
+      let k () =
+        let open Deferred.Let_syntax in
+        [%log info] "Reading specs from folder"
+          ~metadata:[ ("dumped_spec_path", `String dumped_spec_path) ] ;
+        let%bind prover, predefined_specs =
+          read_all_specs_in_folder ~logger dumped_spec_path
+        in
+        let num_specs_to_process = Queue.length predefined_specs in
+        [%log info] "Read %d specs to generate proof" num_specs_to_process
+          ~metadata:[ ("specs_to_process", `Int num_specs_to_process) ] ;
+        let proof_cache_db = Proof_cache_tag.create_identity_db () in
+        let partitioner =
+          Work_partitioner.create
+            ~reassignment_timeout:(Time.Span.of_sec reassignment_timeout)
+            ~logger ~proof_cache_db
+        in
+        let completed_snark_work_source, completed_snark_work_sink =
+          Strict_pipe.create ~name:"completed snark work"
+            (Buffered (`Capacity 50, `Overflow Crash))
+        in
+        let input_sok_message =
+          Sok_message.create ~fee:Currency.Fee.zero ~prover
+        in
+        Mock_coordinator.start ~predefined_specs ~partitioner ~logger
+          ~port:coordinator_port ~rpc_handshake_timeout
+          ~rpc_heartbeat_send_every ~rpc_heartbeat_timeout
+          ~completed_snark_work_sink ~sok_message:input_sok_message
+        |> Deferred.don't_wait_for ;
+        start_verifier ~verifier ~num_specs_to_process ~input_sok_message
+          ~logger ~source:completed_snark_work_source
       in
-      let completed_snark_work_source, completed_snark_work_sink =
-        Strict_pipe.create ~name:"completed snark work"
-          (Buffered (`Capacity 50, `Overflow Crash))
-      in
-      let input_sok_message =
-        Sok_message.create ~fee:Currency.Fee.zero ~prover
-      in
-      Mock_coordinator.start ~predefined_specs ~partitioner ~logger
-        ~port:coordinator_port ~rpc_handshake_timeout ~rpc_heartbeat_send_every
-        ~rpc_heartbeat_timeout ~completed_snark_work_sink
-        ~sok_message:input_sok_message
-      |> Deferred.don't_wait_for ;
-      start_verifier ~specs_to_process ~input_sok_message ~logger
-        ~source:completed_snark_work_source)
+      Async.Thread_safe.block_on_async_exn k)
 
 let () = Command_unix.run command

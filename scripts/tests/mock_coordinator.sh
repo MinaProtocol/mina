@@ -11,7 +11,9 @@
 # 4. Once the mock coordinator verified every proof predefined, it will exit
 # with exit code 0
 
-NUM_WORKERS=0
+NUM_WORKERS=1
+# NOTE: have a proper sleep so when worker wakes up the coordinator is ready 
+WORKER_SLEEP=60s
 
 while true; do
   # Random port between 1025 and 65535
@@ -26,22 +28,39 @@ done
 
 cd $(git root)
 
-dune exec \
-  src/app/mock_snark_work_coordinator/mock_snark_work_coordinater.exe \
+# Without `MINA_USE_DUMMY_VERIFIER=1`:
+# Error: No implementations provided for the following modules:
+#          Foreign referenced from /nix/store/0qd7g68imp2csmr22l8waxp0242bcv57-rpc_parallel-v0.14.0/lib/ocaml/4.14.2/site-lib/rpc_parallel/rpc_parallel.cmxa(Rpc_parallel__Utils)
+MINA_USE_DUMMY_VERIFIER=1 dune exec \
+  src/test/mock_snark_work_coordinator/mock_snark_work_coordinater.exe \
   -- \
   --coordinator-port $MOCK_COORDINATOR_PORT \
   --dumped-spec-path $DUMPED_SPEC_PATH \
   &
 
-MOCK_COORDINATOR=$!
+MOCK_COORDINATOR_PID=$!
 
-for i in $(seq 1 $NUM_WORKERS); do
-  dune exec \
-    src/app/cli/src/mina.exe \
-    -- \
-    internal snark-worker \
-    --daemon-address 127.0.0.1:$MOCK_COORDINATOR_PORT \
-    &
-done
+{
+  SNARK_WORKER_PIDS=()
+  echo "Sleeping for $WORKER_SLEEP before spawning workers"
+  sleep $WORKER_SLEEP
+  echo "Start spawning workers"
 
-waitpid $MOCK_COORDINATOR
+  for i in $(seq 1 $NUM_WORKERS); do
+    {
+      dune exec \
+        src/app/cli/src/mina.exe \
+        -- \
+        internal snark-worker \
+        --daemon-address 127.0.0.1:$MOCK_COORDINATOR_PORT
+    } &
+  SNARK_WORKER_PIDS+=($!)  # Capture PID of the background job
+  done
+  for pid in "${SNARK_WORKER_PIDS[@]}"; do
+    wait "$pid"
+  done
+} &
+SNARK_WORKER_GROUPS_PID=$!
+
+wait $MOCK_COORDINATOR_PID
+wait $SNARK_WORKER_GROUPS_PID

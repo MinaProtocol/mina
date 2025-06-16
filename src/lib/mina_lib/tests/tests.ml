@@ -161,8 +161,7 @@ let%test_module "Epoch ledger sync tests" =
       let open Context in
       Verifier.For_tests.default ~constraint_constants ~logger
         ~proof_level:precomputed_values.proof_level ~pids
-        ~conf_dir:(Some (make_dirname "verifier"))
-        ()
+        ~conf_dir:(make_dirname "verifier") ()
 
     let make_empty_ledger (module Context : CONTEXT) =
       Mina_ledger.Ledger.create

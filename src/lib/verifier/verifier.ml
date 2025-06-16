@@ -11,15 +11,15 @@ module Dummy = Dummy
    The implementation of dummy is equivalent to the one with
    [proof_level != Full], so this should make no difference. Inline tests
    shouldn't be run with [proof_level = Full].
+   WARN: do NOT attempt to log anything here! Some of our util would write
+   STDOUT to files and use them, e.g. GraphQL schema
 *)
 let implementation :
     (module Verifier_intf.S with type ledger_proof = Ledger_proof.t) =
-  match (Base__Import.am_testing, Sys.getenv_opt "USE_DUMMY_VERIFIER") with
+  match (Base__Import.am_testing, Sys.getenv_opt "MINA_USE_DUMMY_VERIFIER") with
   | true, _ | _, Some "1" ->
-      print_endline "Using dummy verifier" ;
       (module Dummy)
   | _ ->
-      print_endline "Using prod verifier" ;
       (module Prod)
 
 include (val implementation)
