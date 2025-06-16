@@ -21,3 +21,5 @@ module Spec = struct
   module Sub_zkapp = Sub_zkapp_spec
   module Partitioned = Partitioned_spec
 end
+
+module Metrics = Metrics

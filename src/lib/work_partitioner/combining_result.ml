@@ -68,7 +68,7 @@ let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
     , Mina_wire_types.Network_pool_priced_proof.V1.
         { proof; fee = { fee; prover } } )
 
-let merge_single_result (current : t)
+let merge_single_result (current : t) ~logger
     ~(submitted_result :
        (unit, Ledger_proof.Cached.t) Snark_work_lib.Result.Single.Poly.t )
     ~(submitted_half : submitted_half) : merge_outcome =
@@ -79,6 +79,13 @@ let merge_single_result (current : t)
     , (`First as submitted_half) )
   | ( Spec_only { spec = `Two (other_spec, spec); sok_message }
     , (`Second as submitted_half) ) ->
+      let log_event =
+        Snark_work_lib.(
+          Metrics.emit_single_metrics
+            ~single_spec:(Spec.Single.read_all_proofs_from_disk spec)
+            ~data:{ data = submitted_result.elapsed; proof = () })
+      in
+      [%str_log info] log_event ;
       Pending
         (One_of_two
            { other_spec

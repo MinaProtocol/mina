@@ -22,7 +22,7 @@
  (modules_without_implementation combined_result)
   
  (preprocess
-  (pps ppx_deriving_yojson ppx_jane ppx_version))
+  (pps ppx_deriving_yojson ppx_jane ppx_register_event ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Snark work types"))
