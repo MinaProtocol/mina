@@ -11,7 +11,8 @@ module Master = struct
   let name = "failed_to_generate_snark"
 
   module T = struct
-    type query = Error.t * Spec.Partitioned.Stable.Latest.t
+    type query =
+      Error.t * (unit, unit, unit) Spec.Partitioned.Poly.Stable.Latest.t
 
     type response = unit
   end
@@ -27,7 +28,8 @@ module Stable = struct
   module V3 = struct
     module T = struct
       type query =
-        Bounded_types.Wrapped_error.Stable.V1.t * Spec.Partitioned.Stable.V1.t
+        Bounded_types.Wrapped_error.Stable.V1.t
+        * (unit, unit, unit) Spec.Partitioned.Poly.Stable.V1.t
 
       type response = unit
 

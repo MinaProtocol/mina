@@ -186,10 +186,14 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
         with
         | Error e ->
+            let partitioned_id =
+              Spec.Partitioned.Poly.map ~f_single_spec:(const ())
+                ~f_subzkapp_spec:(const ()) ~f_data:(const ()) partitioned_spec
+            in
             let%bind () =
               match%map
                 dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
-                  shutdown_on_disconnect (e, partitioned_spec) daemon_address
+                  shutdown_on_disconnect (e, partitioned_id) daemon_address
               with
               | Error e ->
                   [%log error]
