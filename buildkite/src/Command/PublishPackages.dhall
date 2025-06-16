@@ -157,6 +157,13 @@ let publish
 
           let indexedAdditionalTags = Prelude.List.indexed Text additional_tags
 
+          let signedArg =
+                      if DebianRepo.isSigned spec.debian_repo
+
+                then  "--signed-debian-repo "
+
+                else  ""
+
           in    [ Command.build
                     Command.Config::{
                     , commands =
@@ -179,13 +186,28 @@ let publish
                                 ++  "--backend ${spec.backend} "
                                 ++  "--channel ${DebianChannel.lowerName
                                                    spec.channel} "
-                                ++  "--verify "
                                 ++  "--source-version ${spec.source_version} "
                                 ++  "--target-version ${target_version} "
                                 ++  "--codenames ${codenames} "
                                 ++  "--debian-repo ${DebianRepo.bucket_or_default
                                                        spec.debian_repo} "
                                 ++  "--only-debians "
+                                ++  "${keyArg}"
+                              )
+                          ]
+                        # [ Cmd.run
+                              (     ". ./buildkite/scripts/export-git-env-vars.sh && "
+                                ++  "./buildkite/scripts/release/manager.sh verify "
+                                ++  "--artifacts ${artifacts} "
+                                ++  "--networks ${networks} "
+                                ++  "--channel ${DebianChannel.lowerName
+                                                   spec.channel} "
+                                ++  "--version ${target_version} "
+                                ++  "--codenames ${codenames} "
+                                ++  "--debian-repo ${DebianRepo.bucket_or_default
+                                                       spec.debian_repo} "
+                                ++  "--only-debians "
+                                ++  "${signedArg}"
                                 ++  "${keyArg}"
                               )
                           ]
