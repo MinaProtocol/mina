@@ -11,3 +11,11 @@ let create f =
   Ivar.read ivar
 
 let to_deferred p = p
+
+module Let_syntax = struct
+  let return = return
+
+  let bind = bind
+
+  let map = map
+end

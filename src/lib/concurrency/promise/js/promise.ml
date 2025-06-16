@@ -38,3 +38,11 @@ include Base.Monad.Make (struct
 
   let return = return
 end)
+
+module Let_syntax = struct
+  let return = return
+
+  let bind = bind
+
+  let map = map
+end
