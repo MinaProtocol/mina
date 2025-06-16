@@ -62,6 +62,12 @@ let keyId =
             }
             repo
 
+let isSigned =
+          \(repo : DebianRepo)
+      ->  merge
+            { Local = False, Unstable = True, Nightly = True, Stable = True }
+            repo
+
 let keyAddress =
           \(repo : DebianRepo)
       ->  let keyPath = "/key.asc"
@@ -128,4 +134,5 @@ in  { Type = DebianRepo
     , bucketArg = bucketArg
     , keyId = keyId
     , keyArg = keyArg
+    , isSigned = isSigned
     }
