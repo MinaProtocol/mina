@@ -18,23 +18,28 @@ cd "${SCRIPTPATH}/../../_build"
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
-# Set dependencies based on debian release
-SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
-
 SUGGESTED_DEPS="jq, curl, wget"
 
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker"
 
 case "${MINA_DEB_CODENAME}" in
+  noble)
+    SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, rocksdb-tools"
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0 , mina-logproc"
+    ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
+    ;;
   bookworm|jammy)
+    SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   bullseye|focal)
+    SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
   stretch|bionic)
+    SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
     DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc1"
     ;;
@@ -123,7 +128,11 @@ build_deb() {
 
   # Build the package
   echo "------------------------------------------------------------"
-  fakeroot dpkg-deb --build "${BUILDDIR}" "${1}"_"${MINA_DEB_VERSION}".deb
+  # NOTE: the reason for `-Zgzip` is we might be building on newer Ubuntu, e.g. 
+  # Noble. The default packaging format is `zstd`, but then when we're building
+  # Docker image, we're examining those packages in buildkite's agent, where 
+  # `zstd` might not be available.
+  fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" "${1}"_"${MINA_DEB_VERSION}".deb
   echo "build_deb outputs:"
   ls -lh "${1}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
@@ -344,6 +353,36 @@ build_daemon_devnet_deb() {
   build_deb mina-devnet
 }
 ##################################### END DEVNET PACKAGE ########################################
+
+##################################### MAINNET LEGACY PACKAGE #######################################
+build_daemon_mainnet_legacy_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mainnet legacy deb without keys:"
+
+  create_control_file mina-mainnet-legacy "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+
+  # Copy legacy binary
+  cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-legacy"
+
+  build_deb mina-mainnet-legacy
+}
+##################################### END MAINNET LEGACY PACKAGE #######################################
+
+##################################### DEVNET LEGACY PACKAGE ############################################
+build_daemon_devnet_legacy_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building testnet signatures legacy deb without keys:"
+
+  create_control_file mina-devnet-legacy "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+
+  # Copy legacy binary
+  cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-legacy"
+
+  build_deb mina-devnet-legacy
+}
+##################################### END DEVNET LEGACY PACKAGE ########################################
 
 ##################################### BERKELEY PACKAGE ##########################################
 build_daemon_berkeley_deb() {

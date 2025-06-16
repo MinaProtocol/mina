@@ -27,7 +27,7 @@ function checkout_and_dump() {
     git checkout $__commit
     git submodule sync
     git submodule update --init --recursive
-    eval $(opam config env)
+    eval "$(opam config env)"
     TYPE_SHAPE_FILE=${__commit:0:7}-type_shape.txt
     dune exec src/app/cli/src/mina.exe internal dump-type-shapes > /tmp/${TYPE_SHAPE_FILE}
     revert_checkout
