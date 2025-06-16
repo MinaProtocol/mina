@@ -18,16 +18,17 @@ module Impl = struct
       { proof_level_snark : proof_level_snark
       ; proof_cache_db : Proof_cache_tag.cache_db
       ; logger : Logger.t
+      ; signature_kind : Mina_signature_kind.t
       }
 
-    let create ~constraint_constants ~proof_level () =
+    let create ~constraint_constants ~proof_level ~signature_kind () =
       let proof_cache_db = Proof_cache_tag.create_identity_db () in
       let proof_level_snark =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
             Full
               ( module Transaction_snark.Make (struct
-                let signature_kind = Mina_signature_kind.t_DEPRECATED
+                let signature_kind = signature_kind
 
                 let constraint_constants = constraint_constants
 
@@ -39,7 +40,11 @@ module Impl = struct
             No_check
       in
       Deferred.return
-        { proof_level_snark; proof_cache_db; logger = Logger.create () }
+        { proof_level_snark
+        ; proof_cache_db
+        ; logger = Logger.create ()
+        ; signature_kind
+        }
 
     let worker_wait_time = 5.
   end
@@ -191,7 +196,6 @@ module Impl = struct
               (* Validate the received transaction *)
               match w.transaction with
               | Command (Signed_command cmd) -> (
-                  let signature_kind = Mina_signature_kind.t_DEPRECATED in
                   match Signed_command.check ~signature_kind cmd with
                   | Some cmd ->
                       ( Ok (Command (Signed_command cmd))
@@ -220,9 +224,9 @@ module Impl = struct
         M.merge ~sok_digest proof1 proof2
 
   let perform_single
-      ({ proof_level_snark; proof_cache_db; logger } : Worker_state.t) ~message
+      ({ proof_level_snark; proof_cache_db; logger; signature_kind } :
+        Worker_state.t ) ~message
       (single_spec : Work.Selector.Single.Spec.Stable.Latest.t) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let sok_digest = Mina_base.Sok_message.digest message in
     match proof_level_snark with
     | Full ((module M) as m) ->
@@ -275,7 +279,9 @@ module Impl = struct
              } )
 
   let perform_partitioned
-      ~state:({ proof_level_snark; proof_cache_db; logger } : Worker_state.t)
+      ~state:
+        ({ proof_level_snark; proof_cache_db; logger; signature_kind } :
+          Worker_state.t )
       ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) :
       Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
@@ -283,7 +289,6 @@ module Impl = struct
       Work.Spec.Partitioned.Poly.sok_message partitioned_spec
       |> Sok_message.digest
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match proof_level_snark with
     | Worker_state.Full ((module M) as m) -> (
         match partitioned_spec with
