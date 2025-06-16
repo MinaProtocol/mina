@@ -149,8 +149,7 @@ let%test_module "Transaction union tests" =
               ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
-          Transaction_snark.check_transaction ~signature_kind:U.signature_kind
-            txn_in_block
+          Transaction_snark.check_transaction ~signature_kind txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants:U.constraint_constants
             ~sok_message:
