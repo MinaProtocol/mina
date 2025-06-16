@@ -2,10 +2,16 @@ open Mina_automation
 open Intf
 
 type after_bootstrap =
-  { archive : Archive.Process.t; network_data : Network_data.t }
+  { archive : Archive.Process.t
+  ; network_data : Network_data.t
+  ; temp_dir : string
+  }
 
 type before_bootstrap =
-  { config : Archive.Config.t; network_data : Network_data.t }
+  { config : Archive.Config.t
+  ; network_data : Network_data.t
+  ; temp_dir : string
+  }
 
 module type TestCaseWithBootstrap = TestCase with type t = after_bootstrap
 
