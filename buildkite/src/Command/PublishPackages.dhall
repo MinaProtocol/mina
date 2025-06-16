@@ -169,10 +169,9 @@ let publish
                               , privileged = True
                               , useRoot = True
                               }
-                              ( 
-                                "git config --global --add safe.directory /workdir && "
+                              (     "git config --global --add safe.directory /workdir && "
                                 ++  ". ./buildkite/scripts/export-git-env-vars.sh && "
-                                ++  "whoami && "
+                                ++  " gpg --import /var/secrets/debian && "
                                 ++  "./buildkite/scripts/release/manager.sh publish "
                                 ++  "--artifacts ${artifacts} "
                                 ++  "--networks ${networks} "
