@@ -127,7 +127,6 @@ module Transaction_key = struct
       in
       Mina_ledger.Ledger.register_mask ledger new_mask
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let _partial_stmt =
       Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
         ~constraint_constants

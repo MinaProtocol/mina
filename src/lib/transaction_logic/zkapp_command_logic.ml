@@ -1147,7 +1147,6 @@ module Make (Inputs : Inputs_intf) = struct
         handler )
       ((global_state : Global_state.t), (local_state : Local_state.t)) =
     let open Inputs in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let is_start' =
       let is_empty_call_forest =
         Call_forest.is_empty (Stack_frame.calls local_state.stack_frame)
