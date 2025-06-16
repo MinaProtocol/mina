@@ -8,6 +8,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineMode = ../../Pipeline/Mode.dhall
+
 let Network = ../../Constants/Network.dhall
 
 in  Pipeline.build
@@ -26,5 +28,6 @@ in  Pipeline.build
             , PipelineTag.Type.Docker
             ]
           , debVersion = DebianVersions.DebVersion.Noble
+          , mode = PipelineMode.Type.Stable
           }
       )
