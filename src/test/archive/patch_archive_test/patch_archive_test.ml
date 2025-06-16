@@ -105,18 +105,7 @@ let main ~db_uri ~network_data_folder () =
   let unpatched_extensional_files =
     List.filteri extensional_files ~f:(fun i _ ->
         not (Array.mem missing_blocks i ~equal:Int.equal) )
-    |> List.dedup_and_sort ~compare:(fun left right ->
-           let scan_height item =
-             let item =
-               Filename.basename item |> Str.global_replace (Str.regexp "-") " "
-             in
-             Scanf.sscanf item "%s %d %s" (fun _ height _ -> height)
-           in
-
-           let left_height = scan_height left in
-           let right_height = scan_height right in
-
-           Int.compare left_height right_height )
+    |> Utils.dedup_and_sort_archive_files
   in
 
   let%bind _ =
