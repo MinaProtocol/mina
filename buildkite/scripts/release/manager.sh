@@ -7,7 +7,6 @@ set -E # inherit -e
 set -e # exit immediately on errors
 set -u # exit on not assigned variables
 set -o pipefail # exit on pipe failure
-set -x 
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -1091,15 +1090,16 @@ function verify_help(){
     printf "  %-25s %s\n" "--version" "[path] target version of build to publish"; 
     printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal"; 
     printf "  %-25s %s\n" "--channel" "[string] target debian channel"; 
+    printf "  %-25s %s\n" "--debian-repo" "[string] debian repository. default: $DEBIAN_REPO";
     printf "  %-25s %s\n" "--docker-io" "[bool] publish to docker.io instead of gcr.io"; 
     printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images"; 
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages"; 
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME verify --artifacts mina-logproc,mina-archive,mina-rosetta --networks devnet,mainnet --buildkite-build-id 123 --source-version 2.0.0-rc1-48efea4 --version 2.0.0-rc1-48efea5 --codenames bullseye,focal --channel nightly --docker-io --only-dockers
+    echo "  " $CLI_NAME verify --artifacts mina-logproc,mina-archive,mina-rosetta --networks devnet,mainnet  --version 2.0.0-rc1-48efea5 --codenames bullseye,focal --channel nightly --docker-io --only-debian
     echo ""
-    echo " Above command will promote mina-logproc,mina-archive,mina-rosetta artifacts to debian repository and docker registry"
+    echo " Above command will promote mina-logproc,mina-archive,mina-rosetta artifacts to debian repository"
     echo ""
     echo ""
 }
@@ -1117,6 +1117,8 @@ function verify(){
     local __docker_io=0
     local __only_dockers=0
     local __only_debians=0
+    local __debian_repo=$DEBIAN_REPO
+    local __debian_repo_signed=0
 
 
     while [ ${#} -gt 0 ]; do
@@ -1143,6 +1145,14 @@ function verify(){
             ;;
             --channel )
                 __channel=${2:?$error_message}
+                shift 2;
+            ;;
+            --debian-repo )
+                __debian_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --signed-debian-repo )
+                __signed_debian_repo=${2:?$error_message}
                 shift 2;
             ;;
             --docker-io )
@@ -1175,6 +1185,8 @@ function verify(){
     echo " - Published to docker.io: $__docker_io"
     echo " - Only dockers: $__only_dockers"
     echo " - Only debians: $__only_debians"
+    echo " - Debian repo: $__debian_repo"
+    echo " - Debian repos is signed: $__debian_repo_signed"
     echo ""
     
     #check environment setup
@@ -1200,7 +1212,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
@@ -1218,7 +1231,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
 
                                     echo ""
                                 fi
@@ -1250,7 +1264,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
 
                                     echo ""
                                 fi
@@ -1282,7 +1297,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
                                     echo ""
                                 fi
 
