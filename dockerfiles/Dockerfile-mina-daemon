@@ -26,6 +26,7 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libffi7
 #    libprocps8
 #    libjemalloc2
+#    libssl
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
@@ -48,7 +49,6 @@ RUN apt-get update --quiet --yes \
     jq \
     libgmp10 \
     libgomp1 \
-    libssl1.1 \
     libpq-dev \
     procps \
     python3 \
@@ -70,7 +70,6 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
   && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
-  && apt-get install --quiet --yes --allow-downgrades "mina-create-legacy-genesis=1.4.0beta2-compatible-97f7d8c" \
   && rm -rf /var/lib/apt/lists/*
 
 

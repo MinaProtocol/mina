@@ -345,8 +345,9 @@ module T = struct
       ~pending_coinbases ~scan_state ~snarked_ledger ~snarked_local_state:_
       ~expected_merkle_root ~get_state f =
     let open Deferred.Or_error.Let_syntax in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let apply_first_pass =
-      Ledger.apply_transaction_first_pass ~constraint_constants
+      Ledger.apply_transaction_first_pass ~signature_kind ~constraint_constants
     in
     let apply_second_pass = Ledger.apply_transaction_second_pass in
     let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
@@ -490,6 +491,7 @@ module T = struct
       , Staged_ledger_error.t )
       Result.t =
     let open Result.Let_syntax in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let txn = With_status.data txn_with_status in
     let expected_status = With_status.status txn_with_status in
     (* TODO: for zkapps, we should actually narrow this by segments *)
@@ -510,8 +512,8 @@ module T = struct
     in
     let%map partially_applied_transaction =
       to_staged_ledger_or_error
-        (Ledger.apply_transaction_first_pass ~constraint_constants ~global_slot
-           ~txn_state_view ledger txn )
+        (Ledger.apply_transaction_first_pass ~signature_kind
+           ~constraint_constants ~global_slot ~txn_state_view ledger txn )
     in
     let target_ledger_hash = Ledger.merkle_root ledger in
     ( { Pre_statement.partially_applied_transaction
@@ -2510,65 +2512,67 @@ let%test_module "staged ledger tests" =
         -> int
         -> Account_id.t list
         -> unit =
-     fun test_ledger ~coinbase_cost ~global_slot ~protocol_state_view
-         staged_ledger cmds_all cmds_used pks_to_check ->
-      let producer_account_id =
-        Account_id.create coinbase_receiver Token_id.default
-      in
-      let producer_account =
-        Option.bind
-          (Ledger.location_of_account test_ledger producer_account_id)
-          ~f:(Ledger.get test_ledger)
-      in
-      let is_producer_acc_new = Option.is_none producer_account in
-      let old_producer_balance =
-        Option.value_map producer_account ~default:Currency.Balance.zero
-          ~f:(fun a -> a.balance)
-      in
-      let apply_cmds cmds =
-        cmds
-        |> List.map ~f:(fun cmd ->
-               Transaction.Command (User_command.forget_check cmd) )
-        |> Ledger.apply_transactions ~constraint_constants ~global_slot
-             ~txn_state_view:protocol_state_view test_ledger
-        |> Or_error.ignore_m
-      in
-      Or_error.ok_exn @@ apply_cmds @@ List.take cmds_all cmds_used ;
-      let get_account_exn ledger pk =
-        Option.value_exn
-          (Option.bind
-             (Ledger.location_of_account ledger pk)
-             ~f:(Ledger.get ledger) )
-      in
-      (* Check the user accounts in the updated staged ledger are as
-         expected.
-      *)
-      List.iter pks_to_check ~f:(fun pk ->
-          let expect = get_account_exn test_ledger pk in
-          let actual = get_account_exn (Sl.ledger staged_ledger) pk in
-          [%test_result: Account.t] ~expect actual ) ;
-      (* We only test that the block producer got the coinbase reward here, since calculating the exact correct amount depends on the snark fees and tx fees. *)
-      let producer_balance_with_coinbase =
-        (let open Option.Let_syntax in
-        let%bind total_cost =
-          if is_producer_acc_new then
-            Currency.Fee.add coinbase_cost
-              constraint_constants.account_creation_fee
-          else Some coinbase_cost
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      fun test_ledger ~coinbase_cost ~global_slot ~protocol_state_view
+          staged_ledger cmds_all cmds_used pks_to_check ->
+        let producer_account_id =
+          Account_id.create coinbase_receiver Token_id.default
         in
-        let%bind reward =
-          Currency.Amount.(
-            sub constraint_constants.coinbase_amount (of_fee total_cost))
+        let producer_account =
+          Option.bind
+            (Ledger.location_of_account test_ledger producer_account_id)
+            ~f:(Ledger.get test_ledger)
         in
-        Currency.Balance.add_amount old_producer_balance reward)
-        |> Option.value_exn
-      in
-      let new_producer_balance =
-        (get_account_exn (Sl.ledger staged_ledger) producer_account_id).balance
-      in
-      assert (
-        Currency.Balance.(
-          new_producer_balance >= producer_balance_with_coinbase) )
+        let is_producer_acc_new = Option.is_none producer_account in
+        let old_producer_balance =
+          Option.value_map producer_account ~default:Currency.Balance.zero
+            ~f:(fun a -> a.balance)
+        in
+        let apply_cmds cmds =
+          cmds
+          |> List.map ~f:(fun cmd ->
+                 Transaction.Command (User_command.forget_check cmd) )
+          |> Ledger.apply_transactions ~signature_kind ~constraint_constants
+               ~global_slot ~txn_state_view:protocol_state_view test_ledger
+          |> Or_error.ignore_m
+        in
+        Or_error.ok_exn @@ apply_cmds @@ List.take cmds_all cmds_used ;
+        let get_account_exn ledger pk =
+          Option.value_exn
+            (Option.bind
+               (Ledger.location_of_account ledger pk)
+               ~f:(Ledger.get ledger) )
+        in
+        (* Check the user accounts in the updated staged ledger are as
+           expected.
+        *)
+        List.iter pks_to_check ~f:(fun pk ->
+            let expect = get_account_exn test_ledger pk in
+            let actual = get_account_exn (Sl.ledger staged_ledger) pk in
+            [%test_result: Account.t] ~expect actual ) ;
+        (* We only test that the block producer got the coinbase reward here, since calculating the exact correct amount depends on the snark fees and tx fees. *)
+        let producer_balance_with_coinbase =
+          (let open Option.Let_syntax in
+          let%bind total_cost =
+            if is_producer_acc_new then
+              Currency.Fee.add coinbase_cost
+                constraint_constants.account_creation_fee
+            else Some coinbase_cost
+          in
+          let%bind reward =
+            Currency.Amount.(
+              sub constraint_constants.coinbase_amount (of_fee total_cost))
+          in
+          Currency.Balance.add_amount old_producer_balance reward)
+          |> Option.value_exn
+        in
+        let new_producer_balance =
+          (get_account_exn (Sl.ledger staged_ledger) producer_account_id)
+            .balance
+        in
+        assert (
+          Currency.Balance.(
+            new_producer_balance >= producer_balance_with_coinbase) )
 
     let work_fee = constraint_constants.account_creation_fee
 
@@ -2741,175 +2745,182 @@ let%test_module "staged ledger tests" =
         -> (   Transaction_snark_work.Statement.t
             -> Transaction_snark_work.Checked.t option )
         -> unit Deferred.t =
-     fun ~global_slot account_ids_to_check cmds cmd_iters sl
-         ?(expected_proof_count = None) ?(allow_failures = false)
-         ?(check_snarked_ledger_transition = false) ~snarked_ledger test_mask
-         provers stmt_to_work ->
-      let global_slot =
-        Mina_numbers.Global_slot_since_genesis.of_int global_slot
-      in
-      let state_tbl = State_hash.Table.create () in
-      (*Add genesis state to the table*)
-      let genesis, _ = dummy_state_and_view () in
-      let state_hash = (Mina_state.Protocol_state.hashes genesis).state_hash in
-      State_hash.Table.add state_tbl ~key:state_hash ~data:genesis |> ignore ;
-      let%map `Proof_count total_ledger_proofs, _ =
-        iter_cmds_acc cmds cmd_iters
-          (`Proof_count 0, `Slot global_slot)
-          (fun cmds_left count_opt cmds_this_iter
-               (`Proof_count proof_count, `Slot global_slot) ->
-            let current_state, current_view =
-              dummy_state_and_view ~global_slot ()
-            in
-            let state_hash =
-              (Mina_state.Protocol_state.hashes current_state).state_hash
-            in
-            State_hash.Table.add state_tbl ~key:state_hash ~data:current_state
-            |> ignore ;
-            let%bind ledger_proof, diff =
-              create_and_apply ~global_slot ~protocol_state_view:current_view
-                ~state_and_body_hash:
-                  ( state_hash
-                  , (Mina_state.Protocol_state.hashes current_state)
-                      .state_body_hash |> Option.value_exn )
-                sl cmds_this_iter stmt_to_work
-            in
-            List.iter (Staged_ledger_diff.commands diff) ~f:(fun c ->
-                match With_status.status c with
-                | Applied ->
-                    ()
-                | Failed ftl ->
-                    if not allow_failures then
-                      failwith
-                        (sprintf
-                           "Transaction application failed for command %s. \
-                            Failures %s"
-                           ( User_command.to_yojson (With_status.data c)
-                           |> Yojson.Safe.to_string )
-                           ( Transaction_status.Failure.Collection.to_yojson ftl
-                           |> Yojson.Safe.to_string ) ) ) ;
-            let do_snarked_ledger_transition proof_opt =
-              let apply_first_pass =
-                Ledger.apply_transaction_first_pass ~constraint_constants
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      fun ~global_slot account_ids_to_check cmds cmd_iters sl
+          ?(expected_proof_count = None) ?(allow_failures = false)
+          ?(check_snarked_ledger_transition = false) ~snarked_ledger test_mask
+          provers stmt_to_work ->
+        let global_slot =
+          Mina_numbers.Global_slot_since_genesis.of_int global_slot
+        in
+        let state_tbl = State_hash.Table.create () in
+        (*Add genesis state to the table*)
+        let genesis, _ = dummy_state_and_view () in
+        let state_hash =
+          (Mina_state.Protocol_state.hashes genesis).state_hash
+        in
+        State_hash.Table.add state_tbl ~key:state_hash ~data:genesis |> ignore ;
+        let%map `Proof_count total_ledger_proofs, _ =
+          iter_cmds_acc cmds cmd_iters
+            (`Proof_count 0, `Slot global_slot)
+            (fun cmds_left count_opt cmds_this_iter
+                 (`Proof_count proof_count, `Slot global_slot) ->
+              let current_state, current_view =
+                dummy_state_and_view ~global_slot ()
               in
-              let apply_second_pass = Ledger.apply_transaction_second_pass in
-              let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
-                  sparse_ledger txn =
-                let%map.Or_error _ledger, partial_txn =
-                  Mina_ledger.Sparse_ledger.apply_transaction_first_pass
-                    ~constraint_constants ~global_slot ~txn_state_view
-                    sparse_ledger txn
+              let state_hash =
+                (Mina_state.Protocol_state.hashes current_state).state_hash
+              in
+              State_hash.Table.add state_tbl ~key:state_hash ~data:current_state
+              |> ignore ;
+              let%bind ledger_proof, diff =
+                create_and_apply ~global_slot ~protocol_state_view:current_view
+                  ~state_and_body_hash:
+                    ( state_hash
+                    , (Mina_state.Protocol_state.hashes current_state)
+                        .state_body_hash |> Option.value_exn )
+                  sl cmds_this_iter stmt_to_work
+              in
+              List.iter (Staged_ledger_diff.commands diff) ~f:(fun c ->
+                  match With_status.status c with
+                  | Applied ->
+                      ()
+                  | Failed ftl ->
+                      if not allow_failures then
+                        failwith
+                          (sprintf
+                             "Transaction application failed for command %s. \
+                              Failures %s"
+                             ( User_command.to_yojson (With_status.data c)
+                             |> Yojson.Safe.to_string )
+                             ( Transaction_status.Failure.Collection.to_yojson
+                                 ftl
+                             |> Yojson.Safe.to_string ) ) ) ;
+              let do_snarked_ledger_transition proof_opt =
+                let apply_first_pass =
+                  Ledger.apply_transaction_first_pass ~signature_kind
+                    ~constraint_constants
                 in
-                partial_txn
-              in
-              let get_state state_hash =
-                Ok (State_hash.Table.find_exn state_tbl state_hash)
+                let apply_second_pass = Ledger.apply_transaction_second_pass in
+                let apply_first_pass_sparse_ledger ~global_slot ~txn_state_view
+                    sparse_ledger txn =
+                  let%map.Or_error _ledger, partial_txn =
+                    Mina_ledger.Sparse_ledger.apply_transaction_first_pass
+                      ~constraint_constants ~global_slot ~txn_state_view
+                      sparse_ledger txn
+                  in
+                  partial_txn
+                in
+                let get_state state_hash =
+                  Ok (State_hash.Table.find_exn state_tbl state_hash)
+                in
+                let%bind () =
+                  match proof_opt with
+                  | Some (proof, _transactions) ->
+                      (*update snarked ledger with the transactions in the most recently emitted proof*)
+                      let%map res =
+                        Sl.Scan_state.get_snarked_ledger_async
+                          ~ledger:snarked_ledger ~get_protocol_state:get_state
+                          ~apply_first_pass ~apply_second_pass
+                          ~apply_first_pass_sparse_ledger !sl.scan_state
+                      in
+                      let target_snarked_ledger =
+                        let stmt = Ledger_proof.Cached.statement proof in
+                        stmt.target.first_pass_ledger
+                      in
+                      [%test_eq: Ledger_hash.t] target_snarked_ledger
+                        (Ledger.merkle_root snarked_ledger) ;
+                      Or_error.ok_exn res
+                  | None ->
+                      Deferred.return ()
+                in
+                (*Check snarked_ledger to staged_ledger transition*)
+                let casted =
+                  Ledger.Any_ledger.cast (module Ledger) snarked_ledger
+                in
+                let sl_of_snarked_ledger =
+                  Ledger.Maskable.register_mask casted
+                    (Ledger.Mask.create ~depth:(Ledger.depth snarked_ledger) ())
+                in
+                let expected_staged_ledger_merkle_root =
+                  Ledger.merkle_root !sl.ledger
+                in
+                let%map construction_result =
+                  Sl.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
+                    ~snarked_local_state:
+                      Mina_state.(
+                        Protocol_state.blockchain_state current_state
+                        |> Blockchain_state.snarked_local_state)
+                    ~verifier ~constraint_constants ~scan_state:!sl.scan_state
+                    ~snarked_ledger:sl_of_snarked_ledger
+                    ~expected_merkle_root:expected_staged_ledger_merkle_root
+                    ~pending_coinbases:!sl.pending_coinbase_collection
+                    ~get_state
+                in
+                let _result = Or_error.ok_exn construction_result in
+                [%test_eq: Ledger_hash.t]
+                  (Ledger.merkle_root sl_of_snarked_ledger)
+                  (Ledger.merkle_root !sl.ledger) ;
+                ignore
+                  (Ledger.unregister_mask_exn sl_of_snarked_ledger ~loc:__LOC__)
               in
               let%bind () =
-                match proof_opt with
-                | Some (proof, _transactions) ->
-                    (*update snarked ledger with the transactions in the most recently emitted proof*)
-                    let%map res =
-                      Sl.Scan_state.get_snarked_ledger_async
-                        ~ledger:snarked_ledger ~get_protocol_state:get_state
-                        ~apply_first_pass ~apply_second_pass
-                        ~apply_first_pass_sparse_ledger !sl.scan_state
-                    in
-                    let target_snarked_ledger =
-                      let stmt = Ledger_proof.Cached.statement proof in
-                      stmt.target.first_pass_ledger
-                    in
-                    [%test_eq: Ledger_hash.t] target_snarked_ledger
-                      (Ledger.merkle_root snarked_ledger) ;
-                    Or_error.ok_exn res
-                | None ->
-                    Deferred.return ()
+                if check_snarked_ledger_transition then
+                  do_snarked_ledger_transition ledger_proof
+                else Deferred.return ()
               in
-              (*Check snarked_ledger to staged_ledger transition*)
-              let casted =
-                Ledger.Any_ledger.cast (module Ledger) snarked_ledger
+              let proof_count' =
+                Option.value_map ~default:proof_count
+                  ~f:(fun _ -> proof_count + 1)
+                  ledger_proof
               in
-              let sl_of_snarked_ledger =
-                Ledger.Maskable.register_mask casted
-                  (Ledger.Mask.create ~depth:(Ledger.depth snarked_ledger) ())
+              assert_fee_excess ledger_proof ;
+              let cmds_applied_this_iter =
+                List.length @@ Staged_ledger_diff.commands diff
               in
-              let expected_staged_ledger_merkle_root =
-                Ledger.merkle_root !sl.ledger
-              in
-              let%map construction_result =
-                Sl.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
-                  ~snarked_local_state:
-                    Mina_state.(
-                      Protocol_state.blockchain_state current_state
-                      |> Blockchain_state.snarked_local_state)
-                  ~verifier ~constraint_constants ~scan_state:!sl.scan_state
-                  ~snarked_ledger:sl_of_snarked_ledger
-                  ~expected_merkle_root:expected_staged_ledger_merkle_root
-                  ~pending_coinbases:!sl.pending_coinbase_collection ~get_state
-              in
-              let _result = Or_error.ok_exn construction_result in
-              [%test_eq: Ledger_hash.t]
-                (Ledger.merkle_root sl_of_snarked_ledger)
-                (Ledger.merkle_root !sl.ledger) ;
-              ignore
-                (Ledger.unregister_mask_exn sl_of_snarked_ledger ~loc:__LOC__)
-            in
-            let%bind () =
-              if check_snarked_ledger_transition then
-                do_snarked_ledger_transition ledger_proof
-              else Deferred.return ()
-            in
-            let proof_count' =
-              Option.value_map ~default:proof_count
-                ~f:(fun _ -> proof_count + 1)
-                ledger_proof
-            in
-            assert_fee_excess ledger_proof ;
-            let cmds_applied_this_iter =
-              List.length @@ Staged_ledger_diff.commands diff
-            in
-            let cb = coinbase_count diff in
-            ( match provers with
-            | `One_prover ->
-                assert (cb = 1)
-            | `Many_provers ->
-                assert (cb > 0 && cb < 3) ) ;
-            ( match count_opt with
-            | Some _ ->
-                (* There is an edge case where cmds_applied_this_iter = 0, when
-                   there is only enough space for coinbase transactions. *)
-                assert (cmds_applied_this_iter <= Sequence.length cmds_this_iter) ;
-                let commands_in_ledger =
-                  List.map (Staged_ledger_diff.commands diff)
-                    ~f:(fun { With_status.data; _ } -> data)
-                in
-                let commands_applied =
-                  Sequence.take cmds_this_iter cmds_applied_this_iter
-                  |> Sequence.map ~f:User_command.forget_check
-                  |> Sequence.to_list
-                in
-                assert (
-                  List.equal
-                    User_command.equal_ignoring_proofs_and_hashes_and_aux
-                    commands_in_ledger commands_applied )
-            | None ->
-                () ) ;
-            let coinbase_cost = coinbase_cost diff in
-            assert_ledger test_mask ~coinbase_cost ~global_slot
-              ~protocol_state_view:current_view !sl cmds_left
-              cmds_applied_this_iter account_ids_to_check ;
-            (*increment global slots to simulate multiple blocks*)
-            return
-              ( diff
-              , ( `Proof_count proof_count'
-                , `Slot
-                    (Mina_numbers.Global_slot_since_genesis.succ global_slot) )
-              ) )
-      in
-      (*Should have enough blocks to generate at least expected_proof_count
-        proofs*)
-      if Option.is_some expected_proof_count then
-        assert (total_ledger_proofs = Option.value_exn expected_proof_count)
+              let cb = coinbase_count diff in
+              ( match provers with
+              | `One_prover ->
+                  assert (cb = 1)
+              | `Many_provers ->
+                  assert (cb > 0 && cb < 3) ) ;
+              ( match count_opt with
+              | Some _ ->
+                  (* There is an edge case where cmds_applied_this_iter = 0, when
+                     there is only enough space for coinbase transactions. *)
+                  assert (
+                    cmds_applied_this_iter <= Sequence.length cmds_this_iter ) ;
+                  let commands_in_ledger =
+                    List.map (Staged_ledger_diff.commands diff)
+                      ~f:(fun { With_status.data; _ } -> data)
+                  in
+                  let commands_applied =
+                    Sequence.take cmds_this_iter cmds_applied_this_iter
+                    |> Sequence.map ~f:User_command.forget_check
+                    |> Sequence.to_list
+                  in
+                  assert (
+                    List.equal
+                      User_command.equal_ignoring_proofs_and_hashes_and_aux
+                      commands_in_ledger commands_applied )
+              | None ->
+                  () ) ;
+              let coinbase_cost = coinbase_cost diff in
+              assert_ledger test_mask ~coinbase_cost ~global_slot
+                ~protocol_state_view:current_view !sl cmds_left
+                cmds_applied_this_iter account_ids_to_check ;
+              (*increment global slots to simulate multiple blocks*)
+              return
+                ( diff
+                , ( `Proof_count proof_count'
+                  , `Slot
+                      (Mina_numbers.Global_slot_since_genesis.succ global_slot)
+                  ) ) )
+        in
+        (*Should have enough blocks to generate at least expected_proof_count
+          proofs*)
+        if Option.is_some expected_proof_count then
+          assert (total_ledger_proofs = Option.value_exn expected_proof_count)
 
     (* How many blocks do we need to fully exercise the ledger
        behavior and produce one ledger proof *)

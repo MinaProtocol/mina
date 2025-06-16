@@ -12,7 +12,8 @@
   ppx_inline_test.config
   ;; local libraries
   run_in_thread
-  logger)
+  logger
+  o1trace)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

@@ -108,8 +108,9 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
             in
             let partial_stmt =
               match
-                Ledger.apply_transaction_first_pass ~constraint_constants
-                  ~global_slot ~txn_state_view:state_view ledger
+                Ledger.apply_transaction_first_pass ~signature_kind
+                  ~constraint_constants ~global_slot ~txn_state_view:state_view
+                  ledger
                   (Mina_transaction.Transaction.Command
                      (Zkapp_command zkapp_command) )
               with
@@ -537,6 +538,7 @@ let check_balance pk balance ledger =
 
 (** Test legacy transactions*)
 let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Mina_transaction in
   let to_preunion (t : Transaction.t) =
     match t with
@@ -621,8 +623,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let expect_snark_failure, applied_transaction =
     match
       Result.( >>= )
-        (Ledger.apply_transaction_first_pass ledger ~constraint_constants
-           ~global_slot ~txn_state_view txn_unchecked )
+        (Ledger.apply_transaction_first_pass ~signature_kind ledger
+           ~constraint_constants ~global_slot ~txn_state_view txn_unchecked )
         (Ledger.apply_transaction_second_pass ledger)
     with
     | Ok res ->
