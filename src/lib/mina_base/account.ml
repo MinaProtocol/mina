@@ -1037,6 +1037,9 @@ let deriver obj =
        ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
        obj
 
+(* An unstable account is needed when we're doing ledger migration. The main
+   idea is we provide a function converting from Stable account to this type,
+   and storing all writes to the original ledger to the new ledger. *)
 module Unstable = struct
   type t =
     { public_key : Public_key.Compressed.Stable.V1.t
