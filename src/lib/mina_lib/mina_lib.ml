@@ -666,6 +666,7 @@ let get_ledger t state_hash_opt =
 
 let get_snarked_ledger_full t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind state_hash =
     Option.value_map state_hash_opt ~f:Deferred.Or_error.return
       ~default:
@@ -702,7 +703,7 @@ let get_snarked_ledger_full t state_hash_opt =
                       (State_hash.to_base58_check state_hash)
               in
               let apply_first_pass =
-                Ledger.apply_transaction_first_pass
+                Ledger.apply_transaction_first_pass ~signature_kind
                   ~constraint_constants:
                     t.config.precomputed_values.constraint_constants
               in
@@ -1877,9 +1878,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               | Some frontier ->
                   Transition_frontier.close ~loc:__LOC__ frontier ) ;
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
-          let net_ref = ref None in
           let sync_status_ref = ref None in
-          let get_node_status _env =
+          let get_node_status (net : Mina_networking.t) =
             O1trace.thread "handle_request_get_node_status" (fun () ->
                 let node_ip_addr =
                   config.gossip_net_params.addrs_and_ports.external_ip
@@ -1898,115 +1898,99 @@ let create ~commit_id ?wallets (config : Config.t) =
                                peer ID=%s, node status is disabled"
                              node_ip_addr node_peer_id ) )
                 else
-                  match !net_ref with
-                  | None ->
-                      (* should be unreachable; without a network, we wouldn't receive this RPC call *)
-                      [%log' info config.logger]
-                        "Network not instantiated when node status requested" ;
-                      Deferred.return
-                      @@ Error
-                           (Error.of_string
-                              (sprintf
-                                 !"Node with IP address=%{sexp: \
-                                   Unix.Inet_addr.t}, peer ID=%s, network not \
-                                   instantiated when node status requested"
-                                 node_ip_addr node_peer_id ) )
-                  | Some net ->
-                      let ( protocol_state_hash
-                          , best_tip_opt
-                          , k_block_hashes_and_timestamps ) =
-                        match get_current_frontier () with
-                        | None ->
-                            ( config.precomputed_values
-                                .protocol_state_with_hashes
-                                .hash
-                                .state_hash
-                            , None
-                            , [] )
-                        | Some frontier ->
-                            let tip = Transition_frontier.best_tip frontier in
-                            let protocol_state_hash =
-                              Transition_frontier.Breadcrumb.state_hash tip
-                            in
-                            let k_breadcrumbs =
-                              Transition_frontier.root frontier
-                              :: Transition_frontier.best_tip_path frontier
-                            in
-                            let k_block_hashes_and_timestamps =
-                              List.map k_breadcrumbs ~f:(fun bc ->
-                                  ( Transition_frontier.Breadcrumb.state_hash bc
-                                  , Option.value_map
-                                      (Transition_frontier.Breadcrumb
-                                       .transition_receipt_time bc )
-                                      ~default:"no timestamp available"
-                                      ~f:
-                                        (Time.to_string_iso8601_basic
-                                           ~zone:Time.Zone.utc ) ) )
-                            in
-                            ( protocol_state_hash
-                            , Some tip
-                            , k_block_hashes_and_timestamps )
-                      in
-                      let%bind peers = Mina_networking.peers net in
-                      let open Deferred.Or_error.Let_syntax in
-                      let%map sync_status =
-                        match !sync_status_ref with
-                        | None ->
-                            Deferred.return (Ok `Offline)
-                        | Some status ->
-                            Deferred.return
-                              (Mina_incremental.Status.Observer.value status)
-                      in
-                      let block_producers =
-                        config.block_production_keypairs
-                        |> Public_key.Compressed.Set.map ~f:snd
-                        |> Set.to_list
-                      in
-                      let ban_statuses =
-                        Trust_system.Peer_trust.peer_statuses
-                          config.trust_system
-                      in
-                      let git_commit = commit_id_short in
-                      let uptime_minutes =
-                        let now = Time.now () in
-                        let minutes_float =
-                          Time.diff now config.start_time |> Time.Span.to_min
+                  let ( protocol_state_hash
+                      , best_tip_opt
+                      , k_block_hashes_and_timestamps ) =
+                    match get_current_frontier () with
+                    | None ->
+                        ( config.precomputed_values.protocol_state_with_hashes
+                            .hash
+                            .state_hash
+                        , None
+                        , [] )
+                    | Some frontier ->
+                        let tip = Transition_frontier.best_tip frontier in
+                        let protocol_state_hash =
+                          Transition_frontier.Breadcrumb.state_hash tip
                         in
-                        (* if rounding fails, just convert *)
-                        Option.value_map
-                          (Float.iround_nearest minutes_float)
-                          ~f:Fn.id
-                          ~default:(Float.to_int minutes_float)
-                      in
-                      let block_height_opt =
-                        match best_tip_opt with
-                        | None ->
-                            None
-                        | Some tip ->
-                            let state =
-                              Transition_frontier.Breadcrumb.protocol_state tip
-                            in
-                            let consensus_state =
-                              state |> Mina_state.Protocol_state.consensus_state
-                            in
-                            Some
-                              ( Mina_numbers.Length.to_int
-                              @@ Consensus.Data.Consensus_state
-                                 .blockchain_length consensus_state )
-                      in
-                      Mina_networking.Node_status.Stable.V2.
-                        { node_ip_addr
-                        ; node_peer_id
-                        ; sync_status
-                        ; peers
-                        ; block_producers
-                        ; protocol_state_hash
-                        ; ban_statuses
-                        ; k_block_hashes_and_timestamps
-                        ; git_commit
-                        ; uptime_minutes
-                        ; block_height_opt
-                        } )
+                        let k_breadcrumbs =
+                          Transition_frontier.root frontier
+                          :: Transition_frontier.best_tip_path frontier
+                        in
+                        let k_block_hashes_and_timestamps =
+                          List.map k_breadcrumbs ~f:(fun bc ->
+                              ( Transition_frontier.Breadcrumb.state_hash bc
+                              , Option.value_map
+                                  (Transition_frontier.Breadcrumb
+                                   .transition_receipt_time bc )
+                                  ~default:"no timestamp available"
+                                  ~f:
+                                    (Time.to_string_iso8601_basic
+                                       ~zone:Time.Zone.utc ) ) )
+                        in
+                        ( protocol_state_hash
+                        , Some tip
+                        , k_block_hashes_and_timestamps )
+                  in
+                  let%bind peers = Mina_networking.peers net in
+                  let open Deferred.Or_error.Let_syntax in
+                  let%map sync_status =
+                    match !sync_status_ref with
+                    | None ->
+                        Deferred.return (Ok `Offline)
+                    | Some status ->
+                        Deferred.return
+                          (Mina_incremental.Status.Observer.value status)
+                  in
+                  let block_producers =
+                    config.block_production_keypairs
+                    |> Public_key.Compressed.Set.map ~f:snd
+                    |> Set.to_list
+                  in
+                  let ban_statuses =
+                    Trust_system.Peer_trust.peer_statuses config.trust_system
+                  in
+                  let git_commit = commit_id_short in
+                  let uptime_minutes =
+                    let now = Time.now () in
+                    let minutes_float =
+                      Time.diff now config.start_time |> Time.Span.to_min
+                    in
+                    (* if rounding fails, just convert *)
+                    Option.value_map
+                      (Float.iround_nearest minutes_float)
+                      ~f:Fn.id
+                      ~default:(Float.to_int minutes_float)
+                  in
+                  let block_height_opt =
+                    match best_tip_opt with
+                    | None ->
+                        None
+                    | Some tip ->
+                        let state =
+                          Transition_frontier.Breadcrumb.protocol_state tip
+                        in
+                        let consensus_state =
+                          state |> Mina_state.Protocol_state.consensus_state
+                        in
+                        Some
+                          ( Mina_numbers.Length.to_int
+                          @@ Consensus.Data.Consensus_state.blockchain_length
+                               consensus_state )
+                  in
+                  Mina_networking.Node_status.Stable.V2.
+                    { node_ip_addr
+                    ; node_peer_id
+                    ; sync_status
+                    ; peers
+                    ; block_producers
+                    ; protocol_state_hash
+                    ; ban_statuses
+                    ; k_block_hashes_and_timestamps
+                    ; git_commit
+                    ; uptime_minutes
+                    ; block_height_opt
+                    } )
           in
           let slot_tx_end =
             Runtime_config.slot_tx_end config.precomputed_values.runtime_config
@@ -2093,8 +2077,6 @@ let create ~commit_id ?wallets (config : Config.t) =
                   ~snark_job_state:(fun () -> Some snark_jobs_state)
                   ~get_node_status )
           in
-          (* tie the first knot *)
-          net_ref := Some net ;
           let user_command_input_reader, user_command_input_writer =
             Strict_pipe.(create ~name:"local user transactions" Synchronous)
           in
@@ -2148,6 +2130,17 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_most_recent_valid_block () =
             Broadcast_pipe.Reader.peek most_recent_valid_block_reader
           in
+
+          let transaction_resource_pool =
+            Network_pool.Transaction_pool.resource_pool transaction_pool
+          in
+          let transaction_pool_proxy : Staged_ledger.transaction_pool_proxy =
+            { find_by_hash =
+                Network_pool.Transaction_pool.Resource_pool.find_by_hash
+                  transaction_resource_pool
+            }
+          in
+
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2164,7 +2157,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ()
+              ~notify_online ~transaction_pool_proxy ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
