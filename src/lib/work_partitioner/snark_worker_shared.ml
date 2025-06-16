@@ -79,4 +79,7 @@ let extract_zkapp_segment_works ~m:(module M : S)
          [Transaction_snark.zkapp_command_witnesses_exn] using nonempty
          list. Also, should consider fusing this function with that to one,
          as this is the only callsite. *)
-      failwith "No witness generated"
+      Error
+        (Error.createf "No witness generated for zkapp_command : %s"
+           ( Zkapp_command.read_all_proofs_from_disk zkapp_command
+           |> Zkapp_command.Stable.Latest.to_yojson |> Yojson.Safe.to_string ) )
