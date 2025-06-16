@@ -173,8 +173,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         in
         let work_ids_json =
           ( "work_ids"
-          , `One (Spec.Partitioned.Stable.Latest.statement partitioned_spec)
-            |> Transaction_snark_work.Statement.compact_json )
+          , Spec.Partitioned.Stable.Latest.statement partitioned_spec
+            |> Mina_state.Snarked_ledger_state.to_yojson )
         in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
