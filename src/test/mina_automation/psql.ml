@@ -68,6 +68,13 @@ let create_credential_arg ~connection =
   @ value_or_empty "-U" credentials.user
   @ value_or_empty "-d" credentials.db
 
+(** [run_command ~connection command] runs a SQL command using psql with the given connection. 
+  The command is executed in the current directory, and the output is stripped of leading and trailing whitespace.
+
+  @param connection The connection string or credentials to connect to the PostgreSQL database.
+  @param command The SQL command to execute.
+  @return A deferred string containing the output of the command.
+*)
 let run_command ~connection command =
   let creds = create_credential_arg ~connection in
   Util.run_cmd_exn "." psql (creds @ [ "-c"; command; "-t" ]) >>| String.strip
