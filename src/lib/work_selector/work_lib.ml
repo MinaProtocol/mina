@@ -11,10 +11,12 @@ module Make (Inputs : Intf.Inputs_intf) = struct
        so we don't waste time calculate hashes *)
     module Job_key = struct
       type t = Transaction_snark.Statement.t One_or_two.t
-      [@@deriving compare, equal, sexp, to_yojson, hash]
+      [@@deriving compare, equal, sexp, to_yojson]
 
       let of_job x = One_or_two.map ~f:Work_spec.statement x
     end
+
+    module Job_key_set = Set.Make (Job_key)
 
     type t =
       { mutable available_jobs :
@@ -27,7 +29,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                 whenever the pipe has broadcasted new frontier. The works
                 between consecutive frontier broadcasts should be largely
                 identical. *)
-      ; jobs_scheduled : Job_key.t Hash_set.t
+      ; mutable jobs_scheduled : Job_key_set.t
+            (* WARN: Don't replace this with a hashset! Hashing statements are
+               very slow! *)
       ; reassignment_wait : int
       }
 
@@ -41,7 +45,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
      fun ~reassignment_wait ~frontier_broadcast_pipe ~logger ->
       let t =
         { available_jobs = []
-        ; jobs_scheduled = Hash_set.create (module Job_key)
+        ; jobs_scheduled = Job_key_set.empty
         ; reassignment_wait
         }
       in
@@ -80,11 +84,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                       t.available_jobs <- new_available_jobs ;
                       let new_job_keys =
                         List.map ~f:Job_key.of_job t.available_jobs
-                        |> Hash_set.of_list (module Job_key)
+                        |> Job_key_set.of_list
                       in
-                      Hash_set.filter_inplace
-                        ~f:(Hash_set.mem new_job_keys)
-                        t.jobs_scheduled ) ;
+                      t.jobs_scheduled <-
+                        Job_key_set.inter t.jobs_scheduled new_job_keys ) ;
                   Deferred.unit )
               |> Deferred.don't_wait_for ) ;
           Deferred.unit )
@@ -94,10 +97,12 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     let all_unscheduled_works t =
       O1trace.sync_thread "work_lib_all_unscheduled_works" (fun () ->
           List.filter t.available_jobs ~f:(fun js ->
-              not @@ Hash_set.mem t.jobs_scheduled (Job_key.of_job js) ) )
+              not @@ Job_key_set.mem t.jobs_scheduled (Job_key.of_job js) ) )
 
     let set_as_scheduled t x =
-      Hash_set.add t.jobs_scheduled (One_or_two.map ~f:Work_spec.statement x)
+      t.jobs_scheduled <-
+        Job_key_set.add t.jobs_scheduled
+          (One_or_two.map ~f:Work_spec.statement x)
   end
 
   let does_not_have_better_fee ~snark_pool ~fee
