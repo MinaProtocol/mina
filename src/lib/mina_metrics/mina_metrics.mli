@@ -60,7 +60,7 @@ module Cryptography : sig
 
   val snark_work_zkapp_base_time_sec : Counter.t
 
-  val snark_work_base_time_sec : Counter.t
+  val snark_work_non_zkapp_base_time_sec : Counter.t
 
   val snark_work_zkapp_base_submissions : Counter.t
 

@@ -70,7 +70,7 @@ module Cryptography = struct
 
   let snark_work_zkapp_base_time_sec : Counter.t = ()
 
-  let snark_work_base_time_sec : Counter.t = ()
+  let snark_work_non_zkapp_base_time_sec : Counter.t = ()
 
   let snark_work_zkapp_base_submissions : Counter.t = ()
 
