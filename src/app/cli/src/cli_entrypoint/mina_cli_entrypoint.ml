@@ -1856,8 +1856,7 @@ let internal_commands logger ~itn_features =
 
           let%bind verifier =
             Verifier.For_tests.default ~constraint_constants ~proof_level
-              ~commit_id:Mina_version.commit_id ~logger
-              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir) ()
+              ~commit_id:Mina_version.commit_id ~logger ~conf_dir ()
           in
           let%bind result =
             let cap lst =

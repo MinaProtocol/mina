@@ -3,21 +3,26 @@ module Failure = Verification_failure
 module Prod = Prod
 module Dummy = Dummy
 
-let m =
-  if Base__Import.am_testing then
-    (* Spawning a process using [Rpc_parallel] calls the current binary with a
-       particular set of arguments. Unfortunately, unit tests use the inline
-       test binary -- which doesn't support these arguments -- and so we're not
-       able to use these [Rpc_parallel] calls. Here we detect this and call out
-       to the dummy verifier instead.
-       The implementation of dummy is equivalent to the one with
-       [proof_level <> Full], so this should make no difference. Inline tests
-       shouldn't be run with [proof_level = Full].
-    *)
-    (module Dummy : Verifier_intf.S with type ledger_proof = Ledger_proof.t)
-  else (module Prod)
+(* Spawning a process using [Rpc_parallel] calls the current binary with a
+   particular set of arguments. Unfortunately, unit tests use the inline test
+   binary -- which doesn't support these arguments -- and so we're not able to
+   use these [Rpc_parallel] calls. Here we detect this and call out to the dummy
+   verifier instead.
+   The implementation of dummy is equivalent to the one with
+   [proof_level != Full], so this should make no difference. Inline tests
+   shouldn't be run with [proof_level = Full].
+*)
+let implementation :
+    (module Verifier_intf.S with type ledger_proof = Ledger_proof.t) =
+  match (Base__Import.am_testing, Sys.getenv_opt "USE_DUMMY_VERIFIER") with
+  | true, _ | _, Some "1" ->
+      print_endline "Using dummy verifier" ;
+      (module Dummy)
+  | _ ->
+      print_endline "Using prod verifier" ;
+      (module Prod)
 
-include (val m)
+include (val implementation)
 
 module For_tests = struct
   let get_verification_keys_eagerly ~constraint_constants ~proof_level =
@@ -40,11 +45,10 @@ module For_tests = struct
 
   let default ~logger ~constraint_constants ?enable_internal_tracing
       ?internal_trace_filename ~proof_level
-      ?(pids = Child_processes.Termination.create_pid_table ())
-      ?(conf_dir = None) ?(commit_id = "not specified for unit tests") () =
-    let open Async.Deferred.Let_syntax in
-    let%bind ( `Blockchain blockchain_verification_key
-             , `Transaction transaction_verification_key ) =
+      ?(pids = Child_processes.Termination.create_pid_table ()) ?conf_dir
+      ?(commit_id = "unspecified") () =
+    let%bind.Async.Deferred ( `Blockchain blockchain_verification_key
+                            , `Transaction transaction_verification_key ) =
       get_verification_keys_eagerly ~constraint_constants ~proof_level
     in
     create ~logger ?enable_internal_tracing ?internal_trace_filename

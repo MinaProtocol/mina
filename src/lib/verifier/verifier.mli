@@ -16,7 +16,7 @@ module For_tests : sig
     -> ?internal_trace_filename:string
     -> proof_level:Genesis_constants.Proof_level.t
     -> ?pids:Child_processes.Termination.t
-    -> ?conf_dir:string option
+    -> ?conf_dir:string
     -> ?commit_id:string
     -> unit
     -> t Async.Deferred.t
