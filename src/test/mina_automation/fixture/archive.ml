@@ -30,7 +30,7 @@ let read_postgres_uri_from_env_var () =
       uri
   | None ->
       failwith "Environment variable MINA_TEST_POSTGRES_URI is not set"
-      
+
 (** [setup_connection ~network_data] sets up a connection to the PostgreSQL database
   and creates a configuration for the Archive service.
 
