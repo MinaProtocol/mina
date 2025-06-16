@@ -678,24 +678,28 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           ~constraint_constants txn
         |> Or_error.ok_exn )
   in
-  match
-    Or_error.try_with (fun () ->
-        Transaction_snark.check_transaction ~constraint_constants ~sok_message
-          ~source_first_pass_ledger ~target_first_pass_ledger
-          ~init_stack:pending_coinbase_stack
-          ~pending_coinbase_stack_state:
-            { Transaction_snark.Pending_coinbase_stack_state.source =
-                pending_coinbase_stack
-            ; target = pending_coinbase_stack_target
-            }
-          ~supply_increase
-          { transaction = txn; block_data = state_body; global_slot }
-          (unstage @@ Sparse_ledger.handler sparse_ledger) )
-  with
-  | Error _e ->
-      assert expect_snark_failure
-  | Ok _ ->
-      assert (not expect_snark_failure)
+  let k () =
+    Transaction_snark.check_transaction ~constraint_constants ~sok_message
+      ~source_first_pass_ledger ~target_first_pass_ledger
+      ~init_stack:pending_coinbase_stack
+      ~pending_coinbase_stack_state:
+        { Transaction_snark.Pending_coinbase_stack_state.source =
+            pending_coinbase_stack
+        ; target = pending_coinbase_stack_target
+        }
+      ~supply_increase
+      { transaction = txn; block_data = state_body; global_slot }
+      (unstage @@ Sparse_ledger.handler sparse_ledger)
+      ~signature_kind
+  in
+  if expect_snark_failure then
+    match Or_error.try_with k with
+    | Error _ ->
+        ()
+    | Ok _ ->
+        raise
+          (Error.of_string "Expecting an exception but got none" |> Error.to_exn)
+  else k ()
 
 let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
     ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
