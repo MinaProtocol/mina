@@ -43,8 +43,7 @@ module Make (Lib : Intf.Lib_intf) = struct
   end
 
   let work ~snark_pool ~fee ~logger:_ (state : Lib.State.t) =
-    let unseen_jobs = Lib.State.all_unscheduled_works state in
-    match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
+    match Lib.State.all_unscheduled_expensive_works ~snark_pool ~fee state with
     | [] ->
         None
     | expensive_work ->

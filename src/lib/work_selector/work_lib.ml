@@ -28,25 +28,20 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                 between consecutive frontier broadcasts should be largely
                 identical. *)
       ; mutable jobs_scheduled : Job_key_set.t
+            (** Jobs that are already scheduled by the work selector. This is
+                only cleaned up when a new batch of jobs arrived. *)
             (* WARN: Don't replace this with a hashset! Hashing statements are
                very slow! *)
-      ; reassignment_wait : int
       }
 
     let init :
-           reassignment_wait:int
-        -> frontier_broadcast_pipe:
+           frontier_broadcast_pipe:
              Inputs.Transition_frontier.t option
              Pipe_lib.Broadcast_pipe.Reader.t
         -> logger:Logger.t
         -> t =
-     fun ~reassignment_wait ~frontier_broadcast_pipe ~logger ->
-      let t =
-        { available_jobs = []
-        ; jobs_scheduled = Job_key_set.empty
-        ; reassignment_wait
-        }
-      in
+     fun ~frontier_broadcast_pipe ~logger ->
+      let t = { available_jobs = []; jobs_scheduled = Job_key_set.empty } in
       Pipe_lib.Broadcast_pipe.Reader.iter frontier_broadcast_pipe
         ~f:(fun frontier_opt ->
           ( match frontier_opt with
@@ -92,38 +87,32 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       |> Deferred.don't_wait_for ;
       t
 
-    let all_unscheduled_works t =
-      O1trace.sync_thread "work_lib_all_unscheduled_works" (fun () ->
-          List.filter t.available_jobs ~f:(fun js ->
-              not @@ Job_key_set.mem t.jobs_scheduled (Job_key.of_job js) ) )
-
     let mark_scheduled t x =
       t.jobs_scheduled <-
         Job_key_set.add t.jobs_scheduled
           (One_or_two.map ~f:Work_spec.statement x)
-  end
 
-  let does_not_have_better_fee ~snark_pool ~fee
-      (statements : Inputs.Transaction_snark_work.Statement.t) : bool =
-    Option.value_map ~default:true
-      (Inputs.Snark_pool.get_completed_work snark_pool statements)
-      ~f:(fun priced_proof ->
-        let competing_fee =
-          Inputs.Transaction_snark_work.Checked.fee priced_proof
-        in
-        Fee.compare fee competing_fee < 0 )
+    let does_not_have_better_fee ~snark_pool ~fee
+        (statements : Inputs.Transaction_snark_work.Statement.t) : bool =
+      Option.value_map ~default:true
+        (Inputs.Snark_pool.get_completed_work snark_pool statements)
+        ~f:(fun priced_proof ->
+          let competing_fee =
+            Inputs.Transaction_snark_work.Checked.fee priced_proof
+          in
+          Fee.compare fee competing_fee < 0 )
+
+    let all_unscheduled_expensive_works ~snark_pool ~fee (t : t) =
+      O1trace.sync_thread "work_lib_all_unscheduled_expensive_works" (fun () ->
+          List.filter t.available_jobs ~f:(fun job ->
+              let job_key = Job_key.of_job job in
+              (not (Job_key_set.mem t.jobs_scheduled job_key))
+              && does_not_have_better_fee ~snark_pool ~fee job_key ) )
+  end
 
   module For_tests = struct
-    let does_not_have_better_fee = does_not_have_better_fee
+    let does_not_have_better_fee = State.does_not_have_better_fee
   end
-
-  let get_expensive_work ~snark_pool ~fee
-      (jobs : ('a, 'b) Work_spec.t One_or_two.t list) :
-      ('a, 'b) Work_spec.t One_or_two.t list =
-    O1trace.sync_thread "work_lib_get_expensive_work" (fun () ->
-        List.filter jobs ~f:(fun job ->
-            does_not_have_better_fee ~snark_pool ~fee
-              (One_or_two.map job ~f:Work_spec.statement) ) )
 
   let all_pending_work ~snark_pool statements =
     List.filter statements ~f:(fun st ->
@@ -152,7 +141,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
     in
     let expensive_work statements ~fee =
-      List.filter statements ~f:(does_not_have_better_fee ~snark_pool ~fee)
+      List.filter statements
+        ~f:(State.does_not_have_better_fee ~snark_pool ~fee)
     in
     match fee_opt with
     | None ->

@@ -2084,7 +2084,6 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           let work_selector =
             Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~logger:config.logger
           in
