@@ -1,7 +1,9 @@
 (** swappable strict pipe *)
 type ('data_in_pipe, 'write_return) t
 
-(** [create ?warn_on_drop ~name type] creates a swappable strict pipe. *)
+(** [create ?warn_on_drop ~name type] creates a swappable strict pipe.
+    This name would be used to generate prometheus metrics, so please obey the
+    naming convention, e.g. use underscore & alphas only. *)
 val create :
      ?warn_on_drop:bool
   -> name:string

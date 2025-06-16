@@ -9,6 +9,7 @@ module Poly : sig
         ; proof : 'proof
         ; elapsed : Mina_stdlib.Time.Span.Stable.V1.t
         }
+      [@@deriving to_yojson]
     end
   end]
 

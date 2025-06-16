@@ -402,11 +402,11 @@
     "opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1708601497,
-        "narHash": "sha256-mDYINTjOiYLN4wT5fGlWTvHFQdWkzY46XUuZWKgmJxY=",
+        "lastModified": 1749131784,
+        "narHash": "sha256-mg/09iq35MjQY5nemd8X5yu9DcJrBiBDVXfwAwtfCbE=",
         "owner": "ocaml",
         "repo": "opam-repository",
-        "rev": "90d8c520a4f0b035ac51e267a8b33739c5a78b5a",
+        "rev": "bc726805e36ba923501178d17bb69e6822269249",
         "type": "github"
       },
       "original": {

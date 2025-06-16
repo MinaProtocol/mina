@@ -15,8 +15,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
 
   let find ~id t = Hashtbl.find t.index id
 
-  let change_inplace ~id ~f t = Hashtbl.change t.index id ~f
-
   let rec remove_until_reschedule ~f t =
     let%bind.Option job_id = Deque.dequeue_front t.timeline in
     match Hashtbl.find t.index job_id with
