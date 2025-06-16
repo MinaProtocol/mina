@@ -5,7 +5,7 @@ module Make (Lib : Intf.Lib_intf) = struct
     | [] ->
         None
     | x :: _ ->
-        Lib.State.set_as_scheduled state x ;
+        Lib.State.mark_scheduled state x ;
         Some x
 end
 

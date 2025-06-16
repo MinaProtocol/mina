@@ -50,7 +50,7 @@ module Make (Lib : Intf.Lib_intf) = struct
     | expensive_work ->
         Offset.update ~new_length:(List.length expensive_work) ;
         let x = Offset.get_nth expensive_work in
-        Lib.State.set_as_scheduled state x ;
+        Lib.State.mark_scheduled state x ;
         Some x
 end
 

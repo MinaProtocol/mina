@@ -9,7 +9,7 @@ module Make (Lib : Intf.Lib_intf) = struct
     | expensive_work ->
         let i = Random.int (List.length expensive_work) in
         let x = List.nth_exn expensive_work i in
-        Lib.State.set_as_scheduled state x ;
+        Lib.State.mark_scheduled state x ;
         Some x
 end
 

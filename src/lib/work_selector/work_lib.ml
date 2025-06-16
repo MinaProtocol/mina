@@ -7,8 +7,6 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Work_spec = Snark_work_lib.Work.Single.Spec
 
   module State = struct
-    (* TODO: maybe factor out job numbering mechanism from partitioner to here,
-       so we don't waste time calculate hashes *)
     module Job_key = struct
       type t = Transaction_snark.Statement.t One_or_two.t
       [@@deriving compare, equal, sexp, to_yojson]
@@ -99,7 +97,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           List.filter t.available_jobs ~f:(fun js ->
               not @@ Job_key_set.mem t.jobs_scheduled (Job_key.of_job js) ) )
 
-    let set_as_scheduled t x =
+    let mark_scheduled t x =
       t.jobs_scheduled <-
         Job_key_set.add t.jobs_scheduled
           (One_or_two.map ~f:Work_spec.statement x)

@@ -125,7 +125,7 @@ module type Lib_intf = sig
          One_or_two.t
          list
 
-    val set_as_scheduled :
+    val mark_scheduled :
          t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
