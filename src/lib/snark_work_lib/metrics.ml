@@ -153,10 +153,8 @@ let emit_proof_metrics (result_with_spec : _ Partitioned_spec.Poly.t) =
       ; data = Proof_carrying_data.{ data = elapsed; _ }
       ; _
       } ->
-      (* TODO: This should be done once per whole zkapp command
-         Mina_metrics.(
-           Cryptography.(
-             Counter.inc_one snark_work_zkapp_base_submissions ;
+      (* WARN: `Mina_metrics.snark_work_zkapp_base_submissions` for this branch
+         tracked inside the work partitioner, as there's no way to know it here.
       *)
       Perf_histograms.add_span ~name:"snark_worker_subzkapp_time" elapsed ;
       Perf_histograms.add_span
