@@ -60,6 +60,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
     (* FIXME: Use a backoff algo here *)
     k ()
   in
+  (* TODO: refactor this whole function with Deferred.forever into a STM.
+     Now CPS-style is hard to understand *)
   let rec go () =
     let%bind daemon_address =
       let%bind cwd = Sys.getcwd () in
