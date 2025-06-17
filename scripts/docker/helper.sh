@@ -9,8 +9,11 @@ function export_base_image () {
     bionic|focal|impish|jammy|noble)
         IMAGE="ubuntu:${DEB_CODENAME##*=}"
     ;;
-    stretch|buster|bullseye|bookworm|sid)
+    stretch|buster|bullseye|sid)
         IMAGE="debian:${DEB_CODENAME##*=}-slim"
+    ;;
+    bookworm)
+        IMAGE="debian:bookworm"
     ;;
     esac
     export IMAGE="--build-arg image=${IMAGE}"
