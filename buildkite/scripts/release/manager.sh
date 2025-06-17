@@ -7,6 +7,7 @@ set -E # inherit -e
 set -e # exit immediately on errors
 set -u # exit on not assigned variables
 set -o pipefail # exit on pipe failure
+set -x # enable debug mode
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -1153,7 +1154,7 @@ function verify(){
             ;;
             --signed-debian-repo )
                 __signed_debian_repo=1
-                shift 2;
+                shift 1;
             ;;
             --docker-io )
                 __publish_to_docker_io=1
