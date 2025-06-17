@@ -392,14 +392,17 @@ module Ledger_inner = struct
     let cfg : converting_config =
       { primary_directory_name = None; converting_directory_name = None }
     in
-    let ledger = create_converting ~cfg ~depth () |> Or_error.ok_exn in
+    let%bind.Or_error ledger = create_converting ~cfg ~depth () in
     try
       let result = f ledger in
       close (fst ledger) ;
-      result
+      Ok result
     with exn ->
       close (fst ledger) ;
-      raise exn
+      Error (Error.of_exn exn)
+
+  let with_converting_ledger_exn ~depth ~f =
+    with_converting_ledger ~depth ~f |> Or_error.ok_exn
 
   let register_mask t mask =
     let accumulated = Mask.Attached.to_accumulated t in
@@ -877,7 +880,7 @@ let%test_unit "user_command application on converting ledger" =
   in
   Quickcheck.test ~trials:1 Test_spec.gen ~f:(fun { init_ledger; specs } ->
       let cmds = List.map specs ~f:command_send in
-      L.with_converting_ledger ~depth ~f:(fun (l, cl) ->
+      L.with_converting_ledger_exn ~depth ~f:(fun (l, cl) ->
           Init_ledger.init (module L) init_ledger l ;
           let init_merkle_root = L.merkle_root l in
           let init_cl_merkle_root = Unstable_db.merkle_root cl in
