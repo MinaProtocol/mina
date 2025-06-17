@@ -7,6 +7,8 @@ open Snark_work_lib
     - {:https://ocaml.org/p/async_rpc_kernel/v0.14.0/doc/Async_rpc_kernel/Versioned_rpc/index.html}
 *)
 
+(* TODO: refactor so we're not passing timestamp & sok_message or anything
+   non-crucial across RPC boundary*)
 module Master = struct
   let name = "submit_work"
 
