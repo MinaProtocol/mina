@@ -1152,7 +1152,7 @@ function verify(){
                 shift 2;
             ;;
             --signed-debian-repo )
-                __signed_debian_repo=${2:?$error_message}
+                __signed_debian_repo=1
                 shift 2;
             ;;
             --docker-io )
