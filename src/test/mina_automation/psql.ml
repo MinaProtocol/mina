@@ -51,7 +51,11 @@ let create_credential_arg ~connection =
         let host = uri |> Uri.host in
         let port = uri |> Uri.port in
         let db = uri |> Uri.path in
-        let db = if String.is_empty db then None else Some db in
+        (* Db part of Uri is presented as path therefore it includes leading '/',
+           which need to be removed *)
+        let db =
+          if String.is_empty db then None else Some (String.drop_prefix db 1)
+        in
         { Credentials.password; user; host; db; port }
     | Credentials credentials ->
         credentials
@@ -64,9 +68,16 @@ let create_credential_arg ~connection =
   @ value_or_empty "-U" credentials.user
   @ value_or_empty "-d" credentials.db
 
+(** [run_command ~connection command] runs a SQL command using psql with the given connection. 
+  The command is executed in the current directory, and the output is stripped of leading and trailing whitespace.
+
+  @param connection The connection string or credentials to connect to the PostgreSQL database.
+  @param command The SQL command to execute.
+  @return A deferred string containing the output of the command.
+*)
 let run_command ~connection command =
   let creds = create_credential_arg ~connection in
-  Util.run_cmd_exn "." psql (creds @ [ "-c"; command ])
+  Util.run_cmd_exn "." psql (creds @ [ "-c"; command; "-t" ]) >>| String.strip
 
 let run_script ~connection ~db script =
   let creds = create_credential_arg ~connection in

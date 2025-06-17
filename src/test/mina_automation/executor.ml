@@ -128,7 +128,7 @@ module Make (P : AppPaths) = struct
     | AutoDetect -> (
         match%bind Sys.file_exists PathFinder.built_name with
         | `Yes ->
-            f_local ~args ~prefix:PathFinder.built_name ?env ()
+            f_local ~args ~prefix:"" ?env ()
         | _ -> (
             match%bind
               Deferred.List.find_map
@@ -144,7 +144,7 @@ module Make (P : AppPaths) = struct
     | Debian ->
         f_debian ~args ~prefix:"" ?env ()
     | Local ->
-        f_local ~args ~prefix:PathFinder.built_name ?env ()
+        f_local ~args ~prefix:"" ?env ()
     | Docker ctx ->
         f_docker ~args ~ctx ()
 
