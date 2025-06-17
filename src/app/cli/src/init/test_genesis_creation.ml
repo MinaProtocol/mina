@@ -26,6 +26,7 @@ let time_genesis_creation () =
       ; constraint_constants =
           Genesis_constants.For_unit_tests.Constraint_constants.t
       ; commit_id
+      ; signature_kind = Mina_signature_kind.Testnet
       }
   in
   let worker_state_initialized = Time_ns.now () in
