@@ -94,6 +94,8 @@ module Worker_state = struct
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
         let module T = Transaction_snark.Make (struct
+          let signature_kind = Mina_signature_kind.t_DEPRECATED
+
           let constraint_constants = constraint_constants
 
           let proof_level = proof_level

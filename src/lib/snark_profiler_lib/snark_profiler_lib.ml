@@ -118,6 +118,7 @@ module Transaction_key = struct
   let of_zkapp_command
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~ledger
       (p : Zkapp_command.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let second_pass_ledger =
       let new_mask =
         Mina_ledger.Ledger.Mask.create
@@ -126,7 +127,6 @@ module Transaction_key = struct
       in
       Mina_ledger.Ledger.register_mask ledger new_mask
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let _partial_stmt =
       Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
         ~constraint_constants
@@ -137,7 +137,8 @@ module Transaction_key = struct
       |> Or_error.ok_exn
     in
     let segments =
-      Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
+      Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
+        ~constraint_constants
         ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero
@@ -770,6 +771,7 @@ let profile_zkapps
 
 let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
     (transitions : Transaction.Valid.t list) preeval =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   ignore
     ( let sok_message =
         Sok_message.create ~fee:Currency.Fee.zero
@@ -804,7 +806,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
                |> Or_error.ok_exn
              in
              let () =
-               Transaction_snark.check_transaction ?preeval
+               Transaction_snark.check_transaction ~signature_kind ?preeval
                  ~constraint_constants ~sok_message
                  ~source_first_pass_ledger:
                    (Sparse_ledger.merkle_root source_ledger)
@@ -832,6 +834,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
 
 let generate_base_snarks_witness ~genesis_constants ~constraint_constants
     sparse_ledger0 (transitions : Transaction.Valid.t list) preeval =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   ignore
     ( let sok_message =
         Sok_message.create ~fee:Currency.Fee.zero
@@ -866,8 +869,8 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
                |> Or_error.ok_exn
              in
              let () =
-               Transaction_snark.generate_transaction_witness ?preeval
-                 ~constraint_constants ~sok_message
+               Transaction_snark.generate_transaction_witness ~signature_kind
+                 ?preeval ~constraint_constants ~sok_message
                  ~source_first_pass_ledger:
                    (Sparse_ledger.merkle_root source_ledger)
                  ~target_first_pass_ledger:
