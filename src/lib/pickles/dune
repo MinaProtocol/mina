@@ -4,7 +4,16 @@
  (name pickles)
  (public_name pickles)
  (modules_without_implementation full_signature type intf pickles_intf)
- (flags -open Core_kernel)
+ ;; FIXME
+ ;; allowing -27 to avoid warnings about unused variables in
+ ;; - step_main
+ ;; - wrap_domains
+ ;; - wrap_main
+ ;; We treat all other warnings as errors (-warn-error +a)
+ (flags
+  -open
+  Core_kernel
+  (:standard -warn-error +a -w -27))
  (instrumentation
   (backend bisect_ppx))
  (preprocess

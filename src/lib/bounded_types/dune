@@ -3,6 +3,8 @@
  (public_name bounded_types)
  (instrumentation
   (backend bisect_ppx))
+ (flags
+  (:standard -warn-error +a))
  (libraries
   base.caml
   bin_prot
