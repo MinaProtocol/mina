@@ -79,13 +79,10 @@ let merge_single_result (current : t) ~logger
     , (`First as submitted_half) )
   | ( Spec_only { spec = `Two (other_spec, spec); sok_message }
     , (`Second as submitted_half) ) ->
-      let log_event =
-        Snark_work_lib.(
-          Metrics.emit_single_metrics
-            ~single_spec:(Spec.Single.read_all_proofs_from_disk spec)
-            ~data:{ data = submitted_result.elapsed; proof = () })
-      in
-      [%str_log info] log_event ;
+      Snark_work_lib.(
+        Metrics.emit_single_metrics ~logger
+          ~single_spec:(Spec.Single.read_all_proofs_from_disk spec)
+          ~data:{ data = submitted_result.elapsed; proof = () }) ;
       Pending
         (One_of_two
            { other_spec

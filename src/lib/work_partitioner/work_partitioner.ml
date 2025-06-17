@@ -370,12 +370,8 @@ let submit_into_pending_zkapp_command ~partitioner
     , Single_id_map.find partitioner.pending_zkapp_commands single_id )
   with
   | Some job, Some pending -> (
-      let log_event =
-        Work.Spec.Partitioned.Poly.Stable.Latest.Sub_zkapp_command { job; data }
-        |> Work.Metrics.emit_partitioned_metrics
-      in
-
-      [%str_log' info partitioner.logger] log_event ;
+      Work.Spec.Partitioned.Poly.Stable.Latest.Sub_zkapp_command { job; data }
+      |> Work.Metrics.emit_partitioned_metrics ~logger:partitioner.logger ;
       Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
       match Pending_zkapp_command.try_finalize pending with
       | None ->

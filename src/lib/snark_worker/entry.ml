@@ -135,7 +135,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
               Spec.Partitioned.Poly.map ~f_single_spec:ignore
                 ~f_subzkapp_spec:ignore ~f_data:Fn.id result
             in
-            [%str_log info] (Metrics.emit_partitioned_metrics result) ;
+            Metrics.emit_partitioned_metrics ~logger result ;
             let rec submit_work () =
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
