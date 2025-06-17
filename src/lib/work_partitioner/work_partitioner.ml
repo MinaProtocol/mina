@@ -273,7 +273,8 @@ let submit_into_combining_result ~submitted_result ~partitioner
   in
   match
     Combining_result.merge_single_result combining_result
-      ~submitted_result:submitted_result_cached ~submitted_half
+      ~logger:partitioner.logger ~submitted_result:submitted_result_cached
+      ~submitted_half
   with
   | Pending new_combining_result ->
       `Pending new_combining_result
@@ -360,7 +361,7 @@ let submit_single ~partitioner
 let submit_into_pending_zkapp_command ~partitioner
     ~(job_id : Work.Id.Sub_zkapp.t)
     ~data:
-      ({ proof; data = elapsed } :
+      ({ proof; data = elapsed } as data :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
   let single_id = Work.Id.Sub_zkapp.to_single job_id in
   match
@@ -368,7 +369,9 @@ let submit_into_pending_zkapp_command ~partitioner
         partitioner.zkapp_jobs_sent_by_partitioner
     , Single_id_map.find partitioner.pending_zkapp_commands single_id )
   with
-  | Some _, Some pending -> (
+  | Some job, Some pending -> (
+      Work.Spec.Partitioned.Poly.Stable.Latest.Sub_zkapp_command { job; data }
+      |> Work.Metrics.emit_partitioned_metrics ~logger:partitioner.logger ;
       Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
       match Pending_zkapp_command.try_finalize pending with
       | None ->
