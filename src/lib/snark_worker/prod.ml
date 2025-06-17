@@ -14,6 +14,8 @@ module Impl = struct
 
     type proof_level_snark = Full of (module S) | Check | No_check
 
+    (* TODO: Make it so that snark worker is configurationless, i.e. coordinater
+       tell the worker through RPC which sig kind should it use. *)
     type t =
       { proof_level_snark : proof_level_snark
       ; proof_cache_db : Proof_cache_tag.cache_db
