@@ -372,8 +372,9 @@ let submit_into_pending_zkapp_command ~partitioner
   | Some job, Some pending -> (
       let log_event =
         Work.Spec.Partitioned.Poly.Stable.Latest.Sub_zkapp_command { job; data }
-        |> Work.Metrics.emit_proof_metrics
+        |> Work.Metrics.emit_partitioned_metrics
       in
+
       [%str_log' info partitioner.logger] log_event ;
       Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
       match Pending_zkapp_command.try_finalize pending with
@@ -382,8 +383,6 @@ let submit_into_pending_zkapp_command ~partitioner
       | Some ({ job_id; _ }, proof, elapsed) ->
           partitioner.pending_zkapp_commands <-
             Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
-          Mina_metrics.(
-            Cryptography.(Counter.inc_one snark_work_zkapp_base_submissions)) ;
           submit_single ~partitioner
             ~submitted_result:{ spec = (); proof; elapsed }
             ~job_id )

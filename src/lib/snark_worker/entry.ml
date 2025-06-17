@@ -114,8 +114,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         with
         | Error e ->
             let partitioned_id =
-              Spec.Partitioned.Poly.map ~f_single_spec:(const ())
-                ~f_subzkapp_spec:(const ()) ~f_data:(const ()) partitioned_spec
+              Spec.Partitioned.Poly.map ~f_single_spec:ignore
+                ~f_subzkapp_spec:ignore ~f_data:ignore partitioned_spec
             in
             let%bind () =
               match%map
@@ -132,10 +132,10 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
             let result_without_spec =
-              Spec.Partitioned.Poly.map ~f_single_spec:(const ())
-                ~f_subzkapp_spec:(const ()) ~f_data:Fn.id result
+              Spec.Partitioned.Poly.map ~f_single_spec:ignore
+                ~f_subzkapp_spec:ignore ~f_data:Fn.id result
             in
-            [%str_log info] (Metrics.emit_proof_metrics result) ;
+            [%str_log info] (Metrics.emit_partitioned_metrics result) ;
             let rec submit_work () =
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
