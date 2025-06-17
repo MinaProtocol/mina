@@ -42,16 +42,15 @@ module Make (Lib : Intf.Lib_intf) = struct
         List.nth_exn expensive_work !offset
   end
 
-  let work ~snark_pool ~fee ~logger (state : Lib.State.t) =
-    Lib.State.remove_old_assignments state ~logger ;
-    let unseen_jobs = Lib.State.all_unseen_works state in
-    match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
+  let work ~snark_pool ~fee ~logger:_ (state : Lib.State.t) =
+    match Lib.State.all_unscheduled_expensive_works ~snark_pool ~fee state with
     | [] ->
         None
     | expensive_work ->
         Offset.update ~new_length:(List.length expensive_work) ;
         let x = Offset.get_nth expensive_work in
-        Lib.State.set state x ; Some x
+        Lib.State.mark_scheduled state x ;
+        Some x
 end
 
 let%test_module "test" =
