@@ -208,7 +208,6 @@ let publish
                                                        spec.debian_repo} "
                                 ++  "--only-debians "
                                 ++  "${signedArg}"
-                                ++  "${keyArg}"
                               )
                           ]
                     , label = "Debian Packages Publishing"
