@@ -17,7 +17,7 @@ in  { step =
                     [ "ARCHIVE_TEST_APP=mina-archive-node-test"
                     , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
                     ]
-                    "./src/test/archive/sample_db/archive_db.sql"
+                    "NETWORK_DATA_FOLDER=\\\$NETWORK_DATA_FOLDER ./src/test/archive/sample_db/archive_db.sql"
                     ( Artifacts.fullDockerTag
                         Artifacts.Tag::{
                         , artifact = Artifacts.Type.FunctionalTestSuite
