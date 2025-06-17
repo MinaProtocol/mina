@@ -78,7 +78,7 @@ module Limited = struct
       type t =
         { transition : Mina_block.Validated.Stable.V2.t
         ; protocol_states :
-            Mina_state.Protocol_state.Value.Stable.V2.t
+            Mina_state.Protocol_state.Value.Stable.V3.t
             Mina_base.State_hash.With_state_hashes.Stable.V1.t
             list
         ; common : Common.Stable.V2.t

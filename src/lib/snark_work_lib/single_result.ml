@@ -23,7 +23,7 @@ module Stable = struct
 
   module V1 = struct
     type t =
-      (Single_spec.Stable.V1.t, Ledger_proof.Stable.V2.t) Poly.Stable.V1.t
+      (Single_spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Poly.Stable.V1.t
 
     let to_latest = Fn.id
   end

@@ -195,7 +195,7 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t =
         { app_state : 'app_state
         ; verification_key : 'vk
@@ -225,16 +225,16 @@ type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t_ =
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
-      ( Zkapp_state.Value.Stable.V1.t
+      ( Zkapp_state.Value.Stable.V2.t
       , Verification_key_wire.Stable.V1.t option
       , Mina_numbers.Zkapp_version.Stable.V1.t
       , F.Stable.V1.t
       , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
       , bool
       , Zkapp_uri.Stable.V1.t )
-      Poly.Stable.V2.t
+      Poly.Stable.V3.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
     let to_latest = Fn.id

@@ -11,7 +11,7 @@ module Stable = struct
       { delegator : Account.Index.Stable.V1.t
       ; delegator_pk : Public_key.Compressed.Stable.V1.t
       ; coinbase_receiver_pk : Public_key.Compressed.Stable.V1.t
-      ; ledger : Mina_ledger.Sparse_ledger.Stable.V2.t
+      ; ledger : Mina_ledger.Sparse_ledger.Stable.V3.t
       ; producer_private_key : Private_key.Stable.V1.t
       ; producer_public_key : Public_key.Stable.V1.t
       }

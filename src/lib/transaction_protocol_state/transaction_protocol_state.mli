@@ -3,8 +3,8 @@
 module Block_data : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
-      type t = Mina_state.Protocol_state.Body.Value.Stable.V2.t
+    module V3 : sig
+      type t = Mina_state.Protocol_state.Body.Value.Stable.V3.t
       [@@deriving sexp]
     end
   end]
@@ -22,7 +22,7 @@ module Poly : sig
     module V2 : sig
       type 'a t =
         { transaction : 'a
-        ; block_data : Block_data.Stable.V2.t
+        ; block_data : Block_data.Stable.V3.t
         ; global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
         }
       [@@deriving sexp]

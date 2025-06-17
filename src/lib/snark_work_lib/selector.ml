@@ -24,7 +24,7 @@ module Spec = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = Single.Spec.Stable.V1.t Work.Spec.Stable.V1.t
+      type t = Single.Spec.Stable.V2.t Work.Spec.Stable.V1.t
       [@@deriving sexp, yojson]
 
       let to_latest = Fn.id

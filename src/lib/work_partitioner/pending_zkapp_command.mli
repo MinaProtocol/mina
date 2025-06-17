@@ -10,8 +10,8 @@ type t
 val create_and_yield_segment :
      job:(Spec.Single.t, Id.Single.t) With_job_meta.t
   -> unscheduled_segments:
-       Spec.Sub_zkapp.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
-  -> t * Spec.Sub_zkapp.Stable.V1.t
+       Spec.Sub_zkapp.Stable.Latest.t Mina_stdlib.Nonempty_list.Stable.Latest.t
+  -> t * Spec.Sub_zkapp.Stable.Latest.t
 
 val zkapp_job : t -> (Spec.Single.t, Id.Single.t) With_job_meta.t
 

@@ -47,7 +47,7 @@ if ! $(source buildkite/scripts/cache/manager.sh read mina-type-shapes/"$RELEASE
 fi
 
 if [[ -n "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}" ]]; then 
-    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
+    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
     if ! gsutil ls "gs://mina-type-shapes/${BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT}*"; then
         checkout_and_dump $BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT
     fi
