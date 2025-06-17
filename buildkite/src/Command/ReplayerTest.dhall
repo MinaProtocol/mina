@@ -6,8 +6,6 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
-let Network = ../Constants/Network.dhall
-
 let key = "replayer-test"
 
 in  { step =
@@ -18,8 +16,11 @@ in  { step =
                 [ RunWithPostgres.runInDockerWithPostgresConn
                     ([] : List Text)
                     "./src/test/archive/sample_db/archive_db.sql"
-                    Artifacts.Type.FunctionalTestSuite
-                    (None Network.Type)
+                    ( Artifacts.fullDockerTag
+                        Artifacts.Tag::{
+                        , artifact = Artifacts.Type.FunctionalTestSuite
+                        }
+                    )
                     "./buildkite/scripts/replayer-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Replayer test"
