@@ -1732,9 +1732,10 @@ let internal_commands logger ~itn_features =
                 Reader.read_sexp reader )
           with
           | `Ok sexp -> (
+              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let%bind worker_state =
                 Snark_worker.Inputs.Worker_state.create ~proof_level
-                  ~constraint_constants ()
+                  ~constraint_constants ~signature_kind ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
