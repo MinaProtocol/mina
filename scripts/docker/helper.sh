@@ -12,6 +12,9 @@ function export_base_image () {
     bullseye|bookworm|jammy)
         IMAGE="debian:${DEB_CODENAME##*=}-slim"
     ;;
+    bookworm)
+        IMAGE="debian:bookworm"
+    ;;
     esac
     export IMAGE="--build-arg image=${IMAGE}"
 }

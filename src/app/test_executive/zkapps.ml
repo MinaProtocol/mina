@@ -346,9 +346,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; actions = []
           }
         in
-        Transaction_snark.For_tests.single_account_update
-          ~signature_kind:Mina_signature_kind.(Other_network "Invalid")
-          ~constraint_constants spec
+        Transaction_snark.For_tests.single_account_update ~constraint_constants
+          spec
       in
       ( snapp_update
       , zkapp_command_update_all

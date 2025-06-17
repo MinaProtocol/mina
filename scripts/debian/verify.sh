@@ -88,7 +88,7 @@ SCRIPT=' set -x \
     '
 
 case $CODENAME in
-  bullseye) DOCKER_IMAGE="debian:$CODENAME" ;;
+  bullseye|bookworm) DOCKER_IMAGE="debian:$CODENAME" ;;
   focal|noble) DOCKER_IMAGE="ubuntu:$CODENAME" ;;
   *) echo "❌  Unknown codename passed: $CODENAME"; exit 1;;
 esac
