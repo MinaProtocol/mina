@@ -2087,8 +2087,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~logger:config.logger
           in
-          (* NOTE: see [Work_selector.Work_lib.Job_status.is_old],
-             [reassignment_wait] is interpreted as milliseconds *)
+          (* NOTE: [reassignment_wait] is interpreted as milliseconds *)
           let work_partitioner =
             Work_partitioner.create
               ~reassignment_timeout:
