@@ -10,25 +10,14 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Dockers = ../../Constants/DockerVersions.dhall
-
-let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let dependsOn =
-        Dockers.dependsOn
-          Dockers.Type.Bullseye
-          Network.Type.Berkeley
-          Profiles.Type.Standard
-          Artifacts.Type.Daemon
+        Dockers.dependsOn Dockers.DepsSpec::{ artifact = Artifacts.Type.Daemon }
       # Dockers.dependsOn
-          Dockers.Type.Bullseye
-          Network.Type.Berkeley
-          Profiles.Type.Standard
-          Artifacts.Type.Archive
+          Dockers.DepsSpec::{ artifact = Artifacts.Type.Archive }
 
 in  Pipeline.build
       Pipeline.Config::{

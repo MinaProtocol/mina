@@ -14,22 +14,13 @@ let PipelineMode = ../../Pipeline/Mode.dhall
 
 let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
-
 let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
 let network = Network.Type.Mainnet
 
-let dependsOn =
-      Dockers.dependsOn
-        Dockers.Type.Bullseye
-        network
-        Profiles.Type.Standard
-        Artifacts.Type.Daemon
+let dependsOn = Dockers.dependsOn Dockers.DepsSpec::{ network = network }
 
 in  Pipeline.build
       Pipeline.Config::{
