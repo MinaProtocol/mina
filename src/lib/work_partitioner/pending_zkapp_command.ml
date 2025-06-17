@@ -28,6 +28,8 @@ let create_and_yield_segment ~job
   let first_segment, unscheduled_segments =
     Mina_stdlib.Nonempty_list.uncons unscheduled_segments
   in
+  printf "have total number of segments %d!!\n"
+    (1 + List.length unscheduled_segments) ;
   ( { job
     ; unscheduled_segments = Queue.of_list unscheduled_segments
     ; pending_mergeable_proofs = Deque.create ()
@@ -52,16 +54,16 @@ let try_take2 (q : 'a Deque.t) : ('a * 'a) option =
 (** [next_merge t] attempts dequeuing 2 proofs from [t.pending_mergeable_proofs]
     and generate a sub-zkapp level spec merging them together. *)
 let next_merge (t : t) =
-  let open Option.Let_syntax in
-  let%map proof1, proof2 = try_take2 t.pending_mergeable_proofs in
+  let%map.Option proof1, proof2 = try_take2 t.pending_mergeable_proofs in
+  printf "Merge proof (%d, %d)\n" (Ledger_proof.hash proof1)
+    (Ledger_proof.hash proof2) ;
   t.proofs_in_flight <- t.proofs_in_flight + 1 ;
   Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
 
 (** [next_segment t] dequeus a segment from [t.unscheduled_segments] and generate a
    sub-zkapp level spec proving that segment. *)
 let next_segment (t : t) =
-  let open Option.Let_syntax in
-  let%map segment = Queue.dequeue t.unscheduled_segments in
+  let%map.Option segment = Queue.dequeue t.unscheduled_segments in
   t.proofs_in_flight <- t.proofs_in_flight + 1 ;
   segment
 
@@ -70,6 +72,7 @@ let next_subzkapp_job_spec (t : t) : Spec.Sub_zkapp.Stable.Latest.t option =
 
 let submit_proof (t : t) ~(proof : Ledger_proof.t)
     ~(elapsed : Time.Stable.Span.V1.t) =
+  printf "Submitting proof %d\n" (Ledger_proof.hash proof) ;
   Deque.enqueue_back t.pending_mergeable_proofs proof ;
   t.proofs_in_flight <- t.proofs_in_flight - 1 ;
   t.elapsed <- Time.Span.(t.elapsed + elapsed)
@@ -79,5 +82,8 @@ let try_finalize (t : t) =
     t.proofs_in_flight = 0
     && Queue.is_empty t.unscheduled_segments
     && Deque.length t.pending_mergeable_proofs = 1
-  then Some (t.job, Deque.dequeue_back_exn t.pending_mergeable_proofs, t.elapsed)
+  then (
+    printf "Finalized %d\n"
+      (Ledger_proof.hash (Deque.peek_front_exn t.pending_mergeable_proofs)) ;
+    Some (t.job, Deque.dequeue_back_exn t.pending_mergeable_proofs, t.elapsed) )
   else None

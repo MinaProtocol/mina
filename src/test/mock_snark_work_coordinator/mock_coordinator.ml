@@ -108,7 +108,7 @@ let start ~sok_message
              (Rpc.Implementations.create_exn
                 ~implementations:snark_worker_rpcs_coordinator
                 ~on_unknown_rpc:`Raise )
-           ~connection_state:(fun _ -> ())
+           ~connection_state:ignore
            ~on_handshake_error:
              (`Call
                (fun exn ->

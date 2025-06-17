@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# NOTE: please run this with devnet build
+
 # this test does the following: 
 # 1. starts `mock_snark_work_coordinator.exe`, which reads a list of predefined 
 # specs from a folder, and then starts a work partitioner to distribute jobs 
@@ -12,8 +14,10 @@
 # with exit code 0
 
 NUM_WORKERS=1
-# NOTE: have a proper sleep so when worker wakes up the coordinator is ready 
+# NOTE: Sleep is needed so when worker wakes up the coordinator is ready 
 WORKER_SLEEP=60s
+
+echo "DUMPED_SPEC_PATH = ${DUMPED_SPEC_PATH:?DUMPED_SPEC_PATH is not set, exiting}"
 
 while true; do
   # Random port between 1025 and 65535
@@ -31,9 +35,7 @@ cd $(git root)
 # Without `MINA_USE_DUMMY_VERIFIER=1`:
 # Error: No implementations provided for the following modules:
 #          Foreign referenced from /nix/store/0qd7g68imp2csmr22l8waxp0242bcv57-rpc_parallel-v0.14.0/lib/ocaml/4.14.2/site-lib/rpc_parallel/rpc_parallel.cmxa(Rpc_parallel__Utils)
-MINA_USE_DUMMY_VERIFIER=1 dune exec \
-  src/test/mock_snark_work_coordinator/mock_snark_work_coordinater.exe \
-  -- \
+MINA_USE_DUMMY_VERIFIER=1 ./_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinater.exe \
   --coordinator-port $MOCK_COORDINATOR_PORT \
   --dumped-spec-path $DUMPED_SPEC_PATH \
   &
@@ -48,9 +50,7 @@ MOCK_COORDINATOR_PID=$!
 
   for i in $(seq 1 $NUM_WORKERS); do
     {
-      dune exec \
-        src/app/cli/src/mina.exe \
-        -- \
+      ./_build/default/src/app/cli/src/mina.exe \
         internal snark-worker \
         --daemon-address 127.0.0.1:$MOCK_COORDINATOR_PORT
     } &

@@ -49,6 +49,11 @@ let read_all_specs_in_folder ~logger dir =
         Sequence.iter_m ~bind:Deferred.bind ~return:Deferred.return rest_files
           ~f:(Fn.compose Deferred.ignore_m (process_spec_file ~assumed_prover))
       in
+      [%log info] "Prover key for all snark workers"
+        ~metadata:
+          [ ( "prover"
+            , Signature_lib.Public_key.Compressed.to_yojson assumed_prover )
+          ] ;
       (assumed_prover, spec_queue)
 
 let start_verifier ~verifier ~num_specs_to_process ~input_sok_message ~logger
