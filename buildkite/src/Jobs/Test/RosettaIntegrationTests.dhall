@@ -12,8 +12,6 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Dockers = ../../Constants/DockerVersions.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
@@ -67,10 +65,11 @@ in  Pipeline.build
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn
-                  Dockers.Type.Bullseye
-                  network
-                  Profiles.Type.Standard
-                  Artifacts.Type.Rosetta
+                  Dockers.DepsSpec::{
+                  , codename = Dockers.Type.Bullseye
+                  , artifact = Artifacts.Type.Rosetta
+                  , network = network
+                  }
             }
         ]
       }

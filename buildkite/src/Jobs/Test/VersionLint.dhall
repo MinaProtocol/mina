@@ -20,15 +20,7 @@ let Size = ../../Command/Size.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Network = ../../Constants/Network.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
-
-let dependsOn =
-      DebianVersions.dependsOn
-        DebianVersions.DebVersion.Bullseye
-        Network.Type.Berkeley
-        Profiles.Type.Standard
+let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
 
 let buildTestCmd
     : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type

@@ -72,10 +72,12 @@ in  Pipeline.build
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn
-                  Dockers.Type.Bullseye
-                  network
-                  Profiles.Type.Standard
-                  Artifacts.Type.Rosetta
+                  Dockers.DepsSpec::{
+                  , codename = Dockers.Type.Bullseye
+                  , network = network
+                  , profile = Profiles.Type.Standard
+                  , artifact = Artifacts.Type.Rosetta
+                  }
             }
         ]
       }
