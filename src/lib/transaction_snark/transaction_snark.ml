@@ -4745,9 +4745,9 @@ module Make_str (A : Wire_types.Concrete) = struct
         }
     end
 
-    let single_account_update ?zkapp_prover_and_vk ~other_signature_kind
-        ~constraint_constants (spec : Single_account_update_spec.t) :
-        Zkapp_command.t Async.Deferred.t =
+    let single_account_update ?zkapp_prover_and_vk ~constraint_constants
+        (spec : Single_account_update_spec.t) : Zkapp_command.t Async.Deferred.t
+        =
       let signature_kind = Mina_signature_kind.Testnet in
       let `VK vk, `Prover prover =
         match zkapp_prover_and_vk with
@@ -4791,7 +4791,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       in
       let account_update_digest_with_selected_chain =
         Zkapp_command.Digest.Account_update.create
-          ~signature_kind:other_signature_kind account_update_with_dummy_auth
+          ~signature_kind:(Other_network "dummy") account_update_with_dummy_auth
       in
       let account_update_digest_with_current_chain =
         Zkapp_command.Digest.Account_update.create ~signature_kind

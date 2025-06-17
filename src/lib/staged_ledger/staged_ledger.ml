@@ -5141,10 +5141,8 @@ let%test_module "staged ledger tests" =
                     (zkapp_prover, Async.Deferred.return vk)
                   in
                   let%bind zkapp_command =
-                    single_account_update
-                      ~other_signature_kind:
-                        Mina_signature_kind.(Other_network "invalid")
-                      ~zkapp_prover_and_vk ~constraint_constants spec
+                    single_account_update ~zkapp_prover_and_vk
+                      ~constraint_constants spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Ledger.Ledger_inner)
