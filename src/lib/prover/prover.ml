@@ -73,6 +73,7 @@ module Worker_state = struct
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
     ; commit_id : string
+    ; signature_kind : Mina_signature_kind_type.t
     }
   [@@deriving bin_io_unversioned]
 
@@ -89,12 +90,18 @@ module Worker_state = struct
           }
         , Lazy.force Proof.transaction_dummy )
 
-  let create { logger; proof_level; constraint_constants; commit_id; _ } :
-      t Deferred.t =
+  let create
+      { logger
+      ; proof_level
+      ; constraint_constants
+      ; commit_id
+      ; signature_kind
+      ; _
+      } : t Deferred.t =
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
         let module T = Transaction_snark.Make (struct
-          let signature_kind = Mina_signature_kind.t_DEPRECATED
+          let signature_kind = signature_kind
 
           let constraint_constants = constraint_constants
 
@@ -370,6 +377,7 @@ module Worker = struct
             ; proof_level
             ; constraint_constants
             ; commit_id
+            ; signature_kind
             } =
         let max_size = 256 * 1024 * 512 in
         let num_rotate = 1 in
@@ -400,6 +408,7 @@ module Worker = struct
           ; proof_level
           ; constraint_constants
           ; commit_id
+          ; signature_kind
           }
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
@@ -413,7 +422,8 @@ type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
 let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
-    ~pids ~conf_dir ~proof_level ~constraint_constants ~commit_id () =
+    ~pids ~conf_dir ~proof_level ~constraint_constants ~commit_id
+    ~signature_kind () =
   [%log info] "Starting a new prover process" ;
   let on_failure err =
     [%log error] "Prover process failed with error $err"
@@ -431,6 +441,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       ; proof_level
       ; constraint_constants
       ; commit_id
+      ; signature_kind
       }
   in
   [%log info]

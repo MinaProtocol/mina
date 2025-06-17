@@ -1743,7 +1743,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
                         ~constraint_constants ~pids:config.pids
-                        ~conf_dir:config.conf_dir ()
+                        ~conf_dir:config.conf_dir
+                        ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
                     in
                     let%map () = set_itn_data (module Prover) prover in
                     prover ) )

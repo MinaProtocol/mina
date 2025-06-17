@@ -1705,7 +1705,8 @@ let internal_commands logger ~itn_features =
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
                      ~proof_level ~constraint_constants
-                     ~pids:(Pid.Table.create ()) ~conf_dir ()
+                     ~pids:(Pid.Table.create ()) ~conf_dir
+                     ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
@@ -1963,7 +1964,8 @@ let internal_commands logger ~itn_features =
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
               ~conf_dir ~proof_level
-              ~constraint_constants:precomputed_values.constraint_constants ()
+              ~constraint_constants:precomputed_values.constraint_constants
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
           in
           match%bind
             Prover.create_genesis_block prover
