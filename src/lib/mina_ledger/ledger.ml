@@ -305,6 +305,7 @@ module Ledger_inner = struct
       if Unstable_db.num_accounts db2 = 0 then
         Or_error.return @@ Converting_ledger.create_with_migration db1 db2
       else if not (Db.num_accounts db1 = Unstable_db.num_accounts db2) then (
+        (* TODO: ensure 2 dbs have exact same accounts *)
         Db.close db1 ;
         Unstable_db.close db2 ;
         Or_error.error_string
