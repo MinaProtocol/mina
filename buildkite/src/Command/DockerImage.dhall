@@ -58,7 +58,7 @@ let ReleaseSpec =
           , deb_release = "\\\${MINA_DEB_RELEASE}"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version =
-              "3.1.1-alpha1-dkijania-build-legacy-debian-on-comp-d50ebcc"
+              "3.1.1-alpha1-compatible-14a8b92"
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
