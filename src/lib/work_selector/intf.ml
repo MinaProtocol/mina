@@ -138,6 +138,13 @@ module type Lib_intf = sig
          list
   end
 
+  (**jobs that are not in the snark pool yet*)
+  val pending_work_statements :
+       snark_pool:Snark_pool.t
+    -> fee_opt:Fee.t option
+    -> State.t
+    -> Transaction_snark.Statement.t One_or_two.t list
+
   module For_tests : sig
     (** [does_not_have_better_fee ~snark_pool ~fee stmt] returns true iff the
         statement [stmt] haven't already been proved already in [snark_pool] or
@@ -150,13 +157,6 @@ module type Lib_intf = sig
       -> Transaction_snark_work.Statement.t
       -> bool
   end
-
-  (**jobs that are not in the snark pool yet*)
-  val pending_work_statements :
-       snark_pool:Snark_pool.t
-    -> fee_opt:Fee.t option
-    -> State.t
-    -> Transaction_snark.Statement.t One_or_two.t list
 end
 
 module type Selection_method_intf = sig

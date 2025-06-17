@@ -110,10 +110,6 @@ module Make (Inputs : Intf.Inputs_intf) = struct
               && does_not_have_better_fee ~snark_pool ~fee job_key ) )
   end
 
-  module For_tests = struct
-    let does_not_have_better_fee = State.does_not_have_better_fee
-  end
-
   let all_pending_work ~snark_pool statements =
     List.filter statements ~f:(fun st ->
         Option.is_none (Inputs.Snark_pool.get_completed_work snark_pool st) )
@@ -155,4 +151,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       List.map state.available_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
     in
     all_completed_work ~snark_pool all_todo_statements
+
+  module For_tests = struct
+    let does_not_have_better_fee = State.does_not_have_better_fee
+  end
 end
