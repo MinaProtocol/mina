@@ -36,6 +36,7 @@ cd $(git root)
 # Error: No implementations provided for the following modules:
 #          Foreign referenced from /nix/store/0qd7g68imp2csmr22l8waxp0242bcv57-rpc_parallel-v0.14.0/lib/ocaml/4.14.2/site-lib/rpc_parallel/rpc_parallel.cmxa(Rpc_parallel__Utils)
 MINA_USE_DUMMY_VERIFIER=1 ./_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinater.exe \
+  test \
   --coordinator-port $MOCK_COORDINATOR_PORT \
   --dumped-spec-path $DUMPED_SPEC_PATH \
   &
