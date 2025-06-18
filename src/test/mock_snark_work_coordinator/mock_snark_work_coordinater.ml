@@ -137,7 +137,9 @@ let command_verifier =
        in
        let logger = Logger.create () in
        [%log info] "Starting verifier" ;
+
        (* HACK: this has to run in its own thread to avoid some weird bug *)
+       Parallel.init_master () ;
        let verifier =
          Async.Thread_safe.block_on_async_exn (fun () ->
              Verifier.For_tests.default ~constraint_constants ~logger
@@ -200,6 +202,8 @@ let command_test_coordinator =
        in
        let logger = Logger.create () in
        [%log info] "Starting verifier" ;
+       (* NOTE: needed for Prod verifier *)
+       Parallel.init_master () ;
        (* HACK: this has to run in its own thread to avoid some weird bug *)
        let verifier =
          Async.Thread_safe.block_on_async_exn (fun () ->

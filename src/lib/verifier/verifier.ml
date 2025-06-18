@@ -20,6 +20,8 @@ let implementation :
   | true, _ | _, Some "1" ->
       (module Dummy)
   | _ ->
+      (* WARN: must set below code for Prod verifier!
+         Parallel.init_master () ; *)
       (module Prod)
 
 include (val implementation)
