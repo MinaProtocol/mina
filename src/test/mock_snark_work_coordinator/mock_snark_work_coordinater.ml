@@ -10,14 +10,18 @@ open Async
 open Mina_base
 open Pipe_lib
 
+open struct
+  module Work = Snark_work_lib
+end
+
 let read_all_specs_in_folder ~logger dir =
   let spec_queue = Queue.create () in
   let process_spec_file ?assumed_prover file =
     let full_path = dir ^ "/" ^ file in
     (*NOTE: ignoring fees, we'll use 0 for every spec in this test *)
-    let Dumped_spec.{ prover; spec; _ } =
+    let Work.Spec.Dumped.{ prover; spec; _ } =
       Yojson.Safe.from_file full_path
-      |> Dumped_spec.of_yojson |> Result.ok_or_failwith
+      |> Work.Spec.Dumped.of_yojson |> Result.ok_or_failwith
     in
     match assumed_prover with
     | None ->
@@ -57,7 +61,7 @@ let read_all_specs_in_folder ~logger dir =
       (assumed_prover, spec_queue)
 
 let start_verifier ~verifier ~num_specs_to_process ~input_sok_message ~logger
-    ~(source : Snark_work_lib.Result.Combined.t Strict_pipe.Reader.t) =
+    ~(source : Work.Result.Combined.t Strict_pipe.Reader.t) =
   let rec loop remaining_specs =
     if remaining_specs = 0 then (
       [%log info] "Verified all proofs" ;
