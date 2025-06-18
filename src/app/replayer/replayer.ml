@@ -641,6 +641,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         ~transport:(Logger_file_system.evergrowing ~log_filename)
         () ) ;
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1284,7 +1285,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   let%bind phase_1s =
                     Deferred.List.mapi txns ~f:(fun n txn ->
                         match
-                          Ledger.apply_transaction_first_pass
+                          Ledger.apply_transaction_first_pass ~signature_kind
                             ~constraint_constants
                             ~global_slot:
                               (Mina_numbers.Global_slot_since_genesis.of_uint32

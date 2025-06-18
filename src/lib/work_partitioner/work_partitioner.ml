@@ -28,9 +28,11 @@ type t =
       (Work.Spec.Single.t * Work.Id.Single.t * Mina_base.Sok_message.t) option
         (** When receving a `Two works from the underlying Work_selector, store
             one of them here, so we could schedule them to another worker. *)
+  ; proof_cache_db : Proof_cache_tag.cache_db
   }
 
-let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
+let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
+    ~(proof_cache_db : Proof_cache_tag.cache_db) : t =
   let module M = Transaction_snark.Make (struct
     let constraint_constants = Genesis_constants.Compiled.constraint_constants
 
@@ -46,6 +48,7 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t) : t =
   ; zkapp_jobs_sent_by_partitioner = Sent_zkapp_job_pool.create ()
   ; single_jobs_sent_by_partitioner = Sent_single_job_pool.create ()
   ; tmp_slot = None
+  ; proof_cache_db
   }
 
 let epoch_now () = Time.(now () |> to_span_since_epoch)
@@ -253,3 +256,150 @@ let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
         (request_from_selector_and_consume_by_partitioner ~partitioner
            ~work_from_selector ~sok_message )
     ]
+
+type submit_result =
+  | SpecUnmatched
+  | Removed
+  | Processed of Work.Result.Combined.t option
+
+let submit_into_combining_result ~submitted_result ~partitioner
+    ~combining_result ~submitted_half =
+  let submitted_result_cached =
+    Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
+      ~f_proof:
+        (Ledger_proof.Cached.write_proof_to_disk
+           ~proof_cache_db:partitioner.proof_cache_db )
+      submitted_result
+  in
+  match
+    Combining_result.merge_single_result combining_result
+      ~submitted_result:submitted_result_cached ~submitted_half
+  with
+  | Pending new_combining_result ->
+      `Pending new_combining_result
+  | Done combined ->
+      `Done combined
+  | HalfAlreadyInPool ->
+      [%log' debug partitioner.logger]
+        "Worker submit $result, which is already in the pairing job pool, \
+         meaning it's completed by another worker, ignoring"
+        ~metadata:
+          [ ( "result"
+            , Work.Result.Single.Poly.to_yojson
+                (const `Null)
+                Ledger_proof.to_yojson submitted_result )
+          ] ;
+      `Removed
+  | StructureMismatch { spec } ->
+      [%log' warn partitioner.logger]
+        "Worker submit $result that doesn't match the $spec in the pairing \
+         pool, ignoring"
+        ~metadata:
+          [ ( "spec"
+            , One_or_two.to_yojson
+                Work.Spec.Single.(
+                  Fn.compose Stable.Latest.to_yojson read_all_proofs_from_disk)
+                spec )
+          ; ( "result"
+            , Work.Result.Single.Poly.to_yojson
+                (fun () -> `Null)
+                Ledger_proof.to_yojson submitted_result )
+          ] ;
+      `SpecUnmatched
+
+(** Submits a result of a single job.
+    If job was part of the pairing, stores the half submitted in the pairing
+    pool and returns [Processed None];
+    If the other part was available in the pool, returns
+    [Processed (Some result)] and removes the pairing from the pool;
+    If pairing pool doesn't contain the job, it's most likely that another
+    worker have submitted it previously and it was removed. In this case,
+    [Spec_unmatched] is returned. *)
+let submit_single ~partitioner
+    ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
+    ~job_id =
+  let Work.Id.Single.{ which_one = submitted_half; pairing_id } = job_id in
+  match Hashtbl.find partitioner.pairing_pool pairing_id with
+  | None ->
+      [%log' debug partitioner.logger]
+        "Worker submit a work that's already removed from pairing pool, \
+         meaning it's completed/no longer needed, ignoring"
+        ~metadata:
+          [ ( "result"
+            , Work.Result.Single.Poly.to_yojson
+                (fun () -> `Null)
+                Ledger_proof.to_yojson submitted_result )
+          ] ;
+      Removed
+  | Some combining_result -> (
+      match
+        submit_into_combining_result ~submitted_result ~partitioner
+          ~combining_result ~submitted_half
+      with
+      | `Pending pending ->
+          Hashtbl.set ~key:pairing_id ~data:pending partitioner.pairing_pool ;
+          Processed None
+      | `Done result ->
+          Hashtbl.remove partitioner.pairing_pool pairing_id ;
+          Processed (Some result)
+      | `Removed ->
+          Removed
+      | `SpecUnmatched ->
+          SpecUnmatched )
+
+(** Submits a sub-zkapp job result to the pool. It removes the job id from
+    [zkapp_jobs_sent_by_partitioner] pool.
+    If the job id was present before the removal, and the pending zkapp command
+    is still present in [pending_zkapp_commands], then it attempts to finalize
+    the zkapp and returns [Processed None];
+    If pending zkapp is not yet finalized, or invokes [submit_single] if
+    finalization succeeded (also removing the pending zkapp command's record
+    from the [pending_zkapp_commands]);
+    If either sub-zkapp job spec or pending zkapp command aren't present,
+    returns [Removed]. *)
+let submit_into_pending_zkapp_command ~partitioner
+    ~(job_id : Work.Id.Sub_zkapp.t)
+    ~data:
+      ({ proof; data = elapsed } :
+        (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
+  let single_id = Work.Id.Sub_zkapp.to_single job_id in
+  match
+    ( Sent_zkapp_job_pool.remove ~id:job_id
+        partitioner.zkapp_jobs_sent_by_partitioner
+    , Single_id_map.find partitioner.pending_zkapp_commands single_id )
+  with
+  | Some _, Some pending -> (
+      Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
+      match Pending_zkapp_command.try_finalize pending with
+      | None ->
+          Processed None
+      | Some ({ job_id; _ }, proof, elapsed) ->
+          partitioner.pending_zkapp_commands <-
+            Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
+          submit_single ~partitioner
+            ~submitted_result:{ spec = (); proof; elapsed }
+            ~job_id )
+  | None, _ | _, None ->
+      [%log' debug partitioner.logger]
+        "Worker submit a work that's already removed from sent sub-zkapp job \
+         pool or pending zkapp command pool, meaning it's completed/no longer \
+         needed, ignoring"
+        ~metadata:
+          [ ("job_id", Work.Id.Sub_zkapp.to_yojson job_id)
+          ; ("proof", Ledger_proof.to_yojson proof)
+          ; ("elapsed", Mina_stdlib.Time.Span.to_yojson elapsed)
+          ] ;
+      Removed
+
+let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
+    ~(partitioner : t) =
+  match result with
+  | Work.Spec.Partitioned.Poly.Single
+      { job = Work.With_job_meta.{ job_id; spec; _ }
+      ; data = { proof; data = elapsed }
+      } ->
+      let submitted_result = Work.Result.Single.Poly.{ spec; proof; elapsed } in
+      submit_single ~partitioner ~submitted_result ~job_id
+  | Work.Spec.Partitioned.Poly.Sub_zkapp_command
+      { job = Work.With_job_meta.{ job_id; _ }; data } ->
+      submit_into_pending_zkapp_command ~partitioner ~job_id ~data

@@ -39,53 +39,55 @@ let
 
   implicit-deps-overlay = self: super:
     (if pkgs.stdenv.isDarwin then {
-      async_ssl = super.async_ssl.overrideAttrs {
+      async_ssl = super.async_ssl.overrideAttrs (s: {
         NIX_CFLAGS_COMPILE =
           "-Wno-implicit-function-declaration -Wno-incompatible-function-pointer-types";
+        buildInputs = s.buildInputs ++ [ pkgs.openssl ];
+      });
+    } else {
+      async_ssl = super.async_ssl.overrideAttrs
+        (s: { buildInputs = s.buildInputs ++ [ pkgs.openssl ]; });
+    }) // {
+      # https://github.com/Drup/ocaml-lmdb/issues/41
+      lmdb = super.lmdb.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
+
+      # Doesn't have an explicit dependency on ctypes-foreign
+      ctypes = super.ctypes.overrideAttrs
+        (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+
+      # Can't find sodium-static and ctypes
+      sodium = super.sodium.overrideAttrs {
+        NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
+        propagatedBuildInputs = [ pkgs.sodium-static ];
+        preBuild = ''
+          export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
+        '';
       };
-    } else
-      { }) // {
-        # https://github.com/Drup/ocaml-lmdb/issues/41
-        lmdb = super.lmdb.overrideAttrs
-          (oa: { buildInputs = oa.buildInputs ++ [ self.conf-pkg-config ]; });
 
-        # Doesn't have an explicit dependency on ctypes-foreign
-        ctypes = super.ctypes.overrideAttrs
-          (oa: { buildInputs = oa.buildInputs ++ [ self.ctypes-foreign ]; });
+      rocksdb_stubs = super.rocksdb_stubs.overrideAttrs (oa: {
+        MINA_ROCKSDB = let
+          mainPath = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
+          staticPath =
+            "${pkgs.rocksdb-mina.static or pkgs.rocksdb-mina}/lib/librocksdb.a";
+        in if builtins.pathExists mainPath then
+          mainPath
+        else if builtins.pathExists staticPath then
+          staticPath
+        else
+          throw
+          "Could not find librocksdb.a in either ${mainPath} or ${staticPath}";
+      });
 
-        # Can't find sodium-static and ctypes
-        sodium = super.sodium.overrideAttrs {
-          NIX_CFLAGS_COMPILE = "-I${pkgs.sodium-static.dev}/include";
-          propagatedBuildInputs = [ pkgs.sodium-static ];
-          preBuild = ''
-            export LD_LIBRARY_PATH="${super.ctypes}/lib/ocaml/${super.ocaml.version}/site-lib/ctypes";
-          '';
-        };
+      # This is needed because
+      # - lld package is not wrapped to pick up the correct linker flags
+      # - bintools package also includes as which is incompatible with gcc
+      lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
+        ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
 
-        rocksdb_stubs = super.rocksdb_stubs.overrideAttrs (oa: {
-          MINA_ROCKSDB = let
-            mainPath = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
-            staticPath = "${
-                pkgs.rocksdb-mina.static or pkgs.rocksdb-mina
-              }/lib/librocksdb.a";
-          in if builtins.pathExists mainPath then
-            mainPath
-          else if builtins.pathExists staticPath then
-            staticPath
-          else
-            throw
-            "Could not find librocksdb.a in either ${mainPath} or ${staticPath}";
-        });
-
-        # This is needed because
-        # - lld package is not wrapped to pick up the correct linker flags
-        # - bintools package also includes as which is incompatible with gcc
-        lld_wrapped = pkgs.writeShellScriptBin "ld.lld"
-          ''${pkgs.llvmPackages.bintools}/bin/ld.lld "$@"'';
-
-        core =
-          super.core.overrideAttrs { propagatedBuildInputs = [ pkgs.tzdata ]; };
-      };
+      core =
+        super.core.overrideAttrs { propagatedBuildInputs = [ pkgs.tzdata ]; };
+    };
 
   scope =
     opam-nix.applyOverlays (opam-nix.__overlays ++ [ implicit-deps-overlay ])

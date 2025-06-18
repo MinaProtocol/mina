@@ -104,7 +104,7 @@ echo "docker image: ${IMAGE}"
 if [[ -z "$SERVICE" ]]; then usage "Service is not set!"; fi;
 if [[ -z "$VERSION" ]]; then usage "Version is not set!"; fi;
 if [[ -z "$EXTRA" ]]; then EXTRA=""; fi;
-if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
+if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
 case "${SERVICE}" in
 mina-archive)

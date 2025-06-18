@@ -444,6 +444,7 @@ let init_permissionless_ledger ledger account_info =
         { account with balance; permissions = Permissions.empty } )
 
 let apply_to_ledger ledger cmd =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   match Transaction_hash.User_command_with_valid_signature.command cmd with
   | User_command.Signed_command c ->
       let (`If_this_is_used_it_should_have_a_comment_justifying_it v) =
@@ -458,7 +459,8 @@ let apply_to_ledger ledger cmd =
           )
   | User_command.Zkapp_command p -> (
       let applied, _ =
-        Mina_ledger.Ledger.apply_zkapp_command_unchecked ~constraint_constants
+        Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants
           ~global_slot:dummy_state_view.global_slot_since_genesis
           ~state_view:dummy_state_view ledger p
         |> Or_error.ok_exn

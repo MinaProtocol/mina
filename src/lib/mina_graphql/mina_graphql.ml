@@ -461,7 +461,8 @@ module Mutations = struct
                   |> Mina_state.Protocol_state.Body.view
                 in
                 let applied =
-                  Ledger.apply_zkapp_command_unchecked ~constraint_constants
+                  Ledger.apply_zkapp_command_unchecked ~signature_kind
+                    ~constraint_constants
                     ~global_slot:
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
                       |> Consensus.Data.Consensus_state

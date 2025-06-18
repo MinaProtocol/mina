@@ -19,11 +19,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
   (** [find ~id t] finds the job corresponding to id [id] in [t]. *)
   val find : id:Id.t -> t -> job option
 
-  (** [change_inplace ~id ~f t] attempts to find an item with id [id] in the
-      pool, and apply [f] on it. The order of this item in the timeline is
-      unchanged (hence "inplace" in the name). *)
-  val change_inplace : id:Id.t -> f:(job option -> job option) -> t -> unit
-
   (** [remove_until_reschedule ~f t] iterates through the timeline, for each
       encountered job [j], pattern match on [f j]:
       - If it's [`Remove], remove [j] and continue iteration;

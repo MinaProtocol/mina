@@ -10,7 +10,7 @@ let BuildFlags = ./BuildFlags.dhall
 
 let S = ../Lib/SelectFiles.dhall
 
-let DebVersion = < Bookworm | Bullseye | Jammy | Focal >
+let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
 let capitalName =
           \(debVersion : DebVersion)
@@ -19,6 +19,7 @@ let capitalName =
             , Bullseye = "Bullseye"
             , Jammy = "Jammy"
             , Focal = "Focal"
+            , Noble = "Noble"
             }
             debVersion
 
@@ -29,6 +30,7 @@ let lowerName =
             , Bullseye = "bullseye"
             , Jammy = "jammy"
             , Focal = "focal"
+            , Noble = "noble"
             }
             debVersion
 
@@ -54,6 +56,7 @@ let dependsOnStep =
                 , Bullseye = [ { name = name, key = "${step}-deb-pkg" } ]
                 , Jammy = [ { name = name, key = "${step}-deb-pkg" } ]
                 , Focal = [ { name = name, key = "${step}-deb-pkg" } ]
+                , Noble = [ { name = name, key = "${step}-deb-pkg" } ]
                 }
                 debVersion
 
@@ -72,7 +75,6 @@ let dependsOn =
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
-      , S.exactly "buildkite/src/Command/HardforkPackageGeneration" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
       , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
       , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
@@ -84,7 +86,6 @@ let minimalDirtyWhen =
       , S.strictlyStart (S.contains "scripts/debian")
       , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
-      , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
@@ -113,6 +114,7 @@ let dirtyWhen =
             , Bullseye = bullseyeDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
+            , Noble = minimalDirtyWhen
             }
             debVersion
 

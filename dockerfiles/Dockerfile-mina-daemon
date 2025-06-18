@@ -26,6 +26,7 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libffi7
 #    libprocps8
 #    libjemalloc2
+#    libssl
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
@@ -48,7 +49,6 @@ RUN apt-get update --quiet --yes \
     jq \
     libgmp10 \
     libgomp1 \
-    libssl1.1 \
     libpq-dev \
     procps \
     python3 \

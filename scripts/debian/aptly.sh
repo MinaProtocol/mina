@@ -77,7 +77,7 @@ function start_help(){
     echo ""
     echo "Parameters:"
     echo ""
-    echo "  -b, --background  The Docker name (mina, mina-archive etc.)"
+    echo "  -b, --background  The Docker name (mina-devnet, mina-archive etc.)"
     echo "  -c, --codename    The Codename for debian repository"
     echo "  -d, --debians     The Debian(s) to be available in aptly. Supports regular expression"
     echo "  -m, --component   The Component for debian repository. For example: unstable"

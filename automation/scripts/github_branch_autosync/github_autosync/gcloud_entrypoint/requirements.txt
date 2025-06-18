@@ -1,4 +1,0 @@
-pybuildkite==1.2.2
-PyGithub==1.58.1
-requests==2.22.0
-

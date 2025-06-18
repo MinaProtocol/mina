@@ -15,7 +15,13 @@ sudo -u postgres createdb -O "${user}" "${db}"
 
 # detects up a PostgreSQL database for an archive node.
 # Postgresql Environment Variables
-PGVERSION="${PGVERSION:-12}"
+PGVERSION=$(pg_lsclusters | awk 'NR==2 {print $1}')
+
+if [[ -z "$PGVERSION" ]]; then
+    echo "Error: PostgreSQL version not found"
+    exit 1
+fi
+
 PGPORT_DEFAULT="${PGPORT:-5432}"
 
 psql_config_file="/etc/postgresql/${PGVERSION}/main/postgresql.conf"
