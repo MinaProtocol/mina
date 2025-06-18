@@ -50,24 +50,24 @@ let engines : engine list =
   [ ("local", (module Integration_test_local_engine : Intf.Engine.S)) ]
 
 let tests : test list =
-  [ ( "peers-reliability"
-    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  [ ( "block-prod-prio"
+    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
+  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
-  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
+  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ( "peers-reliability"
+    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
+  ; ( "verification-key"
+    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
   ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
   ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
-  ; ( "verification-key"
-    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
-  ; ( "block-prod-prio"
-    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
-  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
-  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
-  ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
-  ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
