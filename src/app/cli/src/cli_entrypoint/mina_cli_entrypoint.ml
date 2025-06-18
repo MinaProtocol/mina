@@ -1764,10 +1764,10 @@ let internal_commands logger ~itn_features =
         (let open Command.Let_syntax in
         let%map_open mode =
           flag "--mode" ~aliases:[ "-mode" ] (required string)
-            ~doc:"transaction/blockchain the snark to verify. Defaults to json"
+            ~doc:"transaction/blockchain the snark to verify"
         and format =
           flag "--format" ~aliases:[ "-format" ] (optional string)
-            ~doc:"sexp/json the format to parse input in"
+            ~doc:"sexp/json the format to parse input in. Defaults to json"
         and limit =
           flag "--limit" ~aliases:[ "-limit" ] (optional int)
             ~doc:"limit the number of proofs taken from the file"
@@ -1787,6 +1787,8 @@ let internal_commands logger ~itn_features =
                 `Transaction
             | "blockchain" ->
                 `Blockchain
+            | "worker-output" ->
+                `Worker_output
             | mode ->
                 failwithf
                   "Expected mode flag to be one of transaction, blockchain, \
@@ -1824,7 +1826,9 @@ let internal_commands logger ~itn_features =
                 | `Blockchain ->
                     `Blockchain
                       (List.t_of_sexp Blockchain_snark.Blockchain.t_of_sexp
-                         input_sexp ) )
+                         input_sexp )
+                | `Worker_output ->
+                    failwith "TODO" )
             | `Json -> (
                 let%map input_line =
                   match%map Reader.read_line (Lazy.force Reader.stdin) with
@@ -1851,7 +1855,9 @@ let internal_commands logger ~itn_features =
                     | Ok input ->
                         `Blockchain input
                     | Error err ->
-                        failwithf "Could not parse JSON: %s" err () ) )
+                        failwithf "Could not parse JSON: %s" err () )
+                | `Worker_output ->
+                    failwith "TODO" )
           in
 
           let%bind verifier =
