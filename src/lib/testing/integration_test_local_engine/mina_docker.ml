@@ -157,10 +157,7 @@ module Network_config = struct
           Some
             { txpool_max_size = Some txpool_max_size
             ; peer_list_url = None
-            ; zkapp_proof_update_cost = None
-            ; zkapp_signed_single_update_cost = None
-            ; zkapp_signed_pair_update_cost = None
-            ; zkapp_transaction_cost_limit = None
+            ; max_zkapp_segment_per_transaction = None
             ; max_event_elements = None
             ; max_action_elements = None
             ; zkapp_cmd_limit_hardcap = None
@@ -576,7 +573,7 @@ module Network_config = struct
      file contains docker service definitions for each node in the local network. Each node service has different
      configurations which are specified as commands, environment variables, and docker bind volumes.
      We start by creating a runtime config volume to mount to each node service as a bind volume and then continue to create each
-     node service. As we create each definition for a service, we specify the docker command, volume, and environment varibles to 
+     node service. As we create each definition for a service, we specify the docker command, volume, and environment varibles to
      be used (which are mostly defaults).
   *)
   let to_docker network_config =

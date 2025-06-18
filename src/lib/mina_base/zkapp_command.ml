@@ -1309,16 +1309,33 @@ module Update_group = Make_update_group (struct
         failwith "zkapp_segment_of_controls: Unsupported combination"
 end)
 
-let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
-    ~(genesis_constants : Genesis_constants.t) () =
-  (*10.26*np + 10.08*n2 + 9.14*n1 < 69.45*)
-  let proof_cost = genesis_constants.zkapp_proof_update_cost in
-  let signed_pair_cost = genesis_constants.zkapp_signed_pair_update_cost in
-  let signed_single_cost = genesis_constants.zkapp_signed_single_update_cost in
-  Float.(
-    (proof_cost * of_int proof_segments)
-    + (signed_pair_cost * of_int signed_pair_segments)
-    + (signed_single_cost * of_int signed_single_segments))
+(** [zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments]
+    returns the cost of a zkapp command having such constitution.
+
+    The cost of a zkapp command is defined as the number of segments it have in
+    the base layer.
+
+    This is because SNARK Coordinator schedules single base proof/merge to each
+    SNARK worker. These proofs form a B-ary tree, where B is Pickles' branching
+    factor, i.e. the number of proofs Pickles could be merged at once. Under
+    current configuration, B is 2.
+
+    The latency before us getting a final proof would be the latency from root
+    to any leaf node. Given we have sufficient workers available, possible proof
+    trees would be more or less a balanced binary tree, so with n segments, the
+    latency would of Theta(log_B n), assuming all kind proofs requires roughly
+    same time to proof.
+
+    to ensure the latency of receving final proof to be smaller than some cap,
+    we could equally just restrict number of leave segments. For example, If we
+    want the tree to have at most [L] layers, we just ensure the cost for any
+    zkapp_command to be at most [B^L].
+
+    WARN: this is only relevant after we merged SNARK worker rework PRs, please
+    remove this warning if we've already done so.
+*)
+let zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments =
+  proof_segments + signed_single_segments + signed_pair_segments
 
 (* Zkapp_command transactions are filtered using this predicate
    - when adding to the transaction pool
@@ -1361,14 +1378,17 @@ let valid_size (type aux) ~(genesis_constants : Genesis_constants.t)
         | Signed_pair ->
             (proof_segments, signed_singles, signed_pairs + 1) )
   in
-  let cost_limit = genesis_constants.zkapp_transaction_cost_limit in
-  let max_event_elements = genesis_constants.max_event_elements in
-  let max_action_elements = genesis_constants.max_action_elements in
+  let Genesis_constants.
+        { max_event_elements
+        ; max_action_elements
+        ; max_zkapp_segment_per_transaction
+        ; _
+        } =
+    genesis_constants
+  in
   let zkapp_cost_within_limit =
-    Float.(
-      zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
-        ~genesis_constants ()
-      < cost_limit)
+    zkapp_cost ~proof_segments ~signed_single_segments ~signed_pair_segments
+    <= max_zkapp_segment_per_transaction
   in
   let valid_event_elements = num_event_elements <= max_event_elements in
   let valid_action_elements = num_action_elements <= max_action_elements in
