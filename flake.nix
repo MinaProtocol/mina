@@ -95,6 +95,11 @@
           ocamlPackages_mina =
             requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
         };
+         skipNodeTests = final: prev: {
+          nodejs = prev.nodejs.overrideAttrs(old: {
+            doCheck = false;
+          });
+        };
       };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
       # Mina Demo container
