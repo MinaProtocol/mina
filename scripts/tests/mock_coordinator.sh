@@ -13,9 +13,9 @@
 # 4. Once the mock coordinator verified every proof predefined, it will exit
 # with exit code 0
 
-NUM_WORKERS=3
+NUM_WORKERS=5
 # NOTE: Sleep is needed so when worker wakes up the coordinator is ready 
-WORKER_SLEEP=20s
+WORKER_SLEEP=60s
 
 echo "DUMPED_SPEC_PATH = ${DUMPED_SPEC_PATH:?DUMPED_SPEC_PATH is not set, exiting}"
 echo "PROOF_OUTPUT_PATH = ${PROOF_OUTPUT_PATH:?PROOF_OUTPUT_PATH is not set, exiting}"
