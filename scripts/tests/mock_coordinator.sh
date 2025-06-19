@@ -18,6 +18,7 @@ NUM_WORKERS=1
 WORKER_SLEEP=60s
 
 echo "DUMPED_SPEC_PATH = ${DUMPED_SPEC_PATH:?DUMPED_SPEC_PATH is not set, exiting}"
+echo "PROOF_OUTPUT_PATH = ${PROOF_OUTPUT_PATH:?PROOF_OUTPUT_PATH is not set, exiting}"
 
 while true; do
   # Random port between 1025 and 65535
@@ -39,6 +40,7 @@ MINA_USE_DUMMY_VERIFIER=1 ./_build/default/src/test/mock_snark_work_coordinator/
   test \
   --coordinator-port $MOCK_COORDINATOR_PORT \
   --dumped-spec-path $DUMPED_SPEC_PATH \
+  --save-proofs $PROOF_OUTPUT_PATH \
   &
 
 MOCK_COORDINATOR_PID=$!

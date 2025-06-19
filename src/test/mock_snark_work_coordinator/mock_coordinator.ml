@@ -7,13 +7,15 @@ end
 
 let proof_cache_db = Proof_cache_tag.create_identity_db ()
 
+let counter = ref 0
+
 (* NOTE:
    The code here is adapt from Mina_lib & Mina_run.
 *)
 let start ~sok_message
     ~(predefined_specs : Work.Spec.Single.Stable.Latest.t One_or_two.t Queue.t)
     ~partitioner ~logger ~port ~rpc_handshake_timeout ~rpc_heartbeat_send_every
-    ~rpc_heartbeat_timeout ~completed_snark_work_sink =
+    ~rpc_heartbeat_timeout ~completed_snark_work_sink ?save_proof =
   [%log info] "Starting mock snark work coordinator"
     ~metadata:[ ("port", `Int port) ] ;
   let work_from_selector () =
@@ -73,9 +75,24 @@ let start ~sok_message
               Deferred.return `Removed
           | Processed None ->
               Deferred.return `Ok
-          | Processed (Some combined) ->
+          | Processed
+              (Some ((stmts, { proof; fee = { fee; prover } }) as combined)) ->
               Pipe_lib.Strict_pipe.Writer.write completed_snark_work_sink
                 combined ;
+              ( match save_proof with
+              | Some output_path ->
+                  (* WARN: order of output is irrelevant to input! *)
+                  counter := !counter + 1 ;
+                  Work.Work.Result_without_metrics.
+                    { proofs = proof; statements = stmts; prover; fee }
+                  |> Work.Work.Result_without_metrics.to_yojson
+                       Ledger_proof.to_yojson
+                  |> Yojson.Safe.to_file
+                       (Printf.sprintf "%s/new_proof.%d.json" output_path
+                          !counter )
+              | None ->
+                  () ) ;
+
               Deferred.return `Ok )
     ]
   in
