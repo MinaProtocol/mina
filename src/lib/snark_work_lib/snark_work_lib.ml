@@ -20,6 +20,7 @@ module Spec = struct
   module Single = Single_spec
   module Sub_zkapp = Sub_zkapp_spec
   module Partitioned = Partitioned_spec
+  module Dumped = Dumped_spec
 end
 
 module Metrics = Metrics
