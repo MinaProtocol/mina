@@ -340,8 +340,12 @@ let submit_single ~partitioner
     ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
     ~job_id =
   let Work.Id.Single.{ which_one = submitted_half; pairing_id } = job_id in
-  match Hashtbl.find partitioner.pairing_pool pairing_id with
-  | None ->
+  match
+    ( Sent_single_job_pool.remove ~id:job_id
+        partitioner.single_jobs_sent_by_partitioner
+    , Hashtbl.find partitioner.pairing_pool pairing_id )
+  with
+  | _, None | None, _ ->
       [%log' debug partitioner.logger]
         "Worker submit a work that's already removed from pairing pool, \
          meaning it's completed/no longer needed, ignoring"
@@ -352,7 +356,7 @@ let submit_single ~partitioner
                 Ledger_proof.to_yojson submitted_result )
           ] ;
       Removed
-  | Some combining_result -> (
+  | Some _, Some combining_result -> (
       match
         submit_into_combining_result ~submitted_result ~partitioner
           ~combining_result ~submitted_half
