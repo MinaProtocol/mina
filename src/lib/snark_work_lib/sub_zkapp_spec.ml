@@ -11,10 +11,13 @@ module Stable = struct
           ; witness :
               Transaction_snark.Zkapp_command_segment.Witness.Stable.V1.t
           ; spec : Transaction_snark.Zkapp_command_segment.Basic.Stable.V1.t
+          ; which_segment : int
           }
       | Merge of
           { proof1 : Ledger_proof.Stable.V2.t
           ; proof2 : Ledger_proof.Stable.V2.t
+          ; first_segment_of_proof1 : int
+          ; last_segment_of_proof2 : int
           }
     [@@deriving sexp, yojson]
 
@@ -30,7 +33,7 @@ module Stable = struct
               stmt
           | Error e ->
               failwithf
-                "Failed to construct a statement from zkapp merge command %s"
+                "Failed to construct a statement from zkapp merge command: %s"
                 (Error.to_string_hum e) () )
 
     let to_latest = Fn.id
@@ -42,38 +45,50 @@ type t =
       { statement : Transaction_snark.Statement.With_sok.t
       ; witness : Transaction_snark.Zkapp_command_segment.Witness.t
       ; spec : Transaction_snark.Zkapp_command_segment.Basic.t
+      ; which_segment : int
       }
-  | Merge of { proof1 : Ledger_proof.Cached.t; proof2 : Ledger_proof.Cached.t }
+  | Merge of
+      { proof1 : Ledger_proof.Cached.t
+      ; proof2 : Ledger_proof.Cached.t
+      ; first_segment_of_proof1 : int
+      ; last_segment_of_proof2 : int
+      }
 
 let read_all_proofs_from_disk : t -> Stable.Latest.t = function
-  | Segment { statement; witness; spec } ->
+  | Segment { statement; witness; spec; which_segment } ->
       Segment
         { statement
         ; witness =
             Transaction_snark.Zkapp_command_segment.Witness
             .read_all_proofs_from_disk witness
         ; spec
+        ; which_segment
         }
-  | Merge { proof1; proof2 } ->
+  | Merge { proof1; proof2; first_segment_of_proof1; last_segment_of_proof2 } ->
       Merge
         { proof1 = Ledger_proof.Cached.read_proof_from_disk proof1
         ; proof2 = Ledger_proof.Cached.read_proof_from_disk proof2
+        ; first_segment_of_proof1
+        ; last_segment_of_proof2
         }
 
 let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
     Stable.Latest.t -> t = function
-  | Segment { statement; witness; spec } ->
+  | Segment { statement; witness; spec; which_segment } ->
       Segment
         { statement
         ; witness =
             Transaction_snark.Zkapp_command_segment.Witness
             .write_all_proofs_to_disk ~proof_cache_db witness
         ; spec
+        ; which_segment
         }
-  | Merge { proof1; proof2 } ->
+  | Merge { proof1; proof2; first_segment_of_proof1; last_segment_of_proof2 } ->
       Merge
         { proof1 =
             Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof1
         ; proof2 =
             Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db proof2
+        ; first_segment_of_proof1
+        ; last_segment_of_proof2
         }
