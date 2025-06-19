@@ -867,13 +867,15 @@ let request_work t =
   let%bind.Option prover =
     Option.merge (snark_worker_key t) (snark_coordinator_key t) ~f:Fn.const
   in
+  let logger = t.config.logger in
   let fee = snark_work_fee t in
   let sok_message = Sok_message.create ~fee ~prover in
   let work_from_selector =
     lazy
-      (Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
-         ~logger:t.config.logger t.work_selector )
+      (Work_selection_method.work ~snark_pool:(snark_pool t) ~fee ~logger
+         t.work_selector )
   in
+  [%log info] "Processing work request" ;
   Work_partitioner.request_partitioned_work ~work_from_selector ~sok_message
     ~partitioner:t.work_partitioner
 
@@ -892,6 +894,7 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
+  [%log' info t.config.logger] "Processing work submission" ;
   match
     Work_partitioner.submit_partitioned_work ~result:work
       ~partitioner:t.work_partitioner
