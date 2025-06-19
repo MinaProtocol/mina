@@ -1,5 +1,12 @@
 open Core_kernel
 
+(** A range correspond to a consecutive range of segments (both inclusive) *)
+module Range : sig
+  type t = { first : int; last : int } [@@deriving compare, sexp]
+
+  val is_consecutive : t -> t -> bool
+end
+
 [%%versioned:
 module Stable : sig
   [@@@no_toplevel_latest_type]
@@ -20,6 +27,8 @@ module Stable : sig
           ; last_segment_of_proof2 : int
           }
     [@@deriving sexp, yojson]
+
+    val get_range : t -> Range.t
 
     val statement : t -> Transaction_snark.Statement.t
 

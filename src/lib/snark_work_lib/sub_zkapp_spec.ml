@@ -1,5 +1,15 @@
 open Core_kernel
 
+module Range = struct
+  type t = { first : int; last : int } [@@deriving sexp]
+
+  let compare { first = first_left; _ } { first = first_right; _ } =
+    compare first_left first_right
+
+  let is_consecutive { last = last_left; _ } { first = first_right; _ } =
+    succ last_left = first_right
+end
+
 [%%versioned
 module Stable = struct
   [@@@no_toplevel_latest_type]
@@ -20,6 +30,13 @@ module Stable = struct
           ; last_segment_of_proof2 : int
           }
     [@@deriving sexp, yojson]
+
+    let get_range = function
+      | Segment { which_segment; _ } ->
+          Range.{ first = which_segment; last = which_segment }
+      | Merge { first_segment_of_proof1; last_segment_of_proof2; _ } ->
+          Range.
+            { first = first_segment_of_proof1; last = last_segment_of_proof2 }
 
     let statement : t -> Transaction_snark.Statement.t = function
       | Segment { statement; _ } ->

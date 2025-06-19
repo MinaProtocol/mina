@@ -333,8 +333,8 @@ module Impl = struct
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
             { job =
                 { spec =
-                    Work.Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
-                    as sub_zkapp_spec
+                    Work.Spec.Sub_zkapp.Stable.Latest.Merge
+                      { proof1; proof2; _ } as sub_zkapp_spec
                 ; _
                 } as job
             ; data = ()
