@@ -55,35 +55,54 @@ let epoch_now () = Time.(now () |> to_span_since_epoch)
 
 (* TODO: Consider remove all works no longer relevant for current frontier,
    this may need changes from underlying work selector. *)
-let reschedule_if_old ~reassignment_timeout
+let reschedule_if_old ~logger ~spec_to_yojson ~reassignment_timeout
     (job : _ Work.With_job_meta.Stable.Latest.t) =
   let scheduled = Time.of_span_since_epoch job.scheduled_since_unix_epoch in
-  let delta = Time.(diff (now ()) scheduled) in
-  if Time.Span.( > ) delta reassignment_timeout then
+  let now = Time.now () in
+  let elapsed_since_last_schedule = Time.diff now scheduled in
+  if Time.Span.( > ) elapsed_since_last_schedule reassignment_timeout then (
+    [%log warn] "Rescheduling old job $job"
+      ~metadata:
+        [ ("job", spec_to_yojson job.spec)
+        ; ( "scheduled"
+          , Mina_stdlib.Time.Span.to_yojson job.scheduled_since_unix_epoch )
+        ; ( "now"
+          , Mina_stdlib.Time.Span.to_yojson (now |> Time.to_span_since_epoch) )
+        ; ( "elapsed_since_last_schedule"
+          , Mina_stdlib.Time.Span.to_yojson elapsed_since_last_schedule )
+        ; ( "reassignment_timeout"
+          , Mina_stdlib.Time.Span.to_yojson reassignment_timeout )
+        ] ;
     `Stop_reschedule
       Work.With_job_meta.Stable.Latest.
-        { job with scheduled_since_unix_epoch = epoch_now () }
+        { job with scheduled_since_unix_epoch = epoch_now () } )
   else `Stop_keep
 
 (* NOTE: below are logics for work requesting *)
 let reschedule_old_zkapp_job
     ~partitioner:
-      ({ reassignment_timeout; zkapp_jobs_sent_by_partitioner; _ } : t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+      ({ reassignment_timeout; zkapp_jobs_sent_by_partitioner; logger; _ } : t)
+    : Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
     Sent_zkapp_job_pool.remove_until_reschedule
-      ~f:(reschedule_if_old ~reassignment_timeout)
+      ~f:
+        (reschedule_if_old ~logger
+           ~spec_to_yojson:Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
+           ~reassignment_timeout )
       zkapp_jobs_sent_by_partitioner
   in
   Ok (Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () })
 
 let reschedule_old_single_job
     ~partitioner:
-      ({ reassignment_timeout; single_jobs_sent_by_partitioner; _ } : t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+      ({ reassignment_timeout; single_jobs_sent_by_partitioner; logger; _ } : t)
+    : Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
   let%map.Option job =
     Sent_single_job_pool.remove_until_reschedule
-      ~f:(reschedule_if_old ~reassignment_timeout)
+      ~f:
+        (reschedule_if_old ~logger
+           ~spec_to_yojson:Work.Spec.Single.Stable.Latest.to_yojson
+           ~reassignment_timeout )
       single_jobs_sent_by_partitioner
   in
   Ok (Work.Spec.Partitioned.Poly.Single { job; data = () })
