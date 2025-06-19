@@ -13,11 +13,12 @@
 # 4. Once the mock coordinator verified every proof predefined, it will exit
 # with exit code 0
 
-NUM_WORKERS=1
+NUM_WORKERS=3
 # NOTE: Sleep is needed so when worker wakes up the coordinator is ready 
-WORKER_SLEEP=60s
+WORKER_SLEEP=20s
 
 echo "DUMPED_SPEC_PATH = ${DUMPED_SPEC_PATH:?DUMPED_SPEC_PATH is not set, exiting}"
+echo "PROOF_OUTPUT_PATH = ${PROOF_OUTPUT_PATH:?PROOF_OUTPUT_PATH is not set, exiting}"
 
 while true; do
   # Random port between 1025 and 65535
@@ -32,12 +33,10 @@ done
 
 cd $(git root)
 
-# Without `MINA_USE_DUMMY_VERIFIER=1`:
-# Error: No implementations provided for the following modules:
-#          Foreign referenced from /nix/store/0qd7g68imp2csmr22l8waxp0242bcv57-rpc_parallel-v0.14.0/lib/ocaml/4.14.2/site-lib/rpc_parallel/rpc_parallel.cmxa(Rpc_parallel__Utils)
-MINA_USE_DUMMY_VERIFIER=1 ./_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinater.exe \
+./_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinater.exe \
   --coordinator-port $MOCK_COORDINATOR_PORT \
   --dumped-spec-path $DUMPED_SPEC_PATH \
+  --output-folder $PROOF_OUTPUT_PATH \
   &
 
 MOCK_COORDINATOR_PID=$!
@@ -46,10 +45,9 @@ MOCK_COORDINATOR_PID=$!
   SNARK_WORKER_PIDS=()
   echo "Sleeping for $WORKER_SLEEP before spawning workers"
   sleep $WORKER_SLEEP
-  echo "Start spawning workers"
-
   for i in $(seq 1 $NUM_WORKERS); do
     {
+      echo "Start worker $i"
       ./_build/default/src/app/cli/src/mina.exe \
         internal snark-worker \
         --daemon-address 127.0.0.1:$MOCK_COORDINATOR_PORT
@@ -64,3 +62,13 @@ SNARK_WORKER_GROUPS_PID=$!
 
 wait $MOCK_COORDINATOR_PID
 wait $SNARK_WORKER_GROUPS_PID
+
+for file in $PROOF_OUTPUT_PATH/*; do
+  if [ -f "$file" ]; then
+    echo Verifying proof at $file ...
+    cat $file \
+      | ./_build/default/src/app/cli/src/mina.exe internal run-verifier \
+      --mode transaction \
+      --format json
+  fi
+done
