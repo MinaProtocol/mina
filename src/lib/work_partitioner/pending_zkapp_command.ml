@@ -1,15 +1,19 @@
-(* NOTE: Assumption: order of merging segment proofs is irrelvant to the
-   correctness of the final proof. *)
+(* NOTE: Assumption: order of merging segments satisfy associativity. *)
 
 open Core_kernel
 open Snark_work_lib
+
+open struct
+  module Range = Spec.Sub_zkapp.Range
+  module RangeMap = Map.Make (Range)
+end
 
 type t =
   { job : (Spec.Single.t, Id.Single.t) With_job_meta.t
         (** the original work being split, contains `Work_selector.work` with
             some metadata. *)
   ; unscheduled_segments : Spec.Sub_zkapp.Stable.Latest.t Queue.t
-  ; pending_mergeable_proofs : Ledger_proof.t Deque.t
+  ; mutable pending_mergeable_proofs : Ledger_proof.t RangeMap.t
         (* we may need to insert proofs to merge back to the queue, hence a Deque
          *)
   ; mutable elapsed : Time.Stable.Span.V1.t
@@ -32,7 +36,7 @@ let create_and_yield_segment ~job
     (1 + List.length unscheduled_segments) ;
   ( { job
     ; unscheduled_segments = Queue.of_list unscheduled_segments
-    ; pending_mergeable_proofs = Deque.create ()
+    ; pending_mergeable_proofs = RangeMap.empty
     ; elapsed = Time.Span.zero
     ; proofs_in_flight = 1
     }
@@ -40,25 +44,38 @@ let create_and_yield_segment ~job
 
 let zkapp_job t = t.job
 
-let try_take2 (q : 'a Deque.t) : ('a * 'a) option =
-  match Deque.dequeue_front q with
-  | None ->
-      None
-  | Some fst -> (
-      match Deque.dequeue_front q with
-      | Some snd ->
-          Some (fst, snd)
-      | None ->
-          Deque.enqueue_front q fst ; None )
-
 (** [next_merge t] attempts dequeuing 2 proofs from [t.pending_mergeable_proofs]
-    and generate a sub-zkapp level spec merging them together. *)
+    corresponding to consecutive states and generate a sub-zkapp level spec
+    merging them together. *)
 let next_merge (t : t) =
-  let%map.Option proof1, proof2 = try_take2 t.pending_mergeable_proofs in
-  printf "Merge proof (%d, %d)\n" (Ledger_proof.hash proof1)
-    (Ledger_proof.hash proof2) ;
-  t.proofs_in_flight <- t.proofs_in_flight + 1 ;
-  Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
+  let last_element = ref None in
+  RangeMap.to_sequence ~order:`Increasing_key t.pending_mergeable_proofs
+  |> Sequence.fold_until ~init:None ~finish:Fn.id
+       ~f:(fun
+            _
+            ((Range.{ last = last_segment_of_proof2; _ } as this_range), proof2)
+          ->
+         match !last_element with
+         | Some
+             ( (Range.{ first = first_segment_of_proof1; _ } as last_range)
+             , proof1 )
+           when Range.is_consecutive last_range this_range ->
+             t.proofs_in_flight <- t.proofs_in_flight + 1 ;
+             t.pending_mergeable_proofs <-
+               RangeMap.remove
+                 (RangeMap.remove t.pending_mergeable_proofs last_range)
+                 this_range ;
+             Stop
+               (Some
+                  (Spec.Sub_zkapp.Stable.Latest.Merge
+                     { proof1
+                     ; proof2
+                     ; first_segment_of_proof1
+                     ; last_segment_of_proof2
+                     } ) )
+         | _ ->
+             last_element := Some (this_range, proof2) ;
+             Continue None )
 
 (** [next_segment t] dequeus a segment from [t.unscheduled_segments] and generate a
    sub-zkapp level spec proving that segment. *)
@@ -71,19 +88,43 @@ let next_subzkapp_job_spec (t : t) : Spec.Sub_zkapp.Stable.Latest.t option =
   match next_merge t with Some _ as ret -> ret | None -> next_segment t
 
 let submit_proof (t : t) ~(proof : Ledger_proof.t)
-    ~(elapsed : Time.Stable.Span.V1.t) =
-  printf "Submitting proof %d\n" (Ledger_proof.hash proof) ;
-  Deque.enqueue_back t.pending_mergeable_proofs proof ;
-  t.proofs_in_flight <- t.proofs_in_flight - 1 ;
-  t.elapsed <- Time.Span.(t.elapsed + elapsed)
+    ~(elapsed : Time.Stable.Span.V1.t) ~range:(Range.{ first; last } as range) =
+  let should_accept =
+    first <= last
+    && RangeMap.closest_key t.pending_mergeable_proofs `Greater_or_equal_to
+         Range.{ first = last; last }
+       |> Option.map ~f:(fun (Range.{ first = next_first; _ }, _) ->
+              last < next_first )
+       |> Option.value ~default:true
+    && RangeMap.closest_key t.pending_mergeable_proofs `Less_or_equal_to
+         Range.{ first; last = first }
+       |> Option.map ~f:(fun (Range.{ last = previous_last; _ }, _) ->
+              previous_last < first )
+       |> Option.value ~default:true
+  in
+  if should_accept then (
+    t.pending_mergeable_proofs <-
+      RangeMap.add_exn ~key:range ~data:proof t.pending_mergeable_proofs ;
+    t.proofs_in_flight <- t.proofs_in_flight - 1 ;
+    t.elapsed <- Time.Span.(t.elapsed + elapsed) ;
+    Ok () )
+  else
+    let msg =
+      Printf.sprintf
+        "Pending zkapp command has a submission of range [%d, %d], that \
+         doesn't fit"
+        first last
+    in
+    Error (Error.of_string msg)
 
 let try_finalize (t : t) =
   if
     t.proofs_in_flight = 0
     && Queue.is_empty t.unscheduled_segments
-    && Deque.length t.pending_mergeable_proofs = 1
-  then (
-    printf "Finalized %d\n"
-      (Ledger_proof.hash (Deque.peek_front_exn t.pending_mergeable_proofs)) ;
-    Some (t.job, Deque.dequeue_back_exn t.pending_mergeable_proofs, t.elapsed) )
+    && RangeMap.length t.pending_mergeable_proofs = 1
+  then
+    Some
+      ( t.job
+      , RangeMap.min_elt_exn t.pending_mergeable_proofs |> Tuple2.get2
+      , t.elapsed )
   else None

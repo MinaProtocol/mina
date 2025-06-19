@@ -60,8 +60,11 @@ module Cryptography : sig
 
   val snark_work_zkapp_base_time_sec : Counter.t
 
-  val snark_work_base_time_sec : Counter.t
+  val snark_work_nonzkapp_base_time_sec : Counter.t
 
+  (* WARN: At snark worker side this metrics is just wrong. This is because
+     there's no way to know how many full zkapp command is processed by a
+     worker. *)
   val snark_work_zkapp_base_submissions : Counter.t
 
   val snark_work_base_submissions : Counter.t

@@ -43,14 +43,13 @@ module Make (Lib : Intf.Lib_intf) = struct
   end
 
   let work ~snark_pool ~fee ~logger:_ (state : Lib.State.t) =
-    let unseen_jobs = Lib.State.all_unscheduled_works state in
-    match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
+    match Lib.State.all_unscheduled_expensive_works ~snark_pool ~fee state with
     | [] ->
         None
     | expensive_work ->
         Offset.update ~new_length:(List.length expensive_work) ;
         let x = Offset.get_nth expensive_work in
-        Lib.State.set_as_scheduled state x ;
+        Lib.State.mark_scheduled state x ;
         Some x
 end
 

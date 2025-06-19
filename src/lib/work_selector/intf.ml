@@ -100,8 +100,7 @@ module type State_intf = sig
   type transition_frontier
 
   val init :
-       reassignment_wait:int
-    -> frontier_broadcast_pipe:
+       frontier_broadcast_pipe:
          transition_frontier option Pipe_lib.Broadcast_pipe.Reader.t
     -> logger:Logger.t
     -> t
@@ -116,40 +115,28 @@ module type Lib_intf = sig
     include
       State_intf with type transition_frontier := Inputs.Transition_frontier.t
 
-    (**Jobs that have not been scheduled yet*)
-    val all_unscheduled_works :
-         t
-      -> ( Transaction_witness.t
-         , Ledger_proof.Cached.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
-         list
-
-    val set_as_scheduled :
+    val mark_scheduled :
          t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
       -> unit
-  end
 
-  (** [get_expensive_work ~snark_pool ~fee works] filters out all works in the
-      list that satisfy the predicate
-      [does_not_have_better_fee ~snark_pool ~fee] *)
-  val get_expensive_work :
-       snark_pool:Snark_pool.t
-    -> fee:Fee.t
-    -> ( Transaction_witness.t
-       , Ledger_proof.Cached.t )
-       Snark_work_lib.Work.Single.Spec.t
-       One_or_two.t
-       list
-    -> ( Transaction_witness.t
-       , Ledger_proof.Cached.t )
-       Snark_work_lib.Work.Single.Spec.t
-       One_or_two.t
-       list
+    (** [all_unscheduled_expensive_works ~snark_pool ~fee t] filters out all
+        works in the list that satisfy the predicate
+        [does_not_have_better_fee ~snark_pool ~fee], and are not scheduled yet
+        *)
+    val all_unscheduled_expensive_works :
+         snark_pool:Snark_pool.t
+      -> fee:Fee.t
+      -> t
+      -> ( Transaction_witness.t
+         , Ledger_proof.Cached.t )
+         Snark_work_lib.Work.Single.Spec.t
+         One_or_two.t
+         list
+  end
 
   (**jobs that are not in the snark pool yet*)
   val pending_work_statements :

@@ -906,7 +906,7 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
       ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
       Network_pool.Snark_pool.(
         Local_sink.push t.pipes.snark_local_sink
-          (Add_solved_work (stmts, priced_proof), Fn.const ()))
+          (Add_solved_work (stmts, priced_proof), ignore))
       |> Deferred.don't_wait_for ;
       `Ok
 
@@ -2084,12 +2084,10 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           let work_selector =
             Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~logger:config.logger
           in
-          (* NOTE: see [Work_selector.Work_lib.Job_status.is_old],
-             [reassignment_wait] is interpreted as milliseconds *)
+          (* NOTE: [reassignment_wait] is interpreted as milliseconds *)
           let work_partitioner =
             Work_partitioner.create
               ~reassignment_timeout:

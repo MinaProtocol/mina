@@ -22,3 +22,5 @@ module Spec = struct
   module Partitioned = Partitioned_spec
   module Dumped = Dumped_spec
 end
+
+module Metrics = Metrics

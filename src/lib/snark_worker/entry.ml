@@ -1,6 +1,5 @@
 open Core
 open Async
-open Events
 open Snark_work_lib
 
 let command_name = "snark-worker"
@@ -37,78 +36,6 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
-let emit_proof_metrics metrics instances logger =
-  One_or_two.iter (One_or_two.zip_exn metrics instances)
-    ~f:(fun ((time, tag), single) ->
-      match tag with
-      | `Merge ->
-          Mina_metrics.(
-            Cryptography.Snark_work_histogram.observe
-              Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
-          [%str_log info] (Merge_snark_generated { time })
-      | `Transition ->
-          let transaction_type, zkapp_command_count, proof_zkapp_command_count =
-            (*should be Some in the case of `Transition*)
-            match Option.value_exn single with
-            | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Zkapp_command zkapp_command) ->
-                let init =
-                  match
-                    (Mina_base.Account_update.of_fee_payer
-                       zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
-                      .authorization
-                  with
-                  | Proof _ ->
-                      (1, 1)
-                  | _ ->
-                      (1, 0)
-                in
-                let c, p =
-                  Mina_base.Zkapp_command.Call_forest.fold
-                    zkapp_command.account_updates ~init
-                    ~f:(fun (count, proof_updates_count) account_update ->
-                      ( count + 1
-                      , if
-                          Mina_base.Control.(
-                            Tag.equal Proof
-                              (tag
-                                 account_update
-                                   .Mina_base.Account_update.Poly.authorization ))
-                        then proof_updates_count + 1
-                        else proof_updates_count ) )
-                in
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc snark_work_zkapp_base_time_sec
-                      (Time.Span.to_sec time) ;
-                    Counter.inc_one snark_work_zkapp_base_submissions ;
-                    Counter.inc zkapp_transaction_length (Float.of_int c) ;
-                    Counter.inc zkapp_proof_updates (Float.of_int p))) ;
-                ("zkapp_command", c, p)
-            | Command (Signed_command _) ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("signed command", 1, 0)
-            | Coinbase _ ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("coinbase", 1, 0)
-            | Fee_transfer _ ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("fee_transfer", 1, 0)
-          in
-          [%str_log info]
-            (Base_snark_generated
-               { time
-               ; transaction_type
-               ; zkapp_command_count
-               ; proof_zkapp_command_count
-               } ) )
-
 let main ~logger ~proof_level ~constraint_constants daemon_address
     shutdown_on_disconnect =
   let%bind state =
@@ -133,6 +60,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
     (* FIXME: Use a backoff algo here *)
     k ()
   in
+  (* TODO: refactor this whole function with Deferred.forever into a STM.
+     Now CPS-style is hard to understand *)
   let rec go () =
     let%bind daemon_address =
       let%bind cwd = Sys.getcwd () in
@@ -173,8 +102,8 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         in
         let work_ids_json =
           ( "work_ids"
-          , `One (Spec.Partitioned.Stable.Latest.statement partitioned_spec)
-            |> Transaction_snark_work.Statement.compact_json )
+          , Spec.Partitioned.Stable.Latest.statement partitioned_spec
+            |> Mina_state.Snarked_ledger_state.to_yojson )
         in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
@@ -186,10 +115,14 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
         with
         | Error e ->
+            let partitioned_id =
+              Spec.Partitioned.Poly.map ~f_single_spec:ignore
+                ~f_subzkapp_spec:ignore ~f_data:ignore partitioned_spec
+            in
             let%bind () =
               match%map
                 dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
-                  shutdown_on_disconnect (e, partitioned_spec) daemon_address
+                  shutdown_on_disconnect (e, partitioned_id) daemon_address
               with
               | Error e ->
                   [%log error]
@@ -200,21 +133,23 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
-            (* TODO: bring back metrics in subsequent PRs *)
-            (* emit_proof_metrics result.metrics *)
-            (*   (Selector.Result.Stable.Latest.transactions result) *)
-            (*   logger ; *)
-            [%log info] "Submitted completed SNARK work $work_ids to $address"
-              ~metadata:[ address_json; work_ids_json ] ;
+            let result_without_spec =
+              Spec.Partitioned.Poly.map ~f_single_spec:ignore
+                ~f_subzkapp_spec:ignore ~f_data:Fn.id result
+            in
+            Metrics.emit_partitioned_metrics ~logger result ;
             let rec submit_work () =
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
-                  shutdown_on_disconnect result daemon_address
+                  shutdown_on_disconnect result_without_spec daemon_address
               with
               | Error e ->
                   log_and_retry "submitting work" e (retry_pause 10.)
                     submit_work
               | Ok `Ok ->
+                  [%log info]
+                    "Submitted completed SNARK work $work_ids to $address"
+                    ~metadata:[ address_json; work_ids_json ] ;
                   go ()
               | Ok `Removed ->
                   [%log info] "Result $work_ids slashed by $address"
