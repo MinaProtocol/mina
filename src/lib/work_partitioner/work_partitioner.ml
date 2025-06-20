@@ -348,8 +348,8 @@ let submit_single ?is_from_zkapp ~partitioner
     , Hashtbl.find partitioner.pairing_pool pairing_id
     , is_from_zkapp )
   with
-  | None, Some combining_result, Some true | Some _, Some combining_result, _
-    -> (
+  | (None as removed_job), Some combining_result, Some true
+  | (Some _ as removed_job), Some combining_result, _ -> (
       match
         submit_into_combining_result ~submitted_result ~partitioner
           ~combining_result ~submitted_half
@@ -363,7 +363,9 @@ let submit_single ?is_from_zkapp ~partitioner
       | `Removed ->
           Removed
       | `SpecUnmatched ->
-          (* TODO: add it back to sent job pool *)
+          Option.iter removed_job ~f:(fun job ->
+              Sent_single_job_pool.bring_back ~id:job_id ~job
+                partitioner.single_jobs_sent_by_partitioner ) ;
           SpecUnmatched )
   | _ ->
       [%log' debug partitioner.logger]
@@ -418,7 +420,8 @@ let submit_into_pending_zkapp_command ~partitioner
                 ~submitted_result:{ spec = (); proof; elapsed }
                 ~job_id () )
       | Error _ ->
-          (* TODO: add it back to sent job pool *)
+          Sent_zkapp_job_pool.bring_back ~id:job_id ~job
+            partitioner.zkapp_jobs_sent_by_partitioner ;
           SpecUnmatched )
   | None, _ | _, None ->
       [%log' debug partitioner.logger]

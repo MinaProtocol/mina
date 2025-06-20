@@ -70,4 +70,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
 
   let add_exn ~id ~job ~message t =
     match add ~id ~job t with `Ok -> () | `Duplicate -> failwith message
+
+  let bring_back ~id ~job t = ignore (Hashtbl.add ~key:id ~data:job t.index)
 end
