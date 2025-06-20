@@ -195,12 +195,27 @@ let convert_single_work_from_selector ~(partitioner : t)
           (* TODO: we have read from disk followed by write to disk in shared
              function followed by read from disk again. Should consider refactor
              this. *)
+          let logger = partitioner.logger in
+          [%log info] "Splitting zkapp command to subzkapp specs"
+            ~metadata:
+              [ ( "zkapp command"
+                , Mina_base.Zkapp_command.to_yojson zkapp_command )
+              ] ;
           let witness = Transaction_witness.read_all_proofs_from_disk witness in
-          Snark_worker_shared.extract_zkapp_segment_works
-            ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
-          |> Result.map
-               ~f:
-                 (convert_zkapp_command_from_selector ~partitioner ~job ~pairing)
+          let result =
+            Snark_worker_shared.extract_zkapp_segment_works
+              ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
+            |> Result.map
+                 ~f:
+                   (convert_zkapp_command_from_selector ~partitioner ~job
+                      ~pairing )
+          in
+          [%log info] "Done splitting zkapp command to subzkapp specs"
+            ~metadata:
+              [ ( "zkapp command"
+                , Mina_base.Zkapp_command.to_yojson zkapp_command )
+              ] ;
+          result
       | Command (Signed_command _) | Fee_transfer _ | Coinbase _ ->
           let job =
             Work.With_job_meta.map
