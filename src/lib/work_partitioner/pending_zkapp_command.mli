@@ -20,8 +20,15 @@ val zkapp_job : t -> (Spec.Single.t, Id.Single.t) With_job_meta.t
     submitted back to [t] with [submit_proof] *)
 val next_subzkapp_job_spec : t -> Spec.Sub_zkapp.Stable.Latest.t option
 
+(* val [submit_proof t ~proof ~elapsed ~range] submit a proof corresponding to
+   a range of segments(both inclusive). This throws error if either the range is
+   invalid or some corresponded segment proof is already present in [t] *)
 val submit_proof :
-  t -> proof:Ledger_proof.t -> elapsed:Core_kernel_private.Span_float.t -> unit
+     t
+  -> proof:Ledger_proof.t
+  -> elapsed:Core_kernel_private.Span_float.t
+  -> range:Spec.Sub_zkapp.Range.t
+  -> (unit, Error.t) result
 
 (** [try_finalize t] attempts to unwrap completed proof, metric and spec from
     [t] if the proof for entire zkapp transaction is completed *)
