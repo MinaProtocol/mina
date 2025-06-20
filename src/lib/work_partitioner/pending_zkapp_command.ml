@@ -12,6 +12,8 @@ type t =
   { job : (Spec.Single.t, Id.Single.t) With_job_meta.t
         (** the original work being split, contains `Work_selector.work` with
             some metadata. *)
+  ; final_statement : Transaction_snark.Statement.t
+        (** expected statement for the whole zkapp command *)
   ; unscheduled_segments : Spec.Sub_zkapp.Stable.Latest.t Queue.t
   ; mutable pending_mergeable_proofs : Ledger_proof.t RangeMap.t
         (* we may need to insert proofs to merge back to the queue, hence a Deque
@@ -26,7 +28,7 @@ type t =
             as the final proof, provided [unscheduled_segments] being empty. *)
   }
 
-let create_and_yield_segment ~job
+let create_and_yield_segment ~job ~final_statement
     ~(unscheduled_segments :
        Spec.Sub_zkapp.Stable.Latest.t Mina_stdlib.Nonempty_list.t ) =
   let first_segment, unscheduled_segments =
@@ -37,6 +39,7 @@ let create_and_yield_segment ~job
     ; pending_mergeable_proofs = RangeMap.empty
     ; elapsed = Time.Span.zero
     ; proofs_in_flight = 1
+    ; final_statement
     }
   , first_segment )
 
@@ -116,14 +119,30 @@ let submit_proof (t : t) ~(proof : Ledger_proof.t)
     in
     Error (Error.of_string msg)
 
+type finalization_failure =
+  | StatementMismatch of
+      { expected : Transaction_snark.Statement.t
+      ; actual : Transaction_snark.Statement.t
+      }
+
 let try_finalize (t : t) =
   if
     t.proofs_in_flight = 0
     && Queue.is_empty t.unscheduled_segments
     && RangeMap.length t.pending_mergeable_proofs = 1
   then
-    Some
-      ( t.job
-      , RangeMap.min_elt_exn t.pending_mergeable_proofs |> Tuple2.get2
-      , t.elapsed )
+    let proof =
+      RangeMap.min_elt_exn t.pending_mergeable_proofs |> Tuple2.get2
+    in
+    if
+      Ledger_proof.statement proof
+      |> Transaction_snark.Statement.equal t.final_statement
+    then Some (Ok (t.job, proof, t.elapsed))
+    else
+      Some
+        (Error
+           (StatementMismatch
+              { expected = t.final_statement
+              ; actual = Ledger_proof.statement proof
+              } ) )
   else None

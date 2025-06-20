@@ -159,7 +159,7 @@ let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
   Ok result
 
 let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
-    unscheduled_segments =
+    ~final_statement unscheduled_segments =
   let unscheduled_segments =
     Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
       unscheduled_segments
@@ -169,7 +169,8 @@ let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
              { statement; witness; spec; which_segment } )
   in
   let pending_zkapp_command, first_segment =
-    Pending_zkapp_command.create_and_yield_segment ~job ~unscheduled_segments
+    Pending_zkapp_command.create_and_yield_segment ~job ~final_statement
+      ~unscheduled_segments
   in
   partitioner.pending_zkapp_commands <-
     Single_id_map.add_exn ~key:pairing ~data:pending_zkapp_command
@@ -208,7 +209,7 @@ let convert_single_work_from_selector ~(partitioner : t)
             |> Result.map
                  ~f:
                    (convert_zkapp_command_from_selector ~partitioner ~job
-                      ~pairing )
+                      ~pairing ~final_statement:input )
           in
           [%log info] "Done splitting zkapp command to subzkapp specs"
             ~metadata:
@@ -405,6 +406,7 @@ let submit_into_pending_zkapp_command ~partitioner
     ~data:
       ({ proof; data = elapsed } as data :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
+  let logger = partitioner.logger in
   let single_id = Work.Id.Sub_zkapp.to_single job_id in
   match
     ( Sent_zkapp_job_pool.remove ~id:job_id
@@ -422,20 +424,30 @@ let submit_into_pending_zkapp_command ~partitioner
           match Pending_zkapp_command.try_finalize pending with
           | None ->
               Processed None
-          | Some ({ job_id; _ }, proof, elapsed) ->
-              [%log' debug partitioner.logger] "Finalized zkapp" ;
+          | Some (Ok ({ job_id; _ }, proof, elapsed)) ->
+              [%log debug] "Finalized zkapp" ;
               partitioner.pending_zkapp_commands <-
                 Single_id_map.remove partitioner.pending_zkapp_commands
                   single_id ;
               submit_single ~is_from_zkapp:true ~partitioner
                 ~submitted_result:{ spec = (); proof; elapsed }
-                ~job_id () )
+                ~job_id ()
+          | Some (Error (StatementMismatch { expected; actual })) ->
+              [%log fatal]
+                "Zkapp_command transaction final statement mismatch Expected \
+                 $expected Got $got. All inputs: $inputs"
+                ~metadata:
+                  [ ("actual", Transaction_snark.Statement.to_yojson actual)
+                  ; ("expected", Transaction_snark.Statement.to_yojson expected)
+                  ] ;
+              (* TODO: reschedule whole zkapp command *)
+              SpecUnmatched )
       | Error _ ->
           Sent_zkapp_job_pool.bring_back ~id:job_id ~job
             partitioner.zkapp_jobs_sent_by_partitioner ;
           SpecUnmatched )
   | None, _ | _, None ->
-      [%log' debug partitioner.logger]
+      [%log debug]
         "Worker submit a work that's already removed from sent sub-zkapp job \
          pool or pending zkapp command pool, meaning it's completed/no longer \
          needed, ignoring"
