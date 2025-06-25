@@ -108,3 +108,5 @@ _coverage/
 # directory removed in this branch, but still existing in berkeley,
 # may appear as an untracked file occasionally
 /src/external
+
+CLAUDE.local.md
