@@ -15,15 +15,3 @@ let block_cipher _params (s : Field.t array) =
   Kimchi_pasta_fp_poseidon.block_cipher params v ;
   Array.init (Array.length s) ~f:(Kimchi_bindings.FieldVectors.Fp.get v)
 
-let%test_unit "check rust implementation of block-cipher" =
-  let params' : Field.t Sponge.Params.t =
-    Kimchi_pasta_basic.poseidon_params_fp
-  in
-  let open Pickles.Impls.Step in
-  let module T = Internal_Basic in
-  Quickcheck.test (Quickcheck.Generator.list_with_length 3 T.Field.gen)
-    ~f:(fun s ->
-      let s () = Array.of_list s in
-      [%test_eq: T.Field.t array]
-        (Ocaml_permutation.block_cipher params' (s ()))
-        (block_cipher params' (s ())) )

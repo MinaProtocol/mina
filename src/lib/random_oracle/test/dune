@@ -1,0 +1,20 @@
+(test
+ (name test_random_oracle)
+ (libraries
+  ;; opam libraries
+  alcotest
+  base
+  core_kernel
+  ;; local libraries
+  fold_lib
+  kimchi_backend
+  kimchi_pasta
+  kimchi_pasta.basic
+  pickles
+  pickles.backend
+  random_oracle
+  random_oracle.permutation
+  random_oracle_input
+  snark_params
+  snarky.backendless
+  sponge))
