@@ -28,10 +28,6 @@ var caml_pasta_fp_plonk_proof_create = function (
   );
   // Free the witness columns vector after use
   w.free();
-  // Free other intermediate objects
-  prev_challenges.free();
-  wasm_runtime_tables.free();
-  prev_sgs.free();
   return tsRustConversion.fp.proofFromRust(proof);
 };
 
@@ -40,11 +36,7 @@ var caml_pasta_fp_plonk_proof_create = function (
 var caml_pasta_fp_plonk_proof_verify = function (index, proof) {
   index = tsRustConversion.fp.verifierIndexToRust(index);
   proof = tsRustConversion.fp.proofToRust(proof);
-  var result = plonk_wasm.caml_pasta_fp_plonk_proof_verify(index, proof);
-  // Free intermediate objects
-  index.free();
-  proof.free();
-  return result;
+  return plonk_wasm.caml_pasta_fp_plonk_proof_verify(index, proof);
 };
 
 // Provides: caml_pasta_fp_plonk_proof_batch_verify
@@ -58,11 +50,7 @@ var caml_pasta_fp_plonk_proof_batch_verify = function (indexes, proofs) {
     proofs,
     tsRustConversion.fp.proofToRust
   );
-  var result = plonk_wasm.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
-  // Free intermediate vectors
-  indexes.free();
-  proofs.free();
-  return result;
+  return plonk_wasm.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
 };
 
 // Provides: caml_pasta_fp_plonk_proof_dummy
@@ -76,11 +64,11 @@ var caml_pasta_fp_plonk_proof_dummy = function () {
 // Provides: caml_pasta_fp_plonk_proof_deep_copy
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_proof_deep_copy = function (proof) {
-  var wasmProof = tsRustConversion.fp.proofToRust(proof);
-  var copiedProof = plonk_wasm.caml_pasta_fp_plonk_proof_deep_copy(wasmProof);
-  // Free the intermediate proof object
-  wasmProof.free();
-  return tsRustConversion.fp.proofFromRust(copiedProof);
+  return tsRustConversion.fp.proofFromRust(
+    plonk_wasm.caml_pasta_fp_plonk_proof_deep_copy(
+      tsRustConversion.fp.proofToRust(proof)
+    )
+  );
 };
 
 // Provides: caml_pasta_fq_plonk_proof_create
@@ -110,10 +98,6 @@ var caml_pasta_fq_plonk_proof_create = function (
   );
   // Free the witness columns vector after use
   w.free();
-  // Free other intermediate objects
-  prev_challenges.free();
-  wasm_runtime_tables.free();
-  prev_sgs.free();
   return tsRustConversion.fq.proofFromRust(proof);
 };
 
@@ -122,11 +106,7 @@ var caml_pasta_fq_plonk_proof_create = function (
 var caml_pasta_fq_plonk_proof_verify = function (index, proof) {
   index = tsRustConversion.fq.verifierIndexToRust(index);
   proof = tsRustConversion.fq.proofToRust(proof);
-  var result = plonk_wasm.caml_pasta_fq_plonk_proof_verify(index, proof);
-  // Free intermediate objects
-  index.free();
-  proof.free();
-  return result;
+  return plonk_wasm.caml_pasta_fq_plonk_proof_verify(index, proof);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_batch_verify
@@ -140,11 +120,7 @@ var caml_pasta_fq_plonk_proof_batch_verify = function (indexes, proofs) {
     proofs,
     tsRustConversion.fq.proofToRust
   );
-  var result = plonk_wasm.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
-  // Free intermediate vectors
-  indexes.free();
-  proofs.free();
-  return result;
+  return plonk_wasm.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_dummy
@@ -158,11 +134,11 @@ var caml_pasta_fq_plonk_proof_dummy = function () {
 // Provides: caml_pasta_fq_plonk_proof_deep_copy
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_proof_deep_copy = function (proof) {
-  var wasmProof = tsRustConversion.fq.proofToRust(proof);
-  var copiedProof = plonk_wasm.caml_pasta_fq_plonk_proof_deep_copy(wasmProof);
-  // Free the intermediate proof object
-  wasmProof.free();
-  return tsRustConversion.fq.proofFromRust(copiedProof);
+  return tsRustConversion.fq.proofFromRust(
+    plonk_wasm.caml_pasta_fq_plonk_proof_deep_copy(
+      tsRustConversion.fq.proofToRust(proof)
+    )
+  );
 };
 
 // Provides: prover_to_json
