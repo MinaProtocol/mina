@@ -26,6 +26,8 @@ var caml_pasta_fp_plonk_proof_create = function (
     prev_challenges,
     prev_sgs
   );
+  // Free the witness columns vector after use
+  w.free();
   return tsRustConversion.fp.proofFromRust(proof);
 };
 
@@ -94,6 +96,8 @@ var caml_pasta_fq_plonk_proof_create = function (
     prev_challenges,
     prev_sgs
   );
+  // Free the witness columns vector after use
+  w.free();
   return tsRustConversion.fq.proofFromRust(proof);
 };
 
