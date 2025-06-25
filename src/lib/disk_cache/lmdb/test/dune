@@ -1,0 +1,6 @@
+(test
+ (name test_disk_cache)
+ (libraries alcotest disk_cache.lmdb disk_cache_test_lib)
+ (instrumentation
+  (backend bisect_ppx))
+)

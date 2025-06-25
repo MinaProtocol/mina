@@ -47,16 +47,3 @@ module Make (Data : Binable.S) = struct
 
   let int_of_id { idx } = idx
 end
-
-let%test_module "disk_cache lmdb" =
-  ( module struct
-    include Disk_cache_test_lib.Make_extended (Make)
-
-    let%test_unit "remove data on gc" = remove_data_on_gc ()
-
-    let%test_unit "simple read/write (with iteration)" =
-      simple_write_with_iteration ()
-
-    let%test_unit "initialization special cases" =
-      initialization_special_cases ()
-  end )
