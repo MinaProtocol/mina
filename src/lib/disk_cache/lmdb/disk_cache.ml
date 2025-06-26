@@ -16,29 +16,37 @@ module Make (Data : Binable.S) = struct
 
   module Rw = Read_write (F)
 
-  type t = { env : Rw.t; db : Rw.holder; counter : int ref }
+  type t = { env : Rw.t; db : Rw.holder; counter : int ref; logger : Logger.t }
 
   let initialize path ~logger =
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun path ->
         let env, db = Rw.create path in
-        { env; db; counter = ref 0 } )
+        { env; db; counter = ref 0; logger } )
 
   type id = { idx : int }
 
-  let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
+  let get ({ env; db; logger; _ } : t) ({ idx } : id) : Data.t =
+    [%log debug] "Getting data at %d in LMDB cache" idx
+      ~metadata:[ ("index", `Int idx) ] ;
     Rw.get ~env db idx |> Option.value_exn
 
-  let put ({ env; db; counter } : t) (x : Data.t) : id =
+  let put ({ env; db; counter; logger } : t) (x : Data.t) : id =
     let idx = !counter in
     incr counter ;
     let res = { idx } in
     (* When this reference is GC'd, delete the file. *)
-    Gc.Expert.add_finalizer_last_exn res (fun () -> Rw.remove ~env db idx) ;
+    Gc.Expert.add_finalizer_last_exn res (fun () ->
+        [%log debug] "Data at %d is GCed, removing from LMDB cache" idx
+          ~metadata:[ ("index", `Int idx) ] ;
+        Rw.remove ~env db idx ) ;
     Rw.set ~env db idx x ;
     res
 
-  let iteri ({ env; db; _ } : t) ~f = Rw.iter ~env db ~f
+  let iteri ({ env; db; logger; _ } : t) ~f =
+    Rw.iter ~env db ~f:(fun k v ->
+        [%log debug] "Iterating at index %d" k ~metadata:[ ("index", `Int k) ] ;
+        f k v )
 
   let count ({ env; db; _ } : t) =
     let sum = ref 0 in
