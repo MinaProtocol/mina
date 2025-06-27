@@ -98,6 +98,7 @@ USER 0
 COPY --chown=${UID} scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
 COPY --chown=${UID} scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
 COPY --chown=${UID} scripts/daemon-entrypoint.sh /entrypoint.sh
+COPY --chown=${UID} scripts/freeze-alert.sh /freeze-alert.sh
 # Solve this by marking scripts executable in git
 COPY --chown=${UID} ./auxiliary_entrypoints /entrypoint.d
 
