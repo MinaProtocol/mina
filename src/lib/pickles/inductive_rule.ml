@@ -199,7 +199,7 @@ module Make (P : Proof_intf) : Intf with type 'a proof = 'a P.t = struct
     (** This type models an "inductive rule". It includes
      - the list of previous statements which this one assumes
      - the snarky main function
- 
+
      The types parameters are:
      - ['prev_vars] the tuple-list of public input circuit types to the previous
        proofs.
