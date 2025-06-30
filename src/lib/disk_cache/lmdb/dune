@@ -11,7 +11,7 @@
   disk_cache.utils
   disk_cache.test_lib)
  (preprocess
-  (pps ppx_version ppx_jane))
+  (pps ppx_mina ppx_jane ppx_version))
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation
