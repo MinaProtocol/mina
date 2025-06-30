@@ -21,7 +21,7 @@ in  { step =
                         , artifact = Artifacts.Type.FunctionalTestSuite
                         }
                     )
-                    "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db ./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                    "NETWORK_DATA_FOLDER=./src/test/archive/sample_db ./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Node Test"
               , key = key
