@@ -1,22 +1,23 @@
+open Async_kernel
+open Core_kernel
+
 module type S = sig
-  module Scalar_challenge = Scalar_challenge
-  module Endo = Endo
-  open Core_kernel
-  open Async_kernel
   open Pickles_types
   open Hlist
-  module Tick_field_sponge = Tick_field_sponge
-  module Util = Util
-  module Step_main_inputs = Step_main_inputs
   module Backend = Backend
-  module Sponge_inputs = Sponge_inputs
-  module Impls = Impls
-  module Tag = Tag
-  module Types_map = Types_map
-  module Step_verifier = Step_verifier
-  module Common = Common
-  module Proof_cache = Proof_cache
   module Cache = Cache
+  module Common = Common
+  module Endo = Endo
+  module Impls = Impls
+  module Proof_cache = Proof_cache
+  module Scalar_challenge = Scalar_challenge
+  module Sponge_inputs = Sponge_inputs
+  module Step_main_inputs = Step_main_inputs
+  module Step_verifier = Step_verifier
+  module Tag = Tag
+  module Tick_field_sponge = Tick_field_sponge
+  module Types_map = Types_map
+  module Util = Util
   module Ro = Ro
 
   module type Statement_intf = sig
