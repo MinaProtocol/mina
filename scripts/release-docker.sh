@@ -53,10 +53,10 @@ esac; shift; done
 
 # Determine the proper image for ubuntu or debian
 case "${DEB_CODENAME##*=}" in
-  focal|noble)
+  focal|jammy|noble)
     IMAGE="ubuntu:${DEB_CODENAME##*=}"
   ;;
-  bullseye|bookworm|jammy)
+  bullseye|bookworm)
     IMAGE="debian:${DEB_CODENAME##*=}-slim"
   ;;
 esac
