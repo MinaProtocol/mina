@@ -30,39 +30,15 @@ module type Bool_intf = sig
   val any : t list -> t
 end
 
-module type Field_intf = sig
-  type t
-
-  val size_in_bits : int
-
-  val zero : t
-
-  val one : t
-
-  val of_int : int -> t
-
-  val ( * ) : t -> t -> t
-
-  val ( / ) : t -> t -> t
-
-  val ( + ) : t -> t -> t
-
-  val ( - ) : t -> t -> t
-
-  val inv : t -> t
-
-  val negate : t -> t
-end
-
 module type Field_with_if_intf = sig
-  include Field_intf
+  include Plonkish_prelude.Field_intf.T
 
   type bool
 
   val if_ : bool -> then_:(unit -> t) -> else_:(unit -> t) -> t
 end
 
-type 'f field = (module Field_intf with type t = 'f)
+type 'f field = (module Plonkish_prelude.Field_intf.T with type t = 'f)
 
 let pow2pow (type t) ((module F) : t field) (x : t) n : t =
   let rec go acc i = if i = 0 then acc else go F.(acc * acc) (i - 1) in
@@ -86,7 +62,8 @@ let domain (type t) ((module F) : t field) ~shifts ~domain_generator
     method generator = generator
   end
 
-let actual_evaluation (type f) (module Field : Field_intf with type t = f)
+let actual_evaluation (type f)
+    (module Field : Plonkish_prelude.Field_intf.T with type t = f)
     (e : Field.t array) (pt : Field.t) ~rounds : Field.t =
   let pt_n =
     let rec go acc i = if i = 0 then acc else go Field.(acc * acc) (i - 1) in
@@ -346,7 +323,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
   (** Computes the ft evaluation at zeta.
   (see https://o1-labs.github.io/mina-book/crypto/plonk/maller_15.html#the-evaluation-of-l)
   *)
-  let ft_eval0 (type t) (module F : Field_intf with type t = t) ~domain
+  let ft_eval0 (type t)
+      (module F : Plonkish_prelude.Field_intf.T with type t = t) ~domain
       ~(env : t Scalars.Env.t)
       ({ alpha = _; beta; gamma; zeta; joint_combiner = _; feature_flags = _ } :
         _ Minimal.t ) (e : (_ * _, _) Plonk_types.Evals.In_circuit.t) p_eval0 =
@@ -400,7 +378,8 @@ module Make (Shifted_value : Shifted_value.S) (Sc : Scalars.S) = struct
 
   (** Computes the list of scalars used in the linearization. *)
   let derive_plonk (type t) ?(with_label = fun _ (f : unit -> t) -> f ())
-      (module F : Field_intf with type t = t) ~(env : t Scalars.Env.t) ~shift =
+      (module F : Plonkish_prelude.Field_intf.T with type t = t)
+      ~(env : t Scalars.Env.t) ~shift =
     let _ = with_label in
     let open F in
     fun ({ alpha

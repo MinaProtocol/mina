@@ -27,39 +27,15 @@ module type Bool_intf = sig
   val any : t list -> t
 end
 
-module type Field_intf = sig
-  type t
-
-  val size_in_bits : int
-
-  val zero : t
-
-  val one : t
-
-  val of_int : int -> t
-
-  val ( * ) : t -> t -> t
-
-  val ( / ) : t -> t -> t
-
-  val ( + ) : t -> t -> t
-
-  val ( - ) : t -> t -> t
-
-  val inv : t -> t
-
-  val negate : t -> t
-end
-
 module type Field_with_if_intf = sig
-  include Field_intf
+  include Plonkish_prelude.Field_intf.T
 
   type bool
 
   val if_ : bool -> then_:(unit -> t) -> else_:(unit -> t) -> t
 end
 
-type 'f field = (module Field_intf with type t = 'f)
+type 'f field = (module Plonkish_prelude.Field_intf.T with type t = 'f)
 
 val lookup_tables_used : Opt.Flag.t Plonk_types.Features.t -> Opt.Flag.t
 
@@ -114,7 +90,7 @@ module Make (Shifted_value : Pickles_types.Shifted_value.S) (_ : Scalars.S) : si
 
   val derive_plonk :
        ?with_label:(string -> (unit -> 't) -> 't)
-    -> (module Field_intf with type t = 't)
+    -> (module Plonkish_prelude.Field_intf.T with type t = 't)
     -> env:'t Scalars.Env.t
     -> shift:'t Shifted_value.Shift.t
     -> ( 't

@@ -35,6 +35,7 @@
   kimchi_bindings
   kimchi_types
   pasta_bindings
+  plonkish_prelude
   kimchi_pasta
   kimchi_pasta.basic
   kimchi_pasta.constraint_system
