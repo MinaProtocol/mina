@@ -2,7 +2,7 @@
  (name merkle_ledger)
  (public_name merkle_ledger)
  (flags
-  (:standard -open Core_kernel -warn-error +a))
+  (:standard -warn-error +a))
  (library_flags -linkall)
  (modules_without_implementation location_intf)
  (libraries
