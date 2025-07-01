@@ -94,18 +94,26 @@ function load_from_db() {
 }
 
 function load_blocks_from_db() {
+    # Load the first 100 blocks from the database
+    echo "Loading blocks from database..."
     load_from_db "$1" "SELECT state_hash FROM blocks LIMIT 100;" "blocks"
 }
 
 function load_accounts_from_db() {
+    # Load the first 100 public keys from the database
+    echo "Loading accounts from database..."
     load_from_db "$1" "SELECT value FROM public_keys LIMIT 100;" "accounts"
 }
 
 function load_payment_transactions_from_db() {
+    # Load the first 100 payment transaction hashes from the database
+    echo "Loading payment transactions from database..."
     load_from_db "$1" "SELECT hash FROM user_commands LIMIT 100;" "payment_transactions"
 }
 
 function load_zkapp_transactions_from_db() {
+    # Load the first 100 zkapp transaction hashes from the database
+    echo "Loading zkapp transactions from database..."
     load_from_db "$1" "SELECT hash FROM zkapp_commands LIMIT 100;" "zkapp_transactions"
 }
 
