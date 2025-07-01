@@ -43,17 +43,16 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
+MINA_DEB_NAME="mina-berkeley"
+DEB_SUFFIX=""
+    
 # Add suffix to debian to distinguish different profiles (mainnet/devnet/lightnet)
 case "${DUNE_PROFILE}" in
-  devnet|mainnet)
-    MINA_DEB_NAME="mina-berkeley"
-    DEB_SUFFIX=""
-   ;;
-  *)
+  lightnet)
     # use dune profile as suffix but replace underscore to dashes so deb builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
-    MINA_DEB_NAME="mina-berkeley-${_SUFFIX}"
-    DEB_SUFFIX="-${_SUFFIX}"
+    DEB_SUFFIX="${_SUFFIX}"
+    MINA_DEB_NAME="${MINA_DEB_NAME}-${DEB_SUFFIX}"
     ;;
 esac
 
@@ -394,16 +393,8 @@ build_daemon_berkeley_deb() {
 }
 ##################################### END BERKELEY PACKAGE ######################################
 
-##################################### ARCHIVE PACKAGE ###########################################
-build_archive_deb () {
-  ARCHIVE_DEB=mina-archive${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive deb"
-
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
+copy_common_archive_configs() {
+  local ARCHIVE_DEB="${1}"
 
   cp ./default/src/app/archive/archive.exe "${BUILDDIR}/usr/local/bin/mina-archive"
   cp ./default/src/app/archive_blocks/archive_blocks.exe "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
@@ -419,9 +410,53 @@ build_archive_deb () {
   cp ../src/app/archive/drop_tables.sql "${BUILDDIR}/etc/mina/archive"
 
   build_deb "$ARCHIVE_DEB"
+}
+
+##################################### ARCHIVE DEVNET PACKAGE ###########################################
+build_archive_devnet_deb () {
+  ARCHIVE_DEB=mina-archive-devnet
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive devnet deb"
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+}
+##################################### END ARCHIVE DEVNET PACKAGE ########################################
+
+##################################### ARCHIVE BERKELEY PACKAGE ###########################################
+build_archive_berkeley_deb () {
+  ARCHIVE_DEB=mina-archive-berkeley${DEB_SUFFIX}
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive berkeley deb"
+
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
 
 }
 ##################################### END ARCHIVE PACKAGE ########################################
+
+##################################### ARCHIVE MAINNET PACKAGE ###########################################
+build_archive_mainnet_deb () {
+  ARCHIVE_DEB=mina-archive-mainnet
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive mainnet deb"
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+}
+##################################### END ARCHIVE MAINNET PACKAGE ########################################
 
 
 ##################################### ZKAPP TEST TXN #############################################
