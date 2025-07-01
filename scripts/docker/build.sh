@@ -44,6 +44,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;
   --deb-version) INPUT_VERSION="$2"; shift;;
+  --deb-legacy-version) INPUT_LEGACY_VERSION="$2"; shift;;
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
@@ -59,6 +60,12 @@ NETWORK="--build-arg network=$INPUT_NETWORK"
 if [[ -z "$INPUT_NETWORK" ]]; then 
   echo "Network is not set. Using the default (devnet)"
   NETWORK="--build-arg network=devnet"
+fi
+
+LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
+
+if [[ -z "$INPUT_LEGACY_VERSION" ]]; then 
+  LEGACY_VERSION=""
 fi
 
 BRANCH="--build-arg MINA_BRANCH=$INPUT_BRANCH"
@@ -124,6 +131,15 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
+    mina-daemon-hardfork)
+        if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
+          echo "Legacy version is not set for mina-daemon-hardfork."
+          echo "Please provide the --deb-legacy-version argument."
+          exit 1
+        fi
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-hardfork"
+        DOCKER_CONTEXT="dockerfiles/"
+        ;;
     mina-toolchain)
         DOCKERFILE_PATH_SCRIPT_1="dockerfiles/stages/1-build-deps"
         DOCKERFILE_PATH_SCRIPT_2_AND_MORE="dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
@@ -187,7 +203,7 @@ docker system prune --all --force --filter until=24h
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
-  docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
