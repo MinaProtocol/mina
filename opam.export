@@ -106,7 +106,7 @@ installed: [
   "core_unix.v0.14.0"
   "cppo.1.6.7"
   "cppo_ocamlbuild.1.6.7"
-  "crunch.3.0.0"
+  "crunch.3.2.0"
   "csexp.1.5.1"
   "cstruct.6.0.1"
   "ctypes.0.17.1"
