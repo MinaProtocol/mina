@@ -148,7 +148,7 @@ RUN mkdir --mode=700 /home/opam/.gnupg \
 
 ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
-# --- Ocaml install of a given OCAML_VERSION via opam switch
+# --- OCaml install of a given OCAML_VERSION via opam switch
 # additionally initializes opam with sandboxing disabled, as we did not install
 # bubblewrap above.
 RUN git clone \
