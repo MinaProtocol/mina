@@ -417,26 +417,12 @@ doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources))) ## Generate d
 ########################################
 # Docker images
 
-.PHONY: docker-build-toolchain-bullseye
-docker-build-toolchain-bullseye: ## Build the toolchain to be used in CI, based on Debian Bullseye
+.PHONY: docker-build-toolchain
+docker-build-toolchain: ## Build the toolchain to be used in CI
 	./scripts/docker/build.sh \
-		--deb-codename bullseye \
+		--deb-codename $(CODENAME) \
 		--service mina-toolchain \
-		--version mina-toolchain-bullseye-$(shell git rev-parse --short=8 HEAD)
-
-.PHONY: docker-build-toolchain-focal
-docker-build-toolchain-focal: ## Build the toolchain to be used in CI, based on Debian Focal
-	./scripts/docker/build.sh \
-		--deb-codename focal \
-		--service mina-toolchain \
-		--version mina-toolchain-focal-$(shell git rev-parse --short=8 HEAD)
-
-.PHONY: docker-build-toolchain-noble
-docker-build-toolchain-noble: ## Build the toolchain to be used in CI, based on Ubuntu Noble
-	./scripts/docker/build.sh \
-		--deb-codename noble \
-		--service mina-toolchain \
-		--version mina-toolchain-noble-$(shell git rev-parse --short=8 HEAD)
+		--version mina-toolchain-$(CODENAME)-$(GITHASH)
 
 ########################################
 # Generate odoc documentation
