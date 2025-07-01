@@ -18,7 +18,7 @@ module Snark_pool : sig
   val verify :
        t
     -> proof_envelope
-    -> (unit, [> `Crash of Error.t | `Invalid of Verifier.invalid ]) result
+    -> (unit, [> `Crash of Error.t | `Invalid of Verifier.invalid ]) Result.t
        Deferred.t
 end
 
