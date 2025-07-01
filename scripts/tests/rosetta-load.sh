@@ -9,14 +9,19 @@ source "$(dirname "$0")/rosetta-helper.sh"
 # ./rosetta-load.sh mainnet 2 5 10 15 20 25
 # (network, status_interval, options_interval, block_interval, account_balance_interval, payment_tx_interval, zkapp_tx_interval)
 
-NETWORK="${1:-mainnet}"
-ADDRESS="${2:-http://rosetta-mainnet.gcp.o1test.net}"
-STATUS_INTERVAL="${2:-2}"
-OPTIONS_INTERVAL="${3:-5}"
-BLOCK_INTERVAL="${4:-10}"
-ACCOUNT_BALANCE_INTERVAL="${5:-15}"
-PAYMENT_TX_INTERVAL="${6:-20}"
-ZKAPP_TX_INTERVAL="${7:-25}"
+NETWORK="mainnet"
+ADDRESS="http://rosetta-mainnet.gcp.o1test.net"
+DB_CONN_STR="postgresql://user:password@localhost/mina"
+STATUS_INTERVAL="2"
+OPTIONS_INTERVAL="5"
+BLOCK_INTERVAL="10"
+ACCOUNT_BALANCE_INTERVAL="15"
+PAYMENT_TX_INTERVAL="20"
+ZKAPP_TX_INTERVAL="25"
+
+function usage() {
+    echo "Usage: $0 [--network mainnet|devnet] [--address <address>] [--db-conn-str <conn_str>] [--status-interval N] [--options-interval N] [--block-interval N] [--account-balance-interval N] [--payment-tx-interval N] [--zkapp-tx-interval N]"
+}
 
 # Argument parsing
 while [[ $# -gt 0 ]]; do
@@ -58,14 +63,21 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            echo "Usage: $0 [--network mainnet|devnet] [--address <address>] [--db-conn-str <conn_str>] [--status-interval N] [--options-interval N] [--block-interval N] [--account-balance-interval N] [--payment-tx-interval N] [--zkapp-tx-interval N]"
+            usage
             exit 0
             ;;
         *)
-            break
+            echo "Unknown option: $1"
+            usage
+            exit 1
             ;;
     esac
 done
+
+echo "Running Rosetta load tests with the following parameters:"
+echo "  Network: $NETWORK"
+echo "  Address: $ADDRESS"
+echo "  DB Connection String: $DB_CONN_STR" 
 
 declare -A load
 export load
@@ -97,10 +109,6 @@ function load_zkapp_transactions_from_db() {
     load_from_db "$1" "SELECT hash FROM zkapp_commands LIMIT 100;" "zkapp_transactions"
 }
 
-
-
-# Example connection string, adjust as needed
-DB_CONN_STR="postgresql://user:password@localhost/mina"
 
 load_blocks_from_db "$DB_CONN_STR" "blocks"
 load_accounts_from_db "$DB_CONN_STR" "accounts"
