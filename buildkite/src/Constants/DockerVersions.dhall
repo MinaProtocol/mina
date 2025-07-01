@@ -77,13 +77,6 @@ let ofDebian =
             }
             debian
 
-let dependsOn =
-          \(docker : Docker)
-      ->  \(network : Network.Type)
-      ->  \(profile : Profiles.Type)
-      ->  \(binary : Artifacts.Type)
-      ->  dependsOnStep docker "MinaArtifact" network profile binary
-
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName

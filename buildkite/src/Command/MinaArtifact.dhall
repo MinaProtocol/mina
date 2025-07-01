@@ -208,10 +208,12 @@ let docker_step
                     , deps =
                           deps
                         # DockerVersion.dependsOn
-                            (DockerVersion.ofDebian spec.debVersion)
-                            spec.network
-                            spec.profile
-                            Artifacts.Type.Daemon
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.Daemon
+                            }
                     , service = Artifacts.Type.DaemonHardfork
                     , network = spec.network
                     , deb_codename = spec.debVersion
