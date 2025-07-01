@@ -32,22 +32,36 @@ let lowerName =
             }
             docker
 
-let dependsOnStep =
-          \(docker : Docker)
-      ->  \(prefix : Text)
-      ->  \(network : Network.Type)
-      ->  \(profile : Profiles.Type)
-      ->  \(binary : Artifacts.Type)
-      ->  let network = "${Network.capitalName network}"
+let DepsSpec =
+      { Type =
+          { codename : Docker
+          , prefix : Text
+          , network : Network.Type
+          , profile : Profiles.Type
+          , artifact : Artifacts.Type
+          , suffix : Text
+          }
+      , default =
+          { codename = Docker.Bullseye
+          , prefix = "MinaArtifact"
+          , network = Network.Type.Berkeley
+          , profile = Profiles.Type.Standard
+          , artifact = Artifacts.Type.Daemon
+          , suffix = "docker-image"
+          }
+      }
 
-          let profileSuffix = "${Profiles.toSuffixUppercase profile}"
+let dependsOn =
+          \(spec : DepsSpec.Type)
+      ->  let network = "${Network.capitalName spec.network}"
 
-          let suffix = "docker-image"
+          let profileSuffix = "${Profiles.toSuffixUppercase spec.profile}"
 
-          let key = "${Artifacts.lowerName binary}-${suffix}"
+          let key = "${Artifacts.lowerName spec.artifact}-${spec.suffix}"
 
           in  [ { name =
-                    "${prefix}${capitalName docker}${network}${profileSuffix}"
+                    "${spec.prefix}${capitalName
+                                       spec.codename}${network}${profileSuffix}"
                 , key = key
                 }
               ]
@@ -63,17 +77,10 @@ let ofDebian =
             }
             debian
 
-let dependsOn =
-          \(docker : Docker)
-      ->  \(network : Network.Type)
-      ->  \(profile : Profiles.Type)
-      ->  \(binary : Artifacts.Type)
-      ->  dependsOnStep docker "MinaArtifact" network profile binary
-
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName
     , ofDebian = ofDebian
     , dependsOn = dependsOn
-    , dependsOnStep = dependsOnStep
+    , DepsSpec = DepsSpec
     }

@@ -176,13 +176,15 @@ let docker_step
       ->  let step_dep_name = "build"
 
           let deps =
-                DebianVersions.dependsOnStep
-                  (Some spec.prefix)
-                  spec.debVersion
-                  spec.network
-                  spec.profile
-                  spec.buildFlags
-                  step_dep_name
+                DebianVersions.dependsOn
+                  DebianVersions.DepsSpec::{
+                  , deb_version = spec.debVersion
+                  , network = spec.network
+                  , profile = spec.profile
+                  , build_flag = spec.buildFlags
+                  , step = step_dep_name
+                  , prefix = spec.prefix
+                  }
 
           let docker_publish = DockerPublish.Type.Essential
 
@@ -206,10 +208,12 @@ let docker_step
                     , deps =
                           deps
                         # DockerVersion.dependsOn
-                            (DockerVersion.ofDebian spec.debVersion)
-                            spec.network
-                            spec.profile
-                            Artifacts.Type.Daemon
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.Daemon
+                            }
                     , service = Artifacts.Type.DaemonHardfork
                     , network = spec.network
                     , deb_codename = spec.debVersion
