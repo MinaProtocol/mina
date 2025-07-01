@@ -12,7 +12,11 @@ ARG deb_codename
 
 FROM ${image} AS build-deps
 
-# Ocaml Version
+# OCaml Version
+# The version must be the same as the version used in:
+# - dockerfiles/1-build-deps
+# - opam.export
+# - scripts/update_opam_switch.sh
 ARG OCAML_VERSION=4.14
 ARG OCAML_REVISION=.2
 ARG OCAML_VARIANT=
