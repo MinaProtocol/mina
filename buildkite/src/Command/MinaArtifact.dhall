@@ -24,6 +24,8 @@ let DockerImage = ./DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
+let DockerVersion = ../Constants/DockerVersions.dhall
+
 let DebianRepo = ../Constants/DebianRepo.dhall
 
 let DockerPublish = ../Constants/DockerPublish.dhall
@@ -53,6 +55,7 @@ let MinaBuildSpec =
           , tags : List PipelineTag.Type
           , channel : DebianChannel.Type
           , debianRepo : DebianRepo.Type
+          , deb_legacy_version : Text
           , if : Optional B/If
           }
       , default =
@@ -67,6 +70,7 @@ let MinaBuildSpec =
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
+          , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , if = None B/If
           }
       }
@@ -195,7 +199,27 @@ let docker_step
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
                     , if = spec.if
+                    }
+                  ]
+                , DaemonHardfork =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            (DockerVersion.ofDebian spec.debVersion)
+                            spec.network
+                            spec.profile
+                            Artifacts.Type.Daemon
+                    , service = Artifacts.Type.DaemonHardfork
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
                     }
                   ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
@@ -210,6 +234,7 @@ let docker_step
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
                     , if = spec.if
                     }
                   ]
@@ -222,6 +247,7 @@ let docker_step
                     , build_flags = spec.buildFlags
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
                     , if = spec.if
                     }
                   ]
@@ -234,6 +260,7 @@ let docker_step
                     , deb_profile = spec.profile
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
                     , if = spec.if
                     }
                   ]
@@ -246,6 +273,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_codename = spec.debVersion
+                    , deb_legacy_version = spec.deb_legacy_version
                     , if = spec.if
                     }
                   ]
@@ -259,6 +287,7 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
+                    , deb_legacy_version = spec.deb_legacy_version
                     , if = spec.if
                     }
                   ]

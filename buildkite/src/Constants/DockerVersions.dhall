@@ -4,6 +4,8 @@ let Artifacts = ./Artifacts.dhall
 
 let Network = ./Network.dhall
 
+let DebianVersions = ./DebianVersions.dhall
+
 let Docker
     : Type
     = < Bookworm | Bullseye | Jammy | Focal | Noble >
@@ -64,9 +66,28 @@ let dependsOn =
                 }
               ]
 
+let ofDebian =
+          \(debian : DebianVersions.DebVersion)
+      ->  merge
+            { Bookworm = Docker.Bookworm
+            , Bullseye = Docker.Bullseye
+            , Jammy = Docker.Jammy
+            , Focal = Docker.Focal
+            , Noble = Docker.Noble
+            }
+            debian
+
+let dependsOn =
+          \(docker : Docker)
+      ->  \(network : Network.Type)
+      ->  \(profile : Profiles.Type)
+      ->  \(binary : Artifacts.Type)
+      ->  dependsOnStep docker "MinaArtifact" network profile binary
+
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName
+    , ofDebian = ofDebian
     , dependsOn = dependsOn
     , DepsSpec = DepsSpec
     }

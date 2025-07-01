@@ -5,7 +5,7 @@
   ;; opam libraries
   core
   async
-  bounded_types
+  mina_stdlib
   ;; local libraries
   logger
   file_system

@@ -109,5 +109,4 @@ _coverage/
 # may appear as an untracked file occasionally
 /src/external
 
-# Claude AI assistance file
-CLAUDE.md
+CLAUDE.local.md

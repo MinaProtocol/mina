@@ -1996,8 +1996,8 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_single_account_update ~signature_kind ~fee_payer_idx
-        ~zkapp_account_idx ~fee ~nonce ~ledger =
+    let mk_single_account_update ~fee_payer_idx ~zkapp_account_idx ~fee ~nonce
+        ~ledger =
       let fee = Currency.Fee.of_nanomina_int_exn fee in
       let fee_payer_kp = test_keys.(fee_payer_idx) in
       let nonce = Account.Nonce.of_int nonce in
@@ -2014,8 +2014,8 @@ let%test_module _ =
           }
       in
       let%map zkapp_command =
-        Transaction_snark.For_tests.single_account_update ~signature_kind
-          ~constraint_constants spec
+        Transaction_snark.For_tests.single_account_update ~constraint_constants
+          spec
       in
       Or_error.ok_exn
         (Zkapp_command.Verifiable.create ~failed:false
@@ -3129,9 +3129,8 @@ let%test_module _ =
               ()
           in
           let%bind zkapp_command =
-            mk_single_account_update
-              ~signature_kind:Mina_signature_kind.(Other_network "invalid")
-              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
+            mk_single_account_update ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0
+              ~zkapp_account_idx:1
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
           in
           let tx =

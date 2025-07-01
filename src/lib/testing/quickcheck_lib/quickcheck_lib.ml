@@ -146,7 +146,7 @@ let gen_imperative_rose_tree ?(p = 0.75) (root_gen : 'a t)
   imperative_fixed_point root ~f:(fun self ->
       match%bind size with
       | 0 ->
-          return (fun parent -> Rose_tree.T (parent, []))
+          return (fun parent -> Mina_stdlib.Rose_tree.T (parent, []))
       | n ->
           let%bind fork_count = geometric ~p 1 >>| Int.max n in
           let%bind fork_sizes = gen_division n fork_count in
@@ -158,7 +158,7 @@ let gen_imperative_rose_tree ?(p = 0.75) (root_gen : 'a t)
                 tuple2 node_gen (with_size ~size:(s - 1) self) )
           in
           fun parent ->
-            Rose_tree.T
+            Mina_stdlib.Rose_tree.T
               (parent, List.map forks ~f:(fun (this, f) -> f (this parent))) )
 
 let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t) (node_gen : ('a -> 'a) t)

@@ -577,7 +577,7 @@ module For_tests = struct
 
   let load_with_max_length = load_with_max_length
 
-  let rec deferred_rose_tree_iter (Rose_tree.T (root, trees)) ~f =
+  let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
     let%bind () = f root in
     Deferred.List.iter trees ~f:(deferred_rose_tree_iter ~f)
 
@@ -726,7 +726,7 @@ module For_tests = struct
     (* TODO: ensure that rose_tree cannot be longer than k *)
     let%bind root, branches, protocol_states =
       let%bind root, protocol_states = gen_root_breadcrumb in
-      let%map (Rose_tree.T (root, branches)) =
+      let%map (Mina_stdlib.Rose_tree.T (root, branches)) =
         Quickcheck.Generator.with_size ~size
           (Quickcheck_lib.gen_imperative_rose_tree
              (Quickcheck.Generator.return root)

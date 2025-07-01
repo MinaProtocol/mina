@@ -25,7 +25,7 @@
   trust_system
   block_time
   verifier
-  rose_tree
+  mina_stdlib
   mina_ledger
   transaction_snark_work)
  (instrumentation

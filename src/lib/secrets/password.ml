@@ -31,7 +31,7 @@ let read_hidden_line ~error_help_message prompt : Bytes.t Async.Deferred.t =
   | `Ok pwd ->
       Bytes.of_string pwd
   | `Eof ->
-      Mina_user_error.raisef {|No password was provided.
+      Mina_stdlib.Mina_user_error.raisef {|No password was provided.
 
 %s|}
         error_help_message

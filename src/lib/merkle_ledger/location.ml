@@ -14,7 +14,7 @@ module Bigstring = struct
       let hash_fold_t hash_state t =
         String.hash_fold_t hash_state (Bigstring.to_string t)
 
-      include Bounded_types.String.Of_stringable (struct
+      include Mina_stdlib.Bounded_types.String.Of_stringable (struct
         type nonrec t = t
 
         let of_string s = Bigstring.of_string s

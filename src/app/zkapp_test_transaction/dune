@@ -16,7 +16,7 @@
   mina_graphql
   mina_numbers
   currency
-  bounded_types
+  mina_stdlib
   cli_lib
   mina_base
   signature_lib)

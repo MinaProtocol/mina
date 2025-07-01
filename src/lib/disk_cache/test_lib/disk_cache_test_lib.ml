@@ -2,7 +2,7 @@ open Async
 open Core
 
 module Mock = struct
-  type t = { proof : Bounded_types.String.Stable.V1.t }
+  type t = { proof : Mina_stdlib.Bounded_types.String.Stable.V1.t }
   [@@deriving bin_io_unversioned]
 end
 

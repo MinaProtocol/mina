@@ -18,7 +18,6 @@
   child_processes
   network_peer
   file_system
-  bounded_types
   mina_compile_config)
  (instrumentation
   (backend bisect_ppx))
