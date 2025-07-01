@@ -34,7 +34,7 @@ function export_suffixes () {
     # - lightnet
     # - hardfork-instrumented
     case "${DEB_PROFILE}" in
-        standard)
+        devnet|mainnet)
         case "${DEB_BUILD_FLAGS}" in 
             *instrumented)
             export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"

@@ -1,11 +1,13 @@
+let Network = ./Network.dhall
+
 let Profile
     : Type
-    = < Standard | Mainnet | Lightnet | Dev >
+    = < Devnet | Mainnet | Lightnet | Dev >
 
 let capitalName =
           \(profile : Profile)
       ->  merge
-            { Standard = "Standard"
+            { Devnet = "Devnet"
             , Mainnet = "Mainnet"
             , Lightnet = "Lightnet"
             , Dev = "Dev"
@@ -15,7 +17,7 @@ let capitalName =
 let lowerName =
           \(profile : Profile)
       ->  merge
-            { Standard = "standard"
+            { Devnet = "devnet"
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
             , Dev = "dev"
@@ -25,17 +27,26 @@ let lowerName =
 let duneProfile =
           \(profile : Profile)
       ->  merge
-            { Standard = "devnet"
+            { Devnet = "devnet"
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
             , Dev = "dev"
             }
             profile
 
+let fromNetwork =
+          \(network : Network.Type)
+      ->  merge
+            { Devnet = Profile.Devnet
+            , Mainnet = Profile.Mainnet
+            , Berkeley = Profile.Devnet
+            }
+            network
+
 let toSuffixUppercase =
           \(profile : Profile)
       ->  merge
-            { Standard = ""
+            { Devnet = "Devnet"
             , Mainnet = "Mainnet"
             , Lightnet = "Lightnet"
             , Dev = "Dev"
@@ -45,7 +56,7 @@ let toSuffixUppercase =
 let toSuffixLowercase =
           \(profile : Profile)
       ->  merge
-            { Standard = ""
+            { Devnet = "devnet"
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
             , Dev = "dev"
@@ -55,7 +66,7 @@ let toSuffixLowercase =
 let toLabelSegment =
           \(profile : Profile)
       ->  merge
-            { Standard = ""
+            { Devnet = "devnet"
             , Mainnet = "-mainnet"
             , Lightnet = "-lightnet"
             , Dev = "-dev"
@@ -67,6 +78,7 @@ in  { Type = Profile
     , lowerName = lowerName
     , duneProfile = duneProfile
     , toSuffixUppercase = toSuffixUppercase
+    , fromNetwork = fromNetwork
     , toSuffixLowercase = toSuffixLowercase
     , toLabelSegment = toLabelSegment
     }
