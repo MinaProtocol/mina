@@ -1,27 +1,26 @@
-(library
+(test
  (name mina_net2_tests)
  (libraries
   ;; opam libraries
-  core
+  alcotest
   async
-  ppx_inline_test.config
   async_kernel
   async_unix
-  core_kernel
-  sexplib0
-  bin_prot.shape
   base.caml
+  bin_prot.shape
+  core
+  core_kernel
+  ppx_inline_test.config
+  sexplib0
   ;; local libraries
+  child_processes
+  file_system
+  logger
   mina_net2
   mina_stdlib
-  logger
-  child_processes
-  network_peer
-  file_system
-  mina_compile_config)
+  mina_compile_config
+  network_peer)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version))
- (inline_tests
-  (flags -verbose -show-counts)))
+  (pps ppx_jane ppx_mina ppx_version)))

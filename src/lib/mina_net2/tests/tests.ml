@@ -2,8 +2,6 @@ open Core
 open Async
 open Mina_net2
 
-let%test_module "Mina network tests" =
-  ( module struct
     let logger = Logger.null ()
 
     let pids = Child_processes.Termination.create_pid_table ()
