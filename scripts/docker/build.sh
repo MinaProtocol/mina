@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
+# Enable debug output only in CI environments
+if [[ -n "$CI" || -n "$BUILDKITE" || -n "$GITHUB_ACTIONS" ]]; then
+    set -x
+fi
 
-set -x
 # Author's Note: Because the structure of this repo is inconsistent (Dockerfiles and build contexts placed willy-nilly)
 # we have to trustlist and configure image builds individually because each one is going to be slightly different.
 # This is needed as opposed to trusting the structure of the each project to be consistent for every deployable.
