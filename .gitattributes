@@ -1,5 +1,3 @@
-# Ignore vendored code when calculating repo code %s
-# libsnark is lots of c++
 # PragmataPro requires a license and costs $$, let's protect it with password
 # protected zip file
 frontend/website/static/font/PragmataPro.zip filter=lfs diff=lfs merge=lfs -text
