@@ -2,10 +2,7 @@
  (name rocksdb)
  (public_name rocksdb)
  (library_flags -linkall)
- (flags
-  (:standard -warn-error +a)
-  -open
-  Core_kernel)
+ (flags (:standard -warn-error +a))
  (libraries
   ;; opam libraries
   async

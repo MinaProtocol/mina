@@ -1,4 +1,5 @@
 (* rocksdb.ml -- expose RocksDB operations for Mina *)
+open Core_kernel
 
 type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
 [@@deriving sexp]
