@@ -18,6 +18,8 @@ ocaml_version=4.14.2
 
 # The version must be the same as the version used in:
 # - dockerfiles/1-build-deps
+# - flake.nix (and flake.lock after running
+#   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
 opam_repository_commit=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
 

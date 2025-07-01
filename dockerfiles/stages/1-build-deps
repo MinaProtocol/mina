@@ -24,6 +24,8 @@ ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 # The version must be the same as the version used in:
 # - dockerfiles/1-build-deps
+# - flake.nix (and flake.lock after running
+#   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
 ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
 
