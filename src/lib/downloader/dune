@@ -8,7 +8,7 @@
   core
   core_kernel.pairing_heap
   ;; local libraries
-  bounded_types
+  mina_stdlib
   logger
   network_peer
   o1trace

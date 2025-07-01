@@ -13,7 +13,7 @@
   lens
   ppx_hash.runtime-lib
   ;; local libraries
-  bounded_types
+  mina_stdlib
   cache_dir
   child_processes
   coda_genesis_ledger
@@ -36,7 +36,6 @@
   mina_numbers
   mina_signature_kind
   mina_state
-  mina_stdlib
   mina_transaction
   mina_transaction_logic
   mina_wire_types

@@ -81,7 +81,7 @@ module Make () = struct
         [%%define_locally T1.(to_string, of_string)]
       end
 
-      include Bounded_types.String.Of_stringable (Arg)
+      include Mina_stdlib.Bounded_types.String.Of_stringable (Arg)
     end
   end]
 

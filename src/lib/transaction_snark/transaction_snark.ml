@@ -4157,8 +4157,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; zkapp_account_keypairs : Signature_lib.Keypair.t list
         ; memo : Signed_command_memo.t
         ; new_zkapp_account : bool
-        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; actions :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
         ; transfer_parties_get_actions_events : bool
               (** If true, all parties with the correct authorization get an
                   update with the spec actions and events. If false, only the
@@ -4713,8 +4715,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; zkapp_account_keypair : Signature_lib.Keypair.t
         ; memo : Signed_command_memo.t
         ; update : Account_update.Update.t
-        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; actions :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         }
 
@@ -4857,8 +4861,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
         ; current_auth : Permissions.Auth_required.t
-        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; actions :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         }
@@ -5020,8 +5026,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; actions :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
         ; transfer_parties_get_actions_events : bool
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
@@ -5099,8 +5107,10 @@ module Make_str (A : Wire_types.Concrete) = struct
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; actions :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events :
+            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         }

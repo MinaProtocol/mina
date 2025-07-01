@@ -16,7 +16,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module V1 = struct
       [@@@with_all_version_tags]
 
-      type t = Bounded_types.String.Tagged.Stable.V1.t
+      type t = Mina_stdlib.Bounded_types.String.Tagged.Stable.V1.t
       [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id

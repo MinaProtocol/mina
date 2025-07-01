@@ -10,7 +10,7 @@
   core_kernel
   core
   base
-  bounded_types)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
