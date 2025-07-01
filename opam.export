@@ -1,4 +1,8 @@
 opam-version: "2.0"
+# The version must be the same as the version used in:
+# - dockerfiles/1-build-deps
+# - opam.export
+# - scripts/update_opam_switch.sh
 compiler: ["ocaml-base-compiler.4.14.2"]
 roots: [
   "alcotest.1.1.0"

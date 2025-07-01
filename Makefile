@@ -32,6 +32,9 @@ COVERAGE_DIR=_coverage
 ########################################
 ## Handy variables
 
+# Distribution codename, to be used in Docker builds
+CODENAME ?= $(shell lsb_release -cs)
+
 # This commit hash
 GITHASH := $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH := $(shell git rev-parse HEAD)
@@ -410,6 +413,16 @@ doc_diagram_sources+=$(addprefix src/lib/transition_frontier/res/,*.dot *.tex *.
 
 .PHONY: doc_diagrams
 doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources))) ## Generate documentation diagrams
+
+########################################
+# Docker images
+
+.PHONY: docker-build-toolchain
+docker-build-toolchain: ## Build the toolchain to be used in CI
+	./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-toolchain \
+		--version mina-toolchain-$(CODENAME)-$(GITHASH)
 
 ########################################
 # Generate odoc documentation
