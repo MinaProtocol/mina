@@ -21,7 +21,7 @@ ARG OCAML_VERSION=4.14
 ARG OCAML_REVISION=.2
 ARG OCAML_VARIANT=
 ARG OCAML_PACKAGE=
-ARG OPAM_VERSION=2.0.7
+ARG OPAM_VERSION=2.3.0
 # The version must be the same as the version used in:
 # - dockerfiles/1-build-deps
 # - flake.nix (and flake.lock after running
