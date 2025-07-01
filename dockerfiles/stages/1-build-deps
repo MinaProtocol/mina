@@ -159,7 +159,8 @@ RUN git clone \
   https://github.com/ocaml/opam-repository.git \
   --depth 1 \
   /home/opam/opam-repository
-# Pin OPAM repo to specific commit, o.w. after this commit some of our direct dependencies are removed
+# Pin OPAM repo to specific commit, o.w. after this commit some of our direct
+# dependencies are removed
 RUN cd /home/opam/opam-repository \
   && git fetch origin "${OPAM_REPOSITORY_COMMIT}" \
   && git checkout "${OPAM_REPOSITORY_COMMIT}"
