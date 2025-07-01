@@ -137,10 +137,10 @@ ENV HOME=/home/opam
 ## unlimit stack for future shells that might use spacetime,
 ## disable ipv6
 ## disable sandboxing to allow unprivledged builds
-RUN mkdir --mode=700 ~/.gnupg \
-  && echo 'export PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"' >> ~/.bashrc \
-  && echo 'ulimit -s unlimited' >> ~/.bashrc \
-  && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
+RUN mkdir --mode=700 /home/opam/.gnupg \
+  && echo 'export PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"' >> /home/opam/.bashrc \
+  && echo 'ulimit -s unlimited' >> /home/opam/.bashrc \
+  && echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 
 ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
@@ -150,15 +150,15 @@ ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 RUN git clone \
   https://github.com/ocaml/opam-repository.git \
   --depth 1 \
-  ~/opam-repository
+  /home/opam/opam-repository
 # Pin OPAM repo to specific commit, o.w. after this commit some of our direct dependencies are removed
-RUN cd ~/opam-repository \ 
+RUN cd /home/opam/opam-repository \ 
   && git fetch origin 08d8c16c16dc6b23a5278b06dff0ac6c7a217356 \
   && git checkout 08d8c16c16dc6b23a5278b06dff0ac6c7a217356
 
 RUN opam init --disable-sandboxing \
     -k git \
-    -a ~/opam-repository \
+    -a /home/opam/opam-repository \
     --bare
 RUN opam repository add --yes \
     --all \
