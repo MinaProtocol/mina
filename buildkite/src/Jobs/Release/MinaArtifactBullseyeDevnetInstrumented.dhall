@@ -8,6 +8,8 @@ let Network = ../../Constants/Network.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -18,5 +20,10 @@ in  Pipeline.build
             ]
           , network = Network.Type.Devnet
           , buildFlags = BuildFlags.Type.Instrumented
+          , tags =
+            [ PipelineTag.Type.Long
+            , PipelineTag.Type.Release
+            , PipelineTag.Type.Docker
+            ]
           }
       )
