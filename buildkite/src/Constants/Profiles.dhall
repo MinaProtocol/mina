@@ -40,6 +40,8 @@ let fromNetwork =
             { Devnet = Profile.Devnet
             , Mainnet = Profile.Mainnet
             , Berkeley = Profile.Devnet
+            , DevnetLegacy = Profile.Devnet
+            , MainnetLegacy = Profile.Mainnet
             }
             network
 

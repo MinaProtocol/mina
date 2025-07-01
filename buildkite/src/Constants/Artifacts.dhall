@@ -162,7 +162,7 @@ let Tag =
       , default =
           { artifact = Artifact.Daemon
           , version = "\\\${MINA_DOCKER_TAG}"
-          , profile = Profiles.Type.Standard
+          , profile = Profiles.Type.Devnet
           , network = Network.Type.Berkeley
           , remove_profile_from_name = False
           }

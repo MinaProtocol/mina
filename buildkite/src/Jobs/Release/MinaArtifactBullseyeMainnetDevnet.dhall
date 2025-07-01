@@ -30,6 +30,6 @@ in  Pipeline.build
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
-          , profile = Profiles.Type.Mainnet
+          , profile = Profiles.Type.Devnet
           }
       )
