@@ -37,7 +37,7 @@ if [[ ! -d "${switch_dir}" ]]; then
     eval "$(opam env)"
     # We add o1-labs opam repository and make it default
     # (if it's repeated, it's a no-op)
-    opam repository add --yes --all --set-default o1-labs \
+    opam repository add --yes --set-default o1-labs \
          https://github.com/o1-labs/opam-repository.git
     # The default opam repository is set to a specific commit as some of our
     # dependencies have been archived.
