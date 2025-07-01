@@ -33,7 +33,7 @@
   inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
   inputs.o1-opam-repository.flake = false;
 
-  inputs.opam-repository.url = "github:ocaml/opam-repository";
+  inputs.opam-repository.url = "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
   inputs.opam-repository.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
