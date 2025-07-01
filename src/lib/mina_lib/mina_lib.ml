@@ -869,6 +869,8 @@ let request_work t =
   in
   let fee = snark_work_fee t in
   let sok_message = Sok_message.create ~fee ~prover in
+  [%log' info t.config.logger] "Received work request with sok message"
+    ~metadata:[ ("sok_message", Sok_message.to_yojson sok_message) ] ;
   let work_from_selector =
     lazy
       (Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
