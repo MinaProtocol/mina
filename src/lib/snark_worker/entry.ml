@@ -105,10 +105,15 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
           , Spec.Partitioned.Stable.Latest.statement partitioned_spec
             |> Mina_state.Snarked_ledger_state.to_yojson )
         in
+        let sok_message_json =
+          ( "sok_message"
+          , Spec.Partitioned.Stable.Latest.sok_message partitioned_spec
+            |> Mina_base.Sok_message.to_yojson )
+        in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
-          ~metadata:[ address_json; work_ids_json ] ;
+          ~metadata:[ address_json; work_ids_json; sok_message_json ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
         match%bind
