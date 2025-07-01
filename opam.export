@@ -98,7 +98,7 @@ installed: [
   "conduit.4.0.0"
   "conduit-async.4.0.0"
   "conf-g++.1.0"
-  "conf-gmp.2"
+  "conf-gmp.5"
   "conf-libbz2.1"
   "conf-libffi.2.0.0"
   "conf-libssl.4"
