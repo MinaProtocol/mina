@@ -111,8 +111,10 @@ let emit_proof_metrics metrics instances logger =
 
 let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
     ~constraint_constants daemon_address shutdown_on_disconnect =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let%bind state =
-    Prod.Impl.Worker_state.create ~constraint_constants ~proof_level ()
+    Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
+      ~signature_kind ()
   in
   let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
   (* retry interval with jitter *)
