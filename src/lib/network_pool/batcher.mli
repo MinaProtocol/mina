@@ -15,7 +15,11 @@ module Snark_pool : sig
     -> Verifier.t
     -> t
 
-  val verify : t -> proof_envelope -> bool Deferred.Or_error.t
+  val verify :
+       t
+    -> proof_envelope
+    -> (unit, [> `Crash of Error.t | `Invalid of Verifier.invalid ]) result
+       Deferred.t
 end
 
 type ('initial, 'partially_validated, 'result) t
