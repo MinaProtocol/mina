@@ -32,6 +32,9 @@ COVERAGE_DIR=_coverage
 ########################################
 ## Handy variables
 
+# Distribution codename, to be used in Docker builds
+CODENAME ?= $(shell lsb_release -cs)
+
 # This commit hash
 GITHASH := $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH := $(shell git rev-parse HEAD)
