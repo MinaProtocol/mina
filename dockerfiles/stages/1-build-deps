@@ -22,6 +22,10 @@ ARG OCAML_REVISION=.2
 ARG OCAML_VARIANT=
 ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
+# The version must be the same as the version used in:
+# - dockerfiles/1-build-deps
+# - scripts/update_opam_switch.sh
+ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
 
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
@@ -156,9 +160,9 @@ RUN git clone \
   --depth 1 \
   /home/opam/opam-repository
 # Pin OPAM repo to specific commit, o.w. after this commit some of our direct dependencies are removed
-RUN cd /home/opam/opam-repository \ 
-  && git fetch origin 08d8c16c16dc6b23a5278b06dff0ac6c7a217356 \
-  && git checkout 08d8c16c16dc6b23a5278b06dff0ac6c7a217356
+RUN cd /home/opam/opam-repository \
+  && git fetch origin "${OPAM_REPOSITORY_COMMIT}" \
+  && git checkout "${OPAM_REPOSITORY_COMMIT}"
 
 RUN opam init --disable-sandboxing \
     -k git \
