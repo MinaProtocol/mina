@@ -89,6 +89,10 @@ val current_epoch_delegators :
 val last_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
 
+(** [replace_snark_worker_key t key_opt] Replace all SNARK worker's key
+    associated with current coordinator.
+    - If the new key is [None], SNARK worker will be turned off if it's running;
+    - If the new key is [Some k], SNARK worker will be turn on if it's not running. *)
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t
 
