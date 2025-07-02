@@ -32,7 +32,7 @@ module Account_update_under_construction = struct
             ; receipt_chain_hash = Ignore
             ; delegate = Ignore
             ; state =
-                Zkapp_state.V.init ~f:(fun _ -> Zkapp_basic.Or_ignore.Ignore)
+                Zkapp_state.V.init ~f:(const Zkapp_basic.Or_ignore.Ignore)
             ; action_state = Ignore
             ; proved_state = Ignore
             ; is_new = Ignore
@@ -70,7 +70,7 @@ module Account_update_under_construction = struct
       type t = { app_state : Field.t option Zkapp_state.V.t }
 
       let create () =
-        { app_state = Mina_base.Zkapp_state.V.init ~f:(fun _ -> None) }
+        { app_state = Mina_base.Zkapp_state.V.init ~f:(const None) }
 
       let to_zkapp_command_update ({ app_state } : t) :
           Account_update.Update.Checked.t =
@@ -87,7 +87,7 @@ module Account_update_under_construction = struct
           var_of_t
             (Account_update.Update.typ ())
             { app_state =
-                Mina_base.Zkapp_state.V.init ~f:(fun _ ->
+                Mina_base.Zkapp_state.V.init ~f:(const
                     Zkapp_basic.Set_or_keep.Keep )
             ; delegate = Keep
             ; verification_key = Keep
