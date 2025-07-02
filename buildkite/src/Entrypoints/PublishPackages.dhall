@@ -1,6 +1,6 @@
 let S = ../Lib/SelectFiles.dhall
 
-let PublishPackages = ../Command/PublishPackages.dhall
+let PublishPackages = ../Command/Packages/Publish.dhall
 
 let Profile = ../Constants/Profiles.dhall
 
