@@ -85,7 +85,6 @@ let minimalDirtyWhen =
 
 let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
-        , S.strictlyStart (S.contains "automation")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
