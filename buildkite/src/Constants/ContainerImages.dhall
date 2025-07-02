@@ -11,9 +11,6 @@
     "gcr.io/o1labs-192920/mina-toolchain@sha256:9eb216d62a319ba9ef9670e7b753d76f24db8f86ad638992e5095839348b401a"
 , minaToolchain =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:bbeaa957443357adf132951fe780600821d817c40cfbc6c71a04eba5e97df97f"
-, elixirToolchain = "elixir:1.10-alpine"
-, nodeToolchain = "node:14.13.1-stretch-slim"
-, ubuntu2004 = "ubuntu:20.04"
 , postgres = "postgres:12.4-alpine"
 , xrefcheck =
     "dkhamsing/awesome_bot@sha256:a8adaeb3b3bd5745304743e4d8a6d512127646e420544a6d22d9f58a07f35884"
