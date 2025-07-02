@@ -169,6 +169,7 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , verify = True
                     , if = spec.if
                     }
                   ]
@@ -219,6 +220,7 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , verify = True
                     , if = spec.if
                     }
                   ]
@@ -232,6 +234,7 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , verify = True
                     , if = spec.if
                     }
                   ]

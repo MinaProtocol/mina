@@ -26,6 +26,8 @@ let Network = ../Constants/Network.dhall
 
 let DockerPublish = ../Constants/DockerPublish.dhall
 
+let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -45,6 +47,7 @@ let ReleaseSpec =
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
+          , verify : Bool
           , if : Optional B/If
           }
       , default =
@@ -65,6 +68,7 @@ let ReleaseSpec =
           , no_cache = False
           , no_debian = False
           , step_key_suffix = "-docker-image"
+          , verify = False
           , if = None B/If
           }
       }
@@ -107,6 +111,19 @@ let generateStep =
                 then  " && echo Skipping local debian repo teardown "
 
                 else  " && ./scripts/debian/aptly.sh stop"
+
+          let maybeVerify =
+                      if spec.verify
+
+                then  VerifyDockers.verify
+                        VerifyDockers.Spec::{
+                        , artifacts = [ spec.service ]
+                        , networks = [ spec.network ]
+                        , version = spec.version
+                        , codenames = [ spec.deb_codename ]
+                        }
+
+                else  ""
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
@@ -154,6 +171,8 @@ let generateStep =
                       ++  buildDockerCmd
                       ++  " && "
                       ++  releaseDockerCmd
+                      ++  " && "
+                      ++  maybeVerify
                     )
                 ]
 
@@ -172,6 +191,8 @@ let generateStep =
                           ++  " && "
                           ++  releaseDockerCmd
                           ++  maybeStopDebianRepo
+                          ++  " && "
+                          ++  maybeVerify
                         )
                     ]
                   }
