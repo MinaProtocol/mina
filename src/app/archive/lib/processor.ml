@@ -4693,7 +4693,7 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-    ~(genesis_constants : Genesis_constants.t)
+    ~(genesis_constants : Genesis_constants.t) ~chunks_length
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
   match runtime_config_opt with
   | None ->
@@ -4782,7 +4782,6 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
               | Some acct ->
                   (index, acct) )
         in
-        let chunks_length = 100 in
         let%bind list_of_results =
           List.map account_ids ~f:(fun acct_id ->
               acccount_with_index_of_id ~ledger acct_id )
@@ -4849,7 +4848,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
 (* for running the archive process *)
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~metrics_server_port ~logger ~postgres_address ~server_port
+    ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
@@ -4881,7 +4880,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
   | Ok pool ->
       let%bind () =
         add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt
+          ~constraint_constants ~runtime_config_opt ~chunks_length
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than

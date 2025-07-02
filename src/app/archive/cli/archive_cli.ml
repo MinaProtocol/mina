@@ -37,6 +37,14 @@ let command_run =
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
+     and chunks_length =
+       flag "--chunks-length" ~aliases:[ "-chunks-length" ]
+         ~doc:
+           "int The number of accounts to insert from the database in one \
+            transaction, when processing genesis ledger. This is to prevent \
+            Postgres Out of Memory errors \n\
+           \            when handling very big genesis file. Default is 100."
+         (optional_with_default 100 int)
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
@@ -54,7 +62,7 @@ let command_run =
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
        Archive_lib.Processor.setup_server ~proof_cache_db ~metrics_server_port
-         ~logger ~genesis_constants ~constraint_constants
+         ~logger ~genesis_constants ~constraint_constants ~chunks_length
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
