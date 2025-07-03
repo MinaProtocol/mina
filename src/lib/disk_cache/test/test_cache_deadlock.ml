@@ -92,7 +92,7 @@ let run_test_with_cache (module Cache_impl : Cache_intf) ~timeout_seconds
         (Option.value_exn timeout_seconds) ;
       Core.printf "This indicates a deadlock in the cache implementation.\n%!" ;
       Core.printf "The finalizer likely tried to acquire a lock during GC.\n%!" ;
-      return ()
+      failwith "Deadlock detected in cache"
   | `Result `Success ->
       Core.printf "Evil put completed successfully (no deadlock)\n%!" ;
       Core.printf "\nSUCCESS: Cache does NOT deadlock with finalizers.\n%!" ;
