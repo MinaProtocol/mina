@@ -6,7 +6,7 @@ function cleanup
   remove_active_stacks() {
       for stack in $(docker stack ls --format "{{.Name}}"); do
           echo "Removing stack: $stack"
-          docker stack rm $stack
+          docker stack rm "${stack}"
       done
   }
   while [[ $(docker stack ls | wc -l) -gt 1 ]]; do
