@@ -13,7 +13,7 @@ TX_INTERVAL=${TX_INTERVAL:-30s}
 # Ignored if GENESIS_TIMESTAMP variable is specified
 DELAY_MIN=${DELAY_MIN:-20}
 
-# Allows to use berkeley ledger when equals to .berkeley
+# Allows to use develop ledger when equals to .develop
 CONF_SUFFIX=${CONF_SUFFIX:-}
 
 # Allows to specify a specific configuration file.
@@ -38,7 +38,7 @@ GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
 SLOT=${SLOT:-30}
 
 echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
-echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [-b|--berkeley] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
+echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [--develop] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
 echo "Consider reading script's code for information on optional arguments" >&2
 
 ##########################################################
@@ -51,8 +51,8 @@ while [[ $# -gt 0 ]]; do
       DELAY_MIN="$2"; shift; shift ;;
     -i|--tx-interval)
       TX_INTERVAL="$2"; shift; shift ;;
-    -b|--berkeley)
-      CONF_SUFFIX=".berkeley"; shift ;;
+    --develop)
+      CONF_SUFFIX=".develop"; shift ;;
     -m|--mina)
       MINA_EXE="$2"; shift; shift ;;
     -s|--slot)
@@ -73,7 +73,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
-  echo "Can't use both --berkeley and --config options" >&2
+  echo "Can't use both --develop and --config options" >&2
   exit 1
 fi
 
@@ -142,12 +142,12 @@ jq "$update_config_expr" > $CONF_DIR/base.json << EOF
 }
 EOF
 
-MAINNET_TO_BERKELEY_EXPR='.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]'
+MAINNET_TO_DEVELOP_EXPR='.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]'
 
 if [[ "$CUSTOM_CONF" == "" ]]; then
   { echo '{"ledger": {"accounts": '; cat $CONF_DIR/ledger.json; echo '}}'; } > $CONF_DIR/daemon.json
-  # Convert ledger to berkeley format
-  jq "$MAINNET_TO_BERKELEY_EXPR" <$CONF_DIR/daemon.json >$CONF_DIR/daemon.berkeley.json
+  # Convert ledger to develop format
+  jq "$MAINNET_TO_DEVELOP_EXPR" <$CONF_DIR/daemon.json >$CONF_DIR/daemon.develop.json
 else
   cp "$CUSTOM_CONF" $CONF_DIR/daemon.json
 fi

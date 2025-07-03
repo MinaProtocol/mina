@@ -26,7 +26,7 @@ source "$SCRIPT_DIR"/test-helper.sh
 MAIN_MINA_EXE="$1"
 MAIN_RUNTIME_GENESIS_LEDGER_EXE="$2"
 
-# Executables built off fork branch (e.g. berkeley)
+# Executables built off fork branch (e.g. develop)
 FORK_MINA_EXE="$3"
 FORK_RUNTIME_GENESIS_LEDGER_EXE="$4"
 
