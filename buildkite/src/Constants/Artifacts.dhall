@@ -6,6 +6,8 @@ let Profiles = ./Profiles.dhall
 
 let Network = ./Network.dhall
 
+let BuildFlags = ./BuildFlags.dhall
+
 let Repo = ./DockerRepo.dhall
 
 let Artifact
@@ -157,12 +159,14 @@ let Tag =
           , version : Text
           , profile : Profiles.Type
           , network : Network.Type
+          , buildFlags : BuildFlags.Type
           , remove_profile_from_name : Bool
           }
       , default =
           { artifact = Artifact.Daemon
           , version = "\\\${MINA_DOCKER_TAG}"
           , profile = Profiles.Type.Devnet
+          , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
           , remove_profile_from_name = False
           }
@@ -177,20 +181,28 @@ let dockerTag =
 
                 else  "${Profiles.toLabelSegment spec.profile}"
 
+          let build_flags_part =
+                merge
+                  { None = ""
+                  , Instrumented =
+                      "${BuildFlags.toLabelSegment spec.buildFlags}"
+                  }
+                  spec.buildFlags
+
           in  merge
                 { Daemon =
                     "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}"
+                                         spec.network}${profile_part}${build_flags_part}"
                 , DaemonHardfork =
                     "${spec.version}-${Network.lowerName
                                          spec.network}${profile_part}"
-                , Archive = "${spec.version}"
+                , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"
                 , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
                 , ZkappTestTransaction = "${spec.version}"
-                , FunctionalTestSuite = "${spec.version}"
+                , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"
                 }
                 spec.artifact

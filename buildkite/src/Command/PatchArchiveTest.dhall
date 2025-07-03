@@ -1,5 +1,7 @@
 let Artifacts = ../Constants/Artifacts.dhall
 
+let BuildFlags = ../Constants/BuildFlags.dhall
+
 let Command = ./Base.dhall
 
 let Size = ./Size.dhall
@@ -21,6 +23,7 @@ in  { step =
                     ( Artifacts.fullDockerTag
                         Artifacts.Tag::{
                         , artifact = Artifacts.Type.FunctionalTestSuite
+                        , buildFlags = BuildFlags.Type.Instrumented
                         }
                     )
                     "./scripts/patch-archive-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
