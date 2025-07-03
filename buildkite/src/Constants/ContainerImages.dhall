@@ -4,11 +4,11 @@
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 { toolchainBase = "codaprotocol/ci-toolchain-base:v3"
 , minaToolchainBullseye =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:8248ceb8f35bae0b5b0474a3e296ad0380ea2ab339f353943ee36564a12a745a"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:ea894449da218191f03b311c356c7331a16df17f2e41809c4b2a7ee813c3cb25"
 , minaToolchainBookworm =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:8248ceb8f35bae0b5b0474a3e296ad0380ea2ab339f353943ee36564a12a745a"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:ea894449da218191f03b311c356c7331a16df17f2e41809c4b2a7ee813c3cb25"
 , minaToolchain =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:8248ceb8f35bae0b5b0474a3e296ad0380ea2ab339f353943ee36564a12a745a"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:ea894449da218191f03b311c356c7331a16df17f2e41809c4b2a7ee813c3cb25"
 , elixirToolchain = "elixir:1.10-alpine"
 , nodeToolchain = "node:14.13.1-stretch-slim"
 , ubuntu2004 = "ubuntu:20.04"
