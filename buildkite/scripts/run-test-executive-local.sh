@@ -24,14 +24,11 @@ fi
 
 cleanup
 
-TEST_NAME="$1"
+# Export the variables to be used later in the Makefile target
 DOCKER_REPO="$2"
-MINA_DOCKER_NAME="mina-daemon"
-MINA_ARCHIVE_DOCKER_NAME="mina-archive"
-
-
-MINA_IMAGE="$DOCKER_REPO/$MINA_DOCKER_NAME:$MINA_DOCKER_TAG-devnet-generic"
-ARCHIVE_IMAGE="$DOCKER_REPO/$MINA_ARCHIVE_DOCKER_NAME:$MINA_DOCKER_TAG-devnet"
+export TEST_NAME="$1"
+export MINA_IMAGE="$DOCKER_REPO/mina-daemon:$MINA_DOCKER_TAG-devnet-generic"
+export ARCHIVE_IMAGE="$DOCKER_REPO/mina-archive:$MINA_DOCKER_TAG-devnet"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
@@ -44,8 +41,5 @@ source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
-mina-test-executive local "$TEST_NAME" \
-  --mina-image "$MINA_IMAGE" \
-  --archive-image "$ARCHIVE_IMAGE" \
-  | tee "$TEST_NAME.local.test.log" \
-  | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+# This should be shared with a local UX
+make -C ../../ run-test-executive
