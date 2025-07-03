@@ -23,7 +23,7 @@ module type S = sig
 
   val initialization_special_cases : unit -> unit
 
-  (** [remove_data_on_gc_impl ?gc_strict ())] test behavior of cache on GC.
+  (** [remove_data_on_gc ?gc_strict ())] test behavior of cache on GC.
       If [gc_strict] is set to [false], then we won't check if the cache is
       empty after GC.
    *)
