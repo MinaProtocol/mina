@@ -52,11 +52,15 @@ module Make (Data : Binable.S) = struct
     let res = { idx } in
     (* When this reference is GC'd, delete the file. *)
     Gc.Expert.add_finalizer_last_exn res (fun () ->
-        [%log debug] "Data at %d is GCed, removing from LMDB cache" idx
+        [%log debug] "Data at %d is GCed, marking as garbage" idx
           ~metadata:[ ("index", `Int idx) ] ;
         Hash_set.add garbage idx ) ;
     if Hash_set.length garbage >= garbage_size_limit then (
-      Hash_set.iter garbage ~f:(fun to_remove -> Rw.remove ~env db to_remove) ;
+      Hash_set.iter garbage ~f:(fun to_remove ->
+          [%log debug] "Instructing LMDB to remove garbage at index %d"
+            to_remove
+            ~metadata:[ ("index", `Int to_remove) ] ;
+          Rw.remove ~env db to_remove ) ;
       Hash_set.clear garbage ) ;
     Rw.set ~env db idx x ;
     res
