@@ -40,9 +40,8 @@ module Step : sig
        prev_challenges:int
     -> Key_cache.Spec.t list
     -> ?s_p:storable
-    -> ?s_v:vk_storable
-    -> ?lazy_mode:bool
     -> Key.Proving.t Promise.t Lazy.t
+    -> ?s_v:vk_storable
     -> Key.Verification.t Promise.t Lazy.t
     -> ( Impls.Step.Proving_key.t
        * ([> `Cache_hit | `Generated_something | `Locally_generated ] as 'e) )
@@ -94,9 +93,8 @@ module Wrap : sig
        prev_challenges:Core_kernel.Int.t
     -> Key_cache.Spec.t list
     -> ?s_p:storable
-    -> ?s_v:vk_storable
-    -> ?lazy_mode:bool
     -> Key.Proving.t Promise.t Lazy.t
+    -> ?s_v:vk_storable
     -> Key.Verification.t Promise.t Lazy.t
     -> ( Impls.Wrap.Proving_key.t
        * [> `Cache_hit | `Generated_something | `Locally_generated ] )

@@ -91,8 +91,8 @@ module Step = struct
                 (Kimchi_bindings.Protocol.VerifierIndex.Fp.write (Some true) x)
               header path ) )
 
-  let read_or_generate ~prev_challenges cache ?(s_p = storable)
-      ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
+  let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
+      ?(s_v = vk_storable) k_v =
     let open Impls.Step in
     let pk =
       lazy
@@ -107,7 +107,7 @@ module Step = struct
              let _, _, _, sys = k_p in
              let r =
                Common.time "stepkeygen" (fun () ->
-                   Keypair.generate ~prev_challenges sys ~lazy_mode )
+                   Keypair.generate ~prev_challenges sys )
              in
              Timer.clock __LOC__ ;
              ignore
@@ -227,8 +227,8 @@ module Wrap = struct
                          t ) ) )
               header path ) )
 
-  let read_or_generate ~prev_challenges cache ?(s_p = storable)
-      ?(s_v = vk_storable) ?(lazy_mode = false) k_p k_v =
+  let read_or_generate ~prev_challenges cache ?(s_p = storable) k_p
+      ?(s_v = vk_storable) k_v =
     let module Vk = Verification_key in
     let open Impls.Wrap in
     let pk =
@@ -244,7 +244,7 @@ module Wrap = struct
              let _, _, sys = k in
              let r =
                Common.time "wrapkeygen" (fun () ->
-                   Keypair.generate ~lazy_mode ~prev_challenges sys )
+                   Keypair.generate ~prev_challenges sys )
              in
              ignore
                ( Key_cache.Sync.write cache s_p k (Keypair.pk r)

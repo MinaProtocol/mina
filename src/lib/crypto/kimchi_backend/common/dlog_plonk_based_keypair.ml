@@ -68,8 +68,7 @@ module type Inputs_intf = sig
           nb_public
           runtime_tables_cfg
           nb_prev_challanges
-          srs
-          lazy_mode] *)
+          srs] *)
     val create :
          Gate_vector.t
       -> int
@@ -77,7 +76,6 @@ module type Inputs_intf = sig
       -> Scalar_field.t Kimchi_types.runtime_table_cfg array
       -> int
       -> Urs.t
-      -> bool
       -> t
   end
 
@@ -174,7 +172,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
-  let create ?(lazy_mode = false) ~prev_challenges cs =
+  let create ~prev_challenges cs =
     let gates, fixed_lookup_tables, runtime_table_cfgs =
       Inputs.Constraint_system.finalize_and_get_gates cs
     in
@@ -192,7 +190,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let index =
       Inputs.Index.create gates public_input_size fixed_lookup_tables
-        runtime_table_cfgs prev_challenges (load_urs ()) lazy_mode
+        runtime_table_cfgs prev_challenges (load_urs ())
     in
     { index; cs }
 

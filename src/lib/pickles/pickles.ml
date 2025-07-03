@@ -315,14 +315,14 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Compile.compile_with_wrap_main_override_promise
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
-      ?disk_keys ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
-      ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
+      ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
+      ~max_proofs_verified ~name ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
@@ -366,8 +366,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
-        ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
+        ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -383,7 +383,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     (self, cache_handle, proof_module, adjust_provers provers)
 
   let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
+      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
@@ -432,8 +432,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
-        ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
+        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
+        ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -1224,7 +1224,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Cache.Step.read_or_generate
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
-              [] ~lazy_mode:false k_p k_v
+              [] k_p k_v
           in
           let step_vks =
             lazy
@@ -1296,7 +1296,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let r =
               Common.time "wrap read or generate " (fun () ->
                   Cache.Wrap.read_or_generate ~prev_challenges:2 []
-                    ~lazy_mode:false
                     (Lazy.map ~f:Promise.return disk_key_prover)
                     (Lazy.map ~f:Promise.return disk_key_verifier) )
             in

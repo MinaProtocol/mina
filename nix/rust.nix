@@ -91,7 +91,6 @@ in {
     };
     # FIXME: tests fail
     doCheck = false;
-    dontUpdateAutotoolsGnuConfigScripts = true;
   };
 
   kimchi_stubs_static_lib = let
