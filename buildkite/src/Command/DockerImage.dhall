@@ -112,8 +112,16 @@ let generateStep =
 
                 else  " && ./scripts/debian/aptly.sh stop"
 
+          let suffix =
+                "${Profiles.toSuffixLowercase
+                     spec.deb_profile}${BuildFlags.toLabelSegment
+                                          spec.build_flags}"
+
           let maybeVerify =
-                      if spec.verify
+                      if     spec.verify
+                         &&  DockerPublish.shouldPublish
+                               spec.docker_publish
+                               spec.service
 
                 then      " && "
                       ++  VerifyDockers.verify
@@ -122,6 +130,7 @@ let generateStep =
                             , networks = [ spec.network ]
                             , version = spec.deb_version
                             , codenames = [ spec.deb_codename ]
+                            , suffix = suffix
                             }
 
                 else  ""

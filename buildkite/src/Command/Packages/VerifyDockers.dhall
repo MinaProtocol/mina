@@ -21,6 +21,7 @@ let Spec =
           , version : Text
           , codenames : List DebianVersions.DebVersion
           , published_to_docker_io : Bool
+          , suffix : Text
           }
       , default =
           { artifacts = [] : List Package.Type
@@ -30,6 +31,7 @@ let Spec =
             , DebianVersions.DebVersion.Bullseye
             ]
           , published_to_docker_io = False
+          , suffix = ""
           }
       }
 
@@ -72,6 +74,7 @@ let verify
           ++  "--networks ${joinNetworks spec} "
           ++  "--version ${spec.version} "
           ++  "--codenames ${joinCodenames spec} "
+          ++  "--docker-suffix \"${spec.suffix}\""
           ++  "--only-dockers "
 
 in  { verify = verify, Spec = Spec }

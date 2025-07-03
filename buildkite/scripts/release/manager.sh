@@ -1112,13 +1112,13 @@ function verify(){
     local __networks="$DEFAULT_NETWORKS"
     local __version
     local __codenames="$DEFAULT_CODENAMES"
-    local __channel
+    local __channel="unstable"
     local __docker_io=0
     local __only_dockers=0
     local __only_debians=0
     local __debian_repo=$DEBIAN_REPO
     local __debian_repo_signed=0
-
+    local __docker_suffix=""
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -1166,6 +1166,10 @@ function verify(){
                 __only_debians=1
                 shift 1;
             ;;
+            --docker-suffix )
+                __suffix=${2:?$error_message}
+                shift 2;
+            ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -1180,16 +1184,15 @@ function verify(){
     echo " - Networks: $__networks"
     echo " - Version: $__version"
     echo " - Promoting codenames: $__codenames" 
-    if [[ $__only_dockers == 1 ]]; then
-        echo " - Published to docker.io: $__docker_io"
-    else
-        echo " - Debian repo: $__debian_repo"
-        echo " - Debian repos is signed: $__debian_repo_signed"
-        echo " - Channel: $__channel"
-    fi
+    echo " - Published to docker.io: $__docker_io"
+    echo " - Debian repo: $__debian_repo"
+    echo " - Debian repos is signed: $__debian_repo_signed"
+    echo " - Channel: $__channel"
     echo " - Only debians: $__only_debians"
     echo " - Only dockers: $__only_dockers"
+    echo " - Docker suffix: $__suffix"
     echo ""
+    
     #check environment setup
     check_docker
 
@@ -1214,6 +1217,7 @@ function verify(){
                                         -m $__codename \
                                         -r $__debian_repo \
                                         -c $__channel \
+                                        -s "$__suffix" \
                                         ${__signed_debian_repo:+--signed}
                             fi
 
@@ -1245,7 +1249,7 @@ function verify(){
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "" \
+                                        -s "$__suffix" \
                                         -r "$__repo" 
 
                                     echo ""
