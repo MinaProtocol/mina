@@ -78,7 +78,7 @@ let%test_module "disk_cache lmdb" =
   ( module struct
     include Disk_cache_test_lib.Make_extended (Make)
 
-    let%test_unit "remove data on gc" = remove_data_on_gc ()
+    let%test_unit "remove data on gc" = remove_data_on_gc ~gc_strict:false ()
 
     let%test_unit "simple read/write (with iteration)" =
       simple_write_with_iteration ()

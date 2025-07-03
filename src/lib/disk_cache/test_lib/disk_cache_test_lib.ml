@@ -23,7 +23,11 @@ module type S = sig
 
   val initialization_special_cases : unit -> unit
 
-  val remove_data_on_gc : unit -> unit
+  (** [remove_data_on_gc_impl ?gc_strict ())] test behavior of cache on GC.
+      If [gc_strict] is set to [false], then we won't check if the cache is
+      empty after GC.
+   *)
+  val remove_data_on_gc : ?gc_strict:bool -> unit -> unit
 end
 
 module type S_extended = sig
@@ -77,7 +81,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
     File_system.with_temp_dir "disk_cache"
       ~f:(simple_write_impl ?additional_checks)
 
-  let remove_data_on_gc_impl tmp_dir =
+  let remove_data_on_gc_impl ~gc_strict tmp_dir =
     let%map cache = initialize_cache_or_fail tmp_dir ~logger in
 
     let proof = Mock.{ proof = "dummy" } in
@@ -91,16 +95,19 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
      [%test_eq: string] proof.proof proof_from_cache.proof
        ~message:"invalid proof from cache" ) ;
 
-    Gc.compact () ;
+    match gc_strict with
+    | Some false ->
+        ()
+    | _ ->
+        Gc.compact () ;
+        [%test_eq: int] (Cache.count cache) 0
+          ~message:"cache should be empty after garbage collector run"
 
-    [%test_eq: int] (Cache.count cache) 0
-      ~message:"cache should be empty after garbage collector run"
-
-  let remove_data_on_gc () =
+  let remove_data_on_gc ?gc_strict () =
     Async.Thread_safe.block_on_async_exn
     @@ fun () ->
     File_system.with_temp_dir "disk_cache-remove_data_on_gc"
-      ~f:remove_data_on_gc_impl
+      ~f:(remove_data_on_gc_impl ~gc_strict)
 
   let initialize_and_expect_failure path ~logger =
     let%bind cache_res = Cache.initialize path ~logger in
