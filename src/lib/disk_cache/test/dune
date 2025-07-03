@@ -1,0 +1,48 @@
+(library
+ (name test_cache_deadlock_lib)
+ (modules test_cache_deadlock)
+ (libraries
+  ;; opam libraries
+  async
+  core
+  core_kernel
+  ;; local libraries
+  disk_cache_intf
+  file_system
+  logger)
+ (preprocess
+  (pps ppx_jane ppx_version))
+ (flags
+  (:standard -w -22)))
+
+(test
+ (name test_lmdb_deadlock)
+ (modules test_lmdb_deadlock)
+ (libraries
+  ;; opam libraries
+  async
+  core
+  core_kernel
+  ;; local libraries
+  disk_cache.lmdb
+  test_cache_deadlock_lib)
+ (preprocess
+  (pps ppx_jane ppx_version))
+ (flags
+  (:standard -w -22)))
+
+(test
+ (name test_filesystem_deadlock)
+ (modules test_filesystem_deadlock)
+ (libraries
+  ;; opam libraries
+  async
+  core
+  core_kernel
+  ;; local libraries
+  disk_cache.filesystem
+  test_cache_deadlock_lib)
+ (preprocess
+  (pps ppx_jane ppx_version))
+ (flags
+  (:standard -w -22)))
