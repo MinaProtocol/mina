@@ -14,14 +14,16 @@ in  { step =
               Command.Config::{
               , commands =
                 [ RunWithPostgres.runInDockerWithPostgresConn
-                    [ "ARCHIVE_TEST_APP=mina-archive-node-test" ]
-                    "./src/test/archive/sample_db/archive_db.sql"
+                    [ "ARCHIVE_TEST_APP=mina-archive-node-test"
+                    , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
+                    ]
+                    "/etc/mina/test/archive/sample_db/archive_db.sql"
                     ( Artifacts.fullDockerTag
                         Artifacts.Tag::{
                         , artifact = Artifacts.Type.FunctionalTestSuite
                         }
                     )
-                    "NETWORK_DATA_FOLDER=./src/test/archive/sample_db ./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Node Test"
               , key = key
