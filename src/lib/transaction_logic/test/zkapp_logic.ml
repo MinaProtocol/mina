@@ -470,7 +470,7 @@ let%test_module "Test transaction logic." =
           Generator.create (fun ~size:_ ~random:_ -> Zkapp_basic.F.random ())
         in
         let%map app_state_update =
-          Generator.list_with_length 8 (Zkapp_basic.Set_or_keep.gen gen_field)
+          Generator.list_with_length Mina_base.Zkapp_state.max_size_int (Zkapp_basic.Set_or_keep.gen gen_field)
         in
         let app_state = Zkapp_state.V.of_list_exn app_state_update in
         let txn =
