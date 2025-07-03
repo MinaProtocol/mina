@@ -142,12 +142,8 @@ jq "$update_config_expr" > $CONF_DIR/base.json << EOF
 }
 EOF
 
-MAINNET_TO_DEVELOP_EXPR='.ledger.accounts = [.ledger.accounts[] | del(.token_permissions, .permissions.stake) | .token = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" | .token_symbol = "" | select(.permissions.set_verification_key == "signature").permissions.set_verification_key |= {auth:"signature", txn_version: "1"} ]'
-
 if [[ "$CUSTOM_CONF" == "" ]]; then
   { echo '{"ledger": {"accounts": '; cat $CONF_DIR/ledger.json; echo '}}'; } > $CONF_DIR/daemon.json
-  # Convert ledger to develop format
-  jq "$MAINNET_TO_DEVELOP_EXPR" <$CONF_DIR/daemon.json >$CONF_DIR/daemon.develop.json
 else
   cp "$CUSTOM_CONF" $CONF_DIR/daemon.json
 fi
