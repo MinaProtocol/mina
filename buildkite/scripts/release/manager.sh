@@ -1179,15 +1179,16 @@ function verify(){
     echo " - Verifying artifacts: $__artifacts"
     echo " - Networks: $__networks"
     echo " - Version: $__version"
-    echo " - Promoting codenames: $__codenames"
+    echo " - Promoting codenames: $__codenames" 
     echo " - Channel: $__channel"
-    echo " - Published to docker.io: $__docker_io"
+    if [[ $__only_dockers == 1 ]]; then
+        echo " - Published to docker.io: $__docker_io"
+        echo " - Only debians: $__only_debians"
+    fi
     echo " - Only dockers: $__only_dockers"
-    echo " - Only debians: $__only_debians"
     echo " - Debian repo: $__debian_repo"
     echo " - Debian repos is signed: $__debian_repo_signed"
     echo ""
-    
     #check environment setup
     check_docker
 
@@ -1218,7 +1219,6 @@ function verify(){
                             if [[ $__only_debians == 0 ]]; then
                                 echo "    ℹ️  There is no mina-logproc docker image. skipping"
                             fi
-
                             
                         ;;
                         mina-archive)
