@@ -198,7 +198,8 @@ let report_test_errors ~log_error_set ~internal_error_set =
       let%bind () = Writer.(flushed (Lazy.force stderr)) in
       return exit_code
 
-(* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
+(* TODO: refactor cleanup system (smells like a monad for composing linear
+   resources would help a lot) *)
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
@@ -506,7 +507,8 @@ let default_cmd =
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 
-(* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
+(* TODO: move required args to positions instead of flags, or provide reasonable
+   defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
   Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))

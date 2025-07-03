@@ -110,6 +110,7 @@
 (package (name mina_signature_kind))
 (package (name mina_state))
 (package (name mina_stdlib))
+(package (name mina_test_executive))
 (package (name mina_transaction_logic))
 (package (name mina_transaction))
 (package (name mina_version))
