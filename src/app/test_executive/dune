@@ -2,63 +2,63 @@
  (name test_executive)
  (libraries
   ;; opam libraries
-  async_kernel
   async
-  core
-  uri
-  yojson
-  core_kernel
-  cmdliner
+  async_kernel
+  async_unix
   base.base_internalhash_types
   base.caml
-  async_unix
-  unsigned_extended
-  stdio
+  cmdliner
+  core
+  core_kernel
   sexplib0
+  stdio
+  uri
+  unsigned_extended
+  yojson
   ;; local libraries
-  protocol_version
-  mina_wire_types
-  with_hash
+  block_time
+  cache_dir
+  currency
   data_hash_lib
+  file_system
+  genesis_constants
+  integers
+  integration_test_lib
+  integration_test_local_engine
+  key_gen
   kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
-  pickles
-  pickles_types
-  random_oracle_input
-  genesis_constants
-  integration_test_lib
-  signature_lib
-  mina_signature_kind
+  logger
   mina_base
+  mina_base.import
+  mina_generators
+  mina_numbers
+  mina_runtime_config
+  mina_signature_kind
   mina_stdlib
   mina_transaction
-  file_system
-  currency
-  mina_runtime_config
-  secrets
-  integration_test_local_engine
-  mina_generators
-  logger
-  random_oracle
-  mina_numbers
-  transaction_snark
-  snark_params
-  pickles.backend
-  pipe_lib
-  mina_base.import
-  key_gen
-  integers
-  user_command_input
-  participating_state
-  visualization
-  sgn
-  zkapp_command_builder
+  mina_wire_types
   network_pool
-  zkapps_examples
-  cache_dir
+  participating_state
+  pickles
+  pickles.backend
+  pickles_types
+  pipe_lib
+  protocol_version
+  random_oracle
+  random_oracle_input
+  secrets
+  sgn
+  signature_lib
   snarky.backendless
-  block_time)
+  snark_params
+  transaction_snark
+  user_command_input
+  visualization
+  with_hash
+  zkapp_command_builder
+  zkapps_examples)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
