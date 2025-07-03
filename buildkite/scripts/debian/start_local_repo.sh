@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -z $MINA_DEB_CODENAME ]; then 
+if [ -z $MINA_DEB_CODENAME ]; then
     echo "MINA_DEB_CODENAME env var is not defined"
     exit 1
 fi
@@ -11,7 +11,7 @@ set -eou pipefail
 set -x
 
 
-apt-get update 
+apt-get update
 apt-get install -y aptly
 
 # Download locally static debians (for example mina-legacy )
