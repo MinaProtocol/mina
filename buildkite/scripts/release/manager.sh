@@ -1180,14 +1180,15 @@ function verify(){
     echo " - Networks: $__networks"
     echo " - Version: $__version"
     echo " - Promoting codenames: $__codenames" 
-    echo " - Channel: $__channel"
     if [[ $__only_dockers == 1 ]]; then
         echo " - Published to docker.io: $__docker_io"
-        echo " - Only debians: $__only_debians"
+    else
+        echo " - Debian repo: $__debian_repo"
+        echo " - Debian repos is signed: $__debian_repo_signed"
+        echo " - Channel: $__channel"
     fi
+    echo " - Only debians: $__only_debians"
     echo " - Only dockers: $__only_dockers"
-    echo " - Debian repo: $__debian_repo"
-    echo " - Debian repos is signed: $__debian_repo_signed"
     echo ""
     #check environment setup
     check_docker
