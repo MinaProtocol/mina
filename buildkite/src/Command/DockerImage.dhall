@@ -115,13 +115,14 @@ let generateStep =
           let maybeVerify =
                       if spec.verify
 
-                then  VerifyDockers.verify
-                        VerifyDockers.Spec::{
-                        , artifacts = [ spec.service ]
-                        , networks = [ spec.network ]
-                        , version = spec.deb_version
-                        , codenames = [ spec.deb_codename ]
-                        }
+                then      " && "
+                      ++  VerifyDockers.verify
+                            VerifyDockers.Spec::{
+                            , artifacts = [ spec.service ]
+                            , networks = [ spec.network ]
+                            , version = spec.deb_version
+                            , codenames = [ spec.deb_codename ]
+                            }
 
                 else  ""
 
@@ -171,7 +172,6 @@ let generateStep =
                       ++  buildDockerCmd
                       ++  " && "
                       ++  releaseDockerCmd
-                      ++  " && "
                       ++  maybeVerify
                     )
                 ]
@@ -191,7 +191,6 @@ let generateStep =
                           ++  " && "
                           ++  releaseDockerCmd
                           ++  maybeStopDebianRepo
-                          ++  " && "
                           ++  maybeVerify
                         )
                     ]
