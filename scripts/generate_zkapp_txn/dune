@@ -1,0 +1,8 @@
+(executable
+ (name generate_zkapp_txn)
+ (libraries
+  core
+  mina_base
+  mina_transaction
+  mina_signature_kind.type
+  base64))
