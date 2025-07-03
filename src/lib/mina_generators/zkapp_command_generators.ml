@@ -1379,7 +1379,8 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
                             Snark_params.Tick.Field.gen
                             >>| fun x -> Set_or_keep.Set x
                           in
-                          Quickcheck.Generator.list_with_length 8 field_gen
+                          Quickcheck.Generator.list_with_length
+                            Zkapp_state.max_size_int field_gen
                         in
                         Zkapp_state.V.of_list_exn fields
                       in
