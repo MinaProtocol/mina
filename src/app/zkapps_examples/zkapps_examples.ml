@@ -31,8 +31,7 @@ module Account_update_under_construction = struct
             ; nonce = Ignore
             ; receipt_chain_hash = Ignore
             ; delegate = Ignore
-            ; state =
-                Zkapp_state.V.init ~f:(const Zkapp_basic.Or_ignore.Ignore)
+            ; state = Zkapp_state.V.init ~f:(const Zkapp_basic.Or_ignore.Ignore)
             ; action_state = Ignore
             ; proved_state = Ignore
             ; is_new = Ignore
@@ -87,8 +86,8 @@ module Account_update_under_construction = struct
           var_of_t
             (Account_update.Update.typ ())
             { app_state =
-                Mina_base.Zkapp_state.V.init ~f:(const
-                    Zkapp_basic.Set_or_keep.Keep )
+                Mina_base.Zkapp_state.V.init
+                  ~f:(const Zkapp_basic.Set_or_keep.Keep)
             ; delegate = Keep
             ; verification_key = Keep
             ; permissions = Keep
