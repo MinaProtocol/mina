@@ -24,10 +24,10 @@ fi
 
 cleanup
 
-TEST_NAME="$1"
-
-MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-berkeley"
-ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
+# Export the variables to be used later in the Makefile target
+export TEST_NAME="$1"
+export MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-berkeley"
+export ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
 
 if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]]; then
   echo "Skipping $TEST_NAME"
@@ -53,8 +53,5 @@ git config --global --add safe.directory /workdir
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 
-mina-test-executive local "$TEST_NAME" \
-  --mina-image "$MINA_IMAGE" \
-  --archive-image "$ARCHIVE_IMAGE" \
-  | tee "$TEST_NAME.local.test.log" \
-  | mina-logproc -i inline -f '!(.level in ["Debug", "Spam"])'
+# This should be shared with a local UX
+make -C ../../ run-test-executive
