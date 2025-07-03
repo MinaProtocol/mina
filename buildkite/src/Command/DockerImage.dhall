@@ -119,7 +119,7 @@ let generateStep =
                         VerifyDockers.Spec::{
                         , artifacts = [ spec.service ]
                         , networks = [ spec.network ]
-                        , version = spec.version
+                        , version = spec.deb_version
                         , codenames = [ spec.deb_codename ]
                         }
 
