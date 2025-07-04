@@ -150,7 +150,7 @@ let
   granularBase =
     dune-nix.outputs' commonOverrides ./.. allDeps info packageHasSrcApp;
   vmOverlays = let
-    commit = inputs.self.sourceInfo.rev or "<dirty>";
+    commit = inputs.self.sourceInfo.rev or "<unknown>";
     commitShort = builtins.substring 0 8 commit;
     cmdLineTest = ''
       mina --version
@@ -193,7 +193,7 @@ let
       });
     in {
       pkgs.mina_version = super.pkgs.mina_version.overrideAttrs {
-        MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<dirty>";
+        MINA_COMMIT_SHA1 = inputs.self.sourceInfo.rev or "<unknown>";
       };
       pkgs.kimchi_bindings =
         super.pkgs.kimchi_bindings.overrideAttrs marlinPlonkStubs;
@@ -270,7 +270,7 @@ let
 
       # Make a script wrapper around a binary, setting all the necessary environment variables and adding necessary tools to PATH.
       # Also passes the version information to the executable.
-      wrapMina = let commit_sha1 = inputs.self.sourceInfo.rev or "<dirty>";
+      wrapMina = let commit_sha1 = inputs.self.sourceInfo.rev or "<unknown>";
       in package:
       { deps ? [ pkgs.gnutar pkgs.gzip ] }:
       pkgs.runCommand "${package.name}-release" {
