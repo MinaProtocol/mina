@@ -47,6 +47,7 @@ module Make (Data : Binable.S) = struct
     Rw.get ~env db idx |> Option.value_exn
 
   let put ({ env; db; counter; logger; garbage } : t) (x : Data.t) : id =
+    (* TODO: we may reuse IDs by pulling them from the `garbage` hash set *)
     let idx = !counter in
     incr counter ;
     let res = { idx } in
