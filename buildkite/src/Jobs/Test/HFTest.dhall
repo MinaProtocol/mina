@@ -36,7 +36,7 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "HFTest"
-        , mode = PipelineMode.Type.Stable
+        , mode = PipelineMode.Type.PullRequest
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
