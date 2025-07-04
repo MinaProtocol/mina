@@ -95,15 +95,12 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
      [%test_eq: string] proof.proof proof_from_cache.proof
        ~message:"invalid proof from cache" ) ;
 
-    match gc_strict with
-    | Some false ->
-        ()
-    | _ ->
-        Gc.compact () ;
-        [%test_eq: int] (Cache.count cache) 0
-          ~message:"cache should be empty after garbage collector run"
+    if gc_strict then (
+      Gc.compact () ;
+      [%test_eq: int] (Cache.count cache) 0
+        ~message:"cache should be empty after garbage collector run" )
 
-  let remove_data_on_gc ?gc_strict () =
+  let remove_data_on_gc ?(gc_strict = true) () =
     Async.Thread_safe.block_on_async_exn
     @@ fun () ->
     File_system.with_temp_dir "disk_cache-remove_data_on_gc"
