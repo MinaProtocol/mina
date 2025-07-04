@@ -5,12 +5,8 @@ open Async
 
 (* Create a custom binable module that triggers GC during serialization *)
 module Evil_data = struct
-  module T = struct
-    type t = { value : string; trigger_gc : (unit -> unit) option }
-    [@@deriving sexp]
-  end
-
-  include T
+  type t = { value : string; trigger_gc : (unit -> unit) option }
+  [@@deriving sexp]
 
   (* We convert to/from string for bin_io, injecting our GC trigger during conversion *)
   include
