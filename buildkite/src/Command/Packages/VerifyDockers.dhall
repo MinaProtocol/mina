@@ -74,7 +74,7 @@ let verify
           ++  "--networks ${joinNetworks spec} "
           ++  "--version ${spec.version} "
           ++  "--codenames ${joinCodenames spec} "
-          ++  "--docker-suffix \"${spec.suffix}\""
+          ++  "--docker-suffix '${spec.suffix}'"
           ++  "--only-dockers "
 
 in  { verify = verify, Spec = Spec }
