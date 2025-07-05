@@ -28,6 +28,8 @@ let DockerPublish = ../Constants/DockerPublish.dhall
 
 let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
+let Extensions = ../Lib/Extensions.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -113,9 +115,22 @@ let generateStep =
                 else  " && ./scripts/debian/aptly.sh stop"
 
           let suffix =
-                "${Profiles.toSuffixLowercase
-                     spec.deb_profile}${BuildFlags.toLabelSegment
-                                          spec.build_flags}"
+                Extensions.joinOptionals
+                  [ merge
+                      { Standard = None Text
+                      , Mainnet = None Text
+                      , Dev = None Text
+                      , Lightnet = Some
+                          "${Profiles.toSuffixLowercase spec.deb_profile}"
+                      }
+                      spec.deb_profile
+                  , merge
+                      { None = None Text
+                      , Instrumented = Some
+                          "${BuildFlags.toLabelSegment spec.build_flags}"
+                      }
+                      spec.build_flags
+                  ]
 
           let maybeVerify =
                       if     spec.verify

@@ -7,6 +7,8 @@ let List/concatMap = Prelude.List.concatMap
 
 let List/drop = Prelude.List.drop
 
+let List/fold_ = Prelude.List.fold
+
 let Text/concat = Prelude.Text.concat
 
 let join =
@@ -19,4 +21,28 @@ let join =
 
           in  Text/concat concat
 
-in  { join = join }
+let joinOptionals
+    : List (Optional Text) -> Optional Text
+    =     \(xs : List (Optional Text))
+      ->  List/fold_
+            (Optional Text)
+            xs
+            (Optional Text)
+            (     \(acc : Optional Text)
+              ->  \(x : Optional Text)
+              ->  merge
+                    { Some =
+                            \(text : Text)
+                        ->  merge
+                              { None = Some text
+                              , Some =
+                                  \(accText : Text) -> Some (accText ++ text)
+                              }
+                              acc
+                    , None = acc
+                    }
+                    x
+            )
+            (None Text)
+
+in  { join = join, joinOptionals = joinOptionals }
