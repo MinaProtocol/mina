@@ -130,7 +130,7 @@ let toDebianNames =
                     ->  merge
                           { Daemon = [ toDebianName a network ]
                           , DaemonHardfork = [ toDebianName a network ]
-                          , Archive = [ "archive" ]
+                          , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
