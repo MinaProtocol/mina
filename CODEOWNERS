@@ -40,7 +40,6 @@
 /src/lib/pickles/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/precomputed_values/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/concurrency/promise @MinaProtocol/protocol-eng-reviewers @MinaProtocol/product-eng-reviewers
-/src/lib/sha256_lib/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/signature_lib/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky @MinaProtocol/crypto-eng-reviewers
 /src/lib/snarky_blake2/ @MinaProtocol/crypto-eng-reviewers
