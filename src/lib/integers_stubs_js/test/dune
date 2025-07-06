@@ -2,7 +2,7 @@
  (name test)
  (modes js)
  (js_of_ocaml
-  (flags +nat.js --source-map --pretty))
+  (flags --source-map --pretty))
  (libraries integers integers_stubs_js)
  (instrumentation
   (backend bisect_ppx))
