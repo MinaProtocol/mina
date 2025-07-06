@@ -164,7 +164,6 @@
 (package (name secrets))
 (package (name sgn))
 (package (name sgn_type))
-(package (name sha256_lib))
 (package (name signature_lib))
 (package (name snark_bits))
 (package (name snark_keys_header))
