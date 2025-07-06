@@ -1167,7 +1167,7 @@ function verify(){
                 shift 1;
             ;;
             --docker-suffix )
-                __suffix=${2:?$error_message}
+                __docker_suffix=${2:?$error_message}
                 shift 2;
             ;;
             * )
@@ -1190,7 +1190,7 @@ function verify(){
     echo " - Channel: $__channel"
     echo " - Only debians: $__only_debians"
     echo " - Only dockers: $__only_dockers"
-    echo " - Docker suffix: $__suffix"
+    echo " - Docker suffix: $__docker_suffix"
     echo ""
     
     #check environment setup
@@ -1217,7 +1217,7 @@ function verify(){
                                         -m $__codename \
                                         -r $__debian_repo \
                                         -c $__channel \
-                                        -s "$__suffix" \
+                                        -s "$__docker_suffix" \
                                         ${__signed_debian_repo:+--signed}
                             fi
 
@@ -1249,7 +1249,7 @@ function verify(){
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "$__suffix" \
+                                        -s "$__docker_suffix" \
                                         -r "$__repo" 
 
                                     echo ""
@@ -1278,12 +1278,19 @@ function verify(){
                                     
                                     echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
                                     echo ""
+
+                                    local docker_suffix_combined=""
+                                    if [[ -n "$__docker_suffix" ]]; then
+                                        docker_suffix_combined="-$network-$__docker_suffix"
+                                    else
+                                        docker_suffix_combined="-$network"
+                                    fi
                                     
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "-$network" \
+                                        -s "$docker_suffix_combined" \
                                         -r "$__repo" 
                                     
                                     echo ""
