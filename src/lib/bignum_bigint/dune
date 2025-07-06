@@ -6,9 +6,9 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   async_kernel
   bignum.bigint
+  core_kernel
   ;; local libraries
   fold_lib)
  (preprocess

@@ -3,46 +3,46 @@
  (public_name transition_frontier)
  (libraries
   ;;opam libraries
-  async_unix
-  integers
   async
+  async_unix
   core
+  integers
   ;;local libraries
-  o1trace
-  mina_metrics
-  mina_wire_types
-  merkle_ledger
-  staged_ledger
-  mina_state
-  signature_lib
-  mina_ledger
-  consensus
-  genesis_constants
-  mina_numbers
-  mina_block
-  logger
-  transition_frontier_full_frontier
-  transition_frontier_persistent_root
-  downloader
-  transition_frontier_base
-  transition_frontier_persistent_frontier
-  transition_frontier_extensions
-  mina_base
+  block_time
   cache_lib
+  consensus
   data_hash_lib
+  downloader
+  genesis_constants
+  internal_tracing
+  logger
+  merkle_ledger
+  mina_base
+  mina_block
+  mina_ledger
+  mina_metrics
+  mina_net2
+  mina_numbers
+  mina_state
+  mina_stdlib
+  mina_transaction
+  mina_wire_types
   network_peer
+  o1trace
+  precomputed_values
+  protocol_version
+  quickcheck_lib
+  signature_lib
+  staged_ledger
+  transition_frontier_base
+  transition_frontier_extensions
+  transition_frontier_full_frontier
+  transition_frontier_persistent_frontier
+  transition_frontier_persistent_root
+  trust_system
   unsigned_extended
   verifier
-  precomputed_values
-  block_time
-  trust_system
-  with_hash
-  mina_stdlib
-  quickcheck_lib
-  protocol_version
-  mina_net2
-  internal_tracing
-  mina_transaction)
+  with_hash)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

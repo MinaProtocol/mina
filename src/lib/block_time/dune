@@ -6,29 +6,29 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  integers
-  base.caml
-  bin_prot.shape
-  sexplib0
   async_kernel
-  core_kernel
   base
   base.base_internalhash_types
+  base.caml
+  bin_prot.shape
+  core_kernel
+  integers
+  sexplib0
   ;; local libraries
-  mina_wire_types
   bitstring_lib
-  pickles
-  unsigned_extended
-  snark_params
-  mina_numbers
-  logger
-  snark_bits
-  timeout_lib
   crypto_params
-  snarky.backendless
-  random_oracle_input
+  logger
+  mina_numbers
+  mina_wire_types
+  pickles
+  ppx_version.runtime
   random_oracle
-  ppx_version.runtime)
+  random_oracle_input
+  snark_bits
+  snark_params
+  snarky.backendless
+  timeout_lib
+  unsigned_extended)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

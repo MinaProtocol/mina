@@ -4,28 +4,28 @@
  (library_flags (-linkall))
  (libraries
   ;; opam libraries
-  sexplib0
-  core
-  ppx_inline_test.config
-  base.caml
-  async_kernel
-  core_kernel
-  bin_prot.shape
-  base
-  result
   async
+  async_kernel
   async_unix
+  base
+  base.caml
+  bin_prot.shape
+  core
+  core_kernel
+  ppx_inline_test.config
+  result
+  sexplib0
   ;; local libraries
-  mina_metrics
-  rocksdb
-  pipe_lib
-  logger
   key_value_database
+  logger
+  mina_metrics
+  mina_stdlib
   network_peer
-  run_in_thread
-  test_util
+  pipe_lib
   ppx_version.runtime
-  mina_stdlib)
+  rocksdb
+  run_in_thread
+  test_util)
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess

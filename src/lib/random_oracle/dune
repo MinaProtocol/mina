@@ -17,18 +17,18 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
   base
   core_kernel
+  ppx_inline_test.config
   sexplib0
   ;; local libraries
-  snark_params
-  pickles.backend
-  sponge
-  pickles
-  random_oracle_input
-  snarky.backendless
+  fold_lib
   kimchi_pasta
   kimchi_pasta.basic
-  fold_lib
-  random_oracle.permutation))
+  pickles
+  pickles.backend
+  random_oracle.permutation
+  random_oracle_input
+  snark_params
+  snarky.backendless
+  sponge))

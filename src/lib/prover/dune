@@ -3,54 +3,54 @@
  (public_name prover)
  (libraries
   ;; opam libraries
-  base64
-  async_unix
-  rpc_parallel
-  core
   async
   async_kernel
-  core_kernel
-  bin_prot.shape
+  async_unix
   base.caml
+  base64
+  bin_prot.shape
+  core
+  core_kernel
+  rpc_parallel
   sexplib0
   ;; local libraries
-  with_hash
-  coda_genesis_ledger
-  mina_metrics
-  error_json
-  pickles_types
-  snarky.backendless
-  snark_params
-  pickles
-  sgn
-  currency
-  child_processes
   blockchain_snark
-  mina_block
-  mina_state
-  mina_base
-  mina_compile_config
-  logger
-  itn_logger
-  internal_tracing
-  genesis_constants
-  ledger_proof
-  consensus
+  child_processes
+  coda_genesis_ledger
   coda_genesis_proof
-  transaction_snark
-  logger.file_system
+  consensus
+  currency
   data_hash_lib
-  staged_ledger_diff
-  ppx_version.runtime
-  mina_transaction_logic
-  pickles.backend
-  sgn_type
+  error_json
+  genesis_constants
+  internal_tracing
+  itn_logger
   kimchi_backend
-  mina_numbers
   kimchi_pasta
   kimchi_pasta.basic
+  ledger_proof
+  logger
+  logger.file_system
+  mina_base
+  mina_block
+  mina_compile_config
+  mina_metrics
+  mina_numbers
+  mina_state
+  mina_transaction_logic
   mina_wire_types
-  promise)
+  pickles
+  pickles.backend
+  pickles_types
+  ppx_version.runtime
+  promise
+  sgn
+  sgn_type
+  snark_params
+  snarky.backendless
+  staged_ledger_diff
+  transaction_snark
+  with_hash)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

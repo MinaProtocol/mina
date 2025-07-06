@@ -33,9 +33,9 @@
   ppx_version.runtime
   random_oracle
   sgn
-  snarky.backendless
   snark_keys_header
   snark_params
+  snarky.backendless
   transaction_snark)
  (inline_tests
   (flags -verbose -show-counts))

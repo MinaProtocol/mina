@@ -6,14 +6,14 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  base.caml
-  core_kernel
-  sexplib0
   base
-  ppx_inline_test.config
+  base.caml
   bin_prot.shape
-  result
+  core_kernel
+  ppx_inline_test.config
   ppx_version.runtime
+  result
+  sexplib0
   ;; mina
   mina_stdlib)
  (preprocess

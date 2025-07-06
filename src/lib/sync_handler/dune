@@ -9,31 +9,31 @@
   (pps ppx_mina ppx_version ppx_jane))
  (libraries
   ;; opam libraries
-  sexplib0
-  core
   async
-  core_kernel
   async_kernel
+  core
+  core_kernel
+  sexplib0
   ;; local libraries
-  with_hash
-  data_hash_lib
-  precomputed_values
-  genesis_constants
-  trust_system
-  transition_frontier_extensions
-  transition_frontier_base
-  consensus
-  syncable_ledger
-  mina_base
-  mina_intf
-  transition_frontier
   best_tip_prover
-  mina_block
-  network_peer
+  consensus
+  data_hash_lib
+  genesis_constants
   logger
   merkle_ledger
-  staged_ledger
-  mina_stdlib
-  proof_carrying_data
+  mina_base
+  mina_block
+  mina_intf
   mina_ledger
-  mina_wire_types))
+  mina_stdlib
+  mina_wire_types
+  network_peer
+  precomputed_values
+  proof_carrying_data
+  staged_ledger
+  syncable_ledger
+  transition_frontier
+  transition_frontier_base
+  transition_frontier_extensions
+  trust_system
+  with_hash))
