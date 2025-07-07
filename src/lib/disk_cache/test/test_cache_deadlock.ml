@@ -88,15 +88,15 @@ let run_test_with_cache (module Cache_impl : Cache_intf) ~timeout_seconds
   match%bind put_with_timeout () with
   | `Timeout ->
       Core.printf
-        "\nDEADLOCK DETECTED: Cache.put timed out after %.1f seconds!\n%!"
+        "\nDEADLOCK DETECTED: Cache.put timed out after %.1f seconds!\n"
         (Option.value_exn timeout_seconds) ;
-      Core.printf "This indicates a deadlock in the cache implementation.\n%!" ;
-      Core.printf "The finalizer likely tried to acquire a lock during GC.\n%!" ;
-      return ()
+      Core.printf "This indicates a deadlock in the cache implementation.\n" ;
+      Core.printf "The finalizer likely tried to acquire a lock during GC.\n" ;
+      return `Timeout
   | `Result `Success ->
-      Core.printf "Evil put completed successfully (no deadlock)\n%!" ;
-      Core.printf "\nSUCCESS: Cache does NOT deadlock with finalizers.\n%!" ;
-      return ()
+      Core.printf "Evil put completed successfully (no deadlock)" ;
+      Core.printf "\nCache does NOT deadlock with finalizers." ;
+      return `Success
 
 let test_cache_deadlock (module Cache_impl : Cache_intf) =
   (* Read configuration from environment variables *)
@@ -112,22 +112,18 @@ let test_cache_deadlock (module Cache_impl : Cache_intf) =
   in
   let database_dir = Sys.getenv_opt "CACHE_DEADLOCK_TEST_DIR" in
 
-  Core.printf "\nCache deadlock test\n%!" ;
-  Core.printf "===================\n%!" ;
+  Core.printf "\nCache deadlock test\n" ;
+  Core.printf "===================\n" ;
   ( match timeout_seconds with
   | Some t ->
-      Core.printf "Timeout: %.1f seconds\n%!" t
+      Core.printf "Timeout: %.1f seconds\n" t
   | None ->
-      Core.printf "Timeout: disabled (test will hang if deadlock occurs)\n%!" ) ;
-  Core.printf "\n%!" ;
+      Core.printf "Timeout: disabled (test will hang if deadlock occurs)\n" ) ;
+  Core.printf "\n" ;
 
   let run_in_dir dir =
-    Core.printf "Using database directory: %s\n%!" dir ;
-    let%bind () =
-      run_test_with_cache (module Cache_impl) ~timeout_seconds ~tmpdir:dir
-    in
-    Core.printf "\nTest completed successfully.\n%!" ;
-    return ()
+    Core.printf "Using database directory: %s\n" dir ;
+    run_test_with_cache (module Cache_impl) ~timeout_seconds ~tmpdir:dir
   in
 
   match database_dir with
