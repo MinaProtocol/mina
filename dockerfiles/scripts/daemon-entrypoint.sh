@@ -62,7 +62,7 @@ export MINA_PRIVKEY_PASS MINA_LIBP2P_PASS UPTIME_PRIVKEY_PASS
 
 
 if [[ ${ENABLE_FREEZE_ALERT} ]]; then
-  FILE_TO_WATCH=.mina-config/mina.log /freeze_alert.sh
+  FILE_TO_WATCH=.mina-config/mina.log /freeze-alert.sh
 fi
 
 # Run the daemon in the foreground
