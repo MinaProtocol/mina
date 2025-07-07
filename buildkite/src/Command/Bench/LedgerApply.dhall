@@ -12,10 +12,17 @@ let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
+let Scope = ../../Pipeline/Scope.dhall
+
 let Spec =
       { Type =
-          { key : Text, name : Text, label : Text, mode : PipelineMode.Type }
-      , default.mode = PipelineMode.Type.PullRequest
+          { key : Text
+          , name : Text
+          , label : Text
+          , mode : PipelineMode.Type
+          , scope : List Scope.Type
+          }
+      , default = { mode = PipelineMode.Type.Triaged, scope = Scope.Full }
       }
 
 let dependsOn =
@@ -32,7 +39,7 @@ let pipeline
             , label = spec.label
             , key = spec.key
             , bench = "ledger-apply"
-            , mode = spec.mode
+            , scope = spec.scope
             , dependsOn = dependsOn
             , additionalDirtyWhen =
               [ SelectFiles.exactly

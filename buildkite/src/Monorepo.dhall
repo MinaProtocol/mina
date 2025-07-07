@@ -16,9 +16,13 @@ let Pipeline = ./Pipeline/Dsl.dhall
 
 let PipelineMode = ./Pipeline/Mode.dhall
 
-let PipelineFilter = ./Pipeline/Filter.dhall
+let PipelineTagFilter = ./Pipeline/TagFilter.dhall
 
 let PipelineTag = ./Pipeline/Tag.dhall
+
+let PipelineScope = ./Pipeline/Scope.dhall
+
+let PipelineScopeFilter = ./Pipeline/ScopeFilter.dhall
 
 let Size = ./Command/Size.dhall
 
@@ -40,22 +44,32 @@ let prefixCommands =
       ]
 
 let commands
-    : PipelineFilter.Type -> PipelineMode.Type -> List Cmd.Type
-    =     \(filter : PipelineFilter.Type)
+    :     PipelineTagFilter.Type
+      ->  PipelineScopeFilter.Type
+      ->  PipelineMode.Type
+      ->  List Cmd.Type
+    =     \(filter : PipelineTagFilter.Type)
+      ->  \(scope : PipelineScopeFilter.Type)
       ->  \(mode : PipelineMode.Type)
       ->  List/map
             JobSpec.Type
             Cmd.Type
             (     \(job : JobSpec.Type)
-              ->  let targetMode = PipelineMode.capitalName mode
+              ->  let targetTags = PipelineTagFilter.tags filter
 
-                  let targetTags = PipelineFilter.tags filter
+                  let jobsFilter = PipelineTagFilter.show filter
 
-                  let filter = PipelineFilter.show filter
-
-                  let isIncluded =
+                  let isIncludedInTag =
                         Prelude.Bool.show
                           (PipelineTag.contains job.tags targetTags)
+
+                  let targetScopes = PipelineScopeFilter.tags scope
+
+                  let scopeFilter = PipelineScopeFilter.show scope
+
+                  let isIncludedInScope =
+                        Prelude.Bool.show
+                          (PipelineScope.contains job.scope targetScopes)
 
                   let dirtyWhen = SelectFiles.compile job.dirtyWhen
 
@@ -63,64 +77,69 @@ let commands
                         triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
 
                   let pipelineHandlers =
-                        { PullRequest =
+                        { Triaged =
                             ''
-                              if [ "${targetMode}" == "PullRequest" ]; then
-                                if [ "${isIncluded}" == "True" ]; then
-                                  if (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
-                                    echo "Triggering ${job.name} for reason:"
-                                    cat _computed_diff.txt | egrep '${dirtyWhen}'
-                                    ${Cmd.format trigger}
-                                  fi
-                                else
-                                  echo "Skipping ${job.name} because this is a ${filter} stage"
-                                fi
-                              elif [ "${targetMode}" == "Stable" ]; then
-                                if [ "${isIncluded}" == "True" ]; then
-                                  echo "Triggering ${job.name} because this is a stable buildkite run"
-                                  ${Cmd.format trigger}
-                                else 
-                                  echo "Skipping ${job.name} because this is a ${filter} stage"
-                                fi
+                              if [ "${isIncludedInTag}" == "False" ]; then
+                                echo "Skipping ${job.name} because this job is not falling under ${jobsFilter} filter "
+                              elif [ "${isIncludedInScope}" == "False" ]; then
+                                echo "Skipping ${job.name} because this is job is not falling under ${scopeFilter} stage"
+                              elif (cat _computed_diff.txt | egrep -q '${dirtyWhen}'); then
+                                echo "Triggering ${job.name} for reason:"
+                                cat _computed_diff.txt | egrep '${dirtyWhen}'
+                                ${Cmd.format trigger}
                               else
-                                echo "Skipping ${job.name} because this is a stable buildkite run"
-                              fi
+                                echo "Skipping ${job.name} because is irrelevant to PR changes"
                             ''
-                        , Stable =
+                        , Full =
                             ''
-                              if [ "${targetMode}" == "Stable" ]; then
-                                if [ "${isIncluded}" == "True" ]; then
-                                  echo "Triggering ${job.name} because this is a stable buildkite run"
-                                  ${Cmd.format trigger}
-                                else
-                                  echo "Skipping ${job.name} because this is a ${filter} stage"
-                                fi
+                              if [ "${isIncludedInTag}" == "False" ]; then
+                                echo "Skipping ${job.name} because this job is not falling under ${jobsFilter} filter "
+                              elif [ "${isIncludedInScope}" == "False" ]; then
+                                echo "Skipping ${job.name} because this is job is not falling under ${scopeFilter} stage"
                               else
-                                echo "Skipping ${job.name} because this is a PR buildkite run"
+                                echo "Triggering ${job.name} because this is a stable buildkite run"
+                                ${Cmd.format trigger}
                               fi
                             ''
                         }
 
-                  in  Cmd.quietly (merge pipelineHandlers job.mode)
+                  in  Cmd.quietly (merge pipelineHandlers mode)
             )
             jobs
 
-in      \(args : { filter : PipelineFilter.Type, mode : PipelineMode.Type })
+in      \ ( args
+          : { tagFilter : PipelineTagFilter.Type
+            , scopeFilter : PipelineScopeFilter.Type
+            , mode : PipelineMode.Type
+            }
+          )
     ->  let pipelineType =
               Pipeline.build
                 Pipeline.Config::{
                 , spec = JobSpec::{
-                  , name = "monorepo-triage-${PipelineFilter.show args.filter}"
+                  , name =
+                      "monorepo-triage-${PipelineTagFilter.show
+                                           args.tagFilter}-${PipelineScopeFilter.show
+                                                               args.scopeFilter}-${PipelineMode.capitalName
+                                                                                     args.mode}"
                   , dirtyWhen = [ SelectFiles.everything ]
                   }
                 , steps =
                   [ Command.build
                       Command.Config::{
                       , commands =
-                          prefixCommands # commands args.filter args.mode
+                            prefixCommands
+                          # commands args.tagFilter args.scopeFilter args.mode
                       , label =
-                          "Monorepo triage ${PipelineFilter.show args.filter}"
-                      , key = "cmds-${PipelineFilter.show args.filter}"
+                          "Monorepo triage ${PipelineTagFilter.show
+                                               args.tagFilter} ${PipelineScopeFilter.show
+                                                                   args.scopeFilter} ${PipelineMode.capitalName
+                                                                                         args.mode}"
+                      , key =
+                          "cmds-${PipelineTagFilter.show
+                                    args.tagFilter}-${PipelineScopeFilter.show
+                                                        args.scopeFilter}-${PipelineMode.capitalName
+                                                                              args.mode}"
                       , target = Size.Multi
                       , docker = Some Docker::{
                         , image =

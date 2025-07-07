@@ -14,7 +14,7 @@ let Pipeline = ../Pipeline/Dsl.dhall
 
 let PipelineTag = ../Pipeline/Tag.dhall
 
-let PipelineMode = ../Pipeline/Mode.dhall
+let PipelineScope = ../Pipeline/Scope.dhall
 
 let JobSpec = ../Pipeline/JobSpec.dhall
 
@@ -51,7 +51,7 @@ let MinaBuildSpec =
           , network : Network.Type
           , buildFlags : BuildFlags.Type
           , toolchainSelectMode : Toolchain.SelectionMode
-          , mode : PipelineMode.Type
+          , scope : List PipelineScope.Type
           , tags : List PipelineTag.Type
           , channel : DebianChannel.Type
           , debianRepo : DebianRepo.Type
@@ -66,8 +66,8 @@ let MinaBuildSpec =
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
           , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
-          , mode = PipelineMode.Type.PullRequest
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
+          , scope = PipelineScope.Full
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
@@ -303,7 +303,7 @@ let pipelineBuilder
             , path = "Release"
             , name = "${spec.prefix}${nameSuffix spec}"
             , tags = spec.tags
-            , mode = spec.mode
+            , scope = spec.scope
             }
           , steps = steps
           }
