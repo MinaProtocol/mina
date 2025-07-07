@@ -22,8 +22,9 @@ let join =
           in  Text/concat concat
 
 let joinOptionals
-    : List (Optional Text) -> Optional Text
-    =     \(xs : List (Optional Text))
+    : Text -> List (Optional Text) -> Optional Text
+    =     \(sep : Text)
+      ->  \(xs : List (Optional Text))
       ->  List/fold_
             (Optional Text)
             xs
@@ -36,7 +37,8 @@ let joinOptionals
                         ->  merge
                               { None = Some text
                               , Some =
-                                  \(accText : Text) -> Some (accText ++ text)
+                                      \(accText : Text)
+                                  ->  Some (accText ++ sep ++ text)
                               }
                               acc
                     , None = acc

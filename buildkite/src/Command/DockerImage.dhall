@@ -116,6 +116,7 @@ let generateStep =
 
           let suffix =
                 Extensions.joinOptionals
+                  "-"
                   [ merge
                       { Standard = None Text
                       , Mainnet = None Text
@@ -127,7 +128,7 @@ let generateStep =
                   , merge
                       { None = None Text
                       , Instrumented = Some
-                          "${BuildFlags.toLabelSegment spec.build_flags}"
+                          "${BuildFlags.toSuffixLowercase spec.build_flags}"
                       }
                       spec.build_flags
                   ]
