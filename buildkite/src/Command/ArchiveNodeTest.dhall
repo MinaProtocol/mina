@@ -23,7 +23,7 @@ in  { step =
                         , artifact = Artifacts.Type.FunctionalTestSuite
                         }
                     )
-                    "MINA_TEST_POSTGRES_URI=\\\$POSTGRES_URI ./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Node Test"
               , key = key
