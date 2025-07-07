@@ -576,7 +576,7 @@ module Network_config = struct
      file contains docker service definitions for each node in the local network. Each node service has different
      configurations which are specified as commands, environment variables, and docker bind volumes.
      We start by creating a runtime config volume to mount to each node service as a bind volume and then continue to create each
-     node service. As we create each definition for a service, we specify the docker command, volume, and environment varibles to 
+     node service. As we create each definition for a service, we specify the docker command, volume, and environment varibles to
      be used (which are mostly defaults).
   *)
   let to_docker network_config =
@@ -1078,18 +1078,14 @@ module Network_manager = struct
     network
 
   let destroy t =
-    [%log' info t.logger] "Destroying network" ;
+    [%log' info t.logger] "Not destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
-    let%bind _ =
-      Util.run_cmd_exn "/" "docker" [ "stack"; "rm"; t.stack_name ]
-    in
     t.deployed <- false ;
     Deferred.unit
 
   let cleanup t =
     let%bind () = if t.deployed then destroy t else return () in
-    [%log' info t.logger] "Cleaning up network configuration" ;
-    let%bind () = File_system.remove_dir t.docker_dir in
+    [%log' info t.logger] "Not cleaning up network configuration" ;
     Deferred.unit
 
   let destroy t =
