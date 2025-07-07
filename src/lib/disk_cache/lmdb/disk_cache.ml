@@ -53,6 +53,10 @@ module Make (Data : Binable.S) = struct
     let res = { idx } in
     (* When this reference is GC'd, delete the file. *)
     Gc.Expert.add_finalizer_last_exn res (fun () ->
+        (* The actual deletion is delayed, as GC maybe triggered in LMDB's
+           critical section. LMDB critical section then will be re-entered if
+           it's invoked directly in a GC hook.
+           This causes mutex double-acquiring and node freezes. *)
         [%log debug] "Data at %d is GCed, marking as garbage" idx
           ~metadata:[ ("index", `Int idx) ] ;
         Hash_set.add garbage idx ) ;
