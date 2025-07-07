@@ -75,7 +75,7 @@ in  Pipeline.build
                   Dockers.DepsSpec::{
                   , codename = Dockers.Type.Bullseye
                   , network = network
-                  , profile = Profiles.Type.Standard
+                  , profile = Profiles.Type.Devnet
                   , artifact = Artifacts.Type.Rosetta
                   }
             }

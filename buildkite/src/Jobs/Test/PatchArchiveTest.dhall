@@ -12,9 +12,14 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let dependsOn =
       Dockers.dependsOn
-        Dockers.DepsSpec::{ artifact = Artifacts.Type.FunctionalTestSuite }
+        Dockers.DepsSpec::{
+        , artifact = Artifacts.Type.FunctionalTestSuite
+        , buildFlags = BuildFlags.Type.Instrumented
+        }
 
 in  Pipeline.build
       Pipeline.Config::{

@@ -6,6 +6,8 @@ let Network = ./Network.dhall
 
 let DebianVersions = ./DebianVersions.dhall
 
+let BuildFlags = ./BuildFlags.dhall
+
 let Docker
     : Type
     = < Bookworm | Bullseye | Jammy | Focal | Noble >
@@ -39,14 +41,16 @@ let DepsSpec =
           , network : Network.Type
           , profile : Profiles.Type
           , artifact : Artifacts.Type
+          , buildFlags : BuildFlags.Type
           , suffix : Text
           }
       , default =
           { codename = Docker.Bullseye
           , prefix = "MinaArtifact"
           , network = Network.Type.Berkeley
-          , profile = Profiles.Type.Standard
+          , profile = Profiles.Type.Devnet
           , artifact = Artifacts.Type.Daemon
+          , buildFlags = BuildFlags.Type.None
           , suffix = "docker-image"
           }
       }
@@ -59,9 +63,17 @@ let dependsOn =
 
           let key = "${Artifacts.lowerName spec.artifact}-${spec.suffix}"
 
+          let buildFlagSuffix =
+                merge
+                  { None = ""
+                  , Instrumented =
+                      "${BuildFlags.toSuffixUppercase spec.buildFlags}"
+                  }
+                  spec.buildFlags
+
           in  [ { name =
                     "${spec.prefix}${capitalName
-                                       spec.codename}${network}${profileSuffix}"
+                                       spec.codename}${network}${profileSuffix}${buildFlagSuffix}"
                 , key = key
                 }
               ]

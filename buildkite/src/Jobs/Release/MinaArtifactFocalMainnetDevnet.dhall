@@ -6,6 +6,8 @@ let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
@@ -31,5 +33,6 @@ in  Pipeline.build
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
+          , profile = Profiles.Type.Devnet
           }
       )
