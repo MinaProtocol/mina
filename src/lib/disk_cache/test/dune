@@ -12,8 +12,9 @@
   logger)
  (preprocess
   (pps ppx_jane ppx_version))
+ ;; Ignoring -22 because we use Binable.of_binable_without_uuid
  (flags
-  (:standard -w -22)))
+  (:standard -w +a -w -22)))
 
 (test
  (name test_lmdb_deadlock)
@@ -29,7 +30,7 @@
  (preprocess
   (pps ppx_jane ppx_version))
  (flags
-  (:standard -w -22)))
+  (:standard -w +a)))
 
 (test
  (name test_filesystem_deadlock)
@@ -45,4 +46,4 @@
  (preprocess
   (pps ppx_jane ppx_version))
  (flags
-  (:standard -w -22)))
+  (:standard -w +a)))
