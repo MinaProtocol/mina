@@ -1307,7 +1307,7 @@ let shorten_commit_id commit_id =
   if String.length commit_id < min_commit_id_length then commit_id
   else
     (* Take the first 8 characters of the commit ID *)
-    String.sub ~pos:0 ~len commit_id
+    String.sub ~pos:0 ~len:min_commit_id_length commit_id
 
 let start t =
   let commit_id_short = shorten_commit_id t.commit_id in
