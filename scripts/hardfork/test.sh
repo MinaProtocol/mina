@@ -170,6 +170,7 @@ prefork_hashes="$(jq -cS "$prefork_hashes_select" localnet/prefork_hf_ledger_has
 if [[ "$prefork_hashes" != "$expected_prefork_hashes" ]]; then
   echo "Assertion failed: unexpected ledgers in fork_config" >&2
   echo "Expected: $expected_prefork_hashes" >&2
+  echo "Actual: $prefork_hashes" >&2
   exit 3
 fi
 
