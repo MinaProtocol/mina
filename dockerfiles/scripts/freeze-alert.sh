@@ -5,6 +5,9 @@ SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-""}  # Slack bot token
 SLACK_BOT_CHANNEL=${SLACK_BOT_CHANNEL:-"#n8n-bot-hub"}  # Slack channel to post alerts
 MAX_FREEZE_SEC=$((60 * 60)) #
 
+echo "Waiting for 60s before starting to watch file..."
+sleep 60s
+
 # Ensure inotifywait is available
 if ! command -v inotifywait &>/dev/null; then
   echo "Error: inotifywait is not installed."
