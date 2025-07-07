@@ -1,5 +1,4 @@
 (* LMDB-specific deadlock test *)
-open! Core
 open Async
 
 let () =

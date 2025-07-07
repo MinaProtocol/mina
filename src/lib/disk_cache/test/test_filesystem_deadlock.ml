@@ -1,5 +1,4 @@
 (* Filesystem cache control test - should not deadlock *)
-open! Core
 open Async
 
 let () =
