@@ -45,10 +45,9 @@ module Network_config = struct
     }
   [@@deriving to_yojson]
 
-  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
+  let expand ~logger ~test_name ~cli_inputs:(_ : Cli_inputs.t) ~(debug : bool)
       ~(images : Test_config.Container_images.t) ~(test_config : Test_config.t)
       ~(constants : Test_config.constants) =
-    let _ = cli_inputs in
     let ({ genesis_ledger
          ; epoch_data
          ; block_producers
@@ -576,7 +575,7 @@ module Network_config = struct
      file contains docker service definitions for each node in the local network. Each node service has different
      configurations which are specified as commands, environment variables, and docker bind volumes.
      We start by creating a runtime config volume to mount to each node service as a bind volume and then continue to create each
-     node service. As we create each definition for a service, we specify the docker command, volume, and environment varibles to 
+     node service. As we create each definition for a service, we specify the docker command, volume, and environment varibles to
      be used (which are mostly defaults).
   *)
   let to_docker network_config =
