@@ -57,13 +57,12 @@ module Make (Data : Binable.S) = struct
            critical section. LMDB critical section then will be re-entered if
            it's invoked directly in a GC hook.
            This causes mutex double-acquiring and node freezes. *)
-        [%log debug] "Data at %d is GCed, marking as garbage" idx
+        [%log spam] "Data at %d is GCed, marking as garbage" idx
           ~metadata:[ ("index", `Int idx) ] ;
         Hash_set.add garbage idx ) ;
     if Hash_set.length garbage >= garbage_size_limit then (
       Hash_set.iter garbage ~f:(fun to_remove ->
-          [%log debug] "Instructing LMDB to remove garbage at index %d"
-            to_remove
+          [%log spam] "Instructing LMDB to remove garbage at index %d" to_remove
             ~metadata:[ ("index", `Int to_remove) ] ;
           Rw.remove ~env db to_remove ) ;
       Hash_set.clear garbage ) ;
@@ -72,7 +71,7 @@ module Make (Data : Binable.S) = struct
 
   let iteri ({ env; db; logger; _ } : t) ~f =
     Rw.iter ~env db ~f:(fun k v ->
-        [%log debug] "Iterating at index %d" k ~metadata:[ ("index", `Int k) ] ;
+        [%log spam] "Iterating at index %d" k ~metadata:[ ("index", `Int k) ] ;
         f k v )
 
   let count ({ env; db; _ } : t) =
