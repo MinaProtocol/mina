@@ -50,7 +50,6 @@ module Dockerfile = struct
           ; ("ports", `List (List.map ~f:Port.to_yojson ports))
           ; ("environment", Environment.to_yojson environment)
           ; ("volumes", `List (List.map ~f:Volume.to_yojson volumes))
-          ; ("privileged", `Bool true)
           ]
         @
         match entrypoint with
