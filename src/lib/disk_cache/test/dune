@@ -10,6 +10,8 @@
   disk_cache_intf
   file_system
   logger)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps ppx_jane ppx_version))
  ;; Ignoring -22 because we use Binable.of_binable_without_uuid
@@ -25,6 +27,8 @@
   ;; local libraries
   disk_cache.lmdb
   test_cache_deadlock_lib)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps ppx_jane ppx_version))
  (flags
@@ -39,6 +43,8 @@
   ;; local libraries
   disk_cache.filesystem
   test_cache_deadlock_lib)
+ (instrumentation
+  (backend bisect_ppx))
  (preprocess
   (pps ppx_jane ppx_version))
  (flags
