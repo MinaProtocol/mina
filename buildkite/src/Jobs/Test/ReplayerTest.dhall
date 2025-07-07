@@ -8,20 +8,13 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ReplayerTest = ../../Command/ReplayerTest.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Dockers = ../../Constants/DockerVersions.dhall
-
-let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let dependsOn =
       Dockers.dependsOn
-        Dockers.Type.Bullseye
-        Network.Type.Berkeley
-        Profiles.Type.Standard
-        Artifacts.Type.FunctionalTestSuite
+        Dockers.DepsSpec::{ artifact = Artifacts.Type.FunctionalTestSuite }
 
 in  Pipeline.build
       Pipeline.Config::{

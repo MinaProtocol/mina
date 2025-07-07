@@ -19,7 +19,7 @@ in  Pipeline.build
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
             ]
-          , tags = [ PipelineTag.Type.Debian ]
+          , tags = [ PipelineTag.Type.Docker ]
           , channel = DebianChannel.Type.Experimental
           , prefix = "MinaArtifactOnlyDebian"
           }

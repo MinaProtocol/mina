@@ -145,7 +145,6 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~cache_exceptions ~best_seen_transition ~catchup_mode =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
-  [%log info] "Starting Bootstrap Controller phase" ;
   producer_transition_writer_ref := None ;
   let f b_or_h =
     Strict_pipe.Swappable.write network_transition_pipe (b_or_h, `Valid_cb None) ;
@@ -621,7 +620,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       let network_transition_pipe : _ Strict_pipe.Swappable.t =
-        let name = "transition frontier controller pipe" in
+        let name = "transition_frontier_controller_pipe" in
         let drop_f (b_or_h, `Valid_cb valid_cb) =
           Mina_metrics.(
             Counter.inc_one Pipe.Drop_on_overflow.router_transitions) ;

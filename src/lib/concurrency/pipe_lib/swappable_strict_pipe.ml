@@ -33,7 +33,7 @@ type ('data_in_pipe, 'write_return) state_t =
   ; exposed : ('data_in_pipe, 'write_return) t
         (** [short_lived_sink] is the short-lived pipe that is currently
       used for writing.
-    
+
       Invariant: there was no successful write to [short_lived_sink]
       since it was set to the value of [state_t]. I.e. every
       [Choosable_synchronous_pipe.write_choice] that results in write
@@ -64,7 +64,7 @@ let terminate state =
   `Finished ()
 
 (** Returns a choice that terminates the pipe when the termination signal is filled.
-    
+
     If choice is fullfilled, [Finished ()] is returned to signal [background_thread]
     to exit.
 *)
@@ -105,7 +105,7 @@ let write_sink_choice state sink data =
 
 (** [reconfiguration_choices] returns a list of choices that reconfigure
     the pipe: reset shot-lived pipe or terminate the pipe.
-    
+
     These choices should appear in every [Deferred.choose] call to ensure
     structure's invariants hold.
     *)
@@ -113,7 +113,7 @@ let reconfiguration_choices state =
   [ terminate_choice state; read_short_lived_pipe_choice state ]
 
 (** Attempt to write data to the short-lived sink.
-    
+
     If the pipe is terminated, [`Finished ()] is returned.
     If write follows through, [`Repeat] is returned with updated state
     (with [data_unconsumed] set to [None]).
@@ -128,7 +128,7 @@ let short_lived_write state sink data =
   choose (write_sink_choice state sink data :: reconfiguration_choices state)
 
 (** Attempt to read next short-lived sink.
-    
+
     If the pipe is terminated, [`Finished ()] is returned.
     If the next short-lived sink is available, [`Repeat] is returned with updated state
     (with [short_lived_sink] set to [Some sink]).
@@ -136,7 +136,7 @@ let short_lived_write state sink data =
     There is no guarantee on the order of the choices. Behavior
     of [Deferred.choice] guarantees that the result is determined in the
     async cycle if any of the choices becomes determined.
-    
+
     This function is expected to be called at most once over the structure's lifetime.
     Once some short-lived pipe is obtained, structure should attempt to read data
     from long-lived pipe or write to short-lived pipe.
@@ -144,7 +144,7 @@ let short_lived_write state sink data =
 let read_short_lived_pipe state = choose (reconfiguration_choices state)
 
 (** Attempt to read from the long-lived reader.
-    
+
     If the pipe is terminated, [`Finished ()] is returned.
     If the next short-lived sink is available, [`Repeat] is returned with updated state
     (with [short_lived_sink] set to [Some sink]).
@@ -180,7 +180,7 @@ let read_long_lived state =
   choose (read_choice :: reconfiguration_choices state')
 
 (** Step the background thread.
-    
+
     If the pipe is terminated, [`Finished ()] is returned.
     If the next short-lived sink is available, swap will be performed.
 
@@ -215,7 +215,7 @@ let step (type data_in_pipe write_return)
       short_lived_write state short_lived_sink data
 
 let background_thread ~name (t : _ state_t) =
-  O1trace.background_thread (name ^ "-swappable") (fun () ->
+  O1trace.background_thread (name ^ "_swappable") (fun () ->
       Deferred.repeat_until_finished t step )
 
 let create (type data_in_pipe pipe_kind write_return) ?warn_on_drop ~name

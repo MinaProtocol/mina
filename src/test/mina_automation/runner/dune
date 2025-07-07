@@ -1,0 +1,12 @@
+(library
+ (name mina_automation_runner)
+ (public_name mina_automation.runner)
+ (libraries
+   ;; opam libraries
+   async
+   core
+  ;; local libraries
+  mina_automation.fixture
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_deriving_yojson ppx_jane ppx_mina)))

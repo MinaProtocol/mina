@@ -66,9 +66,10 @@ module Transaction_with_witness = struct
       ; second_pass_ledger_witness
       ; block_global_slot
       } =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { transaction_with_info =
         Mina_transaction_logic.Transaction_applied.write_all_proofs_to_disk
-          ~proof_cache_db transaction_with_info
+          ~signature_kind ~proof_cache_db transaction_with_info
     ; state_hash
     ; statement
     ; init_stack
@@ -1015,6 +1016,7 @@ let apply_ordered_txns_stepwise ?(stop_at_first_pass = false) ordered_txns
             { command = t.command
             ; previous_hash = t.previous_hash
             ; original_first_pass_account_states
+            ; signature_kind = Mina_signature_kind.t_DEPRECATED
             ; constraint_constants = t.constraint_constants
             ; state_view = t.state_view
             ; global_state

@@ -30,7 +30,7 @@ module Stable = struct
   module V3 = struct
     module T = struct
       type query =
-        Bounded_types.Wrapped_error.Stable.V1.t
+        Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t
         * (unit, unit, unit) Spec.Partitioned.Poly.Stable.V1.t
 
       type response = unit

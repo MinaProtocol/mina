@@ -20,7 +20,7 @@
   kimchi_pasta
   kimchi_pasta.basic
   genesis_constants
-  bounded_types
+  mina_stdlib
   crypto_params
   random_oracle
   blake2

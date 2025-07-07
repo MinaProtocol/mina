@@ -1,6 +1,6 @@
 let Profile
     : Type
-    = < Standard | Mainnet | Lightnet | Hardfork | Dev >
+    = < Standard | Mainnet | Lightnet | Dev >
 
 let capitalName =
           \(profile : Profile)
@@ -8,7 +8,6 @@ let capitalName =
             { Standard = "Standard"
             , Mainnet = "Mainnet"
             , Lightnet = "Lightnet"
-            , Hardfork = "Hardfork"
             , Dev = "Dev"
             }
             profile
@@ -19,7 +18,6 @@ let lowerName =
             { Standard = "standard"
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
-            , Hardfork = "hardfork"
             , Dev = "dev"
             }
             profile
@@ -30,7 +28,6 @@ let duneProfile =
             { Standard = "devnet"
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
-            , Hardfork = "hardfork"
             , Dev = "dev"
             }
             profile
@@ -41,7 +38,6 @@ let toSuffixUppercase =
             { Standard = ""
             , Mainnet = "Mainnet"
             , Lightnet = "Lightnet"
-            , Hardfork = "Hardfork"
             , Dev = "Dev"
             }
             profile
@@ -52,7 +48,6 @@ let toSuffixLowercase =
             { Standard = ""
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
-            , Hardfork = "hardfork"
             , Dev = "dev"
             }
             profile
@@ -63,7 +58,6 @@ let toLabelSegment =
             { Standard = ""
             , Mainnet = "-mainnet"
             , Lightnet = "-lightnet"
-            , Hardfork = "-hardfork"
             , Dev = "-dev"
             }
             profile

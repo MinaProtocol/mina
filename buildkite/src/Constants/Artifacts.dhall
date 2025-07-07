@@ -4,13 +4,14 @@ let Text/concatSep = Prelude.Text.concatSep
 
 let Profiles = ./Profiles.dhall
 
-let DebianVersions = ./DebianVersions.dhall
-
 let Network = ./Network.dhall
+
+let Repo = ./DockerRepo.dhall
 
 let Artifact
     : Type
     = < Daemon
+      | DaemonHardfork
       | LogProc
       | Archive
       | TestExecutive
@@ -23,6 +24,7 @@ let Artifact
 
 let AllButTests =
       [ Artifact.Daemon
+      , Artifact.DaemonHardfork
       , Artifact.LogProc
       , Artifact.Archive
       , Artifact.BatchTxn
@@ -35,12 +37,18 @@ let AllButTests =
 let Main =
       [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All = AllButTests # [ Artifact.FunctionalTestSuite, Artifact.Toolchain ]
+let All =
+        AllButTests
+      # [ Artifact.FunctionalTestSuite
+        , Artifact.Toolchain
+        , Artifact.DaemonHardfork
+        ]
 
 let capitalName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "Daemon"
+            , DaemonHardfork = "DaemonHardfork"
             , LogProc = "LogProc"
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
@@ -56,6 +64,7 @@ let lowerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "daemon"
+            , DaemonHardfork = "daemon_hardfork"
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
@@ -71,6 +80,7 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
+            , DaemonHardfork = "mina-daemon-hardfork"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
@@ -82,11 +92,20 @@ let dockerName =
             }
             artifact
 
+let dockerNames =
+          \(artifacts : List Artifact)
+      ->  Prelude.List.map
+            Artifact
+            Text
+            (\(a : Artifact) -> dockerName a)
+            artifacts
+
 let toDebianName =
           \(artifact : Artifact)
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
+            , DaemonHardfork = ""
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
@@ -108,6 +127,7 @@ let toDebianNames =
                   (     \(a : Artifact)
                     ->  merge
                           { Daemon = [ toDebianName a network ]
+                          , DaemonHardfork = [ toDebianName a network ]
                           , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
@@ -131,46 +151,65 @@ let toDebianNames =
 
           in  Text/concatSep " " items
 
-let dockerTag =
-          \(artifact : Artifact)
-      ->  \(version : Text)
-      ->  \(codename : DebianVersions.DebVersion)
-      ->  \(profile : Profiles.Type)
-      ->  \(network : Network.Type)
-      ->  \(remove_profile_from_name : Bool)
-      ->  let version_and_codename =
-                "${version}-${DebianVersions.lowerName codename}"
+let Tag =
+      { Type =
+          { artifact : Artifact
+          , version : Text
+          , profile : Profiles.Type
+          , network : Network.Type
+          , remove_profile_from_name : Bool
+          }
+      , default =
+          { artifact = Artifact.Daemon
+          , version = "\\\${MINA_DOCKER_TAG}"
+          , profile = Profiles.Type.Standard
+          , network = Network.Type.Berkeley
+          , remove_profile_from_name = False
+          }
+      }
 
-          let profile_part =
-                      if remove_profile_from_name
+let dockerTag =
+          \(spec : Tag.Type)
+      ->  let profile_part =
+                      if spec.remove_profile_from_name
 
                 then  ""
 
-                else  "${Profiles.toLabelSegment profile}"
+                else  "${Profiles.toLabelSegment spec.profile}"
 
           in  merge
                 { Daemon =
-                    "${version_and_codename}-${Network.lowerName
-                                                 network}${profile_part}"
-                , Archive = "${version_and_codename}"
-                , LogProc = "${version_and_codename}"
-                , TestExecutive = "${version_and_codename}"
-                , BatchTxn = "${version_and_codename}"
-                , Rosetta =
-                    "${version_and_codename}-${Network.lowerName network}"
-                , ZkappTestTransaction = "${version_and_codename}"
-                , FunctionalTestSuite = "${version_and_codename}"
-                , Toolchain = "${version_and_codename}"
+                    "${spec.version}-${Network.lowerName
+                                         spec.network}${profile_part}"
+                , DaemonHardfork =
+                    "${spec.version}-${Network.lowerName
+                                         spec.network}${profile_part}"
+                , Archive = "${spec.version}"
+                , LogProc = "${spec.version}"
+                , TestExecutive = "${spec.version}"
+                , BatchTxn = "${spec.version}"
+                , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
+                , ZkappTestTransaction = "${spec.version}"
+                , FunctionalTestSuite = "${spec.version}"
+                , Toolchain = "${spec.version}"
                 }
-                artifact
+                spec.artifact
+
+let fullDockerTag =
+          \(spec : Tag.Type)
+      ->  "${Repo.show Repo.Type.Internal}/${dockerName
+                                               spec.artifact}:${dockerTag spec}"
 
 in  { Type = Artifact
+    , Tag = Tag
     , capitalName = capitalName
     , lowerName = lowerName
     , toDebianName = toDebianName
     , toDebianNames = toDebianNames
     , dockerName = dockerName
+    , dockerNames = dockerNames
     , dockerTag = dockerTag
+    , fullDockerTag = fullDockerTag
     , All = All
     , AllButTests = AllButTests
     , Main = Main

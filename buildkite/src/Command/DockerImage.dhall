@@ -39,6 +39,7 @@ let ReleaseSpec =
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
+          , deb_legacy_version : Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
@@ -56,6 +57,7 @@ let ReleaseSpec =
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "\\\${MINA_DEB_RELEASE}"
           , deb_version = "\\\${MINA_DEB_VERSION}"
+          , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , deb_profile = Profiles.Type.Standard
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
@@ -121,6 +123,7 @@ let generateStep =
                 ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
+                ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =

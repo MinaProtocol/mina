@@ -26,6 +26,7 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libffi7
 #    libprocps8
 #    libjemalloc2
+#    libssl
 
 # Install ca-certificates using HTTP
 RUN apt-get update --quiet --yes \
@@ -33,7 +34,11 @@ RUN apt-get update --quiet --yes \
   && rm -rf /var/lib/apt/lists/*
 
 # Switch to HTTPS
-RUN sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list
+RUN if [ -f /etc/apt/sources.list ]; then \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
+else \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
+fi
 
 # Dependencies
 RUN apt-get update --quiet --yes \
@@ -48,7 +53,6 @@ RUN apt-get update --quiet --yes \
     jq \
     libgmp10 \
     libgomp1 \
-    libssl1.1 \
     libpq-dev \
     procps \
     python3 \

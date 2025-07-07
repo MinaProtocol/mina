@@ -38,7 +38,8 @@ let%test_module "Test transaction logic." =
       in
       let%bind ledger = Ledger_helpers.ledger_of_accounts accounts in
       let%map txn, _ =
-        Transaction_logic.apply_zkapp_command_unchecked ~constraint_constants
+        Transaction_logic.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants
           ~global_slot:Global_slot_since_genesis.(of_int 120)
           ~state_view:protocol_state ledger cmd
       in

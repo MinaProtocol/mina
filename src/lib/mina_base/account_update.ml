@@ -1091,7 +1091,7 @@ module Body = struct
       module V1 = struct
         type t =
           Pickles.Backend.Tick.Field.Stable.V1.t
-          Bounded_types.ArrayN16.Stable.V1.t
+          Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
           list
         [@@deriving sexp, equal, hash, compare, yojson]
 

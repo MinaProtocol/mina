@@ -1,0 +1,13 @@
+(library
+ (name mina_automation_fixture)
+ (public_name mina_automation.fixture)
+ (libraries
+   ;; opam libraries
+   async
+   core
+  ;; local libraries
+  mina_automation
+  file_system
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version ppx_deriving_yojson ppx_jane ppx_mina)))

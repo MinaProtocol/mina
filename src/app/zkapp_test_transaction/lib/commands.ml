@@ -32,9 +32,10 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
     in
     Mina_ledger.Ledger.register_mask ledger new_mask
   in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let _partial_stmt =
-    Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
-      ~global_slot
+    Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
+      ~constraint_constants ~global_slot
       ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
       second_pass_ledger
       (Mina_transaction.Transaction.Command (Zkapp_command zkapp_command))
@@ -44,6 +45,8 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
 
 let print_witnesses ~constraint_constants ~proof_level witnesses =
   let module T = Transaction_snark.Make (struct
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let constraint_constants = constraint_constants
 
     let proof_level = proof_level
@@ -67,6 +70,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
     ~(genesis_constants : Genesis_constants.t)
     ~(proof_level : Genesis_constants.Proof_level.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let ledger = Ledger.create ~depth:constraint_constants.ledger_depth () in
   let _v =
     let id =
@@ -131,8 +135,9 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
       get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
         ~state_body zkapp_command
     in
-    Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~global_slot ~state_body ~fee_excess:Currency.Amount.Signed.zero
+    Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
+      ~constraint_constants ~global_slot ~state_body
+      ~fee_excess:Currency.Amount.Signed.zero
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , `Ledger ledger
@@ -146,6 +151,7 @@ let gen_proof ?(zkapp_account = None) (zkapp_command : Zkapp_command.t)
 let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
     ~zkapp_kp ~(genesis_constants : Genesis_constants.t) ~proof_level
     ~constraint_constants =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let receiver =
     Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
   in
@@ -216,8 +222,9 @@ let generate_zkapp_txn (keypair : Signature_lib.Keypair.t) (ledger : Ledger.t)
       get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
         ~state_body zkapp_command
     in
-    Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
-      ~global_slot ~state_body ~fee_excess:Currency.Amount.Signed.zero
+    Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
+      ~constraint_constants ~global_slot ~state_body
+      ~fee_excess:Currency.Amount.Signed.zero
       [ ( `Pending_coinbase_init_stack pending_coinbase_init_stack
         , `Pending_coinbase_of_statement pending_coinbase_state_stack
         , `Ledger ledger

@@ -57,8 +57,11 @@ in  Pipeline.build
               , Cmd.runInDocker
                   Cmd.Docker::{
                   , image =
-                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-${Network.lowerName
-                                                                                   network}"
+                      Artifacts.fullDockerTag
+                        Artifacts.Tag::{
+                        , artifact = Artifacts.Type.Rosetta
+                        , network = network
+                        }
                   }
                   "buildkite/scripts/rosetta-integration-tests-full.sh"
               ]
@@ -69,10 +72,12 @@ in  Pipeline.build
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn
-                  Dockers.Type.Bullseye
-                  network
-                  Profiles.Type.Standard
-                  Artifacts.Type.Rosetta
+                  Dockers.DepsSpec::{
+                  , codename = Dockers.Type.Bullseye
+                  , network = network
+                  , profile = Profiles.Type.Standard
+                  , artifact = Artifacts.Type.Rosetta
+                  }
             }
         ]
       }

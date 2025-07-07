@@ -446,13 +446,14 @@ let%test_module "account timing check" =
                             "Transaction expected to be applied successfully \
                              but failed with %s"
                             failures_str () ) ) ;
-                  check_transaction_snark ~txn_global_slot:slot
+                  check_transaction_snark ~signature_kind ~txn_global_slot:slot
                     sparse_ledger_before txn ~constraint_constants
               | Error err -> (
                   (*transaction snark should fail as well*)
                   try
-                    check_transaction_snark ~txn_global_slot:slot
-                      sparse_ledger_before txn ~constraint_constants ;
+                    check_transaction_snark ~signature_kind
+                      ~txn_global_slot:slot sparse_ledger_before txn
+                      ~constraint_constants ;
                     failwith
                       "transaction snark successful for a failing transaction"
                   with _exn ->
@@ -1515,7 +1516,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1597,7 +1598,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               match
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1699,7 +1700,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1814,7 +1815,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               match
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 9999)
@@ -2056,7 +2057,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 10_100)
@@ -2213,7 +2214,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 110_000)
