@@ -60,6 +60,11 @@ rm -f .mina-config/.mina-lock
 # Export variables that the daemon would read directly
 export MINA_PRIVKEY_PASS MINA_LIBP2P_PASS UPTIME_PRIVKEY_PASS
 
+
+if [[ ${ENABLE_FREEZE_ALERT} ]]; then
+  FILE_TO_WATCH=.mina-config/mina.log /freeze_alert.sh
+fi
+
 # Run the daemon in the foreground
 ${MINA_APP} ${INPUT_ARGS} ${EXTRA_FLAGS} ${APPENDED_FLAGS} 2>mina-stderr.log
 export MINA_EXIT_CODE="$?"
