@@ -2,8 +2,6 @@ let S = ../../Lib/SelectFiles.dhall
 
 let B = ../../External/Buildkite.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -18,9 +16,11 @@ let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+
 let network = Network.Type.Devnet
 
-let dependsOn = Dockers.dependsOn Dockers.DepsSpec::{ network = network }
+let dependsOn = Dockers.dependsOn Dockers.DepsSpec::{ network }
 
 in  Pipeline.build
       Pipeline.Config::{

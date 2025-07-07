@@ -38,7 +38,7 @@ let dirtyWhen =
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
-        , dirtyWhen = dirtyWhen
+        , dirtyWhen
         , path = "Test"
         , name = "RosettaIntegrationTestsLong"
         , mode = PipelineMode.Type.Stable
@@ -60,7 +60,7 @@ in  Pipeline.build
                       Artifacts.fullDockerTag
                         Artifacts.Tag::{
                         , artifact = Artifacts.Type.Rosetta
-                        , network = network
+                        , network
                         }
                   }
                   "buildkite/scripts/rosetta-integration-tests-full.sh"
@@ -74,7 +74,7 @@ in  Pipeline.build
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
                   , codename = Dockers.Type.Bullseye
-                  , network = network
+                  , network
                   , profile = Profiles.Type.Devnet
                   , artifact = Artifacts.Type.Rosetta
                   }

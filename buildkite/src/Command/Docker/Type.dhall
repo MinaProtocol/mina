@@ -4,7 +4,6 @@
 -- if you'd like to extend this definition for example
 --
 -- TODO: Move volume to something in the cloud or artifacts from gcloud storage
-
 { Type =
     { image : Text
     , shell : Optional (List Text)
@@ -16,12 +15,12 @@
     , user : Optional Text
     }
 , default =
-    { shell = Some [ "/bin/sh", "-e", "-c" ]
-    , propagate-environment = True
-    , mount-buildkite-agent = False
-    , mount-workdir = False
-    , privileged = False
-    , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
-    , user = None Text
-    }
+  { shell = Some [ "/bin/sh", "-e", "-c" ]
+  , propagate-environment = True
+  , mount-buildkite-agent = False
+  , mount-workdir = False
+  , privileged = False
+  , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
+  , user = None Text
+  }
 }

@@ -13,9 +13,9 @@ in  Pipeline.build
           BenchBase.Spec::{
           , mode = PipelineMode.Type.Stable
           , path = "Bench"
-          , name = name
+          , name
           , label = "Snark Profiler"
           , key = bench
-          , bench = bench
+          , bench
           }
       )

@@ -9,26 +9,26 @@ let S = ../Lib/SelectFiles.dhall
 let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
 let capitalName =
-          \(debVersion : DebVersion)
-      ->  merge
-            { Bookworm = "Bookworm"
-            , Bullseye = "Bullseye"
-            , Jammy = "Jammy"
-            , Focal = "Focal"
-            , Noble = "Noble"
-            }
-            debVersion
+      \(debVersion : DebVersion) ->
+        merge
+          { Bookworm = "Bookworm"
+          , Bullseye = "Bullseye"
+          , Jammy = "Jammy"
+          , Focal = "Focal"
+          , Noble = "Noble"
+          }
+          debVersion
 
 let lowerName =
-          \(debVersion : DebVersion)
-      ->  merge
-            { Bookworm = "bookworm"
-            , Bullseye = "bullseye"
-            , Jammy = "jammy"
-            , Focal = "focal"
-            , Noble = "noble"
-            }
-            debVersion
+      \(debVersion : DebVersion) ->
+        merge
+          { Bookworm = "bookworm"
+          , Bullseye = "bullseye"
+          , Jammy = "jammy"
+          , Focal = "focal"
+          , Noble = "noble"
+          }
+          debVersion
 
 let DepsSpec =
       { Type =
@@ -40,26 +40,26 @@ let DepsSpec =
           , prefix : Text
           }
       , default =
-          { deb_version = DebVersion.Bullseye
-          , network = Network.Type.Berkeley
-          , profile = Profiles.Type.Devnet
-          , build_flag = BuildFlags.Type.None
-          , step = "build"
-          , prefix = "MinaArtifact"
-          }
+        { deb_version = DebVersion.Bullseye
+        , network = Network.Type.Berkeley
+        , profile = Profiles.Type.Devnet
+        , build_flag = BuildFlags.Type.None
+        , step = "build"
+        , prefix = "MinaArtifact"
+        }
       }
 
 let dependsOn =
-          \(spec : DepsSpec.Type)
-      ->  let profileSuffix = Profiles.toSuffixUppercase spec.profile
+      \(spec : DepsSpec.Type) ->
+        let profileSuffix = Profiles.toSuffixUppercase spec.profile
 
-          let name =
-                "${spec.prefix}${capitalName
-                                   spec.deb_version}${Network.capitalName
-                                                        spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                                         spec.build_flag}"
+        let name =
+              "${spec.prefix}${capitalName
+                                 spec.deb_version}${Network.capitalName
+                                                      spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                                                                       spec.build_flag}"
 
-          in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
+        in  [ { name, key = "${spec.step}-deb-pkg" } ]
 
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
@@ -96,20 +96,14 @@ let bullseyeDirtyWhen =
       # minimalDirtyWhen
 
 let dirtyWhen =
-          \(debVersion : DebVersion)
-      ->  merge
-            { Bookworm = minimalDirtyWhen
-            , Bullseye = bullseyeDirtyWhen
-            , Jammy = minimalDirtyWhen
-            , Focal = minimalDirtyWhen
-            , Noble = minimalDirtyWhen
-            }
-            debVersion
+      \(debVersion : DebVersion) ->
+        merge
+          { Bookworm = minimalDirtyWhen
+          , Bullseye = bullseyeDirtyWhen
+          , Jammy = minimalDirtyWhen
+          , Focal = minimalDirtyWhen
+          , Noble = minimalDirtyWhen
+          }
+          debVersion
 
-in  { DebVersion = DebVersion
-    , capitalName = capitalName
-    , lowerName = lowerName
-    , dependsOn = dependsOn
-    , dirtyWhen = dirtyWhen
-    , DepsSpec = DepsSpec
-    }
+in  { DebVersion, capitalName, lowerName, dependsOn, dirtyWhen, DepsSpec }

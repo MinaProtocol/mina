@@ -12,10 +12,10 @@ in  Pipeline.build
       ( BenchBase.pipeline
           BenchBase.Spec::{
           , path = "Bench"
-          , name = name
+          , name
           , label = "Ledger Export"
           , size = Size.Small
-          , bench = bench
+          , bench
           , key = bench
           , yellowThreshold = 0.1
           , redThreshold = 0.3

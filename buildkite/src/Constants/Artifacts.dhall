@@ -1,7 +1,5 @@
 let Prelude = ../External/Prelude.dhall
 
-let Text/concatSep = Prelude.Text.concatSep
-
 let Profiles = ./Profiles.dhall
 
 let Network = ./Network.dhall
@@ -9,6 +7,8 @@ let Network = ./Network.dhall
 let BuildFlags = ./BuildFlags.dhall
 
 let Repo = ./DockerRepo.dhall
+
+let Text/concatSep = Prelude.Text.concatSep
 
 let Artifact
     : Type
@@ -47,111 +47,111 @@ let All =
         ]
 
 let capitalName =
-          \(artifact : Artifact)
-      ->  merge
-            { Daemon = "Daemon"
-            , DaemonHardfork = "DaemonHardfork"
-            , LogProc = "LogProc"
-            , Archive = "Archive"
-            , TestExecutive = "TestExecutive"
-            , BatchTxn = "BatchTxn"
-            , Rosetta = "Rosetta"
-            , ZkappTestTransaction = "ZkappTestTransaction"
-            , FunctionalTestSuite = "FunctionalTestSuite"
-            , Toolchain = "Toolchain"
-            }
-            artifact
+      \(artifact : Artifact) ->
+        merge
+          { Daemon = "Daemon"
+          , DaemonHardfork = "DaemonHardfork"
+          , LogProc = "LogProc"
+          , Archive = "Archive"
+          , TestExecutive = "TestExecutive"
+          , BatchTxn = "BatchTxn"
+          , Rosetta = "Rosetta"
+          , ZkappTestTransaction = "ZkappTestTransaction"
+          , FunctionalTestSuite = "FunctionalTestSuite"
+          , Toolchain = "Toolchain"
+          }
+          artifact
 
 let lowerName =
-          \(artifact : Artifact)
-      ->  merge
-            { Daemon = "daemon"
-            , DaemonHardfork = "daemon_hardfork"
-            , LogProc = "logproc"
-            , Archive = "archive"
-            , TestExecutive = "test_executive"
-            , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta"
-            , ZkappTestTransaction = "zkapp_test_transaction"
-            , FunctionalTestSuite = "functional_test_suite"
-            , Toolchain = "toolchain"
-            }
-            artifact
+      \(artifact : Artifact) ->
+        merge
+          { Daemon = "daemon"
+          , DaemonHardfork = "daemon_hardfork"
+          , LogProc = "logproc"
+          , Archive = "archive"
+          , TestExecutive = "test_executive"
+          , BatchTxn = "batch_txn"
+          , Rosetta = "rosetta"
+          , ZkappTestTransaction = "zkapp_test_transaction"
+          , FunctionalTestSuite = "functional_test_suite"
+          , Toolchain = "toolchain"
+          }
+          artifact
 
 let dockerName =
-          \(artifact : Artifact)
-      ->  merge
-            { Daemon = "mina-daemon"
-            , DaemonHardfork = "mina-daemon-hardfork"
-            , Archive = "mina-archive"
-            , TestExecutive = "mina-test-executive"
-            , LogProc = "mina-logproc"
-            , BatchTxn = "mina-batch-txn"
-            , Rosetta = "mina-rosetta"
-            , ZkappTestTransaction = "mina-zkapp-test-transaction"
-            , FunctionalTestSuite = "mina-test-suite"
-            , Toolchain = "mina-toolchain"
-            }
-            artifact
+      \(artifact : Artifact) ->
+        merge
+          { Daemon = "mina-daemon"
+          , DaemonHardfork = "mina-daemon-hardfork"
+          , Archive = "mina-archive"
+          , TestExecutive = "mina-test-executive"
+          , LogProc = "mina-logproc"
+          , BatchTxn = "mina-batch-txn"
+          , Rosetta = "mina-rosetta"
+          , ZkappTestTransaction = "mina-zkapp-test-transaction"
+          , FunctionalTestSuite = "mina-test-suite"
+          , Toolchain = "mina-toolchain"
+          }
+          artifact
 
 let dockerNames =
-          \(artifacts : List Artifact)
-      ->  Prelude.List.map
-            Artifact
-            Text
-            (\(a : Artifact) -> dockerName a)
-            artifacts
+      \(artifacts : List Artifact) ->
+        Prelude.List.map
+          Artifact
+          Text
+          (\(a : Artifact) -> dockerName a)
+          artifacts
 
 let toDebianName =
-          \(artifact : Artifact)
-      ->  \(network : Network.Type)
-      ->  merge
-            { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonHardfork = ""
-            , LogProc = "logproc"
-            , Archive = "archive"
-            , TestExecutive = "test_executive"
-            , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta_${Network.lowerName network}"
-            , ZkappTestTransaction = "zkapp_test_transaction"
-            , FunctionalTestSuite = "functional_test_suite"
-            , Toolchain = ""
-            }
-            artifact
+      \(artifact : Artifact) ->
+      \(network : Network.Type) ->
+        merge
+          { Daemon = "daemon_${Network.lowerName network}"
+          , DaemonHardfork = ""
+          , LogProc = "logproc"
+          , Archive = "archive"
+          , TestExecutive = "test_executive"
+          , BatchTxn = "batch_txn"
+          , Rosetta = "rosetta_${Network.lowerName network}"
+          , ZkappTestTransaction = "zkapp_test_transaction"
+          , FunctionalTestSuite = "functional_test_suite"
+          , Toolchain = ""
+          }
+          artifact
 
 let toDebianNames =
-          \(artifacts : List Artifact)
-      ->  \(network : Network.Type)
-      ->  let list_of_list_of_debians =
-                Prelude.List.map
-                  Artifact
-                  (List Text)
-                  (     \(a : Artifact)
-                    ->  merge
-                          { Daemon = [ toDebianName a network ]
-                          , DaemonHardfork = [ toDebianName a network ]
-                          , Archive = [ "archive" ]
-                          , LogProc = [ "logproc" ]
-                          , TestExecutive = [ "test_executive" ]
-                          , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ toDebianName a network ]
-                          , ZkappTestTransaction = [ "zkapp_test_transaction" ]
-                          , FunctionalTestSuite = [ "functional_test_suite" ]
-                          , Toolchain = [] : List Text
-                          }
-                          a
-                  )
-                  artifacts
+      \(artifacts : List Artifact) ->
+      \(network : Network.Type) ->
+        let list_of_list_of_debians =
+              Prelude.List.map
+                Artifact
+                (List Text)
+                ( \(a : Artifact) ->
+                    merge
+                      { Daemon = [ toDebianName a network ]
+                      , DaemonHardfork = [ toDebianName a network ]
+                      , Archive = [ "archive" ]
+                      , LogProc = [ "logproc" ]
+                      , TestExecutive = [ "test_executive" ]
+                      , BatchTxn = [ "batch_txn" ]
+                      , Rosetta = [ toDebianName a network ]
+                      , ZkappTestTransaction = [ "zkapp_test_transaction" ]
+                      , FunctionalTestSuite = [ "functional_test_suite" ]
+                      , Toolchain = [] : List Text
+                      }
+                      a
+                )
+                artifacts
 
-          let items =
-                Prelude.List.fold
-                  (List Text)
-                  list_of_list_of_debians
-                  (List Text)
-                  (\(x : List Text) -> \(y : List Text) -> x # y)
-                  ([] : List Text)
+        let items =
+              Prelude.List.fold
+                (List Text)
+                list_of_list_of_debians
+                (List Text)
+                (\(x : List Text) -> \(y : List Text) -> x # y)
+                ([] : List Text)
 
-          in  Text/concatSep " " items
+        in  Text/concatSep " " items
 
 let Tag =
       { Type =
@@ -163,66 +163,63 @@ let Tag =
           , remove_profile_from_name : Bool
           }
       , default =
-          { artifact = Artifact.Daemon
-          , version = "\\\${MINA_DOCKER_TAG}"
-          , profile = Profiles.Type.Devnet
-          , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Berkeley
-          , remove_profile_from_name = False
-          }
+        { artifact = Artifact.Daemon
+        , version = "\\\${MINA_DOCKER_TAG}"
+        , profile = Profiles.Type.Devnet
+        , buildFlags = BuildFlags.Type.None
+        , network = Network.Type.Berkeley
+        , remove_profile_from_name = False
+        }
       }
 
 let dockerTag =
-          \(spec : Tag.Type)
-      ->  let profile_part =
-                      if spec.remove_profile_from_name
+      \(spec : Tag.Type) ->
+        let profile_part =
+              if    spec.remove_profile_from_name
+              then  ""
+              else  "${Profiles.toLabelSegment spec.profile}"
 
-                then  ""
-
-                else  "${Profiles.toLabelSegment spec.profile}"
-
-          let build_flags_part =
-                merge
-                  { None = ""
-                  , Instrumented =
-                      "${BuildFlags.toLabelSegment spec.buildFlags}"
-                  }
-                  spec.buildFlags
-
-          in  merge
-                { Daemon =
-                    "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}${build_flags_part}"
-                , DaemonHardfork =
-                    "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}"
-                , Archive = "${spec.version}${build_flags_part}"
-                , LogProc = "${spec.version}"
-                , TestExecutive = "${spec.version}"
-                , BatchTxn = "${spec.version}"
-                , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
-                , ZkappTestTransaction = "${spec.version}"
-                , FunctionalTestSuite = "${spec.version}${build_flags_part}"
-                , Toolchain = "${spec.version}"
+        let build_flags_part =
+              merge
+                { None = ""
+                , Instrumented = "${BuildFlags.toLabelSegment spec.buildFlags}"
                 }
-                spec.artifact
+                spec.buildFlags
+
+        in  merge
+              { Daemon =
+                  "${spec.version}-${Network.lowerName
+                                       spec.network}${profile_part}${build_flags_part}"
+              , DaemonHardfork =
+                  "${spec.version}-${Network.lowerName
+                                       spec.network}${profile_part}"
+              , Archive = "${spec.version}${build_flags_part}"
+              , LogProc = "${spec.version}"
+              , TestExecutive = "${spec.version}"
+              , BatchTxn = "${spec.version}"
+              , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
+              , ZkappTestTransaction = "${spec.version}"
+              , FunctionalTestSuite = "${spec.version}${build_flags_part}"
+              , Toolchain = "${spec.version}"
+              }
+              spec.artifact
 
 let fullDockerTag =
-          \(spec : Tag.Type)
-      ->  "${Repo.show Repo.Type.Internal}/${dockerName
-                                               spec.artifact}:${dockerTag spec}"
+      \(spec : Tag.Type) ->
+        "${Repo.show Repo.Type.Internal}/${dockerName spec.artifact}:${dockerTag
+                                                                         spec}"
 
 in  { Type = Artifact
-    , Tag = Tag
-    , capitalName = capitalName
-    , lowerName = lowerName
-    , toDebianName = toDebianName
-    , toDebianNames = toDebianNames
-    , dockerName = dockerName
-    , dockerNames = dockerNames
-    , dockerTag = dockerTag
-    , fullDockerTag = fullDockerTag
-    , All = All
-    , AllButTests = AllButTests
-    , Main = Main
+    , Tag
+    , capitalName
+    , lowerName
+    , toDebianName
+    , toDebianNames
+    , dockerName
+    , dockerNames
+    , dockerTag
+    , fullDockerTag
+    , All
+    , AllButTests
+    , Main
     }

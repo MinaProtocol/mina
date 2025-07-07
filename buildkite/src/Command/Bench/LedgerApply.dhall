@@ -24,32 +24,32 @@ let dependsOn =
 
 let pipeline
     : Spec.Type -> Pipeline.Config.Type
-    =     \(spec : Spec.Type)
-      ->  BenchBase.pipeline
-            BenchBase.Spec::{
-            , path = "Bench"
-            , name = spec.name
-            , label = spec.label
-            , key = spec.key
-            , bench = "ledger-apply"
-            , mode = spec.mode
-            , dependsOn = dependsOn
-            , additionalDirtyWhen =
-              [ SelectFiles.exactly
-                  "buildkite/src/Command/Bench/LedgerApply"
-                  "dhall"
-              , SelectFiles.exactly
-                  "buildkite/scripts/tests/ledger_test_apply"
-                  "sh"
-              , SelectFiles.exactly "scripts/tests/ledger_test_apply" "sh"
-              ]
-            , preCommands =
-                RunInToolchain.runInToolchain
-                  [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
-                  , "COVERALLS_TOKEN"
-                  , "BENCHMARK_FILE=input.json"
-                  ]
-                  "buildkite/scripts/tests/ledger_test_apply.sh && buildkite/scripts/upload-partial-coverage-data.sh ${spec.key}"
-            }
+    = \(spec : Spec.Type) ->
+        BenchBase.pipeline
+          BenchBase.Spec::{
+          , path = "Bench"
+          , name = spec.name
+          , label = spec.label
+          , key = spec.key
+          , bench = "ledger-apply"
+          , mode = spec.mode
+          , dependsOn
+          , additionalDirtyWhen =
+            [ SelectFiles.exactly
+                "buildkite/src/Command/Bench/LedgerApply"
+                "dhall"
+            , SelectFiles.exactly
+                "buildkite/scripts/tests/ledger_test_apply"
+                "sh"
+            , SelectFiles.exactly "scripts/tests/ledger_test_apply" "sh"
+            ]
+          , preCommands =
+              RunInToolchain.runInToolchain
+                [ "DUNE_INSTRUMENT_WITH=bisect_ppx"
+                , "COVERALLS_TOKEN"
+                , "BENCHMARK_FILE=input.json"
+                ]
+                "buildkite/scripts/tests/ledger_test_apply.sh && buildkite/scripts/upload-partial-coverage-data.sh ${spec.key}"
+          }
 
-in  { pipeline = pipeline, Spec = Spec }
+in  { pipeline, Spec }
