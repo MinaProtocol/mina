@@ -76,7 +76,7 @@ let verify
           ++  "--codenames ${joinCodenames spec} "
           ++  merge
                 { None = ""
-                , Some = \(suffix : Text) -> "--docker-suffix ${suffix}"
+                , Some = \(suffix : Text) -> "--docker-suffix ${suffix} "
                 }
                 spec.suffix
           ++  "--only-dockers "
