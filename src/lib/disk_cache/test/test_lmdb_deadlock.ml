@@ -9,10 +9,7 @@ let () =
           (module Disk_cache)
       in
       match res with
-      | `Timeout ->
-          printf
-            "It is expected that LMDB cache times out for now. This should be \
-             fixed." ;
-          Deferred.unit
       | `Success ->
-          failwith "The process should time out" )
+          printf "Success" ; Deferred.unit
+      | `Timeout ->
+          failwith "The process should not time out" )
