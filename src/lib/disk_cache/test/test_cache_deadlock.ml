@@ -123,15 +123,14 @@ let test_cache_deadlock (module Cache_impl : Cache_intf) =
   let run_in_dir dir =
     Core.printf "Using database directory: %s\n%!" dir ;
     let%bind () =
-      run_test_with_cache
-        (module Cache_impl)
-        ~timeout_seconds ~tmpdir:dir
+      run_test_with_cache (module Cache_impl) ~timeout_seconds ~tmpdir:dir
     in
     Core.printf "\nTest completed successfully.\n%!" ;
     return ()
   in
 
   match database_dir with
-  | Some dir -> run_in_dir dir
+  | Some dir ->
+      run_in_dir dir
   | None ->
       File_system.with_temp_dir "/tmp/cache_deadlock_test" ~f:run_in_dir
