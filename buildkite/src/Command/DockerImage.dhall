@@ -71,25 +71,24 @@ let ReleaseSpec =
 
 let stepKey =
           \(spec : ReleaseSpec.Type)
-      ->  "${Artifacts.lowerName
-               spec.service}${Profiles.toLabelSegment
-                                spec.deb_profile}${BuildFlags.toLabelSegment
-                                                     spec.build_flags}${spec.step_key_suffix}"
+      -> "${Artifacts.lowerName spec.service} " ++
+         "${Profiles.toLabelSegment spec.deb_profile} " ++
+         "${BuildFlags.toLabelSegment spec.build_flags} " ++
+         "${spec.step_key_suffix}"
 
 let stepLabel =
           \(spec : ReleaseSpec.Type)
-      ->  "Docker: ${Artifacts.capitalName
-                       spec.service} ${Network.capitalName
-                                         spec.network} ${DebianVersions.capitalName
-                                                           spec.deb_codename} ${Profiles.toSuffixUppercase
-                                                                                  spec.deb_profile} ${BuildFlags.toSuffixUppercase
-                                                                                                        spec.build_flags}"
+      ->  "Docker: " ++
+          "${Artifacts.capitalName spec.service} " ++
+          "${Network.capitalName spec.network} " ++
+          "${DebianVersions.capitalName spec.deb_codename} " ++
+          "${Profiles.toSuffixUppercase spec.deb_profile} " ++
+          "${BuildFlags.toSuffixUppercase spec.build_flags}"
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
       ->  let exportMinaDebCmd =
-                "export MINA_DEB_CODENAME=${DebianVersions.lowerName
-                                              spec.deb_codename}"
+                "export MINA_DEB_CODENAME=${DebianVersions.lowerName spec.deb_codename}"
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
 
@@ -115,14 +114,12 @@ let generateStep =
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
                 ++  " ${maybeCacheOption} "
-                ++  " --deb-codename ${DebianVersions.lowerName
-                                         spec.deb_codename}"
+                ++  " --deb-codename ${DebianVersions.lowerName spec.deb_codename}"
                 ++  " --deb-repo ${DebianRepo.address spec.deb_repo}"
                 ++  " --deb-release ${spec.deb_release}"
                 ++  " --deb-version ${spec.deb_version}"
                 ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
-                ++  " --deb-build-flags ${BuildFlags.lowerName
-                                            spec.build_flags}"
+                ++  " --deb-build-flags ${BuildFlags.lowerName spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  " --repo ${spec.repo}"
 
