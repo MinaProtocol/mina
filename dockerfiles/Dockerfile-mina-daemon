@@ -41,6 +41,7 @@ else \
 fi
 
 # Dependencies
+# Inotify tools are needed so freeze-alert can watch log files
 RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \
   && apt-get install --quiet --yes --no-install-recommends \
@@ -57,6 +58,7 @@ RUN apt-get update --quiet --yes \
     procps \
     python3 \
     tzdata \
+    inotify-tools \
   && rm -rf /var/lib/apt/lists/*
 
 # Install google-cloud-sdk for GCLOUD_UPLOAD feature
