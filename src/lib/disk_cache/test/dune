@@ -22,8 +22,6 @@
  (libraries
   ;; opam libraries
   async
-  core
-  core_kernel
   ;; local libraries
   disk_cache.lmdb
   test_cache_deadlock_lib)
@@ -38,8 +36,6 @@
  (libraries
   ;; opam libraries
   async
-  core
-  core_kernel
   ;; local libraries
   disk_cache.filesystem
   test_cache_deadlock_lib)
