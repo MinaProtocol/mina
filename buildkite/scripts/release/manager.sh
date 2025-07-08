@@ -1255,6 +1255,10 @@ function verify(){
                                 if [[ $__only_debians == 0 ]]; then
                                     local __artifact_full_name=$(get_artifact_with_suffix $artifact "")
                                
+                                    local __suffix_arg=""
+                                    if [[ -n "$__docker_suffix" ]]; then
+                                        __suffix_arg="-s -$__docker_suffix"
+                                    fi
 
                                     echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
                                 
@@ -1262,7 +1266,7 @@ function verify(){
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "-$__docker_suffix" \
+                                        ${__suffix_arg} \
                                         -r "$__repo" 
 
                                     echo ""
