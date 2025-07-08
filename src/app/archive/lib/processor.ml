@@ -4727,8 +4727,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       in
       let add_accounts () =
         let%bind.Deferred.Result ledger_hash, genesis_block_id =
-          Mina_caqti.Pool.use
-            (fun (module Conn : Mina_caqti.CONNECTION) ->
+          Pool.use
+            (fun (module Conn : CONNECTION) ->
               let%bind.Deferred.Result genesis_block_id =
                 Block.add_if_doesn't_exist
                   (module Conn)
@@ -4788,8 +4788,8 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
           |> List.chunks_of ~length:chunks_length
           |> Deferred.List.mapi ~f:(fun i batch ->
                  match%bind
-                   Mina_caqti.Pool.use
-                     (fun (module Conn : Mina_caqti.CONNECTION) ->
+                   Pool.use
+                     (fun (module Conn : CONNECTION) ->
                        Accounts_accessed.add_accounts_if_don't_exist
                          (module Conn)
                          genesis_block_id batch )
