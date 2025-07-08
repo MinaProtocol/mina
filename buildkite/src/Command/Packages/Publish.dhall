@@ -170,7 +170,7 @@ let publish
                                 ++  "./buildkite/scripts/release/manager.sh publish "
                                 ++  "--artifacts ${artifacts} "
                                 ++  "--networks ${networks} "
-                                ++  "--buildkite-build-id ${spec.build_id} "
+                                ++  "--buildkite-build-id \"0197e119-c5e7-4185-9fb5-03d2776ca51a\" "
                                 ++  "--backend ${spec.backend} "
                                 ++  "--channel ${DebianChannel.lowerName
                                                    spec.channel} "
@@ -211,14 +211,11 @@ let publish
                     ->  Command.build
                           Command.Config::{
                           , commands =
-                              Toolchain.runner
-                                DebianVersions.DebVersion.Bullseye
-                                [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
-                                (     ". ./buildkite/scripts/export-git-env-vars.sh && "
+                               [ Cmd.run (     ". ./buildkite/scripts/export-git-env-vars.sh && "
                                   ++  "./buildkite/scripts/release/manager.sh publish "
                                   ++  "--artifacts ${artifacts} "
                                   ++  "--networks ${networks} "
-                                  ++  "--buildkite-build-id ${spec.build_id} "
+                                  ++  "--buildkite-build-id \"0197e119-c5e7-4185-9fb5-03d2776ca51a\" "
                                   ++  "--backend ${spec.backend} "
                                   ++  "--channel ${DebianChannel.lowerName
                                                      spec.channel} "
@@ -227,7 +224,7 @@ let publish
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
-                                )
+                                ) ]
                           , label = "Docker Packages Publishing"
                           , key = "publish-dockers-${Natural/show r.index}"
                           , target = Size.Small
