@@ -2282,9 +2282,9 @@ let thread_graph =
              exit 1 ) )
 
 let signature_kind =
-  Command.basic
+  Command.async
     ~summary:"Print the signature kind that this binary is compiled with"
-    (let%map.Command () = Command.Param.return () in
+    (let%map_open.Command () = Command.Param.return () in
      fun () ->
        let signature_kind_string =
          match Mina_signature_kind.t_DEPRECATED with
@@ -2296,7 +2296,9 @@ let signature_kind =
              (* Prefix string to disambiguate *)
              "other network: " ^ s
        in
-       print_endline signature_kind_string )
+       let stdout = Lazy.force Writer.stdout in
+       Writer.write_line stdout signature_kind_string ;
+       Writer.flushed stdout )
 
 let test_genesis_creation =
   Command.async ~summary:"Test genesis creation"
