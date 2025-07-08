@@ -939,8 +939,7 @@ let must_send_payment_with_raw_sig ~logger node_uri ~sender_pub_key
 
 let sign_and_send_payment ~logger node_uri
     ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
-    ~fee ~nonce ~memo ~valid_until =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~fee ~nonce ~memo ~valid_until ~signature_kind =
   let sender_pub_key =
     sender_keypair.public_key |> Signature_lib.Public_key.compress
   in
@@ -969,10 +968,10 @@ let sign_and_send_payment ~logger node_uri
 
 let _must_sign_and_send_payment ~logger node_uri
     ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
-    ~fee ~nonce ~memo ~valid_until =
+    ~fee ~nonce ~memo ~valid_until ~signature_kind =
   sign_and_send_payment ~logger node_uri
     ~(sender_keypair : Import.Signature_keypair.t)
-    ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until
+    ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until ~signature_kind
   |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 let send_test_payments ~(repeat_count : Unsigned.UInt32.t)

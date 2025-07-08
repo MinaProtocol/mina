@@ -118,8 +118,7 @@ let get_nonce ~logger ~(ingress_uri : Uri.t) ~(pub_key : Account.key) =
   let account_id = Account_id.create pub_key Mina_base.Token_id.default in
   let%bind nonce =
     let%bind querry_result =
-      Integration_test_lib.Graphql_requests.get_account_data ingress_uri ~logger
-        ~account_id
+      Graphql_requests.get_account_data ingress_uri ~logger ~account_id
     in
     match querry_result with
     | Ok res ->
@@ -262,6 +261,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
         ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
         ~fee:fee_amount ~nonce ~memo:""
         ~valid_until:Mina_numbers.Global_slot_since_genesis.max_value
+        ~signature_kind:Mina_signature_kind.t_DEPRECATED
     in
     let%bind () =
       match res with
