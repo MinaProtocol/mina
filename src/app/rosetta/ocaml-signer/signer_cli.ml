@@ -1,4 +1,5 @@
-(** An agent that pokes at Coda and peeks at Rosetta to see if things look alright *)
+(** An agent that pokes at Mina and peeks at Rosetta to see if things look
+    alright *)
 
 open Core_kernel
 open Async
@@ -107,7 +108,9 @@ let generate_command =
   return ()
 
 (** Extracts an hexadecimal private key suitable for rosetta from a private-key file.
-    Similarly to the main [mina] binary, the password from the [Secrets.Keypair.env] environment variable will be used if it it set, otherwise it will be read from stdin.*)
+    Similarly to the main [mina] binary, the password from the
+    [Secrets.Keypair.env] environment variable will be used if it it set,
+    otherwise it will be read from stdin.*)
 let hex_of_private_key_file =
   let open Command.Let_syntax in
   let%map_open privkey_path =
