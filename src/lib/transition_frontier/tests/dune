@@ -1,45 +1,87 @@
 (library
  (name transition_frontier_tests)
+ (modules transition_frontier_tests)
  (libraries
   ;;opam libraries
-  core.uuid
-  core
   async
   async_kernel
-  core_kernel
-  ppx_inline_test.config
   async_unix
+  core
+  core.uuid
+  core_kernel
   core_kernel.uuid
   sexplib0
+  yojson
   ;;local libraries
-  mina_state
-  staged_ledger
-  with_hash
-  mina_ledger
+  block_time
   child_processes
-  genesis_constants
-  logger
-  mina_block
-  transition_frontier_persistent_root
-  mina_base
-  precomputed_values
-  verifier
   coda_genesis_ledger
-  merkle_ledger
   consensus
   data_hash_lib
-  block_time
-  transition_frontier_full_frontier
-  transition_frontier_base
-  transition_frontier
-  protocol_version
-  yojson
-  mina_net2
+  genesis_constants
   libp2p_ipc
-  staged_ledger_diff)
- (inline_tests
-  (flags -verbose -show-counts))
+  logger
+  merkle_ledger
+  mina_base
+  mina_block
+  mina_ledger
+  mina_net2
+  mina_state
+  precomputed_values
+  protocol_version
+  staged_ledger
+  staged_ledger_diff
+  transition_frontier
+  transition_frontier_base
+  transition_frontier_full_frontier
+  transition_frontier_persistent_root
+  verifier
+  with_hash)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps ppx_jane ppx_version ppx_mina)))
+
+(test
+ (name test_full_frontier)
+ (modules test_full_frontier)
+ (package transition_frontier)
+ (preprocess
+  (pps ppx_jane ppx_version ppx_mina))
+ (libraries
+  ; opam libraries
+  alcotest
+  async
+  async_kernel
+  async_unix
+  core
+  core.uuid
+  core_kernel
+  core_kernel.uuid
+  sexplib0
+  yojson
+  ; local libraries
+  block_time
+  child_processes
+  coda_genesis_ledger
+  consensus
+  data_hash_lib
+  genesis_constants
+  libp2p_ipc
+  logger
+  merkle_ledger
+  mina_base
+  mina_block
+  mina_ledger
+  mina_net2
+  mina_state
+  precomputed_values
+  protocol_version
+  staged_ledger
+  staged_ledger_diff
+  transition_frontier
+  transition_frontier_base
+  transition_frontier_full_frontier
+  transition_frontier_persistent_root
+  verifier
+  with_hash))
