@@ -1103,6 +1103,17 @@ function verify_help(){
     echo ""
 }
 
+function combine_docker_suffixes() {
+    local network=$1
+    local __docker_suffix=$2
+
+    if [[ -n "$__docker_suffix" ]]; then
+        echo "-$network-$__docker_suffix"
+    else
+        echo "-$network"
+    fi
+}
+
 function verify(){
     if [[ ${#} == 0 ]]; then
         verify_help; exit 0;
@@ -1242,14 +1253,16 @@ function verify(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                
+                                    local __artifact_full_name=$(get_artifact_with_suffix $artifact "")
+                               
+
                                     echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
                                 
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "$__docker_suffix" \
+                                        -s "-$__docker_suffix" \
                                         -r "$__repo" 
 
                                     echo ""
@@ -1257,9 +1270,12 @@ function verify(){
                         ;;
                         mina-rosetta)
                             for network in "${__networks_arr[@]}"; do
-                               local __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+                                local __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
                                
-                               if [[ $__only_dockers == 0 ]]; then
+                                local __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+                               
+
+                                if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
                                     echo ""
                                     
@@ -1278,19 +1294,12 @@ function verify(){
                                     
                                     echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
                                     echo ""
-
-                                    local docker_suffix_combined=""
-                                    if [[ -n "$__docker_suffix" ]]; then
-                                        docker_suffix_combined="-$network-$__docker_suffix"
-                                    else
-                                        docker_suffix_combined="-$network"
-                                    fi
-                                    
+  
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "$docker_suffix_combined" \
+                                        -s "$__docker_suffix_combined" \
                                         -r "$__repo" 
                                     
                                     echo ""
@@ -1300,6 +1309,8 @@ function verify(){
                         mina-daemon)
                             for network in "${__networks_arr[@]}"; do
                                 local __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+                                local __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+                               
                                 if [[ $__only_dockers == 0 ]]; then
                                 echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
                                 echo ""
@@ -1320,7 +1331,7 @@ function verify(){
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "-$network" \
+                                        -s "$__docker_suffix_combined" \
                                         -r "$__repo" 
 
                                       echo ""
