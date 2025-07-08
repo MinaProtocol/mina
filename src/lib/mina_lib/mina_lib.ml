@@ -911,6 +911,15 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
   | Processed None ->
       `Ok
   | Processed (Some (stmts, priced_proof)) ->
+      [%log' info t.config.logger] "Partitioner combined work"
+        ~metadata:
+          [ ( "stmts"
+            , One_or_two.to_yojson Mina_state.Snarked_ledger_state.to_yojson
+                stmts )
+          ; ("fee_with_prover", Fee_with_prover.to_yojson priced_proof.fee)
+          ; ( "proofs"
+            , One_or_two.to_yojson Ledger_proof.to_yojson priced_proof.proof )
+          ] ;
       ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
       Network_pool.Snark_pool.(
         Local_sink.push t.pipes.snark_local_sink
