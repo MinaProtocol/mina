@@ -967,7 +967,7 @@ let sign_and_send_payment ~logger node_uri
   send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
     ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
 
-let must_sign_and_send_payment ~logger node_uri
+let _must_sign_and_send_payment ~logger node_uri
     ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
     ~fee ~nonce ~memo ~valid_until =
   sign_and_send_payment ~logger node_uri
