@@ -2,17 +2,17 @@
 --
 -- Goal of the pipeline can be either quick feedback for CI changes
 -- or Nightly run which supposed to be run only on stable changes.
--- Triaged - filter eligible jobs based on tags and then apply triage based on changed made in PR
--- Full - filter only eligible jobs and do not perform triage
+-- PullRequest - filter elligible jobs based on tags and then apply triage based on changed made in PR
+-- Stable - filter only ellligigble jobs and do not perform triage
 
-let Mode = < Triaged | Full >
+let Mode = < PullRequest | Stable >
 
 let capitalName =
           \(pipelineMode : Mode)
-      ->  merge { Triaged = "Triaged", Full = "Full" } pipelineMode
+      ->  merge { PullRequest = "PullRequest", Stable = "Stable" } pipelineMode
 
-let isFull =
+let isStable =
           \(pipelineMode : Mode)
-      ->  merge { Triaged = False, Full = True } pipelineMode
+      ->  merge { PullRequest = False, Stable = True } pipelineMode
 
-in  { Type = Mode, capitalName = capitalName, isFull = isFull }
+in  { Type = Mode, capitalName = capitalName, isStable = isStable }

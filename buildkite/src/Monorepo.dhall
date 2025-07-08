@@ -14,7 +14,7 @@ let JobSpec = ./Pipeline/JobSpec.dhall
 
 let Pipeline = ./Pipeline/Dsl.dhall
 
-let PipelineMode = ./Pipeline/Mode.dhall
+let PipelineJobSelection = ./Pipeline/JobSelection.dhall
 
 let PipelineTagFilter = ./Pipeline/TagFilter.dhall
 
@@ -44,13 +44,13 @@ let prefixCommands =
       ]
 
 let commands
-    :     PipelineTagFilter.Type
+    :     PipelineJobSelection.Type
+      ->  PipelineTagFilter.Type
       ->  PipelineScopeFilter.Type
-      ->  PipelineMode.Type
       ->  List Cmd.Type
-    =     \(filter : PipelineTagFilter.Type)
+    =     \(selection : PipelineJobSelection.Type)
+      ->  \(filter : PipelineTagFilter.Type)
       ->  \(scope : PipelineScopeFilter.Type)
-      ->  \(mode : PipelineMode.Type)
       ->  List/map
             JobSpec.Type
             Cmd.Type
@@ -103,14 +103,14 @@ let commands
                             ''
                         }
 
-                  in  Cmd.quietly (merge pipelineHandlers mode)
+                  in  Cmd.quietly (merge pipelineHandlers selection)
             )
             jobs
 
 in      \ ( args
-          : { tagFilter : PipelineTagFilter.Type
+          : { selection : PipelineJobSelection.Type
+            , tagFilter : PipelineTagFilter.Type
             , scopeFilter : PipelineScopeFilter.Type
-            , mode : PipelineMode.Type
             }
           )
     ->  let pipelineType =
@@ -120,8 +120,8 @@ in      \ ( args
                   , name =
                       "monorepo-triage-${PipelineTagFilter.show
                                            args.tagFilter}-${PipelineScopeFilter.show
-                                                               args.scopeFilter}-${PipelineMode.capitalName
-                                                                                     args.mode}"
+                                                               args.scopeFilter}-${PipelineJobSelection.capitalName
+                                                                                     args.selection}"
                   , dirtyWhen = [ SelectFiles.everything ]
                   }
                 , steps =
@@ -129,17 +129,20 @@ in      \ ( args
                       Command.Config::{
                       , commands =
                             prefixCommands
-                          # commands args.tagFilter args.scopeFilter args.mode
+                          # commands
+                              args.selection
+                              args.tagFilter
+                              args.scopeFilter
                       , label =
                           "Monorepo triage ${PipelineTagFilter.show
                                                args.tagFilter} ${PipelineScopeFilter.show
-                                                                   args.scopeFilter} ${PipelineMode.capitalName
-                                                                                         args.mode}"
+                                                                   args.scopeFilter} ${PipelineJobSelection.capitalName
+                                                                                         args.selection}"
                       , key =
                           "cmds-${PipelineTagFilter.show
                                     args.tagFilter}-${PipelineScopeFilter.show
-                                                        args.scopeFilter}-${PipelineMode.capitalName
-                                                                              args.mode}"
+                                                        args.scopeFilter}-${PipelineJobSelection.capitalName
+                                                                              args.selection}"
                       , target = Size.Multi
                       , docker = Some Docker::{
                         , image =

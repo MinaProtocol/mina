@@ -1,7 +1,5 @@
 let BenchBase = ../../Command/Bench/Base.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
@@ -16,13 +14,8 @@ let Scope = ../../Pipeline/Scope.dhall
 
 let Spec =
       { Type =
-          { key : Text
-          , name : Text
-          , label : Text
-          , mode : PipelineMode.Type
-          , scope : List Scope.Type
-          }
-      , default = { mode = PipelineMode.Type.Triaged, scope = Scope.Full }
+          { key : Text, name : Text, label : Text, scope : List Scope.Type }
+      , default.scope = Scope.Full
       }
 
 let dependsOn =
