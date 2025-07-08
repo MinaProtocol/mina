@@ -15,12 +15,13 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
+COMMANDS=(--version --help)
 
 case $PACKAGE in
-  mina-archive) COMMAND="mina-archive --version && mina-archive --help" ;;
-  mina-logproc) COMMAND="echo skipped execution for mina-logproc" ;;
-  mina-rosetta*) COMMAND="mina --version && mina --help && mina-archive --version && mina-archive --help && mina-rosetta --version && mina-rosetta --help" ;;
-  mina-*) COMMAND="mina --version && mina --help" ;;
+  mina-archive) APPS=mina-archive ;;
+  mina-logproc) APPS=(); echo "skipped execution for mina-logproc" ;;
+  mina-rosetta*) APPS=("mina" "mina-archive" "mina-rosetta") ;;
+  mina-*) APPS=("mina");;
   *) echo "❌  Unknown package passed: $PACKAGE"; exit 1;;
 esac
 
@@ -32,6 +33,14 @@ if ! docker pull $DOCKER_IMAGE ; then
   exit 1
 fi
 
-echo "📋  Testing $PACKAGE $DOCKER_IMAGE" \
-  && docker run --entrypoint bash --rm $DOCKER_IMAGE -c $COMMAND \
-  && echo '✅  OK: ALL WORKED FINE!' || (echo '❌  KO: ERROR!!!' && exit 1)
+for APP in "${APPS[@]}"; do
+  for COMMAND in "${COMMANDS[@]}"; do
+    echo "📋  Testing $APP $COMMAND in $DOCKER_IMAGE"
+    if ! docker run --entrypoint $APP --rm $DOCKER_IMAGE $COMMAND; then
+      echo "❌  KO: ERROR running $APP $COMMAND"
+      exit 1
+    fi
+  done
+done
+
+echo '✅  OK: ALL WORKED FINE!'
