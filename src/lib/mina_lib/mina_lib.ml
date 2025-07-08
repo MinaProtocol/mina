@@ -1319,8 +1319,16 @@ let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
     let proof_cache_db = proof_cache_db
   end )
 
+let shorten_commit_id commit_id =
+  (* Shorten the commit ID to 8 characters for logging purposes *)
+  let min_commit_id_length = 8 in
+  if String.length commit_id < min_commit_id_length then commit_id
+  else
+    (* Take the first 8 characters of the commit ID *)
+    String.sub ~pos:0 ~len:min_commit_id_length commit_id
+
 let start t =
-  let commit_id_short = String.sub ~pos:0 ~len:8 t.commit_id in
+  let commit_id_short = shorten_commit_id t.commit_id in
   let set_next_producer_timing timing consensus_state =
     let block_production_status, next_producer_timing =
       let generated_from_consensus_at :
@@ -1712,7 +1720,8 @@ let initialize_zkapp_vk_cache_db (config : Config.t) =
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let create ~commit_id ?wallets (config : Config.t) =
-  let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
+  [%log' info config.logger] "Creating daemon with commit id: %s" commit_id ;
+  let commit_id_short = shorten_commit_id commit_id in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let block_window_duration = config.compile_config.block_window_duration in

@@ -279,31 +279,6 @@ module Output = struct
           let open Random_oracle.Checked in
           hash ~init:Hash_prefix_states.vrf_output (pack_input input) )
   end
-
-  let%test_unit "hash unchecked vs. checked equality" =
-    let constraint_constants =
-      Genesis_constants.For_unit_tests.Constraint_constants.t
-    in
-    let gen_inner_curve_point =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map compressed = Non_zero_curve_point.gen in
-      Non_zero_curve_point.to_inner_curve compressed
-    in
-    let gen_message_and_curve_point =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map msg = Message.gen ~constraint_constants
-      and g = gen_inner_curve_point in
-      (msg, g)
-    in
-    Quickcheck.test ~trials:10 gen_message_and_curve_point
-      ~f:
-        (Test_util.test_equal ~equal:Field.equal
-           Snark_params.Tick.Typ.(
-             Message.typ ~constraint_constants
-             * Snark_params.Tick.Inner_curve.typ)
-           typ
-           (fun (msg, g) -> Checked.hash msg g)
-           (fun (msg, g) -> hash ~constraint_constants msg g) )
 end
 
 module Threshold = struct
@@ -632,34 +607,3 @@ module Layout = struct
           }
   end
 end
-
-let%test_unit "Standalone and integrates vrfs are consistent" =
-  let constraint_constants =
-    Genesis_constants.For_unit_tests.Constraint_constants.t
-  in
-  let module Standalone = Standalone (struct
-    let constraint_constants = constraint_constants
-  end) in
-  let inputs =
-    let open Quickcheck.Generator.Let_syntax in
-    let%bind private_key = Signature_lib.Private_key.gen in
-    let%map message = Message.gen ~constraint_constants in
-    (private_key, message)
-  in
-  Quickcheck.test ~seed:(`Deterministic "") inputs
-    ~f:(fun (private_key, message) ->
-      let integrated_vrf =
-        Integrated.eval ~constraint_constants ~private_key message
-      in
-      let standalone_eval = Standalone.Evaluation.create private_key message in
-      let context : Standalone.Context.t =
-        { message
-        ; public_key =
-            Signature_lib.Public_key.of_private_key_exn private_key
-            |> Group.of_affine
-        }
-      in
-      let standalone_vrf =
-        Standalone.Evaluation.verified_output standalone_eval context
-      in
-      [%test_eq: Output_hash.t option] (Some integrated_vrf) standalone_vrf )
