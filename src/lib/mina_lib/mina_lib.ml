@@ -12,7 +12,7 @@ module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
 module Snark_worker_lib = Snark_worker
-module Timeout = Timeout_lib.Core_time
+module Timeout = Mina_stdlib.Timeout_lib.Core_time
 
 let daemon_start_time = Time_ns.now ()
 
