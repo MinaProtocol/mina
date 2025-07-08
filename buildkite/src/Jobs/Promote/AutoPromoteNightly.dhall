@@ -65,7 +65,7 @@ in  Pipeline.build
               , Artifacts.Type.Archive
               , Artifacts.Type.Rosetta
               ]
-            , profile = Profiles.Type.Standard
+            , profile = Profiles.Type.Devnet
             , networks = [ Network.Type.Devnet ]
             , codenames =
               [ DebianVersions.DebVersion.Bullseye
