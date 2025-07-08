@@ -67,11 +67,11 @@ fi
 if [[ ! -L compatible-devnet ]]; then
   if [[ $# == 0 ]]; then
     compatible_build=$(mktemp -d)
-    git clone -b dkijania/fix_commit_id_too_short --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
+    git clone -b compatible --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
     cd "$compatible_build"
   else
     git checkout -f $1
-    git checkout -f dkijania/fix_commit_id_too_short
+    git checkout -f compatible
     git checkout -f $1 -- scripts/hardfork
     compatible_build="$INIT_DIR"
   fi
