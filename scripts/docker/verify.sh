@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set +x
+set -x
 
 set -eo pipefail
 
@@ -33,5 +33,5 @@ if ! docker pull $DOCKER_IMAGE ; then
 fi
 
 echo "📋  Testing $PACKAGE $DOCKER_IMAGE" \
-  && docker run --rm $DOCKER_IMAGE bash -c "$COMMAND" \
+  && docker run --entrypoint bash --rm $DOCKER_IMAGE -c $COMMAND \
   && echo '✅  OK: ALL WORKED FINE!' || (echo '❌  KO: ERROR!!!' && exit 1)
