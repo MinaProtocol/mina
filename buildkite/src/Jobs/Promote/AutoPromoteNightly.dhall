@@ -78,7 +78,7 @@ in  Pipeline.build
             , backend = "local"
             , verify = True
             , branch = "\\\${BUILDKITE_BRANCH}"
-            , source_version = "\\\${MINA_DOCKER_TAG}"
+            , source_version = "\\\${MINA_DEB_VERSION}"
             , build_id = "\\\${BUILDKITE_BUILD_ID}"
             }
       }
