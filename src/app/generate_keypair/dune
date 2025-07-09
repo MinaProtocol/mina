@@ -1,7 +1,7 @@
 (executable
  (package generate_keypair)
  (name generate_keypair)
- (public_name generate_keypair)
+ (public_name mina-generate-keypair)
  (modes native)
  (libraries async async_unix cli_lib core_kernel mina_version)
  (instrumentation
