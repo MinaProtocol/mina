@@ -100,18 +100,8 @@ fi
 NODE_ARGS_1=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" )
 NODE_ARGS_2=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
 
-# We handle error of libp2p key generation because `compatible`'s version
-# has a different command for libp2p key generation
-"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 2>/dev/null || \
-  NODE_ARGS_1[0]="--discovery-keypair"
-if [[ "${NODE_ARGS_1[0]}" == "--discovery-keypair" ]]; then
-  "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_1
-fi
-"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 2>/dev/null || \
-  NODE_ARGS_2[0]="--discovery-keypair"
-if [[ "${NODE_ARGS_2[0]}" == "--discovery-keypair" ]]; then
-  "$MINA_EXE" advanced generate-libp2p-keypair --privkey-path $CONF_DIR/libp2p_2
-fi
+"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 
+"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 
 
 if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
   ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" -c 100000 -b 1000000 "$(cat bp.pub)" >ledger.json )
