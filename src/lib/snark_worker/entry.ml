@@ -286,4 +286,4 @@ let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir
   ; "--log-level"
   ; Logger.Level.show log_level
   ]
-  @ if log_json then [ "--log_json" ] else []
+  @ if log_json then [ "--log-json" ] else []

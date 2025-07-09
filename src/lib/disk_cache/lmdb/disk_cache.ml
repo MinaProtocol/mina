@@ -20,7 +20,6 @@ module Make (Data : Binable.S) = struct
     { env : Rw.t
     ; db : Rw.holder
     ; counter : int ref
-    ; logger : Logger.t
     ; garbage : int Hash_set.t
           (** A list of ids that are no longer reachable from OCaml's side *)
     }
@@ -32,21 +31,14 @@ module Make (Data : Binable.S) = struct
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun path ->
         let env, db = Rw.create path in
-        { env
-        ; db
-        ; counter = ref 0
-        ; logger
-        ; garbage = Hash_set.create (module Int)
-        } )
+        { env; db; counter = ref 0; garbage = Hash_set.create (module Int) } )
 
   type id = { idx : int }
 
-  let get ({ env; db; logger; _ } : t) ({ idx } : id) : Data.t =
-    [%log debug] "Getting data at %d in LMDB cache" idx
-      ~metadata:[ ("index", `Int idx) ] ;
+  let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
     Rw.get ~env db idx |> Option.value_exn
 
-  let put ({ env; db; counter; logger; garbage } : t) (x : Data.t) : id =
+  let put ({ env; db; counter; garbage } : t) (x : Data.t) : id =
     (* TODO: we may reuse IDs by pulling them from the `garbage` hash set *)
     let idx = !counter in
     incr counter ;
@@ -57,22 +49,14 @@ module Make (Data : Binable.S) = struct
            critical section. LMDB critical section then will be re-entered if
            it's invoked directly in a GC hook.
            This causes mutex double-acquiring and node freezes. *)
-        [%log spam] "Data at %d is GCed, marking as garbage" idx
-          ~metadata:[ ("index", `Int idx) ] ;
         Hash_set.add garbage idx ) ;
     if Hash_set.length garbage >= garbage_size_limit then (
-      Hash_set.iter garbage ~f:(fun to_remove ->
-          [%log spam] "Instructing LMDB to remove garbage at index %d" to_remove
-            ~metadata:[ ("index", `Int to_remove) ] ;
-          Rw.remove ~env db to_remove ) ;
+      Hash_set.iter garbage ~f:(fun to_remove -> Rw.remove ~env db to_remove) ;
       Hash_set.clear garbage ) ;
     Rw.set ~env db idx x ;
     res
 
-  let iteri ({ env; db; logger; _ } : t) ~f =
-    Rw.iter ~env db ~f:(fun k v ->
-        [%log spam] "Iterating at index %d" k ~metadata:[ ("index", `Int k) ] ;
-        f k v )
+  let iteri ({ env; db; _ } : t) ~f = Rw.iter ~env db ~f
 
   let count ({ env; db; _ } : t) =
     let sum = ref 0 in
