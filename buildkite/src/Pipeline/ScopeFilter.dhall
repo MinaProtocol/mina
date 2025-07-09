@@ -13,10 +13,7 @@ let tags
     =     \(filter : Filter)
       ->  merge
             { PullRequestOnly = [ Scope.Type.PullRequest ]
-            , StableOnly =
-              [ Scope.Type.MainlineNightly
-              , Scope.Type.Release
-              ]
+            , StableOnly = [ Scope.Type.MainlineNightly, Scope.Type.Release ]
             , Nightly = [ Scope.Type.Nightly ]
             , MainlineNightly = [ Scope.Type.MainlineNightly ]
             , All =
