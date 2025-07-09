@@ -50,7 +50,7 @@ DEFAULT_NETWORKS="devnet,mainnet"
 DEFAULT_CODENAMES="bullseye,focal"
 DEFAULT_ARCHITECTURE="amd64"
 
-DEBIAN_CACHE_FOLDER=~/.release/debian/cache
+DEBIAN_CACHE_FOLDER=${DEBIAN_CACHE_FOLDER:-~/.release/debian/cache}
 GCR_REPO="gcr.io/o1labs-192920"
 DOCKER_IO_REPO="docker.io/minaprotocol"
 DEBIAN_REPO=packages.o1test.net
