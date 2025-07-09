@@ -42,7 +42,7 @@ module Make (Data : Binable.S) = struct
   type id = { idx : int }
 
   let get ({ env; db; logger; _ } : t) ({ idx } : id) : Data.t =
-    [%log debug] "Getting data at %d in LMDB cache" idx
+    [%log spam] "Getting data at %d in LMDB cache" idx
       ~metadata:[ ("index", `Int idx) ] ;
     Rw.get ~env db idx |> Option.value_exn
 
