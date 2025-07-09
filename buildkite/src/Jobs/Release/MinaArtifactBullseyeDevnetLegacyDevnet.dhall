@@ -23,7 +23,5 @@ in  Pipeline.build
             ]
           , network = Network.Type.DevnetLegacy
           , debVersion = DebianVersions.DebVersion.Bullseye
-          , scope =
-            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )
