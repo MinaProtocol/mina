@@ -16,10 +16,14 @@ lint:
 format:
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" && dhall --ascii format --inplace {} || exit 255'
 
+generate_jobs:
+	(cd ../ && ./buildkite/scripts/generate-jobs.sh > ./buildkite/src/gen/Jobs.dhall)
+	
 check_filter:
 	# Ensure Jobs.dhall is generated before proceeding
-	(cd ../ && ./buildkite/scripts/generate-jobs.sh > ./buildkite/src/gen/Jobs.dhall)
 	python3 ./unit-tests/parse_triage.py
+
+generate_and_check_filter: generate_jobs check_filter
 	
 dump_pipelines:
 	$(eval TMP := $(shell mktemp -d))
@@ -37,4 +41,4 @@ check_dups: dump_pipelines
 check_names: dump_pipelines
 	python3 scripts/dhall/checker.py --root "$(TMP)" names
 
-all: check_syntax lint format check_deps check_dirty check_dups check_names check_filter
+all: check_syntax lint format check_deps check_dirty check_dups check_names generate_and_check_filter
