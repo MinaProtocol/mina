@@ -20,13 +20,9 @@ let DebianChannel = ../../Constants/DebianChannel.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Artifact = ../../Constants/Artifacts.dhall
-
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
-
-let Toolchain = ../../Constants/Toolchain.dhall
 
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
@@ -35,6 +31,8 @@ let Command = ../Base.dhall
 let Cmd = ../../Lib/Cmds.dhall
 
 let Mina = ../Mina.dhall
+
+let Artifact = ../../Constants/Artifacts.dhall
 
 let Spec =
       { Type =
@@ -212,7 +210,8 @@ let publish
                     ->  Command.build
                           Command.Config::{
                           , commands =
-                               [ Cmd.run (     ". ./buildkite/scripts/export-git-env-vars.sh && "
+                            [ Cmd.run
+                                (     ". ./buildkite/scripts/export-git-env-vars.sh && "
                                   ++  "./buildkite/scripts/release/manager.sh publish "
                                   ++  "--artifacts ${artifacts} "
                                   ++  "--networks ${networks} "
@@ -225,7 +224,8 @@ let publish
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
-                                ) ]
+                                )
+                            ]
                           , label = "Docker Packages Publishing"
                           , key = "publish-dockers-${Natural/show r.index}"
                           , target = Size.Small
