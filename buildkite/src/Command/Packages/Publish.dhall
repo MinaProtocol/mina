@@ -175,7 +175,7 @@ let publish
                                 ++  "--backend ${spec.backend} "
                                 ++  "--channel ${DebianChannel.lowerName
                                                    spec.channel} "
-                                ++  "--source-version ${spec.source_version} "
+                                ++  "--source-version \"3.1.1-alpha1-compatible-659640d\" "
                                 ++  "--target-version ${target_version} "
                                 ++  "--codenames ${codenames} "
                                 ++  "--debian-repo ${DebianRepo.bucket_or_default
@@ -221,7 +221,7 @@ let publish
                                   ++  "--channel ${DebianChannel.lowerName
                                                      spec.channel} "
                                   ++  "--verify "
-                                  ++  "--source-version ${spec.source_version} "
+                                  ++  "--source-version \"3.1.1-alpha1-compatible-659640d\" "
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
