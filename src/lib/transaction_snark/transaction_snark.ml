@@ -3536,17 +3536,34 @@ module Make_str (A : Wire_types.Concrete) = struct
           init_stack pending_coinbase_stack_state handler
 
   let verify_impl ~f ts =
-    if
-      List.for_all ts ~f:(fun ((p : Stable.Latest.t), m) ->
-          Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest )
-    then
-      f
-        (List.map ts ~f:(fun ({ Proof_carrying_data.data; proof }, _) ->
-             (data, proof) ) )
-    else
-      Async.return
-        (Or_error.error_string
-           "Transaction_snark.verify: Mismatched sok_message" )
+    let rec error_msg_fold cur_err_msg ts =
+      match ts with
+      | [] ->
+          cur_err_msg
+      | ((p : Stable.Latest.t), m) :: rest ->
+          if Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest
+          then error_msg_fold cur_err_msg rest
+          else
+            let new_err_msg =
+              Printf.sprintf
+                "%s\n\
+                 Mismatched sok digest, expected sok digest: %s, got sok \
+                 message: %s"
+                cur_err_msg
+                ( Sok_message.Digest.Stable.Latest.to_yojson p.data.sok_digest
+                |> Yojson.Safe.to_string )
+                (Sok_message.Stable.Latest.to_yojson m |> Yojson.Safe.to_string)
+            in
+            error_msg_fold new_err_msg ts
+    in
+    match error_msg_fold "" ts with
+    | "" ->
+        f
+          (List.map ts ~f:(fun ({ Proof_carrying_data.data; proof }, _) ->
+               (data, proof) ) )
+    | error_msg ->
+        Async.return
+          (Or_error.error_string ("Transaction_snark.verify: " ^ error_msg))
 
   let verify ~key =
     verify_impl
