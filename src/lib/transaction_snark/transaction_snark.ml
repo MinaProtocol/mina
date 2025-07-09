@@ -3538,7 +3538,17 @@ module Make_str (A : Wire_types.Concrete) = struct
   let verify_impl ~f ts =
     if
       List.for_all ts ~f:(fun ((p : Stable.Latest.t), m) ->
-          Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest )
+          if Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest
+          then true
+          else
+            let logger = Logger.create () in
+            [%log warn] "Sok message mismatch!"
+              ~metadata:
+                [ ( "expected_digest"
+                  , Sok_message.Digest.to_yojson p.data.sok_digest )
+                ; ("actual_message", Sok_message.to_yojson m)
+                ] ;
+            false )
     then
       f
         (List.map ts ~f:(fun ({ Proof_carrying_data.data; proof }, _) ->
