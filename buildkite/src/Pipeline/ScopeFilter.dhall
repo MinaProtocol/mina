@@ -14,8 +14,7 @@ let tags
       ->  merge
             { PullRequestOnly = [ Scope.Type.PullRequest ]
             , StableOnly =
-              [ Scope.Type.Nightly
-              , Scope.Type.MainlineNightly
+              [ Scope.Type.MainlineNightly
               , Scope.Type.Release
               ]
             , Nightly = [ Scope.Type.Nightly ]
