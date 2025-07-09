@@ -45,7 +45,7 @@ let targetVersion =
       ->  \(commit : Text)
       ->  \(latestGitTag : Text)
       ->  \(todayDate : Text)
-      ->  "${latestGitTag}-${todayDate}-${branch}-${DebianVersions.lowerName
+      ->  "${latestGitTag}-${todayDate}-${DebianVersions.lowerName
                                                       codename}-${DebianChannel.lowerName
                                                                     channel}"
 
