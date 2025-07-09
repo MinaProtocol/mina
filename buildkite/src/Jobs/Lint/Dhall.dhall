@@ -118,16 +118,15 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-              [ Cmd.run
-                  "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall"
-              , Cmd.run "cd buildkite && make check_filter"
-              ]
+                RunInToolchain.runInToolchain
+                  ([] : List Text)
+                  (     "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall && "
+                    ++  "cd buildkite && make check_filter"
+                  )
             , label = "Dhall: filter"
             , key = "check-dhall-filter"
             , target = Size.Multi
-            , docker = Some Docker::{
-              , image = (../../Constants/ContainerImages.dhall).toolchainBase
-              }
+            , docker = None Docker.Type
             }
         ]
       }
