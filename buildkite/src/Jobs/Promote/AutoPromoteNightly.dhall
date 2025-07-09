@@ -32,9 +32,9 @@ let new_tags =
       ->  \(commit : Text)
       ->  \(latestGitTag : Text)
       ->  \(todayDate : Text)
-      ->  [ "latest-compatible"
-          , "${todayDate}-compatible"
-          , "${latestGitTag}.${todayDate}-compatible"
+      ->  [ "latest-${branch}"
+          , "${todayDate}-${branch}"
+          , "${latestGitTag}.${todayDate}-${branch}"
           ]
 
 let targetVersion =
