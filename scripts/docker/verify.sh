@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-set -x
+
+# Verify that the Docker image for a given package and version is working correctly.
+# This script pulls the Docker image and runs a set of simplest commands (fetch help and version) 
+# to ensure that the package dependencies are correctly resolved.
+# Usage: ./scripts/docker/verify.sh -p <package> -c <codename> [-s <suffix>] [-r <repo>] [-v <version>]
 
 set -eo pipefail
 
@@ -27,7 +31,7 @@ esac
 
 DOCKER_IMAGE="$REPO/$PACKAGE:$VERSION-${CODENAME}${SUFFIX}"
 
-if ! docker pull $DOCKER_IMAGE ; then
+if ! docker pull "$DOCKER_IMAGE" ; then
   echo "❌ Docker verification for $CODENAME $PACKAGE failed"
   echo "❌ Please check if the image $DOCKER_IMAGE exists."
   exit 1
@@ -36,7 +40,9 @@ fi
 for APP in "${APPS[@]}"; do
   for COMMAND in "${COMMANDS[@]}"; do
     echo "📋  Testing $APP $COMMAND in $DOCKER_IMAGE"
-    if ! docker run --entrypoint $APP --rm $DOCKER_IMAGE $COMMAND; then
+    # Do not quote $COMMAND, because it may contain spaces or other special characters
+    # shellcheck disable=SC2086
+    if ! docker run --entrypoint "$APP" --rm "$DOCKER_IMAGE" $COMMAND; then
       echo "❌  KO: ERROR running $APP $COMMAND"
       exit 1
     fi

@@ -1,5 +1,31 @@
 #!/usr/bin/env bash
 
+# Mina Protocol Release Manager Script
+# 
+# This script provides comprehensive release management functionality for the Mina Protocol project.
+# It handles the complete lifecycle of build artifacts including publishing, promotion, verification,
+# and maintenance of packages across different channels and platforms.
+#
+# Main capabilities:
+# - PUBLISH: Publish build artifacts from cache to Debian repositories and Docker registries
+# - PROMOTE: Promote artifacts from one channel/registry to another (e.g., unstable -> stable)
+# - VERIFY: Verify that artifacts are correctly published in target channels/registries
+# - FIX: Repair Debian repository manifests when needed
+# - PERSIST: Archive artifacts to long-term storage backends
+#
+# Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc
+# Supported networks: devnet, mainnet
+# Supported platforms: Debian (bullseye, focal), Docker (GCR, Docker.io)
+# Supported channels: unstable, alpha, beta, stable
+# Supported backends: Google Cloud Storage (gs), Hetzner, local filesystem
+#
+# Usage examples:
+#   ./manager.sh publish --buildkite-build-id 12345 --source-version 1.0.0 --target-version 1.0.1 --channel stable
+#   ./manager.sh promote --source-version 1.0.0 --target-version 1.0.1 --source-channel alpha --target-channel beta
+#   ./manager.sh verify --version 1.0.1 --channel stable --artifacts mina-daemon,mina-archive
+#
+# For detailed help on any command, use: ./manager.sh [command] --help
+
 # bash strict mode
 set -T # inherit DEBUG and RETURN trap for functions
 set -C # prevent file overwrite by > &> <>
