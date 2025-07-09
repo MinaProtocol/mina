@@ -3,9 +3,9 @@
  (name generate_keypair)
  (public_name generate_keypair)
  (modes native)
- (libraries cli_lib async core_kernel mina_version async_unix mina_stdlib)
+ (libraries async async_unix cli_lib core_kernel mina_version)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_let ppx_sexp_conv))
+  (pps ppx_version))
  (flags :standard -w +a))
