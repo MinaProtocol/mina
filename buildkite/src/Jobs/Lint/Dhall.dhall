@@ -118,11 +118,12 @@ in  Pipeline.build
         , Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
-                  ([] : List Text)
-                  (     "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall && "
-                    ++  "cd buildkite && make check_filter"
-                  )
+                  [ Cmd.run
+                      "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall"
+                  ]
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "cd buildkite && make check_filter"
             , label = "Dhall: filter"
             , key = "check-dhall-filter"
             , target = Size.Multi
