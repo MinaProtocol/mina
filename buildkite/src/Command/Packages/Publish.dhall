@@ -168,7 +168,7 @@ let publish
                                 ++  ". ./buildkite/scripts/export-git-env-vars.sh && "
                                 ++  " gpg --import /var/secrets/debian/key.gpg && "
                                 ++  " mkdir -p ./cache && "
-                                ++  "DEBIAN_CACHE_FOLDER=./cache ./buildkite/scripts/release/manager.sh publish "
+                                ++  "DEBIAN_CACHE_FOLDER=/workdir/cache ./buildkite/scripts/release/manager.sh publish "
                                 ++  "--artifacts ${artifacts} "
                                 ++  "--networks ${networks} "
                                 ++  "--buildkite-build-id \"0197e119-c5e7-4185-9fb5-03d2776ca51a\" "
