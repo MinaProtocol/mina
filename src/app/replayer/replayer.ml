@@ -516,13 +516,14 @@ let get_parent_state_view ~pool block_id =
 
 let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
     (cmd : Sql.Zkapp_command.t) : Mina_transaction.Transaction.t Deferred.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let query_db = Mina_caqti.query pool in
   (* use dummy authorizations *)
   let%bind (fee_payer : Account_update.Fee_payer.t) =
     let%map (body : Account_update.Body.Fee_payer.t) =
       Load_data.get_fee_payer_body ~pool cmd.zkapp_fee_payer_body_id
     in
-    ({ body; authorization = Signature.dummy } : Account_update.Fee_payer.t)
+    Account_update.Fee_payer.make ~body ~authorization:Signature.dummy
   in
   let nonce_str = Mina_numbers.Account_nonce.to_string fee_payer.body.nonce in
   [%log spam]
@@ -547,11 +548,12 @@ let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
           | None_given ->
               None_given
         in
-        ({ body; authorization } : Account_update.Simple.t) )
+        Account_update.with_no_aux ~body ~authorization )
   in
   let memo = Signed_command_memo.of_base58_check_exn cmd.memo in
   let zkapp_command =
-    Zkapp_command.of_simple ~proof_cache_db { fee_payer; account_updates; memo }
+    Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+      { fee_payer; account_updates; memo }
   in
   return
   @@ Mina_transaction.Transaction.Command
@@ -639,6 +641,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         ~transport:(Logger_file_system.evergrowing ~log_filename)
         () ) ;
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1282,7 +1285,7 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                   let%bind phase_1s =
                     Deferred.List.mapi txns ~f:(fun n txn ->
                         match
-                          Ledger.apply_transaction_first_pass
+                          Ledger.apply_transaction_first_pass ~signature_kind
                             ~constraint_constants
                             ~global_slot:
                               (Mina_numbers.Global_slot_since_genesis.of_uint32

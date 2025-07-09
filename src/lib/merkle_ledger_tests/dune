@@ -30,11 +30,9 @@
   sexplib0
   ; Mina
   base58_check
-  bounded_types
   codable
   currency
   data_hash_lib
-  direction
   key_value_database
   merkle_address
   merkle_ledger

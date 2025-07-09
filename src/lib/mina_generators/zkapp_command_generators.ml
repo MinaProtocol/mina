@@ -1064,7 +1064,7 @@ let gen_account_update_from ?(no_account_precondition = false)
   in
   let account_id = Account_id.create body.public_key body.token_id in
   Hash_set.add account_ids_seen account_id ;
-  return { Account_update.Poly.body; authorization }
+  return @@ Account_update.with_no_aux ~body ~authorization
 
 (* takes an account id, if we want to sign this data *)
 let gen_account_update_body_fee_payer ?global_slot ?fee_range ?failure
@@ -1108,7 +1108,7 @@ let gen_fee_payer ?global_slot ?fee_range ?failure ?permissions_auth ~account_id
   in
   (* real signature to be added when this data inserted into a Zkapp_command.t *)
   let authorization = Signature.dummy in
-  ({ body; authorization } : Account_update.Fee_payer.t)
+  Account_update.Fee_payer.make ~body ~authorization
 
 (* keep max_account_updates small, so zkApp integration tests don't need lots
    of block producers
@@ -1139,6 +1139,7 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ~genesis_constants
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) () :
     Zkapp_command.t Quickcheck.Generator.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -1541,14 +1542,14 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         Signed_command_memo.gen
   in
   let zkapp_command =
-    Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
+    Zkapp_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
       { Zkapp_command.Poly.fee_payer; account_updates; memo }
   in
   (* update receipt chain hashes in accounts table *)
   let receipt_elt =
     let _txn_commitment, full_txn_commitment =
       (* also computed in replace_authorizations, but easier just to re-compute here *)
-      Zkapp_command.get_transaction_commitments zkapp_command
+      Zkapp_command.get_transaction_commitments ~signature_kind zkapp_command
     in
     Receipt.Zkapp_command_elt.Zkapp_command_commitment full_txn_commitment
   in
@@ -1664,19 +1665,20 @@ let mk_account_update_body ~pk ~vk : Account_update.Body.Simple.t =
   }
 
 let mk_account_update ~pk ~vk : Account_update.Simple.t =
-  { body = mk_account_update_body ~pk ~vk
-  ; authorization = Control.(dummy_of_tag Proof)
-  }
+  Account_update.with_no_aux
+    ~body:(mk_account_update_body ~pk ~vk)
+    ~authorization:Control.(dummy_of_tag Proof)
 
 let mk_fee_payer ~fee ~pk ~nonce : Account_update.Fee_payer.t =
-  { body = { public_key = pk; fee; valid_until = None; nonce }
-  ; authorization = Signature.dummy
-  }
+  Account_update.Fee_payer.make
+    ~body:{ public_key = pk; fee; valid_until = None; nonce }
+    ~authorization:Signature.dummy
 
 let gen_max_cost_zkapp_command_from ?memo ?fee_range
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(account_state_tbl : (Account.t * role) Account_id.Table.t) ~vk
     ~(genesis_constants : Genesis_constants.t) () =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Quickcheck.Generator.Let_syntax in
   let%bind memo =
     match memo with
@@ -1736,7 +1738,8 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
         None
     | Some (a, role) ->
         Some ({ a with nonce = Account.Nonce.succ a.nonce }, role) ) ;
-  Zkapp_command.of_simple ~proof_cache_db { fee_payer; account_updates; memo }
+  Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+    { fee_payer; account_updates; memo }
 
 let%test_module _ =
   ( module struct

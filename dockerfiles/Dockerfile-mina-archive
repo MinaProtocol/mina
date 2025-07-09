@@ -23,6 +23,18 @@ RUN echo "Building image with version $deb_codename $deb_release $deb_version"
 COPY scripts/archive-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Install ca-certificates using HTTP
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Switch to HTTPS
+RUN if [ -f /etc/apt/sources.list ]; then \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
+else \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
+fi
+
 # Dependencies
 RUN apt-get update --quiet --yes \
     && apt-get upgrade --quiet --yes \
@@ -31,12 +43,10 @@ RUN apt-get update --quiet --yes \
         curl \
         jq \
         dumb-init \
-        libssl1.1 \
         libgomp1 \
         libpq-dev \
         gnupg2 \
         apt-transport-https \
-        ca-certificates \
         dnsutils \
         tzdata \
         postgresql \

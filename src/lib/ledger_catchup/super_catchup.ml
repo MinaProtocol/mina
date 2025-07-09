@@ -778,7 +778,7 @@ let pick ~context:(module Context : CONTEXT)
 
 let forest_pick forest =
   with_return (fun { return } ->
-      List.iter forest ~f:(Rose_tree.iter ~f:return) ;
+      List.iter forest ~f:(Mina_stdlib.Rose_tree.iter ~f:return) ;
       assert false )
 
 let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
@@ -1063,7 +1063,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             let finished = Ivar.create () in
             let c = Cached.transform c ~f:(fun _ -> breadcrumb) in
             Strict_pipe.Writer.write catchup_breadcrumbs_writer
-              ( [ Rose_tree.of_non_empty_list
+              ( [ Mina_stdlib.Rose_tree.of_non_empty_list
                     (Mina_stdlib.Nonempty_list.singleton (c, valid_cb))
                 ]
               , `Ledger_catchup finished ) ;
@@ -1086,39 +1086,31 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
            , State_hash.t )
            Cached.t
          * Mina_net2.Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list )
        Strict_pipe.Reader.t ) ~unprocessed_transition_cache
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , Strict_pipe.crash Strict_pipe.buffered
        , unit )
        Strict_pipe.Writer.t ) =
   let open Context in
-  let t =
-    match Transition_frontier.catchup_state frontier with
-    | Full t ->
-        t
-    | Hash _ ->
-        failwith
-          "If super catchup is running, the frontier should have a full \
-           catchup state"
-  in
+  let (Full t) = Transition_frontier.catchup_state frontier in
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
   let combine = Option.merge ~f:(pick ~context:(module Context)) in
   let pre_context
       (trees :
         ((Mina_block.initial_valid_block Envelope.Incoming.t, _) Cached.t * _)
-        Rose_tree.t
+        Mina_stdlib.Rose_tree.t
         list ) =
     let f tree =
       let best = ref None in
-      Rose_tree.iter tree ~f:(fun (x, _vc) ->
+      Mina_stdlib.Rose_tree.iter tree ~f:(fun (x, _vc) ->
           let x, _ = Envelope.Incoming.data (Cached.peek x) in
           best :=
             combine !best
@@ -1236,8 +1228,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 in
                 let blockchain_length_of_target_hash =
                   let blockchain_length_of_dangling_block =
-                    List.hd_exn forest |> Rose_tree.root |> Tuple2.get1
-                    |> Cached.peek |> Envelope.Incoming.data
+                    List.hd_exn forest |> Mina_stdlib.Rose_tree.root
+                    |> Tuple2.get1 |> Cached.peek |> Envelope.Incoming.data
                     |> Mina_block.Validation.block
                     |> Mina_block.blockchain_length
                   in
@@ -1245,7 +1237,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                 in
                 (* check if the target_parent_hash's own parent is a part of the transition frontier, or not *)
                 match
-                  List.find_map (List.concat_map ~f:Rose_tree.flatten forest)
+                  List.find_map
+                    (List.concat_map ~f:Mina_stdlib.Rose_tree.flatten forest)
                     ~f:(fun (c, _vc) ->
                       let h =
                         State_hash.With_state_hashes.state_hash
@@ -1277,7 +1270,8 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                     (* if the target_parent_hash's own parent is not a part of the transition frontier, then the entire chain of blocks connecting some node in the
                        transition frontier to target_parent_hash needs to be downloaded *)
                     let preferred_peers =
-                      List.fold (List.concat_map ~f:Rose_tree.flatten forest)
+                      List.fold
+                        (List.concat_map ~f:Mina_stdlib.Rose_tree.flatten forest)
                         ~init:Peer.Set.empty ~f:(fun acc (c, _vc) ->
                           match (Cached.peek c).sender with
                           | Local ->
@@ -1303,13 +1297,14 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                   if contains_no_common_ancestor errors then
                     List.iter forest ~f:(fun subtree ->
                         let transition =
-                          Rose_tree.root subtree |> Tuple2.get1 |> Cached.peek
+                          Mina_stdlib.Rose_tree.root subtree
+                          |> Tuple2.get1 |> Cached.peek
                           |> Envelope.Incoming.data
                         in
                         let children_transitions =
                           List.concat_map
-                            (Rose_tree.children subtree)
-                            ~f:Rose_tree.flatten
+                            (Mina_stdlib.Rose_tree.children subtree)
+                            ~f:Mina_stdlib.Rose_tree.flatten
                         in
                         let children_state_hashes =
                           List.map children_transitions
@@ -1349,7 +1344,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                             ( Float.of_int
                             @@ (1 + List.length children_transitions) )) ) ;
                   List.iter forest ~f:(fun subtree ->
-                      Rose_tree.iter subtree ~f:(fun (node, vc) ->
+                      Mina_stdlib.Rose_tree.iter subtree ~f:(fun (node, vc) ->
                           (* TODO consider rejecting the callback in some cases,
                              see https://github.com/MinaProtocol/mina/issues/11087 *)
                           Option.value_map vc ~default:ignore
@@ -1388,7 +1383,7 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
                   (* if state_hashes is Ok, then we iterate through the forest and fold over state_hashes and call run_state_machine on each node.  order doesn't really matter because nodes called "out of order" will enter the `Wait_for_parent` state and begin running again when ready *)
                   List.iter forest
                     ~f:
-                      (Rose_tree.iter ~f:(fun b_and_c ->
+                      (Mina_stdlib.Rose_tree.iter ~f:(fun b_and_c ->
                            let node =
                              create_node ~logger ~downloader t
                                (`Initial_validated b_and_c)
@@ -1467,8 +1462,6 @@ let%test_module "Ledger_catchup tests" =
 
     (* let time_controller = Block_time.Controller.basic ~logger *)
 
-    let use_super_catchup = true
-
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
@@ -1518,7 +1511,7 @@ let%test_module "Ledger_catchup tests" =
                 , State_hash.t )
                 Cached.t
               * Mina_net2.Validation_callback.t option )
-              Rose_tree.t
+              Mina_stdlib.Rose_tree.t
               list
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
@@ -1526,7 +1519,7 @@ let%test_module "Ledger_catchup tests" =
       ; breadcrumbs_reader :
           ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
             * Mina_net2.Validation_callback.t option )
-            Rose_tree.t
+            Mina_stdlib.Rose_tree.t
             list
           * [ `Catchup_scheduler | `Ledger_catchup of unit Ivar.t ] )
           Strict_pipe.Reader.t
@@ -1584,7 +1577,8 @@ let%test_module "Ledger_catchup tests" =
           (downcast_breadcrumb target_breadcrumb)
       in
       Strict_pipe.Writer.write test.job_writer
-        (parent_hash, [ Rose_tree.T ((target_transition, None), []) ]) ;
+        ( parent_hash
+        , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
       (`Test test, `Cached_transition target_transition)
 
     let rec call_read ~target_best_tip_path ~breadcrumbs_reader
@@ -1610,7 +1604,7 @@ let%test_module "Ledger_catchup tests" =
                   failwith "breadcrumb not found"
               | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
                   let breadcrumb : Breadcrumb.t =
-                    Rose_tree.root (List.hd_exn breadcrumbs)
+                    Mina_stdlib.Rose_tree.root (List.hd_exn breadcrumbs)
                     |> Tuple2.get1 |> Cache_lib.Cached.invalidate_with_success
                   in
                   Ivar.fill ivar () ; breadcrumb )
@@ -1634,7 +1628,9 @@ let%test_module "Ledger_catchup tests" =
       let%map breadcrumb_list =
         call_read ~breadcrumbs_reader ~target_best_tip_path ~my_peer:my_net [] 0
       in
-      let breadcrumbs_tree = Rose_tree.of_list_exn breadcrumb_list in
+      let breadcrumbs_tree =
+        Mina_stdlib.Rose_tree.of_list_exn breadcrumb_list
+      in
       [%test_result: int]
         ~message:
           "Transition_frontier should not have any more catchup jobs at the \
@@ -1643,10 +1639,13 @@ let%test_module "Ledger_catchup tests" =
         (Broadcast_pipe.Reader.peek Catchup_jobs.reader) ;
       [%log info] "target_best_tip_path length: %d"
         (List.length target_best_tip_path) ;
-      let target_best_tip_tree = Rose_tree.of_list_exn target_best_tip_path in
+      let target_best_tip_tree =
+        Mina_stdlib.Rose_tree.of_list_exn target_best_tip_path
+      in
       [%log info] "breadcrumb_list length: %d" (List.length breadcrumb_list) ;
       let catchup_breadcrumbs_are_best_tip_path =
-        Rose_tree.equal target_best_tip_tree breadcrumbs_tree ~f:(fun br1 br2 ->
+        Mina_stdlib.Rose_tree.equal target_best_tip_tree breadcrumbs_tree
+          ~f:(fun br1 br2 ->
             let b1 = Transition_frontier.Breadcrumb.validated_transition br1 in
             let b2 = Transition_frontier.Breadcrumb.validated_transition br2 in
             (* We force evaluation of state body hash for both blocks for further equality check *)
@@ -1670,7 +1669,7 @@ let%test_module "Ledger_catchup tests" =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size
             ])
@@ -1690,7 +1689,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1706,7 +1705,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer; peer_with_branch ~frontier_branch_size:1 ])
         ~f:(fun network ->
           let open Fake_network in
@@ -1723,7 +1722,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 3) + 1)
@@ -1750,7 +1749,8 @@ let%test_module "Ledger_catchup tests" =
           in
           [%log info] "download state hashes fails unit test" ;
           Strict_pipe.Writer.write test.job_writer
-            (parent_hash, [ Rose_tree.T ((target_transition, None), []) ]) ;
+            ( parent_hash
+            , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
           Thread_safe.block_on_async_exn (fun () ->
               let final = Cache_lib.Cached.final_state target_transition in
               match%map
@@ -1801,7 +1801,7 @@ let%test_module "Ledger_catchup tests" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
           gen ~precomputed_values ~verifier ~max_frontier_length
-            ~use_super_catchup ~ledger_sync_config
+            ~ledger_sync_config
             [ fresh_peer
               (* ; peer_with_branch ~frontier_branch_size:(max_frontier_length / 2) *)
             ; peer_with_branch_custom_rpc
@@ -1847,7 +1847,8 @@ let%test_module "Ledger_catchup tests" =
               (downcast_breadcrumb target_breadcrumb)
           in
           Strict_pipe.Writer.write test.job_writer
-            (parent_hash, [ Rose_tree.T ((target_transition, None), []) ]) ;
+            ( parent_hash
+            , [ Mina_stdlib.Rose_tree.T ((target_transition, None), []) ] ) ;
           Thread_safe.block_on_async_exn (fun () ->
               let final = Cache_lib.Cached.final_state target_transition in
               match%map
@@ -1876,11 +1877,6 @@ let%test_module "Ledger_catchup tests" =
                         with
                         | Full tr ->
                             tr
-                        | Hash _ ->
-                            failwith
-                              "in super catchup unit tests, the catchup state \
-                               should always be Full_catchup_tree, but it is \
-                               Catchup_hash_tree for some reason"
                       in
                       let catchup_state_node_list =
                         State_hash.Table.data catchup_state.nodes

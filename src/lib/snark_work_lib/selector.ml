@@ -51,6 +51,10 @@ module Result = struct
         (Spec.Stable.V1.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
 
       let to_latest = Fn.id
+
+      let transactions (t : t) =
+        One_or_two.map t.spec.instances ~f:(fun i ->
+            Single_spec.Stable.Latest.transaction i )
     end
   end]
 

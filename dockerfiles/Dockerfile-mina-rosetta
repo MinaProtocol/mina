@@ -26,7 +26,19 @@ ENV DEBIAN_FRONTEND noninteractive
 #    libffi7
 #    libprocps8
 #    libjemalloc2
+#    libssl
 
+# Install ca-certificates using HTTP
+RUN apt-get update --quiet --yes \
+  && apt-get install --quiet --yes --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Switch to HTTPS
+RUN if [ -f /etc/apt/sources.list ]; then \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
+else \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
+fi
 
 # --- Dependencies across many platforms
 RUN apt-get update --quiet --yes \
@@ -35,7 +47,6 @@ RUN apt-get update --quiet --yes \
     apt-utils \
     apt-transport-https \
     curl \
-    ca-certificates \
     build-essential \
     dnsutils \
     dumb-init \
@@ -43,7 +54,6 @@ RUN apt-get update --quiet --yes \
     gnupg2 \
     libgmp10 \
     libgomp1 \
-    libssl1.1 \
     tzdata \
     jq \
     git \

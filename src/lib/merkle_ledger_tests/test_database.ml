@@ -11,24 +11,59 @@ open Core
 open Test_stubs
 module Intf = Merkle_ledger.Intf
 module Database = Merkle_ledger.Database
+module Location = Merkle_ledger.Location.T
 
-module type DB =
-  Intf.Ledger.DATABASE
-    with type key := Key.t
+module Location_binable = struct
+  module Arg = struct
+    type t = Location.t =
+      | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+      | Account of Location.Addr.Stable.Latest.t
+      | Hash of Location.Addr.Stable.Latest.t
+    [@@deriving bin_io_unversioned, hash, sexp, compare]
+  end
+
+  type t = Arg.t =
+    | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+    | Account of Location.Addr.Stable.Latest.t
+    | Hash of Location.Addr.Stable.Latest.t
+  [@@deriving hash, sexp, compare]
+
+  include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
+end
+
+module type Account_Db =
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Md5.t
+     and type hash := Md5.t
+     and type key := Key.t
      and type token_id := Token_id.t
      and type token_id_set := Token_id.Set.t
-     and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
-     and type account := Account.t
-     and type root_hash := Hash.t
-     and type hash := Hash.t
+     and type account_id := Account_id.t
+
+module type DB = Account_Db with type account := Account.t
+
+module Make_inputs
+    (Account : Merkle_ledger.Intf.Account
+                 with type account_id := Account_id.t
+                  and type token_id := Token_id.t
+                  and type balance := Balance.t)
+    (Hash : Merkle_ledger.Intf.Hash with type account := Account.t) =
+struct
+  include Test_stubs.Make_base_inputs (Account) (Hash)
+  module Location = Location
+  module Addr = Location.Addr
+  module Location_binable = Location_binable
+  module Kvdb = In_memory_kvdb
+  module Storage_locations = Storage_locations
+end
 
 module type Test_intf = sig
   val depth : int
 
-  module Location : Merkle_ledger.Location_intf.S
-
-  module MT : DB with module Location = Location and module Addr = Location.Addr
+  module MT : DB
 
   val with_instance : (MT.t -> 'a) -> 'a
 end
@@ -130,6 +165,7 @@ module Make (Test : Test_intf) = struct
               Quickcheck.random_value ~seed:(`Deterministic "balance 1")
                 Balance.gen
             in
+            let T = Account_id.eq in
             let account = Account.create account_id balance in
             let balance' =
               Quickcheck.random_value ~seed:(`Deterministic "balance 2")
@@ -142,7 +178,7 @@ module Make (Test : Test_intf) = struct
               |> Or_error.ok_exn
             in
             assert (
-              [%equal: Test.Location.t] location location'
+              [%equal: Location.t] location location'
               && (match action with `Existed -> true | `Added -> false)
               && not
                    (Mina_base.Account.equal
@@ -170,7 +206,7 @@ module Make (Test : Test_intf) = struct
                    let location' =
                      MT.location_of_account mdb account_id |> Option.value_exn
                    in
-                   assert ([%equal: Test.Location.t] location location') ) ) )
+                   assert ([%equal: Location.t] location location') ) ) )
 
   let random_accounts max_height =
     let num_accounts = 1 lsl max_height in
@@ -197,11 +233,15 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
-            Quickcheck.test (Direction.gen_var_length_list max_height)
-              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+            Quickcheck.test
+              (Mina_stdlib.Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
                 let address =
                   let offset = depth - max_height in
-                  let padding = List.init offset ~f:(fun _ -> Direction.Left) in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Mina_stdlib.Direction.Left)
+                  in
                   let padded_directions = List.concat [ padding; directions ] in
                   MT.Addr.of_directions padded_directions
                 in
@@ -211,7 +251,7 @@ module Make (Test : Test_intf) = struct
                 in
                 MT.set_batch_accounts mdb addresses_and_accounts ;
                 let new_merkle_root = MT.merkle_root mdb in
-                assert (Hash.equal old_merkle_root new_merkle_root) ) ) )
+                assert (Md5.equal old_merkle_root new_merkle_root) ) ) )
 
   let () =
     add_test "set_batch_accounts would change the merkle root" (fun () ->
@@ -219,11 +259,15 @@ module Make (Test : Test_intf) = struct
             let depth = MT.depth mdb in
             let max_height = Int.min 5 depth in
             populate_db mdb max_height ;
-            Quickcheck.test (Direction.gen_var_length_list max_height)
-              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+            Quickcheck.test
+              (Mina_stdlib.Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
                 let address =
                   let offset = depth - max_height in
-                  let padding = List.init offset ~f:(fun _ -> Direction.Left) in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Mina_stdlib.Direction.Left)
+                  in
                   let padded_directions = List.concat [ padding; directions ] in
                   MT.Addr.of_directions padded_directions
                 in
@@ -260,7 +304,7 @@ module Make (Test : Test_intf) = struct
                     let old_merkle_root = MT.merkle_root mdb in
                     MT.set_batch_accounts mdb new_addresses_and_accounts ;
                     let new_merkle_root = MT.merkle_root mdb in
-                    assert (not @@ Hash.equal old_merkle_root new_merkle_root) ) ) ) )
+                    assert (not @@ Md5.equal old_merkle_root new_merkle_root) ) ) ) )
 
   let () =
     add_test "key by key account retrieval after set_batch_accounts works"
@@ -277,9 +321,9 @@ module Make (Test : Test_intf) = struct
               List.folding_map accounts ~init:last_location
                 ~f:(fun prev_location account ->
                   let location =
-                    Test.Location.next prev_location |> Option.value_exn
+                    Location.next prev_location |> Option.value_exn
                   in
-                  (location, (location |> Test.Location.to_path_exn, account)) )
+                  (location, (location |> Location.to_path_exn, account)) )
             in
             MT.set_batch_accounts mdb accounts_with_addresses ;
             List.iter accounts ~f:(fun account ->
@@ -313,11 +357,15 @@ module Make (Test : Test_intf) = struct
         Test.with_instance (fun mdb ->
             let max_height = Int.min (MT.depth mdb) 5 in
             populate_db mdb max_height ;
-            Quickcheck.test (Direction.gen_var_length_list max_height)
-              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+            Quickcheck.test
+              (Mina_stdlib.Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
                 let address =
                   let offset = MT.depth mdb - max_height in
-                  let padding = List.init offset ~f:(fun _ -> Direction.Left) in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Mina_stdlib.Direction.Left)
+                  in
                   let padded_directions = List.concat [ padding; directions ] in
                   MT.Addr.of_directions padded_directions
                 in
@@ -349,7 +397,7 @@ module Make (Test : Test_intf) = struct
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
             | `Added, _ ->
-                [%test_eq: Hash.t] start_hash (merkle_root ledger) ) )
+                [%test_eq: Md5.t] start_hash (merkle_root ledger) ) )
 
   let () =
     add_test "get_at_index_exn t (index_of_account_exn t public_key) = account"
@@ -390,10 +438,12 @@ module Make (Test : Test_intf) = struct
             let depth = MT.depth mdb in
             let max_height = Int.min depth 5 in
             populate_db mdb max_height ;
-            Quickcheck.test (Direction.gen_list max_height)
-              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+            Quickcheck.test (Mina_stdlib.Direction.gen_list max_height)
+              ~sexp_of:[%sexp_of: Mina_stdlib.Direction.t List.t]
+              ~f:(fun directions ->
                 let offset =
-                  List.init (depth - max_height) ~f:(fun _ -> Direction.Left)
+                  List.init (depth - max_height) ~f:(fun _ ->
+                      Mina_stdlib.Direction.Left )
                 in
                 let padded_directions = List.concat [ offset; directions ] in
                 let address = MT.Addr.of_directions padded_directions in
@@ -422,7 +472,7 @@ module Make (Test : Test_intf) = struct
             let max_height = Int.min (MT.depth mdb) 5 in
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
-                ignore (create_new_account_exn mdb account : Test.Location.t) ) ;
+                ignore (create_new_account_exn mdb account : Location.t) ) ;
             let expect = MT.to_list_sequential mdb in
             [%test_result: Account.t list] accounts ~expect ) )
 
@@ -437,6 +487,7 @@ module Make (Test : Test_intf) = struct
             Quickcheck.random_value
               (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
           in
+          let T = Account_id.eq in
           let accounts = List.map2_exn account_ids balances ~f:Account.create in
           Test.with_instance (fun mdb ->
               List.iter accounts ~f:(fun account ->
@@ -462,6 +513,7 @@ module Make (Test : Test_intf) = struct
               List.fold balances ~init:0 ~f:(fun accum balance ->
                   Balance.to_nanomina_int balance + accum )
             in
+            let T = Account_id.eq in
             let accounts =
               List.map2_exn account_ids balances ~f:Account.create
             in
@@ -492,6 +544,7 @@ module Make (Test : Test_intf) = struct
                   List.fold some_balances ~init:0 ~f:(fun accum balance ->
                       Balance.to_int balance + accum )
                 in
+                let T = Account_id.eq in
                 let accounts =
                   List.map2_exn account_ids balances ~f:Account.create
                 in
@@ -516,39 +569,13 @@ module Make (Test : Test_intf) = struct
     (test_section_name, actual_tests)
 end
 
+module Inputs = Make_inputs (Account) (Hash)
+
 module Make_db (Depth : sig
   val depth : int
 end) =
 Make (struct
   let depth = Depth.depth
-
-  module Location = Merkle_ledger.Location.T
-
-  module Location_binable = struct
-    module Arg = struct
-      type t = Location.t =
-        | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
-        | Account of Location.Addr.Stable.Latest.t
-        | Hash of Location.Addr.Stable.Latest.t
-      [@@deriving bin_io_unversioned, hash, sexp, compare]
-    end
-
-    type t = Arg.t =
-      | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
-      | Account of Location.Addr.Stable.Latest.t
-      | Hash of Location.Addr.Stable.Latest.t
-    [@@deriving hash, sexp, compare]
-
-    include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
-  end
-
-  module Inputs = struct
-    include Test_stubs.Base_inputs
-    module Location = Location
-    module Location_binable = Location_binable
-    module Kvdb = In_memory_kvdb
-    module Storage_locations = Storage_locations
-  end
 
   module MT = Database.Make (Inputs)
 
@@ -559,12 +586,18 @@ Make (struct
 end)
 
 module Depth_4 = struct
+  module Account = Test_stubs.Account
+  module Hash = Test_stubs.Hash
+
   let depth = 4
 end
 
 module Mdb_d4 = Make_db (Depth_4)
 
 module Depth_30 = struct
+  module Account = Test_stubs.Account
+  module Hash = Test_stubs.Hash
+
   let depth = 30
 end
 

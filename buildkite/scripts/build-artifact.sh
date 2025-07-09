@@ -4,6 +4,7 @@ set -eox pipefail
 
 ([ -z ${DUNE_PROFILE+x} ]) && echo "required env vars were not provided" && exit 1
 
+# shellcheck disable=SC1090
 source ~/.profile
 
 MINA_COMMIT_SHA1=$(git rev-parse HEAD)

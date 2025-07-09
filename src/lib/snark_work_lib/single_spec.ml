@@ -58,6 +58,10 @@ module Stable = struct
     [@@deriving sexp, yojson]
 
     let to_latest = Fn.id
+
+    let transaction t =
+      Option.map (Poly.witness t) ~f:(fun w ->
+          w.Transaction_witness.Stable.Latest.transaction )
   end
 end]
 

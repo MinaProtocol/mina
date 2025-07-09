@@ -86,7 +86,6 @@ module Generator : sig
        context:(module CONTEXT)
     -> verifier:Verifier.t
     -> max_frontier_length:int
-    -> use_super_catchup:bool
     -> peer_state Generator.t
 
   val fresh_peer_custom_rpc : peer_config fn_with_mocks
@@ -103,7 +102,6 @@ module Generator : sig
     -> precomputed_values:Precomputed_values.t
     -> verifier:Verifier.t
     -> max_frontier_length:int
-    -> use_super_catchup:bool
     -> ledger_sync_config:Syncable_ledger.daemon_config
     -> (peer_config, 'n num_peers) Vect.t
     -> 'n num_peers t Generator.t

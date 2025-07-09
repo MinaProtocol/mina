@@ -2,7 +2,7 @@
  (name merkle_ledger)
  (public_name merkle_ledger)
  (flags
-  (:standard -open Core_kernel))
+  (:standard -warn-error +a))
  (library_flags -linkall)
  (modules_without_implementation location_intf)
  (libraries
@@ -22,14 +22,10 @@
   rocks
   sexplib0
   ;; local libraries
-  bounded_types
   cache_dir
-  direction
-  empty_hashes
-  immutable_array
+  mina_stdlib
   key_value_database
   merkle_address
-  mina_stdlib
   ppx_version.runtime
   visualization)
  (preprocess

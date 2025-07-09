@@ -1,6 +1,6 @@
 open Core_kernel
 open Async
-module Prod = Snark_worker__Prod.Inputs
+module Prod = Snark_worker.Inputs
 module Graphql_client = Graphql_lib.Client
 module Encoders = Mina_graphql.Types.Input
 module Scalars = Graphql_lib.Scalars
@@ -103,8 +103,11 @@ let command =
        let constraint_constants =
          Genesis_constants.Compiled.constraint_constants
        in
+
+       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let%bind worker_state =
-         Prod.Worker_state.create ~constraint_constants ~proof_level ()
+         Prod.Worker_state.create ~constraint_constants ~proof_level
+           ~signature_kind ()
        in
        let%bind spec =
          let spec_of_json json =

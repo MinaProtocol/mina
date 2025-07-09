@@ -1,3 +1,5 @@
+open Core_kernel
+
 module type LOCATION = sig
   module Addr : module type of Merkle_address
 
@@ -22,7 +24,7 @@ module type LOCATION = sig
 
   val root_hash : t
 
-  val last_direction : Addr.t -> Direction.t
+  val last_direction : Addr.t -> Mina_stdlib.Direction.t
 
   val build_generic : Bigstring.t -> t
 
@@ -44,7 +46,7 @@ module type LOCATION = sig
 
   val order_siblings : t -> 'a -> 'a -> 'a * 'a
 
-  val merkle_path_dependencies_exn : t -> (t * Direction.t) list
+  val merkle_path_dependencies_exn : t -> (t * Mina_stdlib.Direction.t) list
 
   include Comparable.S with type t := t
 end

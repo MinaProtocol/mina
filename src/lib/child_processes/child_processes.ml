@@ -111,49 +111,64 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
     =
  fun name lockpath logger ->
   let open Deferred.Let_syntax in
+  let try_cleanup_lock_file ~pid_metadata () =
+    match%bind Sys.file_exists lockpath with
+    | `Yes | `Unknown -> (
+        match%bind try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
+        | Ok () ->
+            [%log debug] "Deleted existing lock file %s" lockpath ;
+            Deferred.unit
+        | Error exn ->
+            [%log warn]
+              !"Couldn't delete lock file for %s (pid $childPid). If another \
+                Mina daemon was already running it may have cleaned it up for \
+                us. ($exn)"
+              name
+              ~metadata:
+                [ ("childPid", pid_metadata)
+                ; ("exn", `String (Exn.to_string exn))
+                ] ;
+            Deferred.unit )
+    | `No ->
+        [%log debug] "Lock file %s does not exist" lockpath ;
+        Deferred.unit
+  in
   match%bind Sys.file_exists lockpath with
   | `Yes -> (
       let%bind pid_str = Reader.file_contents lockpath in
-      let pid = Pid.of_string pid_str in
-      [%log debug] "Found PID file for %s %s with contents %s" name lockpath
-        pid_str ;
-      let%bind () =
-        match Signal.send Signal.term (`Pid pid) with
-        | `No_such_process ->
-            [%log debug] "Couldn't kill %s with PID %s, does not exist" name
-              pid_str ;
-            Deferred.unit
-        | `Ok -> (
-            [%log debug] "Successfully sent TERM signal to %s (%s)" name pid_str ;
-            let%bind () = after (Time.Span.of_sec 0.5) in
-            match Signal.send Signal.kill (`Pid pid) with
+      let pid_opt = try Some (Pid.of_string pid_str) with _ -> None in
+      match pid_opt with
+      | None ->
+          let pid_log_str = String.escaped pid_str in
+          [%log warn]
+            "Found corrupted PID file for %s %s containing \"%s\", unable to \
+             clean up leftover process if it still exists"
+            name lockpath pid_log_str ;
+          try_cleanup_lock_file ~pid_metadata:(`String pid_log_str) ()
+      | Some pid ->
+          [%log debug] "Found PID file for %s %s with contents %s" name lockpath
+            pid_str ;
+          let%bind () =
+            match Signal.send Signal.term (`Pid pid) with
             | `No_such_process ->
+                [%log debug] "Couldn't kill %s with PID %s, does not exist" name
+                  pid_str ;
                 Deferred.unit
-            | `Ok ->
-                [%log error]
-                  "helper process %s (%s) didn't die after being sent TERM, \
-                   KILLed it"
-                  name pid_str ;
-                Deferred.unit )
-      in
-      match%bind Sys.file_exists lockpath with
-      | `Yes | `Unknown -> (
-          match%bind try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
-          | Ok () ->
-              Deferred.unit
-          | Error exn ->
-              [%log warn]
-                !"Couldn't delete lock file for %s (pid $childPid) after \
-                  killing it. If another Mina daemon was already running it \
-                  may have cleaned it up for us. ($exn)"
-                name
-                ~metadata:
-                  [ ("childPid", `Int (Pid.to_int pid))
-                  ; ("exn", `String (Exn.to_string exn))
-                  ] ;
-              Deferred.unit )
-      | `No ->
-          Deferred.unit )
+            | `Ok -> (
+                [%log debug] "Successfully sent TERM signal to %s (%s)" name
+                  pid_str ;
+                let%bind () = after (Time.Span.of_sec 0.5) in
+                match Signal.send Signal.kill (`Pid pid) with
+                | `No_such_process ->
+                    Deferred.unit
+                | `Ok ->
+                    [%log error]
+                      "helper process %s (%s) didn't die after being sent \
+                       TERM, KILLed it"
+                      name pid_str ;
+                    Deferred.unit )
+          in
+          try_cleanup_lock_file ~pid_metadata:(`Int (Pid.to_int pid)) () )
   | `Unknown | `No ->
       [%log debug] "No PID file for %s" name ;
       Deferred.unit
@@ -249,6 +264,7 @@ let start_custom :
       Deferred.map ~f:Or_error.return
       @@ Async.Writer.save lock_path
            ~contents:(Pid.to_string @@ Process.pid process)
+           ~fsync:true
   in
   let terminated_ivar = Ivar.create () in
   let stdout_pipe = reader_to_strict_pipe (Process.stdout process) stdout in

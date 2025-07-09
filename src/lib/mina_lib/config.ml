@@ -22,7 +22,6 @@ type t =
   ; monitor : Monitor.t option
   ; is_seed : bool
   ; disable_node_status : bool
-  ; super_catchup : bool
   ; block_production_keypairs : Keypair.And_compressed_pk.Set.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t
   ; work_selection_method : (module Work_selector.Selection_method_intf)
@@ -61,6 +60,9 @@ type t =
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
+  ; file_log_level : Logger.Level.t [@default Logger.Level.Info]
+  ; log_level : Logger.Level.t [@default Logger.Level.Info]
+  ; log_json : bool [@default false]
   ; graphql_control_port : int option [@default None]
   ; zkapp_cmd_limit : int option ref
   ; compile_config : Mina_compile_config.t

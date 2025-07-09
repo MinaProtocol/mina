@@ -29,7 +29,7 @@ let DockerPublish = ../Constants/DockerPublish.dhall
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
-          , network : Text
+          , network : Network.Type
           , service : Artifacts.Type
           , version : Text
           , branch : Text
@@ -39,6 +39,7 @@ let ReleaseSpec =
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
+          , deb_legacy_version : Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
@@ -48,7 +49,7 @@ let ReleaseSpec =
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = "${Network.lowerName Network.Type.Berkeley}"
+          , network = Network.Type.Berkeley
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
@@ -56,7 +57,8 @@ let ReleaseSpec =
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "\\\${MINA_DEB_RELEASE}"
           , deb_version = "\\\${MINA_DEB_VERSION}"
-          , deb_profile = Profiles.Type.Standard
+          , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
@@ -69,18 +71,16 @@ let ReleaseSpec =
 
 let stepKey =
           \(spec : ReleaseSpec.Type)
-      ->  "${Artifacts.lowerName
-               spec.service}${Profiles.toLabelSegment
-                                spec.deb_profile}${BuildFlags.toLabelSegment
-                                                     spec.build_flags}${spec.step_key_suffix}"
+      ->  "${Artifacts.lowerName spec.service}${spec.step_key_suffix}"
 
 let stepLabel =
           \(spec : ReleaseSpec.Type)
       ->  "Docker: ${Artifacts.capitalName
-                       spec.service} ${spec.network} ${DebianVersions.capitalName
-                                                         spec.deb_codename} ${Profiles.toSuffixUppercase
-                                                                                spec.deb_profile} ${BuildFlags.toSuffixUppercase
-                                                                                                      spec.build_flags}"
+                       spec.service} ${Network.capitalName
+                                         spec.network} ${DebianVersions.capitalName
+                                                           spec.deb_codename} ${Profiles.toSuffixUppercase
+                                                                                  spec.deb_profile} ${BuildFlags.toSuffixUppercase
+                                                                                                        spec.build_flags}"
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
@@ -108,7 +108,7 @@ let generateStep =
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${Artifacts.dockerName spec.service}"
-                ++  " --network ${spec.network}"
+                ++  " --network ${Network.lowerName spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
                 ++  " ${maybeCacheOption} "
@@ -120,6 +120,7 @@ let generateStep =
                 ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
+                ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =
@@ -130,7 +131,7 @@ let generateStep =
                 then      "./scripts/docker/release.sh"
                       ++  " --service ${Artifacts.dockerName spec.service}"
                       ++  " --version ${spec.version}"
-                      ++  " --network ${spec.network}"
+                      ++  " --network ${Network.lowerName spec.network}"
                       ++  " --deb-codename ${DebianVersions.lowerName
                                                spec.deb_codename}"
                       ++  " --deb-version ${spec.deb_version}"

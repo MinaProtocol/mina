@@ -11,12 +11,8 @@ let account : Mina_base.Account.t =
      the zkapp_uri field is not currently bounded in size
   *)
   let zkapp_account : Mina_base.Zkapp_account.t =
-    let app_state =
-      Pickles_types.Vector.to_list Mina_base.Zkapp_account.default.app_state
-      |> Pickles_types.Vector.Vector_8.of_list_exn
-    in
     { Mina_base.Zkapp_account.default with
-      app_state
+      app_state = Mina_base.Zkapp_account.default.app_state
     ; verification_key =
         Some
           With_hash.
