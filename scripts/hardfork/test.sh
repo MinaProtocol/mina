@@ -162,11 +162,26 @@ expected_next_hash=$(find_staking_hash $((slot_tx_end_epoch+1)))
 
 expected_prefork_hashes="{\"epoch_data\":{\"next\":{\"hash\":\"$expected_next_hash\"},\"staking\":{\"hash\":\"$expected_staking_hash\"}},\"ledger\":{\"hash\":\"${latest_ne[$IX_STAGED_HASH]}\"}}"
 
+# Debug: Print intermediate values
+echo "DEBUG: slot_tx_end_epoch=$slot_tx_end_epoch" >&2
+echo "DEBUG: expected_staking_hash=$expected_staking_hash" >&2
+echo "DEBUG: expected_next_hash=$expected_next_hash" >&2
+echo "DEBUG: latest_ne[IX_STAGED_HASH]=${latest_ne[$IX_STAGED_HASH]}" >&2
+echo "DEBUG: File exists? $(test -f localnet/prefork_hf_ledger_hashes.json && echo 'YES' || echo 'NO')" >&2
+if [[ -f localnet/prefork_hf_ledger_hashes.json ]]; then
+  echo "DEBUG: File content:" >&2
+  cat localnet/prefork_hf_ledger_hashes.json >&2
+fi
+
 # SHA3 hashes are not checked, because this is irrelevant to
 # checking that correct ledgers are used
 prefork_hashes_select='{epoch_data:{staking:{hash:.epoch_data.staking.hash},next:{hash:.epoch_data.next.hash}},ledger:{hash:.ledger.hash}}'
 
 prefork_hashes="$(jq -cS "$prefork_hashes_select" localnet/prefork_hf_ledger_hashes.json)"
+echo "DEBUG: Comparing hashes..." >&2
+echo "DEBUG: Expected (length=${#expected_prefork_hashes}): $expected_prefork_hashes" >&2
+echo "DEBUG: Actual   (length=${#prefork_hashes}): $prefork_hashes" >&2
+
 if [[ "$prefork_hashes" != "$expected_prefork_hashes" ]]; then
   echo "Assertion failed: unexpected ledgers in fork_config" >&2
   echo "Expected: $expected_prefork_hashes" >&2
