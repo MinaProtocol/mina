@@ -171,11 +171,11 @@ let publish
                                 ++  "DEBIAN_CACHE_FOLDER=/workdir/cache ./buildkite/scripts/release/manager.sh publish "
                                 ++  "--artifacts ${artifacts} "
                                 ++  "--networks ${networks} "
-                                ++  "--buildkite-build-id \"0197e119-c5e7-4185-9fb5-03d2776ca51a\" "
+                                ++  "--buildkite-build-id ${spec.build_id} "
                                 ++  "--backend ${spec.backend} "
                                 ++  "--channel ${DebianChannel.lowerName
                                                    spec.channel} "
-                                ++  "--source-version \"3.1.1-alpha1-compatible-659640d\" "
+                                ++  "--source-version ${spec.source_version} "
                                 ++  "--target-version ${target_version} "
                                 ++  "--codenames ${codenames} "
                                 ++  "--debian-repo ${DebianRepo.bucket_or_default
@@ -216,12 +216,12 @@ let publish
                                   ++  "./buildkite/scripts/release/manager.sh publish "
                                   ++  "--artifacts ${artifacts} "
                                   ++  "--networks ${networks} "
-                                  ++  "--buildkite-build-id \"0197e119-c5e7-4185-9fb5-03d2776ca51a\" "
+                                  ++  "--buildkite-build-id ${spec.build_id} "
                                   ++  "--backend ${spec.backend} "
                                   ++  "--channel ${DebianChannel.lowerName
                                                      spec.channel} "
                                   ++  "--verify "
-                                  ++  "--source-version \"3.1.1-alpha1-compatible-659640d\" "
+                                  ++  "--source-version ${spec.source_version} "
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
