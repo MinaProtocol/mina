@@ -12,6 +12,8 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
@@ -71,6 +73,7 @@ in  Pipeline.build
               [ DebianVersions.DebVersion.Bullseye
               , DebianVersions.DebVersion.Focal
               ]
+            , debian_repo = DebianRepo.Type.Nightly
             , channel = DebianChannel.Type.Compatible
             , new_docker_tags = new_tags
             , target_version = targetVersion
