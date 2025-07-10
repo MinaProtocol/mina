@@ -31,12 +31,12 @@ let dirtyWhen =
 
 let rosettaDocker =
       Artifacts.fullDockerTag
-        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network }
+        Artifacts.Tag::{ artifact = Artifacts.Type.Rosetta, network = network }
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
-        , dirtyWhen
+        , dirtyWhen = dirtyWhen
         , path = "Test"
         , name = "RosettaIntegrationTests"
         , tags =
@@ -67,7 +67,7 @@ in  Pipeline.build
                   Dockers.DepsSpec::{
                   , codename = Dockers.Type.Bullseye
                   , artifact = Artifacts.Type.Rosetta
-                  , network
+                  , network = network
                   }
             }
         ]
