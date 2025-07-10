@@ -1,18 +1,20 @@
 let Prelude = ../External/Prelude.dhall
 
-let P = Prelude
-
-let Text/concatMap = P.Text.concatMap
-
 let Cmd = ../Lib/Cmds.dhall
 
 let ContainerImages = ../Constants/ContainerImages.dhall
+
+let P = Prelude
+
+let Text/concatMap = P.Text.concatMap
 
 let runInDockerWithPostgresConn
     : List Text -> Text -> Text -> Cmd.Type
     = \(environment : List Text) ->
       \(docker : Text) ->
       \(innerScript : Text) ->
+        let version = ../../../src/test/archive/sample_db/latest_version as Text
+
         let port = "5432"
 
         let user = "postgres"
@@ -45,8 +47,6 @@ let runInDockerWithPostgresConn
             : Text
             = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
-        let version = ../../../src/test/archive/sample_db/latest_version as Text
-
         let initUrl
             : Text
             = "https://storage.googleapis.com/o1labs-ci-test-data/replay/v${version}/archive_db.sql"
@@ -65,4 +65,4 @@ let runInDockerWithPostgresConn
               , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
               ]
 
-in { runInDockerWithPostgresConn = runInDockerWithPostgresConn }
+in  { runInDockerWithPostgresConn }
