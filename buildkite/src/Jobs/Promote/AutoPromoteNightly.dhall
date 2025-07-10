@@ -22,7 +22,7 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PublishPackages = ../../Command/PublishPackages.dhall
+let PublishPackages = ../../Command/Packages/Publish.dhall
 
 let new_tags =
           \(codename : DebianVersions.DebVersion)

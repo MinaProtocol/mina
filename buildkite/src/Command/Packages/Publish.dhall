@@ -1,52 +1,40 @@
-let Prelude = ../External/Prelude.dhall
+let Prelude = ../../External/Prelude.dhall
+
+let Extensions = ../../Lib/Extensions.dhall
+
+let join = Extensions.join
 
 let Optional/map = Prelude.Optional.map
 
 let Optional/default = Prelude.Optional.default
 
-let List/drop = Prelude.List.drop
+let Artifacts = ../../Constants/Artifacts.dhall
 
-let List/concatMap = Prelude.List.concatMap
+let Size = ../../Command/Size.dhall
 
-let Text/concat = Prelude.Text.concat
+let Package = ../../Constants/DebianPackage.dhall
 
-let Artifacts = ../Constants/Artifacts.dhall
+let Network = ../../Constants/Network.dhall
 
-let Size = ../Command/Size.dhall
+let DebianChannel = ../../Constants/DebianChannel.dhall
 
-let Package = ../Constants/DebianPackage.dhall
+let Profiles = ../../Constants/Profiles.dhall
 
-let Network = ../Constants/Network.dhall
+let Artifact = ../../Constants/Artifacts.dhall
 
-let DebianChannel = ../Constants/DebianChannel.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Profiles = ../Constants/Profiles.dhall
+let DebianRepo = ../../Constants/DebianRepo.dhall
 
-let Artifact = ../Constants/Artifacts.dhall
+let Toolchain = ../../Constants/Toolchain.dhall
 
-let DebianVersions = ../Constants/DebianVersions.dhall
+let ContainerImages = ../../Constants/ContainerImages.dhall
 
-let DebianRepo = ../Constants/DebianRepo.dhall
+let Command = ../Base.dhall
 
-let Toolchain = ../Constants/Toolchain.dhall
+let Cmd = ../../Lib/Cmds.dhall
 
-let ContainerImages = ../Constants/ContainerImages.dhall
-
-let Command = ./Base.dhall
-
-let Cmd = ../Lib/Cmds.dhall
-
-let Mina = ./Mina.dhall
-
-let join =
-          \(sep : Text)
-      ->  \(xs : List Text)
-      ->  let concatWithSepAtStart =
-                List/concatMap Text Text (\(item : Text) -> [ sep, item ]) xs
-
-          let concat = List/drop 1 Text concatWithSepAtStart
-
-          in  Text/concat concat
+let Mina = ../Mina.dhall
 
 let Spec =
       { Type =
