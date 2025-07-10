@@ -10,8 +10,6 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
@@ -51,8 +49,6 @@ let Spec =
           , dependsOn =
               DebianVersions.dependsOn
                 DebianVersions.DepsSpec::{
-                , deb_version = DebianVersions.DebVersion.Bullseye
-                , network = Network.Type.Berkeley
                 , build_flag = BuildFlags.Type.Instrumented
                 }
           , additionalDirtyWhen = [] : List SelectFiles.Type
