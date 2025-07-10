@@ -39,9 +39,13 @@ module Make (Data : Binable.S) = struct
     Rw.get ~env db idx |> Option.value_exn
 
   let put ({ env; db; counter; reusable_keys } : t) (x : Data.t) : id =
-    (* TODO: we may reuse IDs by pulling them from the `garbage` hash set *)
-    let idx = !counter in
-    incr counter ;
+    let idx =
+      match Queue.dequeue reusable_keys with
+      | None ->
+          incr counter ; !counter - 1
+      | Some reused_key ->
+          reused_key
+    in
     let res = { idx } in
     (* When this reference is GC'd, delete the file. *)
     Gc.Expert.add_finalizer_last_exn res (fun () ->
