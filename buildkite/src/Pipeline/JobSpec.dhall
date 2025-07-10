@@ -12,8 +12,8 @@ in  { Type =
         , dirtyWhen : List SelectFiles.Type
         }
     , default =
-        { path = "."
-        , mode = PipelineMode.Type.PullRequest
-        , tags = [ PipelineTag.Type.Fast ]
-        }
+      { path = "."
+      , mode = PipelineMode.Type.PullRequest
+      , tags = [ PipelineTag.Type.Fast ]
+      }
     }

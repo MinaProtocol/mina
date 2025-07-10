@@ -2,8 +2,6 @@
 -- Small trick to allow manual override of source version which is about to be promoted
 -- If FROM_VERSION_MANUAL is set the used it.
 -- Otherwise use MINA_DEB_VERSION which is set in export-git-env-vars.sh file
-
-
 let S = ../../Lib/SelectFiles.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
@@ -25,29 +23,29 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let PublishPackages = ../../Command/PublishPackages.dhall
 
 let new_tags =
-          \(codename : DebianVersions.DebVersion)
-      ->  \(channel : DebianChannel.Type)
-      ->  \(branch : Text)
-      ->  \(profile : Profiles.Type)
-      ->  \(commit : Text)
-      ->  \(latestGitTag : Text)
-      ->  \(todayDate : Text)
-      ->  [ "latest-${branch}"
-          , "${todayDate}-${branch}"
-          , "${latestGitTag}.${todayDate}-${branch}"
-          ]
+      \(codename : DebianVersions.DebVersion) ->
+      \(channel : DebianChannel.Type) ->
+      \(branch : Text) ->
+      \(profile : Profiles.Type) ->
+      \(commit : Text) ->
+      \(latestGitTag : Text) ->
+      \(todayDate : Text) ->
+        [ "latest-${branch}"
+        , "${todayDate}-${branch}"
+        , "${latestGitTag}.${todayDate}-${branch}"
+        ]
 
 let targetVersion =
-          \(codename : DebianVersions.DebVersion)
-      ->  \(channel : DebianChannel.Type)
-      ->  \(branch : Text)
-      ->  \(profile : Profiles.Type)
-      ->  \(commit : Text)
-      ->  \(latestGitTag : Text)
-      ->  \(todayDate : Text)
-      ->  "${latestGitTag}-${todayDate}-${branch}-${DebianVersions.lowerName
-                                                      codename}-${DebianChannel.lowerName
-                                                                    channel}"
+      \(codename : DebianVersions.DebVersion) ->
+      \(channel : DebianChannel.Type) ->
+      \(branch : Text) ->
+      \(profile : Profiles.Type) ->
+      \(commit : Text) ->
+      \(latestGitTag : Text) ->
+      \(todayDate : Text) ->
+        "${latestGitTag}-${todayDate}-${branch}-${DebianVersions.lowerName
+                                                    codename}-${DebianChannel.lowerName
+                                                                  channel}"
 
 in  Pipeline.build
       Pipeline.Config::{

@@ -16,23 +16,23 @@ let Size = ../../Command/Size.dhall
 
 let buildTestCmd
     : Text -> Text -> Size -> Command.Type
-    =     \(profile : Text)
-      ->  \(path : Text)
-      ->  \(cmd_target : Size)
-      ->  let key = "zkapp-tool-unit-test-${profile}"
+    = \(profile : Text) ->
+      \(path : Text) ->
+      \(cmd_target : Size) ->
+        let key = "zkapp-tool-unit-test-${profile}"
 
-          in  Command.build
-                Command.Config::{
-                , commands =
-                    RunInToolchain.runInToolchain
-                      [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
-                      "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
-                , label = "Zkapps test transaction tool unit tests"
-                , key = key
-                , target = cmd_target
-                , docker = None Docker.Type
-                , artifact_paths = [ S.contains "core_dumps/*" ]
-                }
+        in  Command.build
+              Command.Config::{
+              , commands =
+                  RunInToolchain.runInToolchain
+                    [ "DUNE_INSTRUMENT_WITH=bisect_ppx", "COVERALLS_TOKEN" ]
+                    "buildkite/scripts/unit-test.sh ${profile} ${path} && buildkite/scripts/upload-partial-coverage-data.sh ${key} dev"
+              , label = "Zkapps test transaction tool unit tests"
+              , key
+              , target = cmd_target
+              , docker = None Docker.Type
+              , artifact_paths = [ S.contains "core_dumps/*" ]
+              }
 
 in  Pipeline.build
       Pipeline.Config::{

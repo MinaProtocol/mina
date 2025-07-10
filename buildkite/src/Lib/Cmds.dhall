@@ -10,136 +10,134 @@ let Text/concatSep = P.Text.concatSep
 let Text/concatMap = P.Text.concatMap
 
 let module =
-          \(environment : List Text)
-      ->  let Docker =
-                { Type =
-                    { image : Text
-                    , extraEnv : List Text
-                    , privileged : Bool
-                    , useBash : Bool
-                    , useRoot : Bool
-                    }
-                , default =
-                    { extraEnv = [] : List Text
-                    , privileged = False
-                    , useBash = True
-                    , useRoot = False
-                    }
+      \(environment : List Text) ->
+        let Docker =
+              { Type =
+                  { image : Text
+                  , extraEnv : List Text
+                  , privileged : Bool
+                  , useBash : Bool
+                  , useRoot : Bool
+                  }
+              , default =
+                { extraEnv = [] : List Text
+                , privileged = False
+                , useBash = True
+                , useRoot = False
                 }
-
-          let Cmd = { line : Text, readable : Optional Text }
-
-          let run
-              : Text -> Cmd
-              = \(script : Text) -> { line = script, readable = Some script }
-
-          let chain
-              : List Text -> Cmd
-              =     \(chainOfCommands : List Text)
-                ->  run (Text/concatSep " && " chainOfCommands)
-
-          let quietly
-              : Text -> Cmd
-              = \(script : Text) -> { line = script, readable = None Text }
-
-          let true
-              : Cmd
-              = quietly "true"
-
-          let false
-              : Cmd
-              = quietly "false"
-
-          let inDocker
-              : Docker.Type -> Cmd -> Cmd
-              =     \(docker : Docker.Type)
-                ->  \(inner : Cmd)
-                ->  let envVars =
-                          Text/concatMap
-                            Text
-                            (\(var : Text) -> " --env ${var}")
-                            (docker.extraEnv # environment)
-
-                    let outerDir
-                        : Text
-                        = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
-
-                    let sharedDir
-                        : Text
-                        = "/var/buildkite/shared"
-
-                    let maybeRootOption =
-                          if docker.useRoot then "--user=root" else ""
-
-                    let entrypoint
-                        : Text
-                        = if docker.useBash then "/bin/bash" else "/bin/sh"
-
-                    in  { line =
-                            "docker run -it ${maybeRootOption} --rm --entrypoint ${entrypoint} --init --volume /var/storagebox:/var/storagebox --volume /var/secrets:/var/secrets --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${      if docker.privileged
-
-                                                                                                                                                                                                                                                                            then  " --privileged"
-
-                                                                                                                                                                                                                                                                            else  ""} ${docker.image} -c '${inner.line}'"
-                        , readable =
-                            Optional/map
-                              Text
-                              Text
-                              (     \(readable : Text)
-                                ->  "Docker@${docker.image} ( ${readable} )"
-                              )
-                              inner.readable
-                        }
-
-          let runInDocker
-              : Docker.Type -> Text -> Cmd
-              =     \(docker : Docker.Type)
-                ->  \(script : Text)
-                ->  inDocker docker (run script)
-
-          let CacheSetupCmd =
-                { Type = { create : Cmd, package : Cmd }, default = {=} }
-
-          let format
-              : Cmd -> Text
-              = \(cmd : Cmd) -> cmd.line
-
-          let cacheThrough
-              : Docker.Type -> Text -> CacheSetupCmd.Type -> Cmd
-              =     \(docker : Docker.Type)
-                ->  \(cachePath : Text)
-                ->  \(cmd : CacheSetupCmd.Type)
-                ->  let missScript =
-                          format cmd.create ++ " && " ++ format cmd.package
-
-                    let missCmd = runInDocker docker missScript
-
-                    in  { line =
-                            "./buildkite/scripts/cache-through.sh ${cachePath} \"${format
-                                                                                     missCmd}\""
-                        , readable =
-                            Optional/map
-                              Text
-                              Text
-                              (     \(readable : Text)
-                                ->  "Cache@${cachePath} ( onMiss = ${readable} )"
-                              )
-                              missCmd.readable
-                        }
-
-          in  { Type = Cmd
-              , Docker = Docker
-              , CacheSetupCmd = CacheSetupCmd
-              , quietly = quietly
-              , run = run
-              , chain = chain
-              , true = true
-              , false = false
-              , runInDocker = runInDocker
-              , inDocker = inDocker
-              , cacheThrough = cacheThrough
-              , format = format
               }
+
+        let Cmd = { line : Text, readable : Optional Text }
+
+        let run
+            : Text -> Cmd
+            = \(script : Text) -> { line = script, readable = Some script }
+
+        let chain
+            : List Text -> Cmd
+            = \(chainOfCommands : List Text) ->
+                run (Text/concatSep " && " chainOfCommands)
+
+        let quietly
+            : Text -> Cmd
+            = \(script : Text) -> { line = script, readable = None Text }
+
+        let true
+            : Cmd
+            = quietly "true"
+
+        let false
+            : Cmd
+            = quietly "false"
+
+        let inDocker
+            : Docker.Type -> Cmd -> Cmd
+            = \(docker : Docker.Type) ->
+              \(inner : Cmd) ->
+                let envVars =
+                      Text/concatMap
+                        Text
+                        (\(var : Text) -> " --env ${var}")
+                        (docker.extraEnv # environment)
+
+                let outerDir
+                    : Text
+                    = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
+
+                let sharedDir
+                    : Text
+                    = "/var/buildkite/shared"
+
+                let maybeRootOption =
+                      if docker.useRoot then "--user=root" else ""
+
+                let entrypoint
+                    : Text
+                    = if docker.useBash then "/bin/bash" else "/bin/sh"
+
+                in  { line =
+                        "docker run -it ${maybeRootOption} --rm --entrypoint ${entrypoint} --init --volume /var/storagebox:/var/storagebox --volume /var/secrets:/var/secrets --volume ${sharedDir}:/shared --volume ${outerDir}:/workdir --workdir /workdir${envVars}${if    docker.privileged
+                                                                                                                                                                                                                                                                        then  " --privileged"
+                                                                                                                                                                                                                                                                        else  ""} ${docker.image} -c '${inner.line}'"
+                    , readable =
+                        Optional/map
+                          Text
+                          Text
+                          ( \(readable : Text) ->
+                              "Docker@${docker.image} ( ${readable} )"
+                          )
+                          inner.readable
+                    }
+
+        let runInDocker
+            : Docker.Type -> Text -> Cmd
+            = \(docker : Docker.Type) ->
+              \(script : Text) ->
+                inDocker docker (run script)
+
+        let CacheSetupCmd =
+              { Type = { create : Cmd, package : Cmd }, default = {=} }
+
+        let format
+            : Cmd -> Text
+            = \(cmd : Cmd) -> cmd.line
+
+        let cacheThrough
+            : Docker.Type -> Text -> CacheSetupCmd.Type -> Cmd
+            = \(docker : Docker.Type) ->
+              \(cachePath : Text) ->
+              \(cmd : CacheSetupCmd.Type) ->
+                let missScript =
+                      format cmd.create ++ " && " ++ format cmd.package
+
+                let missCmd = runInDocker docker missScript
+
+                in  { line =
+                        "./buildkite/scripts/cache-through.sh ${cachePath} \"${format
+                                                                                 missCmd}\""
+                    , readable =
+                        Optional/map
+                          Text
+                          Text
+                          ( \(readable : Text) ->
+                              "Cache@${cachePath} ( onMiss = ${readable} )"
+                          )
+                          missCmd.readable
+                    }
+
+        in  { Type = Cmd
+            , Docker
+            , CacheSetupCmd
+            , quietly
+            , run
+            , chain
+            , true
+            , false
+            , runInDocker
+            , inDocker
+            , cacheThrough
+            , format
+            }
 
 let tests =
       let M = module [ "TEST" ]

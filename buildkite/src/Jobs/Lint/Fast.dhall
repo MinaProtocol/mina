@@ -41,7 +41,7 @@ in  Pipeline.build
       , steps =
         [ Command.build
             Command.Config::{
-            , commands = commands
+            , commands
             , label =
                 "Fast lint steps; CODEOWNERs, RFCs, Check Snarky & Proof-Systems submodules, Preprocessor Deps"
             , key = "lint"

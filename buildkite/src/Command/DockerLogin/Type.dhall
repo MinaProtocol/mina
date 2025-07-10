@@ -2,11 +2,7 @@
 --
 -- See https://github.com/buildkite-plugins/docker-login-buildkite-plugin for options
 -- if you'd like to extend this definition for example
-
 { Type = { username : Text, password-env : Text, server : Text }
 , default =
-    { username = "o1botdockerhub"
-    , password-env = "DOCKER_PASSWORD"
-    , server = ""
-    }
+  { username = "o1botdockerhub", password-env = "DOCKER_PASSWORD", server = "" }
 }

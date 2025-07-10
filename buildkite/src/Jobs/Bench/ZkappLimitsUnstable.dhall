@@ -12,11 +12,11 @@ in  Pipeline.build
       ( BenchBase.pipeline
           BenchBase.Spec::{
           , path = "Bench"
-          , name = name
+          , name
           , label = "Zkapp Limits"
           , size = Size.Small
           , key = bench
-          , bench = bench
+          , bench
           , yellowThreshold = 0.1
           , redThreshold = 0.3
           }

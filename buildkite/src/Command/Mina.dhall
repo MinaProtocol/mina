@@ -17,19 +17,19 @@ let Config =
 
 let build
     : Config.Type -> Base.Type
-    =     \(c : Config.Type)
-      ->  Base.build
-            Base.Config::{
-            , commands = [ Cmd.run fixPermissionsScript ] # c.commands
-            , label = c.label
-            , key = c.key
-            , target = Size.Small
-            , docker = Some Docker::{ image = dockerImage }
-            }
+    = \(c : Config.Type) ->
+        Base.build
+          Base.Config::{
+          , commands = [ Cmd.run fixPermissionsScript ] # c.commands
+          , label = c.label
+          , key = c.key
+          , target = Size.Small
+          , docker = Some Docker::{ image = dockerImage }
+          }
 
 in  { fixPermissionsCommand =
         Cmd.runInDocker Cmd.Docker::{ image = dockerImage } fixPermissionsScript
-    , Config = Config
-    , build = build
+    , Config
+    , build
     , Type = Base.Type
     }
