@@ -65,4 +65,4 @@ let runInDockerWithPostgresConn
               , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
               ]
 
-in  { runInDockerWithPostgresConn }
+in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }
