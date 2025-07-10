@@ -9,11 +9,11 @@ let P = Prelude
 let Text/concatMap = P.Text.concatMap
 
 let runInDockerWithPostgresConn
-    : List Text -> Text -> Text -> Cmd.Type
-    = \(environment : List Text) ->
-      \(docker : Text) ->
-      \(innerScript : Text) ->
-        let version = ../../../src/test/archive/sample_db/latest_version as Text
+    : List Text → Text → Text → Cmd.Type
+    =   λ(environment : List Text)
+      → λ(docker : Text)
+      → λ(innerScript : Text)
+      → let version = ../../../src/test/archive/sample_db/latest_version as Text
 
         let port = "5432"
 
@@ -33,7 +33,7 @@ let runInDockerWithPostgresConn
         let envVars =
               Text/concatMap
                 Text
-                (\(var : Text) -> " --env ${var}")
+                (λ(var : Text) → " --env ${var}")
                 (   [ "PG_PORT=${port}"
                     , "POSTGRES_USER=${user}"
                     , "POSTGRES_PASSWORD=${password}"
@@ -65,4 +65,4 @@ let runInDockerWithPostgresConn
               , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
               ]
 
-in  { runInDockerWithPostgresConn }
+in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }
