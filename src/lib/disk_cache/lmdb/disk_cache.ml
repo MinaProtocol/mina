@@ -20,25 +20,25 @@ module Make (Data : Binable.S) = struct
     { env : Rw.t
     ; db : Rw.holder
     ; counter : int ref
-    ; garbage : int Hash_set.t
+    ; reusable_keys : int Queue.t
           (** A list of ids that are no longer reachable from OCaml's side *)
     }
 
-  (** How big can the above hashset be before we do a cleanup *)
-  let garbage_size_limit = 512
+  (** How big can the queue [reusable_keys] be before we do a cleanup *)
+  let reuse_size_limit = 512
 
   let initialize path ~logger =
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun path ->
         let env, db = Rw.create path in
-        { env; db; counter = ref 0; garbage = Hash_set.create (module Int) } )
+        { env; db; counter = ref 0; reusable_keys = Queue.create () } )
 
   type id = { idx : int }
 
   let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
     Rw.get ~env db idx |> Option.value_exn
 
-  let put ({ env; db; counter; garbage } : t) (x : Data.t) : id =
+  let put ({ env; db; counter; reusable_keys } : t) (x : Data.t) : id =
     (* TODO: we may reuse IDs by pulling them from the `garbage` hash set *)
     let idx = !counter in
     incr counter ;
@@ -49,10 +49,10 @@ module Make (Data : Binable.S) = struct
            critical section. LMDB critical section then will be re-entered if
            it's invoked directly in a GC hook.
            This causes mutex double-acquiring and node freezes. *)
-        Hash_set.add garbage idx ) ;
-    if Hash_set.length garbage >= garbage_size_limit then (
-      Hash_set.iter garbage ~f:(fun to_remove -> Rw.remove ~env db to_remove) ;
-      Hash_set.clear garbage ) ;
+        Queue.enqueue reusable_keys idx ) ;
+    if Queue.length reusable_keys >= reuse_size_limit then (
+      Queue.iter reusable_keys ~f:(fun to_remove -> Rw.remove ~env db to_remove) ;
+      Queue.clear reusable_keys ) ;
     Rw.set ~env db idx x ;
     res
 
