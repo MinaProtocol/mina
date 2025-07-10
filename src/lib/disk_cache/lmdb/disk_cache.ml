@@ -21,7 +21,8 @@ module Make (Data : Binable.S) = struct
     ; db : Rw.holder
     ; counter : int ref
     ; reusable_keys : int Queue.t
-          (** A list of ids that are no longer reachable from OCaml's side *)
+          (** A list of ids that are no longer reachable from OCaml runtime, but
+              haven't been cleared inside the LMDB disk cache *)
     }
 
   (** How big can the queue [reusable_keys] be before we do a cleanup *)
