@@ -189,7 +189,7 @@ function storage_list() {
 
     case $backend in
         local)
-            ls "$path"
+            ls $path
             ;;
         gs)
             gsutil list "$path"
@@ -211,7 +211,7 @@ function storage_md5() {
 
     case $backend in
         local)
-            md5sum "$path" | awk '{print $1}'
+            md5sum $path | awk '{print $1}'
             ;;
         gs)
             gsutil hash -h -m "$path" | grep "Hash (md5)" | awk '{print $3}'
@@ -233,7 +233,7 @@ function storage_download() {
 
     case $backend in
         local)
-            cp "$remote_path" "$local_path"
+            cp $remote_path $local_path
             ;;
         gs)
             gsutil cp "$remote_path" "$local_path"
@@ -248,6 +248,49 @@ function storage_download() {
     esac
 }
 
+function storage_upload() {
+    local backend=$1
+    local local_path=$2
+    local remote_path=$3
+
+    case $backend in
+        local)
+            cp "$local_path" "$remote_path"
+            ;;
+        gs)
+            gsutil cp "$local_path" "$remote_path"
+            ;;
+        hetzner)
+           rsync -avz -e "ssh -p 23 -i $HETZNER_KEY" $local_path "$HETZNER_USER@$HETZNER_HOST:$remote_path"
+            ;;
+        *)
+            echo "❌ Unsupported backend: $backend"
+            exit 1
+            ;;
+    esac
+}
+
+function storage_root() {
+    local backend=$1
+
+    case $backend in
+        local)
+            echo "/var/storagebox/"
+            ;;
+        gs)
+            echo "gs://buildkite_k8s/coda/shared"
+            ;;
+        hetzner)
+            echo "/home/o1labs-generic/pvc-4d294645-6466-4260-b933-1b909ff9c3a1"
+            ;;
+        *)
+            echo "❌ Unsupported backend: $backend"
+            exit 1
+            ;;
+    esac
+}
+
+
 function get_cached_debian_or_download() {
     local backend=$1
     local artifact=$2
@@ -255,15 +298,7 @@ function get_cached_debian_or_download() {
     local network=$4
 
     local artifact_full_name=$(get_artifact_with_suffix "$artifact" "$network")
-    local remote_path
-    if [[ $backend == "gs" ]]; then
-        remote_path="gs://buildkite_k8s/coda/shared/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
-    elif [[ $backend == "hetzner" ]]; then
-        remote_path="/home/o1labs-generic/pvc-4d294645-6466-4260-b933-1b909ff9c3a1/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
-    else
-        echo "❌ Unsupported backend: $backend"
-        exit 1
-    fi
+    local remote_path="$(storage_root "$backend")/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
 
     local check=$(storage_list "$backend" "$remote_path")
 
@@ -631,8 +666,8 @@ function publish(){
     echo " - Debian sign key: $__debian_sign_key"
     echo ""
 
-    if [[ $__backend != "gs" && $__backend != "hetzner" ]]; then
-        echo -e "❌ ${RED} !! Backend (--backend) can be only gs or hetzner${CLEAR}\n";
+    if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
+        echo -e "❌ ${RED} !! Backend (--backend) can be only gs, hetzner or local ${CLEAR}\n";
         publish_help; exit 1;
     fi
 
@@ -1054,15 +1089,16 @@ function verify_help(){
     printf "  %-25s %s\n" "--version" "[path] target version of build to publish"; 
     printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal"; 
     printf "  %-25s %s\n" "--channel" "[string] target debian channel"; 
+    printf "  %-25s %s\n" "--debian-repo" "[string] debian repository. default: $DEBIAN_REPO";
     printf "  %-25s %s\n" "--docker-io" "[bool] publish to docker.io instead of gcr.io"; 
     printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images"; 
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages"; 
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME verify --artifacts mina-logproc,mina-archive,mina-rosetta --networks devnet,mainnet --buildkite-build-id 123 --source-version 2.0.0-rc1-48efea4 --version 2.0.0-rc1-48efea5 --codenames bullseye,focal --channel nightly --docker-io --only-dockers
+    echo "  " $CLI_NAME verify --artifacts mina-logproc,mina-archive,mina-rosetta --networks devnet,mainnet  --version 2.0.0-rc1-48efea5 --codenames bullseye,focal --channel nightly --docker-io --only-debian
     echo ""
-    echo " Above command will promote mina-logproc,mina-archive,mina-rosetta artifacts to debian repository and docker registry"
+    echo " Above command will promote mina-logproc,mina-archive,mina-rosetta artifacts to debian repository"
     echo ""
     echo ""
 }
@@ -1080,6 +1116,8 @@ function verify(){
     local __docker_io=0
     local __only_dockers=0
     local __only_debians=0
+    local __debian_repo=$DEBIAN_REPO
+    local __debian_repo_signed=0
 
 
     while [ ${#} -gt 0 ]; do
@@ -1107,6 +1145,14 @@ function verify(){
             --channel )
                 __channel=${2:?$error_message}
                 shift 2;
+            ;;
+            --debian-repo )
+                __debian_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --signed-debian-repo )
+                __signed_debian_repo=1
+                shift 1;
             ;;
             --docker-io )
                 __publish_to_docker_io=1
@@ -1138,6 +1184,8 @@ function verify(){
     echo " - Published to docker.io: $__docker_io"
     echo " - Only dockers: $__only_dockers"
     echo " - Only debians: $__only_debians"
+    echo " - Debian repo: $__debian_repo"
+    echo " - Debian repos is signed: $__debian_repo_signed"
     echo ""
     
     #check environment setup
@@ -1163,7 +1211,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
@@ -1181,7 +1230,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
 
                                     echo ""
                                 fi
@@ -1213,7 +1263,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
 
                                     echo ""
                                 fi
@@ -1245,7 +1296,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
                                     echo ""
                                 fi
 
@@ -1357,6 +1409,119 @@ function fix(){
     echo ""
 }
 
+#==============
+# persist
+#==============
+function persist_help(){
+    echo Persist artifact from cache.
+    echo ""
+    echo "     $CLI_NAME persist [-options]"
+    echo ""
+    echo "Parameters:"
+    echo ""
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "--backend" "[string] backend to persist artifacts. e.g gs,hetzner"; 
+    printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta"; 
+    printf "  %-25s %s\n" "--build_id" "[string] buildkite build id to persist artifacts"; 
+    printf "  %-25s %s\n" "--target" "[string] target location to persist artifacts"; 
+    echo ""
+    echo "Example:"
+    echo ""
+    echo "  " $CLI_NAME persist --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --build_id 123 --target /debians_legacy
+    echo ""
+    echo " Above command will persist mina-logproc,mina-archive,mina-rosetta artifacts to {backend root}/debians_legacy"
+    echo ""
+    echo ""
+}
+
+function persist(){
+    if [[ ${#} == 0 ]]; then
+        persist_help; exit 0;
+    fi
+
+    local __backend="hetzner"
+    local __artifacts="$DEFAULT_ARTIFACTS"
+    local __buildkite_build_id
+    local __target
+    local __codename
+
+    while [ ${#} -gt 0 ]; do
+        error_message="Error: a value is needed for '$1'";
+        case $1 in
+            -h | --help ) 
+                persist_help; exit 0;
+            ;;
+            --backend )
+                __backend=${2:?$error_message}
+                shift 2;
+            ;;
+            --artifacts )
+                __artifacts=${2:?$error_message}
+                shift 2;
+            ;;
+            --codename )
+                __codename=${2:?$error_message}
+                shift 2;
+            ;;
+            --buildkite-build-id )
+                __buildkite_build_id=${2:?$error_message}
+                shift 2;
+            ;;
+            --target )
+                __target=${2:?$error_message}
+                shift 2;
+            ;;
+            * )
+                echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
+                echo "";
+                persist_help; exit 1;
+            ;;
+        esac
+    done
+
+    echo ""
+    echo " ℹ️  Persisting mina artifacts with following parameters:"
+    echo " - Backend: $__backend"
+    echo " - Artifacts: $__artifacts"
+    echo " - Buildkite build id: $__buildkite_build_id"
+    echo " - Target: $__target"
+
+    if [[ -z ${__buildkite_build_id+x} ]]; then
+        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -z ${__target+x} ]]; then
+        echo -e "❌ ${RED} !! Target (--target) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -z ${__codename+x} ]]; then
+        echo -e "❌ ${RED} !! Codename (--codename) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -z ${__artifacts+x} ]]; then
+        echo -e "❌ ${RED} !! Artifacts (--artifacts) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    IFS=', '
+    read -r -a __artifacts_arr <<< "$__artifacts"
+        
+    tmp_dir=$(mktemp -d)
+    echo " - Using temporary directory: $tmp_dir"
+    echo ""
+
+    for __artifact in "${__artifacts_arr[@]}"; do
+        storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*" "$tmp_dir"
+        storage_upload "$__backend" "$tmp_dir/${__artifact}_*" "$(storage_root "$__backend")/$__target/debians/$__codename/"
+    done
+    
+    echo " ✅  Done."
+    echo ""
+}
+
 
 function main(){
     if (( ${#} == 0 )); then
@@ -1367,7 +1532,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        publish | promote | verify | fix )
+        publish | promote | verify | fix | persist)
             $1 "${@:2}";
         ;;
         * )

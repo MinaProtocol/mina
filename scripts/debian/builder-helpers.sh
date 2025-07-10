@@ -23,25 +23,20 @@ SUGGESTED_DEPS="jq, curl, wget"
 TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker"
 
 case "${MINA_DEB_CODENAME}" in
-  noble)
+  noble|jammy)
     SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, rocksdb-tools"
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0 , mina-logproc"
     ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
     ;;
-  bookworm|jammy)
-    SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
-    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
-    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
+  bookworm)
+    SHARED_DEPS="libssl3, libgmp10, libgomp1, tzdata, rocksdb-tools"
+    DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0 , mina-logproc"
+    ARCHIVE_DEPS="libssl3, libgomp1, libpq-dev, libjemalloc2"
     ;;
   bullseye|focal)
     SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
-    ;;
-  stretch|bionic)
-    SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools"
-    DAEMON_DEPS=", libffi6, libjemalloc1, libpq-dev, libprocps6, mina-logproc"
-    ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc1"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1

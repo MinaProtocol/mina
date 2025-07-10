@@ -6,11 +6,14 @@ let Profiles = ./Profiles.dhall
 
 let Network = ./Network.dhall
 
+let BuildFlags = ./BuildFlags.dhall
+
 let Repo = ./DockerRepo.dhall
 
 let Artifact
     : Type
     = < Daemon
+      | DaemonHardfork
       | LogProc
       | Archive
       | TestExecutive
@@ -23,6 +26,7 @@ let Artifact
 
 let AllButTests =
       [ Artifact.Daemon
+      , Artifact.DaemonHardfork
       , Artifact.LogProc
       , Artifact.Archive
       , Artifact.BatchTxn
@@ -35,12 +39,18 @@ let AllButTests =
 let Main =
       [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All = AllButTests # [ Artifact.FunctionalTestSuite, Artifact.Toolchain ]
+let All =
+        AllButTests
+      # [ Artifact.FunctionalTestSuite
+        , Artifact.Toolchain
+        , Artifact.DaemonHardfork
+        ]
 
 let capitalName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "Daemon"
+            , DaemonHardfork = "DaemonHardfork"
             , LogProc = "LogProc"
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
@@ -56,6 +66,7 @@ let lowerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "daemon"
+            , DaemonHardfork = "daemon_hardfork"
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
@@ -71,6 +82,7 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
+            , DaemonHardfork = "mina-daemon-hardfork"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
@@ -82,11 +94,20 @@ let dockerName =
             }
             artifact
 
+let dockerNames =
+          \(artifacts : List Artifact)
+      ->  Prelude.List.map
+            Artifact
+            Text
+            (\(a : Artifact) -> dockerName a)
+            artifacts
+
 let toDebianName =
           \(artifact : Artifact)
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
+            , DaemonHardfork = ""
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
@@ -108,6 +129,7 @@ let toDebianNames =
                   (     \(a : Artifact)
                     ->  merge
                           { Daemon = [ toDebianName a network ]
+                          , DaemonHardfork = [ toDebianName a network ]
                           , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
@@ -137,12 +159,14 @@ let Tag =
           , version : Text
           , profile : Profiles.Type
           , network : Network.Type
+          , buildFlags : BuildFlags.Type
           , remove_profile_from_name : Bool
           }
       , default =
           { artifact = Artifact.Daemon
           , version = "\\\${MINA_DOCKER_TAG}"
-          , profile = Profiles.Type.Standard
+          , profile = Profiles.Type.Devnet
+          , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
           , remove_profile_from_name = False
           }
@@ -157,17 +181,28 @@ let dockerTag =
 
                 else  "${Profiles.toLabelSegment spec.profile}"
 
+          let build_flags_part =
+                merge
+                  { None = ""
+                  , Instrumented =
+                      "${BuildFlags.toLabelSegment spec.buildFlags}"
+                  }
+                  spec.buildFlags
+
           in  merge
                 { Daemon =
                     "${spec.version}-${Network.lowerName
+                                         spec.network}${profile_part}${build_flags_part}"
+                , DaemonHardfork =
+                    "${spec.version}-${Network.lowerName
                                          spec.network}${profile_part}"
-                , Archive = "${spec.version}"
+                , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
                 , BatchTxn = "${spec.version}"
                 , Rosetta = "${spec.version}-${Network.lowerName spec.network}"
                 , ZkappTestTransaction = "${spec.version}"
-                , FunctionalTestSuite = "${spec.version}"
+                , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"
                 }
                 spec.artifact
@@ -184,6 +219,7 @@ in  { Type = Artifact
     , toDebianName = toDebianName
     , toDebianNames = toDebianNames
     , dockerName = dockerName
+    , dockerNames = dockerNames
     , dockerTag = dockerTag
     , fullDockerTag = fullDockerTag
     , All = All

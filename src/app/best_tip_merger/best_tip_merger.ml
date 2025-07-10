@@ -144,7 +144,7 @@ module Output = struct
     | Root of { state : State_hash.t; peer_ids : String.Set.t }
     | Node of Node.t
 
-  type t = node Rose_tree.t list
+  type t = node Mina_stdlib.Rose_tree.t list
 
   let of_input (input : Input.t) ~min_peers : t =
     let roots =
@@ -173,12 +173,12 @@ module Output = struct
             else successors
           in
           List.map successors_with_min_peers ~f:(fun s ->
-              Rose_tree.T
+              Mina_stdlib.Rose_tree.T
                 ( Node { state = s.state; peer_ids = s.peer_ids }
                 , go s.state.state_hash ) )
         in
         let root_node =
-          Rose_tree.T (Root { state = root; peer_ids }, go root)
+          Mina_stdlib.Rose_tree.T (Root { state = root; peer_ids }, go root)
         in
         root_node :: acc_trees )
 end
@@ -191,12 +191,12 @@ module Display = struct
 
   type node = { state : state; peers : int } [@@deriving yojson]
 
-  type t = node Rose_tree.t list [@@deriving yojson]
+  type t = node Mina_stdlib.Rose_tree.t list [@@deriving yojson]
 
   let of_output : Output.t -> t =
    fun t ->
     List.map t ~f:(fun tree ->
-        Rose_tree.map tree ~f:(fun (t : Output.node) ->
+        Mina_stdlib.Rose_tree.map tree ~f:(fun (t : Output.node) ->
             match t with
             | Root s ->
                 { state = Root s.state; peers = Set.length s.peer_ids }
@@ -217,11 +217,11 @@ module Compact_display = struct
 
   type node = { state : state; peers : int } [@@deriving yojson]
 
-  type t = node Rose_tree.t list [@@deriving yojson]
+  type t = node Mina_stdlib.Rose_tree.t list [@@deriving yojson]
 
   let of_output t =
     List.map t ~f:(fun tree ->
-        Rose_tree.map tree ~f:(fun (t : Output.node) ->
+        Mina_stdlib.Rose_tree.map tree ~f:(fun (t : Output.node) ->
             match t with
             | Root s ->
                 { state = Root s.state; peers = Set.length s.peer_ids }
@@ -280,7 +280,7 @@ end
 module Visualization = struct
   include Visualization.Make_ocamlgraph (Graph_node)
 
-  let to_graph (t : Compact_display.node Rose_tree.t) =
+  let to_graph (t : Compact_display.node Mina_stdlib.Rose_tree.t) =
     let to_graph_node (node : Compact_display.node) =
       let state =
         match node.state with
@@ -295,7 +295,7 @@ module Visualization = struct
       in
       { Graph_node.state; peers = node.peers }
     in
-    let rec go (Rose_tree.T (node, subtrees)) graph =
+    let rec go (Mina_stdlib.Rose_tree.T (node, subtrees)) graph =
       let node = to_graph_node node in
       let graph_with_node = add_vertex graph node in
       List.fold ~init:graph_with_node subtrees

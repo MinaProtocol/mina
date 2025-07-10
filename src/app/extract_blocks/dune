@@ -19,7 +19,7 @@
   ;; local libraries
   consensus.vrf
   mina_wire_types
-  bounded_types
+  mina_stdlib
   mina_base
   mina_base.import
   kimchi_pasta

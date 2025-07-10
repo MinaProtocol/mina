@@ -39,6 +39,7 @@ let ReleaseSpec =
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
+          , deb_legacy_version : Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
@@ -56,7 +57,8 @@ let ReleaseSpec =
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "\\\${MINA_DEB_RELEASE}"
           , deb_version = "\\\${MINA_DEB_VERSION}"
-          , deb_profile = Profiles.Type.Standard
+          , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
@@ -69,10 +71,7 @@ let ReleaseSpec =
 
 let stepKey =
           \(spec : ReleaseSpec.Type)
-      ->  "${Artifacts.lowerName
-               spec.service}${Profiles.toLabelSegment
-                                spec.deb_profile}${BuildFlags.toLabelSegment
-                                                     spec.build_flags}${spec.step_key_suffix}"
+      ->  "${Artifacts.lowerName spec.service}${spec.step_key_suffix}"
 
 let stepLabel =
           \(spec : ReleaseSpec.Type)
@@ -121,6 +120,7 @@ let generateStep =
                 ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
+                ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =

@@ -3,7 +3,7 @@
  (name generate_keypair)
  (public_name generate_keypair)
  (modes native)
- (libraries cli_lib async core_kernel mina_version async_unix bounded_types)
+ (libraries cli_lib async core_kernel mina_version async_unix mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

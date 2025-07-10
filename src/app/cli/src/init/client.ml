@@ -950,12 +950,14 @@ let currency_in_ledger =
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
+         let signature_kind = Mina_signature_kind.t_DEPRECATED in
          let constraint_constants =
            Genesis_constants.Compiled.constraint_constants
          in
          let proof_level = Genesis_constants.Compiled.proof_level in
          let all =
-           Transaction_snark.constraint_system_digests ~constraint_constants ()
+           Transaction_snark.constraint_system_digests ~signature_kind
+             ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
                ~proof_level ~constraint_constants ()
          in

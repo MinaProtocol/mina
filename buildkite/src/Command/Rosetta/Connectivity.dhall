@@ -18,8 +18,6 @@ let Size = ../../Command/Size.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
@@ -68,10 +66,11 @@ let command
             , soft_fail = Some spec.softFail
             , depends_on =
                 Dockers.dependsOn
-                  spec.dockerType
-                  spec.network
-                  Profiles.Type.Standard
-                  Artifacts.Type.Rosetta
+                  Dockers.DepsSpec::{
+                  , codename = spec.dockerType
+                  , network = spec.network
+                  , artifact = Artifacts.Type.Rosetta
+                  }
             }
 
 let pipeline

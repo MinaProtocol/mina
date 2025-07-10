@@ -1,3 +1,4 @@
+open Core_kernel
 open Unsigned
 
 (* add functions to library module Bigstring so we can derive hash for the type t below *)
@@ -14,7 +15,7 @@ module Bigstring = struct
       let hash_fold_t hash_state t =
         String.hash_fold_t hash_state (Bigstring.to_string t)
 
-      include Bounded_types.String.Of_stringable (struct
+      include Mina_stdlib.Bounded_types.String.Of_stringable (struct
         type nonrec t = t
 
         let of_string s = Bigstring.of_string s

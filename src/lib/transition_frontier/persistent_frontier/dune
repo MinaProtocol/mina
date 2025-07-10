@@ -13,11 +13,10 @@
   sexplib0
   async_unix
   ;;local libraries
-  bounded_types
+  mina_stdlib
   o1trace
   mina_metrics
   trust_system
-  mina_stdlib
   staged_ledger
   precomputed_values
   data_hash_lib
