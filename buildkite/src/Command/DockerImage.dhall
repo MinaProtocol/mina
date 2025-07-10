@@ -115,8 +115,8 @@ let generateStep =
                 Extensions.joinOptionals
                   "-"
                   [ merge
-                      { Standard = None Text
-                      , Mainnet = None Text
+                      { Mainnet = None Text
+                      , Devnet = None Text
                       , Dev = None Text
                       , Lightnet = Some
                           "${Profiles.toSuffixLowercase spec.deb_profile}"
