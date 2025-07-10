@@ -73,3 +73,5 @@ _coverage/
 /src/external
 
 CLAUDE.local.md
+
+it-*/
