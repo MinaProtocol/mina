@@ -57,6 +57,7 @@ mkdir -p $DEBIAN_CACHE_FOLDER
 ################################################################################
 # imports
 ################################################################################
+# shellcheck disable=SC1090
 . $SCRIPTPATH/../../../scripts/debian/reversion-helper.sh
 
 
@@ -162,7 +163,8 @@ function calculate_debian_version() {
     local __codename=$3
     local __network=$4
 
-    local __network_suffix=$(get_suffix $__artifact $__network)
+    local __network_suffix
+    __network_suffix=$(get_suffix $__artifact $__network)
     echo "$__artifact:$__target_version-$__codename$__network_suffix"
 }
 
@@ -174,8 +176,9 @@ function calculate_docker_tag() {
     local __codename=$4
     local __network=$5
 
-    local __network_suffix=$(get_suffix $__artifact $__network)
-    
+    local __network_suffix
+    __network_suffix=$(get_suffix $__artifact $__network)
+
     if [[ $__publish_to_docker_io == 1 ]]; then
         echo "$DOCKER_IO_REPO/$__artifact:$__target_version-$__codename$__network_suffix"
     else
@@ -297,17 +300,21 @@ function get_cached_debian_or_download() {
     local codename=$3
     local network=$4
 
-    local artifact_full_name=$(get_artifact_with_suffix "$artifact" "$network")
-    local remote_path="$(storage_root "$backend")/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
-
-    local check=$(storage_list "$backend" "$remote_path")
+    local artifact_full_name
+    artifact_full_name=$(get_artifact_with_suffix "$artifact" "$network")
+    local remote_path
+    remote_path="$(storage_root "$backend")/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
+    
+    local check
+    check=$(storage_list "$backend" "$remote_path")
 
     if [[ -z "$check" ]]; then
         echo -e "❌ ${RED} !! No debian package found using $artifact_full_name. Are you sure ($BUILDKITE_BUILD_ID) buildkite build is correct? Exiting.${CLEAR}\n"
         exit 1
     fi
 
-    local target_hash=$(storage_md5 "$backend" "$remote_path")
+    local target_hash
+    target_hash=$(storage_md5 "$backend" "$remote_path")
 
     mkdir -p "$DEBIAN_CACHE_FOLDER/$codename"
 
@@ -336,7 +343,8 @@ function publish_debian() {
     local __debian_sign_key=${11}
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network"
-    local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
+    local __artifact_full_name
+    __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__debian_sign_key != "" ]]; then
@@ -397,7 +405,8 @@ function promote_and_verify_docker() {
     local __verify=$7
     local __dry_run=$8
     
-    local __network_suffix=$(get_suffix $__artifact $__network)
+    local __network_suffix
+    __network_suffix=$(get_suffix $__artifact $__network)
 
     local __artifact_full_source_version=$__source_version-$__codename${__network_suffix}
     local __artifact_full_target_version=$__target_version-$__codename${__network_suffix}
@@ -464,7 +473,8 @@ function promote_debian() {
     echo " 🍥 Promoting $__artifact debian from $__source_channel to $__target_channel, from $__source_version to $__target_version"
     echo "    📦 Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network")"
     
-    local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
+    local __artifact_full_name
+    __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__dry_run == 0 ]]; then
@@ -472,14 +482,11 @@ function promote_debian() {
         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/reversion.sh \
                 --deb ${__artifact_full_name} \
                 --version ${__source_version} \
-                --release ${__source_channel} \
                 --new-version ${__target_version} \
                 --suite ${__source_channel} \
                 --repo ${__debian_repo} \
                 --new-suite ${__target_channel} \
-                --new-name ${__artifact_full_name} \
-                --new-release ${__target_channel} \
-                --codename ${__codename}
+                --new-name ${__artifact_full_name}
 
         if [[ $__verify == 1 ]]; then
             echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
@@ -1196,7 +1203,8 @@ function verify(){
     read -r -a __networks_arr <<< "$__networks"
     read -r -a __codenames_arr <<< "$__codenames"
     
-    local __repo=$(get_repo $__docker_io)
+    local __repo
+    __repo=$(get_repo $__docker_io)
     
     for artifact in "${__artifacts_arr[@]}"; do
         for __codename in "${__codenames_arr[@]}"; do
@@ -1252,8 +1260,9 @@ function verify(){
                         ;;
                         mina-rosetta)
                             for network in "${__networks_arr[@]}"; do
-                               local __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
-                               
+                               local __artifact_full_name
+                               __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
                                if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
                                     echo ""
@@ -1287,7 +1296,8 @@ function verify(){
                         ;;
                         mina-daemon)
                             for network in "${__networks_arr[@]}"; do
-                                local __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+                                local __artifact_full_name
+                                __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
                                 if [[ $__only_dockers == 0 ]]; then
                                 echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
                                 echo ""

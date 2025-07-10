@@ -12,8 +12,9 @@ fi
 CLEAR='\033[0m'
 RED='\033[0;31m'
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-source ${SCRIPTPATH}/helper.sh
+SCRIPTPATH="$( cd "$(dirname "$0")" || exit ; pwd -P )"
+# shellcheck disable=SC1090
+source "${SCRIPTPATH}"/helper.sh
 
 function usage() {
   if [[ -n "$1" ]]; then
@@ -51,7 +52,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
-  --deb-repo-key) DEB_REPO_KEY="$2"; shift;;
+  --deb-repo-key) 
+      # shellcheck disable=SC2034
+      DEB_REPO_KEY="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -121,7 +124,7 @@ if [[ -z "$INPUT_REPO" ]]; then
   DEB_REPO="--build-arg deb_repo=http://localhost:8080"
 fi
 
-if [[ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
+if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
 export_base_image
 
