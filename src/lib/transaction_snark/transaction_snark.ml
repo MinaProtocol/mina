@@ -3539,7 +3539,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let rec error_msg_fold cur_err_msg ts =
       match ts with
       | [] ->
-          ""
+          cur_err_msg
       | ((p : Stable.Latest.t), m) :: rest ->
           if Sok_message.Digest.equal (Sok_message.digest m) p.data.sok_digest
           then error_msg_fold cur_err_msg rest
