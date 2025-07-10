@@ -1287,7 +1287,8 @@ function verify(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    local __artifact_full_name=$(get_artifact_with_suffix $artifact "")
+                                    local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact "")
 
                                     local __suffix_arg=""
                                     if [[ -n "$__docker_suffix" ]]; then
