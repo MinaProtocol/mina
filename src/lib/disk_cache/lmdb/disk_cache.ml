@@ -42,8 +42,11 @@ module Make (Data : Binable.S) = struct
     let idx =
       match Queue.dequeue reusable_keys with
       | None ->
+          (* We don't have reusable keys, assign a new one nobody ever used *)
           incr counter ; !counter - 1
       | Some reused_key ->
+          (* Any key inside [reusable_keys] is marked as garbage by GC, so we're
+             free to use them *)
           reused_key
     in
     let res = { idx } in
