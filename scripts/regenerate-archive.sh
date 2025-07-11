@@ -80,7 +80,11 @@ tar -C precomputed_blocks -cvf ./src/test/archive/sample_db/precomputed_blocks.t
 rm -rf precomputed_blocks
 
 echo "Regenerating archive_db.sql"
-PGPASSWORD=${PG_PASSWD} pg_dump -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" -d "${PG_DB}" > ./src/test/archive/sample_db/archive_db.sql
+PGPASSWORD=${PG_PASSWD} pg_dump \
+          -U "${PG_USER}" \
+          -h "${PG_HOST}" \
+          -p "${PG_PORT}" \
+          -d "${PG_DB}" > ./src/test/archive/sample_db/archive_db.sql
 
 
 echo "Regenerating input file"
@@ -92,15 +96,30 @@ rm _tmp.json
 echo "Regenerating genesis_ledger"
 cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat $LOCAL_NETWORK_DATA_FOLDER/genesis_ledger.json | jq -c)"  > _tmp.json
 #update genesis_state_timestamp to the one from daemon.json
-jq --arg timestamp "$(cat $LOCAL_NETWORK_DATA_FOLDER/daemon.json | jq -r '.genesis.genesis_state_timestamp')" '.genesis.genesis_state_timestamp = $timestamp' _tmp.json > _tmp2.json && mv _tmp2.json _tmp.json
+jq --arg timestamp \
+   "$(cat $LOCAL_NETWORK_DATA_FOLDER/daemon.json | jq -r '.genesis.genesis_state_timestamp')" \
+   '.genesis.genesis_state_timestamp = $timestamp' \
+   _tmp.json > _tmp2.json && mv _tmp2.json _tmp.json
 
 mv _tmp.json src/test/archive/sample_db/genesis.json
 
 echo "Finished regenerate testing replay"
 
-PGPASSWORD=${PG_PASSWD} dropdb -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" "${PG_DB}"
-PGPASSWORD=${PG_PASSWD} createdb -U "${PG_USER}" -h "$PG_HOST" -p "${PG_PORT}" "${PG_DB}"
-PGPASSWORD=${PG_PASSWD} psql -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" "${PG_DB}" < ./src/test/archive/sample_db/archive_db.sql
+PGPASSWORD=${PG_PASSWD} dropdb \
+          -U "${PG_USER}" \
+          -h "${PG_HOST}" \
+          -p "${PG_PORT}" \
+          "${PG_DB}"
+PGPASSWORD=${PG_PASSWD} createdb \
+          -U "${PG_USER}" \
+          -h "$PG_HOST" \
+          -p "${PG_PORT}" \
+          "${PG_DB}"
+PGPASSWORD=${PG_PASSWD} psql \
+          -U "${PG_USER}" \
+          -h "${PG_HOST}" \
+          -p "${PG_PORT}" \
+          "${PG_DB}" < ./src/test/archive/sample_db/archive_db.sql
 dune exec src/app/replayer/replayer.exe -- \
      --archive-uri "$PG_URI" \
      --input-file src/test/archive/sample_db/replayer_input_file.json \
