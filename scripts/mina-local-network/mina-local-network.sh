@@ -199,7 +199,7 @@ exec-worker-daemon() {
     -proof-level "${PROOF_LEVEL}" \
     -shutdown-on-disconnect "${SHUTDOWN_ON_DISCONNECT}" \
     -daemon-address "${COORDINATOR_HOST_AND_PORT}" \
-    $@
+    "$@"
 }
 
 # Executes the Archive node
@@ -210,7 +210,7 @@ exec-archive-node() {
     --log-level "${LOG_LEVEL}" \
     --postgres-uri "${PG_URI}" \
     --server-port "${ARCHIVE_SERVER_PORT}" \
-    $@
+    "$@"
 }
 
 # Spawns the Node in background
@@ -408,7 +408,7 @@ if ${ARCHIVE}; then
     recreate-schema
   fi
 
-  psql ${PG_URI} -c "SELECT * FROM user_commands;" &>/dev/null
+  psql "${PG_URI}" -c "SELECT * FROM user_commands;" &>/dev/null
 
   ARCHIVE_ADDRESS_CLI_ARG="-archive-address ${ARCHIVE_SERVER_PORT}"
 fi
@@ -491,25 +491,24 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   generate-keypair "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account
   # shellcheck disable=SC2004
   for ((i = 0; i < ${FISH}; i++)); do
-    generate-keypair "${LEDGER_FOLDER}"/offline_fish_keys/offline_fish_account_${i}
-    generate-keypair "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_${i}
-    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i}
+    generate-keypair "${LEDGER_FOLDER}"/offline_fish_keys/offline_fish_account_"${i}"
+    generate-keypair "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_"${i}"
+    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_"${i}"
   done
   # shellcheck disable=SC2004
   for ((i = 0; i < ${WHALES}; i++)); do
-    generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
-    generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i}
+    generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_"${i}"
+    generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_"${i}"
+    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_"${i}"
   done
   # shellcheck disable=SC2004
   for ((i = 0; i < ${NODES}; i++)); do
-    generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
-    generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i}
+    generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_"${i}"
+    generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_"${i}"
+    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_"${i}"
   done
 
-  if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
-    # shellcheck disable=SC2012
+  if [ "$(uname)" != "Darwin" ] && [ "${FISH}" -gt 0 ]; then
     FILE=$(ls "${LEDGER_FOLDER}"/offline_fish_keys/ | head -n 1)
     OWNER=$(stat -c "%U" "${LEDGER_FOLDER}"/offline_fish_keys/"${FILE}")
 
@@ -573,7 +572,7 @@ if ${UPDATE_GENESIS_TIMESTAMP}; then
   fi
 fi
 
-if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
+if [ -n "${OVERRIDE_SLOT_TIME_MS}" ]; then
   echo 'Modifying configuration to override slot time'
 
   if [ ! -f "${CONFIG}" ]; then
@@ -647,7 +646,7 @@ done
 #---------- Starting snark workers
 
 for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
-  FOLDER="${NODES_FOLDER}"/snark_workers/worker_${i}
+  FOLDER="${NODES_FOLDER}"/snark_workers/worker_"${i}"
   mkdir -p "${FOLDER}"
   spawn-worker "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
   SNARK_WORKERS_PIDS[${i}]=$!
@@ -656,11 +655,14 @@ done
 # ----------
 
 for ((i = 0; i < WHALES; i++)); do
-  FOLDER="${NODES_FOLDER}"/whale_${i}
-  KEY_FILE="${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
+  FOLDER="${NODES_FOLDER}"/whale_"${i}"
+  KEY_FILE="${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_"${i}"
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
-    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+  spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) \
+             -peer ${SEED_PEER_ID} \
+             -block-producer-key "${KEY_FILE}" \
+             -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i} \
+             "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
 done
 
@@ -670,8 +672,11 @@ for ((i = 0; i < FISH; i++)); do
   FOLDER="${NODES_FOLDER}"/fish_${i}
   KEY_FILE="${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
-    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+  spawn-node "${FOLDER}" $((${FISH_START_PORT} + (${i} * 5))) \
+             -peer ${SEED_PEER_ID} \
+             -block-producer-key "${KEY_FILE}" \
+             -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i} \
+             "${ARCHIVE_ADDRESS_CLI_ARG}"
   FISH_PIDS[${i}]=$!
 done
 
@@ -680,8 +685,10 @@ done
 for ((i = 0; i < NODES; i++)); do
   FOLDER="${NODES_FOLDER}"/node_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
-    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
+  spawn-node "${FOLDER}" $((${NODE_START_PORT} + (${i} * 5))) \
+             -peer ${SEED_PEER_ID} \
+             -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i} \
+             "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
 
@@ -801,11 +808,20 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   fi
 
   if ${VALUE_TRANSFERS}; then
-    ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path "${KEY_FILE}"
-    ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key "${PUB_KEY}"
+    ${MINA_EXE} account import \
+                -rest-server ${REST_SERVER} \
+                -privkey-path "${KEY_FILE}"
+    ${MINA_EXE} account unlock \
+                -rest-server ${REST_SERVER} \
+                -public-key "${PUB_KEY}"
 
     sleep "${TRANSACTION_FREQUENCY}"
-    ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
+    ${MINA_EXE} client send-payment \
+                -rest-server ${REST_SERVER} \
+                -amount 1 \
+                -nonce 0 \
+                -receiver "${PUB_KEY}" \
+                -sender "${PUB_KEY}"
   fi
 
   fee_payer_nonce=1
@@ -813,10 +829,14 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   state=0
 
   while true; do
-    sleep ${TRANSACTION_FREQUENCY}
+    sleep "${TRANSACTION_FREQUENCY}"
 
     if ${VALUE_TRANSFERS}; then
-      ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+      ${MINA_EXE} client send-payment \
+                  -rest-server ${REST_SERVER} \
+                  -amount 1 \
+                  -receiver "${PUB_KEY}" \
+                  -sender "${PUB_KEY}"
     fi
 
     if ${ZKAPP_TRANSACTIONS}; then
