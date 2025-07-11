@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-TOTAL_BLOCKS=25
+TOTAL_BLOCKS=${TOTAL_BLOCKS:-25}
 
 # PostgreSQL configuration
 PG_USER=${PG_USER:-postgres}
