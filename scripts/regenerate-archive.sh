@@ -20,7 +20,7 @@ psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'postgres';"
     -tf 1 --override-slot-time 30000 \
     -zt -vt -lp &
 
-LOCAL_NETWORK_DATA_FOLDER=~/.mina-network/mina-local-network-2-1-1
+LOCAL_NETWORK_DATA_FOLDER="${HOME}"/.mina-network/mina-local-network-2-1-1
 
 trap "pkill -f mina-local-network" EXIT
 
