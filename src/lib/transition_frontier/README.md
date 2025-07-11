@@ -18,15 +18,15 @@ background.
 In terms of the data structure, the transition frontier can be thought of as a
 combination of the following pieces of information:
 
-1) A rose tree that contains all blockchains (including forks) up to `k` in
-length from the most recently finalized block.
-2) A history of recently finalized blocks.
-3) A snarked ledger for the most recently finalized block.
-4) A series of ledger masks, chained off of the aforementioned snarked ledger,
-to represent intermediate staged ledger states achieved by blocks tracked past
-the most recently finalized block.
-5) The auxiliary scan state information associated with each block tracked past
-the most recently finalized block.
+1. A rose tree that contains all blockchains (including forks) up to `k` in
+   length from the most recently finalized block.
+2. A history of recently finalized blocks.
+3. A snarked ledger for the most recently finalized block.
+4. A series of ledger masks, chained off of the aforementioned snarked ledger,
+   to represent intermediate staged ledger states achieved by blocks tracked
+   past the most recently finalized block.
+5. The auxiliary scan state information associated with each block tracked past
+   the most recently finalized block.
 
 Importantly, the transition frontier also can identify which of the states it is
 tracking is the strongest state, which is referred to as the "best tip". The
@@ -39,17 +39,17 @@ TODO
 
 ## Glossary
 
-| Name                     | Description |
-|--------------------------|-------------|
-| Best Tip                 | The best state in a frontier. This is always a tip (leaf) of the frontier, by nature of the consensus selection rules |
-| Breadcrumb               | A fully expanded state for a block. Contains a validated block and a make-chained staged ledger, with some metadata. |
-| Frontier Diff            | A representation of a state transition to perform on a frontier data structure. |
+| Name                     | Description                                                                                                                                                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Best Tip                 | The best state in a frontier. This is always a tip (leaf) of the frontier, by nature of the consensus selection rules                                                                                                                                      |
+| Breadcrumb               | A fully expanded state for a block. Contains a validated block and a make-chained staged ledger, with some metadata.                                                                                                                                       |
+| Frontier Diff            | A representation of a state transition to perform on a frontier data structure.                                                                                                                                                                            |
 | Frontier Root Data       | Fat, auxiliary information stored for the root of a persistent frontier. Stored in a single file, it contains a serialized scan state and pending coinbase state, which can be used to reconstruct a staged ledger at the root of the persistent frontier. |
-| Frontier Root Identifier | Light, auxiliary information stored for the persistent root. Stored in a single file, it identifies the root state hash currently associated with a persistent root. |
-| Full Frontier            | The in-memory representation of the transition frontier, with fully expanded states at every node (breadcrumbs). |
-| Persistent Frontier      | An on-disk representation of the transition frontier. Stores block information in RocksDB, which is asynchronously updated by processing frontier diffs applied to the in memory full frontier representation. |
-| Persistent Root          | An on-disk ledger where the root snarked ledger of the transition frontier is stored. The ledger serves as the root ledger in the full frontier's mask chain, and is actively mutated by the full frontier as new roots are committed. |
-| Root Snarked Ledger      | Synonymous with persistent root (in the case of full frontier), this is the fully snarked ledger at the root of a frontier |
+| Frontier Root Identifier | Light, auxiliary information stored for the persistent root. Stored in a single file, it identifies the root state hash currently associated with a persistent root.                                                                                       |
+| Full Frontier            | The in-memory representation of the transition frontier, with fully expanded states at every node (breadcrumbs).                                                                                                                                           |
+| Persistent Frontier      | An on-disk representation of the transition frontier. Stores block information in RocksDB, which is asynchronously updated by processing frontier diffs applied to the in memory full frontier representation.                                             |
+| Persistent Root          | An on-disk ledger where the root snarked ledger of the transition frontier is stored. The ledger serves as the root ledger in the full frontier's mask chain, and is actively mutated by the full frontier as new roots are committed.                     |
+| Root Snarked Ledger      | Synonymous with persistent root (in the case of full frontier), this is the fully snarked ledger at the root of a frontier                                                                                                                                 |
 
 ## Architecture
 
@@ -166,14 +166,14 @@ exceeded.
 
 The database supports the following schema:
 
-| Key                                   | Args           | Value                       | Description |
-|---------------------------------------|----------------|-----------------------------|-------------|
-| `Db_version`                          | `()`           | `int`                       | The current schema version stored in the database. |
-| `Root`                                | `()`           | `Root_data.Minimal.t`       | The auxiliary root data. |
-| `Best_tip`                            | `()`           | `State_hash.t`              | Pointer to the current best tip. |
+| Key                                   | Args           | Value                       | Description                                                                  |
+| ------------------------------------- | -------------- | --------------------------- | ---------------------------------------------------------------------------- |
+| `Db_version`                          | `()`           | `int`                       | The current schema version stored in the database.                           |
+| `Root`                                | `()`           | `Root_data.Minimal.t`       | The auxiliary root data.                                                     |
+| `Best_tip`                            | `()`           | `State_hash.t`              | Pointer to the current best tip.                                             |
 | `Protocol_states_for_root_scan_state` | `()`           | `Protocol_state.value list` | Auxiliary block headers required for constructing the scan state at the root |
-| `Transition`                          | `State_hash.t` | `External_transition.t`     | Block storage by state hash. |
-| `Arcs`                                | `State_hash.t` | `State_hash.t list`         | Successor hash storage by predecessor hash. |
+| `Transition`                          | `State_hash.t` | `External_transition.t`     | Block storage by state hash.                                                 |
+| `Arcs`                                | `State_hash.t` | `State_hash.t list`         | Successor hash storage by predecessor hash.                                  |
 
 #### Resynchronization
 
@@ -208,20 +208,20 @@ of the best tip.
 
 TODO: extensions
 
-| Name                                | File                                                                     | Description |
-|-------------------------------------|--------------------------------------------------------------------------|-------------|
-| Breadcrumb                          | [frontier\_base/breadcrumb.ml](./frontier_base/breadcrumb.ml)            | The breadcrumb data structure. |
-| Frontier Interface                  | [frontier\_base/frontier\_intf.ml](./frontier_base/frontier_intf.ml)     | The external interface which frontiers must provide to. |
-| Diff                                | [frontier\_base/diff.ml](./frontier_base/diff.ml)                        | The representation of frontier diffs. |
-| Root Data                           | [frontier\_base/root\_data.ml](./frontier_base/root_data.ml)             | The representation of frontier root data, at varying levels of detail/size. |
-| Root Identifier                     | [frontier\_base/root\_identifier.ml](./frontier_base/root_identifier.ml) | The representation of frontier root identifiers. |
-| Full Frontier                       | [full\_frontier/full\_frontier.ml](./full_frontier/full_frontier.ml)     | The in memory, fully expanded frontier data structure. |
-| Persistent Frontier Database        | [database.ml](./persistent_frontier/database.ml)                         | The RocksDB database that the persistent frontier is stored in. |
-| Persistent Frontier Diff Buffer     | [diff\_buffer.ml](./persistent_frontier/diff_buffer.ml)                  | The diff buffer used as part of the persistent frontier synchronization subsystem. |
-| Persistent Frontier Synchronization | [sync.ml](./persistent_frontier/sync.ml)                                 | The persistent frontier synchronization subsystem. |
-| Persistent Frontier Worker          | [worker.ml](./persistent_frontier/worker.ml)                             | The persistent frontier synchronization subsystem worker. Responsible for applying diffs flushed from the diff to the persistent frontier database. |
-| Persistent Frontier                 | [diff\_buffer.ml](./persistent_frontier/diff_buffer.ml)                  | The persistent frontier instance and singleton factory. |
-| Transition Frontier                 | [transition\_frontier.ml](./transition_frontier.ml)                      | The library entrypoint which ties together all of the transition frontier concepts. |
+| Name                                | File                                                                   | Description                                                                                                                                         |
+| ----------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Breadcrumb                          | [frontier_base/breadcrumb.ml](./frontier_base/breadcrumb.ml)           | The breadcrumb data structure.                                                                                                                      |
+| Frontier Interface                  | [frontier_base/frontier_intf.ml](./frontier_base/frontier_intf.ml)     | The external interface which frontiers must provide to.                                                                                             |
+| Diff                                | [frontier_base/diff.ml](./frontier_base/diff.ml)                       | The representation of frontier diffs.                                                                                                               |
+| Root Data                           | [frontier_base/root_data.ml](./frontier_base/root_data.ml)             | The representation of frontier root data, at varying levels of detail/size.                                                                         |
+| Root Identifier                     | [frontier_base/root_identifier.ml](./frontier_base/root_identifier.ml) | The representation of frontier root identifiers.                                                                                                    |
+| Full Frontier                       | [full_frontier/full_frontier.ml](./full_frontier/full_frontier.ml)     | The in memory, fully expanded frontier data structure.                                                                                              |
+| Persistent Frontier Database        | [database.ml](./persistent_frontier/database.ml)                       | The RocksDB database that the persistent frontier is stored in.                                                                                     |
+| Persistent Frontier Diff Buffer     | [diff_buffer.ml](./persistent_frontier/diff_buffer.ml)                 | The diff buffer used as part of the persistent frontier synchronization subsystem.                                                                  |
+| Persistent Frontier Synchronization | [sync.ml](./persistent_frontier/sync.ml)                               | The persistent frontier synchronization subsystem.                                                                                                  |
+| Persistent Frontier Worker          | [worker.ml](./persistent_frontier/worker.ml)                           | The persistent frontier synchronization subsystem worker. Responsible for applying diffs flushed from the diff to the persistent frontier database. |
+| Persistent Frontier                 | [diff_buffer.ml](./persistent_frontier/diff_buffer.ml)                 | The persistent frontier instance and singleton factory.                                                                                             |
+| Transition Frontier                 | [transition_frontier.ml](./transition_frontier.ml)                     | The library entrypoint which ties together all of the transition frontier concepts.                                                                 |
 
 ## Future Plans
 

@@ -1,8 +1,8 @@
 # Building Mina using Nix
 
-Nix is a declarative package manager for Linux, macOS and other
-UNIX-like systems. You can read more about Nix on its [official
-website](https://nixos.org).
+Nix is a declarative package manager for Linux, macOS and other UNIX-like
+systems. You can read more about Nix on its
+[official website](https://nixos.org).
 
 Mina can be built using Nix, in multiple ways. Follow the steps below to get
 started and read the [troubleshooting section](#troubleshooting) if you
@@ -14,25 +14,25 @@ encounter any problem.
 This is a flake. It provides a lot of different packages from the monorepo. Most
 of those packages require submodules to build. To simplify your life, there's
 `nix/pin.sh` script which creates the relevant registry entry with
-`?submodules=1`, so that you can then use it like `nix build mina`, `nix develop
-mina`, etc. You can discover all the available packages as usual, by using tab
-completion or `nix eval mina#packages.x86_64-linux --apply __attrNames` or your
-favourite way.
+`?submodules=1`, so that you can then use it like `nix build mina`,
+`nix develop mina`, etc. You can discover all the available packages as usual,
+by using tab completion or
+`nix eval mina#packages.x86_64-linux --apply __attrNames` or your favourite way.
 
 </details>
 
 ## 1. Install Nix
 
-If you don't already have Nix on your machine, you can install it with
-the following command:
+If you don't already have Nix on your machine, you can install it with the
+following command:
 
 ```
 sh <(curl -L https://nixos.org/nix/install) --daemon
 ```
 
-You may also install Nix from your distribution's official repository;
-Note however that it is preferable you get a relatively recent
-version (⩾ 2.5), and the version from the repository may be rather old.
+You may also install Nix from your distribution's official repository; Note
+however that it is preferable you get a relatively recent version (⩾ 2.5), and
+the version from the repository may be rather old.
 
 **warning for macOS users**: macOS updates will often break your nix
 installation. To prevent that, you can add the following to your `~/.bashrc` or
@@ -47,13 +47,12 @@ fi
 
 ## 2. Enable Flakes (optional but recommended)
 
-Mina is packaged using [Nix Flakes](https://nixos.wiki/wiki/Flakes),
-which are an experimental feature of Nix. However, compatibility with
-pre-flake Nix is provided. If you wish to contribute the Nix
-expressions in this repository, or want to get some convenience
-features and speed improvements, **it is advisable to enable flakes**. For
-this, you'll want to make sure you're running recent Nix (⩾2.5) and
-have enabled the relevant experimental features, either in
+Mina is packaged using [Nix Flakes](https://nixos.wiki/wiki/Flakes), which are
+an experimental feature of Nix. However, compatibility with pre-flake Nix is
+provided. If you wish to contribute the Nix expressions in this repository, or
+want to get some convenience features and speed improvements, **it is advisable
+to enable flakes**. For this, you'll want to make sure you're running recent Nix
+(⩾2.5) and have enabled the relevant experimental features, either in
 `/etc/nix/nix.conf` or (recommended) in `~/.config/nix/nix.conf`:
 
 ```
@@ -61,8 +60,8 @@ mkdir -p "${XDG_CONFIG_HOME-${HOME}/.config}/nix"
 echo 'experimental-features = nix-command flakes' > "${XDG_CONFIG_HOME-${HOME}/.config}/nix/nix.conf"
 ```
 
-You can check that your flake support is working by running `nix flake metadata
-github:nixos/nixpkgs` for example.
+You can check that your flake support is working by running
+`nix flake metadata github:nixos/nixpkgs` for example.
 
 ## 3. Add a nix registry entry
 
@@ -74,14 +73,15 @@ dependencies from, resulting in errors.
 
 For the curious, `mina` registry entry will resolve to
 `git+file:///path/to/your/mina/checkout?submodules=1`. Should you want to hack
-on a different mina checkout, try e.g. `nix develop
-"git+file://$PWD?submodules=1"` from that checkout.
+on a different mina checkout, try e.g.
+`nix develop "git+file://$PWD?submodules=1"` from that checkout.
 
 ## 4. Use it
 
 ### "Pure" development shell
 
 TL;DR:
+
 ```
 nix develop mina
 dune build src/app/cli/src/mina.exe
@@ -93,18 +93,18 @@ build system to build Mina itself.
 If you wish to build Mina yourself, or work on some changes incrementally, run
 `nix develop mina` if you're using flakes (or `nix-shell default.nix`
 otherwise). This will drop you in a shell with all dependencies, including
-OCaml, Rust and Go ones available, so the only thing you have to do is run `dune
-build src/app/cli/src/mina.exe`. You can also just run `eval "$buildPhase"` to
-run the same command as would be run inside the nix sandbox. Running `make
-build` will **not** work due to it trying to build the already-built go
-dependencies. The produced executable can be found in
+OCaml, Rust and Go ones available, so the only thing you have to do is run
+`dune build src/app/cli/src/mina.exe`. You can also just run
+`eval "$buildPhase"` to run the same command as would be run inside the nix
+sandbox. Running `make build` will **not** work due to it trying to build the
+already-built go dependencies. The produced executable can be found in
 `_build/default/src/app/cli/src/mina.exe`. You most likely want to **run it from
 the same shell you've built it in**, since the executable looks for certain
 dependencies at runtime via environment variables, meaning you either have to
 set those variables yourself or rely on the ones set by the `devShell`. The
-executable produced by `nix build mina` (see ["Pure" build
-section](#pure-build)) doesn't suffer from this limitation, since it is wrapped
-with all the necessary environment variables.
+executable produced by `nix build mina` (see
+["Pure" build section](#pure-build)) doesn't suffer from this limitation, since
+it is wrapped with all the necessary environment variables.
 
 Note that `opam` will **not** be available in that shell, since Nix takes over
 the job of computing and installing dependencies. If you need to modify the opam
@@ -124,13 +124,14 @@ nix develop mina#with-lsp -c $EDITOR .
 if you have your `$EDITOR` variable set correctly. Otherwise, replace it with
 the editor you want to edit Mina with.
 
-This will drop you in your favorite editor within a Nix environment containing an
-OCaml LSP server. You might need to configure your editor appropriately;
-See [Per-editor instructions](#per-editor-instructions).
+This will drop you in your favorite editor within a Nix environment containing
+an OCaml LSP server. You might need to configure your editor appropriately; See
+[Per-editor instructions](#per-editor-instructions).
 
 However, for LSP to work its magic, you will need to have to make type
-information available. They can for example be obtained by running `dune build
-@check` in `src/app/cli`, which might take a while, or by compiling the project.
+information available. They can for example be obtained by running
+`dune build @check` in `src/app/cli`, which might take a while, or by compiling
+the project.
 
 Don't forget to exit and re-enter the editor using this command after switching
 branches, or otherwise changing the dependency tree of Mina.
@@ -143,12 +144,14 @@ You have to install the "OCaml Platform" extension, either from
 [official marketplace](https://marketplace.visualstudio.com/items?itemName=ocamllabs.ocaml-platform)
 or [openvsix](https://open-vsx.org/extension/ocamllabs/ocaml-platform).
 
-After installing it, run `code` (or `codium`) from within the `nix develop mina#with-lsp` shell,
-click "Select Sandbox" in the extension menu, and then pick "Global Sandbox". From then on, it should just work.
+After installing it, run `code` (or `codium`) from within the
+`nix develop mina#with-lsp` shell, click "Select Sandbox" in the extension menu,
+and then pick "Global Sandbox". From then on, it should just work.
 
 ##### Vim
 
-Install [CoC](https://github.com/neoclide/coc.nvim), and add the following to its configuration (`$HOME/.config/nvim`, or just enter command `:CocConfig`):
+Install [CoC](https://github.com/neoclide/coc.nvim), and add the following to
+its configuration (`$HOME/.config/nvim`, or just enter command `:CocConfig`):
 
 ```
 {
@@ -164,20 +167,32 @@ Install [CoC](https://github.com/neoclide/coc.nvim), and add the following to it
 }
 ```
 
-Now, whenever you start vim from `nix develop mina#with-lsp`, it should just work.
+Now, whenever you start vim from `nix develop mina#with-lsp`, it should just
+work.
 
 ##### Emacs
 
-You need to install [tuareg](https://github.com/ocaml/tuareg) and  a LSP client, like  [lsp-mode](https://github.com/emacs-lsp/lsp-mode) or [eglot](https://github.com/joaotavora/eglot).
-You do not need to use [merlin](https://github.com/ocaml/merlin) directly (through `merlin-mode`), as `ocaml-lsp-server` that LSP client will use uses `merlin` backend.
-Note that LSP with flycheck and similar tools will not provide the global project compilation functionality, they will focus on individual buffers instead.
-To compile the whole project you can still use `M-x compile` or anything else; compilation results will be then seen by the LSP/flycheck.
-This should just work without any configuration, as long as you start it from `nix develop mina#with-lsp`.
-If you prefer to have just one instance of `emacs` running, consider installing `direnv` as explained in the sections below: emacs packages [envrc](https://github.com/purcell/envrc) and [emacs-direnv](https://github.com/wbolster/emacs-direnv) (just `direnv` in MELPA) provide integration with the tool, allowing emacs to use nix-defined sandbox variables when the open buffer is a repository file.
+You need to install [tuareg](https://github.com/ocaml/tuareg) and a LSP client,
+like [lsp-mode](https://github.com/emacs-lsp/lsp-mode) or
+[eglot](https://github.com/joaotavora/eglot). You do not need to use
+[merlin](https://github.com/ocaml/merlin) directly (through `merlin-mode`), as
+`ocaml-lsp-server` that LSP client will use uses `merlin` backend. Note that LSP
+with flycheck and similar tools will not provide the global project compilation
+functionality, they will focus on individual buffers instead. To compile the
+whole project you can still use `M-x compile` or anything else; compilation
+results will be then seen by the LSP/flycheck. This should just work without any
+configuration, as long as you start it from `nix develop mina#with-lsp`. If you
+prefer to have just one instance of `emacs` running, consider installing
+`direnv` as explained in the sections below: emacs packages
+[envrc](https://github.com/purcell/envrc) and
+[emacs-direnv](https://github.com/wbolster/emacs-direnv) (just `direnv` in
+MELPA) provide integration with the tool, allowing emacs to use nix-defined
+sandbox variables when the open buffer is a repository file.
 
 ### "Pure" build
 
 TL;DR:
+
 ```
 nix build mina
 ```
@@ -189,6 +204,7 @@ otherwise). You can find the resulting executable at `result/bin/mina`.
 ### "Impure" development shell
 
 TL;DR:
+
 ```
 nix develop mina#impure
 opam init --bare
@@ -213,6 +229,7 @@ branches, or otherwise changing the dependency tree of Mina.
 ### Building a docker image
 
 TL;DR:
+
 ```
 $(nix build mina#mina-image-full) | docker load
 # Also available: mina-image-slim, mina-image-instr, mina-archive-image-full,
@@ -223,21 +240,23 @@ result to produce other useful artifacts with Nix. For example, we can build
 docker images. Due to /nix/store space usage concerns, instead of building the
 image itself Nix produces a script which, when executed, outputs a tarball of a
 docker image, suitable for consumption with `docker load`. After loading the
-image, it can be used as any other docker image would be (e.g. with `docker
-run`). The images for branches available on github can also be obtained from the
-registry at
+image, it can be used as any other docker image would be (e.g. with
+`docker run`). The images for branches available on github can also be obtained
+from the registry at
 `us-west2-docker.pkg.dev/o1labs-192920/nix-containers/$IMAGE:$BRANCH`, e.g.
-`docker run --rm -it
-us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop` .
+`docker run --rm -it us-west2-docker.pkg.dev/o1labs-192920/nix-containers/mina-image-full:develop`
+.
 
 The `slim` image only has the Mina daemon itself, whereas `full` images also
 contain many useful tools, such as coreutils, fake init, jq, etc.
 
-The `instr` image is a replica of `full` image with additional instrumenation data.
+The `instr` image is a replica of `full` image with additional instrumenation
+data.
 
 ### Debian package
 
 TL;DR:
+
 ```
 nix build mina#mina-deb
 ```
@@ -269,6 +288,7 @@ sudo nixos-container start mina
 ### direnv
 
 TL;DR
+
 ```
 printf './nix/pin.sh\nuse flake mina\n' > .envrc
 direnv allow
@@ -305,11 +325,11 @@ time you enter the Mina repo directory. One way to do this is by using
 - _Optional_: Reload your shell
 - Now you will enter the Nix shell automatically should you `cd` into the Mina
   repo root path.
-- To build Mina, you can use all the same techniques as from within the `nix
-  develop` shell mentioned above. For example, try `dune build
-  src/app/cli/src/mina.exe`, or `eval "$buildPhase"`. Please note though that
-  `make` targets invocation won't work as usual, that is why it is preferably to
-  use `dune` directly.
+- To build Mina, you can use all the same techniques as from within the
+  `nix develop` shell mentioned above. For example, try
+  `dune build src/app/cli/src/mina.exe`, or `eval "$buildPhase"`. Please note
+  though that `make` targets invocation won't work as usual, that is why it is
+  preferably to use `dune` directly.
 
 #### Check the shell
 
@@ -349,8 +369,8 @@ expressions from `nix/`, `flake.lock` which locks the input versions, and
 ### Updating inputs
 
 If you wish to update all the inputs of this flake, run `nix flake update` . If
-you want to update a particular input, run `nix flake lock --update-input
-<input>` .
+you want to update a particular input, run
+`nix flake lock --update-input <input>` .
 
 ### Notes on the "pure" build
 
@@ -385,11 +405,12 @@ specified explicitly. This is the hash you're updating by running
 
 ### Notes on instrumenation package
 
-`nix build mina#mina_with_instrumentation` allows to build a special version on mina
- with instrumentation enabled. This can be helpful if one would like verify 
-what is a code coverage of end-to-end/manual tests performed over mina under development. 
-Additionally there is a docker image available which wraps up above mina build into full mina image. 
-One can prepare it using command: `$(nix build mina#mina-image-instr-full --print-out-paths) | docker load`
+`nix build mina#mina_with_instrumentation` allows to build a special version on
+mina with instrumentation enabled. This can be helpful if one would like verify
+what is a code coverage of end-to-end/manual tests performed over mina under
+development. Additionally there is a docker image available which wraps up above
+mina build into full mina image. One can prepare it using command:
+`$(nix build mina#mina-image-instr-full --print-out-paths) | docker load`
 
 ### Discovering all the packages this Flake provides
 
@@ -503,21 +524,21 @@ Hint: Make sure your editor runs OCaml LSP that supports this version of
 compiler.
 ```
 
-This could be caused by having some non-Nix setup polluting the environment
-in your shell init file. Try running `nix develop mina -c bash --norc` or
-`nix develop mina -c zsh --no-rc` and see if that helps. If it does, look through
-the corresponding shell init files for anything suspicious (e.g. `eval $(opam env)`
-or `PATH` modifications).
+This could be caused by having some non-Nix setup polluting the environment in
+your shell init file. Try running `nix develop mina -c bash --norc` or
+`nix develop mina -c zsh --no-rc` and see if that helps. If it does, look
+through the corresponding shell init files for anything suspicious (e.g.
+`eval $(opam env)` or `PATH` modifications).
 
-Alternatively, you might have switched branches but didn't re-enter the development
-shell. Exit the development shell (with `exit`, Ctrl+D, or however else you like
-exiting your shells) and re-enter it again with `nix develop mina`. `direnv` can
-also sometimes not reload the environment automatically, in that case, try
-`direnv reload`.
+Alternatively, you might have switched branches but didn't re-enter the
+development shell. Exit the development shell (with `exit`, Ctrl+D, or however
+else you like exiting your shells) and re-enter it again with
+`nix develop mina`. `direnv` can also sometimes not reload the environment
+automatically, in that case, try `direnv reload`.
 
-Finally, in some circumstances, `dune` is not smart enough to rebuild
-things even if the environment changed and they should be rebuilt. Try removing
-the `_build` directory (or running `dune clean`, which does the same thing).
+Finally, in some circumstances, `dune` is not smart enough to rebuild things
+even if the environment changed and they should be rebuilt. Try removing the
+`_build` directory (or running `dune clean`, which does the same thing).
 
 ### `MINA_LIBP2P_HELPER_PATH`
 
@@ -539,32 +560,32 @@ If you get an error like
 
 This is most likely because you have built Mina yourself from `nix develop mina`
 or `nix-shell default.nix`, and then ran the resulting executable from outside
-the shell. This is not supported, see ["Pure" development
-shell](#pure-development-shell) section. You can try re-entering the shell and
-running the executable from there, or building mina with `nix build mina` and
-running it with `result/bin/mina` instead.
+the shell. This is not supported, see
+["Pure" development shell](#pure-development-shell) section. You can try
+re-entering the shell and running the executable from there, or building mina
+with `nix build mina` and running it with `result/bin/mina` instead.
 
 ### Submodules
 
-Nix will **not** fetch submodules for you. You have to make sure that
-you have the entire mina source code, including submodules, before you
-run any nix commands. This should make sure you have the right
-versions checked out (in most cases):
+Nix will **not** fetch submodules for you. You have to make sure that you have
+the entire mina source code, including submodules, before you run any nix
+commands. This should make sure you have the right versions checked out (in most
+cases):
 
 ```
 git submodule sync
 git submodule update --init --recursive
 ```
 
-If you don't do this, Nix may not always yell at you right away
-(especially if all the submodule directories are present in the tree
-somehow, but not correctly filled in). It will however fail with a
-strange error during the build, when it fails to find a
-dependency. Make sure you do this!
+If you don't do this, Nix may not always yell at you right away (especially if
+all the submodule directories are present in the tree somehow, but not correctly
+filled in). It will however fail with a strange error during the build, when it
+fails to find a dependency. Make sure you do this!
 
 ### git LFS
 
-If you have git LFS installed and configured on your system, the build may fail with strange errors similar to this:
+If you have git LFS installed and configured on your system, the build may fail
+with strange errors similar to this:
 
 ```
 Downloading docs/res/all_data_structures.dot.png (415 KB)
@@ -578,7 +599,8 @@ error: program 'git' failed with exit code 128
 (use '--show-trace' to show detailed location information)
 ```
 
-You can fix this by setting `GIT_LFS_SKIP_SMUDGE=1` env variable, e.g. by running
+You can fix this by setting `GIT_LFS_SKIP_SMUDGE=1` env variable, e.g. by
+running
 
 ```
 export GIT_LFS_SKIP_SMUDGE=1
@@ -614,51 +636,82 @@ export XDG_DATA_DIRS= DIRENV_DIFF= <...>
 
 Before running any `dune` commands.
 
-Alternatively, you can just run your commands inside `nix develop
---ignore-environment mina`, which unsets all the outside environment variables,
-resulting in a more reproducible but less convenient environment.
+Alternatively, you can just run your commands inside
+`nix develop --ignore-environment mina`, which unsets all the outside
+environment variables, resulting in a more reproducible but less convenient
+environment.
 
 # Granular nix
 
-A new way to build Mina with nix goes by the catchname "granular nix". It's granular because it relies on splitting the task of building the Mina project to building each opam package defined by Mina in isolation (instead of invoking `dune build` for the whole filetree).
+A new way to build Mina with nix goes by the catchname "granular nix". It's
+granular because it relies on splitting the task of building the Mina project to
+building each opam package defined by Mina in isolation (instead of invoking
+`dune build` for the whole filetree).
 
 This has a benefit of allowing caching of artifacts and test results.
 
 ## Build methodology
 
-Dune files are analyzed by the [o1-labs/describe-dune](https://github.com/o1-labs/describe-dune) tool. Libraries, executables, tests and generated files, along with their mutual dependencies (as present by dune files) are extracted.
+Dune files are analyzed by the
+[o1-labs/describe-dune](https://github.com/o1-labs/describe-dune) tool.
+Libraries, executables, tests and generated files, along with their mutual
+dependencies (as present by dune files) are extracted.
 
-After that, dependencies between all of the units (libraries, executables, tests) and files are determined. Then a greedy algorithm attempts to "upgrade" each library/executable dependency to a package dependency. It ends with an error if it fails. But if it succeeds, it comes up with a dependency tree (that can be plotted with `nix build mina#info.deps-graph`) that allows compilation of project's Ocaml code to be executed package-by-package.
+After that, dependencies between all of the units (libraries, executables,
+tests) and files are determined. Then a greedy algorithm attempts to "upgrade"
+each library/executable dependency to a package dependency. It ends with an
+error if it fails. But if it succeeds, it comes up with a dependency tree (that
+can be plotted with `nix build mina#info.deps-graph`) that allows compilation of
+project's Ocaml code to be executed package-by-package.
 
-Then packages are compiled one by one using `dune`, with dependencies of a package built before it and then provided to the package via `OCAMLPATH` environment variable. Code of each package is isolated from its dependencies and packages that depend on it.
+Then packages are compiled one by one using `dune`, with dependencies of a
+package built before it and then provided to the package via `OCAMLPATH`
+environment variable. Code of each package is isolated from its dependencies and
+packages that depend on it.
 
 ## New nix derivations
 
-There is a bunch of new derivations available using nix flake for Mina repository.
-In subsections there are some examples and the full list of new derivations.
+There is a bunch of new derivations available using nix flake for Mina
+repository. In subsections there are some examples and the full list of new
+derivations.
 
-A note on building process and treatment of packages. All of the code is build on a package level. That is, for compilation units (executables, libraries, tests) that are assigned to a package, they are compiled with `dune build --only-packages <package>`. Any of dependencies are pre-built the same way and are provided to `dune` via `OCAMLPATH`.
+A note on building process and treatment of packages. All of the code is build
+on a package level. That is, for compilation units (executables, libraries,
+tests) that are assigned to a package, they are compiled with
+`dune build --only-packages <package>`. Any of dependencies are pre-built the
+same way and are provided to `dune` via `OCAMLPATH`.
 
-For compilation units that have no package defined, a synthetic package name is generated. Path to dune directory with these units is quoted by replacing `.` with `__` and `/` with `-` in the package path, and also prepending and appending the resulting string with `__`. E.g. for path `src/test/command_line_tests` a synthetic package `__src-test-command_line_tests__` is generated. Such synthetic packages are built with `dune build <path-to-dune-directory>` (isolation is ensured by filtering out all of irrelevant Ocaml sources).
+For compilation units that have no package defined, a synthetic package name is
+generated. Path to dune directory with these units is quoted by replacing `.`
+with `__` and `/` with `-` in the package path, and also prepending and
+appending the resulting string with `__`. E.g. for path
+`src/test/command_line_tests` a synthetic package
+`__src-test-command_line_tests__` is generated. Such synthetic packages are
+built with `dune build <path-to-dune-directory>` (isolation is ensured by
+filtering out all of irrelevant Ocaml sources).
 
 ## Examples
 
-CLI commands below assume to be executed from a directory with Mina repository checked out and `./nix/pin.sh` executed.
+CLI commands below assume to be executed from a directory with Mina repository
+checked out and `./nix/pin.sh` executed.
 
-| Description | Command |
-|--------------|-------------|
-| Build all Ocaml code, run same tests as in `unit-test.sh` | `nix build mina#granular` |
-| Build all Ocaml code and run all unit tests | `nix build mina#all-tested` |
-| Build all Ocaml code without running tests | `nix build mina#all` |
-| Build `mina_lib` package | `nix build mina#pkgs.mina_lib` |
-| Build `mina_net2` package and run its tests | `nix build mina#tested.mina_net2` |
-| Build `validate_keypair` executable | `nix build mina#exes.validate_keypair` |
-| Run tests from `src/lib/staged_ledger/test` | `nix build mina#tested.__src-lib-staged_ledger-test__` |
-| Plot dependencies of package `mina_lib` | `nix build mina#info.deps-graphs.mina_lib` |
-| Plot dependency graph of Mina repository | `nix build mina#info.deps-graph` |
-| Extract json description of dependencies | `nix build mina#info.deps` |
+| Description                                               | Command                                                |
+| --------------------------------------------------------- | ------------------------------------------------------ |
+| Build all Ocaml code, run same tests as in `unit-test.sh` | `nix build mina#granular`                              |
+| Build all Ocaml code and run all unit tests               | `nix build mina#all-tested`                            |
+| Build all Ocaml code without running tests                | `nix build mina#all`                                   |
+| Build `mina_lib` package                                  | `nix build mina#pkgs.mina_lib`                         |
+| Build `mina_net2` package and run its tests               | `nix build mina#tested.mina_net2`                      |
+| Build `validate_keypair` executable                       | `nix build mina#exes.validate_keypair`                 |
+| Run tests from `src/lib/staged_ledger/test`               | `nix build mina#tested.__src-lib-staged_ledger-test__` |
+| Plot dependencies of package `mina_lib`                   | `nix build mina#info.deps-graphs.mina_lib`             |
+| Plot dependency graph of Mina repository                  | `nix build mina#info.deps-graph`                       |
+| Extract json description of dependencies                  | `nix build mina#info.deps`                             |
 
-Dependency description generated via `nix build mina#info.deps --out-link deps.json` is useful for investigation of dependencies in a semi-automated way. E.g. to check which executables implicitly depend on `mina_lib`, just run the following `jq` command:
+Dependency description generated via
+`nix build mina#info.deps --out-link deps.json` is useful for investigation of
+dependencies in a semi-automated way. E.g. to check which executables implicitly
+depend on `mina_lib`, just run the following `jq` command:
 
 ```bash
 $ jq '[.units | to_entries | .[] | { key: .key, value: [ .value.exe? | to_entries? | .[]? | select(.value.pkgs? | contains(["mina_lib"])?) | .key ] } | select (.value != []) | .key ]' <deps.json
@@ -673,27 +726,33 @@ $ jq '[.units | to_entries | .[] | { key: .key, value: [ .value.exe? | to_entrie
 
 ## Combined derivations
 
-Derivations that combine all packages: all of the Ocaml code is built, three options vary in which unit tests are executed.
+Derivations that combine all packages: all of the Ocaml code is built, three
+options vary in which unit tests are executed.
 
 - `#all`
-  - builds all the Ocaml code discovered in the dune root (libraries, executables, tests)
+  - builds all the Ocaml code discovered in the dune root (libraries,
+    executables, tests)
   - tests aren't executed
 - `#granular`
-  - `#all` + running all of tests except for tests in `src/app` (behavior similar to `buildkite/scripts/unit-test.sh`)
+  - `#all` + running all of tests except for tests in `src/app` (behavior
+    similar to `buildkite/scripts/unit-test.sh`)
 - `#all-tested`
   - `#all` + running all discovered tests
-  - discovery of tests is done by finding `test` stanzas and libraries with `inline_tests` stanza
+  - discovery of tests is done by finding `test` stanzas and libraries with
+    `inline_tests` stanza
 
 ## Individual compilation units
 
-These allow every package to be compiled/tested in isolation, without requiring all of the other packages to be built (except for dependencies, of course).
+These allow every package to be compiled/tested in isolation, without requiring
+all of the other packages to be built (except for dependencies, of course).
 
 - `#pkgs.<package>`
   - takes sources of the package and builds it with `dune build <package>`
   - all library dependencies are provided via `OCAMLPATH`
   - derivation contains everything from the `_build` directory
 - `#src.pkgs.<package>`
-  - show sources of a package (and some relevant files, like `dune` from the parent directory), as filtered for building the `#pkgs.<package>`
+  - show sources of a package (and some relevant files, like `dune` from the
+    parent directory), as filtered for building the `#pkgs.<package>`
 - `#files.<path>`
   - build all file rules in the `<path>` used by stanzas in other directories
   - defined only for generated files that are used outside `<path>/dune` scope
@@ -703,63 +762,86 @@ These allow every package to be compiled/tested in isolation, without requiring 
   - same as `#pkgs.<package>`, but also runs tests for the package
   - note that tests for package's dependencies aren't executed
 
-There are also a few derivations that help build a particular executable. These are merely shortcuts for building a package with an executable and then copying the executable to another directory.
+There are also a few derivations that help build a particular executable. These
+are merely shortcuts for building a package with an executable and then copying
+the executable to another directory.
 
 - `#all-exes.<package>.<exe>`
-  - builds a derivation with a single file `bin/<exe>` that is executable with name `<exe>` from package `<package>`
-  - when a public name is available, `<exe>` stands for executable's public name (and private name otherwise)
+  - builds a derivation with a single file `bin/<exe>` that is executable with
+    name `<exe>` from package `<package>`
+  - when a public name is available, `<exe>` stands for executable's public name
+    (and private name otherwise)
 - `#exes.<exe>`
   - shortcut for `#all-exes.<package>.<exe>`
   - if `<exe>` is defined for multiple packages, error is printed
-  - if `<exe>` is defined in a single package `<pkg>`, it's same as `#all-exes.<pkg>.<exe>`
+  - if `<exe>` is defined in a single package `<pkg>`, it's same as
+    `#all-exes.<pkg>.<exe>`
 
 ## Metadata/debug information
 
 - `#info.src`
-  - mapping from dune directory path `dir` to metadata related to files outside of dune directory that is needed for compilation
+  - mapping from dune directory path `dir` to metadata related to files outside
+    of dune directory that is needed for compilation
   - in particular the following fields:
-     - `subdirs`, containing list of file paths (relative to the `dir`) that contain dune files with compilation units
-     - `file_deps`, containing list of file paths from other dirs which should be included into source when compiling units from `dir` (e.g. some top-level `dune` files which use `env` stanza)
-     - `file_outs`, containing a mapping from absolute path of a file generated by some `rule` stanza of the dune file to type of this file output (for type being one of `promote`, `standard` and `fallback`)
+    - `subdirs`, containing list of file paths (relative to the `dir`) that
+      contain dune files with compilation units
+    - `file_deps`, containing list of file paths from other dirs which should be
+      included into source when compiling units from `dir` (e.g. some top-level
+      `dune` files which use `env` stanza)
+    - `file_outs`, containing a mapping from absolute path of a file generated
+      by some `rule` stanza of the dune file to type of this file output (for
+      type being one of `promote`, `standard` and `fallback`)
 - `#info.exe`
-  - mapping from executable path (in format like `src/app/archive/archive.exe`) to an object with fields `name` and `package`
+  - mapping from executable path (in format like `src/app/archive/archive.exe`)
+    to an object with fields `name` and `package`
   - `package` field contains name of the package that declares the executable
   - `name` is either `public_name` of executable (if defined) or simply `name`
 - `#info.package`
-  - mapping from package name to an object containing information about all of the units defined by the package
+  - mapping from package name to an object containing information about all of
+    the units defined by the package
   - object schema is the following:
-     ```
-     { exe | lib | test : { name:  { public_name: string (optional), name: string, src: string, type: exe | lib | test, deps: [string] } }
-     ```
+    ```
+    { exe | lib | test : { name:  { public_name: string (optional), name: string, src: string, type: exe | lib | test, deps: [string] } }
+    ```
   - this object contains raw data extracted from dune files
-  - `deps` contains opam library names exactly as defined by dune (ppx-related libraries are concatenated to `libraries`)
+  - `deps` contains opam library names exactly as defined by dune (ppx-related
+    libraries are concatenated to `libraries`)
 - `#info.separated-libs`
-  - when there is a package-to-package circular dependency, this would be a non-empty object in the format similar to `#info.deps` containing information about edges in dependency graph that form a cycle
-  - useful for debugging when an error `Package ${pkg} has separated lib dependency to packages` which may occur after future edits to dune files
+  - when there is a package-to-package circular dependency, this would be a
+    non-empty object in the format similar to `#info.deps` containing
+    information about edges in dependency graph that form a cycle
+  - useful for debugging when an error
+    `Package ${pkg} has separated lib dependency to packages` which may occur
+    after future edits to dune files
 - `#info.deps`
   - mapping from files and units to their dependencies
   - external dependencies (defined outside of repository) are ignored
   - schema:
-     ```
-     { files: { <path> : { exes: { <package> : [<exe>] } } },
-       units: { <package> : { exe | lib | test : { <name> : { 
-          exes: { <package> : <exe> },
-          files: [<dune dir path>],
-          libs: { <package> : [<lib name>] },
-          pkgs: [ <package> ]
-       } } 
-     }
-     ```
+    ```
+    { files: { <path> : { exes: { <package> : [<exe>] } } },
+      units: { <package> : { exe | lib | test : { <name> : {
+         exes: { <package> : <exe> },
+         files: [<dune dir path>],
+         libs: { <package> : [<lib name>] },
+         pkgs: [ <package> ]
+      } }
+    }
+    ```
 - `#dune-description`
-  - raw description of dune files as parsed by  [o1-labs/describe-dune](https://github.com/o1-labs/describe-dune) tool
+  - raw description of dune files as parsed by
+    [o1-labs/describe-dune](https://github.com/o1-labs/describe-dune) tool
 - `#base-libs`
-  - a derivation that builds an opam repo-like file structure with all of the dependencies from `opam.export` (plus some extra opam packages for building)
+  - a derivation that builds an opam repo-like file structure with all of the
+    dependencies from `opam.export` (plus some extra opam packages for building)
 
 ## Dependency graphs
 
 - `#info.deps-graph`
   - generates a dot graph of all of Mina packages (a huge one)
-  - see [example ](https://drive.google.com/file/d/1G_8REbd4-rKJpWBkNOFI4P6_3sWAp2io/view?usp=sharing)(after generating an svg with `nix build mina#info.deps-graph --out-link all.dot && dot -Tsvg -o all.svg all.dot`)
+  - see
+    [example ](https://drive.google.com/file/d/1G_8REbd4-rKJpWBkNOFI4P6_3sWAp2io/view?usp=sharing)(after
+    generating an svg with
+    `nix build mina#info.deps-graph --out-link all.dot && dot -Tsvg -o all.svg all.dot`)
 - `#info.deps-graphs.<package>`
   - plots package dependencies for the `<package>`
 
@@ -767,6 +849,14 @@ Here's example of graph for `mina_wire_types` package:
 
 ![Dependencies of mina_wire_types](https://storage.googleapis.com/o1labs-doc-images/mina_wire_types_dep_diagram.png)
 
-Note that there are a few details of this graph. Graph generated for a package `p` displays may omit some of transitive dependencies of a dependency package if they're formed by units on which `p` has no dependency itself. And dependencies `A -> B` and `B -> C` do not always imply `A -> C`: package `B` may have a test dependent on package `C`, but `A` doesn't depend on that tests, only libraries it uses.
+Note that there are a few details of this graph. Graph generated for a package
+`p` displays may omit some of transitive dependencies of a dependency package if
+they're formed by units on which `p` has no dependency itself. And dependencies
+`A -> B` and `B -> C` do not always imply `A -> C`: package `B` may have a test
+dependent on package `C`, but `A` doesn't depend on that tests, only libraries
+it uses.
 
-True meaning of this graph is that one can build package by package following edges backwards, building all of the units of a package all at once on each step. Interpretation of a graph for dependency analysis is handy, just it's useful to keep in mind certain details.
+True meaning of this graph is that one can build package by package following
+edges backwards, building all of the units of a package all at once on each
+step. Interpretation of a graph for dependency analysis is handy, just it's
+useful to keep in mind certain details.

@@ -5,9 +5,9 @@ for use within the Mina protocol.
 
 ## Overview
 
-RocksDB is a high-performance embedded database for key-value data, optimized for
-fast storage. This library provides an OCaml interface to use RocksDB within the
-Mina protocol.
+RocksDB is a high-performance embedded database for key-value data, optimized
+for fast storage. This library provides an OCaml interface to use RocksDB within
+the Mina protocol.
 
 ## Features
 
@@ -156,8 +156,8 @@ $ dune utop src/lib/rocksdb
 
 ## Thread Safety
 
-RocksDB operations are thread-safe. Multiple threads can access the same database
-concurrently.
+RocksDB operations are thread-safe. Multiple threads can access the same
+database concurrently.
 
 ## Testing
 
