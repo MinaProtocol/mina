@@ -24,9 +24,13 @@ PGPASSWORD=${PG_PW} createdb \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" "${PG_DB}"
 export DUNE_PROFILE=devnet
-dune build src/app/cli/src/mina.exe src/app/archive/archive.exe src/app/zkapp_test_transaction/zkapp_test_transaction.exe src/app/logproc/logproc.exe
 psql -U postgres "$PG_DB" < ./src/app/archive/create_schema.sql
 psql -U postgres -c "ALTER USER $PG_USER WITH PASSWORD '$PG_PW';"
+dune build \
+     src/app/cli/src/mina.exe \
+     src/app/archive/archive.exe \
+     src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
+     src/app/logproc/logproc.exe
 
 # start mina-local-network
 ./scripts/mina-local-network/mina-local-network.sh -a -r \
