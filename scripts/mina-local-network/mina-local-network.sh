@@ -52,6 +52,8 @@ PG_USER="${USER}"
 PG_PASSWD=""
 PG_DB="archive"
 
+PG_URI="postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB}"
+
 ARCHIVE_ADDRESS_CLI_ARG=""
 
 # ================================================
@@ -206,7 +208,7 @@ exec-archive-node() {
   exec ${ARCHIVE_EXE} run \
     --config-file "${CONFIG}" \
     --log-level "${LOG_LEVEL}" \
-    --postgres-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
+    --postgres-uri "${PG_URI}" \
     --server-port "${ARCHIVE_SERVER_PORT}" \
     $@
 }
@@ -257,7 +259,7 @@ recreate-schema() {
   # We need to change our working directory as script has relation to others subscripts
   # and calling them from local folder
   cd ./src/app/archive
-  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < create_schema.sql
+  psql ${PG_URI} < create_schema.sql
   cd ../../../
 
   echo "Schema '${PG_DB}' created successfully."
@@ -409,7 +411,7 @@ if ${ARCHIVE}; then
     recreate-schema
   fi
 
-  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" -c "SELECT * FROM user_commands;" &>/dev/null
+  psql ${PG_URI} -c "SELECT * FROM user_commands;" &>/dev/null
 
   ARCHIVE_ADDRESS_CLI_ARG="-archive-address ${ARCHIVE_SERVER_PORT}"
 fi
