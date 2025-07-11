@@ -61,7 +61,7 @@ done
 echo "Converting canonical blocks"
 source ./src/test/archive/sample_db/convert_chain_to_canonical.sh postgres://$PG_USER:$PG_PW@$PG_HOST:$PG_PORT/$PG_DB
 
-echo Regenerating precomputed_blocks.tar.xz
+echo "Regenerating precomputed_blocks.tar.xz"
 rm -rf precomputed_blocks || true
 mkdir precomputed_blocks
 find ~/.mina-network -name 'precomputed_blocks.log' | xargs -I ! ./scripts/mina-local-network/split_precomputed_log.sh ! precomputed_blocks
@@ -69,24 +69,24 @@ rm ./src/test/archive/sample_db/precomputed_blocks.tar.xz || true
 tar -C precomputed_blocks -cvf ./src/test/archive/sample_db/precomputed_blocks.tar.xz .
 rm -rf precomputed_blocks
 
-echo Regenerating archive_db.sql
+echo "Regenerating archive_db.sql"
 pg_dump -U postgres -d "$PG_DB" > ./src/test/archive/sample_db/archive_db.sql
 
 
-echo Regenerating input file
+echo "Regenerating input file"
 cp ./scripts/mina-local-network/annotated_ledger.json _tmp.json
 echo '{ "genesis_ledger": { "accounts": '"$(cat _tmp.json | jq '.accounts')"', "num_accounts": '"$(cat _tmp.json | jq '.num_accounts')"' }}' \
   | jq -c > ./src/test/archive/sample_db/replayer_input_file.json
 rm _tmp.json
 
-echo Regenerating genesis_ledger
+echo "Regenerating genesis_ledger"
 cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat $LOCAL_NETWORK_DATA_FOLDER/genesis_ledger.json | jq -c)"  > _tmp.json
 #update genesis_state_timestamp to the one from daemon.json
 jq --arg timestamp "$(cat $LOCAL_NETWORK_DATA_FOLDER/daemon.json | jq -r '.genesis.genesis_state_timestamp')" '.genesis.genesis_state_timestamp = $timestamp' _tmp.json > _tmp2.json && mv _tmp2.json _tmp.json
 
 mv _tmp.json src/test/archive/sample_db/genesis.json
 
-echo finished regenerate testing replay
+echo "Finished regenerate testing replay"
 
 sudo -u postgres dropdb "$PG_DB"
 psql -U postgres -c "CREATE DATABASE $PG_DB"
