@@ -3,7 +3,14 @@
 set -euo pipefail
 
 # Kill background process when script exits
-trap "killall background" EXIT
+function kill_background_jobs() {
+    local pids
+    pids=$(jobs -p)
+    if [[ -n "$pids" ]]; then
+        kill "$pids" 2>/dev/null
+    fi
+}
+trap kill_background_jobs EXIT SIGTERM SIGINT
 
 # ================================================
 # Constants
