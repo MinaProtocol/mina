@@ -474,3 +474,9 @@ postgres-clean:
 	@sudo -u postgres psql -c "DROP DATABASE IF EXISTS ${PG_USER}"
 	@sudo -u postgres psql -c "DROP ROLE IF EXISTS ${PG_USER}"
 	@echo "Cleanup complete."
+
+.PHONY: regenerate-archive
+regenerate-archive: ## Regenerate archive database with test data
+	@echo "Regenerating archive database using configured PG variables"
+	@PG_USER=$(PG_USER) PG_PW=$(PG_PW) PG_DB=$(PG_DB) PG_HOST=$(PG_HOST) PG_PORT=$(PG_PORT) \
+	./scripts/regenerate-archive.sh
