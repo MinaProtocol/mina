@@ -8,6 +8,7 @@ VERSION_FILE_PATH="./src/test/archive/sample_db/latest_version"
 CURRENT_VERSION=$(<"$VERSION_FILE_PATH")
 
 
+# Check if the required files exist otherwise tell the developer to generate them first
 if ! [[ -f "$ARCHIVE_DATA_SQL" && -f "$PRECOMPUTED_BLOCKS_TAR" ]]; then
     echo "Required archive data files not found."
     echo "Please run 'scripts/regenerate-archive.sh' first to generate them."
@@ -15,15 +16,19 @@ if ! [[ -f "$ARCHIVE_DATA_SQL" && -f "$PRECOMPUTED_BLOCKS_TAR" ]]; then
     exit 1;
 fi
 
+# increment the version number so that we can store the new archive data into a fresh folder
 echo "Current data version: $CURRENT_VERSION"
 NEW_VERSION=$((CURRENT_VERSION + 1))
 echo "New data version: $NEW_VERSION"
 
+# store the new version number in the version file
 printf "$NEW_VERSION" > "$VERSION_FILE_PATH"
 
-# Upload the archive data to the replayer
+# upload the archive data to the replayer
 echo "Uploading archive data to GCP bucket..."
 
+# this requries the gcloud CLI to be installed and authenticated
+# upload ARCHIVE_DATA_SQL to o1labs-ci-test-data bucket
 curl -X POST --data-binary @$ARCHIVE_DATA_SQL \
     -H "Authorization: Bearer $(gcloud auth print-access-token)" \
     -H "Content-Type: application/sql" \
@@ -31,7 +36,7 @@ curl -X POST --data-binary @$ARCHIVE_DATA_SQL \
 
 echo "Uploaded archive_db.sql to o1labs-ci-test-data bucket."
 
-
+# upload PRECOMPUTED_BLOCKS_TAR to o1labs-ci-test-data bucket
 curl -X POST --data-binary @$PRECOMPUTED_BLOCKS_TAR \
     -H "Authorization: Bearer $(gcloud auth print-access-token)" \
     -H "Content-Type: application/octet-stream" \
