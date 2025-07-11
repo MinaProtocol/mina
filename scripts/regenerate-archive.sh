@@ -38,9 +38,13 @@ dune build \
 
 # start mina-local-network
 ./scripts/mina-local-network/mina-local-network.sh -a -r \
-    -pu "$PG_USER" -ppw "$PG_PW" \
-    -tf 1 --override-slot-time 30000 \
-    -zt -vt -lp &
+    -pu "${PG_USER}" \
+    -ppw "${PG_PW}" \
+    -tf 1 \
+    --override-slot-time 30000 \
+    -zt \
+    -vt \
+    -lp &
 
 LOCAL_NETWORK_DATA_FOLDER="${HOME}"/.mina-network/mina-local-network-2-1-1
 
