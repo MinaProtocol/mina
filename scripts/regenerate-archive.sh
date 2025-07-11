@@ -14,8 +14,15 @@ PG_PORT=${PG_PORT:-5432}
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
 
 # Prepare the database
-sudo -u postgres dropdb "$PG_DB" || true # fails when db doesn't exist which is fine
-psql -U postgres -c "CREATE DATABASE $PG_DB"
+PGPASSWORD=${PG_PW} dropdb \
+          -U "${PG_USER}" \
+          -h "${PG_HOST}" \
+          -p "${PG_PORT}" \
+          "${PG_DB}" || true # fails when db doesn't exist which is fine
+PGPASSWORD=${PG_PW} createdb \
+          -U "${PG_USER}" \
+          -h "${PG_HOST}" \
+          -p "${PG_PORT}" "${PG_DB}"
 export DUNE_PROFILE=devnet
 dune build src/app/cli/src/mina.exe src/app/archive/archive.exe src/app/zkapp_test_transaction/zkapp_test_transaction.exe src/app/logproc/logproc.exe
 psql -U postgres "$PG_DB" < ./src/app/archive/create_schema.sql
