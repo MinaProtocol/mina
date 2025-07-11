@@ -253,8 +253,8 @@ recreate-schema() {
 
   PGPASSWORD=${PG_PASSWD} psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "CREATE DATABASE ${PG_DB};"
 
-  # We need to change our working directory as script has relation to others subscripts
-  # and calling them from local folder
+  # We need to change our working directory as script has relation to others
+  # subscripts and calling them from local folder
   cd ./src/app/archive
   psql "${PG_URI}" < create_schema.sql
   cd ../../../
