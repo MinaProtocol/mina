@@ -642,8 +642,7 @@ done
 
 #---------- Starting snark workers
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
+for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
   FOLDER="${NODES_FOLDER}"/snark_workers/worker_${i}
   mkdir -p "${FOLDER}"
   spawn-worker "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
@@ -652,8 +651,7 @@ done
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${WHALES}; i++)); do
+for ((i = 0; i < WHALES; i++)); do
   FOLDER="${NODES_FOLDER}"/whale_${i}
   KEY_FILE="${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
@@ -664,8 +662,7 @@ done
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${FISH}; i++)); do
+for ((i = 0; i < FISH; i++)); do
   FOLDER="${NODES_FOLDER}"/fish_${i}
   KEY_FILE="${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
@@ -676,8 +673,7 @@ done
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${NODES}; i++)); do
+for ((i = 0; i < NODES; i++)); do
   FOLDER="${NODES_FOLDER}"/node_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
@@ -705,8 +701,7 @@ echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_E
 
 if [ "${SNARK_WORKERS_COUNT}" -gt "0" ]; then
   echo -e "\tSnark Workers:"
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
+  for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${SNARK_WORKERS_PIDS[${i}]}"
     echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_workers/snark_worker_${i}/log.txt | ${LOGPROC_EXE}"
@@ -723,8 +718,7 @@ fi
 
 if [ "${WHALES}" -gt "0" ]; then
   echo -e "\tWhales:"
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${WHALES}; i++)); do
+  for ((i = 0; i < WHALES; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${WHALE_PIDS[${i}]}"
     # shellcheck disable=SC2004
@@ -735,8 +729,7 @@ fi
 
 if [ "${FISH}" -gt "0" ]; then
   echo -e "\tFish:"
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${FISH}; i++)); do
+  for ((i = 0; i < FISH; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${FISH_PIDS[${i}]}"
     # shellcheck disable=SC2004
@@ -747,7 +740,7 @@ fi
 
 if [ "${NODES}" -gt "0" ]; then
   echo -e "\tNon block-producing nodes:"
-  for ((i = 0; i < ${NODES}; i++)); do
+  for ((i = 0; i < NODES; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${NODE_PIDS[${i}]}"
     # shellcheck disable=SC2004
