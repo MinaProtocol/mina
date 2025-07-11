@@ -1,22 +1,29 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 TOTAL_BLOCKS=25
+
+# PostgreSQL configuration
+PG_USER=${PG_USER:-postgres}
+PG_PW=${PG_PW:-postgres}
+PG_DB=${PG_DB:-archive}
+PG_HOST=${PG_HOST:-localhost}
+PG_PORT=${PG_PORT:-5432}
 
 # go to root of mina repo
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
 
 # Prepare the database
-sudo -u postgres dropdb archive || true # fails when db doesn't exist which is fine
-psql -U postgres -c 'CREATE DATABASE archive'
+sudo -u postgres dropdb "$PG_DB" || true # fails when db doesn't exist which is fine
+psql -U postgres -c "CREATE DATABASE $PG_DB"
 export DUNE_PROFILE=devnet
 dune build src/app/cli/src/mina.exe src/app/archive/archive.exe src/app/zkapp_test_transaction/zkapp_test_transaction.exe src/app/logproc/logproc.exe
-psql -U postgres archive < ./src/app/archive/create_schema.sql
-psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+psql -U postgres "$PG_DB" < ./src/app/archive/create_schema.sql
+psql -U postgres -c "ALTER USER $PG_USER WITH PASSWORD '$PG_PW';"
 
 # start mina-local-network
 ./scripts/mina-local-network/mina-local-network.sh -a -r \
-    -pu postgres -ppw postgres \
+    -pu "$PG_USER" -ppw "$PG_PW" \
     -tf 1 --override-slot-time 30000 \
     -zt -vt -lp &
 
@@ -28,7 +35,7 @@ trap "pkill -f mina-local-network" EXIT
 while true; do
   sleep 10s
   # psql outputs "    " until there are blocks in the db, the +0 defaults that to 0
-  BLOCKS="$(( $(psql -U postgres archive -t -c  "select MAX(height) from blocks" 2> /dev/null) +0))"
+  BLOCKS="$(( $(psql -U postgres "$PG_DB" -t -c  "select MAX(height) from blocks" 2> /dev/null) +0))"
   echo Generated $BLOCKS/$TOTAL_BLOCKS blocks
   if [ "$((BLOCKS+0))" -ge  $TOTAL_BLOCKS ] ; then
     pkill -f mina-local-network
@@ -36,8 +43,8 @@ while true; do
   fi
 done
 
-echo Converting canonical blocks
-source ./src/test/archive/sample_db/convert_chain_to_canonical.sh postgres://postgres:postgres@localhost:5432/archive
+echo "Converting canonical blocks"
+source ./src/test/archive/sample_db/convert_chain_to_canonical.sh postgres://$PG_USER:$PG_PW@$PG_HOST:$PG_PORT/$PG_DB
 
 echo Regenerating precomputed_blocks.tar.xz
 rm -rf precomputed_blocks || true
@@ -48,7 +55,7 @@ tar -C precomputed_blocks -cvf ./src/test/archive/sample_db/precomputed_blocks.t
 rm -rf precomputed_blocks
 
 echo Regenerating archive_db.sql
-pg_dump -U postgres -d archive > ./src/test/archive/sample_db/archive_db.sql
+pg_dump -U postgres -d "$PG_DB" > ./src/test/archive/sample_db/archive_db.sql
 
 
 echo Regenerating input file
@@ -66,7 +73,7 @@ mv _tmp.json src/test/archive/sample_db/genesis.json
 
 echo finished regenerate testing replay
 
-sudo -u postgres dropdb archive
-psql -U postgres -c 'CREATE DATABASE archive'
-psql -U postgres archive < ./src/test/archive/sample_db/archive_db.sql
-dune exec src/app/replayer/replayer.exe -- --archive-uri postgres://postgres:postgres@localhost:5432/archive --input-file src/test/archive/sample_db/replayer_input_file.json --log-level Trace --log-json  | jq
+sudo -u postgres dropdb "$PG_DB"
+psql -U postgres -c "CREATE DATABASE $PG_DB"
+psql -U postgres "$PG_DB" < ./src/test/archive/sample_db/archive_db.sql
+dune exec src/app/replayer/replayer.exe -- --archive-uri postgres://$PG_USER:$PG_PW@$PG_HOST:$PG_PORT/$PG_DB --input-file src/test/archive/sample_db/replayer_input_file.json --log-level Trace --log-json  | jq
