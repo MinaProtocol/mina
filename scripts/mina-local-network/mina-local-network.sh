@@ -489,20 +489,17 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   fi
 
   generate-keypair "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${FISH}; i++)); do
+  for ((i = 0; i < FISH; i++)); do
     generate-keypair "${LEDGER_FOLDER}"/offline_fish_keys/offline_fish_account_"${i}"
     generate-keypair "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_"${i}"
     generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_"${i}"
   done
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${WHALES}; i++)); do
+  for ((i = 0; i < WHALES; i++)); do
     generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_"${i}"
     generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_"${i}"
     generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_"${i}"
   done
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${NODES}; i++)); do
+  for ((i = 0; i < NODES; i++)); do
     generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_"${i}"
     generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_"${i}"
     generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_"${i}"
