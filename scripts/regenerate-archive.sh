@@ -9,6 +9,7 @@ PG_PW=${PG_PW:-postgres}
 PG_DB=${PG_DB:-archive}
 PG_HOST=${PG_HOST:-localhost}
 PG_PORT=${PG_PORT:-5432}
+PG_URI="postgres://${PG_USER}:${PG_PW}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 
 # go to root of mina repo
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
@@ -63,7 +64,7 @@ while true; do
 done
 
 echo "Converting canonical blocks"
-source ./src/test/archive/sample_db/convert_chain_to_canonical.sh postgres://$PG_USER:$PG_PW@$PG_HOST:$PG_PORT/$PG_DB
+source ./src/test/archive/sample_db/convert_chain_to_canonical.sh "$PG_URI"
 
 echo "Regenerating precomputed_blocks.tar.xz"
 rm -rf precomputed_blocks || true
@@ -95,4 +96,4 @@ echo "Finished regenerate testing replay"
 sudo -u postgres dropdb "$PG_DB"
 psql -U postgres -c "CREATE DATABASE $PG_DB"
 psql -U postgres "$PG_DB" < ./src/test/archive/sample_db/archive_db.sql
-dune exec src/app/replayer/replayer.exe -- --archive-uri postgres://$PG_USER:$PG_PW@$PG_HOST:$PG_PORT/$PG_DB --input-file src/test/archive/sample_db/replayer_input_file.json --log-level Trace --log-json  | jq
+dune exec src/app/replayer/replayer.exe -- --archive-uri "$PG_URI" --input-file src/test/archive/sample_db/replayer_input_file.json --log-level Trace --log-json  | jq
