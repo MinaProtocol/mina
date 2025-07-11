@@ -778,7 +778,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
   fi
 
-  if ${VALUE_TRANSFER}; then
+  if ${VALUE_TRANSFERS}; then
     ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path ${KEY_FILE}
     ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key ${PUB_KEY}
 
@@ -793,7 +793,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   while true; do
     sleep ${TRANSACTION_FREQUENCY}
 
-    if ${VALUE_TRANSFER}; then
+    if ${VALUE_TRANSFERS}; then
       ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
     fi
 
