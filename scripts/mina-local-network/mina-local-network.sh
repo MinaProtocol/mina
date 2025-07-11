@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-#set -x
 
-# Exit script when commands fail
-set -e
+set -euo pipefail
+
 # Kill background process when script exits
 trap "killall background" EXIT
 
