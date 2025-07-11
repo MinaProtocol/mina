@@ -488,7 +488,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   clean-dir "${LEDGER_FOLDER}"/zkapp_keys
 
   if ${ZKAPP_TRANSACTIONS}; then
-    generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
+    generate-keypair "${LEDGER_FOLDER}"/zkapp_keys/zkapp_account
   fi
 
   generate-keypair "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account
@@ -558,7 +558,7 @@ SNARK_COORDINATOR_PUBKEY=$(cat "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_c
 # ================================================
 # Update the Genesis State Timestamp or Reset the Genesis Ledger
 
-CONFIG=${LEDGER_FOLDER}/daemon.json
+CONFIG="${LEDGER_FOLDER}"/daemon.json
 
 if ${RESET}; then
   reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
@@ -591,7 +591,7 @@ fi
 # ================================================
 # Launch the Nodes
 
-NODES_FOLDER=${LEDGER_FOLDER}/nodes
+NODES_FOLDER="${LEDGER_FOLDER}"/nodes
 mkdir -p "${NODES_FOLDER}"/seed
 mkdir -p "${NODES_FOLDER}"/snark_coordinator
 mkdir -p "${NODES_FOLDER}"/snark_workers
@@ -655,7 +655,7 @@ done
 # shellcheck disable=SC2004
 for ((i = 0; i < ${WHALES}; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
-  KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
+  KEY_FILE="${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
     -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
@@ -667,7 +667,7 @@ done
 # shellcheck disable=SC2004
 for ((i = 0; i < ${FISH}; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
-  KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
+  KEY_FILE="${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
     -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
@@ -763,12 +763,12 @@ printf "\n"
 # Start sending transactions and zkApp transactions
 
 if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
-  FEE_PAYER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_0
-  SENDER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_1
-  ZKAPP_ACCOUNT_KEY_FILE=${LEDGER_FOLDER}/zkapp_keys/zkapp_account
-  ZKAPP_ACCOUNT_PUB_KEY=$(cat ${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub)
+  FEE_PAYER_KEY_FILE="${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_0
+  SENDER_KEY_FILE="${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_1
+  ZKAPP_ACCOUNT_KEY_FILE="${LEDGER_FOLDER}"/zkapp_keys/zkapp_account
+  ZKAPP_ACCOUNT_PUB_KEY=$(cat "${LEDGER_FOLDER}"/zkapp_keys/zkapp_account.pub)
 
-  KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
+  KEY_FILE="${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
 
