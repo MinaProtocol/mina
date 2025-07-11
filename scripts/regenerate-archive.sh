@@ -80,7 +80,7 @@ tar -C precomputed_blocks -cvf ./src/test/archive/sample_db/precomputed_blocks.t
 rm -rf precomputed_blocks
 
 echo "Regenerating archive_db.sql"
-pg_dump -U postgres -d "$PG_DB" > ./src/test/archive/sample_db/archive_db.sql
+PGPASSWORD=${PG_PASSWD} pg_dump -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" -d "${PG_DB}" > ./src/test/archive/sample_db/archive_db.sql
 
 
 echo "Regenerating input file"
@@ -98,9 +98,9 @@ mv _tmp.json src/test/archive/sample_db/genesis.json
 
 echo "Finished regenerate testing replay"
 
-sudo -u postgres dropdb "$PG_DB"
-psql -U postgres -c "CREATE DATABASE $PG_DB"
-psql -U postgres "$PG_DB" < ./src/test/archive/sample_db/archive_db.sql
+PGPASSWORD=${PG_PASSWD} dropdb -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" "${PG_DB}"
+PGPASSWORD=${PG_PASSWD} createdb -U "${PG_USER}" -h "$PG_HOST" -p "${PG_PORT}" "${PG_DB}"
+PGPASSWORD=${PG_PASSWD} psql -U "${PG_USER}" -h "${PG_HOST}" -p "${PG_PORT}" "${PG_DB}" < ./src/test/archive/sample_db/archive_db.sql
 dune exec src/app/replayer/replayer.exe -- \
      --archive-uri "$PG_URI" \
      --input-file src/test/archive/sample_db/replayer_input_file.json \
