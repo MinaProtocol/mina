@@ -55,9 +55,14 @@ trap "pkill -f mina-local-network" EXIT
 while true; do
   sleep 10s
   # psql outputs "    " until there are blocks in the db, the +0 defaults that to 0
-  BLOCKS="$(( $(psql -U postgres "$PG_DB" -t -c  "select MAX(height) from blocks" 2> /dev/null) +0))"
-  echo Generated $BLOCKS/$TOTAL_BLOCKS blocks
-  if [ "$((BLOCKS+0))" -ge  $TOTAL_BLOCKS ] ; then
+  BLOCKS="$((
+    $(PGPASSWORD=${PG_PW} \
+      psql -U "$PG_USER" -h "$PG_HOST" -p "$PG_PORT" "$PG_DB" \
+      -t \
+      -c "select MAX(height) from blocks" 2>/dev/null) + 0
+  ))"
+  echo "Generated ${BLOCKS}/${TOTAL_BLOCKS} blocks"
+  if [ "${BLOCKS}" -ge "${TOTAL_BLOCKS}" ] ; then
     pkill -f mina-local-network
     break
   fi
