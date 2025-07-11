@@ -24,8 +24,12 @@ PGPASSWORD=${PG_PW} createdb \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" "${PG_DB}"
 export DUNE_PROFILE=devnet
-psql -U postgres "$PG_DB" < ./src/app/archive/create_schema.sql
 psql -U postgres -c "ALTER USER $PG_USER WITH PASSWORD '$PG_PW';"
+PGPASSWORD=${PG_PW} psql \
+          -U "${PG_USER}" \
+          -h "${PG_HOST}" \
+          -p "${PG_PORT}" \
+          "${PG_DB}" < ./src/app/archive/create_schema.sql
 dune build \
      src/app/cli/src/mina.exe \
      src/app/archive/archive.exe \
