@@ -1,5 +1,7 @@
 let BenchBase = ../../Command/Bench/Base.dhall
 
+let SelectFiles = ../../Lib/SelectFiles.dhall
+
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
@@ -12,6 +14,16 @@ let makeArchiveBench =
       ->  Pipeline.build
             ( BenchBase.pipeline
                 BenchBase.Spec::{
+                , additionalDirtyWhen =
+                  [ SelectFiles.strictlyStart
+                      (SelectFiles.contains "src/test/archive")
+                  , SelectFiles.exactly
+                      "buildkite/src/Jobs/Bench/ArchiveStable"
+                      "dhall"
+                  , SelectFiles.exactly
+                      "buildkite/src/Jobs/Bench/ArchiveUnstable"
+                      "dhall"
+                  ]
                 , path = "Bench"
                 , name = name
                 , label = "Archive"
