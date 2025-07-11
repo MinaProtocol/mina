@@ -96,4 +96,8 @@ echo "Finished regenerate testing replay"
 sudo -u postgres dropdb "$PG_DB"
 psql -U postgres -c "CREATE DATABASE $PG_DB"
 psql -U postgres "$PG_DB" < ./src/test/archive/sample_db/archive_db.sql
-dune exec src/app/replayer/replayer.exe -- --archive-uri "$PG_URI" --input-file src/test/archive/sample_db/replayer_input_file.json --log-level Trace --log-json  | jq
+dune exec src/app/replayer/replayer.exe -- \
+     --archive-uri "$PG_URI" \
+     --input-file src/test/archive/sample_db/replayer_input_file.json \
+     --log-level Trace \
+     --log-json  | jq
