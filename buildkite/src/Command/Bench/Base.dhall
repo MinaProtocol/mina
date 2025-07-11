@@ -41,6 +41,7 @@ let Spec =
           , yellowThreshold : Double
           , redThreshold : Double
           , preCommands : List Cmd.Type
+          , extraArgs : Text
           , scope : List PipelineScope.Type
           }
       , default =
@@ -55,6 +56,7 @@ let Spec =
           , yellowThreshold = 0.1
           , redThreshold = 0.2
           , preCommands = [] : List Cmd.Type
+          , extraArgs = ""
           }
       }
 
@@ -70,7 +72,7 @@ let command
                       # [ "BRANCH=\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-BUILDKITE_BRANCH}"
                         ]
                     )
-                    "./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
+                    "./buildkite/scripts/bench/run.sh  ${spec.bench} ${spec.extraArgs} --red-threshold ${Double/show
                                                                                          spec.redThreshold} --yellow-threshold ${Double/show
                                                                                                                                    spec.yellowThreshold}"
             , label = "Perf: ${spec.label}"

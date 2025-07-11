@@ -26,7 +26,7 @@ in  { step =
                         , buildFlags = BuildFlags.Type.Instrumented
                         }
                     )
-                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} && buildkite/scripts/debian/write_to_cache.sh ${key}/"
                 ]
               , label = "Archive: Node Test"
               , key = key
