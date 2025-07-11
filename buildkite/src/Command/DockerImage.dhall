@@ -26,6 +26,10 @@ let Network = ../Constants/Network.dhall
 
 let DockerPublish = ../Constants/DockerPublish.dhall
 
+let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
+
+let Extensions = ../Lib/Extensions.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -45,6 +49,7 @@ let ReleaseSpec =
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
+          , verify : Bool
           , if : Optional B/If
           }
       , default =
@@ -65,6 +70,7 @@ let ReleaseSpec =
           , no_cache = False
           , no_debian = False
           , step_key_suffix = "-docker-image"
+          , verify = False
           , if = None B/If
           }
       }
@@ -104,6 +110,43 @@ let generateStep =
                 then  " && echo Skipping local debian repo teardown "
 
                 else  " && ./scripts/debian/aptly.sh stop"
+
+          let suffix =
+                Extensions.joinOptionals
+                  "-"
+                  [ merge
+                      { Mainnet = None Text
+                      , Devnet = None Text
+                      , Dev = None Text
+                      , Lightnet = Some
+                          "${Profiles.toSuffixLowercase spec.deb_profile}"
+                      }
+                      spec.deb_profile
+                  , merge
+                      { None = None Text
+                      , Instrumented = Some
+                          "${BuildFlags.toSuffixLowercase spec.build_flags}"
+                      }
+                      spec.build_flags
+                  ]
+
+          let maybeVerify =
+                      if     spec.verify
+                         &&  DockerPublish.shouldPublish
+                               spec.docker_publish
+                               spec.service
+
+                then      " && "
+                      ++  VerifyDockers.verify
+                            VerifyDockers.Spec::{
+                            , artifacts = [ spec.service ]
+                            , networks = [ spec.network ]
+                            , version = spec.deb_version
+                            , codenames = [ spec.deb_codename ]
+                            , suffix = suffix
+                            }
+
+                else  ""
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
@@ -151,6 +194,7 @@ let generateStep =
                       ++  buildDockerCmd
                       ++  " && "
                       ++  releaseDockerCmd
+                      ++  maybeVerify
                     )
                 ]
 
@@ -169,6 +213,7 @@ let generateStep =
                           ++  " && "
                           ++  releaseDockerCmd
                           ++  maybeStopDebianRepo
+                          ++  maybeVerify
                         )
                     ]
                   }

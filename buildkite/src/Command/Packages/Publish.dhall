@@ -1,52 +1,38 @@
-let Prelude = ../External/Prelude.dhall
+let Prelude = ../../External/Prelude.dhall
+
+let Extensions = ../../Lib/Extensions.dhall
+
+let join = Extensions.join
 
 let Optional/map = Prelude.Optional.map
 
 let Optional/default = Prelude.Optional.default
 
-let List/drop = Prelude.List.drop
+let Artifacts = ../../Constants/Artifacts.dhall
 
-let List/concatMap = Prelude.List.concatMap
+let Size = ../../Command/Size.dhall
 
-let Text/concat = Prelude.Text.concat
+let Package = ../../Constants/DebianPackage.dhall
 
-let Artifacts = ../Constants/Artifacts.dhall
+let Network = ../../Constants/Network.dhall
 
-let Size = ../Command/Size.dhall
+let DebianChannel = ../../Constants/DebianChannel.dhall
 
-let Package = ../Constants/DebianPackage.dhall
+let Profiles = ../../Constants/Profiles.dhall
 
-let Network = ../Constants/Network.dhall
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let DebianChannel = ../Constants/DebianChannel.dhall
+let DebianRepo = ../../Constants/DebianRepo.dhall
 
-let Profiles = ../Constants/Profiles.dhall
+let ContainerImages = ../../Constants/ContainerImages.dhall
 
-let Artifact = ../Constants/Artifacts.dhall
+let Command = ../Base.dhall
 
-let DebianVersions = ../Constants/DebianVersions.dhall
+let Cmd = ../../Lib/Cmds.dhall
 
-let DebianRepo = ../Constants/DebianRepo.dhall
+let Mina = ../Mina.dhall
 
-let Toolchain = ../Constants/Toolchain.dhall
-
-let ContainerImages = ../Constants/ContainerImages.dhall
-
-let Command = ./Base.dhall
-
-let Cmd = ../Lib/Cmds.dhall
-
-let Mina = ./Mina.dhall
-
-let join =
-          \(sep : Text)
-      ->  \(xs : List Text)
-      ->  let concatWithSepAtStart =
-                List/concatMap Text Text (\(item : Text) -> [ sep, item ]) xs
-
-          let concat = List/drop 1 Text concatWithSepAtStart
-
-          in  Text/concat concat
+let Artifact = ../../Constants/Artifacts.dhall
 
 let Spec =
       { Type =
@@ -179,7 +165,8 @@ let publish
                               (     "git config --global --add safe.directory /workdir && "
                                 ++  ". ./buildkite/scripts/export-git-env-vars.sh && "
                                 ++  " gpg --import /var/secrets/debian/key.gpg && "
-                                ++  "./buildkite/scripts/release/manager.sh publish "
+                                ++  " mkdir -p ./cache && "
+                                ++  "DEBIAN_CACHE_FOLDER=/workdir/cache ./buildkite/scripts/release/manager.sh publish "
                                 ++  "--artifacts ${artifacts} "
                                 ++  "--networks ${networks} "
                                 ++  "--buildkite-build-id ${spec.build_id} "
@@ -223,9 +210,7 @@ let publish
                     ->  Command.build
                           Command.Config::{
                           , commands =
-                              Toolchain.runner
-                                DebianVersions.DebVersion.Bullseye
-                                [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+                            [ Cmd.run
                                 (     ". ./buildkite/scripts/export-git-env-vars.sh && "
                                   ++  "./buildkite/scripts/release/manager.sh publish "
                                   ++  "--artifacts ${artifacts} "
@@ -240,6 +225,7 @@ let publish
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
                                 )
+                            ]
                           , label = "Docker Packages Publishing"
                           , key = "publish-dockers-${Natural/show r.index}"
                           , target = Size.Small

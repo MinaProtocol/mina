@@ -12,6 +12,8 @@ let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let Profiles = ../../Constants/Profiles.dhall
 
 let Docker = ../../Command/Docker/Type.dhall
@@ -21,7 +23,8 @@ let Size = ../../Command/Size.dhall
 let dependsOn =
         DebianVersions.dependsOn
           DebianVersions.DepsSpec::{ profile = Profiles.Type.Lightnet }
-      # DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
+      # DebianVersions.dependsOn
+          DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let buildTestCmd
     : Size -> Command.Type

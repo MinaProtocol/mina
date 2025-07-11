@@ -12,6 +12,7 @@ if [[ -n "$BRANCH_NAME" ]]; then
   # shellcheck disable=SC1090
   BRANCH_NAME="$BRANCH_NAME" source "${SCRIPTPATH}/../export-git-env-vars.sh"
 else
+  # shellcheck disable=SC1090
   source "${SCRIPTPATH}"/../export-git-env-vars.sh
 fi
 

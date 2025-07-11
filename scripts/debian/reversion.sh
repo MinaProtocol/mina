@@ -10,9 +10,6 @@ function usage() {
   fi
   echo "Usage: $0 [-d deb-name] [-v new-version] "
   echo "  -d, --deb         The Debian name"
-  echo "  -c, --codename    The Debian codename"
-  echo "  --release         The Current Debian release"
-  echo "  --new-release     The New Debian release"
   echo "  --version         The Current Debian version"
   echo "  --new-version     The New Debian version"
   echo "  --suite           The Current Debian suite"
@@ -26,14 +23,11 @@ function usage() {
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -d|--deb) DEB="$2"; shift;;
-  -c|--codename) CODENAME="$2"; shift;;
   --new-name) NEW_NAME="$2"; shift;;
-  --new-release) NEW_RELEASE="$2"; shift;;
   --new-version) NEW_VERSION="$2"; shift;;
   --new-suite) NEW_SUITE="$2"; shift;;
   --new-repo) NEW_REPO="$2"; shift;;
   --suite) SUITE="$2"; shift;;
-  --release) RELEASE="$2"; shift;;
   --version) VERSION="$2"; shift;;
   --repo) REPO="$2"; shift;;
   --sign) SIGN="$2"; shift;;
