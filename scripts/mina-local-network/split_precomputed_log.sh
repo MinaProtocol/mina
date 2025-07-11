@@ -15,7 +15,7 @@ PG_PORT=${PG_PORT:-5432}
 PG_URI="postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 ARCHIVE_URI=${ARCHIVE_URI:-${PG_URI}}
 PRECOMPUTED_LOG_FILE=$1
-OUTPUT_FOLDER=${2:precomputed_blocks}
+OUTPUT_FOLDER=${2:-precomputed_blocks}
 
 cd "${OUTPUT_FOLDER}" || exit
 
