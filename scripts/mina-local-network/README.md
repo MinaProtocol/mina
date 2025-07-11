@@ -4,29 +4,58 @@ A script to spin up a local Mina blockchain network for development and testing.
 
 ## Quick Start
 
-### Prerequisites
-- Mina repository checked out
-- Python 3 and `jq` installed
-- PostgreSQL (optional, for archive node)
 
 ### Installation
 
-1. Install Python dependencies:
-   ```shell
-   pip3 install -r ./scripts/mina-local-network/requirements.txt
-   ```
+1. Checkout `Mina` repository.
+2. Go to its root directory and execute commands staying in this root directory.
+3. Install dependencies.
 
-2. Build Mina executables (using Nix):
-   ```shell
-   nix develop mina
-   MINA_COMMIT_SHA1=$(git rev-parse HEAD) \
-   DUNE_PROFILE="devnet" \
-     dune build \
-       src/app/cli/src/mina.exe \
-       src/app/archive/archive.exe \
-       src/app/logproc/logproc.exe
-   ```
+   - OS dependencies:
+     - `PostgreSQL`, its client and credentials configuration, if you'd like to
+       also run the Archive Node.
+     - `Python3`.
+     - `jq` tool.
+   - Python dependencies:
 
+     ```shell
+     pip3 install -r ./scripts/mina-local-network/requirements.txt
+     ```
+
+4. Build `Mina` executables.
+
+   - Perhaps the easiest way is to use
+     [Nix](https://github.com/MinaProtocol/mina/tree/develop/nix).
+
+     - After installation open the `devShell`:
+
+       ```shell
+       nix develop mina
+       ```
+
+     - Build the executables:
+
+       ```shell
+       MINA_COMMIT_SHA1=$(git rev-parse HEAD) \
+       DUNE_PROFILE="devnet" \
+         dune build \
+           src/app/cli/src/mina.exe \
+           src/app/archive/archive.exe \
+           src/app/logproc/logproc.exe
+       ```
+
+     - If you’d like to work with
+       [zkApps](https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0004-zkapps.md)
+       using [SnarkyJS](https://github.com/o1-labs/snarkyjs) locally.
+
+       - Build the `SnarkyJS`:
+
+         ```shell
+         ./scripts/update-snarkyjs-bindings.sh
+         ```
+
+
+     
 ### Basic Usage
 
 Run a local network with default settings:
@@ -52,6 +81,9 @@ View all options:
 ```
 
 ## Advanced Features and Examples
+     - If you’d like to work with
+       [zkApps](https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0004-zkapps.md)
+       using [SnarkyJS](https://github.com/o1-labs/snarkyjs) locally.
 
 ### New Seed Node Configuration
 
@@ -193,7 +225,8 @@ Control when transactions and block production stop:
 
 For faster testing with reduced resource usage, use the `lightnet` build profile:
 
-1. Build with the `lightnet` profile:
+1. Build with the [lightnet](https://github.com/MinaProtocol/mina/tree/develop/src/config/lightnet.mlh)
+ profile:
    ```shell
    MINA_COMMIT_SHA1=$(git rev-parse HEAD) \
    DUNE_PROFILE="lightnet" \
