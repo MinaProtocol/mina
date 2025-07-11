@@ -5,6 +5,7 @@
     "prettier": "^3.0.0"
   },
   "scripts": {
-    "format-markdown": "prettier --prose-wrap always --print-width 80 --write \"**/*.md\""
+    "format-markdown": "prettier --prose-wrap always --print-width 80 --write \"**/*.md\"",
+    "check-markdown": "prettier --prose-wrap always --print-width 80 --check \"**/*.md\""
   }
 }

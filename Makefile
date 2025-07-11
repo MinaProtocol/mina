@@ -310,6 +310,10 @@ reformat-diff: ## Reformat only modified OCaml files
 reformat-markdown: ## Format markdown files with 80-character line wrapping
 	npm run format-markdown
 
+.PHONY: check-markdown
+check-markdown: ## Check formatting of markdown files
+	npm run check-markdown
+
 .PHONY: check-format
 check-format: ocaml_checks ## Check formatting of OCaml code
 	dune exec \
