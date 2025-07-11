@@ -644,7 +644,7 @@ done
 
 # shellcheck disable=SC2004
 for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
-  FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
+  FOLDER="${NODES_FOLDER}"/snark_workers/worker_${i}
   mkdir -p "${FOLDER}"
   spawn-worker "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
   SNARK_WORKERS_PIDS[${i}]=$!
@@ -654,7 +654,7 @@ done
 
 # shellcheck disable=SC2004
 for ((i = 0; i < ${WHALES}; i++)); do
-  FOLDER=${NODES_FOLDER}/whale_${i}
+  FOLDER="${NODES_FOLDER}"/whale_${i}
   KEY_FILE="${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
@@ -666,7 +666,7 @@ done
 
 # shellcheck disable=SC2004
 for ((i = 0; i < ${FISH}; i++)); do
-  FOLDER=${NODES_FOLDER}/fish_${i}
+  FOLDER="${NODES_FOLDER}"/fish_${i}
   KEY_FILE="${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
@@ -678,7 +678,7 @@ done
 
 # shellcheck disable=SC2004
 for ((i = 0; i < ${NODES}; i++)); do
-  FOLDER=${NODES_FOLDER}/node_${i}
+  FOLDER="${NODES_FOLDER}"/node_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
     -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
