@@ -217,24 +217,21 @@ exec-archive-node() {
 spawn-node() {
   FOLDER=${1}
   shift
-  # shellcheck disable=SC2068
-  exec-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  exec-daemon "$@" -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
 }
 
 # Spawns worker in background
 spawn-worker() {
   FOLDER=${1}
   shift
-  # shellcheck disable=SC2068
-  exec-worker-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  exec-worker-daemon "$@" -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
 }
 
 # Spawns the Archive Node in background
 spawn-archive-node() {
   FOLDER=${1}
   shift
-  # shellcheck disable=SC2068
-  exec-archive-node $@ &>"${FOLDER}"/log.txt &
+  exec-archive-node "$@" &>"${FOLDER}"/log.txt &
 }
 
 # Resets genesis ledger
@@ -245,8 +242,8 @@ reset-genesis-ledger() {
   printf "\n"
 
   jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
-    <"${GENESIS_LEDGER_FOLDER}"/genesis_ledger.json \
-    >"${DAEMON_CONFIG}"
+    < "${GENESIS_LEDGER_FOLDER}"/genesis_ledger.json \
+    > "${DAEMON_CONFIG}"
 }
 
 recreate-schema() {
@@ -259,7 +256,7 @@ recreate-schema() {
   # We need to change our working directory as script has relation to others subscripts
   # and calling them from local folder
   cd ./src/app/archive
-  psql ${PG_URI} < create_schema.sql
+  psql "${PG_URI}" < create_schema.sql
   cd ../../../
 
   echo "Schema '${PG_DB}' created successfully."
@@ -617,7 +614,10 @@ fi
 
 # ----------
 
-spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" \
+           -seed \
+           -libp2p-keypair "${SEED_PEER_KEY}" \
+           "${ARCHIVE_ADDRESS_CLI_ARG}"
 SEED_PID=$!
 
 echo 'Waiting for seed to go up...'
@@ -630,7 +630,11 @@ done
 #---------- Starting snark coordinator
 
 SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
-spawn-node "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+spawn-node "${NODES_FOLDER}"/snark_coordinator \
+           "${SNARK_COORDINATOR_PORT}" \
+           -peer ${SEED_PEER_ID} \
+           -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} \
+           "${SNARK_COORDINATOR_FLAGS}"
 SNARK_COORDINATOR_PID=$!
 
 echo 'Waiting for snark coordinator to go up...'
