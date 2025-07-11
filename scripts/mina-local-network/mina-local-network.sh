@@ -771,34 +771,39 @@ printf "\n"
 # Start sending transactions and zkApp transactions
 
 if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
-  FEE_PAYER_KEY_FILE="${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_0
-  SENDER_KEY_FILE="${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_1
-  ZKAPP_ACCOUNT_KEY_FILE="${LEDGER_FOLDER}"/zkapp_keys/zkapp_account
-  ZKAPP_ACCOUNT_PUB_KEY=$(cat "${LEDGER_FOLDER}"/zkapp_keys/zkapp_account.pub)
+  fee_payer_key_file="${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_0"
+  sender_key_file="${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_1"
+  zkapp_account_key_file="${LEDGER_FOLDER}/zkapp_keys/zkapp_account"
+  zkapp_account_pub_key=$(cat "${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub")
 
-  KEY_FILE="${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_0
-  PUB_KEY=$(cat "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_0.pub)
-  REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
+  key_file="${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0"
+  pub_key=$(cat "${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub")
+  rest_server="http://127.0.0.1:$((FISH_START_PORT + 1))/graphql"
 
-  echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
+  echo "Waiting for Node (${rest_server}) to be up to start sending value transfer transactions..."
   printf "\n"
 
   until ${MINA_EXE} client status -daemon-port "${FISH_START_PORT}" &>/dev/null; do
     sleep 1
   done
 
-  SYNCED=0
+  synced=0
 
-  echo "Waiting for Node (${REST_SERVER})'s transition frontier to be up"
+  echo "Waiting for Node (${rest_server})'s transition frontier to be up"
   printf "\n"
 
   set +e
 
-  while [ $SYNCED -eq 0 ]; do
-    SYNC_STATUS=$(curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
-    SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
+  while [ "$synced" -eq 0 ]; do
+    sync_status=$(curl -g -X POST \
+      -H "Content-Type: application/json" \
+      -d '{"query":"query { syncStatus }"}' \
+      "${rest_server}")
+    synced=$(echo "${sync_status}" | grep -c "SYNCED")
     sleep 1
   done
+
+  set -e
 
   echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
   printf "\n"
@@ -807,25 +812,32 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     echo "Set up zkapp account"
     printf "\n"
 
-    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key "${FEE_PAYER_KEY_FILE}" --nonce 0 --sender-key "${SENDER_KEY_FILE}" --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,7d)
-    python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+    query=$(${ZKAPP_EXE} create-zkapp-account \
+      --fee-payer-key "${fee_payer_key_file}" --nonce 0 \
+      --sender-key "${sender_key_file}" --sender-nonce 0 \
+      --receiver-amount 1000 \
+      --zkapp-account-key "${zkapp_account_key_file}" \
+      --fee 5 | sed 1,7d)
+
+    python3 scripts/mina-local-network/send-graphql-query.py "${rest_server}" "${query}"
   fi
 
   if ${VALUE_TRANSFERS}; then
     ${MINA_EXE} account import \
-                -rest-server ${REST_SERVER} \
-                -privkey-path "${KEY_FILE}"
+      -rest-server "${rest_server}" \
+      -privkey-path "${key_file}"
     ${MINA_EXE} account unlock \
-                -rest-server ${REST_SERVER} \
-                -public-key "${PUB_KEY}"
+      -rest-server "${rest_server}" \
+      -public-key "${pub_key}"
 
     sleep "${TRANSACTION_FREQUENCY}"
+
     ${MINA_EXE} client send-payment \
-                -rest-server ${REST_SERVER} \
-                -amount 1 \
-                -nonce 0 \
-                -receiver "${PUB_KEY}" \
-                -sender "${PUB_KEY}"
+      -rest-server "${rest_server}" \
+      -amount 1 \
+      -nonce 0 \
+      -receiver "${pub_key}" \
+      -sender "${pub_key}"
   fi
 
   fee_payer_nonce=1
@@ -837,26 +849,32 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
     if ${VALUE_TRANSFERS}; then
       ${MINA_EXE} client send-payment \
-                  -rest-server ${REST_SERVER} \
-                  -amount 1 \
-                  -receiver "${PUB_KEY}" \
-                  -sender "${PUB_KEY}"
+        -rest-server "${rest_server}" \
+        -amount 1 \
+        -receiver "${pub_key}" \
+        -sender "${pub_key}"
     fi
 
     if ${ZKAPP_TRANSACTIONS}; then
-      QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --sender-key ${SENDER_KEY_FILE} --sender-nonce $sender_nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,5d)
-      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
-      let fee_payer_nonce++
-      let sender_nonce++
+      query=$(${ZKAPP_EXE} transfer-funds-one-receiver \
+        --fee-payer-key "${fee_payer_key_file}" --nonce "${fee_payer_nonce}" \
+        --sender-key "${sender_key_file}" --sender-nonce "${sender_nonce}" \
+        --receiver-amount 1 --fee 5 --receiver "${zkapp_account_pub_key}" | sed 1,5d)
+      python3 scripts/mina-local-network/send-graphql-query.py "${rest_server}" "${query}"
+      ((fee_payer_nonce++))
+      ((sender_nonce++))
 
-      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 | sed 1,5d)
-      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
-      let fee_payer_nonce++
-      let state++
+      query=$(${ZKAPP_EXE} update-state \
+        --fee-payer-key "${fee_payer_key_file}" \
+        --nonce "${fee_payer_nonce}" \
+        --zkapp-account-key "${zkapp_account_key_file}" \
+        --zkapp-state "${state}" \
+        --fee 5 | sed 1,5d)
+      python3 scripts/mina-local-network/send-graphql-query.py "${rest_server}" "${query}"
+      ((fee_payer_nonce++))
+      ((state++))
     fi
   done
-
-  set -e
 fi
 
 # ================================================
