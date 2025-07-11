@@ -1,5 +1,7 @@
 (executable
  (name batch_txn_tool)
+ (package mina_batch_txn)
+ (public_name mina-batch-txn)
  (libraries
   ;; opam libraries
   async.async_command
