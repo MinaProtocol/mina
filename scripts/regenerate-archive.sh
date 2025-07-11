@@ -80,7 +80,7 @@ tar -C precomputed_blocks -cvf ./src/test/archive/sample_db/precomputed_blocks.t
 rm -rf precomputed_blocks
 
 echo "Regenerating archive_db.sql"
-PGPASSWORD=${PG_PASSWD} pg_dump \
+PGPASSWORD=${PG_PW} pg_dump \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
@@ -105,17 +105,17 @@ mv _tmp.json src/test/archive/sample_db/genesis.json
 
 echo "Finished regenerate testing replay"
 
-PGPASSWORD=${PG_PASSWD} dropdb \
+PGPASSWORD=${PG_PW} dropdb \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
           "${PG_DB}"
-PGPASSWORD=${PG_PASSWD} createdb \
+PGPASSWORD=${PG_PW} createdb \
           -U "${PG_USER}" \
           -h "$PG_HOST" \
           -p "${PG_PORT}" \
           "${PG_DB}"
-PGPASSWORD=${PG_PASSWD} psql \
+PGPASSWORD=${PG_PW} psql \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
