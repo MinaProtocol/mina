@@ -12,6 +12,8 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
+let DebianRepo = ../../Constants/DebianRepo.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
@@ -45,16 +47,16 @@ let targetVersion =
       ->  \(commit : Text)
       ->  \(latestGitTag : Text)
       ->  \(todayDate : Text)
-      ->  "${latestGitTag}-${todayDate}-${branch}-${DebianVersions.lowerName
-                                                      codename}-${DebianChannel.lowerName
-                                                                    channel}"
+      ->  "${latestGitTag}-${todayDate}-${DebianVersions.lowerName
+                                            codename}-${DebianChannel.lowerName
+                                                          channel}"
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen = [ S.everything ]
         , path = "Promote"
-        , tags = [ PipelineTag.Type.Promote ]
+        , tags = [ PipelineTag.Type.Promote, PipelineTag.Type.TearDown ]
         , name = "AutoPromoteNightly"
         }
       , steps =
@@ -71,6 +73,7 @@ in  Pipeline.build
               [ DebianVersions.DebVersion.Bullseye
               , DebianVersions.DebVersion.Focal
               ]
+            , debian_repo = DebianRepo.Type.Nightly
             , channel = DebianChannel.Type.Compatible
             , new_docker_tags = new_tags
             , target_version = targetVersion
@@ -78,7 +81,7 @@ in  Pipeline.build
             , backend = "local"
             , verify = True
             , branch = "\\\${BUILDKITE_BRANCH}"
-            , source_version = "\\\${MINA_DOCKER_TAG}"
+            , source_version = "\\\${MINA_DEB_VERSION}"
             , build_id = "\\\${BUILDKITE_BUILD_ID}"
             }
       }

@@ -60,6 +60,12 @@ function reversion() {
     # shellcheck disable=SC2140
     rm -rf "${__parent_dir}"/"${__new_deb}.deb"
 
+    if [[ ! -f "${__deb}_${__source_version}.deb" ]]; then
+        echo "Error: File ${__deb}_${__source_version}.deb does not exist" >&2
+        echo "Contents of ${__parent_dir}:" >&2
+        ls -la "${__parent_dir}"
+        exit 1
+    fi
     dpkg-deb -R "${__deb}_${__source_version}.deb" "${__new_deb}"
     # shellcheck disable=SC2140
     sed -i 's/Version: '"${__source_version}"'/Version: '"${__new_version}"'/g' "${__new_deb}/DEBIAN/control"
