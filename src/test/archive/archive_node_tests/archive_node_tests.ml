@@ -27,6 +27,87 @@ let assert_archived_blocks ~archive_uri ~expected =
       actual_blocks_count expected ()
   else Deferred.unit
 
+(* Convert performance metrics to a JSON format suitable for output *)
+(* The metrics are expected to be a list of tuples (operation, avg_time) *)
+(* where operation is a string and avg_time is a float representing the average time in milliseconds *)
+let perf_metrics_to_yojson metrics =
+  let json_list =
+    List.map metrics ~f:(fun (operation, avg_time) ->
+        `Assoc
+          [ ("operation", `String operation); ("avg_time_ms", `Float avg_time) ] )
+  in
+  `List json_list
+
+(* Extract performance metrics from the log file *)
+(* where X is a floating point number representing the time taken for the operation *)
+(* log output should be in JSON format *)
+(* Example log line: {..., "message": "Operation took 123.45 ms"} *)
+(* The function will return a map of operation names to their average time in milliseconds *)
+let extract_perf_metrics log_file =
+  let open Deferred.Let_syntax in
+  let%bind lines = Reader.file_lines log_file in
+  let perf_metrics =
+    List.filter_map lines ~f:(fun line ->
+        if String.is_substring line ~substring:" took " then
+          (* Extract the operation and time from the line *)
+          (* Parse the JSON line to extract the message field *)
+          let json = Yojson.Safe.from_string line in
+          let message =
+            json
+            |> Yojson.Safe.Util.member "message"
+            |> Yojson.Safe.Util.to_string
+          in
+          let pattern =
+            Re.Perl.compile_pat {|(.+) took (\d+(?:\.\d+)?)(ms|us)|}
+          in
+          match Re.exec_opt pattern message with
+          | Some result ->
+              let groups = Re.Group.all result in
+              let operation = groups.(1) in
+              (* Extract the time and its unit *)
+              let time_value = groups.(2) in
+              let time_unit = groups.(3) in
+              let time_float = Float.of_string time_value in
+              let time_obj =
+                match time_unit with
+                | "ms" ->
+                    `Milliseconds time_float
+                | "us" ->
+                    `Microseconds time_float
+                | _ ->
+                    failwith ("Unknown time unit: " ^ time_unit)
+              in
+              Some (operation, time_obj)
+          | None ->
+              None
+        else None )
+  in
+  let grouped_metrics =
+    List.fold perf_metrics
+      ~init:(Map.empty (module String))
+      ~f:(fun acc (operation, time_obj) ->
+        let time_ms =
+          match time_obj with
+          | `Milliseconds ms ->
+              ms
+          | `Microseconds us ->
+              us /. 1000.0
+        in
+        Map.add_multi acc ~key:operation ~data:time_ms )
+  in
+  (* Calculate the average time for each operation *)
+  (* Group by operation and calculate the average time *)
+  let averaged_metrics =
+    Map.mapi grouped_metrics ~f:(fun ~key:operation ~data:times ->
+        let avg_time =
+          List.fold times ~init:0.0 ~f:( +. )
+          /. Float.of_int (List.length times)
+        in
+        (operation, avg_time) )
+    |> Map.data
+  in
+  Deferred.return averaged_metrics
+
 module ArchivePrecomputedBlocksFromDaemon = struct
   type t = Mina_automation_fixture.Archive.after_bootstrap
 
@@ -42,7 +123,8 @@ module ArchivePrecomputedBlocksFromDaemon = struct
       List.map precomputed_blocks ~f:(fun file -> output ^ "/" ^ file)
       |> List.filter ~f:(fun file -> String.is_suffix file ~suffix:".json")
     in
-    Archive.Process.start_logging test_data.archive ;
+    Archive.Process.start_logging test_data.archive
+      ~log_file:(output ^ "/archive.log") ;
     let%bind () =
       Daemon.archive_blocks_from_files daemon
         ~archive_address:test_data.archive.config.server_port
@@ -80,6 +162,10 @@ module ArchivePrecomputedBlocksFromDaemon = struct
     assert (
       String.equal output_ledger.target_epoch_ledgers_state_hash
         latest_state_hash ) ;
+
+    let%bind perf_data = extract_perf_metrics (output ^ "/archive.log") in
+    perf_metrics_to_yojson perf_data |> Yojson.to_file "archive.perf" ;
+
     Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
 end
 
@@ -90,8 +176,10 @@ let () =
 let () =
   let open Alcotest in
   run "Test archive node."
-    [ ( "precomputed blocks"
-      , [ test_case "The mina daemon works in background mode" `Quick
+    [ ( "precomputed_blocks"
+      , [ test_case
+            "Recreate database from precomputed blocks sent from mock daemon"
+            `Quick
             (Runner.run_blocking
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (ArchivePrecomputedBlocksFromDaemon) ) )
