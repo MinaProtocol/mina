@@ -58,8 +58,7 @@ function rebuild_deb() {
             --new-version ${NEW_VERSION} \
             --suite ${SUITE} \
             --new-suite ${NEW_SUITE} \
-            --new-name ${NEW_NAME} \
-            --codename ${CODENAME}
+            --new-name ${NEW_NAME}
 }
 
 rebuild_deb
