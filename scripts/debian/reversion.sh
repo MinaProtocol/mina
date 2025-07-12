@@ -34,13 +34,10 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "❌ Unknown parameter passed: $1"; usage exit 1;;
 esac; shift; done
 
-if [[ ! -v RELEASE && ! -v SUITE ]]; then echo "❌ No release nor suite specified"; echo ""; usage "$0" "$1" ; exit 1; fi
+if [[ ! -v SUITE ]]; then echo "❌ No release nor suite specified"; echo ""; usage "$0" "$1" ; exit 1; fi
 if [[ ! -v VERSION ]]; then echo "❌ No version specified"; echo ""; usage "$0" "$1" ; exit 1; fi
 if [[ ! -v REPO ]]; then echo "❌ No repo specified"; echo ""; usage "$0" "$1" ; exit 1; fi
-if [[ ! -v SUITE ]]; then SUITE=$RELEASE; fi;
-if [[ ! -v RELEASE ]]; then RELEASE=$SUITE; fi;
 if [[ ! -v NEW_NAME ]]; then NEW_NAME=$DEB; fi;
-if [[ ! -v NEW_RELEASE ]]; then NEW_RELEASE=$RELEASE; fi;
 if [[ ! -v NEW_VERSION ]]; then NEW_VERSION=$VERSION; fi;
 if [[ ! -v NEW_SUITE ]]; then NEW_SUITE=$SUITE; fi;
 if [[ ! -v NEW_REPO ]]; then NEW_REPO=$REPO; fi;
@@ -62,9 +59,8 @@ function rebuild_deb() {
             --suite ${SUITE} \
             --new-suite ${NEW_SUITE} \
             --new-name ${NEW_NAME} \
-            --new-release ${NEW_RELEASE} \
             --codename ${CODENAME}
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_RELEASE}" --bucket "${NEW_REPO}" ${SIGN_ARG}
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG}

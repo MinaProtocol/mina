@@ -391,7 +391,6 @@ function publish_debian() {
                 --suite "unstable" \
                 --new-suite ${__channel} \
                 --new-name ${__artifact_full_name} \
-                --new-release ${__channel} \
                 --codename ${__codename}
     fi
 
