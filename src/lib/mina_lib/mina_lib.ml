@@ -1884,7 +1884,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_current_frontier () =
             Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
           in
-          Exit_handlers.register_async_shutdown_handler ~logger:config.logger
+          Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
+            ~logger:config.logger
             ~description:"Close transition frontier, if exists" (fun () ->
               match get_current_frontier () with
               | None ->

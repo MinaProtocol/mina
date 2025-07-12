@@ -40,6 +40,7 @@
   base_quickcheck
   ;;local libraries
   mina_stdlib
+  mina_stdlib_unix
   snark_profiler_lib
   archive_lib
   mina_wire_types
@@ -91,7 +92,6 @@
   transaction_snark_tests
   transaction_protocol_state
   test_util
-  file_system
   daemon_rpcs
   trust_system
   secrets

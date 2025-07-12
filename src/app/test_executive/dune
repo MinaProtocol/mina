@@ -22,7 +22,6 @@
   cache_dir
   currency
   data_hash_lib
-  file_system
   genesis_constants
   integers
   integration_test_lib
@@ -39,8 +38,8 @@
   mina_runtime_config
   mina_signature_kind
   mina_stdlib
+  mina_stdlib_unix
   mina_transaction
-  mina_wire_types
   network_pool
   participating_state
   pickles

@@ -8,8 +8,8 @@
   core_kernel
   ;; local libraries
   disk_cache_intf
-  file_system
-  logger)
+  logger
+  mina_stdlib_unix)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
