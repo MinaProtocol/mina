@@ -390,8 +390,7 @@ function publish_debian() {
                 --new-version ${__target_version} \
                 --suite "unstable" \
                 --new-suite ${__channel} \
-                --new-name ${__artifact_full_name} \
-                --codename ${__codename}
+                --new-name ${__artifact_full_name}
     fi
 
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
