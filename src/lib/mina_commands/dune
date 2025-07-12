@@ -3,53 +3,53 @@
  (public_name mina_commands)
  (libraries
   ;; opam libraries
-  async_kernel
-  base
-  core_kernel
-  core
   async
+  async_kernel
   async_unix
+  base
+  core
+  core_kernel
   sexplib0
   ;; local libraries
-  pickles.backend
-  mina_base.import
-  kimchi_backend
-  mina_metrics
-  mina_stdlib
-  transition_frontier
-  sync_status
-  pipe_lib
-  perf_histograms
-  network_peer
-  consensus
-  precomputed_values
-  logger
-  currency
-  mina_state
-  signature_lib
-  daemon_rpcs
-  mina_lib
-  mina_base
-  user_command_input
-  node_addrs_and_ports
-  mina_numbers
-  participating_state
-  trust_system
-  network_pool
-  merkle_list_verifier
-  genesis_constants
   block_time
-  mina_block
-  mina_incremental
-  gossip_net
+  consensus
+  currency
+  daemon_rpcs
   data_hash_lib
-  mina_ledger
+  genesis_constants
+  gossip_net
+  kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
+  logger
+  merkle_list_verifier
+  mina_base
+  mina_base.import
+  mina_block
+  mina_incremental
+  mina_ledger
+  mina_lib
+  mina_metrics
+  mina_numbers
+  mina_state
+  mina_stdlib
+  network_peer
+  network_pool
+  node_addrs_and_ports
+  participating_state
+  perf_histograms
   pickles
+  pickles.backend
+  pipe_lib
+  precomputed_values
   protocol_version
   random_oracle
-  transition_frontier_base)
+  signature_lib
+  sync_status
+  transition_frontier
+  transition_frontier_base
+  trust_system
+  user_command_input)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

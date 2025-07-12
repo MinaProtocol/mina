@@ -6,43 +6,43 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  bin_prot.shape
-  sexplib0
-  core
   async
-  core_kernel
-  base
-  base.caml
-  base.base_internalhash_types
   async_kernel
-  ppx_inline_test.config
   async_unix
+  base
+  base.base_internalhash_types
+  base.caml
+  bin_prot.shape
+  core
+  core_kernel
+  ppx_inline_test.config
+  sexplib0
   ;; local libraries
-  transaction_protocol_state
-  transaction_snark_work
-  transition_frontier_base
+  currency
   error_json
   ledger_proof
-  precomputed_values
-  transaction_witness
-  snark_work_lib
-  mina_state
+  logger
   mina_base
+  mina_ledger
+  mina_metrics
+  mina_state
   mina_transaction
   network_pool
-  staged_ledger
-  logger
-  currency
+  o1trace
   one_or_two
-  transaction_snark
   pipe_lib
-  transition_frontier
-  with_hash
-  mina_metrics
-  transition_frontier_extensions
-  mina_ledger
   ppx_version.runtime
-  o1trace)
+  precomputed_values
+  snark_work_lib
+  staged_ledger
+  transaction_protocol_state
+  transaction_snark
+  transaction_snark_work
+  transaction_witness
+  transition_frontier
+  transition_frontier_base
+  transition_frontier_extensions
+  with_hash)
  (preprocess
   (pps
    ppx_mina

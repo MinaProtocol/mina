@@ -7,11 +7,11 @@
   (pps ppx_version ppx_jane ppx_compare))
  (libraries
   ;; opam libraries
-  core_kernel
   core
+  core_kernel
   ;; local libraries
+  data_hash_lib
   merkle_list_verifier
-  mina_state
   mina_base
-  mina_stdlib
-  data_hash_lib))
+  mina_state
+  mina_stdlib))

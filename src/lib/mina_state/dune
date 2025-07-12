@@ -26,38 +26,38 @@
   ;; opam libraries
   core
   ;; local libraries
-  signature_lib
-  pickles.backend
-  outside_hash_image
-  pickles
-  random_oracle_input
-  random_oracle
-  genesis_constants
-  block_time
-  mina_base
-  mina_debug
-  mina_transaction_logic
-  snark_params
-  consensus
   bitstring_lib
-  fold_lib
-  tuple_lib
-  with_hash
-  snarky.backendless
+  blake2
+  block_time
+  consensus
   crypto_params
-  data_hash_lib
   currency
-  visualization
-  linked_tree
-  mina_numbers
+  data_hash_lib
+  fold_lib
+  genesis_constants
+  kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
-  kimchi_backend
+  linked_tree
+  mina_base
   mina_base.util
+  mina_debug
   mina_ledger
-  unsigned_extended
+  mina_numbers
+  mina_transaction_logic
+  mina_wire_types
+  outside_hash_image
+  pickles
+  pickles.backend
+  ppx_version.runtime
+  random_oracle
+  random_oracle_input
   sgn
   sgn_type
-  blake2
-  ppx_version.runtime
-  mina_wire_types))
+  signature_lib
+  snark_params
+  snarky.backendless
+  tuple_lib
+  unsigned_extended
+  visualization
+  with_hash))

@@ -3,15 +3,15 @@
  (public_name generated_graphql_queries)
  (libraries
   async
+  base
   cohttp
-  core
   cohttp-async
-  mina_base
+  core
   graphql-async
   graphql-cohttp
-  yojson
   graphql_lib
-  base)
+  mina_base
+  yojson)
  (instrumentation
   (backend bisect_ppx))
  (preprocessor_deps

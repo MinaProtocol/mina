@@ -6,34 +6,34 @@
  (library_flags -linkall)
  (libraries
   ;; opam libraries
-  result
-  base.caml
-  bin_prot.shape
-  bignum.bigint
-  core_kernel
-  integers
-  sexplib0
   base
   base.base_internalhash_types
+  base.caml
+  bignum.bigint
+  bin_prot.shape
+  core_kernel
+  integers
   ppx_inline_test.config
+  result
+  sexplib0
   ;; local libraries
-  protocol_version
-  mina_wire_types
   bignum_bigint
-  pickles
+  bitstring_lib
   codable
-  snarky.backendless
   fold_lib
-  tuple_lib
-  snark_bits
-  snark_params
-  unsigned_extended
+  kimchi_backend_common
+  mina_wire_types
+  pickles
+  ppx_version.runtime
+  protocol_version
   random_oracle
   random_oracle_input
-  bitstring_lib
+  snark_bits
+  snark_params
+  snarky.backendless
   test_util
-  kimchi_backend_common
-  ppx_version.runtime)
+  tuple_lib
+  unsigned_extended)
  (preprocess
   (pps
    ppx_version

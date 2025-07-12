@@ -16,51 +16,51 @@
    ppx_assert))
  (libraries
   ;; opam libraries
-  rocks
-  integers
+  async
   async_kernel
-  base.caml
   base
+  base.base_internalhash_types
+  base.caml
+  bin_prot.shape
   core
   core_kernel
-  sexplib0
-  bin_prot.shape
-  base.base_internalhash_types
-  async
   core_kernel.uuid
+  integers
   ppx_inline_test.config
+  rocks
+  sexplib0
   ;; local libraries
-  mina_wire_types
-  sgn
-  syncable_ledger
-  snark_params
-  zkapp_command_builder
-  pickles
-  pickles.backend
-  pickles_types
-  mina_base.import
-  o1trace
-  rocksdb
-  random_oracle
   currency
+  data_hash_lib
+  debug_assert
   genesis_constants
+  key_value_database
   kimchi_backend
   kimchi_pasta
   kimchi_pasta.basic
-  merkle_mask
+  merkle_address
   merkle_ledger
+  merkle_mask
   mina_base
+  mina_base.import
+  mina_numbers
+  mina_stdlib
   mina_transaction
   mina_transaction_logic
-  signature_lib
-  mina_numbers
-  debug_assert
-  merkle_address
-  key_value_database
-  data_hash_lib
+  mina_wire_types
+  o1trace
+  pickles
+  pickles.backend
+  pickles_types
+  ppx_version.runtime
   quickcheck_lib
+  random_oracle
+  rocksdb
+  sgn
+  signature_lib
+  snark_params
   snarky.backendless
+  syncable_ledger
   unsigned_extended
   with_hash
-  ppx_version.runtime
-  mina_stdlib))
+  zkapp_command_builder))

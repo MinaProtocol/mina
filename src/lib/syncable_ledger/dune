@@ -5,24 +5,24 @@
  (flags :standard -short-paths)
  (libraries
   ;; opam libraries
-  async_kernel
-  core_kernel
-  bin_prot.shape
-  base.caml
-  sexplib0
-  core
   async
+  async_kernel
+  base.caml
+  bin_prot.shape
+  core
+  core_kernel
+  sexplib0
   ;; local libraries
-  trust_system
-  logger
-  merkle_ledger
-  pipe_lib
-  network_peer
-  merkle_address
-  mina_stdlib
   error_json
+  logger
+  merkle_address
+  merkle_ledger
+  mina_compile_config
+  mina_stdlib
+  network_peer
+  pipe_lib
   ppx_version.runtime
-  mina_compile_config)
+  trust_system)
  (preprocess
   (pps
    ppx_mina

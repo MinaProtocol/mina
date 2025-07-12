@@ -6,98 +6,98 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  integers
-  async_unix
-  sexplib0
   archive_lib
-  core
   async
-  incremental
-  core_kernel
   async_kernel
-  base.caml
+  async_unix
   base.base_internalhash_types
-  uri
-  stdio
-  result
+  base.caml
   bin_prot.shape
+  core
+  core_kernel
+  incremental
+  integers
+  result
+  sexplib0
+  stdio
+  uri
   ;; local libraries
-  mina_stdlib
-  transition_chain_prover
   best_tip_prover
-  proof_carrying_data
-  mina_runtime_config
-  ledger_proof
-  mina_net2
-  network_peer
-  mina_incremental
-  mina_numbers
-  precomputed_values
-  transition_frontier_base
-  with_hash
-  currency
-  gossip_net
-  transition_frontier
-  trust_system
-  node_status_service
-  vrf_evaluator
-  uptime_service
-  exit_handlers
-  daemon_rpcs
-  sync_status
-  node_addrs_and_ports
-  transition_router
-  sync_handler
-  genesis_constants
   block_producer
-  mina_networking
-  consensus
-  o1trace
-  filtered_external_transition
-  pipe_lib
-  user_command_input
-  logger
-  child_processes
-  secrets
-  work_selector
-  mina_ledger
-  protocol_version
-  snark_worker
-  participating_state
-  cli_lib
-  signature_lib
-  mina_base
-  mina_transaction
-  mina_block
-  transition_frontier_extensions
   block_time
-  error_json
-  unsigned_extended
-  mina_metrics
-  staged_ledger
-  mina_state
-  network_pool
-  timeout_lib
-  prover
-  verifier
-  snark_work_lib
-  ledger_catchup
-  genesis_ledger_helper
+  child_processes
+  cli_lib
   coda_genesis_proof
-  mina_base.import
+  consensus
+  currency
+  daemon_rpcs
   data_hash_lib
-  transition_handler
-  ppx_version.runtime
-  mina_intf
-  node_error_service
-  mina_transaction_logic
-  pickles.backend
-  pickles
-  snark_params
+  error_json
+  exit_handlers
+  filtered_external_transition
+  genesis_constants
+  genesis_ledger_helper
+  gossip_net
+  internal_tracing
   kimchi_pasta
   kimchi_pasta.basic
+  ledger_catchup
+  ledger_proof
+  logger
+  mina_base
+  mina_base.import
+  mina_block
+  mina_incremental
+  mina_intf
+  mina_ledger
+  mina_metrics
+  mina_net2
+  mina_networking
+  mina_numbers
+  mina_runtime_config
+  mina_state
+  mina_stdlib
+  mina_transaction
+  mina_transaction_logic
   mina_wire_types
-  internal_tracing)
+  network_peer
+  network_pool
+  node_addrs_and_ports
+  node_error_service
+  node_status_service
+  o1trace
+  participating_state
+  pickles
+  pickles.backend
+  pipe_lib
+  ppx_version.runtime
+  precomputed_values
+  proof_carrying_data
+  protocol_version
+  prover
+  secrets
+  signature_lib
+  snark_params
+  snark_work_lib
+  snark_worker
+  staged_ledger
+  sync_handler
+  sync_status
+  timeout_lib
+  transition_chain_prover
+  transition_frontier
+  transition_frontier_base
+  transition_frontier_extensions
+  transition_handler
+  transition_router
+  trust_system
+  unsigned_extended
+  uptime_service
+  user_command_input
+  verifier
+  vrf_evaluator
+  with_hash
+  work_selector)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

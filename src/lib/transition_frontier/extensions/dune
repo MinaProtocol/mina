@@ -3,26 +3,26 @@
  (public_name transition_frontier_extensions)
  (libraries
   ;;opam libraries
-  base.caml
   async_kernel
-  core_kernel
-  sexplib0
-  result
   base.base_internalhash_types
+  base.caml
+  core_kernel
+  result
+  sexplib0
   ;;local libraries
-  with_hash
-  mina_block
-  transaction_snark_work
   data_hash_lib
-  pipe_lib
+  logger
   mina_base
+  mina_block
+  mina_ledger
+  mina_state
+  mina_wire_types
+  pipe_lib
+  staged_ledger
+  transaction_snark_work
   transition_frontier_base
   transition_frontier_full_frontier
-  mina_ledger
-  logger
-  mina_state
-  staged_ledger
-  mina_wire_types)
+  with_hash)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

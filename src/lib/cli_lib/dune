@@ -6,47 +6,47 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
+  async
+  async.async_command
+  async.async_rpc
+  async_kernel
+  async_rpc_kernel
+  async_unix
+  base.caml
+  bin_prot.shape
+  camlp-streams
+  core
+  core_kernel
+  ppx_deriving_yojson.runtime
   result
   sexplib0
-  async.async_command
-  base.caml
-  async_kernel
-  async.async_rpc
-  camlp-streams
-  core_kernel
-  yojson
   sodium
-  core
-  async_unix
-  ppx_deriving_yojson.runtime
-  async
-  uri
-  async_rpc_kernel
-  bin_prot.shape
   stdio
+  uri
+  yojson
   ;; local libraries
-  genesis_constants
-  random_oracle
-  pickles
-  mina_numbers
-  signature_lib
-  currency
-  rosetta_lib
-  secrets
-  mina_base
-  work_selector
-  rosetta_coding
-  logger
-  interpolator_lib
-  snark_params
-  pickles.backend
   consensus.vrf
+  currency
   error_json
+  genesis_constants
+  gossip_net
+  interpolator_lib
   kimchi_pasta
   kimchi_pasta.basic
+  logger
+  mina_base
+  mina_numbers
+  mina_runtime_config
+  pickles
+  pickles.backend
   ppx_version.runtime
-  gossip_net
-  mina_runtime_config)
+  random_oracle
+  rosetta_coding
+  rosetta_lib
+  secrets
+  signature_lib
+  snark_params
+  work_selector)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
  (instrumentation
