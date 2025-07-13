@@ -89,6 +89,7 @@ let commands
                                 ${Cmd.format trigger}
                               else
                                 echo "Skipping ${job.name} because is irrelevant to PR changes"
+                              fi
                             ''
                         , Full =
                             ''
