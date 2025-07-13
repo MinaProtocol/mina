@@ -6,8 +6,6 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineScope = ../../Pipeline/Scope.dhall
-
 let Network = ../../Constants/Network.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
