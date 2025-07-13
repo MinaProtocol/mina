@@ -136,6 +136,16 @@ module type Lib_intf = sig
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
          list
+
+    (** [add_back t work] add back a work manually, usually this is needed when 
+        proof verification failed *)
+    val add_back :
+         t
+      -> ( Transaction_witness.t
+         , Ledger_proof.Cached.t )
+         Snark_work_lib.Work.Single.Spec.t
+         One_or_two.t
+      -> unit
   end
 
   (**jobs that are not in the snark pool yet*)

@@ -39,3 +39,5 @@ val all_work :
 
 val completed_work_statements :
   snark_pool:snark_pool -> State.t -> Transaction_snark_work.Checked.t list
+
+val add_back : State.t -> work One_or_two.t -> unit
