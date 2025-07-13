@@ -34,7 +34,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "❌ Unknown parameter passed: $1"; usage exit 1;;
 esac; shift; done
 
-if [[ ! -v SUITE ]]; then echo "❌ No release nor suite specified"; echo ""; usage "$0" "$1" ; exit 1; fi
+if [[ ! -v SUITE ]]; then echo "❌ No suite specified"; echo ""; usage "$0" "$1" ; exit 1; fi
 if [[ ! -v VERSION ]]; then echo "❌ No version specified"; echo ""; usage "$0" "$1" ; exit 1; fi
 if [[ ! -v REPO ]]; then echo "❌ No repo specified"; echo ""; usage "$0" "$1" ; exit 1; fi
 if [[ ! -v NEW_NAME ]]; then NEW_NAME=$DEB; fi;
