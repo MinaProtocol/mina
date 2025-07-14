@@ -6,14 +6,15 @@
  (enabled_if
   (= %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
  (action
-  (progn
-   (run
-    curl
-    -L
-    -o
-    %{target}.gz
-    https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
-   (run gzip -d %{target}.gz))))
+  (ignore-stdout
+   (progn
+    (run
+     curl
+     -L
+     -o
+     %{target}.gz
+     https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
+    (run gzip -d %{target}.gz)))))
 
 (rule
  (enabled_if
