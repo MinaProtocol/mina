@@ -7,7 +7,7 @@
   core
   ;; local libraries
   mina_automation
-  file_system)
+  mina_stdlib_unix)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
