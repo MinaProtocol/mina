@@ -12,10 +12,14 @@ open Mina_automation_fixture.Archive
 let assert_archived_blocks ~archive_uri ~expected =
   let connection = Psql.Conn_str archive_uri in
   let%bind actual_blocks_count =
-    Psql.run_command ~connection "Select count(*) from blocks where height > 0"
+    Psql.run_command ~connection "SELECT COUNT(*) FROM blocks WHERE height > 1"
   in
   let actual_blocks_count =
-    actual_blocks_count |> String.strip |> Int.of_string
+    match actual_blocks_count with
+    | Ok count ->
+        Int.of_string count
+    | Error err ->
+        failwith ("Failed to query blocks count: " ^ Error.to_string_hum err)
   in
   if Int.( <> ) actual_blocks_count expected then
     failwithf "Invalid number of archive blocks. Actual (%d) vs Expected (%d)"
@@ -38,7 +42,7 @@ module ArchivePrecomputedBlocksFromDaemon = struct
     in
     Archive.Process.start_logging test_data.archive ;
     let%bind () =
-      Daemon.dispatch_blocks daemon
+      Daemon.archive_blocks_from_files daemon
         ~archive_address:test_data.archive.config.server_port
         ~format:Archive_blocks.Precomputed precomputed_blocks
     in
@@ -49,19 +53,19 @@ module ArchivePrecomputedBlocksFromDaemon = struct
     in
     let connection = Psql.Conn_str archive_uri in
     let%bind latest_state_hash =
-      Psql.run_command ~connection
-        "select state_hash from blocks WHERE id=(SELECT max(id) FROM blocks) \
-         LIMIT 1"
+      Psql.run_command_exn ~connection
+        "SELECT state_hash FROM blocks ORDER BY id DESC LIMIT 1"
     in
     let output_ledger = output ^ "/output_ledger.json" in
     let replayer = Replayer.default in
-    let%bind _ =
+    let%bind output =
       Replayer.run replayer ~archive_uri
         ~input_config:
           (Network_data.replayer_input_file_path test_data.network_data)
         ~target_state_hash:latest_state_hash ~interval_checkpoint:10
         ~output_ledger ()
     in
+    let () = print_endline output in
     let output_ledger = Replayer.Output.of_json_file_exn output_ledger in
     assert (
       String.equal output_ledger.target_epoch_ledgers_state_hash
