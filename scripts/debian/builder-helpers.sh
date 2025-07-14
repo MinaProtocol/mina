@@ -1,4 +1,45 @@
 #!/bin/bash
+
+# Mina Protocol Debian Package Builder Helper Script
+# ================================================
+#
+# This script provides helper functions and environment setup for building
+# Debian packages for the Mina Protocol blockchain client and related tools.
+#
+# OVERVIEW:
+# This script sets up the build environment and provides functions to create
+# various Debian packages including:
+# - Archive node packages
+# - Mina daemon packages (for mainnet, devnet, berkeley)
+# - Rosetta API packages
+# - Utility packages (keypair generation, logging, testing)
+# The output directory for the debian packages will be in the `BUILDDIR` directory
+#
+# ENVIRONMENT VARIABLES:
+# - BUILD_URL: Build URL for tracking (default: BUILDKITE_BUILD_URL or local
+#   hostname)
+# - DUNE_PROFILE: Build profile (affects package naming)
+# - DUNE_INSTRUMENT_WITH: Adds instrumentation suffix if set. Instrumentation
+#   includes additional symbols added by bisect_ppx for code coverage
+# - MINA_DEB_CODENAME: Debian codename (default: "bullseye")
+# - MINA_DEB_VERSION: Package version (default: "0.0.0-experimental")
+# - MINA_DEB_RELEASE: Release channel (default: "unstable")
+#
+# SUPPORTED DEBIAN CODENAMES:
+# - noble, jammy (Ubuntu 24.04+, 22.04)
+# - bookworm (Debian 12)
+# - bullseye, focal (Debian 11, Ubuntu 20.04)
+#
+# USAGE:
+# This script is intended to be sourced by other build scripts like ./build.sh
+#
+# FUNCTIONS:
+# - create_control_file(): Creates Debian control files
+# - build_deb(): Builds the actual .deb package
+# - copy_common_daemon_configs(): Copies shared daemon configuration
+# - copy_common_rosetta_configs(): Copies shared Rosetta configuration
+# - build_*_deb(): Various package build functions
+
 set -euox pipefail
 
 BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
