@@ -42,24 +42,31 @@ if [[ ! -v NEW_VERSION ]]; then NEW_VERSION=$VERSION; fi;
 if [[ ! -v NEW_SUITE ]]; then NEW_SUITE=$SUITE; fi;
 if [[ ! -v NEW_REPO ]]; then NEW_REPO=$REPO; fi;
 if [[ ! -v DEB ]]; then NEW_NAME=$DEB; fi;
-if [[ ! -v SIGN ]]; then 
+if [[ ! -v SIGN ]]; then
   SIGN_ARG=""
-else 
+else
   SIGN_ARG="--sign $SIGN"
 fi
 
 function rebuild_deb() {
   source scripts/debian/reversion-helper.sh
 
-  wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
-  reversion --deb ${DEB} \
-            --package ${DEB} \
-            --source-version ${VERSION} \
-            --new-version ${NEW_VERSION} \
-            --suite ${SUITE} \
-            --new-suite ${NEW_SUITE} \
-            --new-name ${NEW_NAME}
+  wget https://s3.us-west-2.amazonaws.com/"${REPO}"/pool/"${CODENAME}"/m/mi/"${DEB}"_"${VERSION}".deb
+  reversion --deb "${DEB}" \
+            --package "${DEB}" \
+            --source-version "${VERSION}" \
+            --new-version "${NEW_VERSION}" \
+            --suite "${SUITE}" \
+            --new-suite "${NEW_SUITE}" \
+            --new-name "${NEW_NAME}"
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG}
+
+# shellcheck disable=SC2086
+source scripts/debian/publish.sh \
+       --names "${NEW_NAME}_${NEW_VERSION}.deb" \
+       --version "${NEW_VERSION}" \
+       --codename "${CODENAME}" \
+       --release "${NEW_SUITE}" \
+       --bucket "${NEW_REPO}" ${SIGN_ARG}
