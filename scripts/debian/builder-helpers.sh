@@ -57,12 +57,12 @@ case "${DUNE_PROFILE}" in
     ;;
 esac
 
-
+INSTRUMENTED_SUFFIX=""
 #Add suffix to debian to distinguish instrumented packages
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
-    INSTRUMENTED_SUFFIX=instrumented
-    MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
-    DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
+    INSTRUMENTED_SUFFIX="-instrumented"
+    MINA_DEB_NAME="${MINA_DEB_NAME}${INSTRUMENTED_SUFFIX}"
+    DEB_SUFFIX="${DEB_SUFFIX}${INSTRUMENTED_SUFFIX}"
 fi
 
 BUILDDIR="deb_build"
@@ -327,11 +327,11 @@ build_daemon_mainnet_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building mainnet deb without keys:"
 
-  create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
+  create_control_file mina-mainnet${INSTRUMENTED_SUFFIX} "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
 
-  build_deb mina-mainnet
+  build_deb mina-mainnet${INSTRUMENTED_SUFFIX}
 }
 ##################################### END MAINNET PACKAGE #######################################
 
@@ -341,11 +341,11 @@ build_daemon_devnet_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building testnet signatures deb without keys:"
 
-  create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+  create_control_file mina-devnet${INSTRUMENTED_SUFFIX} "${SHARED_DEPS}${DAEMON_DEPS}" 'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
-  build_deb mina-devnet
+  build_deb mina-devnet${INSTRUMENTED_SUFFIX}
 }
 ##################################### END DEVNET PACKAGE ########################################
 
