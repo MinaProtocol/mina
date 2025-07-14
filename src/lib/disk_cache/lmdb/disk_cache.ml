@@ -23,6 +23,7 @@ module Make (Data : Binable.S) = struct
     ; reusable_keys : int Queue.t
           (** A list of ids that are no longer reachable from OCaml runtime, but
               haven't been cleared inside the LMDB disk cache *)
+    ; queue_guard : Error_checking_mutex.t
     }
 
   (** How big can the queue [reusable_keys] be before we do a cleanup *)
@@ -32,16 +33,25 @@ module Make (Data : Binable.S) = struct
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun path ->
         let env, db = Rw.create path in
-        { env; db; counter = ref 0; reusable_keys = Queue.create () } )
+        { env
+        ; db
+        ; counter = ref 0
+        ; reusable_keys = Queue.create ()
+        ; queue_guard = Error_checking_mutex.create ()
+        } )
 
   type id = { idx : int }
 
   let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
     Rw.get ~env db idx |> Option.value_exn
 
-  let put ({ env; db; counter; reusable_keys } : t) (x : Data.t) : id =
+  let put ({ env; db; counter; reusable_keys; queue_guard } : t) (x : Data.t) :
+      id =
     let idx =
-      match Queue.dequeue reusable_keys with
+      match
+        Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
+            Queue.dequeue reusable_keys )
+      with
       | None ->
           (* We don't have reusable keys, assign a new one nobody ever used *)
           incr counter ; !counter - 1
@@ -57,10 +67,14 @@ module Make (Data : Binable.S) = struct
            critical section. LMDB critical section then will be re-entered if
            it's invoked directly in a GC hook.
            This causes mutex double-acquiring and node freezes. *)
-        Queue.enqueue reusable_keys idx ) ;
-    if Queue.length reusable_keys >= reuse_size_limit then (
-      Queue.iter reusable_keys ~f:(fun to_remove -> Rw.remove ~env db to_remove) ;
-      Queue.clear reusable_keys ) ;
+        Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
+            Queue.enqueue reusable_keys idx ) ) ;
+
+    Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
+        if Queue.length reusable_keys >= reuse_size_limit then (
+          Queue.iter reusable_keys ~f:(fun to_remove ->
+              Rw.remove ~env db to_remove ) ;
+          Queue.clear reusable_keys ) ) ;
     Rw.set ~env db idx x ;
     res
 
