@@ -54,19 +54,20 @@ else
   GPG_OPTS=("--gpg-options=\"--batch" "--pinentry-mode=loopback" "--yes")
 fi
 
-
-
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
 for _ in {1..10}; do (
-  # utility for publishing deb repo with commons options
+# utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
-#NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the registry and some files will be lost. If a build fails with the following error, delete the lock file https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
+#NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the
+# registry and some files will be lost. If a build fails with the following
+# error, delete the lock file
+# https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
 #>> Checking for existing lock file
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
-#/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+# /var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
 deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   --fail-if-exists \
   --lock \
