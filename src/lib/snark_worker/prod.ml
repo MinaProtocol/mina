@@ -291,10 +291,13 @@ module Impl = struct
       Work.Spec.Partitioned.Poly.Stable.Latest.t
       Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
-    let sok_digest =
-      Work.Spec.Partitioned.Poly.sok_message partitioned_spec
-      |> Sok_message.digest
-    in
+    let sok_message = Work.Spec.Partitioned.Poly.sok_message partitioned_spec in
+    let sok_digest = Sok_message.digest sok_message in
+    [%log info] "$sok_message, $sok_digest"
+      ~metadata:
+        [ ("sok_message", Sok_message.to_yojson sok_message)
+        ; ("sok_digest", Sok_message.Digest.to_yojson sok_digest)
+        ] ;
     match proof_level_snark with
     | Worker_state.Full ((module M) as m) -> (
         match partitioned_spec with
