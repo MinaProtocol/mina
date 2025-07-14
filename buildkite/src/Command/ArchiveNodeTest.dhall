@@ -6,6 +6,8 @@ let Size = ./Size.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
+let BuildFlags = ../Constants/BuildFlags.dhall
+
 let key = "archive-node-test"
 
 in  { step =
@@ -21,6 +23,7 @@ in  { step =
                     ( Artifacts.fullDockerTag
                         Artifacts.Tag::{
                         , artifact = Artifacts.Type.FunctionalTestSuite
+                        , buildFlags = BuildFlags.Type.Instrumented
                         }
                     )
                     "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
