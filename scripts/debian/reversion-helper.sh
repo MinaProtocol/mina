@@ -55,7 +55,7 @@ function reversion() {
     local __new_deb="${__new_name}_${__new_version}"
     local __parent_dir
     __parent_dir=$(dirname "${__deb}_${__source_version}.deb")
-    
+
     rm -rf "${__new_deb}"
     # shellcheck disable=SC2140
     rm -rf "${__parent_dir}"/"${__new_deb}.deb"
