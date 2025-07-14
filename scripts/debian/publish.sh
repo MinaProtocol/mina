@@ -1,4 +1,36 @@
 #!/bin/bash
+
+# Mina Protocol Debian Package Publishing Script
+# ==============================================
+#
+# This script publishes Debian packages to an S3-hosted APT repository using
+# the deb-s3 tool. It handles uploading, signing, and verification of packages
+# in a distributed repository environment.
+#
+# OVERVIEW:
+# The script performs the following operations:
+# 1. Uploads .deb packages to S3-hosted APT repository
+# 2. Signs packages with GPG if signing key is provided
+# 3. Handles repository locking to prevent concurrent upload conflicts
+# 4. Verifies successful upload and repository consistency
+# 5. Retries failed uploads with automatic lock cleanup
+#
+# PREREQUISITES:
+# - deb-s3 tool installed (https://github.com/krobertson/deb-s3)
+# - AWS credentials configured for S3 access
+# - GPG key configured for package signing (optional)
+#
+# REPOSITORY STRUCTURE:
+# Packages are organized by:
+# - Codename (bullseye, bookworm, etc.)
+# - Release/Component (unstable, stable, etc.)
+# - Architecture (amd64)
+#
+# LOCKING MECHANISM:
+# The script uses repository locking to prevent concurrent uploads from
+# corrupting the repository metadata. If a lock persists, it will be
+# automatically cleared and the upload retried.
+
 set -eo pipefail
 
 CLEAR='\033[0m'
@@ -54,19 +86,20 @@ else
   GPG_OPTS=("--gpg-options=\"--batch" "--pinentry-mode=loopback" "--yes")
 fi
 
-
-
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
 for _ in {1..10}; do (
-  # utility for publishing deb repo with commons options
+# utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
-#NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the registry and some files will be lost. If a build fails with the following error, delete the lock file https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
+#NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the
+# registry and some files will be lost. If a build fails with the following
+# error, delete the lock file
+# https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
 #>> Checking for existing lock file
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
-#/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+# /var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
 deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   --fail-if-exists \
   --lock \
@@ -114,11 +147,11 @@ do
       echo "⏩️  Skipping debian repository consistency check after push to unstable channel as it is taking too long."
     else
       echo "📋  Validating debian repository consistency after push..."
-      if deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then
+      if deb-s3 verify $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then
         echo "✅  Debian repository is consistent"
       else
         echo "❌  Error: Debian repository is not consistent. Please run: "
-        echo "💻  deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE --fix-manifests"
+        echo "💻  deb-s3 verify $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE --fix-manifests"
         exit 1
       fi
     fi
