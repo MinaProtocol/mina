@@ -39,6 +39,7 @@ module ArchivePrecomputedBlocksFromDaemon = struct
     in
     let precomputed_blocks =
       List.map precomputed_blocks ~f:(fun file -> output ^ "/" ^ file)
+      |> List.filter ~f:(fun file -> String.is_suffix file ~suffix:".json")
     in
     Archive.Process.start_logging test_data.archive ;
     let%bind () =
