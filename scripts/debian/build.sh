@@ -9,14 +9,14 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 # In case of running this script on detached head, script has difficulties in finding out
 # what is the current branch.
 if [[ -n "$BRANCH_NAME" ]]; then
-  # shellcheck disable=SC1090
+  # shellcheck disable=SC1091
   BRANCH_NAME="$BRANCH_NAME" source "${SCRIPTPATH}/../export-git-env-vars.sh"
 else
-  # shellcheck disable=SC1090
+  # shellcheck disable=SC1091
   source "${SCRIPTPATH}"/../export-git-env-vars.sh
 fi
 
-# shellcheck disable=SC1090
+# shellcheck disable=SC1091
 source "${SCRIPTPATH}/builder-helpers.sh"
 
 if [ $# -eq 0 ]
