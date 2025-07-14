@@ -9,7 +9,7 @@ PG_PW=${PG_PW:-postgres}
 PG_DB=${PG_DB:-archive}
 PG_HOST=${PG_HOST:-localhost}
 PG_PORT=${PG_PORT:-5432}
-PG_URI="postgres://${PG_USER}:${PG_PW}@${PG_HOST}:${PG_PORT}/${PG_DB}"
+PG_URI="postgresql://${PG_USER}:${PG_PW}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 
 # go to root of mina repo
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
