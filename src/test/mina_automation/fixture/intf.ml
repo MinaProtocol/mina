@@ -11,11 +11,12 @@ end
 module type Fixture = sig
   type t
 
-  (** 
-    This module defines a type [t] representing a fixture for integration tests and provides functions to set up, run, and tear down the fixture.
-    
+  (**
+    This module defines a type [t] representing a fixture for integration tests
+    and provides functions to set up, run, and tear down the fixture.
+
     {1 Functions}
-    
+
     - [setup ()]: Sets up the fixture and returns an instance of [t].
     - [test_case t]: Runs the test case associated with the fixture and returns a result.
     - [teardown t]: Tears down the fixture and cleans up resources.

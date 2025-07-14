@@ -60,7 +60,9 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Tearing down archive" ;
     let%bind _ = Archive.Process.force_kill t.archive in
-    let%bind.Deferred () = File_system.remove_dir @@ t.network_data.folder in
+    let%bind.Deferred () =
+      Mina_stdlib_unix.File_system.remove_dir @@ t.network_data.folder
+    in
     [%log info] "Archive teardown completed" ;
     Deferred.Or_error.ok_unit
 
