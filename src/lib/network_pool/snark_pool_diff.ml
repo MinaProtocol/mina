@@ -149,12 +149,13 @@ module Make
     match Pool.request_proof pool work with
     | None ->
         Ok ()
-    | Some { fee = { fee = prev; _ }; _ } ->
-        let cmp_res = Currency.Fee.compare fee prev in
+    | Some { fee = { fee = in_pool_fee; prover = in_pool_key }; _ } ->
+        let cmp_res = Currency.Fee.compare fee in_pool_fee in
         if cmp_res < 0 then Ok ()
-        else if cmp_res = 0 then
-          reject_and_log_if_local Intf.Verification_error.Fee_equal
-        else reject_and_log_if_local Intf.Verification_error.Fee_higher
+        else
+          reject_and_log_if_local
+            (Intf.Verification_error.Fee_too_high
+               { in_pool_key; in_pool_fee; submitted_fee = fee } )
 
   let verify pool ({ data; sender; _ } as t : t Envelope.Incoming.t) =
     match data with
