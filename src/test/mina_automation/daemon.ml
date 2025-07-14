@@ -151,8 +151,8 @@ let archive_blocks t ~archive_address ~(format : Archive_blocks.format) blocks =
 let archive_blocks_from_files t ~archive_address
     ~(format : Archive_blocks.format) ?(sleep = 5) blocks =
   Deferred.List.iter blocks ~f:(fun block ->
-      Core.Unix.sleep sleep ;
-      archive_blocks t ~archive_address ~format [ block ] () >>| ignore )
+      let%bind _ = archive_blocks t ~archive_address ~format [ block ] () in
+      after (Time.Span.of_sec (Float.of_int sleep)) )
 
 let default = Executor.default
 

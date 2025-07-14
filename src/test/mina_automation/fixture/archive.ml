@@ -84,7 +84,7 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
     [%log info] "Tearing down archive" ;
     let%bind _ = Archive.Process.force_kill t.archive in
     let%bind.Deferred () =
-      Mina_stdlib_unix.File_system.remove_dir @@ t.network_data.folder
+      Mina_stdlib_unix.File_system.remove_dir @@ t.temp_dir
     in
     [%log info] "Archive teardown completed" ;
     Deferred.Or_error.ok_unit

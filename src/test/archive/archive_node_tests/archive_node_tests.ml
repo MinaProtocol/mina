@@ -12,12 +12,13 @@ open Mina_automation_fixture.Archive
 let assert_archived_blocks ~archive_uri ~expected =
   let connection = Psql.Conn_str archive_uri in
   let%bind actual_blocks_count =
-    Psql.run_command ~connection "SELECT COUNT(*) FROM blocks WHERE height > 1"
+    Psql.run_command ~connection
+      "SELECT COUNT(*) FROM blocks WHERE global_slot_since_genesis > 1"
   in
   let actual_blocks_count =
     match actual_blocks_count with
     | Ok count ->
-        count |> String.strip |> Int.of_string 
+        count |> Int.of_string
     | Error err ->
         failwith ("Failed to query blocks count: " ^ Error.to_string_hum err)
   in
@@ -54,19 +55,27 @@ module ArchivePrecomputedBlocksFromDaemon = struct
     in
     let connection = Psql.Conn_str archive_uri in
     let%bind latest_state_hash =
-      Psql.run_command_exn ~connection
+      Psql.run_command ~connection
         "SELECT state_hash FROM blocks ORDER BY id DESC LIMIT 1"
+    in
+    let latest_state_hash =
+      match latest_state_hash with
+      | Ok hash ->
+          hash
+      | Error err ->
+          failwith
+            ("Failed to query latest state hash: " ^ Error.to_string_hum err)
     in
     let output_ledger = output ^ "/output_ledger.json" in
     let replayer = Replayer.default in
-    let%bind output =
+    let%bind replayer_output =
       Replayer.run replayer ~archive_uri
         ~input_config:
           (Network_data.replayer_input_file_path test_data.network_data)
         ~target_state_hash:latest_state_hash ~interval_checkpoint:10
         ~output_ledger ()
     in
-    let () = print_endline output in
+    let () = print_endline replayer_output in
     let output_ledger = Replayer.Output.of_json_file_exn output_ledger in
     assert (
       String.equal output_ledger.target_epoch_ledgers_state_hash
