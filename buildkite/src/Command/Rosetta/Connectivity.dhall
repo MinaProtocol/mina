@@ -22,6 +22,8 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Spec =
@@ -32,6 +34,7 @@ let Spec =
           , additionalDirtyWhen : List S.Type
           , softFail : B/SoftFail
           , timeout : Natural
+          , profile : Profiles.Type
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
@@ -40,6 +43,7 @@ let Spec =
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
           , timeout = 1000
+          , profile = Profiles.Type.Devnet
           }
       }
 
@@ -70,6 +74,7 @@ let command
                   , codename = spec.dockerType
                   , network = spec.network
                   , artifact = Artifacts.Type.Rosetta
+                  , profile = spec.profile
                   }
             }
 
