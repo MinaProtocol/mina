@@ -6,26 +6,25 @@ let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonHardfork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
-          , debVersion = DebianVersions.DebVersion.Focal
+          , debVersion = DebianVersions.DebVersion.Bookworm
           , network = Network.Type.Mainnet
           , tags =
             [ PipelineTag.Type.Long
@@ -33,6 +32,6 @@ in  Pipeline.build
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
-          , profile = Profiles.Type.Devnet
+          , profile = Profiles.Type.Mainnet
           }
       )
