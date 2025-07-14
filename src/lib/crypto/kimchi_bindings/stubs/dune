@@ -54,23 +54,25 @@
   (env_var KIMCHI_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
-  (progn
-   (setenv
-    RUSTFLAGS
-    %{read:rustflags.sexp}
+  (ignore-stdout
+   (progn
+    (setenv
+     RUSTFLAGS
+     %{read:rustflags.sexp}
+     (run
+      cargo
+      build
+      -q ;; suppress cargo build output
+      -p
+      kimchi-stubs
+      --release
+      --target-dir
+      %{read:../dune-build-root}/cargo_kimchi_stubs
+      --offline))
     (run
-     cargo
-     build
-     -p
-     kimchi-stubs
-     --release
-     --target-dir
-     %{read:../dune-build-root}/cargo_kimchi_stubs
-     --offline))
-   (run
-    cp
-    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
-    .))))
+     cp
+     %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
+     .)))))
 
 ;; this is used by nix
 
@@ -166,14 +168,15 @@
   (env_var KIMCHI_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
-  (progn
-   (run rm -rf ./target)
-   (run rm -f ./Cargo.lock)
-   (setenv
-    CARGO_TARGET_DIR
-    "%{read:../dune-build-root}/cargo_kimchi_bindgen"
-    (run cargo run %{targets} --offline))
-   (run ocamlformat -i %{targets}))))
+  (ignore-stdout
+   (progn
+    (run rm -rf ./target)
+    (run rm -f ./Cargo.lock)
+    (setenv
+     CARGO_TARGET_DIR
+     "%{read:../dune-build-root}/cargo_kimchi_bindgen"
+     (run cargo run %{targets} -q --offline))
+    (run ocamlformat -i %{targets})))))
 
 ;; this is used by nix
 
@@ -186,6 +189,7 @@
   ../../../../.ocamlformat
   (env_var KIMCHI_STUBS))
  (action
-  (progn
-   (run %{env:KIMCHI_STUBS=n}/bin/wires_15_stubs %{targets})
-   (run ocamlformat -i %{targets}))))
+  (ignore-stdout
+    (progn
+     (run %{env:KIMCHI_STUBS=n}/bin/wires_15_stubs %{targets})
+     (run ocamlformat -i %{targets})))))
