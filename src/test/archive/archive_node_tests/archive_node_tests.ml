@@ -17,7 +17,7 @@ let assert_archived_blocks ~archive_uri ~expected =
   let actual_blocks_count =
     match actual_blocks_count with
     | Ok count ->
-        Int.of_string count
+        count |> String.strip |> Int.of_string 
     | Error err ->
         failwith ("Failed to query blocks count: " ^ Error.to_string_hum err)
   in
