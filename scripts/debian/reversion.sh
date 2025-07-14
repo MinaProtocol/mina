@@ -1,4 +1,26 @@
 #!/bin/bash
+
+# Mina Protocol Debian Package Reversion Script
+# =============================================
+#
+# This script downloads an existing Debian package, modifies its version and
+# metadata, and republishes it to a new repository location. It's used for
+# package promotion between different release channels (unstable -> stable).
+#
+# OVERVIEW:
+# The script performs the following operations:
+# 1. Downloads the specified .deb package from the source repository
+# 2. Extracts and modifies the package metadata (version, suite, name)
+# 3. Repackages the .deb with new metadata
+# 4. Publishes the modified package to the target repository
+#
+# PREREQUISITES:
+# - wget (for downloading packages)
+# - Access to source and target S3 repositories
+# - GPG key for package signing (if --sign is used)
+# - scripts/debian/reversion-helper.sh must exist
+# - scripts/debian/publish.sh must exist
+
 set -eo pipefail
 
 CLEAR='\033[0m'
