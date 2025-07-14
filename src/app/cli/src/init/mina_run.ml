@@ -308,8 +308,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               | Genesis_epoch_ledger l ->
                   let%map accts = Mina_ledger.Ledger.to_list l in
                   Ok accts
-              | Ledger_db db ->
-                  let%map accts = Mina_ledger.Ledger.Db.to_list db in
+              | Any_ledger db ->
+                  let%map accts = Mina_ledger.Ledger.Any_ledger.M.to_list db in
                   Ok accts )
           | Error err ->
               return (Error err) )

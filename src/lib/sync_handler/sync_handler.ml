@@ -49,8 +49,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
-      Ledger.Any_ledger.cast (module Ledger.Db)
-      @@ Transition_frontier.root_snarked_ledger frontier
+      Transition_frontier.root_snarked_ledger frontier
     in
     let staking_epoch_ledger =
       Transition_frontier.consensus_local_state frontier
@@ -73,8 +72,8 @@ module Make (Inputs : Inputs_intf) :
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+      | Any_ledger ledger ->
+          Some ledger
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
@@ -84,8 +83,8 @@ module Make (Inputs : Inputs_intf) :
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+      | Any_ledger ledger ->
+          Some ledger
     else None
 
   let answer_query :
@@ -306,7 +305,7 @@ let%test_module "Sync_handler" =
               in
               let source_ledger =
                 Transition_frontier.For_tests.root_snarked_ledger frontier
-                |> Ledger.of_database
+                |> Ledger.of_any_ledger
               in
               let desired_root = Ledger.merkle_root source_ledger in
               let sync_ledger =

@@ -569,6 +569,10 @@ module For_tests = struct
     Mina_ledger.Ledger_transfer.Make
       (Mina_ledger.Ledger)
       (Mina_ledger.Ledger.Db)
+  module Ledger_transfer_to_any =
+    Mina_ledger.Ledger_transfer.Make
+      (Mina_ledger.Ledger)
+      (Mina_ledger.Ledger.Any_ledger.M)
   open Full_frontier.For_tests
 
   let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y
@@ -666,7 +670,7 @@ module For_tests = struct
               ~f:(fun instance ->
                 Persistent_frontier.Database.close instance.db ) ;
             Option.iter persistent_root.Persistent_root.Factory_type.instance
-              ~f:(fun instance -> Ledger.Db.close instance.snarked_ledger) ;
+              ~f:(fun instance -> Ledger.Any_ledger.M.close instance.snarked_ledger) ;
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
@@ -758,7 +762,7 @@ module For_tests = struct
         Persistent_root.Instance.set_root_state_hash instance
           (Mina_block.Validated.state_hash transition) ;
         ignore
-        @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
+        @@ Ledger_transfer_to_any.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->

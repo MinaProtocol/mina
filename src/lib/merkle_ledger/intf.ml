@@ -386,6 +386,12 @@ module Ledger = struct
     (** return Some [directory] for ledgers that use a file system, else None *)
     val get_directory : t -> string option
 
+    (** create a checkpoint of the ledger at the given directory *)
+    val make_checkpoint : t -> directory_name:string -> unit
+
+    (** create a checkpoint and return a new ledger instance pointing to it *)
+    val create_checkpoint : t -> directory_name:string -> unit -> t
+
     val get : t -> Location.t -> account option
 
     val get_batch : t -> Location.t list -> (Location.t * account option) list

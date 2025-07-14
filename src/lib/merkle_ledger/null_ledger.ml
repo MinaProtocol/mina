@@ -110,6 +110,10 @@ end = struct
 
   let get_directory _ = None
 
+  let make_checkpoint _t ~directory_name:_ = ()
+
+  let create_checkpoint t ~directory_name:_ () = t
+
   let last_filled _t = None
 
   let close _t = ()

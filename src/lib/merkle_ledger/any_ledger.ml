@@ -96,6 +96,13 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let get_directory (T ((module Base), t)) = Base.get_directory t
 
+    let make_checkpoint (T ((module Base), t)) ~directory_name =
+      Base.make_checkpoint t ~directory_name
+
+    let create_checkpoint (T ((module Base), t)) ~directory_name () =
+      let new_t = Base.create_checkpoint t ~directory_name () in
+      T ((module Base), new_t)
+
     let last_filled (T ((module Base), t)) = Base.last_filled t
 
     let close (T ((module Base), t)) = Base.close t

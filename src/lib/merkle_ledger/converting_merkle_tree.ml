@@ -169,6 +169,23 @@ end = struct
 
   let get_directory t = Primary_ledger.get_directory t.primary_ledger
 
+  let make_checkpoint t ~directory_name =
+    let converting_dir = directory_name ^ "_converting" in
+    Primary_ledger.make_checkpoint t.primary_ledger ~directory_name ;
+    Converting_ledger.make_checkpoint t.converting_ledger
+      ~directory_name:converting_dir
+
+  let create_checkpoint t ~directory_name () =
+    let converting_dir = directory_name ^ "_converting" in
+    let new_primary =
+      Primary_ledger.create_checkpoint t.primary_ledger ~directory_name ()
+    in
+    let new_converting =
+      Converting_ledger.create_checkpoint t.converting_ledger
+        ~directory_name:converting_dir ()
+    in
+    { primary_ledger = new_primary; converting_ledger = new_converting }
+
   let get t location = Primary_ledger.get t.primary_ledger location
 
   let get_batch t locations =

@@ -691,7 +691,7 @@ let get_snarked_ledger_full t state_hash_opt =
       let root_snarked_ledger =
         Transition_frontier.root_snarked_ledger frontier
       in
-      let ledger = Ledger.of_database root_snarked_ledger in
+      let ledger = Ledger.of_any_ledger root_snarked_ledger in
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
       let%bind () =
         Mina_stdlib.Deferred.Result.List.iter path ~f:(fun b ->

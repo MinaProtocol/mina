@@ -1509,14 +1509,15 @@ module AccountObj = struct
                             genesis ledger. The account was not present in the \
                             ledger." ;
                          None )
-                 | Ledger_db staking_ledger -> (
+                 | Any_ledger staking_ledger -> (
                      try
                        let index =
-                         Ledger.Db.index_of_account_exn staking_ledger
+                         Ledger.Any_ledger.M.index_of_account_exn staking_ledger
                            account_id
                        in
                        let account =
-                         Ledger.Db.get_at_index_exn staking_ledger index
+                         Ledger.Any_ledger.M.get_at_index_exn staking_ledger
+                           index
                        in
                        let%bind delegate_key = account.delegate in
                        Some (get_best_ledger_account_pk mina delegate_key)

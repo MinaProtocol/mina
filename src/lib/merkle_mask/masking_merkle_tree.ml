@@ -193,6 +193,29 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       Base.get_directory (Result.ok_or_failwith t.parent)
 
+    let make_checkpoint t ~directory_name =
+      assert_is_attached t ;
+      Base.make_checkpoint (Result.ok_or_failwith t.parent) ~directory_name
+
+    let create_checkpoint t ~directory_name () =
+      assert_is_attached t ;
+      (* Delegate checkpoint to parent without committing.
+         Caller must commit before if they want committed changes included. *)
+      let parent = Result.ok_or_failwith t.parent in
+      let checkpointed_parent =
+        Base.create_checkpoint parent ~directory_name ()
+      in
+      (* Create new attached mask with current state over checkpointed parent *)
+      { uuid = Uuid_unix.create ()
+      ; parent = Ok checkpointed_parent
+      ; detached_parent_signal = Async.Ivar.create ()
+      ; current_location = t.current_location
+      ; depth = t.depth
+      ; maps = t.maps (* Preserve current uncommitted changes *)
+      ; accumulated = None
+      ; is_committing = false
+      }
+
     let depth t = assert_is_attached t ; t.depth
 
     let update_maps ~f t =

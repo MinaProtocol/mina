@@ -1,8 +1,12 @@
 open Core
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Any_ledger = Ledger.Any_ledger
 open Frontier_base
-module Ledger_transfer = Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Db)
+module Ledger_transfer_ledger_to_any =
+  Mina_ledger.Ledger_transfer.Make (Ledger) (Any_ledger.M)
+module Ledger_transfer_any =
+  Mina_ledger.Ledger_transfer.Make (Any_ledger.M) (Any_ledger.M)
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in
@@ -58,7 +62,7 @@ end
 (* TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
   type t =
-    { snarked_ledger : Ledger.Db.t
+    { snarked_ledger : Any_ledger.M.t
     ; potential_snarked_ledgers : string Queue.t
     ; factory : Factory_type.t
     }
@@ -113,18 +117,22 @@ module Instance = struct
       ~f:Mina_stdlib_unix.File_system.rmrf ;
     Mina_stdlib_unix.File_system.rmrf
       (Locations.potential_snarked_ledgers t.factory.directory) ;
-    Ledger.Db.close t.snarked_ledger ;
+    Any_ledger.M.close t.snarked_ledger ;
     t.factory.instance <- None
 
   let close t =
-    Ledger.Db.close t.snarked_ledger ;
+    Any_ledger.M.close t.snarked_ledger ;
     t.factory.instance <- None
+
+  (* Helper function to load a potential snarked ledger *)
+  let load_potential_snarked_ledger factory location =
+    Ledger.create_unmasked_ledger ~depth:factory.ledger_depth
+      ~directory_name:location ()
 
   let create factory =
     let snarked_ledger =
-      Ledger.Db.create ~depth:factory.ledger_depth
-        ~directory_name:(Locations.snarked_ledger factory.directory)
-        ()
+      load_potential_snarked_ledger factory
+        (Locations.snarked_ledger factory.directory)
     in
     { snarked_ledger; potential_snarked_ledgers = Queue.create (); factory }
 
@@ -143,12 +151,11 @@ module Instance = struct
       List.fold_until potential_snarked_ledgers ~init:None
         ~f:(fun _ location ->
           let potential_snarked_ledger =
-            Ledger.Db.create ~depth:factory.ledger_depth
-              ~directory_name:location ()
+            load_potential_snarked_ledger factory location
           in
           let potential_snarked_ledger_hash =
             Frozen_ledger_hash.of_ledger_hash
-            @@ Ledger.Db.merkle_root potential_snarked_ledger
+            @@ Any_ledger.M.merkle_root potential_snarked_ledger
           in
           [%log debug]
             ~metadata:
@@ -161,17 +168,15 @@ module Instance = struct
               snarked_ledger_hash
           then (
             let snarked_ledger =
-              Ledger.Db.create ~depth:factory.ledger_depth
-                ~directory_name:(Locations.tmp_snarked_ledger factory.directory)
-                ()
+              load_potential_snarked_ledger factory
+                (Locations.tmp_snarked_ledger factory.directory)
             in
             match
-              Ledger_transfer.transfer_accounts
-                ~src:(Ledger.of_database potential_snarked_ledger)
-                ~dest:snarked_ledger
+              Ledger_transfer_any.transfer_accounts
+                ~src:potential_snarked_ledger ~dest:snarked_ledger
             with
             | Ok _ ->
-                Ledger.Db.close potential_snarked_ledger ;
+                Any_ledger.M.close potential_snarked_ledger ;
                 Mina_stdlib_unix.File_system.rmrf
                 @@ Locations.snarked_ledger factory.directory ;
                 Sys.rename
@@ -183,7 +188,7 @@ module Instance = struct
                   (Locations.potential_snarked_ledgers factory.directory) ;
                 Stop (Some snarked_ledger)
             | Error e ->
-                Ledger.Db.close potential_snarked_ledger ;
+                Any_ledger.M.close potential_snarked_ledger ;
                 List.iter potential_snarked_ledgers
                   ~f:Mina_stdlib_unix.File_system.rmrf ;
                 Mina_stdlib_unix.File_system.rmrf
@@ -193,7 +198,7 @@ module Instance = struct
                   "Ledger_transfer failed" ;
                 Stop None )
           else (
-            Ledger.Db.close potential_snarked_ledger ;
+            Any_ledger.M.close potential_snarked_ledger ;
             Continue None ) )
         ~finish:(fun _ ->
           List.iter potential_snarked_ledgers
@@ -205,13 +210,12 @@ module Instance = struct
     match snarked_ledger with
     | None ->
         let snarked_ledger =
-          Ledger.Db.create ~depth:factory.ledger_depth
-            ~directory_name:(Locations.snarked_ledger factory.directory)
-            ()
+          load_potential_snarked_ledger factory
+            (Locations.snarked_ledger factory.directory)
         in
         let potential_snarked_ledger_hash =
           Frozen_ledger_hash.of_ledger_hash
-          @@ Ledger.Db.merkle_root snarked_ledger
+          @@ Any_ledger.M.merkle_root snarked_ledger
         in
         if
           Frozen_ledger_hash.equal potential_snarked_ledger_hash
@@ -223,7 +227,7 @@ module Instance = struct
             ; factory
             }
         else (
-          Ledger.Db.close snarked_ledger ;
+          Any_ledger.M.close snarked_ledger ;
           Error `Snarked_ledger_mismatch )
     | Some snarked_ledger ->
         Ok
@@ -297,12 +301,12 @@ let reset_to_genesis_exn t ~precomputed_values =
   Mina_stdlib_unix.File_system.rmrf t.directory ;
   with_instance_exn t ~f:(fun instance ->
       ignore
-        ( Ledger_transfer.transfer_accounts
+        ( Ledger_transfer_ledger_to_any.transfer_accounts
             ~src:
               (Lazy.force
                  (Precomputed_values.genesis_ledger precomputed_values) )
             ~dest:(Instance.snarked_ledger instance)
-          : Ledger.Db.t Or_error.t ) ;
+          : Any_ledger.M.t Or_error.t ) ;
       Instance.set_root_identifier instance
         (genesis_root_identifier
            ~genesis_state_hash:

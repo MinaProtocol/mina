@@ -97,7 +97,18 @@ val create : ?directory_name:string -> depth:int -> unit -> t
 
 val create_ephemeral : depth:int -> unit -> t
 
+(** Create an unmasked database ledger wrapped as Any_ledger.M.t.
+    
+    Unlike [create], this returns a raw database ledger without registering
+    a mask on top. This is useful for persistent ledgers like the snarked
+    ledger that don't need mask functionality.
+*)
+val create_unmasked_ledger :
+  ?directory_name:string -> depth:int -> unit -> Any_ledger.M.t
+
 val of_database : Db.t -> t
+
+val of_any_ledger : Any_ledger.M.t -> t
 
 (** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
 val copy : t -> t

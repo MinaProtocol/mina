@@ -87,7 +87,7 @@ val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
 
-val root_snarked_ledger : t -> Mina_ledger.Ledger.Db.t
+val root_snarked_ledger : t -> Mina_ledger.Ledger.Any_ledger.M.t
 
 val extensions : t -> Extensions.t
 
