@@ -103,11 +103,18 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           Fee.compare fee competing_fee < 0 )
 
     let all_unscheduled_expensive_works ~snark_pool ~fee (t : t) =
+      (* WARN: Always use filtering as [add_back] may causes work pool to have duplicates *)
       O1trace.sync_thread "work_lib_all_unscheduled_expensive_works" (fun () ->
           List.filter t.available_jobs ~f:(fun job ->
               let job_key = Job_key.of_job job in
               (not (Job_key_set.mem t.jobs_scheduled job_key))
               && does_not_have_better_fee ~snark_pool ~fee job_key ) )
+
+    let add_back (state : t) x =
+      state.jobs_scheduled <-
+        Job_key_set.remove state.jobs_scheduled
+          (One_or_two.map ~f:Work_spec.statement x) ;
+      state.available_jobs <- x :: state.available_jobs
   end
 
   let all_pending_work ~snark_pool statements =

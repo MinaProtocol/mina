@@ -914,20 +914,41 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
       `Removed
   | Processed None ->
       `Ok
-  | Processed (Some (stmts, priced_proof)) ->
+  | Processed (Some { spec_with_proof; fee; prover }) ->
+      let proofs = spec_with_proof |> One_or_two.map ~f:Tuple2.get2 in
+      let fee_with_prover = Fee_with_prover.{ fee; prover } in
+      let spec = One_or_two.map ~f:Tuple2.get1 spec_with_proof in
+      let stmts =
+        spec_with_proof
+        |> One_or_two.map ~f:(fun (spec, _) ->
+               Snark_work_lib.Selector.Single.Spec.Poly.statement spec )
+      in
       [%log' info t.config.logger] "Partitioner combined work"
         ~metadata:
           [ ( "stmts"
             , One_or_two.to_yojson Mina_state.Snarked_ledger_state.to_yojson
                 stmts )
-          ; ("fee_with_prover", Fee_with_prover.to_yojson priced_proof.fee)
-          ; ( "proofs"
-            , One_or_two.to_yojson Ledger_proof.to_yojson priced_proof.proof )
+          ; ("fee_with_prover", Fee_with_prover.to_yojson fee_with_prover)
+          ; ("proofs", proofs |> One_or_two.to_yojson Ledger_proof.to_yojson)
           ] ;
       ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
       Network_pool.Snark_pool.(
         Local_sink.push t.pipes.snark_local_sink
-          (Add_solved_work (stmts, priced_proof), ignore))
+          ( Add_solved_work
+              ( stmts
+              , Network_pool.Priced_proof.
+                  { proof = proofs; fee = fee_with_prover } )
+          , Result.iter_error ~f:(fun err ->
+                [%log' info t.config.logger]
+                  "Failed to push completed work to local snark sink, \
+                   returning them to work selector"
+                  ~metadata:
+                    [ ( "stmts"
+                      , One_or_two.to_yojson
+                          Mina_state.Snarked_ledger_state.to_yojson stmts )
+                    ; ("error", `String (Error.to_string_hum err))
+                    ] ;
+                Work_selector.add_back t.work_selector spec ) ))
       |> Deferred.don't_wait_for ;
       `Ok
 
