@@ -42,23 +42,31 @@ module type Resource_pool_base_intf = sig
 end
 
 module Verification_error = struct
-  type t = Fee_higher | Fee_equal | Invalid of Error.t | Failure of Error.t
+  type t =
+    | Fee_too_high of
+        { in_pool_key : Signature_lib.Public_key.Compressed.t
+        ; in_pool_fee : Currency.Fee.t
+        ; submitted_fee : Currency.Fee.t
+        }
+    | Invalid of Error.t
+    | Failure of Error.t
 
   let to_error = function
-    | Fee_equal ->
-        Error.of_string "fee equal to cheapest work we have"
-    | Fee_higher ->
-        Error.of_string "fee higher than cheapest work we have"
+    | Fee_too_high { in_pool_key; in_pool_fee; submitted_fee } ->
+        Printf.sprintf
+          "Fee too high: submitted_fee %s, in_pool_fee: %s, in_pool_key: %s"
+          (Currency.Fee.to_string submitted_fee)
+          (Currency.Fee.to_string in_pool_fee)
+          (Signature_lib.Public_key.Compressed.to_string in_pool_key)
+        |> Error.of_string
     | Invalid err ->
         Error.tag err ~tag:"invalid"
     | Failure err ->
         Error.tag err ~tag:"failure"
 
   let to_short_string = function
-    | Fee_equal ->
-        "fee_equal"
-    | Fee_higher ->
-        "fee_higher"
+    | Fee_too_high _ ->
+        "fee_too_high"
     | Invalid _ ->
         "invalid"
     | Failure _ ->
