@@ -1,4 +1,36 @@
 #!/bin/bash
+
+# Mina Protocol Debian Package Publishing Script
+# ==============================================
+#
+# This script publishes Debian packages to an S3-hosted APT repository using
+# the deb-s3 tool. It handles uploading, signing, and verification of packages
+# in a distributed repository environment.
+#
+# OVERVIEW:
+# The script performs the following operations:
+# 1. Uploads .deb packages to S3-hosted APT repository
+# 2. Signs packages with GPG if signing key is provided
+# 3. Handles repository locking to prevent concurrent upload conflicts
+# 4. Verifies successful upload and repository consistency
+# 5. Retries failed uploads with automatic lock cleanup
+#
+# PREREQUISITES:
+# - deb-s3 tool installed (https://github.com/krobertson/deb-s3)
+# - AWS credentials configured for S3 access
+# - GPG key configured for package signing (optional)
+#
+# REPOSITORY STRUCTURE:
+# Packages are organized by:
+# - Codename (bullseye, bookworm, etc.)
+# - Release/Component (unstable, stable, etc.)
+# - Architecture (amd64)
+#
+# LOCKING MECHANISM:
+# The script uses repository locking to prevent concurrent uploads from
+# corrupting the repository metadata. If a lock persists, it will be
+# automatically cleared and the upload retried.
+
 set -eo pipefail
 
 CLEAR='\033[0m'
@@ -115,11 +147,11 @@ do
       echo "⏩️  Skipping debian repository consistency check after push to unstable channel as it is taking too long."
     else
       echo "📋  Validating debian repository consistency after push..."
-      if deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then
+      if deb-s3 verify $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then
         echo "✅  Debian repository is consistent"
       else
         echo "❌  Error: Debian repository is not consistent. Please run: "
-        echo "💻  deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE --fix-manifests"
+        echo "💻  deb-s3 verify $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE --fix-manifests"
         exit 1
       fi
     fi
