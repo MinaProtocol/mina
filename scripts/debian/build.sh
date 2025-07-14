@@ -6,8 +6,8 @@ set -eox pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
-# In case of running this script on detached head, script has difficulties in finding out
-# what is the current branch.
+# In case of running this script on detached head, script has difficulties in
+# finding out what is the current branch.
 if [[ -n "$BRANCH_NAME" ]]; then
   # shellcheck disable=SC1091
   BRANCH_NAME="$BRANCH_NAME" source "${SCRIPTPATH}/../export-git-env-vars.sh"
