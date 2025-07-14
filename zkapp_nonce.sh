@@ -1,4 +1,4 @@
-export MINA_DOCKER_TAG=3.1.1-alpha1-lyh-update-snark-worker-rpc-jun-12-testing-9e52843-bullseye
+export MINA_DOCKER_TAG=3.1.1-alpha1-lyh-update-snark-worker-rpc-jun-12-testing-3ac8559-bullseye
 
 export MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-berkeley"
 export ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
