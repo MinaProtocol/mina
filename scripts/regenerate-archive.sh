@@ -15,17 +15,17 @@ PG_URI="postgres://${PG_USER}:${PG_PW}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
 
 # Prepare the database
-PGPASSWORD=${PG_PW} dropdb \
+PGPASSWORD="${PG_PW}" dropdb \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
           "${PG_DB}" || true # fails when db doesn't exist which is fine
-PGPASSWORD=${PG_PW} createdb \
+PGPASSWORD="${PG_PW}" createdb \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" "${PG_DB}"
 export DUNE_PROFILE=devnet
-PGPASSWORD=${PG_PW} psql \
+PGPASSWORD="${PG_PW}" psql \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
@@ -56,7 +56,7 @@ while true; do
   sleep 10s
   # psql outputs "    " until there are blocks in the db, the +0 defaults that to 0
   BLOCKS="$((
-    $(PGPASSWORD=${PG_PW} \
+    $(PGPASSWORD=\"${PG_PW}\" \
       psql -U "$PG_USER" -h "$PG_HOST" -p "$PG_PORT" "$PG_DB" \
       -t \
       -c "select MAX(height) from blocks" 2>/dev/null) + 0
@@ -80,7 +80,7 @@ tar -C precomputed_blocks -cvf ./src/test/archive/sample_db/precomputed_blocks.t
 rm -rf precomputed_blocks
 
 echo "Regenerating archive_db.sql"
-PGPASSWORD=${PG_PW} pg_dump \
+PGPASSWORD="${PG_PW}" pg_dump \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
@@ -105,17 +105,17 @@ mv _tmp.json src/test/archive/sample_db/genesis.json
 
 echo "Finished regenerate testing replay"
 
-PGPASSWORD=${PG_PW} dropdb \
+PGPASSWORD="${PG_PW}" dropdb \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
           "${PG_DB}"
-PGPASSWORD=${PG_PW} createdb \
+PGPASSWORD="${PG_PW}" createdb \
           -U "${PG_USER}" \
           -h "$PG_HOST" \
           -p "${PG_PORT}" \
           "${PG_DB}"
-PGPASSWORD=${PG_PW} psql \
+PGPASSWORD="${PG_PW}" psql \
           -U "${PG_USER}" \
           -h "${PG_HOST}" \
           -p "${PG_PORT}" \
