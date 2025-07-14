@@ -374,7 +374,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           | None ->
               Deferred.return None
           | Some (Ok spec) ->
-              [%log trace] "responding to a Get_work request with some new work"
+              [%log info] "responding to a Get_work request with some new work"
                 ~metadata:
                   [ ( "work_spec"
                     , Snark_work_lib.Spec.Partitioned.Stable.Latest.to_yojson
@@ -389,7 +389,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               Deferred.return None )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
-          [%log trace] "received completed work from a snark worker"
+          [%log info] "received completed work from a snark worker"
             ~metadata:
               [ ( "result"
                 , Snark_work_lib.Result.Partitioned.Stable.Latest.to_yojson
