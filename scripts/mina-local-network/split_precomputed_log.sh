@@ -12,7 +12,6 @@ PG_PASSWD=${PG_PW:-""}
 PG_DB=${PG_DB:-archive}
 PG_HOST=${PG_HOST:-localhost}
 PG_PORT=${PG_PORT:-5432}
-PG_URI="postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 PRECOMPUTED_LOG_FILE=$1
 OUTPUT_FOLDER=${2:-precomputed_blocks}
 
