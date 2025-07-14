@@ -302,11 +302,24 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                        "current staking ledger not available" )
                   ~f:Or_error.return
           in
+          let print_count accts  = 
+            (* Count number of accounts with edit_state permissions equaling to Either *)
+            let count =
+              List.length
+                (List.filter accts ~f:(fun acc ->
+                      match acc.Mina_base.Account.permissions.edit_state with
+                      | Either -> true
+                      | _ -> false )
+                )
+            in
+            printf "Number of accounts with edit_state permissions equaling to Either: %d\n" count ;
+          in
           match ledger_or_error with
           | Ok ledger -> (
               match ledger with
               | Genesis_epoch_ledger l ->
                   let%map accts = Mina_ledger.Ledger.to_list l in
+                  print_count accts ;
                   Ok accts
               | Ledger_db db ->
                   let%map accts = Mina_ledger.Ledger.Db.to_list db in

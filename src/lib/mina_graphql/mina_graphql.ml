@@ -2774,6 +2774,21 @@ module Queries = struct
         let%bind staking_ledger, next_epoch_ledger =
           get_epoch_ledgers ~mina breadcrumb
         in
+        let print_count accts  = 
+          (* Count number of accounts with edit_state permissions equaling to Either *)
+          let count =
+            List.length
+              (List.filter accts ~f:(fun acc ->
+                    match acc.Mina_base.Account.permissions.edit_state with
+                    | Either -> true
+                    | _ -> false )
+              )
+          in
+          printf "Number of accounts with edit_state permissions equaling to Either: %d\n" count ;
+        in
+        let%bind.Deferred () =
+          Deferred.(Mina_ledger.Ledger.Any_ledger.M.to_list staking_ledger >>| print_count)
+        in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger
             ~global_slot_since_genesis ~state_hash ~staking_ledger
