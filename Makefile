@@ -107,7 +107,7 @@ check: ocaml_checks libp2p_helper ## Check that all OCaml packages build without
 
 .PHONY: build
 build: ocaml_checks reformat-diff libp2p_helper ## Build the main project executables
-	$(info Starting Build)
+	$(info Starting build of main project executables)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
 	dune build \
@@ -121,7 +121,7 @@ build: ocaml_checks reformat-diff libp2p_helper ## Build the main project execut
 
 .PHONY: build_all_sigs
 build_all_sigs: ocaml_checks reformat-diff libp2p_helper build ## Build all signature variants of the daemon
-	$(info Starting Build)
+	$(info Starting build of all signatures variants)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
 	dune build \
@@ -132,7 +132,7 @@ build_all_sigs: ocaml_checks reformat-diff libp2p_helper build ## Build all sign
 
 .PHONY: build_archive
 build_archive: ocaml_checks reformat-diff ## Build the archive node
-	$(info Starting Build)
+	$(info Starting build of archive.exe)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/archive/archive.exe \
@@ -141,7 +141,7 @@ build_archive: ocaml_checks reformat-diff ## Build the archive node
 
 .PHONY: build_archive_utils
 build_archive_utils: ocaml_checks reformat-diff ## Build archive node and related utilities
-	$(info Starting Build)
+	$(info Starting build of archive utils)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/archive/archive.exe \
@@ -154,7 +154,7 @@ build_archive_utils: ocaml_checks reformat-diff ## Build archive node and relate
 
 .PHONY: build_rosetta
 build_rosetta: ocaml_checks ## Build Rosetta API components
-	$(info Starting Build)
+	$(info Starting build of archive, rosetta and signer)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/archive/archive.exe \
@@ -165,7 +165,7 @@ build_rosetta: ocaml_checks ## Build Rosetta API components
 
 .PHONY: build_rosetta_all_sigs
 build_rosetta_all_sigs: ocaml_checks ## Build all signature variants of Rosetta
-	$(info Starting Build)
+	$(info Starting build of archive, rosetta and rosetta for all networks)
 	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/archive/archive.exe \
@@ -182,7 +182,7 @@ build_rosetta_all_sigs: ocaml_checks ## Build all signature variants of Rosetta
 
 .PHONY: build_intgtest
 build_intgtest: ocaml_checks ## Build integration test tools
-	$(info Starting Build)
+	$(info Starting build of test_executive)
 	@dune build \
 		--profile=$(DUNE_PROFILE) \
 		src/app/test_executive/test_executive.exe \
@@ -191,7 +191,7 @@ build_intgtest: ocaml_checks ## Build integration test tools
 
 .PHONY: rosetta_lib_encodings
 rosetta_lib_encodings: ocaml_checks ## Test Rosetta library encodings
-	$(info Starting Build)
+	$(info Starting build of rosetta_lib_encodings)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 	  src/lib/rosetta_lib/test/test_encodings.exe \
@@ -200,7 +200,7 @@ rosetta_lib_encodings: ocaml_checks ## Test Rosetta library encodings
 
 .PHONY: replayer
 replayer: ocaml_checks ## Build the replayer tool
-	$(info Starting Build)
+	$(info Starting build of replayer.exe)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/replayer/replayer.exe \
@@ -209,7 +209,7 @@ replayer: ocaml_checks ## Build the replayer tool
 
 .PHONY: missing_blocks_auditor
 missing_blocks_auditor: ocaml_checks ## Build missing blocks auditor tool
-	$(info Starting Build)
+	$(info Starting build of missing_blocks_auditor.exe)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
@@ -218,7 +218,7 @@ missing_blocks_auditor: ocaml_checks ## Build missing blocks auditor tool
 
 .PHONY: extract_blocks
 extract_blocks: ocaml_checks ## Build the extract_blocks executable
-	$(info Starting Build)
+	$(info Starting build of extract_blocks.exe)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/extract_blocks/extract_blocks.exe \
@@ -227,7 +227,7 @@ extract_blocks: ocaml_checks ## Build the extract_blocks executable
 
 .PHONY: archive_blocks
 archive_blocks: ocaml_checks ## Build the archive_blocks executable
-	$(info Starting Build)
+	$(info Starting build of archive_blocks)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/archive_blocks/archive_blocks.exe \
@@ -236,7 +236,7 @@ archive_blocks: ocaml_checks ## Build the archive_blocks executable
 
 .PHONY: patch_archive_test
 patch_archive_test: ocaml_checks ## Build the patch archive test
-	$(info Starting Build)
+	$(info Starting build of patch_archive_test.exe)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
 	  src/app/patch_archive_test/patch_archive_test.exe \
@@ -245,7 +245,7 @@ patch_archive_test: ocaml_checks ## Build the patch archive test
 
 .PHONY: heap_usage
 heap_usage: ocaml_checks ## Build heap usage analysis tool
-	$(info Starting Build)
+	$(info Starting build of heap_usage.exe)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/heap_usage/heap_usage.exe \
@@ -254,7 +254,7 @@ heap_usage: ocaml_checks ## Build heap usage analysis tool
 
 .PHONY: zkapp_limits
 zkapp_limits: ocaml_checks ## Build ZkApp limits tool
-	$(info Starting Build)
+	$(info Starting build of zkapp_limits)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
 		src/app/zkapp_limits/zkapp_limits.exe \
