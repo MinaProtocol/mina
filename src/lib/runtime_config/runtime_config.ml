@@ -245,7 +245,7 @@ module Json_layout = struct
             ]
 
         let of_permissions (perm : Mina_base.Permissions.t) =
-          { edit_state = Auth_required.of_account_perm perm.edit_action_state
+          { edit_state = Auth_required.of_account_perm perm.edit_state
           ; send = Auth_required.of_account_perm perm.send
           ; receive = Auth_required.of_account_perm perm.receive
           ; set_delegate = Auth_required.of_account_perm perm.set_delegate
