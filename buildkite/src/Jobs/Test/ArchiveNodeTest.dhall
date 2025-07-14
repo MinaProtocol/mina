@@ -8,20 +8,12 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let ArchiveNodeTest = ../../Command/ArchiveNodeTest.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
-let Network = ../../Constants/Network.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
 let dependsOn =
-      Dockers.dependsOn
-        Dockers.Type.Bullseye
-        Network.Type.Berkeley
-        Profiles.Type.Standard
-        Artifacts.Type.FunctionalTestSuite
+      Dockers.dependsOn Dockers.DepsSpec::{ artifact = Artifacts.Type.Rosetta }
 
 in  Pipeline.build
       Pipeline.Config::{
