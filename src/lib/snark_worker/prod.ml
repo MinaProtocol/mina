@@ -55,8 +55,11 @@ module Impl = struct
      [log_subzkapp_base_snark] and [log_subzkapp_merge_snark] is that when
      receiving a partitioned spec holding a subzkapp merge/segment, we don't
      know all of [witnesses_specs_stmts]. *)
-  let log_subzkapp_base_snark ?witnesses_specs_stmts ~logger ~statement ~spec f
-      () =
+  let log_subzkapp_base_snark ?witnesses_specs_stmts ~logger ~statement ~spec
+      ~sok_digest f () =
+    let statement =
+      Mina_state.Snarked_ledger_state.Poly.{ statement with sok_digest }
+    in
     match%map.Deferred
       Deferred.Or_error.try_with ~here:[%here] (fun () -> f ~statement ~spec)
     with
@@ -148,21 +151,21 @@ module Impl = struct
               |> Deferred.return
             in
             match Mina_stdlib.Nonempty_list.uncons witnesses_specs_stmts with
-            | (witness, spec, stmt), rest ->
+            | (witness, spec, statement), rest ->
                 let%bind (p1 : Ledger_proof.t) =
                   log_subzkapp_base_snark ~witnesses_specs_stmts ~logger
-                    ~statement:{ stmt with sok_digest } ~spec
+                    ~statement ~spec ~sok_digest
                     (M.of_zkapp_command_segment_exn ~witness)
                     ()
                 in
 
                 let%bind (p : Ledger_proof.t) =
                   Deferred.List.fold ~init:(Ok p1) rest
-                    ~f:(fun acc (witness, spec, stmt) ->
+                    ~f:(fun acc (witness, spec, statement) ->
                       let%bind (prev : Ledger_proof.t) = Deferred.return acc in
                       let%bind (curr : Ledger_proof.t) =
                         log_subzkapp_base_snark ~witnesses_specs_stmts ~logger
-                          ~statement:{ stmt with sok_digest } ~spec
+                          ~statement ~spec ~sok_digest
                           (M.of_zkapp_command_segment_exn ~witness)
                           ()
                       in
@@ -327,7 +330,8 @@ module Impl = struct
             in
 
             let%map proof, elapsed =
-              log_subzkapp_base_snark ~logger ~statement ~spec:segment_spec
+              log_subzkapp_base_snark ~logger ~statement ~sok_digest
+                ~spec:segment_spec
                 (M.of_zkapp_command_segment_exn ~witness)
               |> measure_runtime ~logger
                    ~spec_json:
