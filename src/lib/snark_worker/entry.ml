@@ -114,7 +114,7 @@ let main ~logger ~proof_level ~constraint_constants daemon_address
         in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
-           generation"
+           generation. Sok_message: $sok_message"
           ~metadata:[ address_json; work_ids_json; sok_message_json ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
