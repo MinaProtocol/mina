@@ -39,7 +39,7 @@ if [[ -z "$DEB_CODENAME" ]]; then usage "❌  Codename is not set!"; fi;
 if [[ -z "$DEB_RELEASE" ]]; then usage "❌  Release is not set!"; fi;
 
 
-if [[ -z "${SIGN:-}" ]]; then 
+if [[ -z "${SIGN:-}" ]]; then
   SIGN_ARG=""
 else
   SIGN_ARG="--sign=$SIGN"
@@ -112,9 +112,9 @@ do
 
     if [[ $DEB_RELEASE == "unstable" ]]; then
       echo "⏩️  Skipping debian repository consistency check after push to unstable channel as it is taking too long."
-    else 
+    else
       echo "📋  Validating debian repository consistency after push..."
-      if deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then 
+      if deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then
         echo "✅  Debian repository is consistent"
       else
         echo "❌  Error: Debian repository is not consistent. Please run: "
@@ -131,7 +131,7 @@ do
     echo "❌  Error: Some Debians are still not correctly published : "$(join_by " " "${debs[@]}")
     echo "ℹ️  You may still try to rerun job as debian repository is known from imperfect performance"
     exit 1
-  fi 
+  fi
 
   sleep 60
 done
