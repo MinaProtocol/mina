@@ -150,8 +150,17 @@ module Make
     | None ->
         Ok ()
     | Some { fee = { fee = in_pool_fee; prover = in_pool_key }; _ } ->
-        let cmp_res = Currency.Fee.compare fee in_pool_fee in
-        if cmp_res < 0 then Ok ()
+        if Currency.Fee.compare fee in_pool_fee < 0 then (
+          [%log' trace (Pool.get_logger pool)]
+            "Local snark work with metadata ($in_pool_fee, $in_pool_key) has \
+             higher fee than $work from $sender"
+            ~metadata:
+              [ ("work", Work.compact_json work)
+              ; ("in_pool_fee", Currency.Fee.to_yojson fee)
+              ; ( "in_pool_key"
+                , Signature_lib.Public_key.Compressed.to_yojson in_pool_key )
+              ] ;
+          Ok () )
         else
           reject_and_log_if_local
             (Intf.Verification_error.Fee_too_high
