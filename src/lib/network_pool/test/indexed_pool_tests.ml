@@ -444,6 +444,7 @@ let init_permissionless_ledger ledger account_info =
         { account with balance; permissions = Permissions.empty } )
 
 let apply_to_ledger ledger cmd =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   match Transaction_hash.User_command_with_valid_signature.command cmd with
   | User_command.Signed_command c ->
       let (`If_this_is_used_it_should_have_a_comment_justifying_it v) =
@@ -458,7 +459,8 @@ let apply_to_ledger ledger cmd =
           )
   | User_command.Zkapp_command p -> (
       let applied, _ =
-        Mina_ledger.Ledger.apply_zkapp_command_unchecked ~constraint_constants
+        Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants
           ~global_slot:dummy_state_view.global_slot_since_genesis
           ~state_view:dummy_state_view ledger p
         |> Or_error.ok_exn
@@ -501,6 +503,8 @@ let commit_to_pool ledger pool cmd expected_drops =
   pool
 
 let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+let signature_kind = Mina_signature_kind.Testnet
 
 let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ~double_increment_sender ~increment_receiver ~amount ~fee nonce_int =
@@ -568,7 +572,8 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     }
   in
   let zkapp_command =
-    Zkapp_command.write_all_proofs_to_disk ~proof_cache_db zkapp_command_wire
+    Zkapp_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+      zkapp_command_wire
   in
   (* We skip signing the commitment and updating the authorization as it is not necessary to have a valid transaction for these tests. *)
   let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =

@@ -62,18 +62,19 @@ end
 
 module Gen = Gen_make (Signed_command)
 
-let gen_signed =
+let gen_signed ~signature_kind =
   let module G = Signed_command.Gen in
   let open Quickcheck.Let_syntax in
   let%bind keys =
     Quickcheck.Generator.list_with_length 2
       Mina_base_import.Signature_keypair.gen
   in
-  let sign_type = `Real Mina_signature_kind.t_DEPRECATED in
+  let sign_type = `Real signature_kind in
   G.payment_with_random_participants ~sign_type ~keys:(Array.of_list keys)
     ~max_amount:10000 ~fee_range:1000 ()
 
-let gen = Gen.to_signed_command gen_signed
+let gen =
+  Gen.to_signed_command (gen_signed ~signature_kind:Mina_signature_kind.Testnet)
 
 [%%versioned
 module Stable = struct
@@ -91,11 +92,14 @@ end]
 type t = (Signed_command.t, Zkapp_command.t) Poly.t
 [@@deriving sexp_of, to_yojson]
 
-let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t = function
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db :
+    Stable.Latest.t -> t = function
   | Signed_command sc ->
       Signed_command sc
   | Zkapp_command zc ->
-      Zkapp_command (Zkapp_command.write_all_proofs_to_disk ~proof_cache_db zc)
+      Zkapp_command
+        (Zkapp_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+           zc )
 
 let read_all_proofs_from_disk : t -> Stable.Latest.t = function
   | Signed_command sc ->
@@ -362,8 +366,7 @@ module Valid = struct
 end
 
 module For_tests = struct
-  let check_verifiable (t : Verifiable.t) : Valid.t Or_error.t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let check_verifiable ~signature_kind (t : Verifiable.t) : Valid.t Or_error.t =
     match t with
     | Signed_command x -> (
         match Signed_command.check ~signature_kind x with

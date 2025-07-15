@@ -67,7 +67,7 @@ module As_record = struct
     ; vesting_period : 'slot_span
     ; vesting_increment : 'amount
     }
-  [@@deriving equal, hlist, fields, annot]
+  [@@deriving equal, hlist, fields, annot, sexp_of]
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
@@ -86,6 +86,7 @@ type as_record =
   , Balance.Stable.Latest.t
   , Amount.Stable.Latest.t )
   As_record.t
+[@@deriving sexp_of]
 
 (* convert sum type to record format, useful for to_bits and typ *)
 let to_record t =

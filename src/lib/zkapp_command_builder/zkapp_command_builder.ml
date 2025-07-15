@@ -45,6 +45,7 @@ let mk_account_update_body ?preconditions ?(increment_nonce = false)
 
 let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
     Zkapp_command.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let fee_payer : Account_update.Fee_payer.t =
     Account_update.Fee_payer.make
       ~body:
@@ -59,7 +60,7 @@ let mk_zkapp_command ?memo ~fee ~fee_payer_pk ~fee_payer_nonce account_updates :
     Option.value_map memo ~default:Signed_command_memo.dummy
       ~f:Signed_command_memo.create_from_string_exn
   in
-  Zkapp_command.write_all_proofs_to_disk
+  Zkapp_command.write_all_proofs_to_disk ~signature_kind
     ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
     { Zkapp_command.Poly.fee_payer
     ; memo
@@ -88,8 +89,9 @@ let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 *)
 let replace_authorizations ?prover ~keymap (zkapp_command : Zkapp_command.t) :
     Zkapp_command.t Async_kernel.Deferred.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let txn_commitment, full_txn_commitment =
-    Zkapp_command.get_transaction_commitments zkapp_command
+    Zkapp_command.get_transaction_commitments ~signature_kind zkapp_command
   in
   let sign_for_account_update ~use_full_commitment sk =
     let commitment =

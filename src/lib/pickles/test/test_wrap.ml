@@ -1,12 +1,13 @@
-(* Testing
-   -------
+(** Testing
+    -------
 
-   Component: Pickles
-   Subject: Test Wrap
-   Invocation: \
-    dune exec src/lib/pickles/test/main.exe -- test "Gate:"
+    Component: Pickles
+    Subject: Test Wrap
+    Invocation: \
+     dune exec src/lib/pickles/test/test_wrap.exe
 *)
 open Pickles_types
+
 module Wrap = Pickles__Wrap
 module Import = Pickles__Import
 
@@ -323,11 +324,13 @@ module FFAdd = Make (struct
     }
 end)
 
-let tests =
-  [ ("Gate:Lookup", Lookup.tests)
-  ; ("Gate:Foreign field addition", FFAdd.tests)
-  ; ("Gate:Rot", Rot.tests)
-  ; ("Gate:Xor", Xor.tests)
-  ; ("Gate:Range check", Range_check.tests)
-  ; ("Gate:Range_check 64 bits", Range_check_64.tests)
-  ]
+let () =
+  let open Alcotest in
+  run "Gate tests"
+    [ ("Gate:Lookup", Lookup.tests)
+    ; ("Gate:Foreign field addition", FFAdd.tests)
+    ; ("Gate:Rot", Rot.tests)
+    ; ("Gate:Xor", Xor.tests)
+    ; ("Gate:Range check", Range_check.tests)
+    ; ("Gate:Range_check 64 bits", Range_check_64.tests)
+    ]

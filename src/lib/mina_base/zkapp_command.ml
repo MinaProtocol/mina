@@ -136,8 +136,8 @@ end
 
 include T
 
-let write_all_proofs_to_disk ~proof_cache_db (w : Stable.Latest.t) : t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+    (w : Stable.Latest.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
@@ -166,8 +166,7 @@ let forget_digests_and_proofs_and_aux
 
 [%%define_locally Stable.Latest.(gen)]
 
-let of_simple ~proof_cache_db (w : Simple.t) : t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let of_simple ~signature_kind ~proof_cache_db (w : Simple.t) : t =
   { fee_payer = w.fee_payer
   ; memo = w.memo
   ; account_updates =
@@ -215,8 +214,7 @@ let to_simple (t : t) : Simple.t =
              } )
   }
 
-let all_account_updates t : _ Call_forest.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let all_account_updates ~signature_kind t : _ Call_forest.t =
   let p = t.Poly.fee_payer in
   let body = Account_update.Body.of_fee_payer p.body in
   let account_update =
@@ -926,8 +924,7 @@ let zkapp_command_to_json x =
 let arg_query_string x =
   Fields_derivers_zkapps.Test.Loop.json_to_string_gql @@ to_json x
 
-let dummy =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let dummy ~signature_kind =
   lazy
     (let account_update =
        Account_update.with_aux ~body:Account_update.Body.dummy
@@ -1433,8 +1430,7 @@ let is_incompatible_version
       | Set { set_verification_key = _auth, txn_version; _ } ->
           not Mina_numbers.Txn_version.(equal_to_current txn_version) )
 
-let get_transaction_commitments (zkapp_command : _ Poly.t) =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let get_transaction_commitments ~signature_kind (zkapp_command : _ Poly.t) =
   let memo_hash = Signed_command_memo.hash zkapp_command.memo in
   let fee_payer_hash =
     Account_update.of_fee_payer zkapp_command.fee_payer

@@ -10,10 +10,10 @@ if [[ "$GO" == "" ]];then
   GO=go
 fi
 
-cmd=build
+cmd="build"
 
 if [[ "$1" == "--test" ]]; then
-  cmd=test
+  cmd="test"
   shift
 fi
 

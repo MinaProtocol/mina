@@ -330,6 +330,7 @@ module Rules = struct
         State.Circuit.t
         * Zkapp_call_forest.Checked.account_update
         * Account_update.May_use_token.Checked.t =
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let dummy_account_update_body = Lazy.force dummy_account_update_body in
       let dummy : _ Zkapp_command.Call_forest.Tree.t =
         { account_update =
@@ -343,7 +344,8 @@ module Rules = struct
         Zkapp_command.Digest.Tree.constant (Lazy.force dummy_tree_hash)
       in
       let (account_update, forest), rest_of_forest =
-        Zkapp_call_forest.Checked.pop ~dummy ~dummy_tree_hash forest
+        Zkapp_call_forest.Checked.pop ~signature_kind ~dummy ~dummy_tree_hash
+          forest
       in
       let rest_of_forest_is_empty =
         Zkapp_call_forest.Checked.is_empty rest_of_forest

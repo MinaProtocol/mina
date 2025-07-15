@@ -4,7 +4,7 @@ open Mina_base
 let different_version = Mina_numbers.Txn_version.(succ current)
 
 let update_vk_perm_to_be ~auth : Zkapp_command.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let signature_kind = Mina_signature_kind.Testnet in
   let account_update : Account_update.t =
     Account_update.with_aux
       ~body:

@@ -8,7 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -69,8 +70,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Core.String.Map.data all_mina_nodes) )
     in
     (* Since I made the balances of block producers in genesis ledger and next
-       epoch ledgers to be 0, then blocks would only be produced, if the consensus
-       selects the staking epoch *)
+       epoch ledgers to be 0, then blocks would only be produced, if the
+       consensus selects the staking epoch *)
     section "wait for 3 block to be produced"
       (wait_for t (Wait_condition.blocks_to_be_produced 3))
 end

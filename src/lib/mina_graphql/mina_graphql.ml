@@ -397,6 +397,7 @@ module Mutations = struct
       , string )
       result
       Io.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     (* instead of adding the zkapp_command to the transaction pool, as we would for an actual zkapp,
        apply the zkapp using an ephemeral ledger
     *)
@@ -460,13 +461,14 @@ module Mutations = struct
                   |> Mina_state.Protocol_state.Body.view
                 in
                 let applied =
-                  Ledger.apply_zkapp_command_unchecked ~constraint_constants
+                  Ledger.apply_zkapp_command_unchecked ~signature_kind
+                    ~constraint_constants
                     ~global_slot:
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
                       |> Consensus.Data.Consensus_state
                          .global_slot_since_genesis )
                     ~state_view ledger
-                    (Zkapp_command.write_all_proofs_to_disk
+                    (Zkapp_command.write_all_proofs_to_disk ~signature_kind
                        ~proof_cache_db:(Mina_lib.proof_cache_db mina)
                        zkapp_command )
                 in
@@ -1543,7 +1545,7 @@ module Mutations = struct
               let clean_config = Option.value ~default:false clean_config in
               let conf_dir = (Mina_lib.config mina).conf_dir in
               if clean_config then
-                Exit_handlers.register_async_shutdown_handler
+                Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
                   ~logger:(Mina_lib.config mina).logger
                   ~description:"Remove configuration data" (fun () ->
                     let epoch_ledger_json_file =
@@ -1580,7 +1582,7 @@ module Mutations = struct
                                 in
                                 match%bind Sys.file_exists path with
                                 | `Yes ->
-                                    File_system.remove_dir path
+                                    Mina_stdlib_unix.File_system.remove_dir path
                                 | `No | `Unknown ->
                                     Deferred.unit
                               in
@@ -1610,7 +1612,7 @@ module Mutations = struct
                         let path = conf_dir ^/ dir in
                         match%bind Sys.file_exists path with
                         | `Yes ->
-                            File_system.remove_dir path
+                            Mina_stdlib_unix.File_system.remove_dir path
                         | `No | `Unknown ->
                             Deferred.unit ) ) ;
               let s =
@@ -1656,6 +1658,7 @@ module Queries = struct
   (* helper for pooledUserCommands, pooledZkappCommands *)
   let get_commands ~proof_cache_db ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
       =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
         Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
@@ -1709,7 +1712,7 @@ module Queries = struct
                           let user_cmd =
                             User_command.Zkapp_command
                               (Zkapp_command.write_all_proofs_to_disk
-                                 ~proof_cache_db zkapp_command )
+                                 ~signature_kind ~proof_cache_db zkapp_command )
                           in
                           (* The command gets piped through [forget_check]
                              below; this is just to make the types work

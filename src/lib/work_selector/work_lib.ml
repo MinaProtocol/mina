@@ -33,6 +33,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           Work_spec.t
           One_or_two.t
           list
+            (** Jobs received from [frontier_broadcast_pipe], would be updated
+                whenever the pipe has broadcasted new frontier. The works
+                between consecutive frontier broadcasts should be largely
+                identical. *)
       ; mutable jobs_seen : Job_status.t Seen_key.Map.t
       ; reassignment_wait : int
       }

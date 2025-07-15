@@ -4,9 +4,13 @@ let Artifacts = ./Artifacts.dhall
 
 let Network = ./Network.dhall
 
+let DebianVersions = ./DebianVersions.dhall
+
+let BuildFlags = ./BuildFlags.dhall
+
 let Docker
     : Type
-    = < Bookworm | Bullseye | Jammy | Focal >
+    = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
 let capitalName =
           \(docker : Docker)
@@ -15,6 +19,7 @@ let capitalName =
             , Bullseye = "Bullseye"
             , Jammy = "Jammy"
             , Focal = "Focal"
+            , Noble = "Noble"
             }
             docker
 
@@ -25,67 +30,69 @@ let lowerName =
             , Bullseye = "bullseye"
             , Jammy = "jammy"
             , Focal = "focal"
+            , Noble = "noble"
             }
             docker
 
-let dependsOnStep =
-          \(docker : Docker)
-      ->  \(prefix : Text)
-      ->  \(network : Network.Type)
-      ->  \(profile : Profiles.Type)
-      ->  \(binary : Artifacts.Type)
-      ->  let network = "${Network.capitalName network}"
-
-          let profileSuffix = "${Profiles.toSuffixUppercase profile}"
-
-          let suffix = "docker-image"
-
-          let key = "${Artifacts.lowerName binary}-${suffix}"
-
-          in  merge
-                { Bookworm =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Bullseye =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Jammy =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                , Focal =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      docker}${network}${capitalName
-                                                           docker}${profileSuffix}"
-                    , key = key
-                    }
-                  ]
-                }
-                docker
+let DepsSpec =
+      { Type =
+          { codename : Docker
+          , prefix : Text
+          , network : Network.Type
+          , profile : Profiles.Type
+          , artifact : Artifacts.Type
+          , buildFlags : BuildFlags.Type
+          , suffix : Text
+          }
+      , default =
+          { codename = Docker.Bullseye
+          , prefix = "MinaArtifact"
+          , network = Network.Type.Berkeley
+          , profile = Profiles.Type.Devnet
+          , artifact = Artifacts.Type.Daemon
+          , buildFlags = BuildFlags.Type.None
+          , suffix = "docker-image"
+          }
+      }
 
 let dependsOn =
-          \(docker : Docker)
-      ->  \(network : Network.Type)
-      ->  \(profile : Profiles.Type)
-      ->  \(binary : Artifacts.Type)
-      ->  dependsOnStep docker "MinaArtifact" network profile binary
+          \(spec : DepsSpec.Type)
+      ->  let network = "${Network.capitalName spec.network}"
+
+          let profileSuffix = "${Profiles.toSuffixUppercase spec.profile}"
+
+          let key = "${Artifacts.lowerName spec.artifact}-${spec.suffix}"
+
+          let buildFlagSuffix =
+                merge
+                  { None = ""
+                  , Instrumented =
+                      "${BuildFlags.toSuffixUppercase spec.buildFlags}"
+                  }
+                  spec.buildFlags
+
+          in  [ { name =
+                    "${spec.prefix}${capitalName
+                                       spec.codename}${network}${profileSuffix}${buildFlagSuffix}"
+                , key = key
+                }
+              ]
+
+let ofDebian =
+          \(debian : DebianVersions.DebVersion)
+      ->  merge
+            { Bookworm = Docker.Bookworm
+            , Bullseye = Docker.Bullseye
+            , Jammy = Docker.Jammy
+            , Focal = Docker.Focal
+            , Noble = Docker.Noble
+            }
+            debian
 
 in  { Type = Docker
     , capitalName = capitalName
     , lowerName = lowerName
+    , ofDebian = ofDebian
     , dependsOn = dependsOn
-    , dependsOnStep = dependsOnStep
+    , DepsSpec = DepsSpec
     }

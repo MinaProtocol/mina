@@ -349,12 +349,13 @@ include Mina_transaction_logic.Make (Ledger_inner)
 (* use mask to restore ledger after application *)
 let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
     ~txn_state_view ledger zkapp_command =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let mask = Mask.create ~depth:(depth ledger) () in
   let masked_ledger = register_mask ledger mask in
   let _applied =
     Or_error.ok_exn
-      (apply_zkapp_command_unchecked ~constraint_constants ~global_slot
-         ~state_view:txn_state_view masked_ledger
+      (apply_zkapp_command_unchecked ~signature_kind ~constraint_constants
+         ~global_slot ~state_view:txn_state_view masked_ledger
          (Zkapp_command.Valid.forget zkapp_command) )
   in
   let root = merkle_root masked_ledger in
@@ -431,6 +432,7 @@ let apply_initial_ledger_state : t -> init_state -> unit =
 let%test_unit "tokens test" =
   let open Mina_transaction_logic.For_tests in
   let open Zkapp_command_builder in
+  let signature_kind = Mina_signature_kind.Testnet in
   let constraint_constants =
     Genesis_constants.For_unit_tests.Constraint_constants.t
   in
@@ -464,7 +466,7 @@ let%test_unit "tokens test" =
           account_updates
       in
       match
-        apply_zkapp_command_unchecked ~constraint_constants
+        apply_zkapp_command_unchecked ~signature_kind ~constraint_constants
           ~global_slot:
             (Mina_numbers.Global_slot_since_genesis.succ
                view.global_slot_since_genesis )
@@ -643,8 +645,9 @@ let%test_unit "zkapp_command payment test" =
               let%bind () =
                 iter_err ts2 ~f:(fun t ->
                     let%bind res, _ =
-                      apply_zkapp_command_unchecked l2 t ~constraint_constants
-                        ~global_slot:txn_global_slot ~state_view:view
+                      apply_zkapp_command_unchecked ~signature_kind l2 t
+                        ~constraint_constants ~global_slot:txn_global_slot
+                        ~state_view:view
                     in
                     match res.command.status with
                     | Transaction_status.Applied ->
@@ -730,8 +733,9 @@ let%test_unit "zkapp_command application on masked ledger" =
           let () =
             iter_err cmds
               ~f:
-                (apply_zkapp_command_unchecked ~constraint_constants
-                   ~global_slot:txn_global_slot ~state_view:view l )
+                (apply_zkapp_command_unchecked ~signature_kind
+                   ~constraint_constants ~global_slot:txn_global_slot
+                   ~state_view:view l )
             |> Or_error.ok_exn
           in
           assert (not (Ledger_hash.equal init_merkle_root (L.merkle_root l))) ;

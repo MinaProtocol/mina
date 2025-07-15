@@ -54,6 +54,7 @@ let test_db () =
   Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Balance.t list]
     gen_non_zero_balances ~f:(fun balances ->
       let account_ids = Account_id.gen_accounts num_accounts in
+      let T = Account_id.eq in
       let accounts = List.map2_exn account_ids balances ~f:Account.create in
       DB.with_ledger ~depth:Depth.depth ~f:(fun db ->
           let enumerate_dir_combinations max_depth =
