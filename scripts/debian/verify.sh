@@ -61,7 +61,7 @@ if [ -z $REPO ]; then
 fi
 
 case $PACKAGE in
-  mina-archive) COMMAND="mina-archive --version && mina-archive --help" ;;
+  mina-archive*) COMMAND="mina-archive --version && mina-archive --help" ;;
   mina-logproc) COMMAND="echo skipped execution for mina-logproc" ;;
   mina-rosetta*) COMMAND="echo skipped execution for mina-rosetta" ;;
   mina-*) COMMAND="mina --version && mina --help" ;;
