@@ -320,6 +320,7 @@ check-snarky-submodule: ## Check the snarky submodule
 #######################################
 ## Bash checks
 
+.PHONY: check-bash
 check-bash: ## Run shellcheck on bash scripts
 	shellcheck ./scripts/**/*.sh -S warning
 	shellcheck ./buildkite/scripts/**/*.sh -S warning
