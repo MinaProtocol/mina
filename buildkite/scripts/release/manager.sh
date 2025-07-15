@@ -1279,6 +1279,7 @@ function verify(){
 
                         ;;
                         mina-archive)
+                            for network in "${__networks_arr[@]}"; do
                                local __artifact_full_name
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
                                
@@ -1314,6 +1315,7 @@ function verify(){
 
                                     echo ""
                                 fi
+                            done
                         ;;
                         mina-rosetta)
                             for network in "${__networks_arr[@]}"; do
