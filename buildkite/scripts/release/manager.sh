@@ -179,7 +179,7 @@ function get_artifact_with_suffix() {
             echo "mina-rosetta-$__network"
         ;;
         mina-archive)
-            echo "mina-$__network"
+            echo "mina-archive-$__network"
         ;;
         *)
             echo "$__artifact"
@@ -739,7 +739,7 @@ function publish(){
                                         $__dry_run \
                                         $__backend \
                                         $__debian_repo \
-                                        $__debian_sign_key
+                                        "$__debian_sign_key"
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
@@ -760,7 +760,7 @@ function publish(){
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -781,7 +781,7 @@ function publish(){
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -802,7 +802,7 @@ function publish(){
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1279,9 +1279,12 @@ function verify(){
 
                         ;;
                         mina-archive)
+                               local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+                               
                                if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
-
+                                    
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
                                         -p $artifact \
                                         --version $__version \
@@ -1294,8 +1297,6 @@ function verify(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    local __artifact_full_name
-                                    __artifact_full_name=$(get_artifact_with_suffix $artifact "")
 
                                     local __suffix_arg=""
                                     if [[ -n "$__docker_suffix" ]]; then
