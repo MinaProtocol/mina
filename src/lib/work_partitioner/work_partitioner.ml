@@ -240,15 +240,16 @@ let schedule_job_from_partitioner ~(partitioner : t) :
     ; lazy (schedule_from_tmp_slot ~partitioner)
     ]
 
+type work_from_selector = Work.Spec.Single.t One_or_two.t option Lazy.t
+
 (* WARN: this should only be called if [partitioner.tmp_slot] is None *)
-let consume_job_from_selector ~(partitioner : t)
-    ~(sok_message : Mina_base.Sok_message.t)
-    ~(instances : Work.Spec.Single.t One_or_two.t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t =
+let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
+    ~(work_from_selector : work_from_selector)
+    ~(sok_message : Mina_base.Sok_message.t) =
+  let%map.Option instances = Lazy.force work_from_selector in
   let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
     ~data:(Spec_only { spec = instances; sok_message }) ;
-
   match instances with
   | `One single_spec ->
       let pairing : Work.Id.Single.t = { which_one = `One; pairing_id } in
@@ -261,14 +262,6 @@ let consume_job_from_selector ~(partitioner : t)
       partitioner.tmp_slot <- Some (spec1, pairing1, sok_message) ;
       convert_single_work_from_selector ~partitioner ~single_spec:spec2
         ~sok_message ~pairing:pairing2
-
-type work_from_selector = Work.Spec.Single.t One_or_two.t option Lazy.t
-
-let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
-    ~(work_from_selector : work_from_selector)
-    ~(sok_message : Mina_base.Sok_message.t) =
-  let%map.Option instances = Lazy.force work_from_selector in
-  consume_job_from_selector ~partitioner ~instances ~sok_message
 
 let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
     ~(work_from_selector : work_from_selector) ~(partitioner : t) :
