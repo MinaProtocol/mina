@@ -325,6 +325,17 @@ check-bash: ## Run shellcheck on bash scripts
 	shellcheck ./scripts/**/*.sh -S warning
 	shellcheck ./buildkite/scripts/**/*.sh -S warning
 
+.PHONY: check-docker
+check-docker: ## Run hadolint on Docker files
+ifdef BUILDKITE
+	hadolint dockerfiles/Dockerfile-* dockerfiles/stages/*
+else
+	docker run --rm -v $(PWD):/workspace -w /workspace \
+		hadolint/hadolint hadolint \
+		dockerfiles/Dockerfile-* \
+		dockerfiles/stages/*
+endif
+
 ########################################
 ## Artifacts
 
