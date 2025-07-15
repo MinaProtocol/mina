@@ -26,7 +26,7 @@
   mina_base
   otp_lib
   pipe_lib
-  rose_tree
+  mina_stdlib
   consensus
   transition_frontier
   perf_histograms
@@ -36,7 +36,6 @@
   network_peer
   with_hash
   logger
-  mina_stdlib
   mina_state
   precomputed_values
   child_processes

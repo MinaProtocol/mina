@@ -10,11 +10,9 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let RunInToolchain = ../../Command/RunInToolchain.dhall
-
-let Network = ../../Constants/Network.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
 
 let Command = ../../Command/Base.dhall
 
@@ -49,10 +47,11 @@ let Spec =
           { mode = PipelineMode.Type.PullRequest
           , size = Size.Perf
           , dependsOn =
-              DebianVersions.dependsOn
-                DebianVersions.DebVersion.Bullseye
-                Network.Type.Berkeley
-                Profiles.Type.Standard
+                DebianVersions.dependsOn
+                  DebianVersions.DepsSpec::{
+                  , build_flag = BuildFlags.Type.Instrumented
+                  }
+              # DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
           , additionalDirtyWhen = [] : List SelectFiles.Type
           , yellowThreshold = 0.1
           , redThreshold = 0.2

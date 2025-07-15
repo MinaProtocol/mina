@@ -133,7 +133,6 @@ download_block() {
   fi
 }
 
-HASH='map(select(.metadata.parent_hash != null and .metadata.parent_height != null)) | .[0].metadata.parent_hash'
 # Bootstrap finds every missing state hash in the database and imports them from a bucket of precomputed .json blocks
 bootstrap() {
   echo "[BOOTSTRAP] Top 10 blocks before bootstrapping the archiveDB:"

@@ -56,10 +56,16 @@ let keyId =
           \(repo : DebianRepo)
       ->  merge
             { Local = None Text
-            , Unstable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
-            , Nightly = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
-            , Stable = Some "B40D16B1A4773DE415DAF9DBFE236881C07523DC"
+            , Unstable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+            , Nightly = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
+            , Stable = Some "386E9DAC378726A48ED5CE56ADB30D9ACE02F414"
             }
+            repo
+
+let isSigned =
+          \(repo : DebianRepo)
+      ->  merge
+            { Local = False, Unstable = True, Nightly = True, Stable = True }
             repo
 
 let keyAddress =
@@ -128,4 +134,5 @@ in  { Type = DebianRepo
     , bucketArg = bucketArg
     , keyId = keyId
     , keyArg = keyArg
+    , isSigned = isSigned
     }

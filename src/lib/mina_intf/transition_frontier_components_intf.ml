@@ -70,9 +70,10 @@ module type Breadcrumb_builder_intf = sig
     -> ( Mina_block.initial_valid_block Envelope.Incoming.t
        , State_hash.t )
        Cached.t
-       Rose_tree.t
+       Mina_stdlib.Rose_tree.t
        List.t
-    -> (transition_frontier_breadcrumb, State_hash.t) Cached.t Rose_tree.t
+    -> (transition_frontier_breadcrumb, State_hash.t) Cached.t
+       Mina_stdlib.Rose_tree.t
        List.t
        Deferred.Or_error.t
 end
@@ -101,18 +102,20 @@ module type Transition_handler_processor_intf = sig
            * ( Mina_block.initial_valid_block Envelope.Incoming.t
              , State_hash.t )
              Cached.t
-             Rose_tree.t
+             Mina_stdlib.Rose_tree.t
              list
          , Strict_pipe.crash Strict_pipe.buffered
          , unit )
          Strict_pipe.Writer.t
     -> catchup_breadcrumbs_reader:
-         ( (transition_frontier_breadcrumb, State_hash.t) Cached.t Rose_tree.t
+         ( (transition_frontier_breadcrumb, State_hash.t) Cached.t
+           Mina_stdlib.Rose_tree.t
            list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ] )
          Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:
-         ( (transition_frontier_breadcrumb, State_hash.t) Cached.t Rose_tree.t
+         ( (transition_frontier_breadcrumb, State_hash.t) Cached.t
+           Mina_stdlib.Rose_tree.t
            list
            * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
          , Strict_pipe.crash Strict_pipe.buffered

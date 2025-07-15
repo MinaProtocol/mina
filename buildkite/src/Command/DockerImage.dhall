@@ -26,6 +26,10 @@ let Network = ../Constants/Network.dhall
 
 let DockerPublish = ../Constants/DockerPublish.dhall
 
+let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
+
+let Extensions = ../Lib/Extensions.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -39,11 +43,13 @@ let ReleaseSpec =
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
+          , deb_legacy_version : Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
+          , verify : Bool
           , if : Optional B/If
           }
       , default =
@@ -56,23 +62,22 @@ let ReleaseSpec =
           , deb_codename = DebianVersions.DebVersion.Bullseye
           , deb_release = "\\\${MINA_DEB_RELEASE}"
           , deb_version = "\\\${MINA_DEB_VERSION}"
-          , deb_profile = Profiles.Type.Standard
+          , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , deb_profile = Profiles.Type.Devnet
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
           , no_cache = False
           , no_debian = False
           , step_key_suffix = "-docker-image"
+          , verify = False
           , if = None B/If
           }
       }
 
 let stepKey =
           \(spec : ReleaseSpec.Type)
-      ->  "${Artifacts.lowerName
-               spec.service}${Profiles.toLabelSegment
-                                spec.deb_profile}${BuildFlags.toLabelSegment
-                                                     spec.build_flags}${spec.step_key_suffix}"
+      ->  "${Artifacts.lowerName spec.service}${spec.step_key_suffix}"
 
 let stepLabel =
           \(spec : ReleaseSpec.Type)
@@ -106,6 +111,43 @@ let generateStep =
 
                 else  " && ./scripts/debian/aptly.sh stop"
 
+          let suffix =
+                Extensions.joinOptionals
+                  "-"
+                  [ merge
+                      { Mainnet = None Text
+                      , Devnet = None Text
+                      , Dev = None Text
+                      , Lightnet = Some
+                          "${Profiles.toSuffixLowercase spec.deb_profile}"
+                      }
+                      spec.deb_profile
+                  , merge
+                      { None = None Text
+                      , Instrumented = Some
+                          "${BuildFlags.toSuffixLowercase spec.build_flags}"
+                      }
+                      spec.build_flags
+                  ]
+
+          let maybeVerify =
+                      if     spec.verify
+                         &&  DockerPublish.shouldPublish
+                               spec.docker_publish
+                               spec.service
+
+                then      " && "
+                      ++  VerifyDockers.verify
+                            VerifyDockers.Spec::{
+                            , artifacts = [ spec.service ]
+                            , networks = [ spec.network ]
+                            , version = spec.deb_version
+                            , codenames = [ spec.deb_codename ]
+                            , suffix = suffix
+                            }
+
+                else  ""
+
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${Artifacts.dockerName spec.service}"
@@ -121,6 +163,7 @@ let generateStep =
                 ++  " --deb-profile ${Profiles.lowerName spec.deb_profile}"
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
+                ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =
@@ -151,6 +194,7 @@ let generateStep =
                       ++  buildDockerCmd
                       ++  " && "
                       ++  releaseDockerCmd
+                      ++  maybeVerify
                     )
                 ]
 
@@ -169,6 +213,7 @@ let generateStep =
                           ++  " && "
                           ++  releaseDockerCmd
                           ++  maybeStopDebianRepo
+                          ++  maybeVerify
                         )
                     ]
                   }
