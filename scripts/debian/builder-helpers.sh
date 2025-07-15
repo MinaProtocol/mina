@@ -293,12 +293,6 @@ build_functional_test_suite_deb() {
     "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
   cp ./default/src/test/archive/archive_node_tests/archive_node_tests.exe \
     "${BUILDDIR}/usr/local/bin/mina-archive-node-test"
-  cp ./default/src/test/archive/archive_node_tests/archive_node_tests.exe \
-    "${BUILDDIR}/usr/local/bin/mina-archive-node-test"
-
-  mkdir -p ${BUILDDIR}/etc/mina/test/archive/sample_db
-  rsync -Huav ../src/test/archive/sample_db* "${BUILDDIR}/etc/mina/test/archive"
-
 
   mkdir -p ${BUILDDIR}/etc/mina/test/archive/sample_db
   rsync -Huav ../src/test/archive/sample_db* "${BUILDDIR}/etc/mina/test/archive"
