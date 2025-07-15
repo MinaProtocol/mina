@@ -12,6 +12,8 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Network = ../../Constants/Network.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -21,8 +23,9 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             ]
-          , debVersion = DebianVersions.DebVersion.Bullseye
+          , debVersion = DebianVersions.DebVersion.Noble
           , network = Network.Type.MainnetLegacy
           , mode = PipelineMode.Type.Stable
+          , profile = Profiles.Type.Mainnet
           }
       )

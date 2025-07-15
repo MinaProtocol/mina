@@ -1,16 +1,18 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineMode = ../../Pipeline/Mode.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
@@ -23,6 +25,7 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
+          , debVersion = DebianVersions.DebVersion.Focal
           , network = Network.Type.Mainnet
           , tags =
             [ PipelineTag.Type.Long
@@ -30,6 +33,6 @@ in  Pipeline.build
             , PipelineTag.Type.Stable
             ]
           , mode = PipelineMode.Type.Stable
-          , profile = Profiles.Type.Devnet
+          , profile = Profiles.Type.Mainnet
           }
       )

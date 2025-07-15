@@ -10,6 +10,8 @@ let PipelineMode = ../../Pipeline/Mode.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let Network = ../../Constants/Network.dhall
 
 in  Pipeline.build
@@ -21,8 +23,9 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             ]
-          , debVersion = DebianVersions.DebVersion.Bookworm
+          , debVersion = DebianVersions.DebVersion.Focal
           , network = Network.Type.MainnetLegacy
+          , profile = Profiles.Type.Mainnet
           , mode = PipelineMode.Type.Stable
           }
       )

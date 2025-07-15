@@ -18,9 +18,13 @@ let Network = ../../Constants/Network.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let Profile = ../../Constants/Profiles.dhall
+
 let network = Network.Type.Mainnet
 
-let dependsOn = Dockers.dependsOn Dockers.DepsSpec::{ network = network }
+let dependsOn =
+      Dockers.dependsOn
+        Dockers.DepsSpec::{ network = network, profile = Profile.Type.Mainnet }
 
 in  Pipeline.build
       Pipeline.Config::{
