@@ -1282,7 +1282,10 @@ function verify(){
                             for network in "${__networks_arr[@]}"; do
                                local __artifact_full_name
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
-                               
+
+                               local __docker_suffix_combined
+                               __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+
                                if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
                                     
@@ -1299,18 +1302,13 @@ function verify(){
 
                                 if [[ $__only_debians == 0 ]]; then
 
-                                    local __suffix_arg=""
-                                    if [[ -n "$__docker_suffix" ]]; then
-                                        __suffix_arg="-s -$__docker_suffix"
-                                    fi
-
-                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
+                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $artifact $__version $__codename "$network")"
 
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        ${__suffix_arg} \
+                                        -s "$__docker_suffix_combined" \
                                         -r "$__repo"
 
                                     echo ""
