@@ -966,14 +966,6 @@ let sign_and_send_payment ~logger node_uri
   send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
     ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
 
-let _must_sign_and_send_payment ~logger node_uri
-    ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
-    ~fee ~nonce ~memo ~valid_until ~signature_kind =
-  sign_and_send_payment ~logger node_uri
-    ~(sender_keypair : Import.Signature_keypair.t)
-    ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until ~signature_kind
-  |> Deferred.bind ~f:Malleable_error.or_hard_error
-
 let send_test_payments ~(repeat_count : Unsigned.UInt32.t)
     ~(repeat_delay_ms : Unsigned.UInt32.t) ~logger node_uri
     ~(senders : Import.Private_key.t list) ~(receiver_pub_key : Account.key)
