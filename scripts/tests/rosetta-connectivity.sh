@@ -8,8 +8,11 @@ RED='\033[0;31m'
 NETWORK=devnet
 TIMEOUT=900
 
+LOAD_TEST_DURATION=600
+
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--network) NETWORK="$2"; shift;;
+  --run-load-test) RUN_LOAD_TEST=true ;;
   -t|--tag) TAG="$2"; shift;;
   --timeout) TIMEOUT="$2"; shift;;
   -h|--help) usage; exit 0;;
@@ -48,5 +51,13 @@ trap stop_docker ERR
 sleep 5
 #run sanity test
 ./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
+
+# Run load test
+if [[ "$RUN_LOAD_TEST" == true ]]; then
+    echo "Running load test for $LOAD_TEST_DURATION seconds..."
+    docker exec -v .:/workdir   $container_id /workdir/scripts/tests/rosetta-load.sh --address "http://localhost:3087" -db-conn-str postgres://pguser:pguser@localhost:5432/archive --duration $LOAD_TEST_DURATION
+else
+    echo "Skipping load test."
+fi
 
 stop_docker
