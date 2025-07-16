@@ -80,7 +80,7 @@ function test_account_balance() {
     declare -n __test_data=$1
     assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/account/balance" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"},\"account_identifier\":{\"address\":\"${__test_data[account]}\"}}" | jq)" \
         '.balances[0].currency.symbol == "MINA"' \
-        "   ✅  Account: Balance for ok" \
+        "   ✅  Account: Balance ok" \
         "   ❌  Account: Invalid balance structure or balance not found"
 }
 
