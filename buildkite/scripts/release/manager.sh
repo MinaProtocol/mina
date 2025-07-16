@@ -147,7 +147,9 @@ function get_suffix() {
         mina-rosetta)
             echo "-$__network"
         ;;
-
+        mina-archive)
+            echo "-$__network"
+        ;;
         *)
             echo ""
         ;;
@@ -176,7 +178,9 @@ function get_artifact_with_suffix() {
         mina-rosetta)
             echo "mina-rosetta-$__network"
         ;;
-
+        mina-archive)
+            echo "mina-archive-$__network"
+        ;;
         *)
             echo "$__artifact"
         ;;
@@ -735,7 +739,7 @@ function publish(){
                                         $__dry_run \
                                         $__backend \
                                         $__debian_repo \
-                                        $__debian_sign_key
+                                        "$__debian_sign_key"
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
@@ -744,23 +748,25 @@ function publish(){
 
                         ;;
                         mina-archive)
+                            for network in "${__networks_arr[@]}"; do
                                 if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                             $__codename \
                                             $__source_version \
                                             $__target_version \
                                             $__channel \
-                                            "" \
+                                            $network \
                                             $__verify \
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename "" $__publish_to_docker_io $__verify $__dry_run
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__dry_run
                                 fi
+                            done
                         ;;
                         mina-rosetta)
                             for network in "${__networks_arr[@]}"; do
@@ -775,7 +781,7 @@ function publish(){
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -796,7 +802,7 @@ function publish(){
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -1031,6 +1037,7 @@ function promote(){
 
                         ;;
                         mina-archive)
+                            for network in "${__networks_arr[@]}"; do
                                 if [[ $__only_dockers == 0 ]]; then
                                     promote_debian $artifact \
                                         $__codename \
@@ -1038,7 +1045,7 @@ function promote(){
                                         $__target_version \
                                         $__source_channel \
                                         $__target_channel \
-                                        "" \
+                                        $network \
                                         $__verify \
                                         $__dry_run \
                                         $__debian_repo \
@@ -1046,8 +1053,9 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename "" $__publish_to_docker_io $__verify $__dry_run
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__dry_run
                                 fi
+                            done
                         ;;
                         mina-rosetta)
                             for network in "${__networks_arr[@]}"; do
@@ -1271,9 +1279,16 @@ function verify(){
 
                         ;;
                         mina-archive)
+                            for network in "${__networks_arr[@]}"; do
+                               local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                               local __docker_suffix_combined
+                               __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+
                                if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
-
+                                    
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
                                         -p $artifact \
                                         --version $__version \
@@ -1286,25 +1301,19 @@ function verify(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    local __artifact_full_name
-                                    __artifact_full_name=$(get_artifact_with_suffix $artifact "")
 
-                                    local __suffix_arg=""
-                                    if [[ -n "$__docker_suffix" ]]; then
-                                        __suffix_arg="-s -$__docker_suffix"
-                                    fi
-
-                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
+                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $artifact $__version $__codename "$network")"
 
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        ${__suffix_arg} \
+                                        -s "$__docker_suffix_combined" \
                                         -r "$__repo"
 
                                     echo ""
                                 fi
+                            done
                         ;;
                         mina-rosetta)
                             for network in "${__networks_arr[@]}"; do

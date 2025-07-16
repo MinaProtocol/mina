@@ -38,6 +38,7 @@ module T = struct
    * and node locations, the bitstring represents the path in the tree where that node exists.
    * For all other locations (generic locations), the prefix is 0xff. Generic locations can contain
    * any bitstring.
+   * Hence, we can have at most (2^(253 - 1)) accounts, where 253 is just 0xfd.
    *)
 
   module Addr = Merkle_address

@@ -24,6 +24,7 @@
   ;; local libraries
   cache_dir
   mina_stdlib
+  mina_stdlib_unix
   key_value_database
   merkle_address
   ppx_version.runtime
