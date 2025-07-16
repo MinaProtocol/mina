@@ -18,7 +18,7 @@ esac; shift; done
 sudo chown -R opam ~/.gnupg/
 if [ $SILENT == 1 ]; then
   gpg --batch --yes --import "$KEY_LOCATION"
-else 
+else
   echo "Importing GPG key"
   gpg --import "$KEY_LOCATION"
  fi

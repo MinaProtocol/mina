@@ -1,6 +1,6 @@
 (executable
  (name logproc)
- (public_name logproc)
+ (public_name mina-logproc)
  (modules logproc)
  (libraries
   ;;opam libraries
