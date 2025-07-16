@@ -2138,7 +2138,7 @@ module T = struct
                              fee >= constraint_constants.account_creation_fee)
                         || not (is_new_account prover)
                       then (
-                        [%log info] "Including a work by prover $prover in diff"
+                        [%log info] "Including a work $cw_checked in diff"
                           ~metadata:
                             [ ( "cw_checked"
                               , Transaction_snark_work.forget cw_checked
