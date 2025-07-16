@@ -36,8 +36,6 @@ let makeArchiveBench =
                       "./buildkite/scripts/cache/manager.sh read archive-node-test/archive.perf ."
                   ]
                 , mode = mode
-                , extraArgs =
-                    if PipelineMode.isStable mode then "" else "--no-upload"
                 }
             )
 
