@@ -9,6 +9,7 @@ NETWORK=devnet
 TIMEOUT=900
 
 LOAD_TEST_DURATION=600
+RUN_LOAD_TEST=false
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--network) NETWORK="$2"; shift;;
