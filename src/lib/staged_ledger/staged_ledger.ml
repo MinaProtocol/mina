@@ -2137,12 +2137,19 @@ module T = struct
                         || Currency.Fee.(
                              fee >= constraint_constants.account_creation_fee)
                         || not (is_new_account prover)
-                      then
+                      then (
+                        [%log info] "Including a work by prover $prover in diff"
+                          ~metadata:
+                            [ ( "cw_checked"
+                              , Transaction_snark_work.forget cw_checked
+                                |> Transaction_snark_work.info
+                                |> Transaction_snark_work.Info.to_yojson )
+                            ] ;
                         Continue
                           ( Sequence.append seq (Sequence.singleton cw_checked)
                           , One_or_two.length
                               (Transaction_snark_work.Checked.proofs cw_checked)
-                            + count )
+                            + count ) )
                       else (
                         [%log debug]
                           ~metadata:
