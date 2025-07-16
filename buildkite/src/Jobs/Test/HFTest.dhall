@@ -51,6 +51,7 @@ in  Pipeline.build
                   Cmd.Docker::{
                   , image = ContainerImages.nixos
                   , privileged = True
+                  , useBash = False
                   }
                   "./scripts/hardfork/build-and-test.sh \$BUILDKITE_BRANCH"
               ]
