@@ -36,6 +36,7 @@ let makeArchiveBench =
                       "./buildkite/scripts/cache/manager.sh read archive-node-test/archive.perf ."
                   ]
                 , mode = mode
+                , extraArgs = "--input-file archive.perf"
                 }
             )
 
