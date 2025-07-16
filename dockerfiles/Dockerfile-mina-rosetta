@@ -46,6 +46,7 @@ RUN apt-get update --quiet --yes \
     && apt-get install --quiet --yes --no-install-recommends \
     apt-utils \
     apt-transport-https \
+    bc \
     curl \
     build-essential \
     dnsutils \
