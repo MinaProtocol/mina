@@ -24,7 +24,7 @@ function assert() {
 
 function wait_for_sync() {
     declare -n __test_data=$1
-    declare -n __timeout=$2
+    local __timeout=$2
 
     echo "⏳  Waiting for rosetta to sync..."
     local start_time
