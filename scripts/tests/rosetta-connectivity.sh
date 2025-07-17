@@ -40,7 +40,7 @@ function usage() {
 
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
-container_id=$(docker run -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
+container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
 
 stop_docker() {
     { docker stop "$container_id" ; docker rm "$container_id" ; } || true
