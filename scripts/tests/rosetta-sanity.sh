@@ -82,8 +82,16 @@ if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
 fi
 
 if [[ "$NETWORK" == "mainnet" ]]; then
+    if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
+        echo "⏳  Waiting for Rosetta to sync on mainnet..."
+        wait_for_sync "mainnet" "$TIMEOUT"
+    fi
     run_tests_with_test_data "mainnet"
 elif [[ "$NETWORK" == "devnet" ]]; then
+    if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
+        echo "⏳  Waiting for Rosetta to sync on mainnet..."
+        wait_for_sync "mainnet" "$TIMEOUT"
+    fi
     run_tests_with_test_data "devnet"
 else
     echo "Unknown network: $NETWORK. available networks: mainnet, devnet. Exiting..."

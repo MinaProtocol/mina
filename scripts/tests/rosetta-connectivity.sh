@@ -56,7 +56,7 @@ sleep 5
 # Run load test
 if [[ "$RUN_LOAD_TEST" == true ]]; then
     echo "Running load test for $LOAD_TEST_DURATION seconds..."
-    docker exec $container_id bash -c /workdir/scripts/tests/rosetta-load.sh --address "http://localhost:3087" --db-conn-str postgres://pguser:pguser@localhost:5432/archive --duration $LOAD_TEST_DURATION
+    docker exec $container_id bash -c "/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str postgres://pguser:pguser@localhost:5432/archive --duration $LOAD_TEST_DURATION"
 else
     echo "Skipping load test."
 fi
