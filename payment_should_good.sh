@@ -1,7 +1,7 @@
-export MINA_DOCKER_TAG=3.1.1-alpha1-compatible-00a849f-bullseye
+export MINA_DOCKER_TAG=3.2.0-alpha1-compatible-6b5156e-bullseye
 
 export MINA_IMAGE="gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-berkeley"
-export ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG"
+export ARCHIVE_IMAGE="gcr.io/o1labs-192920/mina-archive:$MINA_DOCKER_TAG-devnet"
 
 # docker pull $MINA_IMAGE
 # docker pull $ARCHIVE_IMAGE
