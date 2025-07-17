@@ -1290,7 +1290,7 @@ function verify(){
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
                                     
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
-                                        -p $artifact \
+                                        -p $__artifact_full_name \
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
