@@ -12,5 +12,6 @@ export TEST_NAME=payment
 local $TEST_NAME \
 --mina-image=$MINA_IMAGE \
 --archive-image=$ARCHIVE_IMAGE \
+--debug \
 | tee "$TEST_NAME.local.test.log" \
 | ./_build/default/src/app/logproc/logproc.exe -i inline -f '!(.level in ["Spam"])'
