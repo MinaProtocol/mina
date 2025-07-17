@@ -5,12 +5,13 @@ open Snark_work_lib
     single zkapp transaction. *)
 type t
 
-(** [create_and_yield_segment ~job ~unscheduled_segments] creates a pending
-    zkapp command instance, and immediately generate a segment subzkapp spec. *)
+(** [create_and_yield_segment ~job ~final_statement ~unscheduled_segments]
+    creates a pending zkapp command instance, and immediately generate a
+    segment subzkapp spec. *)
 val create_and_yield_segment :
      job:(Spec.Single.t, Id.Single.t) With_job_meta.t
-  -> unscheduled_segments:
-       Spec.Sub_zkapp.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t
+  -> final_statement:Transaction_snark.Statement.t
+  -> unscheduled_segments:Spec.Sub_zkapp.Stable.V1.t Mina_stdlib.Nonempty_list.t
   -> t * Spec.Sub_zkapp.Stable.V1.t
 
 val zkapp_job : t -> (Spec.Single.t, Id.Single.t) With_job_meta.t
@@ -30,11 +31,19 @@ val submit_proof :
   -> range:Spec.Sub_zkapp.Range.t
   -> (unit, Error.t) result
 
+type finalization_failure =
+  | StatementMismatch of
+      { expected : Transaction_snark.Statement.t
+      ; actual : Transaction_snark.Statement.t
+      }
+
 (** [try_finalize t] attempts to unwrap completed proof, metric and spec from
-    [t] if the proof for entire zkapp transaction is completed *)
+    [t] if the proof for entire zkapp transaction is completed. *)
 val try_finalize :
      t
   -> ( (Spec.Single.t, Id.Single.t) With_job_meta.t
-     * Ledger_proof.t
-     * Time.Stable.Span.V1.t )
+       * Ledger_proof.t
+       * Core_kernel_private.Span_float.t
+     , finalization_failure )
+     result
      option
