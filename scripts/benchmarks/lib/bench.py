@@ -447,7 +447,7 @@ class LedgerApplyBenchmark(Benchmark):
 
 class ArchiveBenchmark(Benchmark):
     """
-     Concrete implementation of Benchmark for ledger test apply benchmark.
+     Concrete implementation of Benchmark for archive benchmark.
      It requires input json file with benchmark data in format
      {
         "final_time":"0.4000" # In ms
