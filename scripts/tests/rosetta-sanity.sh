@@ -70,17 +70,6 @@ function run_tests_with_test_data() {
     echo "🎉  All tests passed successfully!"
 }
 
-if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-    if [[ "$NETWORK" == "mainnet" ]]; then
-        wait_for_sync "mainnet"
-    elif [[ "$NETWORK" == "devnet" ]]; then
-        wait_for_sync "devnet"
-    else
-        echo "Unknown network: $NETWORK. available networks: mainnet, devnet. Exiting..."
-        exit 1
-    fi
-fi
-
 if [[ "$NETWORK" == "mainnet" ]]; then
     if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
         echo "⏳  Waiting for Rosetta to sync on mainnet..."
