@@ -21,8 +21,8 @@ type t = Mina_automation_fixture.Archive.before_bootstrap
 
 let postgres_process_name = "postgres"
 
-let check_postgres_memory_increase_is_below_threshold logger threshold time_interval
-    previous_postgres_memory =
+let check_postgres_memory_increase_is_below_threshold logger threshold
+    time_interval previous_postgres_memory =
   let%bind current_memory =
     Utils.get_memory_usage_mb_of_process_family postgres_process_name
   in
@@ -43,6 +43,7 @@ let test_case (test_data : t) =
   let config =
     { test_data.config with config_file = "genesis_ledgers/mainnet.json" }
   in
+  let container = Sys.getenv "CONTAINER_ID" in
   let logger = Logger.create () in
   let%bind process = Archive.of_config config |> Archive.start in
   Archive.Process.start_logging process ;
@@ -56,7 +57,8 @@ let test_case (test_data : t) =
   let duration = Time.Span.of_min 10.0 in
 
   let%bind previous_postgres_memory =
-    Utils.get_memory_usage_mb_of_process_family postgres_process_name
+    Utils.get_memory_usage_mb_of_process_family ~in_docker:container
+      postgres_process_name
   in
   let previous_postgres_memory = ref previous_postgres_memory in
 
@@ -88,8 +90,7 @@ let test_case (test_data : t) =
           Utils.get_memory_usage_mb_of_process_family "postgres"
         in
         let%bind () =
-          check_postgres_memory_increase_is_below_threshold
-            logger
+          check_postgres_memory_increase_is_below_threshold logger
             postgres_memory_increase_threshold sleep_duration
             previous_postgres_memory
         in
