@@ -48,39 +48,38 @@ let extract_perf_metrics log_file =
   let%bind lines = Reader.file_lines log_file in
   let perf_metrics =
     List.filter_map lines ~f:(fun line ->
-        if String.is_substring line ~substring:" took " then
-          (* Extract the operation and time from the line *)
-          (* Parse the JSON line to extract the message field *)
-          let json = Yojson.Safe.from_string line in
-          let message =
-            json
-            |> Yojson.Safe.Util.member "message"
-            |> Yojson.Safe.Util.to_string
-          in
-          let pattern =
-            Re.Perl.compile_pat {|(.+) took (\d+(?:\.\d+)?)(ms|us)|}
-          in
-          match Re.exec_opt pattern message with
-          | Some result ->
-              let groups = Re.Group.all result in
-              let operation = groups.(1) in
-              (* Extract the time and its unit *)
-              let time_value = groups.(2) in
-              let time_unit = groups.(3) in
-              let time_float = Float.of_string time_value in
-              let time_obj =
-                match time_unit with
-                | "ms" ->
-                    `Milliseconds time_float
-                | "us" ->
-                    `Microseconds time_float
-                | _ ->
-                    failwith ("Unknown time unit: " ^ time_unit)
+        match Logger.Message.of_yojson (Yojson.Safe.from_string line) with
+        | Ok entry ->
+            if String.is_substring entry.message ~substring:" took " then
+              (* Extract the operation and time from the line *)
+              (* Parse the JSON line to extract the message field *)
+              let pattern =
+                Re.Perl.compile_pat {|(.+) took (\d+(?:\.\d+)?)(ms|us)|}
               in
-              Some (operation, time_obj)
-          | None ->
-              None
-        else None )
+              match Re.exec_opt pattern entry.message with
+              | Some result ->
+                  let groups = Re.Group.all result in
+
+                  let operation = groups.(1) in
+                  (* Extract the time and its unit *)
+                  let time_value = groups.(2) in
+                  let time_unit = groups.(3) in
+                  let time_float = Float.of_string time_value in
+                  let time_obj =
+                    match time_unit with
+                    | "ms" ->
+                        `Milliseconds time_float
+                    | "us" ->
+                        `Microseconds time_float
+                    | _ ->
+                        failwith ("Unknown time unit: " ^ time_unit)
+                  in
+                  Some (operation, time_obj)
+              | None ->
+                  None
+            else None
+        | Error err ->
+            failwithf "Invalid log line: %s. Error: %s" line err () )
   in
   let grouped_metrics =
     List.fold perf_metrics
