@@ -13,6 +13,9 @@
 
 NUM_WORKERS=8
 
+MINA_APP=${MINA_APP:-"_build/default/src/app/cli/src/mina.exe"}
+MOCK_SNARK_WORKER_COORDINATOR=${MOCK_SNARK_WORKER_COORDINATOR:-"_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinator.exe"}
+
 # NOTE: Sleep is needed so when worker wakes up the coordinator is ready 
 WORKER_SLEEP_PER_SPEC_SEC=1
 
@@ -36,7 +39,7 @@ done
 
 cd $(git root)
 
-./_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinator.exe \
+$MOCK_SNARK_WORKER_COORDINATOR \
   --coordinator-port $MOCK_COORDINATOR_PORT \
   --dumped-spec-path $DUMPED_SPEC_PATH \
   --output-folder $PROOF_OUTPUT_PATH \
@@ -52,7 +55,7 @@ MOCK_COORDINATOR_PID=$!
   for i in $(seq 1 $NUM_WORKERS); do
     {
       echo "Start worker $i"
-      ./_build/default/src/app/cli/src/mina.exe \
+      $MINA_APP \
         internal snark-worker \
         --daemon-address 127.0.0.1:$MOCK_COORDINATOR_PORT
     } &
@@ -71,7 +74,7 @@ for file in $PROOF_OUTPUT_PATH/*; do
   if [ -f "$file" ]; then
     echo Verifying proof at $file ...
     cat $file \
-      | ./_build/default/src/app/cli/src/mina.exe internal run-verifier \
+      | $MINA_APP internal run-verifier \
       --mode transaction \
       --format json
   fi
