@@ -47,9 +47,7 @@ let targetVersion =
       ->  \(commit : Text)
       ->  \(latestGitTag : Text)
       ->  \(todayDate : Text)
-      ->  "${latestGitTag}-${todayDate}-${DebianVersions.lowerName
-                                            codename}-${DebianChannel.lowerName
-                                                          channel}"
+      ->  "${latestGitTag}-${todayDate}"
 
 in  Pipeline.build
       Pipeline.Config::{
