@@ -17,7 +17,7 @@ in  { step =
                     , "MINA_APP=mina"
                     , "MOCK_SNARK_WORKER_COORDINATOR=mina_mock_snark_worker_coordinator"
                     ]
-                    (     "mkdir tmp/mock-coordinator-test "
+                    (     "mkdir -p /tmp/mock-coordinator-test "
                       ++  "&& mkdir -p /tmp/mock-coordinator-test/proofs "
                       ++  "&& mkdir -p /tmp/mock-coordinator-test/specs "
                       ++  "&&  ./buildkite/scripts/cache/manager.sh read --root test_data ./scripts/tests/mock_coordinator.sh "
