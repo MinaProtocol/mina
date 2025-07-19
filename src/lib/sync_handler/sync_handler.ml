@@ -49,7 +49,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
-      Ledger.Any_ledger.cast (module Ledger.Db)
+      Ledger.Root.as_unmasked
       @@ Transition_frontier.root_snarked_ledger frontier
     in
     let staking_epoch_ledger =
