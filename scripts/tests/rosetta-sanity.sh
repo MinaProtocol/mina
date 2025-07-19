@@ -50,22 +50,22 @@ function run_tests_with_test_data() {
     echo ""
     
     echo "🧪  1/6 Testing network/status endpoint"
-    test_network_status "$1"
+    test_network_status "$1" || exit $?
 
     echo "🧪  2/6 Testing network/options endpoint"
-    test_network_options "$1"
+    test_network_options "$1" || exit $?
 
     echo "🧪  3/6 Testing block endpoint"
-    test_block "$1"
+    test_block "$1" || exit $?
 
     echo "🧪  4/6 Testing account/balance endpoint for account"
-    test_account_balance "$1"
+    test_account_balance "$1" || exit $?
 
     echo "🧪  5/6 Testing search/transactions endpoint for payment transaction"
-    test_payment_transaction "$1"
+    test_payment_transaction "$1" || exit $?
 
     echo "🧪  6/6 Testing search/transactions endpoint for zkapp transaction"
-    test_zkapp_transaction "$1"
+    test_zkapp_transaction "$1" || exit $?
 
     echo "🎉  All tests passed successfully!"
 }
