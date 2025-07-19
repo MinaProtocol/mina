@@ -22,7 +22,6 @@ in  { step =
                 [ RunWithPostgres.runInDockerWithPostgresConn
                     [ "ARCHIVE_TEST_APP=mina-archive-node-test"
                     , "MINA_TEST_NETWORK_DATA=/etc/mina/test/archive/sample_db"
-                    , "POSTGRES_CONTAINER_NAME=postgres"
                     ]
                     "src/test/archive/sample_db/archive_db.sql"
                     ( Artifacts.fullDockerTag
