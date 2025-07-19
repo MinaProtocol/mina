@@ -68,12 +68,13 @@ let get_memory_usage_mb pid =
   @return A deferred float representing the total memory usage in megabytes
   
   @raise If the 'ps' command fails to execute, an exception will be raised by [Util.run_cmd_exn] *)
-let get_memory_usage_mb_of_process_family ?(in_docker=None) process_name =
+let get_memory_usage_mb_of_process_family ?(in_docker = None) process_name =
   let%bind output =
     match in_docker with
     | Some container ->
-        Util.run_cmd_exn "." "docker" [ "exec"; container; "ps"; "-u"; process_name; "-o"; "rss=" ]
-    | _ ->
+        Util.run_cmd_exn "." "docker"
+          [ "exec"; container; "ps"; "-u"; process_name; "-o"; "rss=" ]
+    | None ->
         Util.run_cmd_exn "." "ps" [ "-u"; process_name; "-o"; "rss=" ]
   in
   let lines = String.split_lines output in
