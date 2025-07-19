@@ -48,13 +48,17 @@ let runInDockerWithPostgresConn
               : Text
               = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
+          -- This command runs a Docker container with PostgreSQL, initializes it with a script,
+          -- and then runs another script inside that container.
+          -- option --pid uses the PID namespace of the PostgreSQL container,
+          -- allowing the inner script to access the same processes.
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                 , "source buildkite/scripts/export-git-env-vars.sh"
-                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
+                , "docker run --pid=container:postgres --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
                 , "sleep 5"
                 , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}"
-                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
+                , "docker run --pid=container:postgres --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
                 ]
 
 in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }
