@@ -322,6 +322,10 @@ module Snark_worker = struct
            still set to None" ;
         Deferred.unit
     | `Off fee, Some new_key ->
+        [%log info]
+          "No snark worker is running inside coordinator, trying to start with \
+           key"
+          ~metadata:[ ("prover", Public_key.Compressed.to_yojson new_key) ] ;
         let process = Ivar.create () in
         let kill_ivar = Ivar.create () in
         t.processes.snark_worker <-
