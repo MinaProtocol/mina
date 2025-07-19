@@ -142,10 +142,15 @@ function read(){
         esac
     done
     
+    if [[ ! -v __from ]] || [[ ! -v __to ]]; then
+        echo -e "${RED} !! Missing required arguments: INPUT_CACHE_LOCATION and OUTPUT_LOCAL_LOCATION${CLEAR}\n";
+        read_help;
+    fi
 
     if [[ $__skip_dirs_creation == 1 ]]; then
         echo "..Skipping dirs creation"
     else 
+        
         mkdir -p "$__to"
     fi
 
