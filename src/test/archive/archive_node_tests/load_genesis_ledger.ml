@@ -43,7 +43,7 @@ let test_case (test_data : t) =
   let config =
     { test_data.config with config_file = "genesis_ledgers/mainnet.json" }
   in
-  let container = Sys.getenv "CONTAINER_ID" in
+  let container = Sys.getenv "POSTGRES_CONTAINER_NAME" in
   let logger = Logger.create () in
   let%bind process = Archive.of_config config |> Archive.start in
   Archive.Process.start_logging process ;
