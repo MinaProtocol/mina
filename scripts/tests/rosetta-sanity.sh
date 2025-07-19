@@ -73,13 +73,19 @@ function run_tests_with_test_data() {
 if [[ "$NETWORK" == "mainnet" ]]; then
     if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
         echo "⏳  Waiting for Rosetta to sync on mainnet..."
-        wait_for_sync "mainnet" "$TIMEOUT"
+        if ! wait_for_sync "mainnet" "$TIMEOUT"; then
+            echo "❌  Failed to sync with mainnet within timeout period"
+            exit 1
+        fi
     fi
     run_tests_with_test_data "mainnet"
 elif [[ "$NETWORK" == "devnet" ]]; then
     if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-        echo "⏳  Waiting for Rosetta to sync on mainnet..."
-        wait_for_sync "mainnet" "$TIMEOUT"
+        echo "⏳  Waiting for Rosetta to sync on devnet..."
+        if ! wait_for_sync "devnet" "$TIMEOUT"; then
+            echo "❌  Failed to sync with devnet within timeout period"
+            exit 1
+        fi
     fi
     run_tests_with_test_data "devnet"
 else
