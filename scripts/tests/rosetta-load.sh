@@ -550,14 +550,14 @@ function run_all_tests_custom_intervals() {
 
         # Execute network status test if scheduled
         if (( $(echo "$now >= $status_next" | bc -l) )); then
-            test_network_status "$1"
+            test_network_status "$1" || exit $?
             status_next=$(echo "$now + $status_interval" | bc)
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
         
         # Execute network options test if scheduled
         if (( $(echo "$now >= $options_next" | bc -l) )); then
-            test_network_options "$1"
+            test_network_options "$1" || exit $?
             options_next=$(echo "$now + $options_interval" | bc)
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
@@ -570,7 +570,7 @@ function run_all_tests_custom_intervals() {
             tmp_data[block]="$block_hash"
             tmp_data[id]="${__test_data[id]}"
             tmp_data[address]="${__test_data[address]}"
-            test_block tmp_data
+            test_block tmp_data || exit $?
             block_next=$(echo "$now + $block_interval" | bc)
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
@@ -581,7 +581,7 @@ function run_all_tests_custom_intervals() {
             account=$(pick_random "${__test_data[accounts]}")
             declare -A tmp_data
             tmp_data[account]="$account"
-            test_account_balance tmp_data
+            test_account_balance tmp_data || exit $?
             account_balance_next=$(echo "$now + $account_balance_interval" | bc)
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
@@ -592,7 +592,7 @@ function run_all_tests_custom_intervals() {
             payment_tx=$(pick_random "${__test_data[payment_transactions]}")
             declare -A tmp_data
             tmp_data[payment_transaction]="$payment_tx"
-            test_payment_transaction tmp_data
+            test_payment_transaction tmp_data || exit $?
             payment_tx_next=$(echo "$now + $payment_tx_interval" | bc)
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
@@ -604,7 +604,7 @@ function run_all_tests_custom_intervals() {
             declare -A tmp_data
             #shellcheck disable=SC2034
             tmp_data[zkapp_transaction]="$zkapp_tx"
-            test_zkapp_transaction tmp_data
+            test_zkapp_transaction tmp_data || exit $?
             zkapp_tx_next=$(echo "$now + $zkapp_tx_interval" | bc)
             requests_this_iteration=$((requests_this_iteration + 1))
         fi
