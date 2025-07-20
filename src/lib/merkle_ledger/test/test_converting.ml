@@ -98,7 +98,7 @@ struct
   let with_instance ~f =
     let db1 = Db.create ~depth:Cfg.depth () in
     let db2 = Db_migrated.create ~depth:Cfg.depth () in
-    let ledger = Db_converting.create db1 db2 in
+    let ledger = Db_converting.of_ledgers db1 db2 in
     try
       let result = f ledger in
       Db_converting.close ledger ; result
@@ -171,7 +171,7 @@ struct
                 (* We don't need the actual converting ledger for this test,
                    only the side effect of migration *)
                 let _converting =
-                  Db_converting.create_with_migration primary migrated
+                  Db_converting.of_ledgers_with_migration primary migrated
                 in
                 let stored_migrated_account =
                   Option.value_exn (Db_migrated.get migrated location)
@@ -187,7 +187,7 @@ struct
             populate_primary_db primary max_height ;
             with_migrated ~f:(fun migrated ->
                 let _converting =
-                  Db_converting.create_with_migration primary migrated
+                  Db_converting.of_ledgers_with_migration primary migrated
                 in
                 assert (
                   Db.num_accounts primary = Db_migrated.num_accounts migrated ) ;

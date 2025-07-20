@@ -245,11 +245,13 @@ module Ledger_inner = struct
   type maskable_ledger = t
 
   module Converting_ledger =
-    Converting_merkle_tree.Make
+    Converting_merkle_tree.With_database
       (struct
         type converted_account = Account.Unstable.t
 
         let convert = Account.Unstable.of_stable
+
+        let converted_equal = Account.Unstable.equal
 
         include Inputs
       end)
@@ -277,54 +279,9 @@ module Ledger_inner = struct
     let _base, mask = create_ephemeral_with_base ~depth () in
     mask
 
-  type converting_config =
-    { primary_directory_name : string option
-    ; converting_directory_name : string option
-    }
-
-  let default_converting_directory_name primary_directory_name =
-    primary_directory_name ^ "_converting"
-
-  let converting_directory_name ~cfg ~primary_directory =
-    Option.first_some cfg.converting_directory_name
-    @@ Option.map primary_directory ~f:default_converting_directory_name
-
-  let empty_converting_config : converting_config =
-    { primary_directory_name = None; converting_directory_name = None }
-
-  let create_converting ?(cfg = empty_converting_config) ~logger ~depth () =
-    let db1 = Db.create ?directory_name:cfg.primary_directory_name ~depth () in
-    let db2_directory_name =
-      converting_directory_name ~cfg ~primary_directory:(Db.get_directory db1)
-    in
-    let db2 = Unstable_db.create ?directory_name:db2_directory_name ~depth () in
+  let create_converting_with_base ~config ~logger ~depth () =
     let converting_ledger =
-      if Unstable_db.num_accounts db2 = 0 then
-        Converting_ledger.create_with_migration db1 db2
-      else
-        let is_synced = ref true in
-        Db.iteri db1 ~f:(fun idx stable_account ->
-            let expected_unstable_account =
-              Account.Unstable.of_stable stable_account
-            in
-            let actual_unstable_account =
-              Unstable_db.get_at_index_exn db2 idx
-            in
-            if
-              not
-                (Account.Unstable.equal expected_unstable_account
-                   actual_unstable_account )
-            then is_synced := false ) ;
-        if !is_synced then Converting_ledger.create db1 db2
-        else (
-          [%log warn]
-            "Migrating DB desync, cleaning up unstable DB and remigrating..." ;
-          Unstable_db.close db2 ;
-          let db2 =
-            Unstable_db.create ?directory_name:db2_directory_name ~fresh:true
-              ~depth ()
-          in
-          Converting_ledger.create_with_migration db1 db2 )
+      Converting_ledger.create ~config ~logger ~depth ()
     in
     let casted = Any_ledger.cast (module Converting_ledger) converting_ledger in
     let mask = Mask.create ~depth () in
@@ -403,16 +360,16 @@ module Ledger_inner = struct
   let packed t = Any_ledger.cast (module Mask.Attached) t
 
   let with_converting_ledger ~logger ~depth ~f =
-    let cfg : converting_config =
-      { primary_directory_name = None; converting_directory_name = None }
+    let ledger_and_base =
+      create_converting_with_base ~config:Converting_ledger.Config.Temporary
+        ~logger ~depth ()
     in
-    let ledger = create_converting ~logger ~cfg ~depth () in
     try
-      let result = f ledger in
-      close (fst ledger) ;
+      let result = f ledger_and_base in
+      close (fst ledger_and_base) ;
       Ok result
     with exn ->
-      close (fst ledger) ;
+      close (fst ledger_and_base) ;
       Error (Error.of_exn exn)
 
   let with_converting_ledger_exn ~logger ~depth ~f =
