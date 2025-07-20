@@ -64,7 +64,8 @@ in  Pipeline.build
           PublishPackages.publish
             PublishPackages.Spec::{
             , artifacts =
-              [ Artifacts.Type.Daemon
+              [ Artifacts.Type.LogProc
+              , Artifacts.Type.Daemon
               , Artifacts.Type.Archive
               , Artifacts.Type.Rosetta
               ]
