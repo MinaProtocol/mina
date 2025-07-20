@@ -63,24 +63,13 @@ module Db = Database.Make (Test_database_in_mem.Inputs)
 module Db_migrated = Database.Make (Inputs_migrated)
 
 module Db_converting =
-  Merkle_ledger.Converting_merkle_tree.Make
+  Merkle_ledger.Converting_merkle_tree.With_database
     (struct
       type converted_account = Mina_base.Account.Unstable.t
 
-      let convert (account : Mina_base.Account.Stable.Latest.t) =
-        { Mina_base.Account.Unstable.public_key = account.public_key
-        ; token_id = account.token_id
-        ; token_symbol = account.token_symbol
-        ; balance = account.balance
-        ; nonce = account.nonce
-        ; receipt_chain_hash = account.receipt_chain_hash
-        ; delegate = account.delegate
-        ; voting_for = account.voting_for
-        ; timing = account.timing
-        ; permissions = account.permissions
-        ; zkapp = account.zkapp
-        ; unstable_field = account.nonce
-        }
+      let convert = Mina_base.Account.Unstable.of_stable
+
+      let converted_equal = Mina_base.Account.Unstable.equal
 
       include Test_database_in_mem.Inputs
     end)
@@ -139,6 +128,21 @@ struct
            | `Existed ->
                Db.set mdb location account )
 
+  let populate_converting_ledger ledger max_height =
+    random_primary_accounts max_height
+    |> List.iter ~f:(fun account ->
+           let action, location =
+             Db_converting.get_or_create_account ledger
+               (Account.identifier account)
+               account
+             |> Or_error.ok_exn
+           in
+           match action with
+           | `Added ->
+               ()
+           | `Existed ->
+               Db_converting.set ledger location account )
+
   let test_section_name =
     Printf.sprintf "In-memory converting db (depth %d)" Cfg.depth
 
@@ -189,6 +193,24 @@ struct
                 let _converting =
                   Db_converting.of_ledgers_with_migration primary migrated
                 in
+                assert (
+                  Db.num_accounts primary = Db_migrated.num_accounts migrated ) ;
+                Db.iteri primary ~f:(fun idx primary_account ->
+                    let stored_migrated_account =
+                      Db_migrated.get_at_index_exn migrated idx
+                    in
+                    [%test_eq: Migrated.Account.t] stored_migrated_account
+                      (Db_converting.convert primary_account) ) ) ) )
+
+  let () =
+    add_test "create converting ledger, populate randomly, test iteration order"
+      (fun () ->
+        with_primary ~f:(fun primary ->
+            let depth = Db.depth primary in
+            let max_height = Int.min 5 depth in
+            with_migrated ~f:(fun migrated ->
+                let converting = Db_converting.of_ledgers primary migrated in
+                populate_converting_ledger converting max_height ;
                 assert (
                   Db.num_accounts primary = Db_migrated.num_accounts migrated ) ;
                 Db.iteri primary ~f:(fun idx primary_account ->
