@@ -15,6 +15,7 @@ let minaDocker =
         Artifacts.Tag::{
         , artifact = Artifacts.Type.Daemon
         , buildFlags = BuildFlags.Type.Instrumented
+        , remove_profile_from_name = True
         }
 
 in  { step =
