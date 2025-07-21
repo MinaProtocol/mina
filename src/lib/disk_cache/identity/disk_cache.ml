@@ -7,11 +7,15 @@ end) =
 struct
   type t = unit
 
+  type persistence = unit [@@deriving bin_io_unversioned]
+
   type id = Data.t
 
-  let initialize _path ~logger:_ = Deferred.Result.return ()
+  let initialize _path ~logger:_ ?persistence:_ () = Deferred.Result.return ()
 
   let get () = ident
 
   let put () = ident
+
+  let freeze_eviction () = ()
 end
