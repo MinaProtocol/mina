@@ -20,6 +20,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -56,6 +58,7 @@ in  Pipeline.build
         , path = "Promote"
         , tags = [ PipelineTag.Type.Promote, PipelineTag.Type.TearDown ]
         , name = "AutoPromoteNightly"
+        , scope = [ PipelineScope.Type.MainlineNightly ]
         }
       , steps =
           PublishPackages.publish

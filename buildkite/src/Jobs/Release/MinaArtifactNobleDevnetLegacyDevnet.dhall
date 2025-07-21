@@ -6,7 +6,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
@@ -23,6 +23,7 @@ in  Pipeline.build
             ]
           , network = Network.Type.DevnetLegacy
           , debVersion = DebianVersions.DebVersion.Noble
-          , mode = PipelineMode.Type.Stable
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )
