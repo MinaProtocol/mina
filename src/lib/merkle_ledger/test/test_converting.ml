@@ -129,6 +129,7 @@ struct
                Db.set mdb location account )
 
   let populate_converting_ledger ledger max_height =
+    let primary_ledger = Db_converting.primary_ledger ledger in
     random_primary_accounts max_height
     |> List.iter ~f:(fun account ->
            let action, location =
@@ -137,11 +138,15 @@ struct
                account
              |> Or_error.ok_exn
            in
-           match action with
+           ( match action with
            | `Added ->
                ()
            | `Existed ->
-               Db_converting.set ledger location account )
+               Db_converting.set ledger location account ) ;
+           assert (
+             Account.equal
+               (Db.get primary_ledger location |> Option.value_exn)
+               account ) )
 
   let test_section_name =
     Printf.sprintf "In-memory converting db (depth %d)" Cfg.depth
