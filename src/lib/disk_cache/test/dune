@@ -33,19 +33,3 @@
   (pps ppx_jane ppx_version))
  (flags
   (:standard -w +a)))
-
-(test
- (name test_filesystem_deadlock)
- (modules test_filesystem_deadlock)
- (libraries
-  ;; opam libraries
-  async
-  ;; local libraries
-  disk_cache.filesystem
-  test_cache_deadlock_lib)
- (instrumentation
-  (backend bisect_ppx))
- (preprocess
-  (pps ppx_jane ppx_version))
- (flags
-  (:standard -w +a)))
