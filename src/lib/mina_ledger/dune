@@ -13,7 +13,8 @@
    ppx_base
    ppx_deriving_yojson
    ppx_inline_test
-   ppx_assert))
+   ppx_assert
+   ppx_mina))
  (libraries
   ;; opam libraries
   rocks

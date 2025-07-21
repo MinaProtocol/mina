@@ -12,8 +12,8 @@ SLOT_CHAIN_END="${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}"
 BEST_CHAIN_QUERY_FROM="${BEST_CHAIN_QUERY_FROM:-25}"
 
 # Slot duration in seconds to be used for both version
-MAIN_SLOT="${MAIN_SLOT:-90}"
-FORK_SLOT="${FORK_SLOT:-30}"
+MAIN_SLOT="${MAIN_SLOT:-15}"
+FORK_SLOT="${FORK_SLOT:-15}"
 
 # Delay before genesis slot in minutes to be used for both version
 MAIN_DELAY="${MAIN_DELAY:-20}"
@@ -27,7 +27,7 @@ source "$SCRIPT_DIR"/test-helper.sh
 MAIN_MINA_EXE="$1"
 MAIN_RUNTIME_GENESIS_LEDGER_EXE="$2"
 
-# Executables built off fork branch (e.g. berkeley)
+# Executables built off fork branch (e.g. develop)
 FORK_MINA_EXE="$3"
 FORK_RUNTIME_GENESIS_LEDGER_EXE="$4"
 
@@ -172,10 +172,9 @@ prefork_hashes="$(jq -cS "$prefork_hashes_select" localnet/prefork_hf_ledger_has
 if [[ "$prefork_hashes" != "$expected_prefork_hashes" ]]; then
   echo "Assertion failed: unexpected ledgers in fork_config" >&2
   echo "Expected: $expected_prefork_hashes" >&2
+  echo "Actual: $prefork_hashes" >&2
   exit 3
 fi
-
-sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "1"}/' localnet/fork_config.json
 
 rm -Rf localnet/hf_ledgers
 mkdir localnet/hf_ledgers

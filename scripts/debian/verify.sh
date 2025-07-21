@@ -61,14 +61,14 @@ if [ -z $REPO ]; then
 fi
 
 case $PACKAGE in
-  mina-archive) COMMAND="mina-archive --version && mina-archive --help" ;;
+  mina-archive*) COMMAND="mina-archive --version && mina-archive --help" ;;
   mina-logproc) COMMAND="echo skipped execution for mina-logproc" ;;
   mina-rosetta*) COMMAND="echo skipped execution for mina-rosetta" ;;
   mina-*) COMMAND="mina --version && mina --help" ;;
   *) echo "❌  Unknown package passed: $PACKAGE"; exit 1;;
 esac
 
-if [[ "$SIGNED" ]]; then
+if [[ "$SIGNED" == 1 ]]; then
   SIGNED=" (wget -q https://'$REPO'/repo-signing-key.asc -O- | apt-key add) && apt-get update > /dev/null && "
 else 
   SIGNED=""

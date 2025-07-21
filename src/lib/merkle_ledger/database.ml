@@ -1,7 +1,8 @@
 open Core_kernel
 
 module Make (Inputs : Intf.Inputs.DATABASE) = struct
-  (* The max depth of a merkle tree can never be greater than 253. *)
+  (* The max depth of a merkle tree can never be greater than 253,
+     due to the way we encode locations. *)
   open Inputs
 
   module Db_error = struct
@@ -43,7 +44,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   let depth t = t.depth
 
-  let create ?directory_name ~depth () =
+  let create ?directory_name ?(fresh = false) ~depth () =
     let open Core in
     (* for ^/ and Unix below *)
     assert (depth < 0xfe) ;
@@ -58,6 +59,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       | Some name ->
           name
     in
+    if fresh then Mina_stdlib_unix.File_system.rmrf directory ;
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
     { uuid
