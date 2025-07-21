@@ -35,7 +35,7 @@ module User_command = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V2 = struct
       type t = User_command.Stable.V3.t [@@deriving sexp]
 
       let to_yojson : t -> Yojson.Safe.t =
@@ -114,10 +114,10 @@ module Staged_ledger_diff = struct
       type t = Staged_ledger_diff.Stable.V3.t =
         { diff :
             ( Transaction_snark_work.Stable.V2.t
-            , User_command.Stable.V3.t Mina_base.With_status.Stable.V2.t )
+            , User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t )
             Staged_ledger_diff.Pre_diff_two.Stable.V2.t
             * ( Transaction_snark_work.Stable.V2.t
-              , User_command.Stable.V3.t Mina_base.With_status.Stable.V2.t )
+              , User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t )
               Staged_ledger_diff.Pre_diff_one.Stable.V2.t
               option
         }

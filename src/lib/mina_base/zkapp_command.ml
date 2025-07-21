@@ -6,7 +6,7 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type 'account_updates t =
-            'account_updates Mina_wire_types.Mina_base.Zkapp_command.V3.T.t =
+            'account_updates Mina_wire_types.Mina_base.Zkapp_command.V2.T.t =
         { fee_payer : Account_update.Fee_payer.Stable.V1.t
         ; account_updates : 'account_updates
         ; memo : Signed_command_memo.Stable.V1.t

@@ -6,7 +6,7 @@ end
 
 module V3 = struct
   type t =
-    (Mina_base_signed_command.V2.t, Mina_base_zkapp_command.V3.t) Poly.V2.t
+    (Mina_base_signed_command.V2.t, Mina_base_zkapp_command.V2.t) Poly.V2.t
 end
 
 module Valid = struct
