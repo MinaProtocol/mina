@@ -48,10 +48,6 @@ let runInDockerWithPostgresConn
               : Text
               = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
-          -- This command runs a Docker container with PostgreSQL, initializes it with a script,
-          -- and then runs another script inside that container.
-          -- option --pid uses the PID namespace of the PostgreSQL container,
-          -- allowing the inner script to access the same processes.
           in  Cmd.chain
                 [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
                 , "source buildkite/scripts/export-git-env-vars.sh"
