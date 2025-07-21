@@ -98,20 +98,26 @@ end)
   include module type of Make (Inputs) (Primary_db) (Converting_db)
 
   module Config : sig
-    type 'a config = { primary_directory : string; converting_directory : 'a }
+    type t = { primary_directory : string; converting_directory : string }
 
-    type create = Temporary | In_directories of string option config
-
-    type checkpoint = string config
+    type create =
+      | Temporary
+          (** Create a converting ledger with databases in temporary directories *)
+      | In_directories of t
+          (** Create a converting ledger with databases in explicit directories *)
 
     (** Create a [checkpoint] config with the default converting directory
         name *)
-    val with_primary : directory_name:string -> checkpoint
+    val with_primary : directory_name:string -> t
   end
 
+  (** Create a new converting ledger with the given configuration *)
   val create : config:Config.create -> logger:Logger.t -> depth:int -> unit -> t
 
-  val create_checkpoint : t -> config:Config.checkpoint -> unit -> t
+  (** Make checkpoints of the databases backing the converting ledger and create
+      a new converting ledger based on those checkpoints *)
+  val create_checkpoint : t -> config:Config.t -> unit -> t
 
-  val make_checkpoint : t -> config:Config.checkpoint -> unit
+  (** Make checkpoints of the databases backing the converting ledger *)
+  val make_checkpoint : t -> config:Config.t -> unit
 end

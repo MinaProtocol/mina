@@ -248,11 +248,9 @@ struct
   include Make (Inputs) (Primary_db) (Converting_db)
 
   module Config = struct
-    type 'a config = { primary_directory : string; converting_directory : 'a }
+    type t = { primary_directory : string; converting_directory : string }
 
-    type create = Temporary | In_directories of string option config
-
-    type checkpoint = string config
+    type create = Temporary | In_directories of t
 
     let default_converting_directory_name primary_directory_name =
       primary_directory_name ^ "_converting"
@@ -283,7 +281,7 @@ struct
       | Config.Temporary ->
           (None, None)
       | In_directories { primary_directory; converting_directory } ->
-          (Some primary_directory, converting_directory)
+          (Some primary_directory, Some converting_directory)
     in
     let db1 =
       Primary_db.create ?directory_name:primary_directory_name ~depth ()
