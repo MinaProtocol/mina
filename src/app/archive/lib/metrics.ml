@@ -5,9 +5,15 @@ let time ~label f =
   let start = Time.now () in
   let%map x = f () in
   let stop = Time.now () in
+  let elapsed = Time.diff stop start in
   [%log' info (Logger.create ())]
     "%s took %s" label
-    (Time.Span.to_string_hum (Time.diff stop start)) ;
+    (Time.Span.to_string_hum elapsed)
+    ~metadata:
+      [ ("is_perf_metric", `Bool true)
+      ; ("label", `String label)
+      ; ("elapsed", `Float (Time.Span.to_ms elapsed))
+      ] ;
   x
 
 let default_missing_blocks_width = 2000

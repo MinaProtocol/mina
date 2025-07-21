@@ -48,50 +48,34 @@ let extract_perf_metrics log_file =
   let%bind lines = Reader.file_lines log_file in
   let perf_metrics =
     List.filter_map lines ~f:(fun line ->
-        match Logger.Message.of_yojson (Yojson.Safe.from_string line) with
-        | Ok entry ->
-            if String.is_substring entry.message ~substring:" took " then
-              (* Extract the operation and time from the line *)
-              (* Parse the JSON line to extract the message field *)
-              let pattern =
-                Re.Perl.compile_pat {|(.+) took (\d+(?:\.\d+)?)(ms|us)|}
-              in
-              match Re.exec_opt pattern entry.message with
-              | Some result ->
-                  let groups = Re.Group.all result in
-
-                  let operation = groups.(1) in
-                  (* Extract the time and its unit *)
-                  let time_value = groups.(2) in
-                  let time_unit = groups.(3) in
-                  let time_float = Float.of_string time_value in
-                  let time_obj =
-                    match time_unit with
-                    | "ms" ->
-                        `Milliseconds time_float
-                    | "us" ->
-                        `Microseconds time_float
-                    | _ ->
-                        failwith ("Unknown time unit: " ^ time_unit)
-                  in
-                  Some (operation, time_obj)
-              | None ->
-                  None
-            else None
-        | Error err ->
-            failwithf "Invalid log line: %s. Error: %s" line err () )
+        if String.is_empty line then None
+        else
+          match Logger.Message.of_yojson (Yojson.Safe.from_string line) with
+          | Ok entry ->
+              if String.Map.mem entry.metadata "is_perf_metric" then
+                let time_in_ms =
+                  String.Map.find entry.metadata "elapsed"
+                  |> Option.value_exn
+                       ~message:
+                         ("Missing elapsed in log entry in log line: " ^ line)
+                  |> Yojson.Safe.to_string |> Float.of_string
+                in
+                let label =
+                  String.Map.find entry.metadata "label"
+                  |> Option.value_exn
+                       ~message:
+                         ("Missing label in log entry in log line: " ^ line)
+                  |> Yojson.Safe.to_string
+                in
+                Some (label, time_in_ms)
+              else None
+          | Error err ->
+              failwithf "Invalid log line: %s. Error: %s" line err () )
   in
   let grouped_metrics =
     List.fold perf_metrics
       ~init:(Map.empty (module String))
-      ~f:(fun acc (operation, time_obj) ->
-        let time_ms =
-          match time_obj with
-          | `Milliseconds ms ->
-              ms
-          | `Microseconds us ->
-              us /. 1000.0
-        in
+      ~f:(fun acc (operation, time_ms) ->
         Map.add_multi acc ~key:operation ~data:time_ms )
   in
   (* Calculate the average time for each operation *)
