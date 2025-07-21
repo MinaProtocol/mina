@@ -1,5 +1,46 @@
 #!/bin/bash
 
+# Rosetta Sanity Test Script
+#
+# This script performs comprehensive sanity tests on Mina Protocol's Rosetta API endpoints
+# for both mainnet and devnet networks. It validates core functionality including network
+# status, block retrieval, account balances, and transaction searches.
+#
+# USAGE:
+#   ./rosetta-sanity.sh [OPTIONS]
+#
+# OPTIONS:
+#   --network <mainnet|devnet>    Specify the network to test (default: mainnet)
+#   --wait-for-sync               Wait for Rosetta node to sync before running tests
+#   --timeout <seconds>           Timeout for sync wait in seconds (default: 900)
+#   --address <url>               Override the default Rosetta endpoint address
+#   -h, --help                    Display this help message
+#
+# EXAMPLES:
+#   ./rosetta-sanity.sh --network mainnet
+#   ./rosetta-sanity.sh --network devnet --wait-for-sync --timeout 1200
+#   ./rosetta-sanity.sh --address http://localhost:3087 --network mainnet
+#
+# TEST COVERAGE:
+#   1. Network status endpoint validation
+#   2. Network options endpoint validation  
+#   3. Block retrieval functionality
+#   4. Account balance queries
+#   5. Payment transaction searches
+#   6. zkApp transaction searches
+#
+# DEPENDENCIES:
+#   - rosetta-helper.sh (must be in the same directory)
+#   - curl (for API requests)
+#   - jq (for JSON processing)
+#
+# EXIT CODES:
+#   0 - All tests passed successfully
+#   1 - Test failure or invalid parameters
+#
+# AUTHOR: Mina Protocol Team
+# VERSION: 1.0
+
 NETWORK="mainnet"
 WAIT_FOR_SYNC=false
 TIMEOUT=900
