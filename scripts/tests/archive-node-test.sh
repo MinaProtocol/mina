@@ -3,6 +3,11 @@
 set -x
 # test archive node on known archive db
 
+ps aux
+
+ps aux | grep postgres
+
+
 NETWORK_DATA_FOLDER=${NETWORK_DATA_FOLDER:-src/test/archive/sample_db}
 ARCHIVE_TEST_APP=${ARCHIVE_TEST_APP:-_build/default/src/test/archive/archive_node_tests/archive_node_tests.exe}
 # This env var is used in the test app
