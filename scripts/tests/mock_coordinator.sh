@@ -64,8 +64,6 @@ while true; do
   fi
 done
 
-cd "$(git rev-parse --show-toplevel)" || exit
-
 "$MOCK_SNARK_WORKER_COORDINATOR" \
   --coordinator-port $MOCK_COORDINATOR_PORT \
   --dumped-spec-path $DUMPED_SPEC_PATH \
