@@ -16,7 +16,6 @@
   ;; local libraries
   mina_stdlib
   ppx_version.runtime
-  bounded_types
   test_util)
  (preprocess
   (pps

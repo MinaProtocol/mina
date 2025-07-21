@@ -1,3 +1,5 @@
+open Core_kernel
+
 type uuid := Uuid.Stable.V1.t
 
 type key := Bigstring.t

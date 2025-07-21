@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Bigstring : sig
   [%%versioned:
   module Stable : sig

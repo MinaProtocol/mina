@@ -1,10 +1,10 @@
+open Core_kernel
+
 module Make (Inputs : Intf.Inputs.DATABASE) = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
 
   module Db_error = struct
-    [@@@warning "-4"] (* due to deriving sexp below *)
-
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
   end
@@ -96,7 +96,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     with exn -> close t ; raise exn
 
   let empty_hash =
-    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+    Mina_stdlib.Empty_hashes.extensible_cache
+      (module Hash)
+      ~init_hash:Hash.empty_account
 
   let get_raw { kvdb; depth; _ } location =
     Kvdb.get kvdb ~key:(Location.serialize ~ledger_depth:depth location)

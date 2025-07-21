@@ -332,7 +332,7 @@ module Answer_sync_ledger_query = struct
 
       type response =
         (( Sync_ledger.Answer.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
+         , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
     end
@@ -369,7 +369,7 @@ module Answer_sync_ledger_query = struct
 
       type response =
         (( Sync_ledger.Answer.Stable.V4.t
-         , Bounded_types.Wrapped_error.Stable.V1.t )
+         , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
       [@@deriving sexp]

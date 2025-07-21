@@ -8,7 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t

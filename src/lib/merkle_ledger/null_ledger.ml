@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Make (Inputs : Intf.Inputs.Intf) : sig
   include
     Intf.Ledger.NULL
@@ -28,7 +30,9 @@ end = struct
   let create ~depth () = { uuid = Uuid_unix.create (); depth }
 
   let empty_hash_at_height =
-    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+    Mina_stdlib.Empty_hashes.extensible_cache
+      (module Hash)
+      ~init_hash:Hash.empty_account
 
   let merkle_path t location =
     let location =

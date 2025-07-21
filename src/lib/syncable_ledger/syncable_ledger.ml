@@ -59,7 +59,8 @@ module Answer = struct
   module Stable = struct
     module V2 = struct
       type ('hash, 'account) t =
-        | Child_hashes_are of 'hash Bounded_types.ArrayN4000.Stable.V1.t
+        | Child_hashes_are of
+            'hash Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
             (** The requested addresses' children have these hashes.
             May be any power of 2 number of children, and not necessarily 
             immediate children  *)
