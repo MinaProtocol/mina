@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
-TOTAL_BLOCKS=25
+TOTAL_BLOCKS=31
 
 # go to root of mina repo
 cd "$(dirname -- "${BASH_SOURCE[0]}")"/..

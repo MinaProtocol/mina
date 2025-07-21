@@ -1,49 +1,49 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2025-07-21T12:55:48-0400"
+    "genesis_state_timestamp": "2025-07-21T16:04:56-0400"
   },
   "ledger": {
     "name": "release",
     "num_accounts": 250,
     "accounts": [
       {
-        "pk": "B62qryhNXEY5xamGK79SngJGQXUMuwLjWNdHUaoCRqezoASVB9Nn2BX",
+        "pk": "B62qpctayraXoTe7gUkFnMJsi73Yssbo1zBU1VTR42Qy1uz16w8sKta",
         "sk": null,
         "balance": "5.000000000",
         "delegate": null
       },
       {
-        "pk": "B62qj4gW3qvvy5iE8osN6X5K2WJCPJY2DnszuPi76DhVLWg1HQ442aq",
+        "pk": "B62qqVaPpuZpZddxYtGMKBpCwVyuHfW7sh7ucRN33CPycmLBoM6HdSL",
         "sk": null,
         "balance": "65500.000000000",
-        "delegate": "B62qq8LNixtGwGDM1BGnWR8gkxvQoMAYvJypgB7Vtdh6qiaDJLuX3ed"
+        "delegate": "B62qia6hzqd1yvgEZeTq7yxLCdZjzqfiVWGbYxc1kjKhrjcXWf4eh9d"
       },
       {
-        "pk": "B62qq8LNixtGwGDM1BGnWR8gkxvQoMAYvJypgB7Vtdh6qiaDJLuX3ed",
+        "pk": "B62qia6hzqd1yvgEZeTq7yxLCdZjzqfiVWGbYxc1kjKhrjcXWf4eh9d",
         "sk": null,
         "delegate": null,
         "balance": "500.000000000"
       },
       {
-        "pk": "B62qnkXXgL6H8r8UZ3vxXjNJGH1PEwKjv2PKDraVHws3TRWgD1pK28T",
+        "pk": "B62qkwjinSw9PUp9XzWvv5MNbkYftHb9ZzLWfszaxHJBntDSvoNkRuL",
         "sk": null,
         "balance": "11550000.000000000",
-        "delegate": "B62qmgcDrSTNyok2Ge28BgsCQpTVFJHqrJTcY9ncFATUjK5kbNpedM2"
+        "delegate": "B62qo9hznZofKVEo1JdyVyDokd8NRxSZzHbx7u7WBpci44pXfPYihdH"
       },
       {
-        "pk": "B62qmgcDrSTNyok2Ge28BgsCQpTVFJHqrJTcY9ncFATUjK5kbNpedM2",
+        "pk": "B62qo9hznZofKVEo1JdyVyDokd8NRxSZzHbx7u7WBpci44pXfPYihdH",
         "sk": null,
         "balance": "0.000000000",
         "delegate": null
       },
       {
-        "pk": "B62qpcsgvpHWyR17fnKDGf1wrZn7S2ym3bYTFHhNzsxk1x2xwqTy15h",
+        "pk": "B62qix7awr6K8m1ZNvHU2S9hzxD3DrBqyk3MNnWP247MEpFQ5TpbEYi",
         "sk": null,
         "balance": "11550000.000000000",
-        "delegate": "B62qoYXQqRMzTymcmt2u76tkH64knSaR4HjgXotTXtq8fhhHiTB8Jyb"
+        "delegate": "B62qkGhq3VihfRX4UYrk3srmeU5oppboanJctQuxhxTJsEjX46ma1A3"
       },
       {
-        "pk": "B62qoYXQqRMzTymcmt2u76tkH64knSaR4HjgXotTXtq8fhhHiTB8Jyb",
+        "pk": "B62qkGhq3VihfRX4UYrk3srmeU5oppboanJctQuxhxTJsEjX46ma1A3",
         "sk": null,
         "balance": "0.000000000",
         "delegate": null
