@@ -30,12 +30,30 @@ open Mina_state
     the computationally expensive proof generation.
 *)
 
+(** {1 Proof Module}
+
+    This module defines a specialized proof type with overridden
+    base64-encoding.
+
+    {2 Differences from standard `Mina_base.Proof.t`}
+    - The base64-encoding implementation has been customized to align with Mina's
+      cryptographic proof serialization format.
+      Base64 with the uri-safe alphabet is used to ensure that encoding and
+      decoding is cheap, and that the proof can be easily sent over http
+      etc. without escaping or re-encoding.
+    - This ensures that proofs can be efficiently serialized and deserialized
+      within the Mina protocol while maintaining integrity and compatibility.
+*)
 module Proof : sig
   (* Proof with overridden base64-encoding *)
   type t = Proof.t [@@deriving sexp, yojson]
 
+  (** Converts the proof to a binary string representation using base64
+      encoding *)
   val to_bin_string : t -> string
 
+  (** [of_bin_string str] parses a binary string back into a proof using base64
+      encoding *)
   val of_bin_string : string -> t
 end
 
