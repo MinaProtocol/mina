@@ -1,7 +1,7 @@
 let ArchiveBench = ../../Command/Bench/Archive.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 in  ArchiveBench.makeArchiveBench
       "ArchiveUnstable"
-      PipelineMode.Type.PullRequest
+      PipelineScope.PullRequestOnly

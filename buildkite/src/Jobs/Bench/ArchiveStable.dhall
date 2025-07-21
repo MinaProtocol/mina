@@ -1,5 +1,7 @@
 let ArchiveBench = ../../Command/Bench/Archive.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
-in  ArchiveBench.makeArchiveBench "ArchiveStable" PipelineMode.Type.Stable
+in  ArchiveBench.makeArchiveBench
+      "ArchiveStable"
+      PipelineScope.AllButPullRequest

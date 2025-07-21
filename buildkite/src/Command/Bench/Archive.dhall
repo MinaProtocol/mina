@@ -4,13 +4,13 @@ let SelectFiles = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Cmd = ../../Lib/Cmds.dhall
 
 let makeArchiveBench =
           \(name : Text)
-      ->  \(mode : PipelineMode.Type)
+      ->  \(scope : List PipelineScope.Type)
       ->  Pipeline.build
             ( BenchBase.pipeline
                 BenchBase.Spec::{
@@ -35,7 +35,7 @@ let makeArchiveBench =
                   [ Cmd.run
                       "./buildkite/scripts/cache/manager.sh read archive-node-test/archive.perf ."
                   ]
-                , mode = mode
+                , scope = scope
                 , extraArgs = "--input-file archive.perf"
                 }
             )
