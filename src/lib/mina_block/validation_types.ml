@@ -1,5 +1,50 @@
 open Mina_base
 
+(** {1 Block Validation States}
+
+    Mina blocks go through several validation stages as they move through the
+    network. These types use OCaml's type system to track which validation
+    checks have been completed, preventing bugs where unvalidated blocks are
+    treated as valid.
+
+    {2 The Validation Pipeline}
+
+    When a block is received, it progresses through these states:
+    1. {b Fully Invalid}: Just received, no checks done
+    2. {b Initial Valid}: Basic checks passed (time, genesis, proof format)
+    3. {b Almost Valid}: Most checks passed, but staged ledger diff not validated
+    4. {b Fully Valid}: All validation complete, ready for consensus
+
+    {2 What Gets Validated?}
+
+    Each validation state tracks whether these components have been checked:
+    - {b Time Received}: Block timestamp is reasonable
+    - {b Genesis State}: Block is compatible with our genesis
+    - {b Proof}: zkSNARK proof is well-formed and valid
+    - {b Delta Block Chain}: Block correctly links to previous blocks
+    - {b Frontier Dependencies}: Dependencies on other blocks are resolved
+    - {b Staged Ledger Diff}: Transaction list produces the claimed state changes
+    - {b Protocol Versions}: Block uses valid protocol versions
+
+    {2 Why This Matters}
+
+    This validation pipeline allows Mina to:
+    - Process blocks incrementally without blocking the network
+    - Reject invalid blocks early to save computation
+    - Ensure consensus only considers fully validated blocks
+    - Provide clear error messages about what validation failed
+
+    {2 For Newcomers}
+
+    Think of block validation like checking a document:
+    1. First, check if it's the right format
+    2. Then, verify the signature is valid
+    3. Finally, confirm the content makes sense
+
+    Mina does the same with blocks, checking basic properties first before
+    doing expensive validation like verifying zkSNARK proofs.
+*)
+
 type ( 'time_received
      , 'genesis_state
      , 'proof
@@ -36,6 +81,8 @@ type ( 'time_received
    constraint 'staged_ledger_diff = [ `Staged_ledger_diff ] * (unit, _) Mina_stdlib.Truth.t
    constraint 'protocol_versions = [ `Protocol_versions ] * (unit, _) Mina_stdlib.Truth.t *)
 
+(** A block that has just been received and hasn't passed any validation checks.
+    All validation flags are set to false. *)
 type fully_invalid =
   ( [ `Time_received ] * unit Mina_stdlib.Truth.false_t
   , [ `Genesis_state ] * unit Mina_stdlib.Truth.false_t
@@ -47,6 +94,14 @@ type fully_invalid =
   , [ `Protocol_versions ] * unit Mina_stdlib.Truth.false_t )
   t
 
+(** A block that has passed initial validation checks:
+    - Time received check passed
+    - Genesis state compatibility verified
+    - Proof format is valid
+    - Delta block chain links correctly
+    - Protocol versions are acceptable
+
+    Still needs frontier dependencies and staged ledger diff validation. *)
 type initial_valid =
   ( [ `Time_received ] * unit Mina_stdlib.Truth.true_t
   , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
@@ -58,6 +113,11 @@ type initial_valid =
   , [ `Protocol_versions ] * unit Mina_stdlib.Truth.true_t )
   t
 
+(** A block that has passed most validation checks:
+    - All initial validation checks passed
+    - Frontier dependencies resolved
+
+    Only staged ledger diff validation remains. *)
 type almost_valid =
   ( [ `Time_received ] * unit Mina_stdlib.Truth.true_t
   , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
@@ -69,6 +129,8 @@ type almost_valid =
   , [ `Protocol_versions ] * unit Mina_stdlib.Truth.true_t )
   t
 
+(** A block that has passed all validation checks and is ready for consensus.
+    All validation flags are set to true. *)
 type fully_valid =
   ( [ `Time_received ] * unit Mina_stdlib.Truth.true_t
   , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
