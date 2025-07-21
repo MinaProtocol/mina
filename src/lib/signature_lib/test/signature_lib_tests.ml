@@ -55,6 +55,7 @@ let test_signature_of_fields_123_matches () =
           ; Snark_params.Tick.Field.of_int 3
          |] )
   in
+  (* The expected value has been generated using the commit [19872b9] of [MinaProtocol/mina] *)
   let signature_expected =
     ( Snark_params.Tick.Field.of_string
         "20765817320000234273433345899587917625188885976914380365037035465312392849949"
