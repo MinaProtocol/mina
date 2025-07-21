@@ -73,8 +73,8 @@ let command
                         ]
                     )
                     "EXTRA_ARGS=\"${spec.extraArgs}\" ./buildkite/scripts/bench/run.sh  ${spec.bench} ${spec.extraArgs} --red-threshold ${Double/show
-                                                                                         spec.redThreshold} --yellow-threshold ${Double/show
-                                                                                                                                   spec.yellowThreshold}"
+                                                                                                                                            spec.redThreshold} --yellow-threshold ${Double/show
+                                                                                                                                                                                      spec.yellowThreshold}"
             , label = "Perf: ${spec.label}"
             , key = spec.key
             , target = spec.size
