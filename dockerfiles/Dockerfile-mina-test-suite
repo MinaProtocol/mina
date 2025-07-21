@@ -52,6 +52,7 @@ RUN apt-get update --quiet --yes \
   && rm -rf /var/lib/apt/lists/*
 
 # Install google-cloud-sdk for GCLOUD_UPLOAD feature
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
   && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
   && apt-get update --quiet --yes \
@@ -62,6 +63,7 @@ ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 
 # --- Install Postgresql
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     && echo deb https://apt-archive.postgresql.org/pub/repos/apt/ "$deb_codename"-pgdg-archive main | tee /etc/apt/sources.list.d/pgdg.list \
     && apt-get update -y \

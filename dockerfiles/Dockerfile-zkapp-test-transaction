@@ -25,7 +25,7 @@ fi
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
-    && apt-get -y install \
+    && apt-get -y install --no-install-recommends \
         procps \
         curl \
         jq \
@@ -42,4 +42,5 @@ RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/s
   || sleep 10s && apt-get -y update \
   || sleep 10s && apt-get -y update \
   || sleep 10s && apt-get -y update \
-  && apt-get install -y "mina-zkapp-test-transaction=$deb_version"
+  && apt-get install -y --no-install-recommends "mina-zkapp-test-transaction=$deb_version" \
+  && rm -rf /var/lib/apt/lists/*

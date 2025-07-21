@@ -105,6 +105,7 @@ RUN curl -sL \
   && chmod +x /usr/bin/opam
 
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Rust install via rustup-init to a given RUST_VERSION

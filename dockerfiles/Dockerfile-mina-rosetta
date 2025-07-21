@@ -62,6 +62,7 @@ RUN apt-get update --quiet --yes \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Install Postgresql
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     && echo deb https://apt-archive.postgresql.org/pub/repos/apt/ "$deb_codename"-pgdg-archive main | tee /etc/apt/sources.list.d/pgdg.list \
     && apt-get update -y \
@@ -70,6 +71,7 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     postgresql-client-"$psql_version"
 
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Install rosetta-cli
@@ -107,12 +109,14 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
 
 # --- Set up postgres
 USER postgres
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
     && pg_dropcluster --stop ${POSTGRES_VERSION} main
 # Run as root so it can create /data/postgresql
 USER root
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && pg_createcluster --start -d /data/postgresql --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
 

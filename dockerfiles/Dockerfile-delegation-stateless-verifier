@@ -21,25 +21,25 @@ ARG MINA_DIR=mina
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # git will clone into an empty dir, but this also helps us set the workdir in advance
-RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
+RUN cd "$HOME" && rm -rf "$HOME/${MINA_DIR}" \
   && git clone \
   -b "${MINA_BRANCH}" \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  ${MINA_REPO} ${HOME}/${MINA_DIR}
+  "${MINA_REPO}" "${HOME}/${MINA_DIR}"
 
 WORKDIR $HOME/${MINA_DIR}
 
 RUN git submodule sync && git submodule update --init --recursive
 
-RUN mkdir ${HOME}/app
+RUN mkdir "${HOME}/app"
 
 # HACK: build without special cpu features to allow more people to run delegation verification tool
 # RUN ./scripts/zexe-standardize.sh
 
-RUN eval $(opam config env) \
-  && dune build --profile=${DUNE_PROFILE} \
+RUN eval "$(opam config env)" \
+  && dune build --profile="${DUNE_PROFILE}" \
     src/app/delegation_verify/delegation_verify.exe \
   && cp _build/default/src/app/delegation_verify/delegation_verify.exe ./delegation-verify \
   && rm -rf _build
@@ -60,36 +60,36 @@ COPY --from=builder /bin/delegation-verify /bin/delegation-verify
 COPY --from=builder /bin/authenticate.sh /bin/authenticate.sh
 
 # awscli and cqlsh-expansion are used by the delegation verification tool
-RUN apt-get update && apt-get install -y python3 python3-pip jq libjemalloc2 wget dnsutils gawk
-RUN pip3 install awscli
-RUN pip3 install cqlsh-expansion
-RUN pip3 install pytz
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip jq libjemalloc2 wget dnsutils gawk \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --no-cache-dir awscli cqlsh-expansion pytz
 
 # Install libssl1.1.1b (not in apt)
-RUN wget https://www.openssl.org/source/openssl-1.1.1b.tar.gz
-RUN mkdir /opt/openssl
-RUN tar xfvz openssl-1.1.1b.tar.gz --directory /opt/openssl
-RUN rm openssl-1.1.1b.tar.gz
+RUN wget --progress=dot:giga https://www.openssl.org/source/openssl-1.1.1b.tar.gz \
+    && mkdir /opt/openssl \
+    && tar xfvz openssl-1.1.1b.tar.gz --directory /opt/openssl \
+    && rm openssl-1.1.1b.tar.gz
 
 ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/opt/openssl/lib"
 ENV PATH="$PATH:/opt/openssl/bin"
 
-RUN cd /opt/openssl/openssl-1.1.1b && ./config --prefix=/opt/openssl --openssldir=/opt/openssl/ssl
-RUN cd /opt/openssl/openssl-1.1.1b && make && make install
+WORKDIR /opt/openssl/openssl-1.1.1b
+RUN ./config --prefix=/opt/openssl --openssldir=/opt/openssl/ssl \
+    && make && make install
 
 # Rename openssl old binary
 RUN mv /usr/bin/openssl /usr/bin/openssl.old
 
 # Install libffi7
-RUN wget http://es.archive.ubuntu.com/ubuntu/pool/main/libf/libffi/libffi7_3.3-4_amd64.deb
-RUN dpkg -i libffi7_3.3-4_amd64.deb
-RUN rm libffi7_3.3-4_amd64.deb
+RUN wget --progress=dot:giga http://es.archive.ubuntu.com/ubuntu/pool/main/libf/libffi/libffi7_3.3-4_amd64.deb \
+    && dpkg -i libffi7_3.3-4_amd64.deb \
+    && rm libffi7_3.3-4_amd64.deb
 
 # Make symlinks
-RUN ln -s /usr/local/bin/aws /bin/aws
-RUN ln -s /usr/local/bin/cqlsh /bin/cqlsh
-RUN ln -s /usr/local/bin/cqlsh-expansion /bin/cqlsh-expansion
-RUN /usr/local/bin/cqlsh-expansion.init
+RUN ln -s /usr/local/bin/aws /bin/aws \
+    && ln -s /usr/local/bin/cqlsh /bin/cqlsh \
+    && ln -s /usr/local/bin/cqlsh-expansion /bin/cqlsh-expansion \
+    && /usr/local/bin/cqlsh-expansion.init
 
 # make binary and script executable
 RUN chmod +x /bin/authenticate.sh /bin/delegation-verify
@@ -97,7 +97,7 @@ RUN chmod +x /bin/authenticate.sh /bin/delegation-verify
 # set up timezone
 ENV DEBIAN_FRONTEND="noninteractive"
 ENV TZ="Etc/UTC"
-RUN apt install tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
 
 # set home to root dir
 ENV HOME="/root"
