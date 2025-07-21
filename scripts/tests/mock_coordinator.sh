@@ -44,7 +44,7 @@ if [ ! -d "${PROOF_OUTPUT_PATH}" ]; then
   mkdir -p "${PROOF_OUTPUT_PATH}"
 fi
 
-NUM_SPECS=`ls -1 "${DUMPED_SPEC_PATH}" | wc -l`
+NUM_SPECS=$(ls -1 "${DUMPED_SPEC_PATH}" | wc -l)
 
 if [ "$NUM_SPECS" -eq 0 ]; then
   echo "Error: No spec files found in ${DUMPED_SPEC_PATH}"
@@ -64,7 +64,7 @@ while true; do
   fi
 done
 
-cd $(git rev-parse --show-toplevel)
+cd "$(git rev-parse --show-toplevel)" || exit
 
 "$MOCK_SNARK_WORKER_COORDINATOR" \
   --coordinator-port $MOCK_COORDINATOR_PORT \
