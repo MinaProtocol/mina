@@ -21,7 +21,8 @@ ARG MINA_DIR=mina
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # git will clone into an empty dir, but this also helps us set the workdir in advance
-RUN cd "$HOME" && rm -rf "$HOME/${MINA_DIR}" \
+WORKDIR $HOME
+RUN rm -rf "${HOME:?}/${MINA_DIR:?}" \
   && git clone \
   -b "${MINA_BRANCH}" \
   --depth 1 \
@@ -46,11 +47,9 @@ RUN eval "$(opam config env)" \
 
 USER root
 
-# copy binary to /bin
-RUN cp ./delegation-verify /bin/delegation-verify
-
-# add authenticate.sh to image
-RUN cp src/app/delegation_verify/scripts/authenticate.sh /bin/authenticate.sh
+# copy binary and authenticate.sh to /bin
+RUN cp ./delegation-verify /bin/delegation-verify \
+  && cp src/app/delegation_verify/scripts/authenticate.sh /bin/authenticate.sh
 
 # Runtime image
 FROM ubuntu:latest

@@ -35,7 +35,6 @@ RUN apt-get update --yes \
     python3-pip \
     python3-sexpdata \
     rubygems \
-    wget \
   && rm -rf /var/lib/apt/lists/*
 
 # --- deb-s3 tool
@@ -47,7 +46,7 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
 # --- influx db tool
 # Custom version, with lock only on manifest upload
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN wget --progress=dot:giga https://download.influxdata.com/influxdb/releases/influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-amd64.tar.gz \
+RUN curl -L -o influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-amd64.tar.gz https://download.influxdata.com/influxdb/releases/influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-amd64.tar.gz \
     && mkdir -p "influx_dir" && tar xvzf influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-amd64.tar.gz -C influx_dir \
     && cp influx_dir/influx /usr/local/bin/ \
     && rm influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-amd64.tar.gz \
