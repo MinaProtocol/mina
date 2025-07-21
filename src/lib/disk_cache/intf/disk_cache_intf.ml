@@ -6,10 +6,16 @@ module type S = sig
 
   type t
 
+  (** Data needed to recover te disk cache state on shutdown so we can continue 
+      to use the cache on restart *)
+  type persistence [@@deriving bin_io]
+
   (** Initialize the on-disk cache explicitly before interactions with it take place. *)
   val initialize :
        string
     -> logger:Logger.t
+    -> ?persistence:persistence
+    -> unit
     -> (t, [> `Initialization_error of Error.t ]) Deferred.Result.t
 
   type id
@@ -19,6 +25,10 @@ module type S = sig
 
   (** Read from the cache, crashing if the value cannot be found. *)
   val get : t -> id -> Data.t
+
+  (** Freeze eviction on Disk Cache, reporting persistence information that 
+      could be used to reload the cache on bootstrap *)
+  val freeze_eviction : t -> persistence
 end
 
 module type S_with_count = sig

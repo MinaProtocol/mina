@@ -28,7 +28,7 @@ let write_proof_to_disk db proof =
       Identity proof
 
 let create_db path ~logger =
-  Cache.initialize ~logger path
+  Cache.initialize ~logger path ()
   |> Deferred.Result.map ~f:(fun cache -> Lmdb_cache cache)
 
 let create_identity_db () = Identity_cache

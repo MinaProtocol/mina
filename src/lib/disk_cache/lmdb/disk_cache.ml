@@ -24,20 +24,24 @@ module Make (Data : Binable.S) = struct
           (** A list of ids that are no longer reachable from OCaml runtime, but
               haven't been cleared inside the LMDB disk cache *)
     ; queue_guard : Error_checking_mutex.t
+    ; eviction_freezed : bool ref
     }
+
+  type persistence = int [@@deriving bin_io_unversioned]
 
   (** How big can the queue [reusable_keys] be before we do a cleanup *)
   let reuse_size_limit = 512
 
-  let initialize path ~logger =
+  let initialize path ~logger ?(persistence : persistence = 0) () =
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun path ->
         let env, db = Rw.create path in
         { env
         ; db
-        ; counter = ref 0
+        ; counter = ref persistence
         ; reusable_keys = Queue.create ()
         ; queue_guard = Error_checking_mutex.create ()
+        ; eviction_freezed = ref false
         } )
 
   type id = { idx : int }
@@ -45,8 +49,9 @@ module Make (Data : Binable.S) = struct
   let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
     Rw.get ~env db idx |> Option.value_exn
 
-  let put ({ env; db; counter; reusable_keys; queue_guard } : t) (x : Data.t) :
-      id =
+  let put
+      ({ env; db; counter; reusable_keys; queue_guard; eviction_freezed } : t)
+      (x : Data.t) : id =
     let idx =
       match
         Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
@@ -63,12 +68,13 @@ module Make (Data : Binable.S) = struct
     let res = { idx } in
     (* When this reference is GC'd, delete the file. *)
     Gc.Expert.add_finalizer_last_exn res (fun () ->
-        (* The actual deletion is delayed, as GC maybe triggered in LMDB's
-           critical section. LMDB critical section then will be re-entered if
-           it's invoked directly in a GC hook.
-           This causes mutex double-acquiring and node freezes. *)
-        Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
-            Queue.enqueue reusable_keys idx ) ) ;
+        if not !eviction_freezed then
+          (* The actual deletion is delayed, as GC maybe triggered in LMDB's
+             critical section. LMDB critical section then will be re-entered if
+             it's invoked directly in a GC hook.
+             This causes mutex double-acquiring and node freezes. *)
+          Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
+              Queue.enqueue reusable_keys idx ) ) ;
 
     Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
         if Queue.length reusable_keys >= reuse_size_limit then (
@@ -76,6 +82,10 @@ module Make (Data : Binable.S) = struct
           Queue.clear reusable_keys ) ) ;
     Rw.set ~env db idx x ;
     res
+
+  let freeze_eviction ({ eviction_freezed; counter; _ } : t) =
+    eviction_freezed := true ;
+    !counter
 
   let iteri ({ env; db; _ } : t) ~f = Rw.iter ~env db ~f
 
