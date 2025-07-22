@@ -57,8 +57,8 @@ in  Pipeline.build
         , dirtyWhen = [ S.everything ]
         , path = "Promote"
         , tags = [ PipelineTag.Type.Promote, PipelineTag.Type.TearDown ]
-        , name = "AutoPromoteNightly"
         , scope = [ PipelineScope.Type.MainlineNightly ]
+        , name = "AutoPromoteNightly"
         }
       , steps =
           PublishPackages.publish
