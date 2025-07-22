@@ -83,8 +83,8 @@ RUN apt-get update --quiet \
   && rm -rf /var/lib/apt/lists/*
 
 # Symlink image-specific lld version to a single lld executable
-RUN if command -v ld.lld-10 &> /dev/null; then ln -sf $(which ld.lld-10) /usr/bin/ld.lld; fi
-RUN if command -v ld.lld-11 &> /dev/null; then ln -sf $(which ld.lld-11) /usr/bin/ld.lld; fi
+RUN if command -v ld.lld-10 >/dev/null 2>&1; then ln -sf "$(which ld.lld-10)" /usr/bin/ld.lld; fi
+RUN if command -v ld.lld-11 >/dev/null 2>&1; then ln -sf "$(which ld.lld-11)" /usr/bin/ld.lld; fi
 
 # --- Create opam user (for later) and give sudo to make opam happy
 RUN adduser --uid 65533 --disabled-password --gecos '' opam \
@@ -105,6 +105,7 @@ RUN curl -sL \
   && chmod +x /usr/bin/opam
 
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Rust install via rustup-init to a given RUST_VERSION
@@ -115,7 +116,7 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar 
 # In addition to that, we also install cargo-xtask as it is used to build the
 # WebAssembly artefacts.
 USER opam
-RUN curl --proto '=https' \
+RUN curl --proto "=https" \
   --tlsv1.2 -sSf -o /tmp/rustup-init \
   https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
@@ -124,12 +125,12 @@ RUN curl --proto '=https' \
     --profile minimal \
     --component rust-src \
     --target wasm32-unknown-unknown \
-  && $HOME/.cargo/bin/rustup toolchain install "nightly-${RUST_NIGHTLY}" \
+  && "$HOME/.cargo/bin/rustup" toolchain install "nightly-${RUST_NIGHTLY}" \
     --profile minimal \
     --component rust-src \
     --target wasm32-unknown-unknown \
     --no-self-update \
-  && $HOME/.cargo/bin/cargo install cargo-xtask \
+  && "$HOME/.cargo/bin/cargo" install cargo-xtask \
   && rm /tmp/rustup-init
 USER root
 
@@ -148,8 +149,8 @@ ENV HOME=/home/opam
 ## disable ipv6
 ## disable sandboxing to allow unprivledged builds
 RUN mkdir --mode=700 /home/opam/.gnupg \
-  && echo 'export PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"' >> /home/opam/.bashrc \
-  && echo 'ulimit -s unlimited' >> /home/opam/.bashrc \
+  && echo "export PATH=\"\$PATH:/usr/lib/go/bin:\$HOME/.cargo/bin\"" >> /home/opam/.bashrc \
+  && echo "ulimit -s unlimited" >> /home/opam/.bashrc \
   && echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 
 ENV PATH="$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
@@ -163,8 +164,8 @@ RUN git clone \
   /home/opam/opam-repository
 # Pin OPAM repo to specific commit, o.w. after this commit some of our direct
 # dependencies are removed
-RUN cd /home/opam/opam-repository \
-  && git fetch origin "${OPAM_REPOSITORY_COMMIT}" \
+WORKDIR /home/opam/opam-repository
+RUN git fetch origin "${OPAM_REPOSITORY_COMMIT}" \
   && git checkout "${OPAM_REPOSITORY_COMMIT}"
 
 RUN opam init --disable-sandboxing \
@@ -174,21 +175,24 @@ RUN opam init --disable-sandboxing \
 RUN opam repository add --yes \
     --all \
     --set-default o1-labs \
-    https://github.com/o1-labs/opam-repository.git
-RUN opam switch create "${OCAML_VERSION}${OCAML_REVISION}" \
-    "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}"
-RUN opam switch "${OCAML_VERSION}${OCAML_REVISION}"
+    https://github.com/o1-labs/opam-repository.git \
+  && opam switch create "${OCAML_VERSION}${OCAML_REVISION}" \
+    "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
+  && opam switch "${OCAML_VERSION}${OCAML_REVISION}"
+
+WORKDIR /home/opam
 
 # --- Build and install capnproto go compiler
 # This package was particularly tricky to get to install correctly because of
 # how the package's source code is structured.
 # To work around this, we install it as a dependency for a local go module and
 # build the binary from the GOPATH.
-RUN mkdir go-tmp \
-  && cd go-tmp \
-  && /usr/lib/go/bin/go mod init local/build \
+RUN mkdir go-tmp
+WORKDIR /home/opam/go-tmp
+RUN /usr/lib/go/bin/go mod init local/build \
   && /usr/lib/go/bin/go get capnproto.org/go/capnp/v3@$GO_CAPNP_VERSION \
   && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
-  && sudo mv capnpc-go /usr/local/bin \
-  && cd - \
-  && sudo rm -rf go-tmp
+  && mv capnpc-go /usr/local/bin
+
+WORKDIR /home/opam
+RUN rm -rf go-tmp
