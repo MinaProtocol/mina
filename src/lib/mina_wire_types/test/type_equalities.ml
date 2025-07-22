@@ -31,6 +31,8 @@ module Assert_equal0V2 (O : V2S0) (W : V2S0 with type V2.t = O.V2.t) = struct en
 
 module Assert_equal0V3 (O : V3S0) (W : V3S0 with type V3.t = O.V3.t) = struct end
 
+module Assert_equal0V4 (O : V4S0) (W : V4S0 with type V4.t = O.V4.t) = struct end
+
 module Assert_equal1V1 (O : V1S1) (W : V1S1 with type 'a V1.t = 'a O.V1.t) =
 struct end
 
@@ -418,5 +420,5 @@ end
 module Mina_block = struct
   module O = Mina_block
   module W = WT.Mina_block
-  include Assert_equal0V2 (O.Header.Stable) (W.Header)
+  include Assert_equal0V3 (O.Header.Stable) (W.Header)
 end

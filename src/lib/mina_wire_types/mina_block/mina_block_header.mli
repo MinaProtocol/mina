@@ -2,7 +2,7 @@ open Utils
 
 module Types : sig
   module type S = sig
-    module V2 : S0
+    module V3 : S0
   end
 end
 
@@ -27,4 +27,4 @@ module Make
     (Signature : Local_sig) (_ : functor (A : Concrete) -> Signature(A).S) :
   Signature(M).S
 
-include Types.S with module V2 = M.V2
+include Types.S with module V3 = M.V3

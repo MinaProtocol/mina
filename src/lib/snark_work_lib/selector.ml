@@ -48,7 +48,7 @@ module Result = struct
 
     module V1 = struct
       type t =
-        (Spec.Stable.V1.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
+        (Spec.Stable.V2.t, Ledger_proof.Stable.V2.t) Work.Result.Stable.V1.t
 
       let to_latest = Fn.id
 

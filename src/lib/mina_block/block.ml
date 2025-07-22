@@ -24,7 +24,7 @@ module Stable = struct
 
   module V3 = struct
     type t =
-      { header : Header.Stable.V2.t
+      { header : Header.Stable.V3.t
       ; body : Staged_ledger_diff.Body.Stable.V2.t
       }
     [@@deriving fields, sexp]

@@ -31,7 +31,7 @@ module Stable = struct
     module T = struct
       type query =
         Bounded_types.Wrapped_error.Stable.V1.t
-        * Selector.Spec.Stable.V1.t
+        * Selector.Spec.Stable.V2.t
         * Signature_lib.Public_key.Compressed.Stable.V1.t
 
       type response = unit

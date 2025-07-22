@@ -32,7 +32,7 @@ module Stable = struct
       type query = unit
 
       type response =
-        ( Selector.Spec.Stable.V1.t
+        ( Selector.Spec.Stable.V2.t
         * Signature_lib.Public_key.Compressed.Stable.V1.t )
         option
 

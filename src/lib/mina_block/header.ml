@@ -11,7 +11,7 @@ open Mina_state
 module Wire_types = Mina_wire_types.Mina_block.Header
 
 module Make_sig (A : Wire_types.Types.S) = struct
-  module type S = Header_intf.Full with type Stable.V2.t = A.V2.t
+  module type S = Header_intf.Full with type Stable.V3.t = A.V3.t
 end
 
 module Make_str (A : Wire_types.Concrete) = struct

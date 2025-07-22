@@ -2,7 +2,7 @@ open Utils
 
 module Types = struct
   module type S = sig
-    module V2 : S0
+    module V3 : S0
   end
 end
 

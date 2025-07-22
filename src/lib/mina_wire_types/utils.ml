@@ -82,6 +82,10 @@ module type V3S0 = sig
   module V3 : S0
 end
 
+module type V4S0 = sig
+  module V4 : S0
+end
+
 module type V3S1 = sig
   module V3 : S1
 end

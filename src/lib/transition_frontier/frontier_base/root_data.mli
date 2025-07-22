@@ -40,7 +40,7 @@ module Limited : sig
   module Stable : sig
     [@@@no_toplevel_latest_type]
 
-    module V3 : sig
+    module V4 : sig
       type t
 
       val hashes : t -> State_hash.State_hashes.Stable.V1.t
