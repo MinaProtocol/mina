@@ -34,7 +34,7 @@ in  { step =
                       , "MOCK_SNARK_WORKER_COORDINATOR=mina_mock_snark_worker_coordinator"
                       ]
                     }
-                    "./buildkite/scripts/tests/mock-coordinator.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                    "./buildkite/scripts/tests/mock-coordinator.sh"
                 ]
               , label = "Snark: Mock Coordinator test"
               , key = key
