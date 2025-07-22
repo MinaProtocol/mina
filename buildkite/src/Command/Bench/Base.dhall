@@ -72,9 +72,9 @@ let command
                       # [ "BRANCH=\\\${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-BUILDKITE_BRANCH}"
                         ]
                     )
-                    "EXTRA_ARGS=\"${spec.extraArgs}\" ./buildkite/scripts/bench/run.sh  ${spec.bench} ${spec.extraArgs} --red-threshold ${Double/show
-                                                                                                                                            spec.redThreshold} --yellow-threshold ${Double/show
-                                                                                                                                                                                      spec.yellowThreshold}"
+                    "EXTRA_ARGS=\"${spec.extraArgs}\" ./buildkite/scripts/bench/run.sh  ${spec.bench} --red-threshold ${Double/show
+                                                                                                                          spec.redThreshold} --yellow-threshold ${Double/show
+                                                                                                                                                                    spec.yellowThreshold}"
             , label = "Perf: ${spec.label}"
             , key = spec.key
             , target = spec.size
