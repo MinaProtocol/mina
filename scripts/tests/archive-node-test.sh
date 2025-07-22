@@ -3,6 +3,8 @@
 set -x
 # test archive node on known archive db
 
+apt-get install -y procps
+
 ps aux
 
 ps aux | grep postgres
