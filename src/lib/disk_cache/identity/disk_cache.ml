@@ -2,14 +2,14 @@ open Async_kernel
 open Core_kernel
 
 module Make (Data : sig
-  type t
+  type t [@@deriving bin_io]
 end) =
 struct
   type t = unit
 
   type persistence = unit [@@deriving bin_io_unversioned]
 
-  type id = Data.t
+  type id = Data.t [@@deriving bin_io_unversioned]
 
   let initialize _path ~logger:_ ?persistence:_ () = Deferred.Result.return ()
 

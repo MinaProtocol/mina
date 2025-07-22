@@ -17,6 +17,10 @@ val write_proof_to_disk :
 
 val create_identity_db : unit -> cache_db
 
+type id [@@deriving bin_io]
+
+val cast_id : t -> id
+
 module For_tests : sig
   val create_db : unit -> cache_db
 end

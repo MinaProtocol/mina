@@ -18,7 +18,7 @@ module type S = sig
     -> unit
     -> (t, [> `Initialization_error of Error.t ]) Deferred.Result.t
 
-  type id
+  type id [@@deriving bin_io]
 
   (** Put the value to disk, return an identifier that is associated with a special handler in GC. *)
   val put : t -> Data.t -> id
