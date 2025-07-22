@@ -14,6 +14,7 @@ let minaDocker =
       Artifacts.fullDockerTag
         Artifacts.Tag::{
         , artifact = Artifacts.Type.FunctionalTestSuite
+        , buildFlags = BuildFlags.Type.Instrumented
         }
 
 in  { step =
