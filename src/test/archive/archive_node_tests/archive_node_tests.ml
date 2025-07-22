@@ -38,11 +38,23 @@ let perf_metrics_to_yojson metrics =
   in
   `List json_list
 
-(* Extract performance metrics from the log file *)
-(* where X is a floating point number representing the time taken for the operation *)
-(* log output should be in JSON format *)
-(* Example log line: {..., "message": "Operation took 123.45 ms"} *)
-(* The function will return a map of operation names to their average time in milliseconds *)
+(** Extract performance metrics from a log file and calculate average execution times.
+
+  This function reads a log file line by line, parses each line as a JSON log entry,
+  and extracts performance metrics identified by the "is_perf_metric" metadata field.
+  For each performance metric entry, it extracts the "elapsed" time and "label" fields.
+
+  @param log_file Path to the log file to process
+  @return A deferred list of tuples containing (operation_label, average_time_in_ms)
+  
+  The function performs the following steps:
+  1. Reads all lines from the specified log file
+  2. Filters and parses lines containing performance metrics
+  3. Groups metrics by operation label
+  4. Calculates the average execution time for each operation
+  
+  @raises Failure if a log line cannot be parsed as valid JSON
+  @raises exn if required metadata fields ("elapsed" or "label") are missing *)
 let extract_perf_metrics log_file =
   let open Deferred.Let_syntax in
   let%bind lines = Reader.file_lines log_file in
@@ -58,7 +70,7 @@ let extract_perf_metrics log_file =
                   |> Option.value_exn
                        ~message:
                          ("Missing elapsed in log entry in log line: " ^ line)
-                  |> Yojson.Safe.to_string |> Float.of_string
+                  |> Yojson.Safe.Util.to_float
                 in
                 let label =
                   String.Map.find entry.metadata "label"
