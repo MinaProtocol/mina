@@ -13,9 +13,7 @@ let key = "mock-coordinator-test"
 let minaDocker =
       Artifacts.fullDockerTag
         Artifacts.Tag::{
-        , artifact = Artifacts.Type.Daemon
-        , buildFlags = BuildFlags.Type.Instrumented
-        , remove_profile_from_name = True
+        , artifact = Artifacts.Type.FunctionalTestSuite
         }
 
 in  { step =
