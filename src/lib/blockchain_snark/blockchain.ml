@@ -4,7 +4,7 @@ open Mina_state
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type t =
         { state : Protocol_state.Value.Stable.V3.t; proof : Proof.Stable.V2.t }

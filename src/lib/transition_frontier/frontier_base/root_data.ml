@@ -74,7 +74,7 @@ module Limited = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V3 = struct
+    module V4 = struct
       type t =
         { transition : Mina_block.Validated.Stable.V2.t
         ; protocol_states :

@@ -12,7 +12,7 @@ module Extend_blockchain_input = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V2 = struct
+    module V3 = struct
       type t =
         { chain : Blockchain.Stable.V2.t
         ; next_state : Protocol_state.Value.Stable.V3.t

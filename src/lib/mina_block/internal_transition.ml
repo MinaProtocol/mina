@@ -33,7 +33,7 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { snark_transition : Snark_transition.Value.Stable.V2.t
       ; ledger_proof : Ledger_proof.Stable.V2.t option

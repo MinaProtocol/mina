@@ -7,7 +7,7 @@ module Types = struct
 end
 
 module type Concrete = sig
-  module V2 : sig
+  module V3 : sig
     type t =
       { protocol_state : Mina_state_protocol_state.Value.V3.t
       ; protocol_state_proof : Mina_base.Proof.V2.t
@@ -20,7 +20,7 @@ module type Concrete = sig
 end
 
 module M = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       { protocol_state : Mina_state_protocol_state.Value.V3.t
       ; protocol_state_proof : Mina_base.Proof.V2.t
