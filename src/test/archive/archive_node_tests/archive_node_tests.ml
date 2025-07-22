@@ -77,7 +77,7 @@ let extract_perf_metrics log_file =
                   |> Option.value_exn
                        ~message:
                          ("Missing label in log entry in log line: " ^ line)
-                  |> Yojson.Safe.to_string
+                  |> Yojson.Safe.Util.to_string
                 in
                 Some (label, time_in_ms)
               else None
