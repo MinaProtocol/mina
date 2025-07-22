@@ -25,6 +25,8 @@ module T = struct
 
   let work_is_referenced t work = Map.mem t.refcount_map work
 
+  let all_referenced_work t = Map.key_set t.refcount_map
+
   let best_tip_table t = t.best_tip_table
 
   let add_to_table t scan_state =
