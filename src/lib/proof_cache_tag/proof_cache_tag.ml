@@ -33,6 +33,14 @@ let create_db path ~logger =
 
 let create_identity_db () = Identity_cache
 
+type id = Cache.id [@@deriving bin_io_unversioned]
+
+let cast_id = function
+  | Lmdb { cache_id; _ } ->
+      cache_id
+  | Identity _ ->
+      failwith "Can't cast cache tag to underlying ID!"
+
 module For_tests = struct
   let create_db = create_identity_db
 end

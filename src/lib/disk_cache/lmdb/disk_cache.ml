@@ -44,7 +44,7 @@ module Make (Data : Binable.S) = struct
         ; eviction_freezed = ref false
         } )
 
-  type id = { idx : int }
+  type id = { idx : int } [@@deriving bin_io_unversioned]
 
   let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
     Rw.get ~env db idx |> Option.value_exn

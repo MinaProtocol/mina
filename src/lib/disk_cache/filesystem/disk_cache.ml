@@ -14,7 +14,7 @@ struct
 
   type persistence = int [@@deriving bin_io_unversioned]
 
-  type id = { idx : int }
+  type id = { idx : int } [@@deriving bin_io_unversioned]
 
   let initialize path ~logger ?persistence:(next_idx : persistence = 0) () =
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
