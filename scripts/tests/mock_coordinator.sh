@@ -16,17 +16,6 @@ NUM_WORKERS=8
 MINA_APP=${MINA_APP:-"_build/default/src/app/cli/src/mina.exe"}
 MOCK_SNARK_WORKER_COORDINATOR=${MOCK_SNARK_WORKER_COORDINATOR:-"_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinator.exe"}
 
-# Check if required binaries exist
-if [ ! -f "${MINA_APP}" ]; then
-  echo "Error: MINA_APP binary '${MINA_APP}' does not exist. Please build it first."
-  exit 1
-fi
-
-if [ ! -f "${MOCK_SNARK_WORKER_COORDINATOR}" ]; then
-  echo "Error: MOCK_SNARK_WORKER_COORDINATOR binary '${MOCK_SNARK_WORKER_COORDINATOR}' does not exist. Please build it first."
-  exit 1
-fi
-
 # NOTE: Sleep is needed so when worker wakes up the coordinator is ready 
 WORKER_SLEEP_PER_SPEC_SEC=1
 
