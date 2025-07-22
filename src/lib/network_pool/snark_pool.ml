@@ -76,6 +76,8 @@ module type Transition_frontier_intf = sig
 
   val work_is_referenced : t -> Transaction_snark_work.Statement.t -> bool
 
+  val all_referenced_work : t -> Transaction_snark_work.Statement.Set.t
+
   val best_tip_table : t -> Transaction_snark_work.Statement.Set.t
 end
 
@@ -534,6 +536,10 @@ include
 
       let work_is_referenced t =
         Extensions.Snark_pool_refcount.work_is_referenced
+          (snark_pool_refcount t)
+
+      let all_referenced_work t =
+        Extensions.Snark_pool_refcount.all_referenced_work
           (snark_pool_refcount t)
 
       let best_tip_table t =
