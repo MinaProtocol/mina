@@ -19,7 +19,7 @@ end
 module Poly : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
+    module V3 : sig
       type 'a t =
         { transaction : 'a
         ; block_data : Block_data.Stable.V3.t
@@ -32,8 +32,8 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V2 : sig
-    type 'a t = 'a Poly.Stable.V2.t [@@deriving sexp]
+  module V3 : sig
+    type 'a t = 'a Poly.Stable.V3.t [@@deriving sexp]
   end
 end]
 

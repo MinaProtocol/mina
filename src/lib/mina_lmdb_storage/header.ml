@@ -5,7 +5,7 @@ open Lmdb_storage
 module Entry = struct
   [%%versioned
   module Stable = struct
-    module V1 = struct
+    module V2 = struct
       type t =
         | Header of Mina_block.Header.Stable.V3.t
         | Invalid of

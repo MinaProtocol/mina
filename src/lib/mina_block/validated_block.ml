@@ -5,7 +5,7 @@ open Mina_base
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       Block.Stable.V3.t State_hash.With_state_hashes.Stable.V1.t
       * State_hash.Stable.V1.t Mina_stdlib.Nonempty_list.Stable.V1.t

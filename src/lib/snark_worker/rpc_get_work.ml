@@ -27,7 +27,7 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 
 [%%versioned_rpc
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = unit
 
@@ -49,5 +49,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]

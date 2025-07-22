@@ -3,7 +3,7 @@ open Mina_base
 module Entry : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t =
         | Header of Mina_block.Header.Stable.V3.t
         | Invalid of

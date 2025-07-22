@@ -1039,18 +1039,18 @@ let deriver obj =
 
 module Unstable = struct
   type t =
-    { public_key : Public_key.Compressed.Stable.V1.t
-    ; token_id : Token_id.Stable.V2.t
-    ; token_symbol : Token_symbol.Stable.V1.t
-    ; balance : Balance.Stable.V1.t
-    ; nonce : Nonce.Stable.V1.t
-    ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
-    ; delegate : Public_key.Compressed.Stable.V1.t option
-    ; voting_for : State_hash.Stable.V1.t
-    ; timing : Timing.Stable.V2.t
-    ; permissions : Permissions.Stable.V2.t
-    ; zkapp : Zkapp_account.Stable.V3.t option
-    ; unstable_field : Nonce.Stable.V1.t
+    { public_key : Public_key.Compressed.Stable.Latest.t
+    ; token_id : Token_id.Stable.Latest.t
+    ; token_symbol : Token_symbol.Stable.Latest.t
+    ; balance : Balance.Stable.Latest.t
+    ; nonce : Nonce.Stable.Latest.t
+    ; receipt_chain_hash : Receipt.Chain_hash.Stable.Latest.t
+    ; delegate : Public_key.Compressed.Stable.Latest.t option
+    ; voting_for : State_hash.Stable.Latest.t
+    ; timing : Timing.Stable.Latest.t
+    ; permissions : Permissions.Stable.Latest.t
+    ; zkapp : Zkapp_account.Stable.Latest.t option
+    ; unstable_field : Nonce.Stable.Latest.t
     }
   [@@deriving
     sexp, equal, hash, compare, yojson, hlist, fields, bin_io_unversioned]

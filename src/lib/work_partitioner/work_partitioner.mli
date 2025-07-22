@@ -55,7 +55,7 @@ val request_partitioned_work :
      sok_message:Mina_base.Sok_message.t
   -> work_from_selector:work_from_selector
   -> partitioner:t
-  -> Snark_work_lib.Spec.Partitioned.Stable.V2.t Or_error.t option
+  -> Snark_work_lib.Spec.Partitioned.Stable.Latest.t Or_error.t option
 
 type submit_result =
   | SpecUnmatched  (** Submitted work doesn't match the scheme in pool *)
