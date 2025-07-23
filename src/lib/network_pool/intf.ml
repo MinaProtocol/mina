@@ -264,9 +264,7 @@ module type Snark_resource_pool_intf = sig
        trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> proof_cache_db:Proof_cache_tag.cache_db
-    -> ?persistence:
-         [< `Disk_location of string ]
-         * [< `Store_period of Core_kernel_private.Span_float.t ]
+    -> ?persistence:[< `Disk_location of string ]
     -> unit
     -> Config.t
 

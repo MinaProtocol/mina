@@ -1466,6 +1466,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~persistent_frontier_location:chain_state_locations.frontier
                  ~epoch_ledger_location
                  ~proof_cache_location:chain_state_locations.proof_cache
+                 ~proof_cache_meta_location:
+                   chain_state_locations.proof_cache_meta
                  ~zkapp_vk_cache_location:chain_state_locations.zkapp_vk_cache
                  ~snark_work_fee:snark_work_fee_flag ~time_controller
                  ~block_production_keypairs ~monitor ~consensus_local_state

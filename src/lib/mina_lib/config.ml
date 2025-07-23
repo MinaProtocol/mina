@@ -38,6 +38,7 @@ type t =
   ; persistent_frontier_location : string
   ; epoch_ledger_location : string
   ; proof_cache_location : string
+  ; proof_cache_meta_location : string
   ; zkapp_vk_cache_location : string
   ; staged_ledger_transition_backup_capacity : int [@default 10]
   ; time_controller : Block_time.Controller.t

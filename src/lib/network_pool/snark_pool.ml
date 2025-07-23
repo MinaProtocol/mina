@@ -167,7 +167,7 @@ struct
 
       module Config = struct
         module Persistence = struct
-          type t = { disk_location : string; store_period : Time.Span.t }
+          type t = { disk_location : string }
         end
 
         type t =
@@ -196,10 +196,9 @@ struct
         match persistence with
         | None ->
             Config.make ~trust_system ~verifier ~proof_cache_db ()
-        | Some (`Disk_location disk_location, `Store_period store_period) ->
+        | Some (`Disk_location disk_location) ->
             Config.make ~trust_system ~verifier ~proof_cache_db
-              ~persistence:{ disk_location; store_period }
-              ()
+              ~persistence:{ disk_location } ()
 
       let proof_cache_db t = t.config.proof_cache_db
 
@@ -394,9 +393,12 @@ struct
                 .Genesis_constants.Constraint_constants.account_creation_fee
           }
         in
-        Option.iter t.config.persistence
-          ~f:(fun { store_period; disk_location } ->
-            Clock.every' store_period (store_to_disk ~disk_location t) ) ;
+        Option.iter t.config.persistence ~f:(fun { disk_location } ->
+            Mina_stdlib_unix.Exit_handlers.(
+              register_async_shutdown_handler ~logger
+                ~description:"Store snark pool on shutdown"
+                ~priority:Priority.Snark_pool
+                (store_to_disk ~disk_location t)) ) ;
         listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           ~tf_diff_writer ;
         t

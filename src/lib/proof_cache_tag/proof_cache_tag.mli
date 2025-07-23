@@ -6,8 +6,9 @@ type t [@@deriving sexp_of, to_yojson]
 type cache_db
 
 val create_db :
-     string
-  -> logger:Logger.t
+     logger:Logger.t
+  -> ?disk_meta_location:string
+  -> string
   -> (cache_db, [> `Initialization_error of Error.t ]) Deferred.Result.t
 
 val read_proof_from_disk : t -> Pickles.Proof.Proofs_verified_2.Stable.Latest.t
