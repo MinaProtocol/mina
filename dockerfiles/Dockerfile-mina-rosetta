@@ -80,10 +80,12 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar 
 # Upstream PR to rosetta-sdk-go: https://github.com/coinbase/rosetta-sdk-go/pull/457
 # They can be replaced once there is a new release of rosetta-cli containing the above change by:
 #RUN curl -sSfL https://raw.githubusercontent.com/coinbase/mesh-cli/${ROSETTA_CLI_VERSION}/scripts/install.sh | sh -s
-RUN export GOBIN="$(pwd)/bin" \
-    && curl -L "https://github.com/coinbase/mesh-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
-    && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp" \
-    && cd "/tmp/mesh-cli-0.10.1" \
+RUN curl -L "https://github.com/coinbase/mesh-cli/archive/refs/tags/v0.10.1.tar.gz" -o "/tmp/v0.10.1.tar.gz" \
+    && tar xzf "/tmp/v0.10.1.tar.gz" -C "/tmp"
+
+WORKDIR /tmp/mesh-cli-0.10.1
+RUN GOBIN="/bin" \
+    export GOBIN \
     && /usr/lib/go/bin/go mod edit -replace github.com/coinbase/rosetta-sdk-go@v0.8.1=github.com/MinaProtocol/rosetta-sdk-go@stake-delegation-v1 \
     && /usr/lib/go/bin/go mod tidy \
     && /usr/lib/go/bin/go install
@@ -111,10 +113,11 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
 
 # --- Set up postgres
 USER postgres
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g') \
     && echo "$POSTGRES_VERSION" "$(psql -V)" \
-    && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf \
-    && pg_dropcluster --stop ${POSTGRES_VERSION} main
+    && echo "host all  all    0.0.0.0/0  md5" >> "/etc/postgresql/${POSTGRES_VERSION}/main/pg_hba.conf" \
+    && pg_dropcluster --stop "${POSTGRES_VERSION}" main
 # Run as root so it can create /data/postgresql
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
