@@ -538,7 +538,7 @@ let check_balance pk balance ledger =
 
 (** Test legacy transactions*)
 let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let signature_kind = Mina_signature_kind.Testnet in
   let open Mina_transaction in
   let to_preunion (t : Transaction.t) =
     match t with

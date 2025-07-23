@@ -72,8 +72,7 @@ module Make (Data : Binable.S) = struct
 
     Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
         if Queue.length reusable_keys >= reuse_size_limit then (
-          Queue.iter reusable_keys ~f:(fun to_remove ->
-              Rw.remove ~env db to_remove ) ;
+          Rw.batch_remove ~env db reusable_keys ;
           Queue.clear reusable_keys ) ) ;
     Rw.set ~env db idx x ;
     res

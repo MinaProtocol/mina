@@ -4,9 +4,9 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
@@ -31,7 +31,7 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "TestnetIntegrationTestsLong"
-        , mode = PipelineMode.Type.Stable
+        , scope = PipelineScope.AllButPullRequest
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
