@@ -41,6 +41,13 @@ let cast_id = function
   | Identity _ ->
       failwith "Can't cast cache tag to underlying ID!"
 
+let cast_of_id ~id ~cache_db =
+  match cache_db with
+  | Lmdb_cache cache_db ->
+      Lmdb { cache_id = id; cache_db }
+  | Identity_cache ->
+      failwith "Can't cast ID back to proof with identity cache!"
+
 module For_tests = struct
   let create_db = create_identity_db
 end

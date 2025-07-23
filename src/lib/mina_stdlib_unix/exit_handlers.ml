@@ -8,6 +8,7 @@ module Priority = struct
   type t =
     | Normal
         (** default handler level, ran before exclusion cleanup is issued *)
+    | Transition_frontier  (** Closing transition frontier *)
     | Exclusion
         (** after such cleanup is ran, a new execution of program could be started *)
   [@@deriving compare]

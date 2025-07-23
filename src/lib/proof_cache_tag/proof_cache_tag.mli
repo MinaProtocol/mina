@@ -21,6 +21,8 @@ type id [@@deriving bin_io]
 
 val cast_id : t -> id
 
+val cast_of_id : id:id -> cache_db:cache_db -> t
+
 module For_tests : sig
   val create_db : unit -> cache_db
 end

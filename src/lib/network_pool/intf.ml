@@ -38,7 +38,7 @@ module type Resource_pool_base_intf = sig
          , Strict_pipe.synchronous
          , unit Deferred.t )
          Strict_pipe.Writer.t
-    -> t
+    -> t Deferred.t
 end
 
 module Verification_error = struct
@@ -225,7 +225,7 @@ module type Network_pool_base_intf = sig
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
     -> block_window_duration:Time.Span.t
-    -> t * Remote_sink.t * Local_sink.t
+    -> (t * Remote_sink.t * Local_sink.t) Deferred.t
 
   val of_resource_pool_and_diffs :
        resource_pool
@@ -263,8 +263,11 @@ module type Snark_resource_pool_intf = sig
   val make_config :
        trust_system:Trust_system.t
     -> verifier:Verifier.t
-    -> disk_location:string
     -> proof_cache_db:Proof_cache_tag.cache_db
+    -> ?persistence:
+         [< `Disk_location of string ]
+         * [< `Store_period of Core_kernel_private.Span_float.t ]
+    -> unit
     -> Config.t
 
   val add_snark :

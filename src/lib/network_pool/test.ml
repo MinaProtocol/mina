@@ -35,7 +35,7 @@ let%test_module "network pool test" =
 
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool" ~proof_cache_db
+        ~proof_cache_db ()
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
@@ -56,7 +56,7 @@ let%test_module "network pool test" =
         }
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let network_pool, _, _ =
+          let%bind network_pool, _, _ =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
               ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -116,7 +116,7 @@ let%test_module "network pool test" =
         let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
         let tf = Mocks.Transition_frontier.create [] in
         let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
-        let network_pool, remote_sink, local_sink =
+        let%bind network_pool, remote_sink, local_sink =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
             ~consensus_constants ~time_controller
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
