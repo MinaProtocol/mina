@@ -1693,6 +1693,7 @@ let raise_on_initialization_error (`Initialization_error e) =
 
 let initialize_proof_cache_db (config : Config.t) =
   Proof_cache_tag.create_db ~logger:config.logger
+    ~disk_meta_location:(config.conf_dir ^/ "proof_cache_metadata")
     (config.conf_dir ^/ "proof_cache")
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
@@ -2050,7 +2051,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-              ~trust_system:config.trust_system ~proof_cache_db ()
+              ~trust_system:config.trust_system ~proof_cache_db
+              ~persistence:(`Disk_location config.snark_pool_disk_location) ()
           in
           let%bind snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config
