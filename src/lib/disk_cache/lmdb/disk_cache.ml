@@ -33,6 +33,19 @@ module Make (Data : Binable.S) = struct
   (** How big can the queue [reusable_keys] be before we do a cleanup *)
   let reuse_size_limit = 512
 
+  let freeze_eviction_and_snapshot ~logger
+      ({ eviction_freezed; counter; disk_meta_location; _ } : t) =
+    eviction_freezed := true ;
+    match disk_meta_location with
+    | None ->
+        [%log info]
+          "No metadata location is set for LMDB disk cache, not saving disk \
+           cache persistence information" ;
+        Async.Deferred.unit
+    | Some disk_meta_location ->
+        Async_unix.Writer.save_bin_prot disk_meta_location
+          bin_writer_persistence !counter
+
   let initialize path ~logger ?disk_meta_location () =
     let open Async in
     let open Deferred.Let_syntax in
@@ -59,14 +72,25 @@ module Make (Data : Binable.S) = struct
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun path ->
         let env, db = Rw.create path in
-        { env
-        ; db
-        ; counter = ref counter
-        ; reusable_keys = Queue.create ()
-        ; queue_guard = Error_checking_mutex.create ()
-        ; eviction_freezed = ref false
-        ; disk_meta_location
-        } )
+        let cache =
+          { env
+          ; db
+          ; counter = ref counter
+          ; reusable_keys = Queue.create ()
+          ; queue_guard = Error_checking_mutex.create ()
+          ; eviction_freezed = ref false
+          ; disk_meta_location
+          }
+        in
+
+        Option.iter disk_meta_location ~f:(fun _ ->
+            Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
+              ~logger
+              ~description:
+                "Shutting down LMDB Disk Cache GC Eviction and store \
+                 persistence info needed to reload from disk" (fun () ->
+                freeze_eviction_and_snapshot ~logger cache ) ) ;
+        cache )
 
   type id = { idx : int } [@@deriving bin_io_unversioned]
 
@@ -106,19 +130,6 @@ module Make (Data : Binable.S) = struct
           Queue.clear reusable_keys ) ) ;
     Rw.set ~env db idx x ;
     res
-
-  let freeze_eviction_and_snapshot ~logger
-      ({ eviction_freezed; counter; disk_meta_location; _ } : t) =
-    eviction_freezed := true ;
-    match disk_meta_location with
-    | None ->
-        [%log info]
-          "No disk is set for FS disk cache, not saving disk cache persistence \
-           information" ;
-        Async.Deferred.unit
-    | Some disk_meta_location ->
-        Async_unix.Writer.save_bin_prot disk_meta_location
-          bin_writer_persistence !counter
 
   let iteri ({ env; db; _ } : t) ~f = Rw.iter ~env db ~f
 

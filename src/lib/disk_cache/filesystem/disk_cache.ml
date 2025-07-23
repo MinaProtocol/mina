@@ -21,6 +21,19 @@ struct
 
   type id = { idx : int } [@@deriving bin_io_unversioned]
 
+  let freeze_eviction_and_snapshot ~logger
+      { eviction_freezed; next_idx; disk_meta_location; _ } =
+    eviction_freezed := true ;
+    match disk_meta_location with
+    | None ->
+        [%log info]
+          "No metadata location is set for FS disk cache, not saving disk \
+           cache persistence information" ;
+        Async.Deferred.unit
+    | Some disk_meta_location ->
+        Async_unix.Writer.save_bin_prot disk_meta_location
+          bin_writer_persistence !next_idx
+
   let initialize path ~logger ?disk_meta_location () =
     let open Async in
     let open Deferred.Let_syntax in
@@ -46,11 +59,23 @@ struct
     in
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
       ~f:(fun root ->
-        { root
-        ; next_idx = ref next_idx
-        ; eviction_freezed = ref false
-        ; disk_meta_location
-        } )
+        let cache =
+          { root
+          ; next_idx = ref next_idx
+          ; eviction_freezed = ref false
+          ; disk_meta_location
+          }
+        in
+
+        Option.iter disk_meta_location ~f:(fun _ ->
+            Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
+              ~logger
+              ~description:
+                "Shutting down LMDB Disk Cache GC Eviction and store \
+                 persistence info needed to reload from disk" (fun () ->
+                freeze_eviction_and_snapshot ~logger cache ) ) ;
+
+        cache )
 
   let path root i = root ^ Filename.dir_sep ^ Int.to_string i
 
@@ -59,19 +84,6 @@ struct
     In_channel.with_file ~binary:true (path root id.idx) ~f:(fun chan ->
         let str = In_channel.input_all chan in
         Binable.of_string (module B) str )
-
-  let freeze_eviction_and_snapshot ~logger
-      { eviction_freezed; next_idx; disk_meta_location; _ } =
-    eviction_freezed := true ;
-    match disk_meta_location with
-    | None ->
-        [%log info]
-          "No disk is set for FS disk cache, not saving disk cache persistence \
-           information" ;
-        Async.Deferred.unit
-    | Some disk_meta_location ->
-        Async_unix.Writer.save_bin_prot disk_meta_location
-          bin_writer_persistence !next_idx
 
   let put ({ root; next_idx; eviction_freezed; _ } : t) x : id =
     let idx = !next_idx in
