@@ -6,8 +6,8 @@ open Async_unix
 
 module Priority = struct
   type t =
-    | Normal
-        (** default handler level, ran before exclusion cleanup is issued *)
+    | Early  (** default handler level, ran before any other cleanup *)
+    | Snark_pool  (** Closing snark pool *)
     | Transition_frontier  (** Closing transition frontier *)
     | Exclusion
         (** after such cleanup is ran, a new execution of program could be started *)
@@ -49,7 +49,7 @@ let register_async_shutdown_handler =
                      ; ("exn", `String (Exn.to_string exn))
                      ] )
       |> Deferred.all |> Deferred.ignore_m ) ;
-  fun ~logger ~description ?(priority = Priority.Normal)
+  fun ~logger ~description ?(priority = Priority.Early)
       (thunk : unit -> unit Deferred.t) ->
     [%log debug] "Registering async shutdown handler: $description"
       ~metadata:[ ("description", `String description) ] ;
