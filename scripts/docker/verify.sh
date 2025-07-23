@@ -24,7 +24,7 @@ COMMANDS=(--version --help)
 case $PACKAGE in
   mina-archive) APPS=mina-archive ;;
   mina-logproc) APPS=(); echo "skipped execution for mina-logproc" ;;
-  mina-rosetta*) APPS=("mina" "mina-archive" "mina-rosetta" "rosetta-cli") ;;
+  mina-rosetta*) APPS=("mina" "mina-archive" "mina-rosetta") ;;
   mina-*) APPS=("mina");;
   *) echo "❌  Unknown package passed: $PACKAGE"; exit 1;;
 esac
