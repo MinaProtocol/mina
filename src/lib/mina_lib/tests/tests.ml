@@ -204,7 +204,7 @@ let%test_module "Epoch ledger sync tests" =
           ; constraint_constants
           }
       in
-      let _transaction_pool, tx_remote_sink, _tx_local_sink =
+      let%bind _transaction_pool, tx_remote_sink, _tx_local_sink =
         let config =
           Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
             ~trust_system
@@ -222,23 +222,20 @@ let%test_module "Epoch ledger sync tests" =
             ( Time.Span.of_ms
             @@ Float.of_int constraint_constants.block_window_duration_ms )
       in
-      let snark_remote_sink, snark_pool =
-        let config =
-          Network_pool.Snark_pool.Resource_pool.make_config ~verifier
-            ~trust_system
-            ~disk_location:(make_dirname "snark_pool_config")
-            ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
-        in
-        let snark_pool, snark_remote_sink, _snark_local_sink =
-          Network_pool.Snark_pool.create ~config ~constraint_constants
-            ~consensus_constants ~time_controller ~logger
-            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
-            ~log_gossip_heard:false
-            ~block_window_duration:
-              ( Time.Span.of_ms
-              @@ Float.of_int constraint_constants.block_window_duration_ms )
-        in
-        (snark_remote_sink, snark_pool)
+      let config =
+        Network_pool.Snark_pool.Resource_pool.make_config ~verifier
+          ~trust_system
+          ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+          ()
+      in
+      let%bind snark_pool, snark_remote_sink, _snark_local_sink =
+        Network_pool.Snark_pool.create ~config ~constraint_constants
+          ~consensus_constants ~time_controller ~logger
+          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ~on_remote_push
+          ~log_gossip_heard:false
+          ~block_window_duration:
+            ( Time.Span.of_ms
+            @@ Float.of_int constraint_constants.block_window_duration_ms )
       in
       let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
       let genesis_ledger_hash =

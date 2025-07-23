@@ -4,6 +4,24 @@ open Pipe_lib
 open Network_peer
 
 module Snark_tables = struct
+  module Serializable = struct
+    module Single = struct
+      type t =
+        { proof :
+            ( Mina_state.Snarked_ledger_state.With_sok.Stable.Latest.t
+            , Proof_cache_tag.id )
+            Proof_carrying_data.Stable.Latest.t
+            One_or_two.Stable.Latest.t
+            Priced_proof.Stable.Latest.t
+        ; time : Core.Time.Stable.With_utc_sexp.V2.t option
+        }
+      [@@deriving bin_io_unversioned]
+    end
+
+    type t = Single.t Transaction_snark_work.Statement.Stable.V2.Table.t
+    [@@deriving bin_io_unversioned]
+  end
+
   type t =
     { all :
         Ledger_proof.Cached.t One_or_two.t Priced_proof.t
@@ -12,6 +30,59 @@ module Snark_tables = struct
         (Ledger_proof.Cached.t One_or_two.t Priced_proof.t * Core.Time.t)
         Transaction_snark_work.Statement.Map.t
     }
+
+  let empty =
+    Transaction_snark_work.Statement.Map.
+      { all = empty; rebroadcastable = empty }
+
+  let to_serializable { all; rebroadcastable } =
+    Transaction_snark_work.Statement.Map.to_alist all
+    |> List.map ~f:(fun (stmt, proof) ->
+           let proof =
+             Priced_proof.map
+               ~f:
+                 (One_or_two.map
+                    ~f:
+                      (Proof_carrying_data.map_proof ~f:Proof_cache_tag.cast_id) )
+               proof
+           in
+           let time =
+             Transaction_snark_work.Statement.Map.find rebroadcastable stmt
+             |> Option.map ~f:Tuple2.get2
+           in
+           (stmt, Serializable.Single.{ proof; time }) )
+    |> Transaction_snark_work.Statement.Stable.V2.Table.of_alist_exn
+
+  let of_serializable ~cache_db (tbl : Serializable.t) =
+    Transaction_snark_work.Statement.Table.to_alist tbl
+    |> List.fold
+         ~init:
+           { all = Transaction_snark_work.Statement.Map.empty
+           ; rebroadcastable = Transaction_snark_work.Statement.Map.empty
+           }
+         ~f:(fun
+              { all; rebroadcastable }
+              (stmt, { proof = proof_serializable; time })
+            ->
+           let proof =
+             Priced_proof.map
+               ~f:
+                 (One_or_two.map
+                    ~f:
+                      (Proof_carrying_data.map_proof ~f:(fun id ->
+                           Proof_cache_tag.cast_of_id ~id ~cache_db ) ) )
+               proof_serializable
+           in
+           let all =
+             Transaction_snark_work.Statement.Map.add_exn all ~key:stmt
+               ~data:proof
+           in
+           let rebroadcastable =
+             Option.value_map time ~default:rebroadcastable ~f:(fun time ->
+                 Transaction_snark_work.Statement.Map.add_exn rebroadcastable
+                   ~key:stmt ~data:(proof, time) )
+           in
+           { all; rebroadcastable } )
 end
 
 module type S = sig
@@ -95,11 +166,15 @@ struct
       let label = "snark_pool"
 
       module Config = struct
+        module Persistence = struct
+          type t = { disk_location : string; store_period : Time.Span.t }
+        end
+
         type t =
           { trust_system : (Trust_system.t[@sexp.opaque])
           ; verifier : (Verifier.t[@sexp.opaque])
-          ; disk_location : string
           ; proof_cache_db : Proof_cache_tag.cache_db
+          ; persistence : Persistence.t option
           }
         [@@deriving make]
       end
@@ -117,7 +192,14 @@ struct
         ; batcher : Batcher.Snark_pool.t
         }
 
-      let make_config = Config.make
+      let make_config ~trust_system ~verifier ~proof_cache_db ?persistence () =
+        match persistence with
+        | None ->
+            Config.make ~trust_system ~verifier ~proof_cache_db ()
+        | Some (`Disk_location disk_location, `Store_period store_period) ->
+            Config.make ~trust_system ~verifier ~proof_cache_db
+              ~persistence:{ disk_location; store_period }
+              ()
 
       let proof_cache_db t = t.config.proof_cache_db
 
@@ -250,14 +332,56 @@ struct
         in
         Deferred.don't_wait_for tf_deferred
 
+      let store_to_disk ~disk_location (t : t) () =
+        let before = Time.now () in
+        let%map () =
+          Writer.save_bin_prot disk_location
+            Snark_tables.Serializable.bin_writer_t
+            (Snark_tables.to_serializable !(t.snark_tables))
+        in
+        let elapsed = Time.(diff (now ()) before |> Span.to_ms) in
+        Mina_metrics.(
+          Snark_work.Snark_pool_serialization_ms_histogram.observe
+            Snark_work.snark_pool_serialization_ms elapsed) ;
+        [%log' debug t.logger] "SNARK pool serialization took $time ms"
+          ~metadata:[ ("time", `Float elapsed) ]
+
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
           ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+        let%map snark_tables =
+          match config.Config.persistence with
+          | None ->
+              return Snark_tables.empty
+          | Some persistence -> (
+              match%map
+                Async.Reader.load_bin_prot persistence.disk_location
+                  Snark_tables.Serializable.bin_reader_t
+              with
+              | Error e ->
+                  [%log warn]
+                    "Failed to read snark table from disk, using empty snark \
+                     table"
+                    ~metadata:
+                      [ ("location", `String persistence.disk_location)
+                      ; ("reason", `String (Error.to_string_hum e))
+                      ] ;
+                  Snark_tables.empty
+              | Ok serializable_table -> (
+                  try
+                    Snark_tables.of_serializable ~cache_db:config.proof_cache_db
+                      serializable_table
+                  with e ->
+                    [%log warn]
+                      "Failed to read snark table from disk, using empty snark \
+                       table"
+                      ~metadata:
+                        [ ("location", `String persistence.disk_location)
+                        ; ("reason", `String (Exn.to_string e))
+                        ] ;
+                    Snark_tables.empty ) )
+        in
         let t =
-          { snark_tables =
-              ref
-                { Snark_tables.all = Transaction_snark_work.Statement.Map.empty
-                ; rebroadcastable = Transaction_snark_work.Statement.Map.empty
-                }
+          { snark_tables = ref snark_tables
           ; frontier =
               (fun () -> Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
           ; batcher =
@@ -270,6 +394,9 @@ struct
                 .Genesis_constants.Constraint_constants.account_creation_fee
           }
         in
+        Option.iter t.config.persistence
+          ~f:(fun { store_period; disk_location } ->
+            Clock.every' store_period (store_to_disk ~disk_location t) ) ;
         listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           ~tf_diff_writer ;
         t
@@ -628,7 +755,7 @@ let%test_module "random set test" =
 
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool" ~proof_cache_db
+        ~proof_cache_db ()
 
     let gen ?length () =
       let open Quickcheck.Generator.Let_syntax in
@@ -646,13 +773,12 @@ let%test_module "random set test" =
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
       let open Deferred.Let_syntax in
-      let mock_pool, _r_sink, _l_sink =
+      let%bind mock_pool, _r_sink, _l_sink =
         Mock_snark_pool.create ~config ~logger ~constraint_constants
           ~consensus_constants ~time_controller
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)
           ~block_window_duration
-        (* |>  *)
       in
       let pool = Mock_snark_pool.resource_pool mock_pool in
       (*Statements should be referenced before work for those can be included*)
@@ -790,7 +916,7 @@ let%test_module "random set test" =
           let frontier_broadcast_pipe_r, _ =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create []))
           in
-          let network_pool, _, _ =
+          let%bind network_pool, _, _ =
             Mock_snark_pool.create ~config ~constraint_constants
               ~consensus_constants ~time_controller ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -867,7 +993,7 @@ let%test_module "random set test" =
             let frontier_broadcast_pipe_r, _ =
               Broadcast_pipe.create (Some (Mocks.Transition_frontier.create []))
             in
-            let network_pool, remote_sink, local_sink =
+            let%bind network_pool, remote_sink, local_sink =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
                 ~consensus_constants ~time_controller
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -959,7 +1085,7 @@ let%test_module "random set test" =
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
-          let network_pool, _, _ =
+          let%bind network_pool, _, _ =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
