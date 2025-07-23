@@ -23,10 +23,6 @@ module type S = sig
 
   (** Read from the cache, crashing if the value cannot be found. *)
   val get : t -> id -> Data.t
-
-  (** Freeze eviction on Disk Cache, save persistence information on disk 
-      which could be used to reload the cache on bootstrapping *)
-  val freeze_eviction_and_snapshot : logger:Logger.t -> t -> unit Deferred.t
 end
 
 module type S_with_count = sig

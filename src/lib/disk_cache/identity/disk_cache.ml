@@ -15,6 +15,4 @@ struct
   let get () = ident
 
   let put () = ident
-
-  let freeze_eviction_and_snapshot ~logger:_ () = Deferred.return ()
 end
