@@ -190,7 +190,7 @@ mina daemon \
 
 echo "========================= WAITING FOR THE DAEMON TO SYNC ==========================="
 daemon_status="Pending"
-retries_left=20
+retries_left=40
 until [ $daemon_status == "Synced" ]; do
   [[ $retries_left -eq 0 ]] && echo "Unable to Sync the Daemon" && exit 1 || ((retries_left--))
   sleep 15
