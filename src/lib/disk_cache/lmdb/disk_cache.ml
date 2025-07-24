@@ -121,24 +121,17 @@ module Make (Data : Binable.S) = struct
       Data.t option =
     Rw.get ~env db idx |> Option.map ~f:(fun data -> register_gc ~id t ; data)
 
+  (* WARN: Don't try to be smart here and reuse LMDB keys, as SNARK pool
+     persistence will try to read from disk and trusting the ID they have
+     correspond to the proofs in Cache DB. If reused, we need a mechanism to
+     sync IDs between the 2 which is complex.
+  *)
   let put ({ env; db; counter; reusable_keys; queue_guard; _ } as t : t)
       (x : Data.t) : id =
-    let idx =
-      match
-        Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
-            Queue.dequeue reusable_keys )
-      with
-      | None ->
-          (* We don't have reusable keys, assign a new one nobody ever used *)
-          incr counter ; !counter - 1
-      | Some reused_key ->
-          (* Any key inside [reusable_keys] is marked as garbage by GC, so we're
-             free to use them *)
-          reused_key
-    in
+    let idx = !counter in
+    incr counter ;
     let id = { idx } in
     register_gc ~id t ;
-
     Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
         if Queue.length reusable_keys >= reuse_size_limit then (
           Rw.batch_remove ~env db reusable_keys ;
