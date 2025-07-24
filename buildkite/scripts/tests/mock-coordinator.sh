@@ -16,6 +16,19 @@ tar -xzf /tmp/mock-coordinator-test/specs/mock_coordinator_test_specs.tar.gz -C 
 
 rm /tmp/mock-coordinator-test/specs/mock_coordinator_test_specs.tar.gz
 
+keep_only_n_json_files() {
+    local dir="/tmp/mock-coordinator-test/specs"
+    local n="$1"
+    find "$dir" -maxdepth 1 -type f -name '*.json' | sort | head -n "-$n" | xargs -r rm --
+}
+
+ls /tmp/mock-coordinator-test/specs
+
+# Keep only the latest 10 .json files (adjust N as needed)
+keep_only_n_json_files 10
+
+ls /tmp/mock-coordinator-test/specs
+
 # Set environment variables for the test script
 export DUMPED_SPEC_PATH="/tmp/mock-coordinator-test/specs"
 export PROOF_OUTPUT_PATH="/tmp/mock-coordinator-test/proofs"
