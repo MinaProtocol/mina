@@ -6,6 +6,8 @@ module type S = sig
 
   type t
 
+  (* TODO: LMDB & File system disk cache now grows infinitely on index, we need to fix it. *)
+
   (** Initialize the on-disk cache explicitly before interactions with it take
       place. If disk_meta_location is set, will try to read from metadata at 
       that location, so to reuse disk cache from a previous run. *)
