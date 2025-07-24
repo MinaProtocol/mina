@@ -93,6 +93,12 @@ struct
           (* Ignore errors: if a directory is deleted, it's ok. *)
           try Core.Unix.unlink (path root idx) with _ -> () )
 
+  let try_get_deserialized (t : t) (id : id) : B.t option =
+    try
+      let result = Some (get t id) in
+      register_gc ~id t ; result
+    with Sys_error _ -> None
+
   let put ({ root; next_idx; _ } as t : t) x : id =
     let idx = !next_idx in
     incr next_idx ;
