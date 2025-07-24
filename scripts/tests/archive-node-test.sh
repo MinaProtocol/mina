@@ -3,6 +3,10 @@
 set -x
 # test archive node on known archive db
 
+# Don't prompt for answers during apt-get install
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
 apt-get install -y procps
 
 ps aux
