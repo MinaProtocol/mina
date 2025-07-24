@@ -8,7 +8,7 @@ module Zkapp_command_inputs = struct
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
-    module V1 = struct
+    module V2 = struct
       type t =
         ( Zkapp_command_segment.Witness.Stable.V2.t
         * Zkapp_command_segment.Basic.Stable.V1.t
@@ -26,14 +26,14 @@ module Zkapp_command_inputs = struct
     * Statement.With_sok.t )
     Nonempty_list.t
 
-  let write_all_proofs_to_disk ~proof_cache_db : Stable.V1.t -> t =
+  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
     Nonempty_list.map ~f:(fun (witness, segment, stmt) ->
         ( Zkapp_command_segment.Witness.write_all_proofs_to_disk ~proof_cache_db
             witness
         , segment
         , stmt ) )
 
-  let read_all_proofs_from_disk : t -> Stable.V1.t =
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
     Nonempty_list.map ~f:(fun (witness, segment, stmt) ->
         ( Zkapp_command_segment.Witness.read_all_proofs_from_disk witness
         , segment
@@ -44,9 +44,10 @@ let extract_zkapp_segment_works ~m:(module M : S)
     ~(input : Mina_state.Snarked_ledger_state.t)
     ~(witness : Transaction_witness.Stable.Latest.t)
     ~(zkapp_command : Zkapp_command.t) : Zkapp_command_inputs.t Or_error.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let inputs =
     Or_error.try_with (fun () ->
-        Transaction_snark.zkapp_command_witnesses_exn
+        Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
           ~constraint_constants:M.constraint_constants
           ~global_slot:witness.block_global_slot
           ~state_body:witness.protocol_state_body

@@ -31,9 +31,17 @@ open Core_kernel
 open Async
 open Mina_automation
 
+(* Reference: https://discuss.ocaml.org/t/more-natural-preferred-way-to-shuffle-an-array *)
+let knuth_shuffle a =
+  let a = Array.copy a in
+  for i = Array.length a - 1 downto 1 do
+    let k = Random.int (i + 1) in
+    Array.swap a k i
+  done ;
+  a
+
 let main ~db_uri ~network_data_folder () =
   let open Deferred.Let_syntax in
-  let missing_blocks_count = 3 in
   let network_name = "dummy" in
 
   let network_data = Network_Data.create network_data_folder in
@@ -75,29 +83,29 @@ let main ~db_uri ~network_data_folder () =
             Deferred.return (output_folder ^ "/" ^ e) )
   in
 
-  let n =
-    List.init missing_blocks_count ~f:(fun _ ->
-        (* never remove last block as missing-block-guardian can have issues when patching it
-           as it patching only gaps
-        *)
-        Random.int (List.length extensional_files - 1) )
+  let%bind () =
+    if List.length extensional_files < 3 then (
+      printf
+        "Need at least 3 blocks to have meaningful intermediate block to patch \
+         against" ;
+      exit 1 )
+    else Deferred.unit
   in
+  let missing_blocks_count = min 3 (List.length extensional_files - 2) in
 
+  (* never remove last and first block as missing-block-guardian can have issues
+     when patching "border" blocks as it expect to fill gaps in the middle
+  *)
+  let candidate_blocks =
+    Array.init (List.length extensional_files - 2) ~f:Int.succ
+  in
+  let missing_blocks =
+    Array.slice (knuth_shuffle candidate_blocks) 0 missing_blocks_count
+  in
   let unpatched_extensional_files =
     List.filteri extensional_files ~f:(fun i _ ->
-        not (List.mem n i ~equal:Int.equal) )
-    |> List.dedup_and_sort ~compare:(fun left right ->
-           let scan_height item =
-             let item =
-               Filename.basename item |> Str.global_replace (Str.regexp "-") " "
-             in
-             Scanf.sscanf item "%s %d %s" (fun _ height _ -> height)
-           in
-
-           let left_height = scan_height left in
-           let right_height = scan_height right in
-
-           Int.compare left_height right_height )
+        not (Array.mem missing_blocks i ~equal:Int.equal) )
+    |> Utils.dedup_and_sort_archive_files
   in
 
   let%bind _ =

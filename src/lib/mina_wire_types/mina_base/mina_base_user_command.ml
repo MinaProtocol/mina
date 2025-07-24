@@ -10,7 +10,7 @@ module V3 = struct
 end
 
 module Valid = struct
-  module V2 = struct
+  module V3 = struct
     type t =
       ( Mina_base_signed_command.With_valid_signature.V2.t
       , Mina_base_zkapp_command.Valid.V2.t )

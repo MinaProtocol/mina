@@ -28,7 +28,7 @@ include Versioned_rpc.Both_convert.One_way.Make (Master)
 module V3 = struct
   module T = struct
     type msg =
-      | New_state of Mina_block.Stable.V2.t
+      | New_state of Mina_block.Stable.V3.t
       | Snark_pool_diff of
           Snark_pool.Diff_versioned.Stable.V2.t
           Network_pool.With_nonce.Stable.V1.t

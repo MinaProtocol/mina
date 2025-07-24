@@ -111,6 +111,8 @@ module M = struct
     module V3 = struct
       type t = (Mina_base.State_hash.V1.t, Body.Value.V3.t) Poly.V1.t
     end
+
+    module Latest = V3
   end
 end
 

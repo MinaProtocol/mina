@@ -29,7 +29,7 @@ module Transaction_with_witness = struct
       *)
       type t =
         { transaction_with_info :
-            Mina_transaction_logic.Transaction_applied.Stable.V2.t
+            Mina_transaction_logic.Transaction_applied.Stable.V3.t
         ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
         ; statement : Transaction_snark.Statement.Stable.V2.t
         ; init_stack :
@@ -202,7 +202,7 @@ type job = Available_job.t
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { scan_state :
           ( Ledger_proof_with_sok_message.Stable.V2.t

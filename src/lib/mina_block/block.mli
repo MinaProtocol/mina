@@ -5,10 +5,10 @@ open Mina_transaction
 module Stable : sig
   [@@@no_toplevel_latest_type]
 
-  module V2 : sig
+  module V3 : sig
     type t [@@deriving sexp, equal]
 
-    val header : t -> Header.Stable.V2.t
+    val header : t -> Header.Stable.V3.t
 
     val body : t -> Staged_ledger_diff.Body.Stable.V2.t
 

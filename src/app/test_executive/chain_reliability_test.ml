@@ -8,7 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -99,7 +100,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          () )
     in
     section "common prefix of all nodes is no farther back than 1 block"
-      (* the common prefix test relies on at least 4 blocks having been produced.  previous sections altogether have already produced 4, so no further block production is needed.  if previous sections change, then this may need to be re-adjusted*)
+      (* the common prefix test relies on at least 4 blocks having been
+         produced. previous sections altogether have already produced 4, so no
+         further block production is needed. if previous sections change, then this
+         may need to be re-adjusted*)
       (let%bind (labeled_chains : (string * string list) list) =
          Malleable_error.List.map (Core.String.Map.data all_mina_nodes)
            ~f:(fun node ->

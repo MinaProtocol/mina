@@ -3,9 +3,9 @@ open Mina_base
 module Entry : sig
   [%%versioned:
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type t =
-        | Header of Mina_block.Header.Stable.V2.t
+        | Header of Mina_block.Header.Stable.V3.t
         | Invalid of
             { parent_state_hash : State_hash.Stable.V1.t
             ; blockchain_length : Mina_numbers.Length.Stable.V1.t

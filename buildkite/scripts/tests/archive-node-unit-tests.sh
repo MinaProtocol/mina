@@ -17,7 +17,7 @@ if [[ -z "$user" || -z "$password" || -z "$db" || -z "$command_key" ]]; then
     exit 1
 fi
 
-eval $(opam config env) 
+eval "$(opam config env)"
 
 echo "Setting up database for archive node tests..."
 

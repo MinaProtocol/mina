@@ -1545,7 +1545,7 @@ module Mutations = struct
               let clean_config = Option.value ~default:false clean_config in
               let conf_dir = (Mina_lib.config mina).conf_dir in
               if clean_config then
-                Exit_handlers.register_async_shutdown_handler
+                Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
                   ~logger:(Mina_lib.config mina).logger
                   ~description:"Remove configuration data" (fun () ->
                     let epoch_ledger_json_file =
@@ -1582,7 +1582,7 @@ module Mutations = struct
                                 in
                                 match%bind Sys.file_exists path with
                                 | `Yes ->
-                                    File_system.remove_dir path
+                                    Mina_stdlib_unix.File_system.remove_dir path
                                 | `No | `Unknown ->
                                     Deferred.unit
                               in
@@ -1612,7 +1612,7 @@ module Mutations = struct
                         let path = conf_dir ^/ dir in
                         match%bind Sys.file_exists path with
                         | `Yes ->
-                            File_system.remove_dir path
+                            Mina_stdlib_unix.File_system.remove_dir path
                         | `No | `Unknown ->
                             Deferred.unit ) ) ;
               let s =
@@ -2951,7 +2951,7 @@ module Queries = struct
         match encoding_opt with
         | Some `BASE64 ->
             Bin_prot.Writer.to_string
-              Mina_state.Protocol_state.Value.Stable.V3.bin_t.writer
+              Mina_state.Protocol_state.Value.Stable.Latest.bin_t.writer
               protocol_state
             |> Base64.encode_exn
         | Some `JSON | None ->

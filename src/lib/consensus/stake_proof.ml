@@ -6,7 +6,7 @@ open Signature_lib
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V2 = struct
+  module V3 = struct
     type t =
       { delegator : Account.Index.Stable.V1.t
       ; delegator_pk : Public_key.Compressed.Stable.V1.t

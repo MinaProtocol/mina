@@ -84,7 +84,7 @@ module Token_symbol = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Bounded_types.String.Stable.V1.t
+        type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_latest = Fn.id
@@ -110,9 +110,9 @@ module Token_symbol = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Bounded_types.String.Stable.V1)
+          (Mina_stdlib.Bounded_types.String.Stable.V1)
           (struct
-            type t = Bounded_types.String.Stable.V1.t
+            type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
 
             let to_binable = Fn.id
 
@@ -1037,20 +1037,23 @@ let deriver obj =
        ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
        obj
 
+(* An unstable account is needed when we're doing ledger migration. The main
+   idea is we provide a function converting from Stable account to this type,
+   and storing all writes to the original ledger to the new ledger. *)
 module Unstable = struct
   type t =
-    { public_key : Public_key.Compressed.Stable.V1.t
-    ; token_id : Token_id.Stable.V2.t
-    ; token_symbol : Token_symbol.Stable.V1.t
-    ; balance : Balance.Stable.V1.t
-    ; nonce : Nonce.Stable.V1.t
-    ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
-    ; delegate : Public_key.Compressed.Stable.V1.t option
-    ; voting_for : State_hash.Stable.V1.t
-    ; timing : Timing.Stable.V2.t
-    ; permissions : Permissions.Stable.V2.t
-    ; zkapp : Zkapp_account.Stable.V3.t option
-    ; unstable_field : Nonce.Stable.V1.t
+    { public_key : Public_key.Compressed.Stable.Latest.t
+    ; token_id : Token_id.Stable.Latest.t
+    ; token_symbol : Token_symbol.Stable.Latest.t
+    ; balance : Balance.Stable.Latest.t
+    ; nonce : Nonce.Stable.Latest.t
+    ; receipt_chain_hash : Receipt.Chain_hash.Stable.Latest.t
+    ; delegate : Public_key.Compressed.Stable.Latest.t option
+    ; voting_for : State_hash.Stable.Latest.t
+    ; timing : Timing.Stable.Latest.t
+    ; permissions : Permissions.Stable.Latest.t
+    ; zkapp : Zkapp_account.Stable.Latest.t option
+    ; unstable_field : Nonce.Stable.Latest.t
     }
   [@@deriving
     sexp, equal, hash, compare, yojson, hlist, fields, bin_io_unversioned]
@@ -1098,4 +1101,19 @@ module Unstable = struct
       (Random_oracle.pack_input (to_input t))
 
   let empty_digest = lazy (digest empty)
+
+  let of_stable (account : Stable.Latest.t) : t =
+    { public_key = account.public_key
+    ; token_id = account.token_id
+    ; token_symbol = account.token_symbol
+    ; balance = account.balance
+    ; nonce = account.nonce
+    ; receipt_chain_hash = account.receipt_chain_hash
+    ; delegate = account.delegate
+    ; voting_for = account.voting_for
+    ; timing = account.timing
+    ; permissions = account.permissions
+    ; zkapp = account.zkapp
+    ; unstable_field = account.nonce
+    }
 end

@@ -9,7 +9,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -86,7 +87,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (assert_peers_cant_be_partitioned ~max_disconnections:2
            initial_connectivity_data )
     in
-    (* a couple of transactions, so the persisted transition frontier is not trivial *)
+    (* a couple of transactions, so the persisted transition frontier is not
+       trivial *)
     let%bind () =
       section_hard "send a payment"
         (let%bind sender_pub_key = pub_key_of_node node_c in

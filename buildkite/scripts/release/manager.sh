@@ -1,5 +1,31 @@
 #!/usr/bin/env bash
 
+# Mina Protocol Release Manager Script
+# 
+# This script provides comprehensive release management functionality for the Mina Protocol project.
+# It handles the complete lifecycle of build artifacts including publishing, promotion, verification,
+# and maintenance of packages across different channels and platforms.
+#
+# Main capabilities:
+# - PUBLISH: Publish build artifacts from cache to Debian repositories and Docker registries
+# - PROMOTE: Promote artifacts from one channel/registry to another (e.g., unstable -> stable)
+# - VERIFY: Verify that artifacts are correctly published in target channels/registries
+# - FIX: Repair Debian repository manifests when needed
+# - PERSIST: Archive artifacts to long-term storage backends
+#
+# Supported artifacts: mina-daemon, mina-archive, mina-rosetta, mina-logproc
+# Supported networks: devnet, mainnet
+# Supported platforms: Debian (bullseye, focal), Docker (GCR, Docker.io)
+# Supported channels: unstable, alpha, beta, stable
+# Supported backends: Google Cloud Storage (gs), Hetzner, local filesystem
+#
+# Usage examples:
+#   ./manager.sh publish --buildkite-build-id 12345 --source-version 1.0.0 --target-version 1.0.1 --channel stable
+#   ./manager.sh promote --source-version 1.0.0 --target-version 1.0.1 --source-channel alpha --target-channel beta
+#   ./manager.sh verify --version 1.0.1 --channel stable --artifacts mina-daemon,mina-archive
+#
+# For detailed help on any command, use: ./manager.sh [command] --help
+
 # bash strict mode
 set -T # inherit DEBUG and RETURN trap for functions
 set -C # prevent file overwrite by > &> <>
@@ -7,6 +33,7 @@ set -E # inherit -e
 set -e # exit immediately on errors
 set -u # exit on not assigned variables
 set -o pipefail # exit on pipe failure
+set -x
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -23,7 +50,7 @@ DEFAULT_NETWORKS="devnet,mainnet"
 DEFAULT_CODENAMES="bullseye,focal"
 DEFAULT_ARCHITECTURE="amd64"
 
-DEBIAN_CACHE_FOLDER=~/.release/debian/cache
+DEBIAN_CACHE_FOLDER=${DEBIAN_CACHE_FOLDER:-~/.release/debian/cache}
 GCR_REPO="gcr.io/o1labs-192920"
 DOCKER_IO_REPO="docker.io/minaprotocol"
 DEBIAN_REPO=packages.o1test.net
@@ -57,6 +84,7 @@ mkdir -p $DEBIAN_CACHE_FOLDER
 ################################################################################
 # imports
 ################################################################################
+# shellcheck disable=SC1090
 . $SCRIPTPATH/../../../scripts/debian/reversion-helper.sh
 
 
@@ -72,8 +100,8 @@ function prefix_cmd {
 }
 
 function main_help(){
-    echo Publish/Promote mina build artifact. 
-    echo Script can publish build based on buildkite build id to debian repository and docker registry. 
+    echo Publish/Promote mina build artifact.
+    echo Script can publish build based on buildkite build id to debian repository and docker registry.
     echo "Script can also promote artifacts (debian packages and docker images) from one channel to another."
     echo ""
     echo "     $CLI_NAME [operation]"
@@ -84,7 +112,7 @@ function main_help(){
     echo " promote - promote artifacts from one channel (registry) to another";
     echo " fix - fix debian package repository";
     echo " verify - verify artifacts in target channel (registry)";
-    echo " version - show version";    
+    echo " version - show version";
     echo ""
     echo ""
     echo "Defaults: "
@@ -99,7 +127,7 @@ function main_help(){
     echo " codenames: bullseye,focal"
     echo " channels: unstable,alpha,beta,stable"
     echo ""
-    
+
     exit "${1:-0}";
 }
 
@@ -119,7 +147,9 @@ function get_suffix() {
         mina-rosetta)
             echo "-$__network"
         ;;
-     
+        mina-archive)
+            echo "-$__network"
+        ;;
         *)
             echo ""
         ;;
@@ -148,7 +178,9 @@ function get_artifact_with_suffix() {
         mina-rosetta)
             echo "mina-rosetta-$__network"
         ;;
-     
+        mina-archive)
+            echo "mina-archive-$__network"
+        ;;
         *)
             echo "$__artifact"
         ;;
@@ -162,7 +194,8 @@ function calculate_debian_version() {
     local __codename=$3
     local __network=$4
 
-    local __network_suffix=$(get_suffix $__artifact $__network)
+    local __network_suffix
+    __network_suffix=$(get_suffix $__artifact $__network)
     echo "$__artifact:$__target_version-$__codename$__network_suffix"
 }
 
@@ -174,8 +207,9 @@ function calculate_docker_tag() {
     local __codename=$4
     local __network=$5
 
-    local __network_suffix=$(get_suffix $__artifact $__network)
-    
+    local __network_suffix
+    __network_suffix=$(get_suffix $__artifact $__network)
+
     if [[ $__publish_to_docker_io == 1 ]]; then
         echo "$DOCKER_IO_REPO/$__artifact:$__target_version-$__codename$__network_suffix"
     else
@@ -189,7 +223,7 @@ function storage_list() {
 
     case $backend in
         local)
-            ls "$path"
+            ls $path
             ;;
         gs)
             gsutil list "$path"
@@ -211,7 +245,7 @@ function storage_md5() {
 
     case $backend in
         local)
-            md5sum "$path" | awk '{print $1}'
+            md5sum $path | awk '{print $1}'
             ;;
         gs)
             gsutil hash -h -m "$path" | grep "Hash (md5)" | awk '{print $3}'
@@ -233,7 +267,7 @@ function storage_download() {
 
     case $backend in
         local)
-            cp "$remote_path" "$local_path"
+            cp $remote_path $local_path
             ;;
         gs)
             gsutil cp "$remote_path" "$local_path"
@@ -248,31 +282,70 @@ function storage_download() {
     esac
 }
 
+function storage_upload() {
+    local backend=$1
+    local local_path=$2
+    local remote_path=$3
+
+    case $backend in
+        local)
+            cp "$local_path" "$remote_path"
+            ;;
+        gs)
+            gsutil cp "$local_path" "$remote_path"
+            ;;
+        hetzner)
+           rsync -avz -e "ssh -p 23 -i $HETZNER_KEY" $local_path "$HETZNER_USER@$HETZNER_HOST:$remote_path"
+            ;;
+        *)
+            echo "❌ Unsupported backend: $backend"
+            exit 1
+            ;;
+    esac
+}
+
+function storage_root() {
+    local backend=$1
+
+    case $backend in
+        local)
+            echo "/var/storagebox/"
+            ;;
+        gs)
+            echo "gs://buildkite_k8s/coda/shared"
+            ;;
+        hetzner)
+            echo "/home/o1labs-generic/pvc-4d294645-6466-4260-b933-1b909ff9c3a1"
+            ;;
+        *)
+            echo "❌ Unsupported backend: $backend"
+            exit 1
+            ;;
+    esac
+}
+
+
 function get_cached_debian_or_download() {
     local backend=$1
     local artifact=$2
     local codename=$3
     local network=$4
 
-    local artifact_full_name=$(get_artifact_with_suffix "$artifact" "$network")
+    local artifact_full_name
+    artifact_full_name=$(get_artifact_with_suffix "$artifact" "$network")
     local remote_path
-    if [[ $backend == "gs" ]]; then
-        remote_path="gs://buildkite_k8s/coda/shared/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
-    elif [[ $backend == "hetzner" ]]; then
-        remote_path="/home/o1labs-generic/pvc-4d294645-6466-4260-b933-1b909ff9c3a1/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
-    else
-        echo "❌ Unsupported backend: $backend"
-        exit 1
-    fi
-
-    local check=$(storage_list "$backend" "$remote_path")
+    remote_path="$(storage_root "$backend")/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
+    
+    local check
+    check=$(storage_list "$backend" "$remote_path")
 
     if [[ -z "$check" ]]; then
         echo -e "❌ ${RED} !! No debian package found using $artifact_full_name. Are you sure ($BUILDKITE_BUILD_ID) buildkite build is correct? Exiting.${CLEAR}\n"
         exit 1
     fi
 
-    local target_hash=$(storage_md5 "$backend" "$remote_path")
+    local target_hash
+    target_hash=$(storage_md5 "$backend" "$remote_path")
 
     mkdir -p "$DEBIAN_CACHE_FOLDER/$codename"
 
@@ -301,7 +374,8 @@ function publish_debian() {
     local __debian_sign_key=${11}
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network"
-    local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
+    local __artifact_full_name
+    __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__debian_sign_key != "" ]]; then
@@ -320,9 +394,7 @@ function publish_debian() {
                 --new-version ${__target_version} \
                 --suite "unstable" \
                 --new-suite ${__channel} \
-                --new-name ${__artifact_full_name} \
-                --new-release ${__channel} \
-                --codename ${__codename}
+                --new-name ${__artifact_full_name}
     fi
 
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
@@ -340,7 +412,7 @@ function publish_debian() {
         if [[ $__verify == 1 ]]; then
 
             echo "     📋 Verifying: $__artifact debian to $__channel channel with $__target_version version"
-  
+
             prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/verify.sh \
                 -p $__artifact_full_name \
                 --version $__target_version \
@@ -361,12 +433,12 @@ function promote_and_verify_docker() {
     local __publish_to_docker_io=$6
     local __verify=$7
     local __dry_run=$8
-    
-    local __network_suffix=$(get_suffix $__artifact $__network)
+    local __network_suffix
+    __network_suffix=$(get_suffix $__artifact $__network)
 
     local __artifact_full_source_version=$__source_version-$__codename${__network_suffix}
     local __artifact_full_target_version=$__target_version-$__codename${__network_suffix}
-   
+
     if [[ $__publish_to_docker_io == 1 ]]; then
         local __publish_arg="-p"
         local __repo=$DOCKER_IO_REPO
@@ -398,7 +470,7 @@ function promote_and_verify_docker() {
                 -v "$__target_version" \
                 -c "$__codename" \
                 -s "$__network_suffix" \
-                -r "$__repo" 
+                -r "$__repo"
 
             echo ""
         fi
@@ -428,8 +500,10 @@ function promote_debian() {
 
     echo " 🍥 Promoting $__artifact debian from $__source_channel to $__target_channel, from $__source_version to $__target_version"
     echo "    📦 Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network")"
-    
-    local __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
+   
+    local __artifact_full_name
+    __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
+
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
 
     if [[ $__dry_run == 0 ]]; then
@@ -437,18 +511,15 @@ function promote_debian() {
         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/reversion.sh \
                 --deb ${__artifact_full_name} \
                 --version ${__source_version} \
-                --release ${__source_channel} \
                 --new-version ${__target_version} \
                 --suite ${__source_channel} \
                 --repo ${__debian_repo} \
                 --new-suite ${__target_channel} \
-                --new-name ${__artifact_full_name} \
-                --new-release ${__target_channel} \
-                --codename ${__codename}
+                --new-name ${__artifact_full_name}
 
         if [[ $__verify == 1 ]]; then
             echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
-  
+
             prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
                 -p $__artifact_full_name \
                 --version $__target_version \
@@ -473,17 +544,17 @@ function publish_help(){
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to publish. e.g mina-logproc,mina-archive,mina-rosetta";
-    printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet"; 
-    printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id of release build to publish"; 
-    printf "  %-25s %s\n" "--source-version" "[path] source version of build to publish"; 
-    printf "  %-25s %s\n" "--target-version" "[path] target version of build to publish"; 
-    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal"; 
-    printf "  %-25s %s\n" "--channel" "[string] target debian channel"; 
-    printf "  %-25s %s\n" "--publish-to-docker-io" "[bool] publish to docker.io instead of gcr.io"; 
-    printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images"; 
-    printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages"; 
-    printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed"; 
-    printf "  %-25s %s\n" "--dry-run" "[bool] doesn't publish anything. Just print what would be published"; 
+    printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet";
+    printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id of release build to publish";
+    printf "  %-25s %s\n" "--source-version" "[path] source version of build to publish";
+    printf "  %-25s %s\n" "--target-version" "[path] target version of build to publish";
+    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal";
+    printf "  %-25s %s\n" "--channel" "[string] target debian channel";
+    printf "  %-25s %s\n" "--publish-to-docker-io" "[bool] publish to docker.io instead of gcr.io";
+    printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images";
+    printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
+    printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed";
+    printf "  %-25s %s\n" "--dry-run" "[bool] doesn't publish anything. Just print what would be published";
     printf "  %-25s %s\n" "--backend" "[string] backend to use for storage. e.g gs,hetzner. default: gs";
     printf "  %-25s %s\n" "--debian-repo" "[string] debian repository to publish to. default: $DEBIAN_REPO";
     printf "  %-25s %s\n" "--debian-sign-key" "[string] debian signing key to use. default: lack of presence = no signing";
@@ -521,7 +592,7 @@ function publish(){
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 publish_help; exit 0;
             ;;
             --artifacts )
@@ -584,7 +655,7 @@ function publish(){
                 __debian_sign_key=${2:?$error_message}
                 shift 2;
             ;;
-            * )     
+            * )
                 echo -e "❌ ${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
                 publish_help; exit 1;
@@ -631,8 +702,8 @@ function publish(){
     echo " - Debian sign key: $__debian_sign_key"
     echo ""
 
-    if [[ $__backend != "gs" && $__backend != "hetzner" ]]; then
-        echo -e "❌ ${RED} !! Backend (--backend) can be only gs or hetzner${CLEAR}\n";
+    if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
+        echo -e "❌ ${RED} !! Backend (--backend) can be only gs, hetzner or local ${CLEAR}\n";
         publish_help; exit 1;
     fi
 
@@ -640,23 +711,23 @@ function publish(){
         #check environment setup
         check_gsutil
     fi
-   
+
     if [[ $__verify == 1 ]]; then
         check_docker
     fi
- 
+
     export BUILDKITE_BUILD_ID=$__buildkite_build_id
 
     IFS=', '
     read -r -a __artifacts_arr <<< "$__artifacts"
     read -r -a __networks_arr <<< "$__networks"
     read -r -a __codenames_arr <<< "$__codenames"
-    
+
     for artifact in "${__artifacts_arr[@]}"; do
         for __codename in "${__codenames_arr[@]}"; do
                 case $artifact in
                         mina-logproc)
-                            
+
                             if [[ $__only_dockers == 0 ]]; then
                                     publish_debian $artifact \
                                         $__codename \
@@ -668,32 +739,34 @@ function publish(){
                                         $__dry_run \
                                         $__backend \
                                         $__debian_repo \
-                                        $__debian_sign_key
+                                        "$__debian_sign_key"
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
                                 echo "ℹ️  There is no $artifact docker image to publish. skipping"
                             fi
-                            
+
                         ;;
                         mina-archive)
+                            for network in "${__networks_arr[@]}"; do
                                 if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                             $__codename \
                                             $__source_version \
                                             $__target_version \
                                             $__channel \
-                                            "" \
+                                            $network \
                                             $__verify \
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename "" $__publish_to_docker_io $__verify $__dry_run
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__dry_run
                                 fi
+                            done
                         ;;
                         mina-rosetta)
                             for network in "${__networks_arr[@]}"; do
@@ -708,7 +781,7 @@ function publish(){
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -729,7 +802,7 @@ function publish(){
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            $__debian_sign_key
+                                            "$__debian_sign_key"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -762,17 +835,17 @@ function promote_help(){
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to publish. e.g mina-logproc,mina-archive,mina-rosetta";
-    printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet"; 
-    printf "  %-25s %s\n" "--source-version" "[path] source version of build to publish"; 
-    printf "  %-25s %s\n" "--target-version" "[path] target version of build to publish"; 
-    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal"; 
-    printf "  %-25s %s\n" "--source-channel" "[string] source debian channel"; 
-    printf "  %-25s %s\n" "--target-channel" "[string] target debian channel"; 
-    printf "  %-25s %s\n" "--publish-to-docker-io" "[bool] publish to docker.io instead of gcr.io"; 
-    printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images"; 
-    printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages"; 
-    printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed"; 
-    printf "  %-25s %s\n" "--dry-run" "[bool] doesn't publish anything. Just print what would be published"; 
+    printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet";
+    printf "  %-25s %s\n" "--source-version" "[path] source version of build to publish";
+    printf "  %-25s %s\n" "--target-version" "[path] target version of build to publish";
+    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal";
+    printf "  %-25s %s\n" "--source-channel" "[string] source debian channel";
+    printf "  %-25s %s\n" "--target-channel" "[string] target debian channel";
+    printf "  %-25s %s\n" "--publish-to-docker-io" "[bool] publish to docker.io instead of gcr.io";
+    printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images";
+    printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
+    printf "  %-25s %s\n" "--verify" "[bool] verify packages are published correctly. WARINING: it requires docker engine to be installed";
+    printf "  %-25s %s\n" "--dry-run" "[bool] doesn't publish anything. Just print what would be published";
     printf "  %-25s %s\n" "--debian-repo" "[string] debian repository to publish to. default: $DEBIAN_REPO";
     printf "  %-25s %s\n" "--debian-sign-key" "[string] debian signing key to use. default: lack of presence = no signing";
     echo ""
@@ -809,7 +882,7 @@ function promote(){
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 promote_help; exit 0;
             ;;
             --artifacts )
@@ -881,7 +954,7 @@ function promote(){
         promote_help; exit 1;
     fi
 
-    if [[ -z ${__source_version+x} ]]; then 
+    if [[ -z ${__source_version+x} ]]; then
         echo -e "❌ ${RED} !! Source version (--source-version) is required${CLEAR}\n";
         promote_help; exit 1;
     fi
@@ -928,7 +1001,7 @@ function promote(){
     fi
 
     if [[ $__source_version == "$__target_version" ]]; then
-        echo " ⚠️  Warning: Source version and target version are the same. 
+        echo " ⚠️  Warning: Source version and target version are the same.
     Script will do promotion but it won't have an effect at the end unless you are publishing dockers from gcr.io to docker.io ..."
         echo ""
     fi
@@ -942,7 +1015,7 @@ function promote(){
         for __codename in "${__codenames_arr[@]}"; do
                     case $artifact in
                         mina-logproc)
-                            
+
                             if [[ $__only_dockers == 0 ]]; then
                                 promote_debian $artifact \
                                     $__codename \
@@ -961,9 +1034,10 @@ function promote(){
                                 echo "   ℹ️  There is no mina-logproc docker image to promote. skipping"
                             fi
 
-                            
+
                         ;;
                         mina-archive)
+                            for network in "${__networks_arr[@]}"; do
                                 if [[ $__only_dockers == 0 ]]; then
                                     promote_debian $artifact \
                                         $__codename \
@@ -971,7 +1045,7 @@ function promote(){
                                         $__target_version \
                                         $__source_channel \
                                         $__target_channel \
-                                        "" \
+                                        $network \
                                         $__verify \
                                         $__dry_run \
                                         $__debian_repo \
@@ -979,8 +1053,9 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename "" $__publish_to_docker_io $__verify $__dry_run
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__dry_run
                                 fi
+                            done
                         ;;
                         mina-rosetta)
                             for network in "${__networks_arr[@]}"; do
@@ -996,11 +1071,11 @@ function promote(){
                                             $__dry_run \
                                             $__debian_repo \
                                             $__debian_sign_key
-                                    
+
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__dry_run 
+                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__dry_run
                                 fi
                             done
                         ;;
@@ -1050,21 +1125,33 @@ function verify_help(){
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to publish. e.g mina-logproc,mina-archive,mina-rosetta";
-    printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet"; 
-    printf "  %-25s %s\n" "--version" "[path] target version of build to publish"; 
-    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal"; 
-    printf "  %-25s %s\n" "--channel" "[string] target debian channel"; 
-    printf "  %-25s %s\n" "--docker-io" "[bool] publish to docker.io instead of gcr.io"; 
-    printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images"; 
-    printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages"; 
+    printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet";
+    printf "  %-25s %s\n" "--version" "[path] target version of build to publish";
+    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal";
+    printf "  %-25s %s\n" "--channel" "[string] target debian channel";
+    printf "  %-25s %s\n" "--debian-repo" "[string] debian repository. default: $DEBIAN_REPO";
+    printf "  %-25s %s\n" "--docker-io" "[bool] publish to docker.io instead of gcr.io";
+    printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images";
+    printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
     echo ""
     echo "Example:"
     echo ""
-    echo "  " $CLI_NAME verify --artifacts mina-logproc,mina-archive,mina-rosetta --networks devnet,mainnet --buildkite-build-id 123 --source-version 2.0.0-rc1-48efea4 --version 2.0.0-rc1-48efea5 --codenames bullseye,focal --channel nightly --docker-io --only-dockers
+    echo "  " $CLI_NAME verify --artifacts mina-logproc,mina-archive,mina-rosetta --networks devnet,mainnet  --version 2.0.0-rc1-48efea5 --codenames bullseye,focal --channel nightly --docker-io --only-debian
     echo ""
-    echo " Above command will promote mina-logproc,mina-archive,mina-rosetta artifacts to debian repository and docker registry"
+    echo " Above command will promote mina-logproc,mina-archive,mina-rosetta artifacts to debian repository"
     echo ""
     echo ""
+}
+
+function combine_docker_suffixes() {
+    local network=$1
+    local __docker_suffix=$2
+
+    if [[ -n "$__docker_suffix" ]]; then
+        echo "-$network-$__docker_suffix"
+    else
+        echo "-$network"
+    fi
 }
 
 function verify(){
@@ -1076,16 +1163,18 @@ function verify(){
     local __networks="$DEFAULT_NETWORKS"
     local __version
     local __codenames="$DEFAULT_CODENAMES"
-    local __channel
+    local __channel="unstable"
     local __docker_io=0
     local __only_dockers=0
     local __only_debians=0
-
+    local __debian_repo=$DEBIAN_REPO
+    local __debian_repo_signed=0
+    local __docker_suffix=""
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 promote_help; exit 0;
             ;;
             --artifacts )
@@ -1108,6 +1197,14 @@ function verify(){
                 __channel=${2:?$error_message}
                 shift 2;
             ;;
+            --debian-repo )
+                __debian_repo=${2:?$error_message}
+                shift 2;
+            ;;
+            --signed-debian-repo )
+                __signed_debian_repo=1
+                shift 1;
+            ;;
             --docker-io )
                 __publish_to_docker_io=1
                 shift 1;
@@ -1119,6 +1216,10 @@ function verify(){
             --only-debians )
                 __only_debians=1
                 shift 1;
+            ;;
+            --docker-suffix )
+                __docker_suffix=${2:?$error_message}
+                shift 2;
             ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
@@ -1134,12 +1235,15 @@ function verify(){
     echo " - Networks: $__networks"
     echo " - Version: $__version"
     echo " - Promoting codenames: $__codenames"
-    echo " - Channel: $__channel"
     echo " - Published to docker.io: $__docker_io"
-    echo " - Only dockers: $__only_dockers"
+    echo " - Debian repo: $__debian_repo"
+    echo " - Debian repos is signed: $__debian_repo_signed"
+    echo " - Channel: $__channel"
     echo " - Only debians: $__only_debians"
+    echo " - Only dockers: $__only_dockers"
+    echo " - Docker suffix: $__docker_suffix"
     echo ""
-    
+
     #check environment setup
     check_docker
 
@@ -1148,96 +1252,119 @@ function verify(){
     read -r -a __networks_arr <<< "$__networks"
     read -r -a __codenames_arr <<< "$__codenames"
     
-    local __repo=$(get_repo $__docker_io)
-    
+    local __repo
+    __repo=$(get_repo $__docker_io)
+
     for artifact in "${__artifacts_arr[@]}"; do
         for __codename in "${__codenames_arr[@]}"; do
                     case $artifact in
                         mina-logproc)
-                            
+
                             if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
-  
+
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
                                         -p $artifact \
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        -s "$__docker_suffix" \
+                                        ${__signed_debian_repo:+--signed}
                             fi
 
                             if [[ $__only_debians == 0 ]]; then
                                 echo "    ℹ️  There is no mina-logproc docker image. skipping"
                             fi
 
-                            
                         ;;
                         mina-archive)
+                            for network in "${__networks_arr[@]}"; do
+                               local __artifact_full_name
+                                    __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                               local __docker_suffix_combined
+                               __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+
                                if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
-                                    
-                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
-                                        -p $artifact \
-                                        --version $__version \
-                                        -m $__codename \
-                                        -r $__debian_repo \
-                                        -c $__channel
-
-                                    echo ""
-                                fi
-
-                                if [[ $__only_debians == 0 ]]; then
-                                
-                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
-                                
-                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
-                                        -p "$artifact" \
-                                        -v $__version \
-                                        -c "$__codename" \
-                                        -s "" \
-                                        -r "$__repo" 
-
-                                    echo ""
-                                fi
-                        ;;
-                        mina-rosetta)
-                            for network in "${__networks_arr[@]}"; do
-                               local __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
-                               
-                               if [[ $__only_dockers == 0 ]]; then
-                                    echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
-                                    echo ""
                                     
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
                                         -p $__artifact_full_name \
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
 
                                     echo ""
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    
-                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
-                                    echo ""
-                                    
+
+                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $artifact $__version $__codename "$network")"
+
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "-$network" \
-                                        -r "$__repo" 
-                                    
+                                        -s "$__docker_suffix_combined" \
+                                        -r "$__repo"
+
+                                    echo ""
+                                fi
+                            done
+                        ;;
+                        mina-rosetta)
+                            for network in "${__networks_arr[@]}"; do
+                               local __artifact_full_name
+                               __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                               local __docker_suffix_combined
+                               __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+
+                               if [[ $__only_dockers == 0 ]]; then
+
+                                    echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
+                                    echo ""
+
+                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
+                                        -p $__artifact_full_name \
+                                        --version $__version \
+                                        -m $__codename \
+                                        -r $__debian_repo \
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
+
+                                    echo ""
+                                fi
+
+                                if [[ $__only_debians == 0 ]]; then
+
+                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
+                                    echo ""
+
+                                    prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
+                                        -p "$artifact" \
+                                        -v $__version \
+                                        -c "$__codename" \
+                                        -s "$__docker_suffix_combined" \
+                                        -r "$__repo"
+
                                     echo ""
                                 fi
                             done
                         ;;
                         mina-daemon)
                             for network in "${__networks_arr[@]}"; do
-                                local __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
-                                if [[ $__only_dockers == 0 ]]; then
+                                local __artifact_full_name
+                                __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
+
+                                local __docker_suffix_combined
+                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+
+
+                              if [[ $__only_dockers == 0 ]]; then
                                 echo "     📋  Verifying: $__artifact_full_name debian on $__channel channel with $__version version for $__codename codename"
                                 echo ""
                                        prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
@@ -1245,7 +1372,8 @@ function verify(){
                                         --version $__version \
                                         -m $__codename \
                                         -r $__debian_repo \
-                                        -c $__channel
+                                        -c $__channel \
+                                        ${__signed_debian_repo:+--signed}
                                     echo ""
                                 fi
 
@@ -1256,8 +1384,8 @@ function verify(){
                                         -p "$artifact" \
                                         -v $__version \
                                         -c "$__codename" \
-                                        -s "-$network" \
-                                        -r "$__repo" 
+                                        -s "$__docker_suffix_combined" \
+                                        -r "$__repo"
 
                                       echo ""
                                 fi
@@ -1288,8 +1416,8 @@ function fix_help(){
     echo "Parameters:"
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
-    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal"; 
-    printf "  %-25s %s\n" "--channel" "[string] target debian channel"; 
+    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to publish. e.g bullseye,focal";
+    printf "  %-25s %s\n" "--channel" "[string] target debian channel";
     echo ""
     echo "Example:"
     echo ""
@@ -1309,12 +1437,12 @@ function fix(){
     local __channel
     local __bucket_arg="--bucket=packages.o1test.net"
     local __s3_region_arg="--s3-region=us-west-2"
-    
+
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
         case $1 in
-            -h | --help ) 
+            -h | --help )
                 fix_help; exit 0;
             ;;
             --codenames )
@@ -1338,12 +1466,12 @@ function fix(){
     echo " - Codenames: $__codenames"
     echo " - Channel: $__channel"
     echo ""
-    
-    
+
+
 
     IFS=', '
     read -r -a __codenames_arr <<< "$__codenames"
-        
+
         for __codename in "${__codenames_arr[@]}"; do
             deb-s3 verify \
             --fix-manifests \
@@ -1352,7 +1480,120 @@ function fix(){
             --codename=${__codename} \
             --component=${__channel}
         done
-    
+
+    echo " ✅  Done."
+    echo ""
+}
+
+#==============
+# persist
+#==============
+function persist_help(){
+    echo Persist artifact from cache.
+    echo ""
+    echo "     $CLI_NAME persist [-options]"
+    echo ""
+    echo "Parameters:"
+    echo ""
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "--backend" "[string] backend to persist artifacts. e.g gs,hetzner";
+    printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta";
+    printf "  %-25s %s\n" "--build_id" "[string] buildkite build id to persist artifacts";
+    printf "  %-25s %s\n" "--target" "[string] target location to persist artifacts";
+    echo ""
+    echo "Example:"
+    echo ""
+    echo "  " $CLI_NAME persist --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --build_id 123 --target /debians_legacy
+    echo ""
+    echo " Above command will persist mina-logproc,mina-archive,mina-rosetta artifacts to {backend root}/debians_legacy"
+    echo ""
+    echo ""
+}
+
+function persist(){
+    if [[ ${#} == 0 ]]; then
+        persist_help; exit 0;
+    fi
+
+    local __backend="hetzner"
+    local __artifacts="$DEFAULT_ARTIFACTS"
+    local __buildkite_build_id
+    local __target
+    local __codename
+
+    while [ ${#} -gt 0 ]; do
+        error_message="Error: a value is needed for '$1'";
+        case $1 in
+            -h | --help )
+                persist_help; exit 0;
+            ;;
+            --backend )
+                __backend=${2:?$error_message}
+                shift 2;
+            ;;
+            --artifacts )
+                __artifacts=${2:?$error_message}
+                shift 2;
+            ;;
+            --codename )
+                __codename=${2:?$error_message}
+                shift 2;
+            ;;
+            --buildkite-build-id )
+                __buildkite_build_id=${2:?$error_message}
+                shift 2;
+            ;;
+            --target )
+                __target=${2:?$error_message}
+                shift 2;
+            ;;
+            * )
+                echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
+                echo "";
+                persist_help; exit 1;
+            ;;
+        esac
+    done
+
+    echo ""
+    echo " ℹ️  Persisting mina artifacts with following parameters:"
+    echo " - Backend: $__backend"
+    echo " - Artifacts: $__artifacts"
+    echo " - Buildkite build id: $__buildkite_build_id"
+    echo " - Target: $__target"
+
+    if [[ -z ${__buildkite_build_id+x} ]]; then
+        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -z ${__target+x} ]]; then
+        echo -e "❌ ${RED} !! Target (--target) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -z ${__codename+x} ]]; then
+        echo -e "❌ ${RED} !! Codename (--codename) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    if [[ -z ${__artifacts+x} ]]; then
+        echo -e "❌ ${RED} !! Artifacts (--artifacts) is required${CLEAR}\n";
+        persist_help; exit 1;
+    fi
+
+    IFS=', '
+    read -r -a __artifacts_arr <<< "$__artifacts"
+
+    tmp_dir=$(mktemp -d)
+    echo " - Using temporary directory: $tmp_dir"
+    echo ""
+
+    for __artifact in "${__artifacts_arr[@]}"; do
+        storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*" "$tmp_dir"
+        storage_upload "$__backend" "$tmp_dir/${__artifact}_*" "$(storage_root "$__backend")/$__target/debians/$__codename/"
+    done
+
     echo " ✅  Done."
     echo ""
 }
@@ -1367,7 +1608,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        publish | promote | verify | fix )
+        publish | promote | verify | fix | persist)
             $1 "${@:2}";
         ;;
         * )

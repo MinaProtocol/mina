@@ -12,6 +12,7 @@ if [[ -n "$BRANCH_NAME" ]]; then
   # shellcheck disable=SC1090
   BRANCH_NAME="$BRANCH_NAME" source "${SCRIPTPATH}/../export-git-env-vars.sh"
 else
+  # shellcheck disable=SC1090
   source "${SCRIPTPATH}"/../export-git-env-vars.sh
 fi
 
@@ -23,7 +24,9 @@ if [ $# -eq 0 ]
     echo "No arguments supplied. Building all known debian packages"
     build_logproc_deb
     build_keypair_deb
-    build_archive_deb
+    build_archive_berkeley_deb
+    build_archive_devnet_deb
+    build_archive_mainnet_deb
     build_batch_txn_deb
     build_daemon_berkeley_deb
     build_daemon_mainnet_deb

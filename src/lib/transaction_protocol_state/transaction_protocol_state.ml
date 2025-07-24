@@ -17,7 +17,7 @@ end
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
+    module V3 = struct
       type 'a t =
         { transaction : 'a
         ; block_data : Block_data.Stable.V3.t
@@ -30,8 +30,8 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type 'a t = 'a Poly.Stable.V2.t [@@deriving sexp]
+  module V3 = struct
+    type 'a t = 'a Poly.Stable.V3.t [@@deriving sexp]
   end
 end]
 
