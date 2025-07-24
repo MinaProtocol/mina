@@ -73,36 +73,30 @@ module Builder = struct
     let block_with_hash = Mina_block.Validated.forget validated_block in
     let block = With_hash.data block_with_hash in
     let state_hash = (With_hash.hash block_with_hash).state_hash in
-    [%log debug] "Archive data generation for $state_hash: accounts-accessed"
-      ~metadata:[ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ] ;
-    let accounts_accessed_time = Time.now () in
-    let account_ids_accessed, accounts_accessed =
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Metrics.time ~label:"AccountsAccessed.get"
-          @@ fun () ->
-          let account_ids_accessed =
-            Mina_block.account_ids_accessed
-              ~constraint_constants:precomputed_values.constraint_constants
-              block
-          in
-          let accounts_accessed =
-            List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
-                match status with
-                | `Not_accessed ->
-                    None
-                | `Accessed ->
-                    (* an accessed account may not be in the ledger *)
-                    let%bind.Option index =
-                      Option.try_with (fun () ->
-                          Mina_ledger.Ledger.index_of_account_exn ledger acct_id )
-                    in
-                    let account =
-                      Mina_ledger.Ledger.get_at_index_exn ledger index
-                    in
-                    Some (index, account) )
-          in
-          Async.Deferred.return (account_ids_accessed, accounts_accessed) )
+    let start = Time.now () in
+    let account_ids_accessed =
+      Mina_block.account_ids_accessed
+        ~constraint_constants:precomputed_values.constraint_constants block
     in
+    let accounts_accessed =
+      List.filter_map account_ids_accessed ~f:(fun (acct_id, status) ->
+          match status with
+          | `Not_accessed ->
+              None
+          | `Accessed ->
+              (* an accessed account may not be in the ledger *)
+              let%bind.Option index =
+                Option.try_with (fun () ->
+                    Mina_ledger.Ledger.index_of_account_exn ledger acct_id )
+              in
+              let account = Mina_ledger.Ledger.get_at_index_exn ledger index in
+              Some (index, account) )
+    in
+    let accounts_accessed_time = Time.now () in
+    Metrics.report_time ~logger ~label:"accounts-accessed"
+      ~extra_metadata:
+        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ]
+      (Time.diff accounts_accessed_time start) ;
     let accounts_created =
       let account_creation_fee =
         precomputed_values.constraint_constants.account_creation_fee
@@ -128,15 +122,11 @@ module Builder = struct
           (token_id, owner) )
     in
     let account_created_time = Time.now () in
-    [%log debug]
-      "Archive data generation for $state_hash: accounts-created took $time ms"
-      ~metadata:
-        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
-        ; ( "time"
-          , `Float
-              (Time.Span.to_ms
-                 (Time.diff account_created_time accounts_accessed_time) ) )
-        ] ;
+    Metrics.report_time ~logger ~label:"accounts-created"
+      ~extra_metadata:
+        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ]
+      (Time.diff account_created_time accounts_accessed_time) ;
+
     Transition_frontier.Breadcrumb_added
       { block =
           With_hash.map ~f:Mina_block.read_all_proofs_from_disk block_with_hash
