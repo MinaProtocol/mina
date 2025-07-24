@@ -60,13 +60,17 @@ module Make (Data : Binable.S) = struct
           | Error e ->
               [%log warn]
                 "Failed to read LMDB disk cache persistence information from \
-                 disk, initializing a fresh cache"
+                 disk $location, initializing a fresh cache"
                 ~metadata:
                   [ ("location", `String disk_meta_location)
                   ; ("reason", `String (Error.to_string_hum e))
                   ] ;
               0
           | Ok idx ->
+              [%log info]
+                "Successfully restored LMDB disk cacahe persistence from disk \
+                 $location"
+                ~metadata:[ ("location", `String disk_meta_location) ] ;
               idx )
     in
     Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)

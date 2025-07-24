@@ -358,8 +358,8 @@ struct
               with
               | Error e ->
                   [%log warn]
-                    "Failed to read snark table from disk, using empty snark \
-                     table"
+                    "Failed to read snark table from disk $location, using \
+                     empty snark table"
                     ~metadata:
                       [ ("location", `String persistence.disk_location)
                       ; ("reason", `String (Error.to_string_hum e))
@@ -367,8 +367,16 @@ struct
                   Snark_tables.empty
               | Ok serializable_table -> (
                   try
-                    Snark_tables.of_serializable ~cache_db:config.proof_cache_db
-                      serializable_table
+                    let deserialized =
+                      Snark_tables.of_serializable
+                        ~cache_db:config.proof_cache_db serializable_table
+                    in
+
+                    [%log info]
+                      "Successfully read snark table from disk $location"
+                      ~metadata:
+                        [ ("location", `String persistence.disk_location) ] ;
+                    deserialized
                   with e ->
                     [%log warn]
                       "Failed to read snark table from disk, using empty snark \
