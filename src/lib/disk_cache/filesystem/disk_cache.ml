@@ -85,19 +85,23 @@ struct
         let str = In_channel.input_all chan in
         Binable.of_string (module B) str )
 
-  let put ({ root; next_idx; eviction_freezed; _ } : t) x : id =
-    let idx = !next_idx in
-    incr next_idx ;
-    let res = { idx } in
+  let register_gc ~(id : id) ({ root; eviction_freezed; _ } : t) =
+    let { idx } = id in
     (* When this reference is GC'd, delete the file. *)
-    Core.Gc.Expert.add_finalizer_last_exn res (fun () ->
+    Core.Gc.Expert.add_finalizer_last_exn id (fun () ->
         if not !eviction_freezed then
           (* Ignore errors: if a directory is deleted, it's ok. *)
-          try Core.Unix.unlink (path root idx) with _ -> () ) ;
+          try Core.Unix.unlink (path root idx) with _ -> () )
+
+  let put ({ root; next_idx; _ } as t : t) x : id =
+    let idx = !next_idx in
+    incr next_idx ;
+    let id = { idx } in
+    register_gc ~id t ;
     (* Write the proof to the file. *)
     Out_channel.with_file ~binary:true (path root idx) ~f:(fun chan ->
         Out_channel.output_string chan @@ Binable.to_string (module B) x ) ;
-    res
+    id
 
   let count ({ root; _ } : t) = Sys.ls_dir root |> List.length
 end

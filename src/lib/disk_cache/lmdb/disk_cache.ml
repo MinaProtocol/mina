@@ -104,8 +104,20 @@ module Make (Data : Binable.S) = struct
          ~message:
            (Printf.sprintf "Trying to access non-existent cache item %d" idx)
 
-  let put
-      ({ env; db; counter; reusable_keys; queue_guard; eviction_freezed; _ } : t)
+  let register_gc ~(id : id)
+      ({ reusable_keys; queue_guard; eviction_freezed; _ } : t) =
+    let { idx } = id in
+    (* When this reference is GC'd, delete the file. *)
+    Gc.Expert.add_finalizer_last_exn id (fun () ->
+        if not !eviction_freezed then
+          (* The actual deletion is delayed, as GC maybe triggered in LMDB's
+             critical section. LMDB critical section then will be re-entered if
+             it's invoked directly in a GC hook.
+             This causes mutex double-acquiring and node freezes. *)
+          Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
+              Queue.enqueue reusable_keys idx ) )
+
+  let put ({ env; db; counter; reusable_keys; queue_guard; _ } as t : t)
       (x : Data.t) : id =
     let idx =
       match
@@ -120,23 +132,15 @@ module Make (Data : Binable.S) = struct
              free to use them *)
           reused_key
     in
-    let res = { idx } in
-    (* When this reference is GC'd, delete the file. *)
-    Gc.Expert.add_finalizer_last_exn res (fun () ->
-        if not !eviction_freezed then
-          (* The actual deletion is delayed, as GC maybe triggered in LMDB's
-             critical section. LMDB critical section then will be re-entered if
-             it's invoked directly in a GC hook.
-             This causes mutex double-acquiring and node freezes. *)
-          Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
-              Queue.enqueue reusable_keys idx ) ) ;
+    let id = { idx } in
+    register_gc ~id t ;
 
     Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
         if Queue.length reusable_keys >= reuse_size_limit then (
           Rw.batch_remove ~env db reusable_keys ;
           Queue.clear reusable_keys ) ) ;
     Rw.set ~env db idx x ;
-    res
+    id
 
   let iteri ({ env; db; _ } : t) ~f = Rw.iter ~env db ~f
 

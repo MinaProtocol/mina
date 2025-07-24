@@ -23,6 +23,9 @@ module type S = sig
 
   (** Read from the cache, crashing if the value cannot be found. *)
   val get : t -> id -> Data.t
+
+  (** Register existing ID on GC, useful when reading from disk persistence on initialization where we only have cache ID *)
+  val register_gc : id:id -> t -> unit
 end
 
 module type S_with_count = sig

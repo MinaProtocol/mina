@@ -12,6 +12,8 @@ struct
   let initialize _path ~logger:_ ?disk_meta_location:_ () =
     Deferred.Result.return ()
 
+  let register_gc ~id:_ _ = ()
+
   let get () = ident
 
   let put () = ident
