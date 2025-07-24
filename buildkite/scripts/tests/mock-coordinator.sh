@@ -24,8 +24,8 @@ keep_only_n_json_files() {
 
 ls /tmp/mock-coordinator-test/specs
 
-# Keep only the latest 10 .json files (adjust N as needed)
-keep_only_n_json_files 10
+# Keep only the latest 15 .json files (adjust N as needed)
+keep_only_n_json_files 15
 
 ls /tmp/mock-coordinator-test/specs
 
