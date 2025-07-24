@@ -167,7 +167,7 @@ struct
 
       module Config = struct
         module Persistence = struct
-          type t = { disk_location : string }
+          type t = { disk_location : string; store_every : Time.Span.t }
         end
 
         type t =
@@ -196,9 +196,10 @@ struct
         match persistence with
         | None ->
             Config.make ~trust_system ~verifier ~proof_cache_db ()
-        | Some (`Disk_location disk_location) ->
+        | Some (`Disk_location disk_location, `Store_every store_every) ->
             Config.make ~trust_system ~verifier ~proof_cache_db
-              ~persistence:{ disk_location } ()
+              ~persistence:{ disk_location; store_every }
+              ()
 
       let proof_cache_db t = t.config.proof_cache_db
 
@@ -401,12 +402,18 @@ struct
                 .Genesis_constants.Constraint_constants.account_creation_fee
           }
         in
-        Option.iter t.config.persistence ~f:(fun { disk_location } ->
+        Option.iter t.config.persistence
+          ~f:(fun { disk_location; store_every } ->
+            let shutting_down_snark_persistence = Ivar.create () in
+            Clock.every' store_every
+              ~stop:(Ivar.read shutting_down_snark_persistence)
+              (store_to_disk ~disk_location t) ;
             Mina_stdlib_unix.Exit_handlers.(
               register_async_shutdown_handler ~logger
                 ~description:"Store snark pool on shutdown"
-                ~priority:Priority.Snark_pool
-                (store_to_disk ~disk_location t)) ) ;
+                ~priority:Priority.Snark_pool (fun () ->
+                  Ivar.fill shutting_down_snark_persistence () ;
+                  store_to_disk ~disk_location t () )) ) ;
         listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           ~tf_diff_writer ;
         t

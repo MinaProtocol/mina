@@ -2052,7 +2052,10 @@ let create ~commit_id ?wallets (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system ~proof_cache_db
-              ~persistence:(`Disk_location config.snark_pool_disk_location) ()
+              ~persistence:
+                ( `Disk_location config.snark_pool_disk_location
+                , `Store_every (Time.Span.of_min 5.0) )
+              ()
           in
           let%bind snark_pool, snark_remote_sink, snark_local_sink =
             Network_pool.Snark_pool.create ~config:snark_pool_config
