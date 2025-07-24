@@ -343,8 +343,15 @@ struct
         Mina_metrics.(
           Snark_work.Snark_pool_serialization_ms_histogram.observe
             Snark_work.snark_pool_serialization_ms elapsed) ;
-        [%log' debug t.logger] "SNARK pool serialization took $time ms"
-          ~metadata:[ ("time", `Float elapsed) ]
+        [%log' debug t.logger]
+          "SNARK pool serialization took $time ms, $num_saved SNARKs in total"
+          ~metadata:
+            [ ("time", `Float elapsed)
+            ; ( "num_saved"
+              , `Int
+                  ( !(t.snark_tables).Snark_tables.all
+                  |> Transaction_snark_work.Statement.Map.length ) )
+            ]
 
       let create ~constraint_constants ~consensus_constants:_ ~time_controller:_
           ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
