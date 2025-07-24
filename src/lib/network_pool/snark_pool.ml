@@ -35,22 +35,25 @@ module Snark_tables = struct
     Transaction_snark_work.Statement.Map.
       { all = empty; rebroadcastable = empty }
 
+  (* NOTE: if using Identity as proof cache tag, the serialized map would be none *)
   let to_serializable { all; rebroadcastable } =
     Transaction_snark_work.Statement.Map.to_alist all
-    |> List.map ~f:(fun (stmt, proof) ->
-           let proof =
-             Priced_proof.map
-               ~f:
-                 (One_or_two.map
-                    ~f:
-                      (Proof_carrying_data.map_proof ~f:Proof_cache_tag.cast_id) )
-               proof
+    |> List.filter_map ~f:(fun (stmt, Priced_proof.{ proof = proofs; fee }) ->
+           let%map.Option ids_of_tags =
+             One_or_two.Option.map
+               ~f:(fun Proof_carrying_data.{ proof; data } ->
+                 let%map.Option id = Proof_cache_tag.to_id proof in
+                 { Proof_carrying_data.proof = id; data } )
+               proofs
            in
+
            let time =
              Transaction_snark_work.Statement.Map.find rebroadcastable stmt
              |> Option.map ~f:Tuple2.get2
            in
-           (stmt, Serializable.Single.{ proof; time }) )
+           ( stmt
+           , Serializable.Single.
+               { proof = { Priced_proof.proof = ids_of_tags; fee }; time } ) )
     |> Transaction_snark_work.Statement.Stable.V2.Table.of_alist_exn
 
   let of_serializable ~cache_db (tbl : Serializable.t) =
@@ -62,27 +65,34 @@ module Snark_tables = struct
            }
          ~f:(fun
               { all; rebroadcastable }
-              (stmt, { proof = proof_serializable; time })
+              ( stmt
+              , Serializable.Single.
+                  { proof = Priced_proof.{ proof = proofs; fee }; time } )
             ->
-           let proof =
-             Priced_proof.map
-               ~f:
-                 (One_or_two.map
-                    ~f:
-                      (Proof_carrying_data.map_proof ~f:(fun id ->
-                           Proof_cache_tag.cast_of_id ~id ~cache_db ) ) )
-               proof_serializable
+           let tags_of_ids =
+             One_or_two.Option.map
+               ~f:(fun Proof_carrying_data.{ proof = id; data } ->
+                 let%map.Option tag =
+                   Proof_cache_tag.of_id_deserialized ~id ~cache_db
+                 in
+                 { Proof_carrying_data.proof = tag; data } )
+               proofs
            in
-           let all =
-             Transaction_snark_work.Statement.Map.add_exn all ~key:stmt
-               ~data:proof
-           in
-           let rebroadcastable =
-             Option.value_map time ~default:rebroadcastable ~f:(fun time ->
-                 Transaction_snark_work.Statement.Map.add_exn rebroadcastable
-                   ~key:stmt ~data:(proof, time) )
-           in
-           { all; rebroadcastable } )
+           match tags_of_ids with
+           | None ->
+               { all; rebroadcastable }
+           | Some proofs ->
+               let proof = { Priced_proof.proof = proofs; fee } in
+               let all =
+                 Transaction_snark_work.Statement.Map.add_exn all ~key:stmt
+                   ~data:proof
+               in
+               let rebroadcastable =
+                 Option.value_map time ~default:rebroadcastable ~f:(fun time ->
+                     Transaction_snark_work.Statement.Map.add_exn
+                       rebroadcastable ~key:stmt ~data:(proof, time) )
+               in
+               { all; rebroadcastable } )
 end
 
 module type S = sig
@@ -381,9 +391,15 @@ struct
                     in
 
                     [%log info]
-                      "Successfully read snark table from disk $location"
+                      "Successfully read $num_snarks_read snark table from \
+                       disk $location"
                       ~metadata:
-                        [ ("location", `String persistence.disk_location) ] ;
+                        [ ( "num_snarks_read"
+                          , `Int
+                              (Transaction_snark_work.Statement.Map.length
+                                 deserialized.Snark_tables.all ) )
+                        ; ("location", `String persistence.disk_location)
+                        ] ;
                     deserialized
                   with e ->
                     [%log warn]

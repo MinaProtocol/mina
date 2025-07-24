@@ -35,18 +35,19 @@ let create_identity_db () = Identity_cache
 
 type id = Cache.id [@@deriving bin_io_unversioned]
 
-let cast_id = function
+let to_id = function
   | Lmdb { cache_id; _ } ->
-      cache_id
+      Some cache_id
   | Identity _ ->
-      failwith "Can't cast cache tag to underlying ID!"
+      None
 
-let cast_of_id ~id ~cache_db =
+let of_id_deserialized ~id ~cache_db =
   match cache_db with
   | Lmdb_cache cache_db ->
+      let%map.Option _ = Cache.try_get_deserialized cache_db id in
       Lmdb { cache_id = id; cache_db }
   | Identity_cache ->
-      failwith "Can't cast ID back to proof with identity cache!"
+      None
 
 module For_tests = struct
   let create_db = create_identity_db
