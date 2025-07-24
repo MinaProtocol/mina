@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 
 # Array of valid service names
-export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
+export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-hardfork' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
 function export_base_image () {
     # Determine the proper image for ubuntu or debian
     case "${DEB_CODENAME##*=}" in
-    bionic|focal|impish|jammy|noble)
+    focal|jammy|noble)
         IMAGE="ubuntu:${DEB_CODENAME##*=}"
     ;;
-    stretch|buster|bullseye|bookworm|sid)
+    bullseye)
         IMAGE="debian:${DEB_CODENAME##*=}-slim"
+    ;;
+    bookworm)
+        IMAGE="debian:bookworm"
     ;;
     esac
     export IMAGE="--build-arg image=${IMAGE}"
@@ -18,7 +21,7 @@ function export_base_image () {
 
 function export_version () {
     case "${SERVICE}" in
-        mina-daemon|mina-batch-txn|mina-rosetta) export VERSION="${VERSION}-${NETWORK##*=}" ;;
+        mina-daemon|mina-archive|mina-batch-txn|mina-rosetta|mina-daemon-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
         *)  ;;
 esac
 }
@@ -31,7 +34,7 @@ function export_suffixes () {
     # - lightnet
     # - hardfork-instrumented
     case "${DEB_PROFILE}" in
-        standard)
+        devnet|mainnet)
         case "${DEB_BUILD_FLAGS}" in 
             *instrumented)
             export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"

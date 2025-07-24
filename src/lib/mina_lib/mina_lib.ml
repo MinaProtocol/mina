@@ -182,7 +182,8 @@ let log_snark_coordinator_warning (config : Config.t) snark_worker =
         ()
 
 module Snark_worker = struct
-  let run_process ~logger ~proof_level pids client_port kill_ivar num_threads =
+  let run_process ~logger ~proof_level pids client_port kill_ivar num_threads
+      ~conf_dir ~file_log_level ~log_json ~log_level =
     let env =
       Option.map
         ~f:(fun num -> `Extend [ ("RAYON_NUM_THREADS", string_of_int num) ])
@@ -196,7 +197,8 @@ module Snark_worker = struct
           :: Snark_worker.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
-               ~shutdown_on_disconnect:false )
+               ~shutdown_on_disconnect:false ~conf_dir ~file_log_level ~log_json
+               ~log_level )
     in
     Child_processes.Termination.register_process pids snark_worker_process
       Snark_worker ;
@@ -266,7 +268,10 @@ module Snark_worker = struct
         log_snark_worker_warning t ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
-            ~proof_level:t.config.precomputed_values.proof_level t.config.pids
+            ~proof_level:t.config.precomputed_values.proof_level
+            ~log_json:t.config.log_json ~file_log_level:t.config.file_log_level
+            ~log_level:t.config.log_level t.config.pids
+            ~conf_dir:t.config.conf_dir
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
             t.config.snark_worker_config.num_threads
         in
@@ -1296,8 +1301,16 @@ let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
     let proof_cache_db = proof_cache_db
   end )
 
+let shorten_commit_id commit_id =
+  (* Shorten the commit ID to 8 characters for logging purposes *)
+  let min_commit_id_length = 8 in
+  if String.length commit_id < min_commit_id_length then commit_id
+  else
+    (* Take the first 8 characters of the commit ID *)
+    String.sub ~pos:0 ~len:min_commit_id_length commit_id
+
 let start t =
-  let commit_id_short = String.sub ~pos:0 ~len:8 t.commit_id in
+  let commit_id_short = shorten_commit_id t.commit_id in
   let set_next_producer_timing timing consensus_state =
     let block_production_status, next_producer_timing =
       let generated_from_consensus_at :
@@ -1689,7 +1702,8 @@ let initialize_zkapp_vk_cache_db (config : Config.t) =
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let create ~commit_id ?wallets (config : Config.t) =
-  let commit_id_short = String.sub ~pos:0 ~len:8 commit_id in
+  [%log' info config.logger] "Creating daemon with commit id: %s" commit_id ;
+  let commit_id_short = shorten_commit_id commit_id in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let block_window_duration = config.compile_config.block_window_duration in
@@ -1743,7 +1757,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
                         ~constraint_constants ~pids:config.pids
-                        ~conf_dir:config.conf_dir ()
+                        ~conf_dir:config.conf_dir
+                        ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
                     in
                     let%map () = set_itn_data (module Prover) prover in
                     prover ) )
@@ -1870,7 +1885,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           let get_current_frontier () =
             Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
           in
-          Exit_handlers.register_async_shutdown_handler ~logger:config.logger
+          Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
+            ~logger:config.logger
             ~description:"Close transition frontier, if exists" (fun () ->
               match get_current_frontier () with
               | None ->

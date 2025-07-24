@@ -1,3 +1,4 @@
+open Core_kernel
 open Unsigned
 
 (* add functions to library module Bigstring so we can derive hash for the type t below *)
@@ -14,7 +15,7 @@ module Bigstring = struct
       let hash_fold_t hash_state t =
         String.hash_fold_t hash_state (Bigstring.to_string t)
 
-      include Bounded_types.String.Of_stringable (struct
+      include Mina_stdlib.Bounded_types.String.Of_stringable (struct
         type nonrec t = t
 
         let of_string s = Bigstring.of_string s
@@ -37,6 +38,7 @@ module T = struct
    * and node locations, the bitstring represents the path in the tree where that node exists.
    * For all other locations (generic locations), the prefix is 0xff. Generic locations can contain
    * any bitstring.
+   * Hence, we can have at most (2^(253 - 1)) accounts, where 253 is just 0xfd.
    *)
 
   module Addr = Merkle_address

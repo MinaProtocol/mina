@@ -10,26 +10,15 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let ConnectToNetwork = ../../Command/ConnectToNetwork.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Network = ../../Constants/Network.dhall
-
-let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
 let network = Network.Type.Devnet
 
-let dependsOn =
-      Dockers.dependsOn
-        Dockers.Type.Bullseye
-        network
-        Profiles.Type.Standard
-        Artifacts.Type.Daemon
+let dependsOn = Dockers.dependsOn Dockers.DepsSpec::{ network = network }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -42,7 +31,6 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "ConnectToDevnet"
-        , mode = PipelineMode.Type.Stable
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test

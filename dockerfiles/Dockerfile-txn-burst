@@ -22,12 +22,16 @@ RUN apt-get update --quiet --yes \
   && rm -rf /var/lib/apt/lists/*
 
 # Switch to HTTPS
-RUN sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list
+RUN if [ -f /etc/apt/sources.list ]; then \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list; \
+else \
+  sed -i 's/http:\/\//https:\/\//g' /etc/apt/sources.list.d/debian.sources; \
+fi
 
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
-    && apt-get -y install \
+    && apt-get -y install --no-install-recommends \
         procps \
         curl \
         jq \
@@ -40,10 +44,11 @@ RUN apt-get -y update \
     && rm -rf /var/lib/apt/lists/*
 
 #install mina and txn burst tool
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" | tee /etc/apt/sources.list.d/mina.list \
   && apt-get update\
-  && apt-get install --quiet --yes --allow-downgrades "mina-$network=$deb_version" \
-  && apt-get install --quiet --yes --allow-downgrades "mina-batch-txn=$deb_version" \
+  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades "mina-$network=$deb_version" \
+  && apt-get install --quiet --yes --no-install-recommends --allow-downgrades "mina-batch-txn=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
 
 USER root

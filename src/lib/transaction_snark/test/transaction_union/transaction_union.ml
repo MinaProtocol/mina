@@ -8,6 +8,8 @@ open Mina_base
 
 let state_body = U.genesis_state_body
 
+let signature_kind = U.signature_kind
+
 let constraint_constants = U.constraint_constants
 
 let consensus_constants = U.consensus_constants
@@ -147,7 +149,7 @@ let%test_module "Transaction union tests" =
               ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
-          Transaction_snark.check_transaction txn_in_block
+          Transaction_snark.check_transaction ~signature_kind txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants:U.constraint_constants
             ~sok_message:
@@ -226,8 +228,8 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
-              Transaction_snark.check_user_command ~constraint_constants
-                ~sok_message
+              Transaction_snark.check_user_command ~signature_kind
+                ~constraint_constants ~sok_message
                 ~source_first_pass_ledger:(Ledger.merkle_root ledger)
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state

@@ -1,3 +1,5 @@
+open Core_kernel
+
 module type LOCATION = sig
   module Addr : module type of Merkle_address
 
@@ -471,7 +473,7 @@ module Ledger = struct
   module type DATABASE = sig
     include S
 
-    val create : ?directory_name:string -> depth:int -> unit -> t
+    val create : ?directory_name:string -> ?fresh:bool -> depth:int -> unit -> t
 
     (** create_checkpoint would create the checkpoint and open a db connection to that checkpoint *)
     val create_checkpoint : t -> directory_name:string -> unit -> t

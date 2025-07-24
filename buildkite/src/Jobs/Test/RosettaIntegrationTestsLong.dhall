@@ -6,9 +6,9 @@ let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -41,7 +41,7 @@ in  Pipeline.build
         , dirtyWhen = dirtyWhen
         , path = "Test"
         , name = "RosettaIntegrationTestsLong"
-        , mode = PipelineMode.Type.Stable
+        , scope = PipelineScope.AllButPullRequest
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
@@ -57,8 +57,11 @@ in  Pipeline.build
               , Cmd.runInDocker
                   Cmd.Docker::{
                   , image =
-                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-${Network.lowerName
-                                                                                   network}"
+                      Artifacts.fullDockerTag
+                        Artifacts.Tag::{
+                        , artifact = Artifacts.Type.Rosetta
+                        , network = network
+                        }
                   }
                   "buildkite/scripts/rosetta-integration-tests-full.sh"
               ]
@@ -69,10 +72,12 @@ in  Pipeline.build
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn
-                  Dockers.Type.Bullseye
-                  network
-                  Profiles.Type.Standard
-                  Artifacts.Type.Rosetta
+                  Dockers.DepsSpec::{
+                  , codename = Dockers.Type.Bullseye
+                  , network = network
+                  , profile = Profiles.Type.Devnet
+                  , artifact = Artifacts.Type.Rosetta
+                  }
             }
         ]
       }

@@ -22,7 +22,7 @@
 (executable
   (name versioned_module_good)
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version))
-  (libraries base.caml core_kernel bin_prot.shape sexplib0 ppx_version.runtime bounded_types)
+  (libraries base.caml core_kernel bin_prot.shape sexplib0 ppx_version.runtime mina_stdlib)
   (modules versioned_module_good))
 
 (executable

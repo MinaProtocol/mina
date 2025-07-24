@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Make (Key : Binable.S) (Value : Binable.S) :
   Key_value_database.Intf.S
     with module M := Key_value_database.Monad.Ident

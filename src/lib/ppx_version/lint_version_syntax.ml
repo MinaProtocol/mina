@@ -126,7 +126,7 @@ let is_jane_street_prefix prefix =
 
 let is_bounded_type prefix =
   match Longident.flatten_exn prefix with
-  | "Bounded_types" :: _ ->
+  | "Mina_stdlib.Bounded_types" :: _ ->
       true
   | _ ->
       false
