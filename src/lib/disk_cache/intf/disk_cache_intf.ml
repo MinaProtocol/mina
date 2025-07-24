@@ -24,8 +24,8 @@ module type S = sig
   (** Read from the cache, crashing if the value cannot be found. *)
   val get : t -> id -> Data.t
 
-  (** Register existing ID on GC, useful when reading from disk persistence on initialization where we only have cache ID *)
-  val register_gc : id:id -> t -> unit
+  (** We created an ID without invoking `put`, trying to test if the ID exist, if so, register GC *)
+  val try_get_deserialized : t -> id -> Data.t option
 end
 
 module type S_with_count = sig

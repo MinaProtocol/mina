@@ -12,7 +12,7 @@ struct
   let initialize _path ~logger:_ ?disk_meta_location:_ () =
     Deferred.Result.return ()
 
-  let register_gc ~id:_ _ = ()
+  let try_get_deserialized _ v = Some v
 
   let get () = ident
 

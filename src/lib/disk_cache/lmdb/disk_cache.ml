@@ -117,6 +117,10 @@ module Make (Data : Binable.S) = struct
           Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
               Queue.enqueue reusable_keys idx ) )
 
+  let try_get_deserialized ({ env; db; _ } as t : t) ({ idx } as id : id) :
+      Data.t option =
+    Rw.get ~env db idx |> Option.map ~f:(fun data -> register_gc ~id t ; data)
+
   let put ({ env; db; counter; reusable_keys; queue_guard; _ } as t : t)
       (x : Data.t) : id =
     let idx =
