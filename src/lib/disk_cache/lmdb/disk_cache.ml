@@ -99,7 +99,10 @@ module Make (Data : Binable.S) = struct
   type id = { idx : int } [@@deriving bin_io_unversioned]
 
   let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
-    Rw.get ~env db idx |> Option.value_exn
+    Rw.get ~env db idx
+    |> Option.value_exn
+         ~message:
+           (Printf.sprintf "Trying to access non-existent cache item %d" idx)
 
   let put
       ({ env; db; counter; reusable_keys; queue_guard; eviction_freezed; _ } : t)
