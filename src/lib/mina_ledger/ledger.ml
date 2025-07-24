@@ -258,6 +258,10 @@ module Ledger_inner = struct
       (Db)
       (Unstable_db)
 
+  let of_any_ledger ledger =
+    let mask = Mask.create ~depth:(Any_ledger.M.depth ledger) () in
+    Maskable.register_mask ledger mask
+
   let of_database db =
     let casted = Any_ledger.cast (module Db) db in
     let mask = Mask.create ~depth:(Db.depth db) () in
@@ -287,6 +291,12 @@ module Ledger_inner = struct
     let mask = Mask.create ~depth () in
     ( Maskable.register_mask casted mask
     , Converting_ledger.converting_ledger converting_ledger )
+
+  module Root = struct
+    include Root.Make (Any_ledger) (Db)
+
+    let as_masked t = as_unmasked t |> of_any_ledger
+  end
 
   (** Create a new empty ledger.
 
