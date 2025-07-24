@@ -1,7 +1,3 @@
-let Prelude = ../External/Prelude.dhall
-
-let Optional/default = Prelude.Optional.default
-
 let Profiles = ./Profiles.dhall
 
 let Network = ./Network.dhall
@@ -34,43 +30,36 @@ let lowerName =
             }
             debVersion
 
-let dependsOnStep =
-          \(prefix : Optional Text)
-      ->  \(debVersion : DebVersion)
-      ->  \(network : Network.Type)
-      ->  \(profile : Profiles.Type)
-      ->  \(buildFlag : BuildFlags.Type)
-      ->  \(step : Text)
-      ->  let profileSuffix = Profiles.toSuffixUppercase profile
-
-          let prefix = Optional/default Text "MinaArtifact" prefix
-
-          let name =
-                "${prefix}${capitalName
-                              debVersion}${Network.capitalName
-                                             network}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                         buildFlag}"
-
-          in  merge
-                { Bookworm = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Bullseye = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Jammy = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Focal = [ { name = name, key = "${step}-deb-pkg" } ]
-                , Noble = [ { name = name, key = "${step}-deb-pkg" } ]
-                }
-                debVersion
+let DepsSpec =
+      { Type =
+          { deb_version : DebVersion
+          , network : Network.Type
+          , profile : Profiles.Type
+          , build_flag : BuildFlags.Type
+          , step : Text
+          , prefix : Text
+          }
+      , default =
+          { deb_version = DebVersion.Bullseye
+          , network = Network.Type.Berkeley
+          , profile = Profiles.Type.Devnet
+          , build_flag = BuildFlags.Type.None
+          , step = "build"
+          , prefix = "MinaArtifact"
+          }
+      }
 
 let dependsOn =
-          \(debVersion : DebVersion)
-      ->  \(network : Network.Type)
-      ->  \(profile : Profiles.Type)
-      ->  dependsOnStep
-            (None Text)
-            debVersion
-            network
-            profile
-            BuildFlags.Type.None
-            "build"
+          \(spec : DepsSpec.Type)
+      ->  let profileSuffix = Profiles.toSuffixUppercase spec.profile
+
+          let name =
+                "${spec.prefix}${capitalName
+                                   spec.deb_version}${Network.capitalName
+                                                        spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                                                                         spec.build_flag}"
+
+          in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
@@ -83,6 +72,7 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
+      , S.strictlyStart (S.contains "dockerfiles")
       , S.strictlyStart (S.contains "scripts/debian")
       , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
@@ -96,7 +86,6 @@ let minimalDirtyWhen =
 
 let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
-        , S.strictlyStart (S.contains "automation")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
@@ -122,6 +111,6 @@ in  { DebVersion = DebVersion
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
-    , dependsOnStep = dependsOnStep
     , dirtyWhen = dirtyWhen
+    , DepsSpec = DepsSpec
     }

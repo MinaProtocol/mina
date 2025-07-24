@@ -1,35 +1,26 @@
 let BenchBase = ../../Command/Bench/Base.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let Pipeline = ../../Pipeline/Dsl.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let BuildFlags = ../../Constants/BuildFlags.dhall
 
 let SelectFiles = ../../Lib/SelectFiles.dhall
 
-let Network = ../../Constants/Network.dhall
+let Scope = ../../Pipeline/Scope.dhall
 
 let Spec =
       { Type =
-          { key : Text, name : Text, label : Text, mode : PipelineMode.Type }
-      , default.mode = PipelineMode.Type.PullRequest
+          { key : Text, name : Text, label : Text, scope : List Scope.Type }
+      , default.scope = Scope.Full
       }
 
 let dependsOn =
-      DebianVersions.dependsOnStep
-        (None Text)
-        DebianVersions.DebVersion.Bullseye
-        Network.Type.Berkeley
-        Profiles.Type.Standard
-        BuildFlags.Type.Instrumented
-        "build"
+      DebianVersions.dependsOn
+        DebianVersions.DepsSpec::{ build_flag = BuildFlags.Type.Instrumented }
 
 let pipeline
     : Spec.Type -> Pipeline.Config.Type
@@ -41,7 +32,7 @@ let pipeline
             , label = spec.label
             , key = spec.key
             , bench = "ledger-apply"
-            , mode = spec.mode
+            , scope = spec.scope
             , dependsOn = dependsOn
             , additionalDirtyWhen =
               [ SelectFiles.exactly

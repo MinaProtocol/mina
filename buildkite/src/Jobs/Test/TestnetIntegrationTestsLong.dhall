@@ -4,31 +4,20 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
 let Dockers = ../../Constants/DockerVersions.dhall
-
-let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let dependsOn =
-        Dockers.dependsOn
-          Dockers.Type.Bullseye
-          Network.Type.Berkeley
-          Profiles.Type.Standard
-          Artifacts.Type.Daemon
+        Dockers.dependsOn Dockers.DepsSpec::{ artifact = Artifacts.Type.Daemon }
       # Dockers.dependsOn
-          Dockers.Type.Bullseye
-          Network.Type.Berkeley
-          Profiles.Type.Standard
-          Artifacts.Type.Archive
+          Dockers.DepsSpec::{ artifact = Artifacts.Type.Archive }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -42,7 +31,7 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "TestnetIntegrationTestsLong"
-        , mode = PipelineMode.Type.Stable
+        , scope = PipelineScope.AllButPullRequest
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test

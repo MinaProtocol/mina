@@ -24,12 +24,11 @@
   splittable_random
   stdio
   ;; local libraries
-  bounded_types
+  mina_stdlib
   mina_wire_types
   network_pool
   cli_lib
-  exit_handlers
-  file_system
+  mina_stdlib_unix
   itn_crypto
   kimchi_pasta
   kimchi_pasta.basic

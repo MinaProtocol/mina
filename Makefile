@@ -32,6 +32,9 @@ COVERAGE_DIR=_coverage
 ########################################
 ## Handy variables
 
+# Distribution codename, to be used in Docker builds
+CODENAME ?= $(shell lsb_release -cs)
+
 # This commit hash
 GITHASH := $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH := $(shell git rev-parse HEAD)
@@ -163,7 +166,18 @@ build_rosetta: ocaml_checks ## Build Rosetta API components
 .PHONY: build_rosetta_all_sigs
 build_rosetta_all_sigs: ocaml_checks ## Build all signature variants of Rosetta
 	$(info Starting Build)
-	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/archive/archive.exe \
+		src/app/archive/archive_testnet_signatures.exe \
+		src/app/archive/archive_mainnet_signatures.exe \
+		src/app/rosetta/rosetta.exe \
+		src/app/rosetta/rosetta_testnet_signatures.exe \
+		src/app/rosetta/rosetta_mainnet_signatures.exe \
+		src/app/rosetta/ocaml-signer/signer.exe \
+		src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
+		src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe \
+		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 .PHONY: build_intgtest
@@ -306,9 +320,27 @@ check-snarky-submodule: ## Check the snarky submodule
 #######################################
 ## Bash checks
 
+.PHONY: check-bash
 check-bash: ## Run shellcheck on bash scripts
 	shellcheck ./scripts/**/*.sh -S warning
 	shellcheck ./buildkite/scripts/**/*.sh -S warning
+
+.PHONY: check-docker
+check-docker: ## Run hadolint on Docker files
+ifdef BUILDKITE
+	hadolint --ignore DL3008 --ignore DL3002 --ignore DL3013 --ignore DL3007 --ignore DL3006 --ignore DL3028 dockerfiles/Dockerfile-* dockerfiles/stages/*
+else
+	docker run --rm -v $(PWD):/workspace -w /workspace \
+		hadolint/hadolint hadolint \
+		--ignore DL3008 \
+		--ignore DL3002 \
+		--ignore DL3013 \
+		--ignore DL3007 \
+		--ignore DL3006 \
+		--ignore DL3028 \
+		dockerfiles/Dockerfile-* \
+		dockerfiles/stages/*
+endif
 
 ########################################
 ## Artifacts
@@ -410,6 +442,16 @@ doc_diagram_sources+=$(addprefix src/lib/transition_frontier/res/,*.dot *.tex *.
 
 .PHONY: doc_diagrams
 doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources))) ## Generate documentation diagrams
+
+########################################
+# Docker images
+
+.PHONY: docker-build-toolchain
+docker-build-toolchain: ## Build the toolchain to be used in CI
+	./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-toolchain \
+		--version mina-toolchain-$(CODENAME)-$(GITHASH)
 
 ########################################
 # Generate odoc documentation

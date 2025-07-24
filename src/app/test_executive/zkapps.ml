@@ -182,7 +182,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            zkapp_command_spec
     in
     let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
-      (* construct a Zkapp_command.t, similar to zkapp_test_transaction update-permissions *)
+      (* construct a Zkapp_command.t, similar to zkapp_test_transaction
+         update-permissions *)
       let nonce = Account.Nonce.zero in
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp update permissions"
@@ -346,9 +347,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ; actions = []
           }
         in
-        Transaction_snark.For_tests.single_account_update
-          ~signature_kind:Mina_signature_kind.(Other_network "Invalid")
-          ~constraint_constants spec
+        Transaction_snark.For_tests.single_account_update ~constraint_constants
+          spec
       in
       ( snapp_update
       , zkapp_command_update_all

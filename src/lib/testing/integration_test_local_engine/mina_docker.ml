@@ -42,6 +42,7 @@ module Network_config = struct
                  map )] )
     ; constants : Test_config.constants
     ; docker : docker_config
+    ; commit_id : string
     }
   [@@deriving to_yojson]
 
@@ -552,6 +553,7 @@ module Network_config = struct
     in
     { debug_arg = debug
     ; genesis_keypairs
+    ; commit_id = git_commit
     ; constants
     ; docker =
         { docker_swarm_version
@@ -682,9 +684,9 @@ module Network_manager = struct
       ~network_config =
     let open Deferred.Let_syntax in
     let%bind () =
-      if%bind File_system.dir_exists docker_dir then (
+      if%bind Mina_stdlib_unix.File_system.dir_exists docker_dir then (
         [%log info] "Old docker stack directory found; removing to start clean" ;
-        File_system.remove_dir docker_dir )
+        Mina_stdlib_unix.File_system.remove_dir docker_dir )
       else return ()
     in
     [%log info] "Writing docker configuration %s" docker_dir ;
@@ -739,6 +741,7 @@ module Network_manager = struct
        context)" ;
     let entrypoint_filename, entrypoint_script =
       Docker_node_config.Base_node_config.entrypoint_script
+        network_config.commit_id
     in
     Out_channel.with_file ~fail_if_exists:true
       (docker_dir ^/ entrypoint_filename) ~f:(fun ch ->
@@ -1089,7 +1092,7 @@ module Network_manager = struct
   let cleanup t =
     let%bind () = if t.deployed then destroy t else return () in
     [%log' info t.logger] "Cleaning up network configuration" ;
-    let%bind () = File_system.remove_dir t.docker_dir in
+    let%bind () = Mina_stdlib_unix.File_system.remove_dir t.docker_dir in
     Deferred.unit
 
   let destroy t =

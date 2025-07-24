@@ -26,7 +26,8 @@ RUN apt-get update --quiet --yes \
 # mina keypair package
 RUN echo "deb [trusted=yes] http://packages.o1test.net bullseye stable" > /etc/apt/sources.list.d/o1.list \
    && apt-get update --quiet --yes \
-   && apt-get install --quiet --yes "mina-generate-keypair"
+   && apt-get install --quiet --yes --no-install-recommends "mina-generate-keypair" \
+   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /
 

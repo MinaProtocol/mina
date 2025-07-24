@@ -112,7 +112,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = staking_accounts in
       { epoch_ledger; epoch_seed }
     in
-    (* next accounts contains staking accounts, with balances changed, one new account *)
+    (* next accounts contains staking accounts, with balances changed, one new
+       account *)
     let next_accounts : Test_account.t list =
       let open Test_account in
       [ create ~account_name:"node-a-key" ~balance:"200000" ()
@@ -134,7 +135,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; epoch_data = Some { staking; next = Some next }
     ; genesis_ledger =
         (let open Test_account in
-        (* the genesis ledger contains the staking ledger plus some other accounts *)
+        (* the genesis ledger contains the staking ledger plus some other
+           accounts *)
         staking_accounts
         @ [ create ~account_name:"fish1" ~balance:"100" ()
           ; create ~account_name:"fish2" ~balance:"100" ()
@@ -537,8 +539,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_height =
                  Unsigned.UInt32.to_int height <= fork_config.blockchain_length
                in
-               (* for now, we accept the "link block" with a global slot since genesis equal to the previous global slot
-                  see issue #13897
+               (* for now, we accept the "link block" with a global slot since
+                  genesis equal to the previous global slot - see issue #13897
                *)
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.to_int

@@ -159,6 +159,8 @@ let blockchain_snark_state (inputs : Inputs.t) :
     (module Transaction_snark.S)
     * (module Blockchain_snark.Blockchain_snark_state.S) =
   let module T = Transaction_snark.Make (struct
+    let signature_kind = Mina_signature_kind.t_DEPRECATED
+
     let constraint_constants = inputs.constraint_constants
 
     let proof_level = inputs.proof_level
