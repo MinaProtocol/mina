@@ -196,15 +196,10 @@ module Make0 (Inputs : Input_intf) = struct
     let simple_new = Record_inst.to_peer_status new_record in
     let action_fmt, action_metadata = Action.to_log action in
     let log_trust_change () =
-      if Float.(abs (simple_new.trust - simple_old.trust) < epsilon_float) then
-        let verb =
-          if Float.(simple_new.trust > simple_old.trust) then "Increasing"
-          else "Decreasing"
-        in
-        [%log debug]
-          ~metadata:([ ("sender_id", Peer_id.to_yojson peer) ] @ action_metadata)
-          "%s trust for peer $sender_id due to %s. New trust is %f." verb
-          action_fmt simple_new.trust
+      (* WARN: Trust system doesn't work as intended in practice, and this log pollulate what we see when a node is bootstrapping, and it's misleading.
+         Context: https://o1-labs.slack.com/archives/C01SJSXSM7H/p1753263781812499?thread_ts=1753258585.989459&cid=C01SJSXSM7H
+      *)
+      ()
     in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
