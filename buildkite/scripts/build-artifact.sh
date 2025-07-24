@@ -51,5 +51,6 @@ dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
   src/app/heap_usage/heap_usage.exe \
   src/app/zkapp_limits/zkapp_limits.exe \
   src/lib/snark_worker/standalone/run_snark_worker.exe \
+  src/test/mock_snark_work_coordinator/mock_snark_work_coordinator.exe \
   src/test/command_line_tests/command_line_tests.exe \
   src/test/archive/patch_archive_test/patch_archive_test.exe

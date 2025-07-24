@@ -255,6 +255,7 @@ build_functional_test_suite_deb() {
   cp ./default/src/app/heap_usage/heap_usage.exe "${BUILDDIR}/usr/local/bin/mina-heap-usage"
   cp ./default/src/app/zkapp_limits/zkapp_limits.exe "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
   cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
+  cp ./default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinator.exe "${BUILDDIR}/usr/local/bin/mina-mock-snark-work-coordinator"
 
   build_deb mina-test-suite
 

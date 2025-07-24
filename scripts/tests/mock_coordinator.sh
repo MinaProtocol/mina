@@ -13,13 +13,32 @@
 
 NUM_WORKERS=8
 
+MINA_APP=${MINA_APP:-"_build/default/src/app/cli/src/mina.exe"}
+MOCK_SNARK_WORKER_COORDINATOR=${MOCK_SNARK_WORKER_COORDINATOR:-"_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinator.exe"}
+
 # NOTE: Sleep is needed so when worker wakes up the coordinator is ready 
 WORKER_SLEEP_PER_SPEC_SEC=1
 
 echo "DUMPED_SPEC_PATH = ${DUMPED_SPEC_PATH:?DUMPED_SPEC_PATH is not set, exiting}"
 echo "PROOF_OUTPUT_PATH = ${PROOF_OUTPUT_PATH:?PROOF_OUTPUT_PATH is not set, exiting}"
 
-NUM_SPECS=`ls -1 ${DUMPED_SPEC_PATH} | wc -l`
+# Check if directories exist and are accessible
+if [ ! -d "${DUMPED_SPEC_PATH}" ]; then
+  echo "Error: DUMPED_SPEC_PATH directory '${DUMPED_SPEC_PATH}' does not exist"
+  exit 1
+fi
+
+if [ ! -d "${PROOF_OUTPUT_PATH}" ]; then
+  echo "Error: PROOF_OUTPUT_PATH directory '${PROOF_OUTPUT_PATH}' does not exist, creating it..."
+  mkdir -p "${PROOF_OUTPUT_PATH}"
+fi
+
+NUM_SPECS=$(ls -1 "${DUMPED_SPEC_PATH}" | wc -l)
+
+if [ "$NUM_SPECS" -eq 0 ]; then
+  echo "Error: No spec files found in ${DUMPED_SPEC_PATH}"
+  exit 1
+fi
 
 WORKER_TOTAL_SLEEP=$((WORKER_SLEEP_PER_SPEC_SEC * NUM_SPECS + 10))
 
@@ -34,9 +53,7 @@ while true; do
   fi
 done
 
-cd $(git root)
-
-./_build/default/src/test/mock_snark_work_coordinator/mock_snark_work_coordinator.exe \
+"$MOCK_SNARK_WORKER_COORDINATOR" \
   --coordinator-port $MOCK_COORDINATOR_PORT \
   --dumped-spec-path $DUMPED_SPEC_PATH \
   --output-folder $PROOF_OUTPUT_PATH \
@@ -52,7 +69,7 @@ MOCK_COORDINATOR_PID=$!
   for i in $(seq 1 $NUM_WORKERS); do
     {
       echo "Start worker $i"
-      ./_build/default/src/app/cli/src/mina.exe \
+      "$MINA_APP" \
         internal snark-worker \
         --daemon-address 127.0.0.1:$MOCK_COORDINATOR_PORT
     } &
@@ -67,11 +84,11 @@ SNARK_WORKER_GROUPS_PID=$!
 wait $MOCK_COORDINATOR_PID
 wait $SNARK_WORKER_GROUPS_PID
 
-for file in $PROOF_OUTPUT_PATH/*; do
+for file in "$PROOF_OUTPUT_PATH"/*; do
   if [ -f "$file" ]; then
-    echo Verifying proof at $file ...
-    cat $file \
-      | ./_build/default/src/app/cli/src/mina.exe internal run-verifier \
+    echo "Verifying proof at $file ..."
+    cat "$file" \
+      | "$MINA_APP" internal run-verifier \
       --mode transaction \
       --format json
   fi
