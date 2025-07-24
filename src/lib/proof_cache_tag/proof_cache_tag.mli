@@ -20,9 +20,9 @@ val create_identity_db : unit -> cache_db
 
 type id [@@deriving bin_io]
 
-val cast_id : t -> id
+val to_id : t -> id option
 
-val cast_of_id : id:id -> cache_db:cache_db -> t
+val of_id_deserialized : id:id -> cache_db:cache_db -> t option
 
 module For_tests : sig
   val create_db : unit -> cache_db
