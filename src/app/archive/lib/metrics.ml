@@ -23,12 +23,12 @@ let report_time ~logger ~label ?(extra_metadata = []) elapsed =
   @param f A function of type unit -> 'a Deferred.t whose execution time will be measured.
   @return The result of [f ()], after reporting the elapsed time.
 *)
-let time ~label f =
+let time ~label ~logger f =
   let start = Time.now () in
   let%map x = f () in
   let stop = Time.now () in
   let elapsed = Time.diff stop start in
-  report_time ~logger:(Logger.create ()) ~label elapsed ;
+  report_time ~logger ~label elapsed ;
   x
 
 let default_missing_blocks_width = 2000
@@ -38,8 +38,8 @@ module Max_block_height = struct
     Caqti_request.find Caqti_type.unit Caqti_type.int
       "SELECT GREATEST(0, MAX(height)) FROM blocks"
 
-  let update (module Conn : Caqti_async.CONNECTION) metric_server =
-    time ~label:"max_block_height" (fun () ->
+  let update ~logger (module Conn : Caqti_async.CONNECTION) metric_server =
+    time ~label:"max_block_height" ~logger (fun () ->
         let open Deferred.Result.Let_syntax in
         let%map max_height = Conn.find query () in
         Mina_metrics.(
@@ -61,10 +61,10 @@ module Missing_blocks = struct
       |sql}
          missing_blocks_width )
 
-  let update ~missing_blocks_width (module Conn : Caqti_async.CONNECTION)
-      metric_server =
+  let update ~logger ~missing_blocks_width
+      (module Conn : Caqti_async.CONNECTION) metric_server =
     let open Deferred.Result.Let_syntax in
-    time ~label:"missing_blocks" (fun () ->
+    time ~label:"missing_blocks" ~logger (fun () ->
         let%map missing_blocks = Conn.find (query missing_blocks_width) () in
         Mina_metrics.(
           Gauge.set
@@ -82,9 +82,9 @@ module Unparented_blocks = struct
            WHERE parent_id IS NULL
       |sql}
 
-  let update (module Conn : Caqti_async.CONNECTION) metric_server =
+  let update ~logger (module Conn : Caqti_async.CONNECTION) metric_server =
     let open Deferred.Result.Let_syntax in
-    time ~label:"unparented_blocks" (fun () ->
+    time ~label:"unparented_blocks" ~logger (fun () ->
         let%map unparented_block_count = Conn.find query () in
         Mina_metrics.(
           Gauge.set
@@ -114,7 +114,7 @@ let update ~logger ~missing_blocks_width pool metric_server =
   Deferred.all_unit
     (List.map
        ~f:(log_error ~logger pool metric_server)
-       [ Max_block_height.update
-       ; Unparented_blocks.update
-       ; Missing_blocks.update ~missing_blocks_width
+       [ Max_block_height.update ~logger
+       ; Unparented_blocks.update ~logger
+       ; Missing_blocks.update ~logger ~missing_blocks_width
        ] )
