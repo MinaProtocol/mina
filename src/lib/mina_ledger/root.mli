@@ -55,12 +55,11 @@ module Make
       directory. *)
   val create_single : ?directory_name:string -> depth:int -> unit -> t
 
-  (** Checkpoint the stable database backing the root and create a new
-      [Stable_db.t] based on that checkpoint *)
-  val create_checkpoint_stable :
-    t -> directory_name:string -> unit -> Stable_db.t
+  (** Make a checkpoint of the root ledger and return a new root ledger backed
+      by that checkpoint *)
+  val create_checkpoint : t -> directory_name:string -> unit -> t
 
-  (** Make a checkpoint of the full root ledger *)
+  (** Make a checkpoint of the root ledger *)
   val make_checkpoint : t -> directory_name:string -> unit
 
   (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
@@ -93,19 +92,14 @@ module Make
       [addr] doesn't point to a hash. *)
   val get_inner_hash_at_addr_exn : t -> addr -> hash
 
-  (** Calculate all the addresses that lie in the ledger, starting at [addr] and
-      going downward in the merkle tree. Then, set the accounts at those
-      addresses to the values in the list. Throws an exception if the [addr] is
-      not in the ledger, or if there are not exactly enough accounts in the list
-      to set the values at all the addresses. *)
-
-  (* TODO: see if the hashes of the accounts can be passed in here too *)
+  (** Set the accounts at the leaves underneath [addr] in the ledger to the
+      accounts in the given list. Throws an exception if the [addr] is not in
+      the ledger, or if there are not exactly enough accounts in the list to set
+      the values at the leaves. *)
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
   (** For each addr-account pair, replace the account in the root with the given
       account. This is done as a single batch write. *)
-
-  (* TODO: investigate if this can be removed from the syncable interface *)
   val set_batch_accounts : t -> (addr * account) list -> unit
 
   (** Get all of the accounts that are in a subtree of the underlying Merkle

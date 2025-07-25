@@ -47,10 +47,10 @@ struct
   let create_single ?directory_name ~depth () =
     Stable_db (Stable_db.create ?directory_name ~depth ())
 
-  let create_checkpoint_stable t ~directory_name () =
+  let create_checkpoint t ~directory_name () =
     match t with
     | Stable_db db ->
-        Stable_db.create_checkpoint db ~directory_name ()
+        Stable_db (Stable_db.create_checkpoint db ~directory_name ())
 
   let make_checkpoint t ~directory_name =
     match t with Stable_db db -> Stable_db.make_checkpoint db ~directory_name
