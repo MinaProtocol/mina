@@ -84,12 +84,6 @@ let extract_perf_metrics log_file =
           | Error err ->
               failwithf "Invalid log line: %s. Error: %s" line err () )
   in
-  let grouped_metrics =
-    List.fold perf_metrics
-      ~init:(Map.empty (module String))
-      ~f:(fun acc (operation, time_ms) ->
-        Map.add_multi acc ~key:operation ~data:time_ms )
-  in
   (* Calculate the average time for each operation *)
   (* Group by operation and calculate the average time *)
   let averaged_metrics =
