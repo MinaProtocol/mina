@@ -322,7 +322,7 @@ check-snarky-submodule: ## Check the snarky submodule
 
 .PHONY: check-bash
 check-bash: ## Run shellcheck on bash scripts
-	shellcheck ./scripts/**/*.sh -S warning
+	shellcheck ./scripts/**/*.sh
 	shellcheck ./buildkite/scripts/**/*.sh -S warning
 
 .PHONY: check-docker
