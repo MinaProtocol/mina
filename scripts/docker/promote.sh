@@ -41,14 +41,14 @@ TAG=$(echo "$TAG" | sed 's/[^a-zA-Z0-9_.-]/-/g')
 echo "📎 Adding new tag ($TAG) for docker ${GCR_REPO}/${NAME}:${VERSION}"
 echo "   📥 pulling ${GCR_REPO}/${NAME}:${VERSION}"
 
-docker pull $QUIET ${GCR_REPO}/${NAME}:${VERSION}
+docker pull $QUIET "${GCR_REPO}/${NAME}:${VERSION}"
 
 if [[ $PUBLISH == 1 ]]; then
   TARGET_REPO=docker.io/minaprotocol
   
   echo "   📎 tagging ${GCR_REPO}/${NAME}:${VERSION} as ${TARGET_REPO}/${NAME}:${TAG}"
 
-  docker tag ${GCR_REPO}/${NAME}:${VERSION} ${TARGET_REPO}/${NAME}:${TAG}
+  docker tag "${GCR_REPO}/${NAME}:${VERSION}" "${TARGET_REPO}/${NAME}:${TAG}"
   echo "   📤 pushing ${TARGET_REPO}/${NAME}:${TAG}"
   docker push $QUIET "${TARGET_REPO}/${NAME}:${TAG}"
 else 

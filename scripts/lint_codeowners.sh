@@ -17,8 +17,8 @@ while read line; do
     error 'invalid comment ("#" must appear at the beginning of a line)'
   fi
 
-  target=$(echo $line | cut -d' ' -f1)
-  mentions=$(echo $line | cut -d' ' -f2-)
+  target=$(echo "$line" | cut -d' ' -f1)
+  mentions=$(echo "$line" | cut -d' ' -f2-)
 
   if [[ $target =~ \* ]]; then
     error 'wildcard targets are not allowed (for now)'

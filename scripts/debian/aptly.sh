@@ -53,7 +53,7 @@ function start_aptly() {
         aptly serve -listen localhost:"${__port}"
     fi
 
-    if [ $__wait = 1 ]; then
+    if [ "$__wait" = 1 ]; then
         local __timeout=300
         local __elapsed=0
         while ! curl -s "http://localhost:$__port" >/dev/null; do
@@ -147,13 +147,13 @@ function start(){
         esac
     done
     
-    start_aptly $__distribution \
-        $__debs \
-        $__background \
-        $__clean \
-        $__component \
-        $__port \
-        $__wait
+    start_aptly "$__distribution" \
+        "$__debs" \
+        "$__background" \
+        "$__clean" \
+        "$__component" \
+        "$__port" \
+        "$__wait"
 
 }
 

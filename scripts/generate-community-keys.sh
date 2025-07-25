@@ -14,7 +14,7 @@ COUNT=$2
 mkdir "${PREFIX}"
 cd "${PREFIX}"
 
-for i in $(seq 1 ${COUNT}); do
+for i in $(seq 1 "${COUNT}"); do
 
         NODE="${PREFIX}-${i}"
         PASS="${NODE}-password.txt"
@@ -38,13 +38,13 @@ for i in $(seq 1 ${COUNT}); do
         zip -r "${ZIP}" "${NODE}"
 
         echo "Cleaning up ${NODE} directory"
-        rm -rf ${NODE}
+        rm -rf "${NODE}"
 done
 
 echo "Combining .pub files into one ${PREFIX}-keys.txt and cleaning up"
-cat ${PREFIX}-*.pub > ${PREFIX}-keys.txt
-cp ${PREFIX}-keys.txt ../
-rm -rf ${PREFIX}-*.pub
+cat "${PREFIX}"-*.pub > "${PREFIX}"-keys.txt
+cp "${PREFIX}"-keys.txt ../
+rm -rf "${PREFIX}"-*.pub
 
 cd ..
 echo "All keys generated successfully! Combining into one zip file"

@@ -15,5 +15,5 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
   echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
   exit 0
 else
-  aws s3 cp "dist/$NAME-$VERSION.dmg" s3://$BUCKET/branch/$CIRCLE_BRANCH/wallet.dmg
+  aws s3 cp "dist/$NAME-$VERSION.dmg" s3://"$BUCKET"/branch/"$CIRCLE_BRANCH"/wallet.dmg
 fi

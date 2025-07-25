@@ -29,19 +29,19 @@ if [ -z "$ID"  ]; then
     echo "Error: Cannot find id for $LAST_BLOCK_HASH. Please ensure block exists and database has no missing blocks"
     exit 1
 else 
-    echo Fork block id $ID
+    echo Fork block id "$ID"
 fi
 
 if [ -z "$HEIGHT"  ]; then 
     echo "Error: Cannot find height for $LAST_BLOCK_HASH. Please ensure block exists and database has no missing blocks"
     exit 1
 else 
-    echo Fork block height $HEIGHT
+    echo Fork block height "$HEIGHT"
 fi
 
 
 echo "Calculating canonical chain..."
-canon_chain=$($PSQL $CONN_STR -U postgres -t -c  "WITH RECURSIVE chain AS ( 
+canon_chain=$("$PSQL" "$CONN_STR" -U postgres -t -c  "WITH RECURSIVE chain AS ( 
                     SELECT id, parent_id, height,state_hash 
                     FROM blocks b WHERE b.id = $ID and b.protocol_version_id = $PROTOCOL_VERSION
 

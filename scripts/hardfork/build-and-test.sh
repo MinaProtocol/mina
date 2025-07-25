@@ -70,9 +70,9 @@ if [[ ! -L compatible-devnet ]]; then
     git clone -b compatible --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
     cd "$compatible_build"
   else
-    git checkout -f $1
+    git checkout -f "$1"
     git checkout -f compatible
-    git checkout -f $1 -- scripts/hardfork
+    git checkout -f "$1" -- scripts/hardfork
     compatible_build="$INIT_DIR"
   fi
   git submodule sync --recursive
@@ -87,7 +87,7 @@ fi
 
 if [[ $# -gt 0 ]]; then
   # Branch is specified, this is a CI run
-  git checkout -f $1
+  git checkout -f "$1"
   git submodule sync --recursive
   git submodule update --init --recursive
 fi
@@ -95,8 +95,8 @@ nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR
 nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
 
 if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
-  mkdir -p $HOME/.aws
-  cat <<EOF> $HOME/.aws/credentials
+  mkdir -p "$HOME"/.aws
+  cat <<EOF> "$HOME"/.aws/credentials
 [default]
 aws_access_key_id=$NIX_CACHE_GCP_ID
 aws_secret_access_key=$NIX_CACHE_GCP_SECRET

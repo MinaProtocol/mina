@@ -69,10 +69,10 @@ if [[ "$REPLACE_TOP" != "" ]]; then
 fi
 
 if [[ "$NO_NEXT" == "" ]]; then
-  "$ledger_script" $args -p next-staking-$EPOCH "${KEYS[@]}" | update_extra_balances > genesis.json
+  "$ledger_script" $args -p next-staking-"$EPOCH" "${KEYS[@]}" | update_extra_balances > genesis.json
 else
-  "$ledger_script" $args -p staking-$EPOCH "${KEYS[@]}" | update_extra_balances > genesis.json
+  "$ledger_script" $args -p staking-"$EPOCH" "${KEYS[@]}" | update_extra_balances > genesis.json
   EPOCH=$((EPOCH-1))
 fi
-"$ledger_script" $args -p staking-$EPOCH "${KEYS[@]}" | update_extra_balances > next.json
+"$ledger_script" $args -p staking-"$EPOCH" "${KEYS[@]}" | update_extra_balances > next.json
 "$ledger_script" $args -p staking-$((EPOCH-1)) "${KEYS[@]}" | update_extra_balances > staking.json

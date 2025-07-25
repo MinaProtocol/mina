@@ -11,7 +11,7 @@ error() {
 
 fatal_error() {
   error "$@"
-  exit $status
+  exit "$status"
 }
 
 for padded_id in $rfc_ids; do

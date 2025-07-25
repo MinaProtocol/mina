@@ -35,29 +35,29 @@ esac; done
 
 echo "Exporting ledger to $TEMP_FOLDER"
 echo "20k accounts is way less than the size of a mainnet ledger (200k), but good enough for testing"
-$MINA_APP ledger test generate-accounts -n 20000 --min-balance 1000 --max-balance 10000 > $ACCOUNTS_FILE
+$MINA_APP ledger test generate-accounts -n 20000 --min-balance 1000 --max-balance 10000 > "$ACCOUNTS_FILE"
 
 echo "Adapt ledger for tests"
 
 # give more MINA to first account which will be sending founds
-jq '(.[0] | .balance ) |= "20000000"' $ACCOUNTS_FILE > $TEMP_ACCOUNTS_FILE
-mv $TEMP_ACCOUNTS_FILE $ACCOUNTS_FILE
+jq '(.[0] | .balance ) |= "20000000"' "$ACCOUNTS_FILE" > "$TEMP_ACCOUNTS_FILE"
+mv "$TEMP_ACCOUNTS_FILE" "$ACCOUNTS_FILE"
 
 # construct correct ledger file
-jq  '{ ledger: { accounts: . , "add_genesis_winner": false } }' < $ACCOUNTS_FILE > $GENESIS_LEDGER
+jq  '{ ledger: { accounts: . , "add_genesis_winner": false } }' < "$ACCOUNTS_FILE" > "$GENESIS_LEDGER"
 
 echo "creating runtime ledger in $TEMP_FOLDER"
 
-$RUNTIME_LEDGER_APP --config-file $GENESIS_LEDGER --genesis-dir $TEMP_FOLDER/genesis --hash-output-file $TEMP_FOLDER/genesis/hash.out --ignore-missing
+$RUNTIME_LEDGER_APP --config-file "$GENESIS_LEDGER" --genesis-dir "$TEMP_FOLDER"/genesis --hash-output-file "$TEMP_FOLDER"/genesis/hash.out --ignore-missing
 
 
 # Silently passing MINA_PRIVKEY_PASS & CODA_PRIVKEY
-CODA_PRIVKEY=$(cat $ACCOUNTS_FILE | jq -r .[0].sk) MINA_PRIVKEY_PASS=$MINA_PRIVKEY_PASS $MINA_APP advanced wrap-key --privkey-path $SENDER
-chmod 700 $SENDER
+CODA_PRIVKEY=$(cat "$ACCOUNTS_FILE" | jq -r .[0].sk) MINA_PRIVKEY_PASS=$MINA_PRIVKEY_PASS $MINA_APP advanced wrap-key --privkey-path "$SENDER"
+chmod 700 "$SENDER"
 
-mkdir $TEMP_FOLDER/genesis/ledger
+mkdir "$TEMP_FOLDER"/genesis/ledger
 
-tar -zxf  $TEMP_FOLDER/genesis/genesis_ledger_*.tar.gz -C $TEMP_FOLDER/genesis/ledger
+tar -zxf  "$TEMP_FOLDER"/genesis/genesis_ledger_*.tar.gz -C "$TEMP_FOLDER"/genesis/ledger
 
 echo "running test:"
-time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200 --dump-benchmark $BENCHMARK_FILE $ACTIONS_EVENTS_OPT
+time $MINA_APP ledger test apply --ledger-path "$TEMP_FOLDER"/genesis/ledger  --privkey-path "$SENDER" --num-txs 200 --dump-benchmark "$BENCHMARK_FILE" $ACTIONS_EVENTS_OPT

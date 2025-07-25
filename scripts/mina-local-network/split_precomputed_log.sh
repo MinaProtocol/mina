@@ -11,13 +11,13 @@ OUTPUT_FOLDER=${2:precomputed_blocks}
 cd "$OUTPUT_FOLDER" || exit
 
 while IFS= read -r line; do
-	LEDGER_HASH=$(echo $line | jq -r '.data.protocol_state.body.blockchain_state.staged_ledger_hash.non_snark.ledger_hash')
-	FILE_NAME=$(psql $ARCHIVE_URI -t -c "SELECT 'mainnet-' || height || '-' ||state_hash || '.json' FROM blocks WHERE ledger_hash = '$LEDGER_HASH'" | xargs)
+	LEDGER_HASH=$(echo "$line" | jq -r '.data.protocol_state.body.blockchain_state.staged_ledger_hash.non_snark.ledger_hash')
+	FILE_NAME=$(psql "$ARCHIVE_URI" -t -c "SELECT 'mainnet-' || height || '-' ||state_hash || '.json' FROM blocks WHERE ledger_hash = '$LEDGER_HASH'" | xargs)
 	if [[ -z "$FILE_NAME" ]] || [[ "$FILE_NAME" == "NULL" ]]; then
 		echo "WARNING: No block found in db for ledger hash: $LEDGER_HASH"
 		continue
 	fi
-	echo  $line > $FILE_NAME
-done < $PRECOMPUTED_LOG_FILE
+	echo  "$line" > "$FILE_NAME"
+done < "$PRECOMPUTED_LOG_FILE"
 
 

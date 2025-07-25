@@ -58,9 +58,9 @@ echo '{ "genesis_ledger": { "accounts": '"$(cat _tmp.json | jq '.accounts')"', "
 rm _tmp.json
 
 echo Regenerating genesis_ledger
-cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat $LOCAL_NETWORK_DATA_FOLDER/genesis_ledger.json | jq -c)"  > _tmp.json
+cat src/test/archive/sample_db/genesis.json | jq ".ledger=$(cat "$LOCAL_NETWORK_DATA_FOLDER"/genesis_ledger.json | jq -c)"  > _tmp.json
 #update genesis_state_timestamp to the one from daemon.json
-jq --arg timestamp "$(cat $LOCAL_NETWORK_DATA_FOLDER/daemon.json | jq -r '.genesis.genesis_state_timestamp')" '.genesis.genesis_state_timestamp = $timestamp' _tmp.json > _tmp2.json && mv _tmp2.json _tmp.json
+jq --arg timestamp "$(cat "$LOCAL_NETWORK_DATA_FOLDER"/daemon.json | jq -r '.genesis.genesis_state_timestamp')" '.genesis.genesis_state_timestamp = $timestamp' _tmp.json > _tmp2.json && mv _tmp2.json _tmp.json
 
 mv _tmp.json src/test/archive/sample_db/genesis.json
 

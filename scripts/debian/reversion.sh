@@ -51,15 +51,15 @@ fi
 function rebuild_deb() {
   source scripts/debian/reversion-helper.sh
 
-  wget https://s3.us-west-2.amazonaws.com/${REPO}/pool/${CODENAME}/m/mi/${DEB}_${VERSION}.deb
-  reversion --deb ${DEB} \
-            --package ${DEB} \
-            --source-version ${VERSION} \
-            --new-version ${NEW_VERSION} \
-            --suite ${SUITE} \
-            --new-suite ${NEW_SUITE} \
-            --new-name ${NEW_NAME}
+  wget https://s3.us-west-2.amazonaws.com/"${REPO}"/pool/"${CODENAME}"/m/mi/"${DEB}"_"${VERSION}".deb
+  reversion --deb "${DEB}" \
+            --package "${DEB}" \
+            --source-version "${VERSION}" \
+            --new-version "${NEW_VERSION}" \
+            --suite "${SUITE}" \
+            --new-suite "${NEW_SUITE}" \
+            --new-name "${NEW_NAME}"
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG}
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" "${SIGN_ARG}"

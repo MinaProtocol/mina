@@ -23,7 +23,7 @@ function report () {
 }
 
 echo "Running replayer"
-$REPLAYER_APP --archive-uri $PG_CONN --input-file $INPUT_FILE
+"$REPLAYER_APP" --archive-uri "$PG_CONN" --input-file "$INPUT_FILE"
 
 RESULT=$?
 

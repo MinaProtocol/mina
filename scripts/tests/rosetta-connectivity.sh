@@ -36,7 +36,7 @@ function usage() {
 
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
-container_id=$(docker run -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
+container_id=$(docker run -p 3087:3087 -d --env MINA_NETWORK="$NETWORK" gcr.io/o1labs-192920/mina-rosetta:"$TAG"-"$NETWORK" )
 
 stop_docker() {
     { docker stop "$container_id" ; docker rm "$container_id" ; } || true
@@ -47,6 +47,6 @@ trap stop_docker ERR
 # Wait for the container to start
 sleep 5
 #run sanity test
-./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
+./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --network "$NETWORK" --wait-for-sync --timeout "$TIMEOUT"
 
 stop_docker

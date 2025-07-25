@@ -49,13 +49,13 @@ function assert() {
     local __error_message=$4
     
 
-    if echo $__response | jq "if ($__query) then true else false end" | grep -q true; then
+    if echo "$__response" | jq "if ($__query) then true else false end" | grep -q true; then
         echo "$__success_message"
     else
         echo "$__error_message"
 
         echo "   Response:"
-        echo "      $( echo $__response | jq)"
+        echo "      $( echo "$__response" | jq)"
         exit 1
     fi
 

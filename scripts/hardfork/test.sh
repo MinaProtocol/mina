@@ -67,7 +67,7 @@ genesis_epoch_next_hash="${first_epoch_ne[$((3+IX_NEXT_EPOCH_HASH))]}"
 
 echo "Genesis epoch staking/next hashes: $genesis_epoch_staking_hash, $genesis_epoch_next_hash"
 
-last_ne_str="$(for i in $(seq $BEST_CHAIN_QUERY_FROM $SLOT_CHAIN_END); do
+last_ne_str="$(for i in $(seq "$BEST_CHAIN_QUERY_FROM" "$SLOT_CHAIN_END"); do
   blocks $((10303+10*(i%2))) 2>/dev/null || true
   sleep "${MAIN_SLOT}s"
 done | latest_nonempty_block)"

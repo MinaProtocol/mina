@@ -418,7 +418,7 @@ fi
 # ================================================
 # Configure the Seed Peer ID
 
-SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((${SEED_START_PORT} + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((SEED_START_PORT + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
 
 # ================================================
 #
@@ -487,7 +487,7 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   clean-dir "${LEDGER_FOLDER}"/zkapp_keys
 
   if ${ZKAPP_TRANSACTIONS}; then
-    generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
+    generate-keypair "${LEDGER_FOLDER}"/zkapp_keys/zkapp_account
   fi
 
   generate-keypair "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account
@@ -504,13 +504,13 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i}
   done
   # shellcheck disable=SC2004
-  for ((i = 0; i < ${NODES}; i++)); do
+  for ((i = 0; i < NODES; i++)); do
     generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
     generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
     generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i}
   done
 
-  if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
+  if [ "$(uname)" != "Darwin" ] && [ "${FISH}" -gt 0 ]; then
     # shellcheck disable=SC2012
     FILE=$(ls "${LEDGER_FOLDER}"/offline_fish_keys/ | head -n 1)
     OWNER=$(stat -c "%U" "${LEDGER_FOLDER}"/offline_fish_keys/"${FILE}")
@@ -575,7 +575,7 @@ if ${UPDATE_GENESIS_TIMESTAMP}; then
   fi
 fi
 
-if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
+if [ -n "${OVERRIDE_SLOT_TIME_MS}" ]; then
   echo 'Modifying configuration to override slot time'
   
   if [ ! -f "${CONFIG}" ]; then
@@ -629,7 +629,7 @@ done
 #---------- Starting snark coordinator
 
 SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
-spawn-node "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+spawn-node "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer "${SEED_PEER_ID}" -libp2p-keypair "${SNARK_COORDINATOR_PEER_KEY}" "${SNARK_COORDINATOR_FLAGS}"
 SNARK_COORDINATOR_PID=$!
 
 echo 'Waiting for snark coordinator to go up...'
@@ -656,7 +656,7 @@ for ((i = 0; i < ${WHALES}; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
+  spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) -peer "${SEED_PEER_ID}" -block-producer-key "${KEY_FILE}" \
     -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
 done
@@ -746,7 +746,7 @@ fi
 
 if [ "${NODES}" -gt "0" ]; then
   echo -e "\tNon block-producing nodes:"
-  for ((i = 0; i < ${NODES}; i++)); do
+  for ((i = 0; i < NODES; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${NODE_PIDS[${i}]}"
     # shellcheck disable=SC2004
@@ -765,11 +765,11 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   FEE_PAYER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_0
   SENDER_KEY_FILE=${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_1
   ZKAPP_ACCOUNT_KEY_FILE=${LEDGER_FOLDER}/zkapp_keys/zkapp_account
-  ZKAPP_ACCOUNT_PUB_KEY=$(cat ${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub)
+  ZKAPP_ACCOUNT_PUB_KEY=$(cat "${LEDGER_FOLDER}"/zkapp_keys/zkapp_account.pub)
 
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_0.pub)
-  REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
+  REST_SERVER="http://127.0.0.1:$((FISH_START_PORT + 1))/graphql"
 
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
@@ -785,8 +785,8 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
   set +e
 
-  while [ $SYNCED -eq 0 ]; do
-    SYNC_STATUS=$(curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
+  while [ "$SYNCED" -eq 0 ]; do
+    SYNC_STATUS=$(curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' "${REST_SERVER}")
     SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
     sleep 1
   done
@@ -798,16 +798,16 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     echo "Set up zkapp account"
     printf "\n"
 
-    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key "${FEE_PAYER_KEY_FILE}" --nonce 0 --sender-key "${SENDER_KEY_FILE}" --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,7d)
-    python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
+    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key "${FEE_PAYER_KEY_FILE}" --nonce 0 --sender-key "${SENDER_KEY_FILE}" --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key "${ZKAPP_ACCOUNT_KEY_FILE}" --fee 5 | sed 1,7d)
+    python3 scripts/mina-local-network/send-graphql-query.py "${REST_SERVER}" "${QUERY}"
   fi
 
   if ${VALUE_TRANSFERS}; then
-    ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path "${KEY_FILE}"
-    ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key "${PUB_KEY}"
+    ${MINA_EXE} account import -rest-server "${REST_SERVER}" -privkey-path "${KEY_FILE}"
+    ${MINA_EXE} account unlock -rest-server "${REST_SERVER}" -public-key "${PUB_KEY}"
 
     sleep "${TRANSACTION_FREQUENCY}"
-    ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
+    ${MINA_EXE} client send-payment -rest-server "${REST_SERVER}" -amount 1 -nonce 0 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
   fi
 
   fee_payer_nonce=1
@@ -815,22 +815,22 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   state=0
 
   while true; do
-    sleep ${TRANSACTION_FREQUENCY}
+    sleep "${TRANSACTION_FREQUENCY}"
 
     if ${VALUE_TRANSFERS}; then
-      ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+      ${MINA_EXE} client send-payment -rest-server "${REST_SERVER}" -amount 1 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
     fi
 
     if ${ZKAPP_TRANSACTIONS}; then
-      QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --sender-key ${SENDER_KEY_FILE} --sender-nonce $sender_nonce --receiver-amount 1 --fee 5 --receiver $ZKAPP_ACCOUNT_PUB_KEY | sed 1,5d)
-      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
-      let fee_payer_nonce++
-      let sender_nonce++
+      QUERY=$(${ZKAPP_EXE} transfer-funds-one-receiver --fee-payer-key "${FEE_PAYER_KEY_FILE}" --nonce "$fee_payer_nonce" --sender-key "${SENDER_KEY_FILE}" --sender-nonce "$sender_nonce" --receiver-amount 1 --fee 5 --receiver "$ZKAPP_ACCOUNT_PUB_KEY" | sed 1,5d)
+      python3 scripts/mina-local-network/send-graphql-query.py "${REST_SERVER}" "${QUERY}"
+      ((fee_payer_nonce++))
+      ((sender_nonce++))
 
-      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce $fee_payer_nonce --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --zkapp-state $state --fee 5 | sed 1,5d)
-      python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
-      let fee_payer_nonce++
-      let state++
+      QUERY=$(${ZKAPP_EXE} update-state --fee-payer-key "${FEE_PAYER_KEY_FILE}" --nonce "$fee_payer_nonce" --zkapp-account-key "${ZKAPP_ACCOUNT_KEY_FILE}" --zkapp-state "$state" --fee 5 | sed 1,5d)
+      python3 scripts/mina-local-network/send-graphql-query.py "${REST_SERVER}" "${QUERY}"
+      ((fee_payer_nonce++))
+      ((state++))
     fi
   done
 

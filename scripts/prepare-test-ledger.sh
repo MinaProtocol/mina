@@ -125,7 +125,7 @@ function make_expr(){
   echo ".[$((i+num_accounts))] = {delegate:\"$key\", pk:\"$key\", balance:\"$KEY_BALANCE\"}"
 }
 
-expr=$(for i in "${!KEYS[@]}"; do make_expr $i; done | tr "\n" "|" | head -c -1)
+expr=$(for i in "${!KEYS[@]}"; do make_expr "$i"; done | tr "\n" "|" | head -c -1)
 expr="$expr | [.[] | select(.delegate | IN($keys_)) |= del(.receipt_chain_hash)]"
 
 

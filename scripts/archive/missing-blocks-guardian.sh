@@ -109,8 +109,8 @@ populate_db() {
   tempfile=$(mktemp)
   echo  "${ARCHIVE_BLOCKS} --${BLOCKS_FORMAT} --archive-uri ${1} ${2}"
   ${ARCHIVE_BLOCKS} "--${BLOCKS_FORMAT}" --archive-uri "${1}" "${2}" > tempfile
-  
-  if [ $? -ne 0 ]; then
+  exit_code=$?
+  if [ $exit_code -ne 0 ]; then
     echo $'[ERROR] mina-archive-blocks failed. The database remains unhealthy.\n Make sure the environment variables are set correctly and the database is accessible.'
     rm "${2}" "$tempfile"
     exit 1
@@ -118,7 +118,8 @@ populate_db() {
   jq -rs '"[BOOTSTRAP] Populated database with block: \(.[-1].message)"' < tempfile
   rm "$tempfile"
   rm "${2}"
-  if [ $? -ne 0 ]; then
+  exit_code=$?
+  if [ $exit_code -ne 0 ]; then
     echo $'[ERROR] Failed to remove block file. The database remains unhealthy.\n Make sure the environment variables PRECOMPUTED_BLOCKS_URL and MINA_NETWORK are set correctly.'
     exit 1
   fi
@@ -127,7 +128,8 @@ populate_db() {
 download_block() {
   echo "[BOOTSTRAP] Downloading ${1} block"
   curl -sO "${PRECOMPUTED_BLOCKS_URL}/${1}"
-  if [ $? -ne 0 ]; then
+  exit_code=$?
+  if [ $exit_code -ne 0 ]; then
     echo $'[ERROR] Curl failed to download block. The database remains unhealthy.\n Make sure your PRECOMPUTED_BLOCKS_URL environment variable is set correctly.'
     exit 1
   fi
@@ -137,26 +139,27 @@ download_block() {
 bootstrap() {
   echo "[BOOTSTRAP] Top 10 blocks before bootstrapping the archiveDB:"
   psql -b -e "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
-  if [ $? -ne 0 ]; then
+  exit_code=$?
+  if [ $exit_code -ne 0 ]; then
     echo $'[ERROR] Psql failed to connect. The database remains unhealthy.\n Make sure you can connect to the database with psql nad that the connection string is correct.'
     exit 1
   fi
   echo "[BOOTSTRAP] Restoring blocks individually from ${PRECOMPUTED_BLOCKS_URL}..."
 
   until [[ "$PARENT" == "null" ]] ; do
-    PARENT_FILE="${MINA_NETWORK}-$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_json)"
+    PARENT_FILE="${MINA_NETWORK}-$($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq_parent_json)"
     download_block "${PARENT_FILE}"
     populate_db "$PG_CONN" "$PARENT_FILE"
-    PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
+    PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq_parent_hash)"
   done
 
   echo "[BOOTSTRAP] Top 10 blocks in bootstrapped archiveDB:"
   psql -b -e "${PG_CONN}" -c "SELECT state_hash,height FROM blocks ORDER BY height DESC LIMIT 10"
   echo "[RESOLUTION] This Archive node is synced with no missing blocks back to genesis!"
   
-  if [ $1 = false ]; then
-    echo "[INFO] Checking again in $((6*${TIMEOUT}/60)) minutes..."
-    sleep $((6*${TIMEOUT}))
+  if [ "$1" = false ]; then
+    echo "[INFO] Checking again in $((6*TIMEOUT/60)) minutes..."
+    sleep $((6*TIMEOUT))
   fi
 }
 
@@ -189,13 +192,14 @@ main() {
 
     audit)
       echo "[INFO] Running in audit mode"
-      PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
-      # Check exit code
-      if [ $? -ne 0 ]; then
+      PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq_parent_hash)"
+      PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq_parent_hash)"
+      exit_code=$?
+      if [ $exit_code -ne 0 ]; then
         echo $'[ERROR] mina-missing-blocks-auditor failed with exit code $?. The database remains unhealthy.\nFor more information about the error try running mina-missing-blocks-auditor separately.'
         exit 1
       fi
-      echo "[INFO] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
+      echo "[INFO] $($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq -rs .[].message)"
       [[ "$PARENT" != "null" ]] && echo "[RESOLUTION] Some blocks are missing" && exit 0
       echo "[RESOLUTION] This Archive node is synced with no missing blocks back to genesis!"
       exit 0
@@ -204,13 +208,13 @@ main() {
     single-run)
       echo "[INFO] Running in single-run mode"
       SINGLE_RUN=true
-      PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
-      # Check exit code
-      if [ $? -ne 0 ]; then
+      PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq_parent_hash)"
+      exit_code=$?
+      if [ $exit_code -ne 0 ]; then
         echo $'[ERROR] mina-missing-blocks-auditor failed with exit code $?. The database remains unhealthy.\nFor more information about the error try running mina-missing-blocks-auditor separately.'
         exit 1
       fi
-      echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
+      echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq -rs .[].message)"
       [[ "$PARENT" != "null" ]] && echo "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap $SINGLE_RUN
       echo "[RESOLUTION] The bootstrap process finished successfully, the Archive node is synced with no missing blocks to genesis!"
       exit 0
@@ -220,18 +224,18 @@ main() {
       echo "[INFO] Running in daemon mode"
       SINGLE_RUN=false
       while true; do # Test once every 10 minutes forever, take an hour off when bootstrap completes
-        PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq_parent_hash)"
-        # Check exit code
-        if [ $? -ne 0 ]; then
+        PARENT="$($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq_parent_hash)"
+        exit_code=$?
+        if [ $exit_code -ne 0 ]; then
           echo $'[ERROR] mina-missing-blocks-auditor failed with exit code $?. The database remains unhealthy.\nFor more information about the error try running mina-missing-blocks-auditor separately.'
           exit 1
         fi
-        echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri $PG_CONN | jq -rs .[].message)"
+        echo "[BOOTSTRAP] $($MISSING_BLOCKS_AUDITOR --archive-uri "$PG_CONN" | jq -rs .[].message)"
         if [[ "$PARENT" != "null" ]]; then
           echo "[BOOTSTRAP] Some blocks are missing, moving to recovery logic..." && bootstrap $SINGLE_RUN
         else
-          echo "[RESOLUTION] Database has no missing blocks to genesis for the moment! Waiting for $((${TIMEOUT}/60)) minutes."
-          sleep $TIMEOUT # Wait for the daemon to catchup and start downloading new blocks
+          echo "[RESOLUTION] Database has no missing blocks to genesis for the moment! Waiting for $((TIMEOUT/60)) minutes."
+          sleep "$TIMEOUT" # Wait for the daemon to catchup and start downloading new blocks
         fi
       done
       exit 0

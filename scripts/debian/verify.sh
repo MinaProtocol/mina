@@ -25,35 +25,35 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "❌  Unknown parameter passed: $1"; usage;  exit 1;;
 esac; shift; done
 
-if [ -z $PACKAGE ]; then
+if [ -z "$PACKAGE" ]; then
   echo "❌  No package defined. "
   echo "❌  Did you forget to pass --package?"
   echo "" 
   usage; exit 1;
 fi
 
-if [ -z $VERSION ]; then
+if [ -z "$VERSION" ]; then
   echo "❌  No version defined."; 
   echo "❌  Did you forget to pass --version?";
   echo ""
   usage; exit 1;
 fi
 
-if [ -z $CODENAME ]; then
+if [ -z "$CODENAME" ]; then
   echo "❌  No codename defined.";
   echo "❌  Did you forget to pass --codename?";
   echo ""
   usage; exit 1;
 fi
 
-if [ -z $CHANNEL ]; then
+if [ -z "$CHANNEL" ]; then
   echo "❌  No channel defined.";
   echo "❌  Did you forget to pass --channel?";
   echo ""
   usage; exit 1;
 fi
 
-if [ -z $REPO ]; then
+if [ -z "$REPO" ]; then
   echo "❌  No repository defined."; 
   echo "❌  Did you forget to pass --repo?";
   echo ""
@@ -94,5 +94,5 @@ case $CODENAME in
 esac
 
 echo "📋  Testing $PACKAGE $DOCKER_IMAGE" \
-  && docker run --rm $DOCKER_IMAGE bash -c "$SCRIPT" \
+  && docker run --rm "$DOCKER_IMAGE" bash -c "$SCRIPT" \
   && echo '✅  OK: ALL WORKED FINE!' || (echo '❌  KO: ERROR!!!' && exit 1)

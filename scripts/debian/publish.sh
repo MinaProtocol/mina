@@ -67,17 +67,17 @@ for _ in {1..10}; do (
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
-deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
+deb-s3 upload "$BUCKET_ARG" "$S3_REGION_ARG" \
   --fail-if-exists \
   --lock \
   --preserve-versions \
   --cache-control=max-age=120 \
-  $SIGN_ARG \
+  "$SIGN_ARG" \
   --component "${DEB_RELEASE}" \
   --codename "${DEB_CODENAME}" \
   "${GPG_OPTS[@]}" \
   "${DEB_NAMES}"
-) && break || (MINA_DEB_BUCKET=${BUCKET} scripts/debian/clear-s3-lockfile.sh); done
+) && break || (MINA_DEB_BUCKET="${BUCKET}" scripts/debian/clear-s3-lockfile.sh); done
 
 for deb in $DEB_NAMES
 do
@@ -98,7 +98,7 @@ do
   join=$(join_by " " "${debs[@]}")
 
   IFS=$'\n'
-  output=$(deb-s3 exist $BUCKET_ARG $S3_REGION_ARG "$join" $DEB_VERSION $ARCH -c $DEB_CODENAME -m $DEB_RELEASE)
+  output=$(deb-s3 exist "$BUCKET_ARG" "$S3_REGION_ARG" "$join" "$DEB_VERSION" "$ARCH" -c "$DEB_CODENAME" -m "$DEB_RELEASE")
   debs=()
   for item in $output; do
      if [[ $item == *"Missing" ]]; then
@@ -114,7 +114,7 @@ do
       echo "⏩️  Skipping debian repository consistency check after push to unstable channel as it is taking too long."
     else 
       echo "📋  Validating debian repository consistency after push..."
-      if deb-s3 verify  $BUCKET_ARG $S3_REGION_ARG -c $DEB_CODENAME -m $DEB_RELEASE; then 
+      if deb-s3 verify  "$BUCKET_ARG" "$S3_REGION_ARG" -c "$DEB_CODENAME" -m "$DEB_RELEASE"; then 
         echo "✅  Debian repository is consistent"
       else
         echo "❌  Error: Debian repository is not consistent. Please run: "
