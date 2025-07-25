@@ -93,13 +93,14 @@ let extract_perf_metrics log_file =
   (* Calculate the average time for each operation *)
   (* Group by operation and calculate the average time *)
   let averaged_metrics =
-    Map.mapi grouped_metrics ~f:(fun ~key:operation ~data:times ->
-        let avg_time =
-          List.fold times ~init:0.0 ~f:( +. )
-          /. Float.of_int (List.length times)
-        in
-        (operation, avg_time) )
-    |> Map.data
+    String.Map.of_alist_multi perf_metrics
+    |> Map.to_alist
+    |> List.map ~f:(fun (operation, times) ->
+           let avg_time =
+             List.fold times ~init:0.0 ~f:( +. )
+             /. Float.of_int (List.length times)
+           in
+           (operation, avg_time) )
   in
   Deferred.return averaged_metrics
 
