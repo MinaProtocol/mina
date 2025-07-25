@@ -35,11 +35,21 @@ module Make
                     and module Addr = Any_ledger.M.Addr) : sig
   type t
 
+  type root_hash = Ledger_hash.t
+
+  type hash = Ledger_hash.t
+
+  type account = Account.t
+
+  type addr = Stable_db.Addr.t
+
+  type path = Stable_db.path
+
   (** Close the root ledger instance *)
   val close : t -> unit
 
   (** Retrieve the hash of the merkle root of the root ledger *)
-  val merkle_root : t -> Ledger_hash.t
+  val merkle_root : t -> root_hash
 
   (** Create a root ledger backed by a single database in the given
       directory. *)
@@ -69,4 +79,36 @@ module Make
     -> src:t
     -> dest:t
     -> t Or_error.t
+
+  (** Retrieve the depth of the root ledger *)
+  val depth : t -> int
+
+  (** Retrieve the number of accounts in the root ledger *)
+  val num_accounts : t -> int
+
+  (** Calculate the address path from [addr] to the merkle root. *)
+  val merkle_path_at_addr_exn : t -> addr -> path
+
+  (** Get the hash at the given [addr] in the ledger. Throws an exception if the
+      [addr] doesn't point to a hash. *)
+  val get_inner_hash_at_addr_exn : t -> addr -> hash
+
+  (** Calculate all the addresses that lie in the ledger, starting at [addr] and
+      going downward in the merkle tree. Then, set the accounts at those
+      addresses to the values in the list. Throws an exception if the [addr] is
+      not in the ledger, or if there are not exactly enough accounts in the list
+      to set the values at all the addresses. *)
+
+  (* TODO: see if the hashes of the accounts can be passed in here too *)
+  val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
+
+  (** For each addr-account pair, replace the account in the root with the given
+      account. This is done as a single batch write. *)
+
+  (* TODO: investigate if this can be removed from the syncable interface *)
+  val set_batch_accounts : t -> (addr * account) list -> unit
+
+  (** Get all of the accounts that are in a subtree of the underlying Merkle
+    tree rooted at `address`. The accounts are ordered by their addresses. *)
+  val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
 end

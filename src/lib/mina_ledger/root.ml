@@ -28,6 +28,16 @@ module Make
                    with module Location = Any_ledger.M.Location
                     and module Addr = Any_ledger.M.Addr) =
 struct
+  type root_hash = Ledger_hash.t
+
+  type hash = Ledger_hash.t
+
+  type account = Account.t
+
+  type addr = Stable_db.Addr.t
+
+  type path = Stable_db.path
+
   type t = Stable_db of Stable_db.t
 
   let close t = match t with Stable_db db -> Stable_db.close db
@@ -52,4 +62,23 @@ struct
     match (src, dest) with
     | Stable_db db1, Stable_db db2 ->
         stable ~src:db1 ~dest:db2 |> Or_error.map ~f:(fun x -> Stable_db x)
+
+  let depth t = match t with Stable_db db -> Stable_db.depth db
+
+  let num_accounts t = match t with Stable_db db -> Stable_db.num_accounts db
+
+  let merkle_path_at_addr_exn t =
+    match t with Stable_db db -> Stable_db.merkle_path_at_addr_exn db
+
+  let get_inner_hash_at_addr_exn t =
+    match t with Stable_db db -> Stable_db.get_inner_hash_at_addr_exn db
+
+  let set_all_accounts_rooted_at_exn t =
+    match t with Stable_db db -> Stable_db.set_all_accounts_rooted_at_exn db
+
+  let set_batch_accounts t =
+    match t with Stable_db db -> Stable_db.set_batch_accounts db
+
+  let get_all_accounts_rooted_at_exn t =
+    match t with Stable_db db -> Stable_db.get_all_accounts_rooted_at_exn db
 end
