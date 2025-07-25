@@ -1087,13 +1087,30 @@ module Body = struct
   let hash_fold_array f init x = Array.fold ~init ~f x
 
   module Events' = struct
+    module Bounded = Mina_stdlib.Bounded_types.ArrayN (struct
+      let max_array_len = Node_config.max_event_elements
+    end)
+
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
-          Pickles.Backend.Tick.Field.Stable.V1.t
-          Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
-          list
+        type t = Pickles.Backend.Tick.Field.Stable.V1.t Bounded.Stable.V1.t list
+        [@@deriving sexp, equal, hash, compare, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  module Actions' = struct
+    module Bounded = Mina_stdlib.Bounded_types.ArrayN (struct
+      let max_array_len = Node_config.max_action_elements
+    end)
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Pickles.Backend.Tick.Field.Stable.V1.t Bounded.Stable.V1.t list
         [@@deriving sexp, equal, hash, compare, yojson]
 
         let to_latest = Fn.id
@@ -1113,7 +1130,7 @@ module Body = struct
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; actions : Events'.Stable.V1.t
+          ; actions : Actions'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
@@ -1171,7 +1188,7 @@ module Body = struct
               (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
           ; increment_nonce : bool
           ; events : Events'.Stable.V1.t
-          ; actions : Events'.Stable.V1.t
+          ; actions : Actions'.Stable.V1.t
           ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
           ; call_depth : int
           ; preconditions : Preconditions.Stable.V1.t
@@ -1198,7 +1215,7 @@ module Body = struct
             (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
         ; increment_nonce : bool
         ; events : Events'.Stable.V1.t
-        ; actions : Events'.Stable.V1.t
+        ; actions : Actions'.Stable.V1.t
         ; call_data : Pickles.Backend.Tick.Field.Stable.V1.t
         ; preconditions : Preconditions.Stable.V1.t
         ; use_full_commitment : bool
