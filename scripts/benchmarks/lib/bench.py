@@ -463,6 +463,9 @@ class ArchiveBenchmark(Benchmark):
     def __init__(self):
         Benchmark.__init__(self, BenchmarkType.archive)
 
+    # This benchmark requires an input file with benchmark data
+    # and does not run any command. It is used to parse existing data.
+    # As a result, run method is empty.
     def run(self, path=None):
         pass
 
