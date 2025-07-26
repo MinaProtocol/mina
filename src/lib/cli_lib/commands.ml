@@ -13,7 +13,7 @@ let generate_keypair =
      @@ fun () ->
      let env = Secrets.Keypair.env in
      if Option.is_some (Sys.getenv env) then
-       eprintf "Using password from environment variable %s\n" env ;
+       eprintf "Using password from environment variable\n" ;
      let kp = Keypair.create () in
      let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
      printf "Keypair generated\nPublic key: %s\nRaw public key: %s\n"
