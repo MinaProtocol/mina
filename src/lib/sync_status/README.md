@@ -10,9 +10,11 @@ The library provides a type that encodes the following synchronization states:
 
 - `Connecting`: The node is starting up and attempting to connect to peers
 - `Listening`: The node has connected to peers and is waiting for messages
-- `Offline`: The node hasn't received messages in some time (see Mina_lib.offline_time)
+- `Offline`: The node hasn't received messages in some time (see
+  Mina_lib.offline_time)
 - `Bootstrap`: The node is currently bootstrapping
-- `Synced`: The node is receiving a constant flow of messages and is synchronized
+- `Synced`: The node is receiving a constant flow of messages and is
+  synchronized
 - `Catchup`: The node is catching up with the rest of the network
 
 The library includes functions for converting between the sync status type and
@@ -98,7 +100,8 @@ only a V1 implementation.
 
 ## Testing
 
-Tests for this library have been implemented using Alcotest. The test suite includes:
+Tests for this library have been implemented using Alcotest. The test suite
+includes:
 
 1. Conversion tests:
    - String round-trip conversion

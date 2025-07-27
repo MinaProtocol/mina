@@ -1,25 +1,30 @@
 # Common types and structures
 
 Table of Contents
-* [Basic types](#basic-types)
-* [Composite types](#composite-types)
+
+- [Basic types](#basic-types)
+- [Composite types](#composite-types)
 
 ## Basic types
 
-* `uN`: `N`-bit unsigned integer (where `N in [8, 16, 32, 64, 128, 256]`) in `little-endian` byte order
-* `bool`: `true` or `false`
-* `String` : [`std::string::String`](https://doc.rust-lang.org/std/string/struct.String.html)
-* `[T; N]`: Array of type `T` containing `N` elements, indexed starting from `0`
+- `uN`: `N`-bit unsigned integer (where `N in [8, 16, 32, 64, 128, 256]`) in
+  `little-endian` byte order
+- `bool`: `true` or `false`
+- `String` :
+  [`std::string::String`](https://doc.rust-lang.org/std/string/struct.String.html)
+- `[T; N]`: Array of type `T` containing `N` elements, indexed starting from `0`
 
 ## Composite types
 
 ### `Option<T>`
 
-An optional value that eith either `Some(T)` or `None`, see [`std::option`](https://doc.rust-lang.org/std/option/)
+An optional value that eith either `Some(T)` or `None`, see
+[`std::option`](https://doc.rust-lang.org/std/option/)
 
 ### `Result<T, E>`
 
-An enum with variants `OK(T)` for success and `Err(E)` for failure, see [`std::result`](https://doc.rust-lang.org/std/result/)
+An enum with variants `OK(T)` for success and `Err(E)` for failure, see
+[`std::result`](https://doc.rust-lang.org/std/result/)
 
 ### `Vector<T>`
 
@@ -53,7 +58,8 @@ Variable length vector of type `T`
 
 ### `SRS<G: CommitmentCurve>`
 
-The in-memory verifier index structure contains the verifier key and is defined as follows.
+The in-memory verifier index structure contains the verifier key and is defined
+as follows.
 
 | Field    | Type             | Description                      |
 | -------- | ---------------- | -------------------------------- |
@@ -61,7 +67,6 @@ The in-memory verifier index structure contains the verifier key and is defined 
 | `h`      | `G`              | Blinding factor                  |
 | `endo_r` | `G::ScalarField` | Curve endomorphism coefficient r |
 | `endo_q` | `G::BaseField`   | Curve endomorphism coefficient q |
-
 
 ### `CamlPastaFpUrs`
 
