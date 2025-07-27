@@ -53,6 +53,7 @@ upload_bench.add_argument("--infile")
 upload_bench.add_argument("--benchmark", type=BenchmarkType, help="benchmark to upload")
 
 test_bench = subparsers.add_parser('test', help="Performs entire cycle of operations from run till upload")
+test_bench.add_argument("--no-run", help="skip running benchmark", action='store_true')
 test_bench.add_argument("--benchmark", type=BenchmarkType, help="benchmark to test")
 test_bench.add_argument("--tmpfile", help="temporary location of result file", default="/tmp/bench.tmp")
 test_bench.add_argument("--input-file", help="input file with raw benchmark", default="input.json")
@@ -89,6 +90,8 @@ def select_benchmark(kind):
         return MinaBaseBenchmark()
     elif kind == BenchmarkType.zkapp:
         return ZkappLimitsBenchmark()
+    elif kind == BenchmarkType.archive:
+        return ArchiveBenchmark()
     elif kind == BenchmarkType.heap_usage:
         return HeapUsageBenchmark()
     elif kind == BenchmarkType.snark:
@@ -136,11 +139,16 @@ if args.cmd == "upload":
     bench.upload(args.infile)
 
 if args.cmd == "test":
-    output = bench.run(path=args.path)
+    if args.no_run:
+        print("Skipping running benchmark")
+        output = Path(args.input_file).read_text()
+    else:
+        output = bench.run(path=args.path)
+    
     files = bench.parse(output,
-                        args.tmpfile,
-                        influxdb=True,
-                        branch=args.branch)
+            args.tmpfile,
+            influxdb=True,
+            branch=args.branch)
 
     [
         bench.compare(file, args.yellow_threshold, args.red_threshold)

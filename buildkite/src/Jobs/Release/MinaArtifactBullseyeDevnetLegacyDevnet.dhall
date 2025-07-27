@@ -6,8 +6,6 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let Network = ../../Constants/Network.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
@@ -23,6 +21,5 @@ in  Pipeline.build
             ]
           , network = Network.Type.DevnetLegacy
           , debVersion = DebianVersions.DebVersion.Bullseye
-          , mode = PipelineMode.Type.Stable
           }
       )

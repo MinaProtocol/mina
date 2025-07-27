@@ -8,11 +8,11 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
-
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
+
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
@@ -32,7 +32,8 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
             ]
-          , mode = PipelineMode.Type.Stable
           , profile = Profiles.Type.Mainnet
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )

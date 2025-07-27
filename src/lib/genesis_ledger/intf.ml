@@ -69,6 +69,12 @@ end
 module type S = sig
   val t : Mina_ledger.Ledger.t Lazy.t
 
+  (** Populate a root ledger with the unmasked ledger backing a genesis ledger.
+      Prefer using this to a transfer using [t], for the efficiency reasons
+      described in [Mina_ledger.Ledger.Root.transfer_accounts_with]. *)
+  val populate_root :
+    Mina_ledger.Ledger.Root.t -> Mina_ledger.Ledger.Root.t Or_error.t
+
   val depth : int
 
   val accounts : (Private_key.t option * Account.t) list Lazy.t

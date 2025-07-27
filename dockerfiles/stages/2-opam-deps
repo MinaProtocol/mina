@@ -34,7 +34,7 @@ RUN git clone \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  ${MINA_REPO} ${HOME}/${MINA_DIR}
+  "${MINA_REPO}" "${HOME}/${MINA_DIR}"
 
 WORKDIR $HOME/$MINA_DIR
 
@@ -51,6 +51,6 @@ RUN opam update && \
 # --- Pin external packages / submodules
 # TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage
 # Remove .ppx and the .ppx-cache so they can be built on each run
-RUN eval $(opam config env) \
+RUN eval "$(opam config env)" \
   && scripts/pin-external-packages.sh \
   && opam clean --logs -cs --quiet

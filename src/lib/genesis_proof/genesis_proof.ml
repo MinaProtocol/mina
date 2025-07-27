@@ -113,6 +113,9 @@ module T = struct
   let genesis_ledger { genesis_ledger; _ } =
     Genesis_ledger.Packed.t genesis_ledger
 
+  let populate_root { genesis_ledger; _ } =
+    Genesis_ledger.Packed.populate_root genesis_ledger
+
   let genesis_epoch_data { genesis_epoch_data; _ } = genesis_epoch_data
 
   let accounts { genesis_ledger; _ } =

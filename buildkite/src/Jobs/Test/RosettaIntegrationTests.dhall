@@ -27,6 +27,7 @@ let dirtyWhen =
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
       , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
       , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
+      , S.exactly "dockerfiles/Dockerfile-mina-rosetta" ""
       ]
 
 let rosettaDocker =

@@ -92,6 +92,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         compute_delegatee_table keys ~iter_accounts:(fun f ->
             Mina_ledger.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct) ) )
 
+  let compute_delegatee_table_ledger_any keys ledger =
+    O1trace.sync_thread "compute_delegatee_table_ledger_any" (fun () ->
+        compute_delegatee_table keys ~iter_accounts:(fun f ->
+            Mina_ledger.Ledger.Any_ledger.M.iteri ledger ~f:(fun i acct ->
+                f i acct ) ) )
+
   let compute_delegatee_table_genesis_ledger keys ledger =
     O1trace.sync_thread "compute_delegatee_table_genesis_ledger" (fun () ->
         compute_delegatee_table keys ~iter_accounts:(fun f ->
@@ -3014,7 +3020,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         (next : Consensus_state.Value.t) ~(local_state : Local_state.t)
         ~snarked_ledger ~genesis_ledger_hash =
       let snarked_ledger_hash =
-        Mina_ledger.Ledger.Db.merkle_root snarked_ledger
+        Mina_ledger.Ledger.Root.merkle_root snarked_ledger
       in
       if
         not
@@ -3049,15 +3055,16 @@ module Make_str (A : Wire_types.Concrete) = struct
           !local_state.next_epoch_snapshot <-
             { ledger =
                 Local_state.Snapshot.Ledger_snapshot.Ledger_db
-                  (Mina_ledger.Ledger.Db.create_checkpoint snarked_ledger
+                  (Mina_ledger.Ledger.Root.create_checkpoint_stable
+                     snarked_ledger
                      ~directory_name:
                        ( !local_state.epoch_ledger_location
                        ^ Uuid.to_string epoch_ledger_uuids.next )
                      () )
             ; delegatee_table =
-                compute_delegatee_table_ledger_db
+                compute_delegatee_table_ledger_any
                   (Local_state.current_block_production_keys local_state)
-                  snarked_ledger
+                  (Mina_ledger.Ledger.Root.as_unmasked snarked_ledger)
             } ) )
 
     let should_bootstrap_len ~context:(module Context : CONTEXT) ~existing

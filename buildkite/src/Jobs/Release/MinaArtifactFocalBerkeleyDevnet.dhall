@@ -6,6 +6,8 @@ let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -18,6 +20,8 @@ in  Pipeline.build
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
             ]
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           , debVersion = DebianVersions.DebVersion.Focal
           }
       )

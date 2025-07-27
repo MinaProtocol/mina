@@ -8,8 +8,10 @@ let () =
 let () =
   let open Alcotest in
   run "Test archive node."
-    [ ( "precomputed blocks"
-      , [ test_case "The mina daemon works in background mode" `Quick
+    [ ( "precomputed_blocks"
+      , [ test_case
+            "Recreate database from precomputed blocks sent from mock daemon"
+            `Quick
             (Runner.run_blocking
                ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
                           (Archive_precomputed_blocks_test) ) )

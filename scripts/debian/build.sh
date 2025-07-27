@@ -23,7 +23,6 @@ if [ $# -eq 0 ]
   then
     echo "No arguments supplied. Building all known debian packages"
     build_logproc_deb
-    build_keypair_deb
     build_archive_berkeley_deb
     build_archive_devnet_deb
     build_archive_mainnet_deb

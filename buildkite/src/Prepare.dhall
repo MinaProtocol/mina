@@ -15,9 +15,13 @@ let Pipeline = ./Pipeline/Dsl.dhall
 
 let Size = ./Command/Size.dhall
 
-let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "PullRequest"
+let mode = env:BUILDKITE_PIPELINE_MODE as Text ? "Stable"
 
-let filter = env:BUILDKITE_PIPELINE_FILTER as Text ? "FastOnly"
+let selection = env:BUILDKITE_PIPELINE_JOB_SELECTION as Text ? "Triaged"
+
+let tagFilter = env:BUILDKITE_PIPELINE_FILTER as Text ? "FastOnly"
+
+let scopeFilter = env:BUILDKITE_PIPELINE_SCOPE as Text ? "All"
 
 let config
     : Pipeline.Config.Type
@@ -31,14 +35,16 @@ let config
             Command.Config::{
             , commands =
               [ Cmd.run "export BUILDKITE_PIPELINE_MODE=${mode}"
-              , Cmd.run "export BUILDKITE_PIPELINE_FILTER=${filter}"
+              , Cmd.run "export BUILDKITE_PIPELINE_JOB_SELECTION=${selection}"
+              , Cmd.run "export BUILDKITE_PIPELINE_FILTER=${tagFilter}"
+              , Cmd.run "export BUILDKITE_PIPELINE_SCOPE=${scopeFilter}"
               , Cmd.run
                   "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall"
               , Cmd.quietly
-                  "dhall-to-yaml --quoted <<< '(./buildkite/src/Monorepo.dhall) { mode=(./buildkite/src/Pipeline/Mode.dhall).Type.${mode}, filter=(./buildkite/src/Pipeline/Filter.dhall).Type.${filter}  }' | buildkite-agent pipeline upload"
+                  "dhall-to-yaml --quoted <<< '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}  }' | buildkite-agent pipeline upload"
               ]
             , label = "Prepare monorepo triage"
-            , key = "monorepo-${mode}-${filter}"
+            , key = "monorepo-${selection}-${tagFilter}-${scopeFilter}"
             , target = Size.Multi
             , docker = Some Docker::{
               , image = (./Constants/ContainerImages.dhall).toolchainBase

@@ -42,9 +42,9 @@ end)
        and type account_id := Inputs.Account_id.t
        and type account_id_set := Inputs.Account_id.Set.t
 
-  val create : Primary_ledger.t -> Converting_ledger.t -> t
+  val of_ledgers : Primary_ledger.t -> Converting_ledger.t -> t
 
-  val create_with_migration : Primary_ledger.t -> Converting_ledger.t -> t
+  val of_ledgers_with_migration : Primary_ledger.t -> Converting_ledger.t -> t
 
   val primary_ledger : t -> Primary_ledger.t
 
@@ -67,10 +67,10 @@ end = struct
     ; converting_ledger : Converting_ledger.t
     }
 
-  let create primary_ledger converting_ledger =
+  let of_ledgers primary_ledger converting_ledger =
     { primary_ledger; converting_ledger }
 
-  let create_with_migration primary_ledger converting_ledger =
+  let of_ledgers_with_migration primary_ledger converting_ledger =
     assert (Converting_ledger.num_accounts converting_ledger = 0) ;
     let accounts =
       Primary_ledger.foldi primary_ledger ~init:[] ~f:(fun addr acc account ->
@@ -211,4 +211,116 @@ end = struct
     Primary_ledger.get_hash_batch_exn t.primary_ledger locations
 
   let detached_signal t = Primary_ledger.detached_signal t.primary_ledger
+end
+
+module With_database (Inputs : sig
+  include Intf.Inputs.Intf
+
+  type converted_account
+
+  val convert : Account.t -> converted_account
+
+  val converted_equal : converted_account -> converted_account -> bool
+end)
+(Primary_db : Intf.Ledger.DATABASE
+                with module Location = Inputs.Location
+                 and module Addr = Inputs.Location.Addr
+                 and type key := Inputs.Key.t
+                 and type token_id := Inputs.Token_id.t
+                 and type token_id_set := Inputs.Token_id.Set.t
+                 and type account := Inputs.Account.t
+                 and type root_hash := Inputs.Hash.t
+                 and type hash := Inputs.Hash.t
+                 and type account_id := Inputs.Account_id.t
+                 and type account_id_set := Inputs.Account_id.Set.t)
+(Converting_db : Intf.Ledger.DATABASE
+                   with module Location = Inputs.Location
+                    and module Addr = Inputs.Location.Addr
+                    and type key := Inputs.Key.t
+                    and type token_id := Inputs.Token_id.t
+                    and type token_id_set := Inputs.Token_id.Set.t
+                    and type account := Inputs.converted_account
+                    and type root_hash := Inputs.Hash.t
+                    and type hash := Inputs.Hash.t
+                    and type account_id := Inputs.Account_id.t
+                    and type account_id_set := Inputs.Account_id.Set.t) =
+struct
+  include Make (Inputs) (Primary_db) (Converting_db)
+
+  module Config = struct
+    type t = { primary_directory : string; converting_directory : string }
+
+    type create = Temporary | In_directories of t
+
+    let default_converting_directory_name primary_directory_name =
+      primary_directory_name ^ "_converting"
+
+    let with_primary ~directory_name =
+      { primary_directory = directory_name
+      ; converting_directory = default_converting_directory_name directory_name
+      }
+  end
+
+  let dbs_synced db1 db2 =
+    Primary_db.num_accounts db1 = Converting_db.num_accounts db2
+    &&
+    let is_synced = ref true in
+    Primary_db.iteri db1 ~f:(fun idx stable_account ->
+        let expected_unstable_account = convert stable_account in
+        let actual_unstable_account = Converting_db.get_at_index_exn db2 idx in
+        if
+          not
+            (Inputs.converted_equal expected_unstable_account
+               actual_unstable_account )
+        then is_synced := false ) ;
+    !is_synced
+
+  let create ~config ~logger ~depth () =
+    let primary_directory_name, converting_directory_name =
+      match config with
+      | Config.Temporary ->
+          (None, None)
+      | In_directories { primary_directory; converting_directory } ->
+          (Some primary_directory, Some converting_directory)
+    in
+    let db1 =
+      Primary_db.create ?directory_name:primary_directory_name ~depth ()
+    in
+    let db2_directory_name =
+      Option.first_some converting_directory_name
+      @@ Option.map
+           (Primary_db.get_directory db1)
+           ~f:Config.default_converting_directory_name
+    in
+    let db2 =
+      Converting_db.create ?directory_name:db2_directory_name ~depth ()
+    in
+    if Converting_db.num_accounts db2 = 0 then of_ledgers_with_migration db1 db2
+    else if dbs_synced db1 db2 then of_ledgers db1 db2
+    else (
+      [%log warn]
+        "Migrating DB desync, cleaning up unstable DB and remigrating..." ;
+      Converting_db.close db2 ;
+      let db2 =
+        Converting_db.create ?directory_name:db2_directory_name ~fresh:true
+          ~depth ()
+      in
+      of_ledgers_with_migration db1 db2 )
+
+  let create_checkpoint t ~config () =
+    let primary' =
+      Primary_db.create_checkpoint (primary_ledger t)
+        ~directory_name:config.Config.primary_directory ()
+    in
+    let converting' =
+      Converting_db.create_checkpoint (converting_ledger t)
+        ~directory_name:config.converting_directory ()
+    in
+    of_ledgers primary' converting'
+
+  let make_checkpoint t ~config =
+    Primary_db.make_checkpoint (primary_ledger t)
+      ~directory_name:config.Config.primary_directory ;
+    Converting_db.make_checkpoint (converting_ledger t)
+      ~directory_name:config.converting_directory
 end

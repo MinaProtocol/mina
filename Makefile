@@ -320,9 +320,27 @@ check-snarky-submodule: ## Check the snarky submodule
 #######################################
 ## Bash checks
 
+.PHONY: check-bash
 check-bash: ## Run shellcheck on bash scripts
 	shellcheck ./scripts/**/*.sh -S warning
 	shellcheck ./buildkite/scripts/**/*.sh -S warning
+
+.PHONY: check-docker
+check-docker: ## Run hadolint on Docker files
+ifdef BUILDKITE
+	hadolint --ignore DL3008 --ignore DL3002 --ignore DL3013 --ignore DL3007 --ignore DL3006 --ignore DL3028 dockerfiles/Dockerfile-* dockerfiles/stages/*
+else
+	docker run --rm -v $(PWD):/workspace -w /workspace \
+		hadolint/hadolint hadolint \
+		--ignore DL3008 \
+		--ignore DL3002 \
+		--ignore DL3013 \
+		--ignore DL3007 \
+		--ignore DL3006 \
+		--ignore DL3028 \
+		dockerfiles/Dockerfile-* \
+		dockerfiles/stages/*
+endif
 
 ########################################
 ## Artifacts
