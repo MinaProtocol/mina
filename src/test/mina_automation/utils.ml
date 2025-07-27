@@ -57,31 +57,27 @@ let get_memory_usage_mb pid =
         None
   with _ -> None
 
-(** [get_memory_usage_mb_of_process_family process_name] returns the total memory usage
-  in megabytes for all processes belonging to the specified user [process_name].
-  
+(** [get_memory_usage_mb_of_user_process username] returns the total memory usage
+  in megabytes for all processes belonging to the specified user [username].
+
   This function executes the 'ps' command to retrieve RSS (Resident Set Size) values
   for all processes owned by the given user, sums them up, and converts the result
   from kilobytes to megabytes.
-  
-  @param process_name The username whose processes' memory usage should be calculated
+
+  @param username The username whose processes' memory usage should be calculated
   @return A deferred float representing the total memory usage in megabytes
   
   @raise If the 'ps' command fails to execute, an exception will be raised by [Util.run_cmd_exn] *)
-let get_memory_usage_mb_of_process_family ?(in_docker = None) process_name =
+let get_memory_usage_mb_of_user_process username =
   let%bind output =
-    match in_docker with
-    | Some container ->
-        Util.run_cmd_exn "." "docker"
-          [ "exec"; container; "ps"; "-u"; process_name; "-o"; "rss=" ]
-    | None ->
-        Util.run_cmd_exn "." "ps" [ "-u"; process_name; "-o"; "rss=" ]
+    Util.run_cmd_exn "." "ps" [ "-u"; username; "-o"; "rss=" ]
   in
   let lines = String.split_lines output in
-  let memory_usages =
-    List.filter_map lines ~f:(fun line ->
-        try Some (String.strip line |> Int.of_string) with _ -> None )
+  let total_memory_mb =
+    lines
+    |> List.fold ~init:0 ~f:(fun acc line ->
+           acc + (String.strip line |> Int.of_string) )
+    |> Float.of_int
+    |> fun kb -> kb /. 1024.0
   in
-  let total_memory = List.fold memory_usages ~init:0 ~f:( + ) in
-  let total_memory_mb = Float.of_int total_memory /. 1024.0 in
   Deferred.return total_memory_mb
