@@ -46,6 +46,7 @@
 (package (name graphql_basic_scalars))
 (package (name graphql_lib))
 (package (name graphql_wrapper))
+(package (name hardfork))
 (package (name hash_prefixes))
 (package (name hash_prefix_states))
 (package (name hash_prefix_create))
