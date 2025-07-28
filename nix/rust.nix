@@ -145,7 +145,7 @@ in {
   };
 
   plonk_wasm = let
-    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
+    lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -185,7 +185,7 @@ in {
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
     ];
-    sourceRoot = "source/lib/crypto/proof-systems";
+    sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
     nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock.lockFile = lock;
@@ -211,9 +211,9 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
+      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web ./.
       )
       runHook postBuild
     '';
