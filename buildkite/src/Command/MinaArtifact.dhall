@@ -58,6 +58,7 @@ let MinaBuildSpec =
           , debianRepo : DebianRepo.Type
           , buildScript : Text
           , deb_legacy_version : Text
+          , suffix : Text
           , if : Optional B/If
           }
       , default =
@@ -74,6 +75,7 @@ let MinaBuildSpec =
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
+          , suffix = ""
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , if = None B/If
           }
@@ -126,7 +128,7 @@ let build_artifacts
                                                                         spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
-            , key = "build-deb-pkg"
+            , key = "build-deb-pkg${spec.suffix}"
             , target = Size.XLarge
             , if = spec.if
             , retries =

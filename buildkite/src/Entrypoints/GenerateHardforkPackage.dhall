@@ -96,6 +96,7 @@ let generateDockerForCodename =
                   , debVersion = codename
                   , profile = profile
                   , network = spec.network
+                  , suffix = "-${DebianVersions.lowerName codename}"
                   , extraBuildEnvs =
                     [ "NETWORK_NAME=${Network.lowerName spec.network}"
                     , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
