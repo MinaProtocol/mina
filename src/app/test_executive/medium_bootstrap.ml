@@ -9,7 +9,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -37,9 +38,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   (*
      There are 3 cases of bootstrap that we need to test:
 
-     1: short bootstrap-- bootstrap where node has been down for less than 2k+1 blocks
-     2: medium bootstrap-- bootstrap where node has been down for more than 2k+1 blocks, OR equivalently when the blockchain is longer than 2k+1 blocks and a node goes down and resets to a fresh state, thereby resetting at the genesis block, before reconnecting to the network
-     3: long bootstrap-- bootstrap where node has been down for more than 42k slots (2 epochs) where each epoch emitted at least 1 parallel scan state proof
+     1: short bootstrap-- bootstrap where node has been down for less than 2k+1
+        blocks
+     2: medium bootstrap-- bootstrap where node has been down for more than 2k+1
+        blocks, OR equivalently when the blockchain is longer than 2k+1 blocks and
+        a node goes down and resets to a fresh state, thereby resetting at the
+        genesis block, before reconnecting to the network
+     3: long bootstrap-- bootstrap where node has been down for more than 42k
+        slots (2 epochs) where each epoch emitted at least 1 parallel scan state
+        proof
   *)
 
   (* this test is the medium bootstrap test *)

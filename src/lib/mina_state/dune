@@ -24,13 +24,6 @@
    h_list.ppx))
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
-  base.base_internalhash_types
-  base.caml
-  bin_prot.shape
-  base
-  sexplib0
-  core_kernel
   core
   ;; local libraries
   signature_lib

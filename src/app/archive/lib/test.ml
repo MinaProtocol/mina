@@ -128,13 +128,17 @@ let%test_module "Archive node unit tests" =
           Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
             ~min_fee:Currency.Fee.zero coinbase_amount )
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
       Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
         user_command_signed_gen ~f:(fun user_command ->
-          let transaction_hash = Transaction_hash.hash_command user_command in
+          let transaction_hash =
+            Transaction_hash.hash_command_with_hashes user_command
+          in
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
@@ -164,7 +168,9 @@ let%test_module "Archive node unit tests" =
       @@ fun () ->
       Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
         user_command_zkapp_gen ~f:(fun user_command ->
-          let transaction_hash = Transaction_hash.hash_command user_command in
+          let transaction_hash =
+            Transaction_hash.hash_command_with_hashes user_command
+          in
           match user_command with
           | Signed_command _ ->
               failwith "zkapp_gen failed"
@@ -306,7 +312,7 @@ let%test_module "Archive node unit tests" =
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
           let%bind () =
-            Processor.run
+            Processor.run ~proof_cache_db
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_constants:precomputed_values.constraint_constants pool
               reader ~logger ~delete_older_than:None

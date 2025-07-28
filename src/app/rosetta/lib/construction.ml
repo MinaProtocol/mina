@@ -675,9 +675,10 @@ module Parse = struct
               Signed_command_payload.create ~fee ~fee_payer_pk ~nonce
                 ~valid_until ~memo ~body
             in
+            let signature_kind = Mina_signature_kind.t_DEPRECATED in
             Option.is_some
-            @@ Signed_command.create_with_signature_checked signature signer
-                 payload )
+            @@ Signed_command.create_with_signature_checked ~signature_kind
+                 signature signer payload )
       ; lift = Deferred.return
       }
   end

@@ -1,0 +1,16 @@
+(tests
+ (names test_string_sign)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core_kernel
+  result
+  ;; local libraries
+  mina_base
+  mina_signature_kind
+  signature_lib
+  string_sign)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_version)))

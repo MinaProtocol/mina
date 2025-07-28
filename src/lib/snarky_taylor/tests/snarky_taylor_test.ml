@@ -5,7 +5,7 @@ open Snark
 open Snarky_integer
 open Snarky_taylor
 
-let%test_unit "instantiate" =
+let test_instantiate () =
   let module M = Snark_params.Tick.Run in
   let m : _ m = (module M) in
   let open M in
@@ -26,5 +26,11 @@ let%test_unit "instantiate" =
     Floating_point.to_bignum ~m (Exp.one_minus_exp ~m params arg)
   in
   let res = M.run_and_check c |> Or_error.ok_exn in
-  assert (
-    Bignum.(equal res (Exp.Unchecked.one_minus_exp params (one / of_int 2))) )
+  Alcotest.(check bool)
+    "Exp.one_minus_exp produces the expected result" true
+    Bignum.(equal res (Exp.Unchecked.one_minus_exp params (one / of_int 2)))
+
+(* Main test runner *)
+let () =
+  Alcotest.run "Snarky_taylor"
+    [ ("Exp", [ Alcotest.test_case "instantiate" `Quick test_instantiate ]) ]

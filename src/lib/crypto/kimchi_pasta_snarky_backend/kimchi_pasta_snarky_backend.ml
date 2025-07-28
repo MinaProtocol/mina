@@ -1,6 +1,7 @@
 module Endoscale_round = Endoscale_round
 module Endoscale_scalar_round = Endoscale_scalar_round
 module Constants = Constants
+module Field = Field
 module Intf = Intf
 module Plonk_constraint_system = Plonk_constraint_system
 module Scale_round = Scale_round

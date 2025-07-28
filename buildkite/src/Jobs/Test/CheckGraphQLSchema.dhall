@@ -10,12 +10,7 @@ let CheckGraphQLSchema = ../../Command/CheckGraphQLSchema.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
-let dependsOn =
-      DebianVersions.dependsOn
-        DebianVersions.DebVersion.Bullseye
-        Profiles.Type.Standard
+let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
 
 in  Pipeline.build
       Pipeline.Config::{

@@ -9,9 +9,6 @@ open Transaction_logic_tests
 open Helpers
 open Protocol_config_examples
 
-let expect_success =
-  [%test_pred: Transaction_applied.t list Or_error.t] Or_error.is_ok
-
 let expect_failure ~error = function
   | Ok _ ->
       failwith "Success where failure was expected."
@@ -95,9 +92,12 @@ let simple_payment () =
         | Error _ ->
             assert false
       in
-      [%test_pred: Transaction_applied.t list Or_error.t] Or_error.is_ok
-        (Transaction_logic.apply_transactions ~constraint_constants ~global_slot
-           ~txn_state_view ledger [ txn ] ) )
+      [%test_pred: Transaction_applied.Stable.Latest.t list Or_error.t]
+        Or_error.is_ok
+        Or_error.(
+          Transaction_logic.apply_transactions ~signature_kind
+            ~constraint_constants ~global_slot ~txn_state_view ledger [ txn ]
+          >>| List.map ~f:Transaction_applied.read_all_proofs_from_disk) )
 
 let simple_payment_signer_different_from_fee_payer () =
   Quickcheck.test ~trials:1000 setup
@@ -115,8 +115,8 @@ let simple_payment_signer_different_from_fee_payer () =
       expect_failure
         ~error:
           "Cannot pay fees from a public key that did not sign the transaction"
-        (Transaction_logic.apply_transactions ~constraint_constants ~global_slot
-           ~txn_state_view ledger [ txn ] ) )
+        (Transaction_logic.apply_transactions ~signature_kind
+           ~constraint_constants ~global_slot ~txn_state_view ledger [ txn ] ) )
 
 let coinbase_order_of_created_accounts_is_correct ~with_fee_transfer () =
   let amount = Amount.of_mina_int_exn 720 in

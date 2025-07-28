@@ -180,12 +180,13 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
         Transaction_snark.For_tests.multiple_transfers ~constraint_constants
           multispec )
   in
+  (* TODO do not compute hashes and remove Zkapp_command.read_all_proofs_from_disk *)
   let zkapps_batches = List.chunks_of zkapps ~length:zkapps_per_block in
   Deferred.List.iter zkapps_batches ~f:(fun zkapps_batch ->
       Format.printf "Processing batch of %d zkApps@." (List.length zkapps_batch) ;
       List.iteri zkapps_batch ~f:(fun i zkapp ->
           let txn_hash =
-            Transaction_hash.hash_command (Zkapp_command zkapp)
+            Transaction_hash.hash_zkapp_command_with_hashes zkapp
             |> Transaction_hash.to_base58_check
           in
           Format.printf " zkApp %d, transaction hash: %s@." i txn_hash ;
@@ -219,7 +220,8 @@ let create_accounts ~(genesis_constants : Genesis_constants.t)
                 balance_change_str ) ) ;
       let%bind res =
         Daemon_rpcs.Client.dispatch Daemon_rpcs.Send_zkapp_commands.rpc
-          zkapps_batch port
+          (List.map ~f:Zkapp_command.read_all_proofs_from_disk zkapps_batch)
+          port
       in
       ( match res with
       | Ok res_inner -> (

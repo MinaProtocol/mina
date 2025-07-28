@@ -1036,7 +1036,7 @@ module State = struct
 end
 
 include T
-module State_or_error = State_or_error.Make3 (T)
+module State_or_error = Mina_stdlib.State_or_error.Make3 (T)
 
 let check b ~message = State_or_error.error_if b ~message ~value:()
 

@@ -73,6 +73,10 @@ module type Intf = sig
 
   val to_hex_string : t -> string
 
+  (** [of_hex_string ?reverse s] converts the hexadecimal string [s] to a
+      bigint. The string must start with the prefix "0x" or "0X".
+      Both uppercase and lowercase hex strings are supported.
+      If [reverse] is true, the byte order is reversed. Default is true. *)
   val of_hex_string : ?reverse:bool -> string -> t
 
   val of_numeral : string -> base:int -> t
@@ -132,6 +136,10 @@ module Make : functor
 
   val to_hex_string : t -> string
 
+  (** [of_hex_string ?reverse s] converts the hexadecimal string [s] to a
+      bigint. The string must start with the prefix "0x" or "0X".
+      Both uppercase and lowercase hex strings are supported.
+      If [reverse] is true, the byte order is reversed. Default is true. *)
   val of_hex_string : ?reverse:bool -> string -> t
 
   val of_numeral : string -> base:int -> t

@@ -122,35 +122,36 @@ module type Lib_intf = sig
     val all_unseen_works :
          t
       -> ( Transaction_witness.t
-         , Ledger_proof.t )
+         , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
          list
 
-    val remove :
-         t
-      -> ( Transaction_witness.t
-         , Ledger_proof.t )
-         Snark_work_lib.Work.Single.Spec.t
-         One_or_two.t
-      -> unit
+    val remove : t -> Transaction_snark.Statement.t One_or_two.t -> unit
 
     val set :
          t
       -> ( Transaction_witness.t
-         , Ledger_proof.t )
+         , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t
          One_or_two.t
       -> unit
   end
 
+  (** [get_expensive_work ~snark_pool ~fee works] filters out all works in the
+      list that satisfy the predicate
+      [does_not_have_better_fee ~snark_pool ~fee] *)
   val get_expensive_work :
        snark_pool:Snark_pool.t
     -> fee:Fee.t
-    -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+    -> ( Transaction_witness.t
+       , Ledger_proof.Cached.t )
+       Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
-    -> (Transaction_witness.t, Ledger_proof.t) Snark_work_lib.Work.Single.Spec.t
+    -> ( Transaction_witness.t
+       , Ledger_proof.Cached.t )
+       Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
 
@@ -162,6 +163,11 @@ module type Lib_intf = sig
     -> Transaction_snark.Statement.t One_or_two.t list
 
   module For_tests : sig
+    (** [does_not_have_better_fee ~snark_pool ~fee stmt] returns true iff the
+        statement [stmt] haven't already been proved already in [snark_pool] or
+        it's been proved with a fee higher than ~fee. The reason for the later
+        condition is that the whole protocol would drop proofs with higher fees
+        if there's a equivalent proof with lower fees *)
     val does_not_have_better_fee :
          snark_pool:Snark_pool.t
       -> fee:Fee.t
@@ -194,7 +200,7 @@ module type Make_selection_method_intf = functor (Lib : Lib_intf) ->
     with type staged_ledger := Lib.Inputs.Staged_ledger.t
      and type work :=
       ( Lib.Inputs.Transaction_witness.t
-      , Lib.Inputs.Ledger_proof.t )
+      , Lib.Inputs.Ledger_proof.Cached.t )
       Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Lib.Inputs.Snark_pool.t
      and type transition_frontier := Lib.Inputs.Transition_frontier.t

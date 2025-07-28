@@ -9,7 +9,8 @@
   core_kernel
   ;; local libraries
   mina_wire_types
-  ppx_version.runtime)
+  ppx_version.runtime
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

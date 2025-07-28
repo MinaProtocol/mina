@@ -8,20 +8,18 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let PatchArchiveTest = ../../Command/PatchArchiveTest.dhall
 
-let Profiles = ../../Constants/Profiles.dhall
-
-let Network = ../../Constants/Network.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
 let dependsOn =
       Dockers.dependsOn
-        Dockers.Type.Bullseye
-        (None Network.Type)
-        Profiles.Type.Standard
-        Artifacts.Type.FunctionalTestSuite
+        Dockers.DepsSpec::{
+        , artifact = Artifacts.Type.FunctionalTestSuite
+        , buildFlags = BuildFlags.Type.Instrumented
+        }
 
 in  Pipeline.build
       Pipeline.Config::{

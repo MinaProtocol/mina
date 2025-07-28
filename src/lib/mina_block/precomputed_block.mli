@@ -40,7 +40,7 @@ type t = Stable.Latest.t =
   { scheduled_time : Block_time.Time.t
   ; protocol_state : Protocol_state.value
   ; protocol_state_proof : Proof.t
-  ; staged_ledger_diff : Staged_ledger_diff.t
+  ; staged_ledger_diff : Staged_ledger_diff.Stable.Latest.t
   ; delta_transition_chain_proof :
       Frozen_ledger_hash.t * Frozen_ledger_hash.t list
   ; protocol_version : Protocol_version.t
