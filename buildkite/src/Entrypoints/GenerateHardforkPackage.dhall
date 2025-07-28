@@ -152,11 +152,8 @@ let generateDockerForCodename =
                         "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config ${Network.lowerName
                                                                                                                                            spec.network} config.json /workdir/verification"
                     ]
-                  , label =
-                      "Assert corrupted packaged artifacts are unverifiable"
-                  , key =
-                      "assert-unverify-corrupted-packaged-artifacts-${DebianVersions.lowerName
-                                                                        codename}"
+                  , label = "Verify packaged artifacts"
+                  , key = "verify-packaged-artifacts"
                   , target = Size.XLarge
                   , depends_on = dependsOnTest
                   }
