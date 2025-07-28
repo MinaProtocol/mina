@@ -30,8 +30,8 @@ type t =
   ; work_reassignment_wait : int
   ; gossip_net_params : Gossip_net.Libp2p.Config.t
   ; net_config : Mina_networking.Config.t
-        (* Option.t instead of option, so that the derived `make' requires an argument *)
   ; proposed_protocol_version_opt : Protocol_version.t Option.t
+        (** Option.t instead of option, so that the derived [make] requires an argument *)
   ; snark_pool_disk_location : string
   ; wallets_disk_location : string
   ; persistent_root_location : string
@@ -68,5 +68,7 @@ type t =
   ; compile_config : Mina_compile_config.t
   ; itn_features : bool
   ; hardfork_mode : Hardfork.Mode.t option
+        (** [hardfork_mode] being absent indicates that we're not in any 
+            hardfork mode *)
   }
 [@@deriving make]
