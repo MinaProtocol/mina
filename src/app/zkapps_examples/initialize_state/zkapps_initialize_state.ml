@@ -2,7 +2,10 @@ open Core_kernel
 open Snark_params.Tick.Run
 open Signature_lib
 
-let initial_state = lazy (List.init 8 ~f:(fun _ -> Field.Constant.zero))
+let initial_state =
+  lazy
+    (List.init Mina_base.Zkapp_state.max_size_int ~f:(fun _ ->
+         Field.Constant.zero ) )
 
 let initialize public_key =
   Zkapps_examples.wrap_main
@@ -30,7 +33,8 @@ let update_state public_key =
     ~public_key:(Public_key.Compressed.var_of_t public_key)
     (fun account_update ->
       let new_state =
-        exists (Typ.list ~length:8 Field.typ) ~request:(fun () -> New_state)
+        exists (Typ.list ~length:Mina_base.Zkapp_state.max_size_int Field.typ)
+          ~request:(fun () -> New_state)
       in
       account_update#assert_state_proved ;
       account_update#set_full_state new_state )

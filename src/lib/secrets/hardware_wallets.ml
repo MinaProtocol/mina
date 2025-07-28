@@ -121,8 +121,9 @@ let sign ~hd_index ~public_key ~user_command_payload :
       |> Deferred.Result.map_error ~f:report_process_error
     in
     let%bind signature = decode_signature signature_str |> Deferred.return in
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match
-      Signed_command.create_with_signature_checked signature
+      Signed_command.create_with_signature_checked ~signature_kind signature
         (Public_key.compress public_key)
         user_command_payload
     with

@@ -14,9 +14,8 @@
   base.caml
   ppx_inline_test.config
   ;; local libraries
-  direction
+  mina_stdlib
   ppx_version.runtime
-  bounded_types
   test_util)
  (preprocess
   (pps

@@ -185,21 +185,16 @@ module Values (S : Sample) = struct
    fun () ->
     bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t S.vk
 
-  let side_loaded_proof : unit -> Pickles.Side_loaded.Proof.t =
-    let proof =
-      let cmd = List.hd_exn S.generated_zkapps in
-      let update =
-        List.nth_exn (Mina_base.Zkapp_command.all_account_updates_list cmd) 1
-      in
-      match update.authorization with
-      | Proof proof ->
-          proof
-      | _ ->
-          failwith "woops"
+  let side_loaded_proof : Proof_cache_tag.t =
+    let cmd = List.hd_exn S.generated_zkapps in
+    let update =
+      List.nth_exn (Mina_base.Zkapp_command.all_account_updates_list cmd) 1
     in
-    fun () ->
-      bin_copy ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
-        (Pickles.Side_loaded.Proof.of_proof proof)
+    match update.authorization with
+    | Proof proof ->
+        proof
+    | _ ->
+        failwith "woops"
 
   let ledger_proof () : Ledger_proof.t =
     bin_copy ~bin_class:Ledger_proof.Stable.Latest.bin_t
@@ -302,8 +297,9 @@ module Values (S : Sample) = struct
     Mina_base.User_command.Signed_command (signed_command' ())
 
   let zkapp_account_update () : Mina_base.Account_update.t =
-    { body =
-        { public_key = public_key ()
+    Mina_base.Account_update.with_aux
+      ~body:
+        { Mina_base.Account_update.Body.public_key = public_key ()
         ; token_id = token_id ()
         ; update =
             { app_state =
@@ -330,23 +326,23 @@ module Values (S : Sample) = struct
         ; may_use_token = No
         ; authorization_kind = Proof (field ())
         }
-    ; authorization = Proof (side_loaded_proof ())
-    }
+      ~authorization:(Mina_base.Control.Poly.Proof side_loaded_proof)
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer =
-        { body =
+        Mina_base.Account_update.Fee_payer.make
+          ~body:
             { public_key = public_key ()
             ; fee = fee ()
             ; valid_until = Some (global_slot_since_genesis ())
             ; nonce = account_nonce ()
             }
-        ; authorization = (field (), private_key ())
-        }
+          ~authorization:(field (), private_key ())
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())
         |> List.fold_left ~init:[] ~f:(fun acc () ->
-               Mina_base.Zkapp_command.Call_forest.cons
+               Mina_base.Zkapp_command.Call_forest.cons ~signature_kind
                  (zkapp_account_update ()) acc )
     ; memo = signed_command_memo ()
     }
@@ -462,7 +458,8 @@ module Sizes (S : Sample) = struct
 
   let verification_key = count @@ Values.verification_key ()
 
-  let side_loaded_proof = count @@ Values.side_loaded_proof ()
+  let side_loaded_proof =
+    count @@ Proof_cache_tag.read_proof_from_disk Values.side_loaded_proof
 
   let ledger_proof = count @@ Values.ledger_proof ()
 
@@ -719,8 +716,9 @@ let () =
   let config = { constraint_constants; genesis_constants } in
   let%bind.Async_kernel.Deferred _, generated_zkapps =
     let num_updates = 1 in
-    Snark_profiler_lib.create_ledger_and_zkapps ~genesis_constants
-      ~constraint_constants ~min_num_updates:num_updates
+    Snark_profiler_lib.create_ledger_and_zkapps
+      ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+      ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
       ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
   in
   let%map.Async_kernel.Deferred vk =
@@ -755,7 +753,9 @@ let () =
   let side_loaded_proof_serial_times =
     serial_bench ~name:"Pickles.Side_loaded.Proof.t"
       ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
-      ~gen:(Quickcheck.Generator.return (Values.side_loaded_proof ()))
+      ~gen:
+        ( Quickcheck.Generator.return
+        @@ Proof_cache_tag.read_proof_from_disk Values.side_loaded_proof )
       ~equal:Pickles.Side_loaded.Proof.equal ()
   in
   Printf.printf "\n" ;

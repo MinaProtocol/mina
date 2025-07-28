@@ -295,7 +295,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ()
             | Ledger_db ledger ->
                 Mina_ledger.Ledger.Db.close ledger ;
-                File_system.rmrf location
+                Mina_stdlib_unix.File_system.rmrf location
 
           let ledger_subset keys ledger =
             let open Mina_ledger in
@@ -518,8 +518,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                   ; ("staking", `String staking_ledger_location)
                   ; ("next", `String next_ledger_location)
                   ] ;
-              File_system.rmrf staking_ledger_location ;
-              File_system.rmrf next_ledger_location ;
+              Mina_stdlib_unix.File_system.rmrf staking_ledger_location ;
+              Mina_stdlib_unix.File_system.rmrf next_ledger_location ;
               create_new_uuids () )
           else create_new_uuids ()
         in
@@ -634,30 +634,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let staking_epoch_ledger (t : t) =
         Snapshot.ledger @@ get_snapshot t Staking_epoch_snapshot
-
-      let _seen_slot (t : t) epoch slot =
-        let module Table = Public_key.Compressed.Table in
-        let unseens =
-          Table.to_alist !t.last_checked_slot_and_epoch
-          |> List.filter_map ~f:(fun (pk, last_checked_epoch_and_slot) ->
-                 let i =
-                   Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
-                     last_checked_epoch_and_slot (epoch, slot)
-                 in
-                 if i > 0 then None
-                 else if i = 0 then
-                   (*vrf evaluation was stopped at this point because it was either the end of the epoch or the key won this slot; re-check this slot when staking keys are reset so that we don't skip producing block. This will not occur in the normal flow because [slot] will be greater than the last-checked-slot*)
-                   Some pk
-                 else (
-                   Table.set !t.last_checked_slot_and_epoch ~key:pk
-                     ~data:(epoch, slot) ;
-                   Some pk ) )
-        in
-        match unseens with
-        | [] ->
-            `All_seen
-        | nel ->
-            `Unseen (Public_key.Compressed.Set.of_list nel)
 
       module For_tests = struct
         type nonrec snapshot_identifier = snapshot_identifier =
@@ -2757,7 +2733,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let time_received =
         Time.(
           of_span_since_epoch
-            (Span.of_ms (Unix_timestamp.to_int64 time_received)))
+            (Span.of_ms (Mina_stdlib.Unix_timestamp.to_int64 time_received)))
       in
       let slot_diff =
         Epoch.diff_in_slots ~constants
@@ -3106,24 +3082,9 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~candidate:
               (Consensus_state.blockchain_length (With_hash.data candidate))
 
-    let%test "should_bootstrap is sane" =
-      let module Context = struct
-        let logger = Logger.create ()
-
-        let constraint_constants =
-          Genesis_constants.For_unit_tests.Constraint_constants.t
-
-        let consensus_constants = Lazy.force Constants.for_unit_tests
-      end in
-      (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
-      should_bootstrap_len
-        ~context:(module Context)
-        ~existing:Length.zero
-        ~candidate:(Length.of_int 100_000_000)
-
     let to_unix_timestamp recieved_time =
       recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
-      |> Unix_timestamp.of_int64
+      |> Mina_stdlib.Unix_timestamp.of_int64
 
     let%test "Receive a valid consensus_state with a bit of delay" =
       let constants = Lazy.force Constants.for_unit_tests in

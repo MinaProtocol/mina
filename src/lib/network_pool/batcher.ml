@@ -42,7 +42,7 @@ type ('init, 'partially_validated, 'result) t =
   }
 [@@deriving sexp]
 
-let create ?(how_to_add = `Enqueue_back) ~logger ?compare_init
+let create ~proof_cache_db:_ ?(how_to_add = `Enqueue_back) ~logger ?compare_init
     ?(weight = fun _ -> 1) ?max_weight_per_call verifier =
   { state = Waiting
   ; queue = Q.create ()
@@ -253,7 +253,7 @@ module Transaction_pool = struct
   open Mina_base
 
   type diff = User_command.Verifiable.t list Envelope.Incoming.t
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 
   (* A partially verified transaction is either valid, or valid assuming that some list of
      (verification key, statement, proof) triples will verify. That is, the transaction has
@@ -268,11 +268,12 @@ module Transaction_pool = struct
         * Zkapp_statement.t
         * Pickles.Side_loaded.Proof.t )
         list ]
-  [@@deriving sexp]
+  [@@deriving sexp_of]
 
-  type partial = partial_item list [@@deriving sexp]
+  type partial = partial_item list [@@deriving sexp_of]
 
-  type t = (diff, partial, User_command.Valid.t list) batcher [@@deriving sexp]
+  type t = (diff, partial, User_command.Valid.t list) batcher
+  [@@deriving sexp_of]
 
   type input = [ `Init of diff | `Partially_validated of partial ]
 
@@ -300,8 +301,9 @@ module Transaction_pool = struct
       (Array.to_list
          (Array.map a ~f:(function `Valid c -> Some c | _ -> None)) )
 
-  let create ~logger verifier : t =
-    create ~compare_init:compare_envelope ~logger (fun (ds : input list) ->
+  let create ~proof_cache_db ~logger verifier : t =
+    create ~proof_cache_db ~compare_init:compare_envelope ~logger
+      (fun (ds : input list) ->
         O1trace.thread "dispatching_transaction_pool_batcher_verification"
           (fun () ->
             [%log debug]
@@ -423,15 +425,24 @@ module Snark_pool = struct
 
   type t = (proof_envelope, partial, unit) batcher [@@deriving sexp]
 
-  let verify (t : t) (p : proof_envelope) : bool Deferred.Or_error.t =
-    let open Deferred.Or_error.Let_syntax in
-    match%map verify t p with Ok () -> true | Error _ -> false
+  let verify (t : t) (p : proof_envelope) :
+      (unit, [> `Crash of Error.t | `Invalid of Verifier.invalid ]) result
+      Deferred.t =
+    let%map.Deferred verification_result = verify t p in
+    match verification_result with
+    | Ok (Ok ()) ->
+        Ok ()
+    | Ok (Error invalid) ->
+        Error (`Invalid invalid)
+    | Error e ->
+        Error (`Crash e)
 
-  let create ~logger verifier : t =
+  let create ~proof_cache_db ~logger verifier : t =
     create
-    (* TODO: Make this a proper config detail once we have data on what a
-           good default would be.
-    *)
+      ~proof_cache_db
+        (* TODO: Make this a proper config detail once we have data on what a
+               good default would be.
+        *)
       ~max_weight_per_call:
         (Option.value_map ~default:1000 ~f:Int.of_string
            (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE") )
@@ -471,13 +482,16 @@ module Snark_pool = struct
   end
 
   let verify' (t : t) ps =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Let_syntax in
     let%map invalid =
-      Deferred.Or_error.List.filter_map ps ~f:(fun p ->
-          match%map verify t p with true -> None | false -> Some p )
+      Deferred.List.filter_map ps ~f:(fun p ->
+          match%map verify t p with
+          | Ok () ->
+              None
+          | Error e ->
+              Some (Work_key.of_proof_envelope p, e) )
     in
-    `Invalid
-      (Work_key.Set.of_list (List.map invalid ~f:Work_key.of_proof_envelope))
+    `Invalid (Work_key.Map.of_alist_exn invalid)
 
   let%test_module "With valid and invalid proofs" =
     ( module struct
@@ -495,6 +509,8 @@ module Snark_pool = struct
         Async.Thread_safe.block_on_async_exn (fun () ->
             Verifier.For_tests.default ~constraint_constants ~logger
               ~proof_level () )
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
       let gen_proofs =
         let open Quickcheck.Generator.Let_syntax in
@@ -532,11 +548,13 @@ module Snark_pool = struct
         Envelope.Incoming.gen data_gen
 
       let run_test proof_lists =
-        let batcher = create ~logger verifier in
+        let batcher = create ~proof_cache_db ~logger verifier in
         Deferred.List.iter proof_lists ~f:(fun (invalid_proofs, proof_list) ->
-            let%map r = verify' batcher proof_list in
-            let (`Invalid ps) = Or_error.ok_exn r in
-            assert (Work_key.Set.equal ps invalid_proofs) )
+            let%map (`Invalid pfs_and_reasons) = verify' batcher proof_list in
+            assert (
+              Work_key.Set.equal
+                (Work_key.Map.key_set pfs_and_reasons)
+                invalid_proofs ) )
 
       let gen ~(valid_count : [ `Any | `Count of int ])
           ~(invalid_count : [ `Any | `Count of int ]) =

@@ -26,7 +26,7 @@ let main ~genesis_constants ~constraint_constants conf_dir : unit Deferred.t =
   let%bind proof_cache_db = initialize_proof_cache_db ~logger conf_dir in
   print_heap_usage "Account.t (w/ zkapp)" account ;
   let%bind zkapp_command =
-    zkapp_command ~genesis_constants ~constraint_constants
+    zkapp_command ~proof_cache_db ~genesis_constants ~constraint_constants
   in
   print_heap_usage "Zkapp_command.t" zkapp_command ;
   print_heap_usage "Pickles.Side_loaded.Proof.t" @@ zkapp_proof ~zkapp_command ;
@@ -58,5 +58,5 @@ let () =
       (async ~summary:"Print heap usage of selected Mina data structures"
          (let%map.Command () = Let_syntax.return () in
           fun () ->
-            File_system.with_temp_dir "mina-heap-usage"
+            Mina_stdlib_unix.File_system.with_temp_dir "mina-heap-usage"
               ~f:(main ~genesis_constants ~constraint_constants) ) ))

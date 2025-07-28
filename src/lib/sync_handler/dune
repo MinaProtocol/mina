@@ -33,7 +33,7 @@
   logger
   merkle_ledger
   staged_ledger
-  truth
+  mina_stdlib
   proof_carrying_data
   mina_ledger
   mina_wire_types))

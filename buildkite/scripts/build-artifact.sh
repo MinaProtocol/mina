@@ -4,6 +4,7 @@ set -eox pipefail
 
 ([ -z ${DUNE_PROFILE+x} ]) && echo "required env vars were not provided" && exit 1
 
+# shellcheck disable=SC1090
 source ~/.profile
 
 MINA_COMMIT_SHA1=$(git rev-parse HEAD)
@@ -51,4 +52,5 @@ dune build "--profile=${DUNE_PROFILE}" $INSTRUMENTED_PARAM \
   src/app/zkapp_limits/zkapp_limits.exe \
   src/lib/snark_worker/standalone/run_snark_worker.exe \
   src/test/command_line_tests/command_line_tests.exe \
-  src/test/archive/patch_archive_test/patch_archive_test.exe
+  src/test/archive/patch_archive_test/patch_archive_test.exe \
+  src/test/archive/archive_node_tests/archive_node_tests.exe

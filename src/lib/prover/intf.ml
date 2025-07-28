@@ -8,7 +8,15 @@ module type S = sig
   module Worker_state : sig
     type t
 
-    type init_arg
+    type init_arg =
+      { conf_dir : string
+      ; enable_internal_tracing : bool
+      ; internal_trace_filename : string option
+      ; logger : Logger.t
+      ; proof_level : Genesis_constants.Proof_level.t
+      ; constraint_constants : Genesis_constants.Constraint_constants.t
+      ; commit_id : string
+      }
 
     val create : init_arg -> t Deferred.t
   end

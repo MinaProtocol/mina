@@ -62,13 +62,15 @@ module Rpcs : sig
     type query = Ledger_hash.t * Sync_ledger.Query.t
 
     type response =
-      (Sync_ledger.Answer.t, Bounded_types.Wrapped_error.Stable.V1.t) Result.t
+      ( Sync_ledger.Answer.t
+      , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
+      Result.t
   end
 
   module Get_transition_chain : sig
     type query = State_hash.t list
 
-    type response = Mina_block.t list option
+    type response = Mina_block.Stable.Latest.t list option
   end
 
   module Get_transition_chain_proof : sig
@@ -88,8 +90,8 @@ module Rpcs : sig
       (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
 
     type response =
-      ( Mina_block.t
-      , State_body_hash.t list * Mina_block.t )
+      ( Mina_block.Stable.Latest.t
+      , State_body_hash.t list * Mina_block.Stable.Latest.t )
       Proof_carrying_data.t
       option
   end
@@ -105,8 +107,8 @@ module Rpcs : sig
     type query = unit
 
     type response =
-      ( Mina_block.t
-      , State_body_hash.t list * Mina_block.t )
+      ( Mina_block.Stable.Latest.t
+      , State_body_hash.t list * Mina_block.Stable.Latest.t )
       Proof_carrying_data.t
       option
   end
@@ -114,7 +116,7 @@ module Rpcs : sig
   module Get_completed_snarks : sig
     type query = unit
 
-    type response = Transaction_snark_work.unchecked list option
+    type response = Transaction_snark_work.Stable.Latest.t list option
   end
 
   type ('query, 'response) rpc = ('query, 'response) Rpcs.rpc =
@@ -189,7 +191,9 @@ val get_ancestry :
      t
   -> Peer.Id.t
   -> (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
-  -> (Mina_block.t, State_body_hash.t list * Mina_block.t) Proof_carrying_data.t
+  -> ( Mina_block.Stable.Latest.t
+     , State_body_hash.t list * Mina_block.Stable.Latest.t )
+     Proof_carrying_data.t
      Envelope.Incoming.t
      Deferred.Or_error.t
 
@@ -198,7 +202,9 @@ val get_best_tip :
   -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
-  -> (Mina_block.t, State_body_hash.t list * Mina_block.t) Proof_carrying_data.t
+  -> ( Mina_block.Stable.Latest.t
+     , State_body_hash.t list * Mina_block.Stable.Latest.t )
+     Proof_carrying_data.t
      Deferred.Or_error.t
 
 val get_transition_chain_proof :
@@ -215,7 +221,7 @@ val get_transition_chain :
   -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
-  -> Mina_block.t list Deferred.Or_error.t
+  -> Mina_block.Stable.Latest.t list Deferred.Or_error.t
 
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
@@ -235,7 +241,9 @@ val get_completed_checked_snarks :
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
 val broadcast_state :
-  t -> Mina_block.t State_hash.With_state_hashes.t -> unit Deferred.t
+     t
+  -> Mina_block.Stable.Latest.t State_hash.With_state_hashes.t
+  -> unit Deferred.t
 
 val broadcast_snark_pool_diff :
   ?nonce:int -> t -> Snark_pool.Resource_pool.Diff.t -> unit Deferred.t
@@ -283,6 +291,6 @@ val create :
   -> sinks:Sinks.t
   -> get_transition_frontier:(unit -> Transition_frontier.t option)
   -> get_snark_pool:(unit -> Snark_pool.t option)
-  -> get_node_status:(unit -> Node_status.t Deferred.Or_error.t)
+  -> get_node_status:(t -> Node_status.t Deferred.Or_error.t)
   -> snark_job_state:(unit -> Work_selector.State.t option)
   -> t Deferred.t

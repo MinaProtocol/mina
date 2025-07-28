@@ -50,7 +50,6 @@ let test_range_check_lookup () =
   let _tag, _cache_handle, (module Proof), Pickles.Provers.[ prove ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"lookup range-check"
       ~choices:(fun ~self:_ ->

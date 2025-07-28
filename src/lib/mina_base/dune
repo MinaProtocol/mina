@@ -38,7 +38,7 @@
   sparse_ledger_lib
   snark_params
   signature_lib
-  bounded_types
+  mina_stdlib
   rosetta_coding
   random_oracle
   hash_prefix_states
@@ -73,7 +73,8 @@
   hex
   snark_bits
   error_json
-  ppx_version.runtime)
+  ppx_version.runtime
+  proof_cache_tag)
  (preprocess
   (pps
    ppx_annot

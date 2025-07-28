@@ -1,10 +1,13 @@
 open Pickles_types
 
 module Make
+    (Inductive_rule : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
     (A : Pickles_types.Poly_types.T0) (A_value : sig
       type t
     end)
     (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) : sig
+  module Step_branch_data : module type of Step_branch_data.Make (Inductive_rule)
+
   val f :
        ?handler:
          (   Snarky_backendless.Request.request

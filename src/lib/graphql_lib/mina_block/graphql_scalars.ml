@@ -38,7 +38,7 @@ let%test_module "Roundtrip tests" =
 
           (* Sample gotten from: lib/prover/prover.ml *)
           let example : t =
-            Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
+            Pickles.Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:16
 
           (* TODO: find better ways to generate `Mina_block.Precomputed.Proof.t` values *)
           let gen = Quickcheck.Generator.return example

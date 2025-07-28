@@ -1,10 +1,10 @@
-(* Testing
-   -------
+(** Testing
+    -------
 
-   Component: Pickles
-   Subject: Test module Wrap_hack
-   Invocation: \
-    dune exec src/lib/pickles/test/main.exe -- test "Wrap hack"
+    Component: Pickles
+    Subject: Test module Wrap_hack
+    Invocation: \
+     dune exec src/lib/pickles/test/test_wrap_hack.exe
 *)
 
 open Pickles_types
@@ -38,18 +38,19 @@ let test_hash_messages_for_next_wrap_proof (type n) (n : n Nat.t) () =
       make_checked (fun () ->
           Wrap_hack.Checked.hash_messages_for_next_wrap_proof n t ) )
     (fun t ->
-      Wrap_hack.Checked.hash_constant_messages_for_next_wrap_proof n t
+      Wrap_hack.Checked.hash_constant_messages_for_next_wrap_proof t
       |> Digest.Constant.to_bits |> Impls.Wrap.Field.Constant.project )
     messages_for_next_wrap_proof
 
-let tests =
+let () =
   let open Alcotest in
-  [ ( "Wrap hack"
-    , [ test_case "hash_messages_for_next_wrap_proof correct 0" `Quick
-          (test_hash_messages_for_next_wrap_proof Nat.N0.n)
-      ; test_case "hash_messages_for_next_wrap_proof correct 1" `Quick
-          (test_hash_messages_for_next_wrap_proof Nat.N1.n)
-      ; test_case "hash_messages_for_next_wrap_proof correct 2" `Quick
-          (test_hash_messages_for_next_wrap_proof Nat.N2.n)
-      ] )
-  ]
+  run "Wrap hack"
+    [ ( "Wrap hack"
+      , [ test_case "hash_messages_for_next_wrap_proof correct 0" `Quick
+            (test_hash_messages_for_next_wrap_proof Nat.N0.n)
+        ; test_case "hash_messages_for_next_wrap_proof correct 1" `Quick
+            (test_hash_messages_for_next_wrap_proof Nat.N1.n)
+        ; test_case "hash_messages_for_next_wrap_proof correct 2" `Quick
+            (test_hash_messages_for_next_wrap_proof Nat.N2.n)
+        ] )
+    ]

@@ -28,13 +28,47 @@ module Make
   type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, to_yojson, hash]
 
-  type verified = t [@@deriving compare, to_yojson, hash]
+  module Cached = struct
+    type t =
+      | Add_solved_work of
+          Transaction_snark_work.Statement.t
+          * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+      | Empty
 
-  let t_of_verified = ident
+    let read_all_proofs_from_disk =
+      let map_proofs =
+        Priced_proof.map
+          ~f:(One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk)
+      in
+      function
+      | Add_solved_work (work, proofs) ->
+          Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2
+          .Add_solved_work
+            (work, map_proofs proofs)
+      | Empty ->
+          Empty
 
-  type rejected = Rejected.t [@@deriving to_yojson]
+    let write_all_proofs_to_disk ~proof_cache_db =
+      let map_proofs =
+        Priced_proof.map
+          ~f:
+            (One_or_two.map
+               ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db) )
+      in
+      function
+      | Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2
+        .Add_solved_work (work, proofs) ->
+          (Add_solved_work (work, map_proofs proofs) : t)
+      | Empty ->
+          Empty
+  end
+
+  type verified = Cached.t
+
+  let t_of_verified = Cached.read_all_proofs_from_disk
+
+  type rejected = Rejected.t
 
   let label = Pool.label
 
@@ -131,8 +165,15 @@ module Make
     | Add_solved_work (work, ({ Priced_proof.fee; _ } as p)) ->
         let is_local = match sender with Local -> true | _ -> false in
         let open Deferred.Result in
+        let cache_t () =
+          Envelope.Incoming.map
+            ~f:
+              (Cached.write_all_proofs_to_disk
+                 ~proof_cache_db:(Pool.proof_cache_db pool) )
+            t
+        in
         let verify () =
-          Pool.verify_and_act pool ~work:(work, p) ~sender >>| const t
+          Pool.verify_and_act pool ~work:(work, p) ~sender >>| cache_t
         in
         (*reject higher priced gossiped proofs*)
         if is_local then verify ()
@@ -141,7 +182,7 @@ module Make
           >>= verify
 
   (* This is called after verification has occurred.*)
-  let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
+  let unsafe_apply (pool : Pool.t) (t : Cached.t Envelope.Incoming.t) =
     let { Envelope.Incoming.data = diff; sender; _ } = t in
     match diff with
     | Empty ->
@@ -159,9 +200,11 @@ module Make
             let%map.Result accepted, rejected =
               Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
             in
-            (`Accept, accepted, rejected)
+            (`Accept, Cached.read_all_proofs_from_disk accepted, rejected)
         | Error e ->
-            if is_local then Error (`Locally_generated (diff, ()))
+            if is_local then
+              Error
+                (`Locally_generated (Cached.read_all_proofs_from_disk diff, ()))
             else Error (`Other (Intf.Verification_error.to_error e)) )
 
   type Structured_log_events.t +=

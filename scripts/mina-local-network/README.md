@@ -37,7 +37,7 @@
            src/app/logproc/logproc.exe
        ```
 
-     - If you’d like to work with [zkApps](https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-zkapps.md) using [SnarkyJS](https://github.com/o1-labs/snarkyjs) locally.
+     - If you’d like to work with [zkApps](https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0004-zkapps.md) using [SnarkyJS](https://github.com/o1-labs/snarkyjs) locally.
 
        - Build the `SnarkyJS`:
 

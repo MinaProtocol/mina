@@ -83,7 +83,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
                   [ dump_pipelines_cmd ]
-                # RunInToolchain.runInToolchainBullseye
+                # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines dirty-when  --repo ."
             , label = "Dhall: dirtyWhen"
@@ -95,7 +95,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
                   [ dump_pipelines_cmd ]
-                # RunInToolchain.runInToolchainBullseye
+                # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines dups"
             , label = "Dhall: duplicates"
@@ -107,7 +107,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
                   [ dump_pipelines_cmd ]
-                # RunInToolchain.runInToolchainBullseye
+                # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines names"
             , label = "Dhall: job names"
