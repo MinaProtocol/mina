@@ -97,7 +97,7 @@ let generateDockerForCodename =
                   , profile = profile
                   , network = spec.network
                   , buildScript =
-                      "./buildkite/scripts/hardfork/build-release.sh"
+                      "./buildkite/scripts/hardfork/build-packages.sh"
                   }
               , DockerImage.generateStep dockerDaemonSpec
               , DockerImage.generateStep
