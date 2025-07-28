@@ -44,7 +44,7 @@ let test_case (test_data : t) =
     { test_data.config with config_file = "genesis_ledgers/mainnet.json" }
   in
   let logger = Logger.create () in
-  let log_file = test_data.temp_dir ^ "/archive.log" in
+  let log_file = test_data.temp_dir ^ "/archive.load_genesis_ledger.log" in
   let%bind process = Archive.of_config config |> Archive.start in
   Archive.Process.start_logging process ~log_file ;
 
