@@ -96,6 +96,10 @@ let generateDockerForCodename =
                   , debVersion = codename
                   , profile = profile
                   , network = spec.network
+                  , extraBuildEnvs =
+                    [ "NETWORK_NAME=${Network.lowerName spec.network}"
+                    , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
+                    ]
                   , buildScript =
                       "./buildkite/scripts/hardfork/build-packages.sh"
                   }
