@@ -67,5 +67,6 @@ type t =
   ; zkapp_cmd_limit : int option ref
   ; compile_config : Mina_compile_config.t
   ; itn_features : bool
+  ; hardfork_mode : Hardfork.Mode.t option
   }
 [@@deriving make]
