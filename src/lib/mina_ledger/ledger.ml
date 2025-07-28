@@ -115,8 +115,8 @@ module Ledger_inner = struct
 
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = Account.Stable.V2.t [@@deriving equal, compare, sexp]
+      module V3 = struct
+        type t = Account.Stable.V3.t [@@deriving equal, compare, sexp]
 
         let to_latest = Fn.id
 
