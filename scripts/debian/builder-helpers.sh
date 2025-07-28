@@ -180,7 +180,7 @@ copy_common_daemon_configs() {
     "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   cp ../scripts/hardfork/create_runtime_config.sh \
     "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
-  cp ../scripts/mina-verify-packaged-fork-config \
+  cp ../scripts/hardfork/mina-verify-packaged-fork-config \
     "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
   # Update the mina.service with a new default PEERS_URL based on Seed List \
   # URL $3
@@ -431,6 +431,85 @@ build_daemon_berkeley_deb() {
 }
 ## END BERKELEY PACKAGE ##
 
+replace_runtime_config_and_ledgers_with_hardforked_ones() {
+  local NETWORK_NAME="${1}"
+
+  { [ -z ${RUNTIME_CONFIG_JSON+x} ] || [ -z ${LEDGER_TARBALLS+x} ]; }  \
+    && echo "required env vars were not provided" && exit 1
+
+  # make sure the paths are absolute
+  RUNTIME_CONFIG_JSON=$(realpath -s $RUNTIME_CONFIG_JSON)
+  LEDGER_TARBALLS=$(realpath -s $LEDGER_TARBALLS)
+
+  # Replace the runtime config and ledgers with the hardfork ones
+  cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+  for ledger_tarball in $LEDGER_TARBALLS; do
+    cp "${ledger_tarball}" "${BUILDDIR}/var/lib/coda/"
+  done
+
+  # Overwrite outdated ledgers that are being updated by the hardfork (backing up the outdated ledgers)
+  mv "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
+  cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
+}
+
+
+## DEVNET HARDFORK PACKAGE ##
+build_daemon_devnet_hardfork_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building hardfork testnet signatures deb without keys:"
+
+  create_control_file mina-hardfork-devnet "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones devnet
+
+  build_deb mina-hardfork-devnet
+
+}
+
+## END DEVNET HARDFORK PACKAGE ##
+
+## BERKELEY HARDFORK PACKAGE ##
+build_daemon_berkeley_hardfork_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building hardfork berkeley signatures deb without keys:"
+
+  create_control_file mina-hardfork-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
+
+  build_deb mina-hardfork-berkeley
+
+}
+
+## END BERKELEY HARDFORK PACKAGE ##
+
+## MAINNET HARDFORK PACKAGE ##
+build_daemon_mainnet_hardfork_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building hardfork mainnet signatures deb without keys:"
+
+  create_control_file mina-hardfork-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Mina Protocol Client and Daemon for the Mainnet Network' "${SUGGESTED_DEPS}"
+
+  copy_common_daemon_configs mainnet testnet 'seed-lists/mainnet_seeds.txt'
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones mainnet
+
+  build_deb mina-hardfork-mainnet
+
+}
+
+## END MAINNET HARDFORK PACKAGE ##
+
 copy_common_archive_configs() {
   local ARCHIVE_DEB="${1}"
 
@@ -502,6 +581,58 @@ build_archive_mainnet_deb () {
 }
 ## END ARCHIVE MAINNET PACKAGE ##
 
+## ARCHIVE HARDFORK PACKAGE ##
+build_archive_mainnet_hardfork_deb() {
+  ARCHIVE_DEB=mina-archive-mainnet-hardfork
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive mainnet hardfork deb"
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones mainnet
+
+}
+
+## END ARCHIVE HARDFORK PACKAGE ##
+
+## ARCHIVE DEVNET HARDFORK PACKAGE ##
+
+build_archive_devnet_hardfork_deb() {
+  ARCHIVE_DEB=mina-archive-devnet-hardfork
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive devnet hardfork deb"
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones devnet
+}
+
+## END ARCHIVE DEVNET HARDFORK PACKAGE ##
+
+## ARCHIVE BERKELEY HARDFORK PACKAGE ##
+build_archive_berkeley_hardfork_deb() {
+  ARCHIVE_DEB=mina-archive-berkeley-hardfork
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive berkeley hardfork deb"
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
+}
+
+## END ARCHIVE BERKELEY HARDFORK PACKAGE ##
 
 ## ZKAPP TEST TXN ##
 build_zkapp_test_transaction_deb () {
