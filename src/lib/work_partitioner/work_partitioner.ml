@@ -144,9 +144,10 @@ let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
   let unscheduled_segments =
     Snark_worker_shared.Zkapp_command_inputs.read_all_proofs_from_disk
       unscheduled_segments
-    |> Mina_stdlib.Nonempty_list.map ~f:(fun (witness, spec, statement) ->
+    |> Mina_stdlib.Nonempty_list.mapi
+         ~f:(fun which_segment (witness, spec, statement) ->
            Work.Spec.Sub_zkapp.Stable.Latest.Segment
-             { statement; witness; spec } )
+             { statement; witness; spec; which_segment } )
   in
   let pending_zkapp_command, first_segment =
     Pending_zkapp_command.create_and_yield_segment ~job ~unscheduled_segments
@@ -384,17 +385,27 @@ let submit_into_pending_zkapp_command ~partitioner
         partitioner.zkapp_jobs_sent_by_partitioner
     , Single_id_map.find partitioner.pending_zkapp_commands single_id )
   with
-  | Some _, Some pending -> (
-      Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
-      match Pending_zkapp_command.try_finalize pending with
-      | None ->
-          Processed None
-      | Some ({ job_id; _ }, proof, elapsed) ->
-          partitioner.pending_zkapp_commands <-
-            Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
-          submit_single ~is_from_zkapp:true ~partitioner
-            ~submitted_result:{ spec = (); proof; elapsed }
-            ~job_id () )
+  | Some job, Some pending -> (
+      let range = Work.Spec.Sub_zkapp.Stable.Latest.get_range job.spec in
+      match
+        Pending_zkapp_command.submit_proof ~proof ~elapsed ~range pending
+      with
+      | Ok () -> (
+          match Pending_zkapp_command.try_finalize pending with
+          | None ->
+              Processed None
+          | Some ({ job_id; _ }, proof, elapsed) ->
+              [%log' debug partitioner.logger] "Finalized zkapp" ;
+              partitioner.pending_zkapp_commands <-
+                Single_id_map.remove partitioner.pending_zkapp_commands
+                  single_id ;
+              submit_single ~is_from_zkapp:true ~partitioner
+                ~submitted_result:{ spec = (); proof; elapsed }
+                ~job_id () )
+      | Error _ ->
+          Sent_zkapp_job_pool.bring_back ~id:job_id ~job
+            partitioner.zkapp_jobs_sent_by_partitioner ;
+          SpecUnmatched )
   | None, _ | _, None ->
       [%log' debug partitioner.logger]
         "Worker submit a work that's already removed from sent sub-zkapp job \
