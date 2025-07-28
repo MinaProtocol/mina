@@ -420,7 +420,7 @@ let main inputs =
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
-        T.run network dsl )
+        T.run ~config:test_config network dsl )
   in
   let exit_reason, test_result =
     match monitor_test_result with

@@ -212,7 +212,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let run network t =
+  let run ~config:({ Test_config.signature_kind; _ } as config) network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
@@ -274,7 +274,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       { Signed_command_payload.Poly.common; body }
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let raw_signature =
       Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
@@ -463,15 +462,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            send_payments ~logger ~sender_pub_key ~receiver_pub_key
              ~amount:Currency.Amount.one ~fee ~node:sender 10
          in
-         let constants : Test_config.constants =
-           { genesis_constants = Network.genesis_constants network
-           ; constraint_constants = Network.constraint_constants network
-           ; compile_config = Network.compile_config network
-           }
-         in
          wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis
-              ~test_config:(config ~constants) ~num_proofs:1 ) )
+              ~test_config:config ~num_proofs:1 ) )
     in
     let%bind () =
       section_hard "Check vesting of timed3/timed4 account"
