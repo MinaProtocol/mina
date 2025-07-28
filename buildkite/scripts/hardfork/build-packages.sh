@@ -2,6 +2,9 @@
 
 set -eo pipefail
 
+# shellcheck source=./buildkite/scripts/export-git-env-vars.sh
+source ./buildkite/scripts/export-git-env-vars.sh
+
 if [ -z "${CONFIG_JSON_GZ_URL+x}" ] || [ -z "${NETWORK_NAME+x}" ] || [ -z "${MINA_DEB_CODENAME+x}" ]; then
     echo "❌ Error: Required environment variables not provided:"
     [ -z "${CONFIG_JSON_GZ_URL+x}" ] && echo "  - CONFIG_JSON_GZ_URL: URL to download the network configuration JSON file 🌐"
@@ -9,6 +12,13 @@ if [ -z "${CONFIG_JSON_GZ_URL+x}" ] || [ -z "${NETWORK_NAME+x}" ] || [ -z "${MIN
     [ -z "${MINA_DEB_CODENAME+x}" ] && echo "  - MINA_DEB_CODENAME: Debian codename for package building 📦"
     exit 1
 fi
+
+echo "--- Starting hardfork package generation for network: ${NETWORK_NAME} with Debian codename: ${MINA_DEB_CODENAME}"
+
+if [ "${NETWORK_NAME}" = "mainnet" ]; then
+  export MINA_BUILD_MAINNET=1
+fi
+./buildkite/scripts/build-artifact.sh
 
 # Set the base network config for ./scripts/hardfork/create_runtime_config.sh
 export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
