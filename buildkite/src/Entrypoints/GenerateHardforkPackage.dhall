@@ -238,7 +238,7 @@ let generate_hardfork_package =
       ->  \(genesis_timestamp : Optional Text)
       ->  \(config_json_gz_url : Text)
       ->  \(suffix : Text)
-      ->  pipeline
+      ->  (pipeline
             Spec::{
             , codenames = codenames
             , network = network
@@ -246,6 +246,6 @@ let generate_hardfork_package =
             , genesis_timestamp = genesis_timestamp
             , config_json_gz_url = config_json_gz_url
             , suffix = suffix
-            }
+            }).pipeline
 
 in  { generate_hardfork_package = generate_hardfork_package }
