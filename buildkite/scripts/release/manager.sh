@@ -1269,7 +1269,6 @@ function verify(){
                                         -m $__codename \
                                         -r $__debian_repo \
                                         -c $__channel \
-                                        -s "$__docker_suffix" \
                                         ${__signed_debian_repo:+--signed}
                             fi
 
