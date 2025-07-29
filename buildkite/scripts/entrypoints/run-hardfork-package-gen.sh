@@ -75,4 +75,4 @@ function to_dhall_list() {
 
 DHALL_CODENAMES=$(to_dhall_list "$CODENAMES" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
 
-echo $GENERATE_HARDFORK_PACKAGE_DHALL_DEF'.generate_hardfork_package '"$DHALL_CODENAMES"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' (None Text) "'"${CONFIG_JSON_GZ_URL}"'" "'"${VERSION}"'" ' | dhall-to-yaml --quoted
+echo $GENERATE_HARDFORK_PACKAGE_DHALL_DEF'.generate_hardfork_package '"$DHALL_CODENAMES"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' (None Text) "'"${CONFIG_JSON_GZ_URL}"'" "'""'" ' | dhall-to-yaml --quoted

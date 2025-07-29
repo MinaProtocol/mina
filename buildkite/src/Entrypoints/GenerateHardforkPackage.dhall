@@ -225,7 +225,7 @@ let pipeline
                       , target_version = targetVersion
                       , new_docker_tags = new_tags
                       , depends_on =
-                        [ { name = pipelineName, key = "build-deb-pkg" } ]
+                        [ { name = pipelineName, key = "build-deb-pkg-${DebianVersions.lowerName spec.codenames}" } ]
                       }
               }
 
