@@ -350,6 +350,51 @@ build_rosetta_berkeley_deb() {
 }
 ## END BERKELEY PACKAGE ##
 
+build_rosetta_berkeley_hardfork_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building berkeley rosetta hardfork deb"
+
+  create_control_file mina-rosetta-berkeley-hardfork "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones "testnet"
+
+  build_deb mina-rosetta-berkeley-hardfork
+}
+
+build_rosetta_devnet_hardfork_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building devnet rosetta hardfork deb"
+
+  create_control_file mina-rosetta-devnet-hardfork "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "testnet"
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones "testnet"
+
+  build_deb mina-rosetta-devnet-hardfork
+}
+
+build_rosetta_mainnet_hardfork_deb() {
+
+  echo "------------------------------------------------------------"
+  echo "--- Building mainnet rosetta hardfork deb"
+
+  create_control_file mina-rosetta-mainnet-hardfork "${SHARED_DEPS}" \
+    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
+
+  copy_common_rosetta_configs "mainnet"
+
+  replace_runtime_config_and_ledgers_with_hardforked_ones "mainnet"
+
+  build_deb mina-rosetta-mainnet-hardfork
+}
+
 ## MAINNET PACKAGE ##
 build_daemon_mainnet_deb() {
 
