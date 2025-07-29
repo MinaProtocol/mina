@@ -318,7 +318,8 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
   in
   let transition_graph = Transition_cache.create () in
   let temp_persistent_root_instance =
-    Transition_frontier.Persistent_root.create_instance_exn persistent_root
+    Transition_frontier.Persistent_root.create_instance_exn ~logger
+      persistent_root
   in
   let temp_snarked_ledger =
     Transition_frontier.Persistent_root.Instance.snarked_ledger
@@ -581,7 +582,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           in
           (* TODO: lazy load db in persistent root to avoid unnecessary opens like this *)
           Transition_frontier.Persistent_root.(
-            with_instance_exn persistent_root ~f:(fun instance ->
+            with_instance_exn persistent_root ~logger ~f:(fun instance ->
                 Instance.set_root_state_hash instance
                 @@ Mina_block.Validated.state_hash
                 @@ Mina_block.Validated.lift new_root )) ;

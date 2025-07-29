@@ -283,7 +283,8 @@ let rec load_with_max_length :
           (State_hash.With_state_hashes.state_hash
              precomputed_values.protocol_state_with_hashes )
     in
-    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
+      ~logger ;
     let genesis_ledger_hash =
       Precomputed_values.genesis_ledger precomputed_values
       |> Lazy.force |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
@@ -653,6 +654,7 @@ module For_tests = struct
         let persistent_root =
           Persistent_root.create ~logger ~directory:root_dir
             ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
+            ()
         in
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
@@ -753,7 +755,8 @@ module For_tests = struct
           ~genesis_state_hash:
             (State_hash.With_state_hashes.state_hash
                precomputed_values.protocol_state_with_hashes ) ) ;
-    Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
+    Persistent_root.with_instance_exn persistent_root ~logger
+      ~f:(fun instance ->
         let transition = Root_data.Limited.transition root_data in
         Persistent_root.Instance.set_root_state_hash instance
           (Mina_block.Validated.state_hash transition) ;

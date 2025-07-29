@@ -1026,11 +1026,12 @@ module For_tests = struct
     let persistent_root =
       Persistent_root.create ~logger
         ~directory:(Filename.temp_file "snarked_ledger" "")
-        ~ledger_depth
+        ~ledger_depth ()
     in
-    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
+      ~logger ;
     let persistent_root_instance =
-      Persistent_root.create_instance_exn persistent_root
+      Persistent_root.create_instance_exn persistent_root ~logger
     in
     create
       ~context:(module Context)

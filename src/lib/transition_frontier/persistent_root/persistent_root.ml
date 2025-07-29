@@ -65,6 +65,7 @@ end
 module rec Instance_type : sig
   type t =
     { snarked_ledger : Ledger.Root.t
+    ; migrated_root : Ledger.Db.t option
     ; potential_snarked_ledgers : string Queue.t
     ; factory : Factory_type.t
     }
@@ -74,6 +75,7 @@ end =
 and Factory_type : sig
   type t =
     { directory : string
+    ; migrated_dir : string option
     ; logger : Logger.t
     ; mutable instance : Instance_type.t option
     ; ledger_depth : int
@@ -126,13 +128,46 @@ module Instance = struct
     Ledger.Root.close t.snarked_ledger ;
     t.factory.instance <- None
 
-  let create factory =
+  let migrate_root ~logger ~source factory =
+    let%bind.Option migrated_dir = factory.migrated_dir in
+    let migrated_db =
+      Ledger.Db.create ~directory_name:migrated_dir ~fresh:true
+        ~depth:factory.ledger_depth ()
+    in
+    [%log info] "Transfering all account to migrated root"
+      ~metadata:
+        [ ("source", `String factory.directory)
+        ; ("migrated_dir", `String migrated_dir)
+        ] ;
+    match Ledger_transfer.transfer_accounts ~src:source ~dest:migrated_db with
+    | Ok migrated_db ->
+        [%log info] "Succesfully migrated root"
+          ~metadata:[ ("migrated_dir", `String migrated_dir) ] ;
+        Some migrated_db
+    | Error reason ->
+        [%log info] "Failed to miragte root"
+          ~metadata:
+            [ ("migrated_dir", `String migrated_dir)
+            ; ("reason", `String (Error.to_string_hum reason))
+            ] ;
+        None
+
+  let create ~logger factory =
     let snarked_ledger =
       Ledger.Root.create_single ~depth:factory.ledger_depth
         ~directory_name:(Locations.snarked_ledger factory.directory)
         ()
     in
-    { snarked_ledger; potential_snarked_ledgers = Queue.create (); factory }
+    let migrated_root =
+      migrate_root
+        ~source:(Ledger.Root.as_masked snarked_ledger)
+        ~logger factory
+    in
+    { snarked_ledger
+    ; migrated_root
+    ; potential_snarked_ledgers = Queue.create ()
+    ; factory
+    }
 
   (** When we load from disk,
       1. Check the potential_snarked_ledgers to see if any one of these
@@ -221,18 +256,19 @@ module Instance = struct
         if
           Frozen_ledger_hash.equal potential_snarked_ledger_hash
             snarked_ledger_hash
-        then
-          Ok
-            { snarked_ledger
-            ; potential_snarked_ledgers = Queue.create ()
-            ; factory
-            }
+        then Ok (create ~logger factory)
         else (
           Ledger.Root.close snarked_ledger ;
           Error `Snarked_ledger_mismatch )
     | Some snarked_ledger ->
+        let migrated_root =
+          migrate_root ~logger
+            ~source:(Ledger.Root.as_masked snarked_ledger)
+            factory
+        in
         Ok
           { snarked_ledger
+          ; migrated_root
           ; potential_snarked_ledgers = Queue.create ()
           ; factory
           }
@@ -275,12 +311,12 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~directory ~ledger_depth =
-  { directory; logger; instance = None; ledger_depth }
+let create ?migrated_dir ~logger ~directory ~ledger_depth () =
+  { directory; migrated_dir; logger; instance = None; ledger_depth }
 
-let create_instance_exn t =
+let create_instance_exn ~logger t =
   assert (Option.is_none t.instance) ;
-  let instance = Instance.create t in
+  let instance = Instance.create ~logger t in
   t.instance <- Some instance ;
   instance
 
@@ -291,8 +327,8 @@ let load_from_disk_exn t ~snarked_ledger_hash ~logger =
   t.instance <- Some instance ;
   instance
 
-let with_instance_exn t ~f =
-  let instance = create_instance_exn t in
+let with_instance_exn t ~f ~logger =
+  let instance = create_instance_exn ~logger t in
   let x = f instance in
   Instance.close instance ; x
 

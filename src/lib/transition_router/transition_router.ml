@@ -618,6 +618,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         Transition_frontier.Persistent_root.create ~logger
           ~directory:persistent_root_location
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
+          ()
       in
       let network_transition_pipe : _ Strict_pipe.Swappable.t =
         let name = "transition_frontier_controller_pipe" in
