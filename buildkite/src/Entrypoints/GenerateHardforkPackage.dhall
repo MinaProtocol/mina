@@ -74,6 +74,7 @@ let generateDockerForCodename =
                 , deb_codename = codename
                 , deb_profile = profile
                 , deb_repo = DebianRepo.Type.Local
+                , deb_suffix = Some "hardfork"
                 }
 
           let dockerDaemonStep = DockerImage.stepKey dockerDaemonSpec
@@ -115,6 +116,7 @@ let generateDockerForCodename =
                   , deb_codename = codename
                   , deb_profile = profile
                   , deb_repo = DebianRepo.Type.Local
+                  , deb_suffix = Some "hardfork"
                   }
               , DockerImage.generateStep
                   DockerImage.ReleaseSpec::{
@@ -129,6 +131,7 @@ let generateDockerForCodename =
                   , deb_profile = profile
                   , deb_repo = DebianRepo.Type.Local
                   , deb_codename = codename
+                  , deb_suffix = Some "hardfork"
                   }
               , Command.build
                   Command.Config::{
