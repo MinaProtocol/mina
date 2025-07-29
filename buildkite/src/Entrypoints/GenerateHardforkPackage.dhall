@@ -96,6 +96,7 @@ let generateDockerForCodename =
                   , debVersion = codename
                   , profile = profile
                   , network = spec.network
+                  , prefix = pipelineName
                   , suffix = "-${DebianVersions.lowerName codename}"
                   , extraBuildEnvs =
                     [ "NETWORK_NAME=${Network.lowerName spec.network}"
