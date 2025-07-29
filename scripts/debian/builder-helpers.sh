@@ -205,26 +205,6 @@ copy_common_daemon_configs() {
     "${BUILDDIR}/etc/bash_completion.d/mina"
 }
 
-## GENERATE KEYPAIR PACKAGE ##
-build_keypair_deb() {
-  echo "------------------------------------------------------------"
-  echo "--- Building generate keypair deb:"
-
-  create_control_file mina-generate-keypair "${SHARED_DEPS}" \
-    'Utility to regenerate mina private public keys in new format' \
-    "${SUGGESTED_DEPS}"
-
-  # Binaries
-  cp ./default/src/app/generate_keypair/generate_keypair.exe \
-    "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
-  cp ./default/src/app/validate_keypair/validate_keypair.exe \
-    "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-
-  build_deb mina-generate-keypair
-}
-## END GENERATE KEYPAIR PACKAGE ##
-
-
 ## LOGPROC PACKAGE ##
 build_logproc_deb() {
   create_control_file mina-logproc "${SHARED_DEPS}" \
