@@ -15,7 +15,6 @@ type t =
   { logger : Logger.t
   ; transaction_snark : (module Transaction_snark.S)
   ; single_id_gen : Id_generator.t
-  ; subzkapp_id_gen : Id_generator.t
   ; pairing_pool : (int64, Combining_result.t) Hashtbl.t
         (** if one single work from underlying Work_selector is completed but
            not the other. throw it here. *)
@@ -44,7 +43,6 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
   { logger
   ; transaction_snark = (module T)
   ; single_id_gen = Id_generator.create ~logger
-  ; subzkapp_id_gen = Id_generator.create ~logger
   ; pairing_pool = Hashtbl.create (module Int64)
   ; pending_zkapp_commands = Single_id_map.empty
   ; reassignment_timeout
