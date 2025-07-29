@@ -2,7 +2,7 @@ open Async
 open Core
 
 module Mock = struct
-  type t = { proof : Bounded_types.String.Stable.V1.t }
+  type t = { proof : Mina_stdlib.Bounded_types.String.Stable.V1.t }
   [@@deriving bin_io_unversioned]
 end
 
@@ -23,7 +23,11 @@ module type S = sig
 
   val initialization_special_cases : unit -> unit
 
-  val remove_data_on_gc : unit -> unit
+  (** [remove_data_on_gc ?gc_strict ())] test behavior of cache on GC.
+      If [gc_strict] is set to [false], then we won't check if the cache is
+      empty after GC.
+   *)
+  val remove_data_on_gc : ?gc_strict:bool -> unit -> unit
 end
 
 module type S_extended = sig
@@ -32,7 +36,7 @@ module type S_extended = sig
   val simple_write_with_iteration : unit -> unit
 end
 
-module Make_impl (Cache : Disk_cache_intf.S with module Data := Mock) :
+module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock) :
   S with module Cache := Cache = struct
   let () =
     Core.Backtrace.elide := false ;
@@ -74,10 +78,10 @@ module Make_impl (Cache : Disk_cache_intf.S with module Data := Mock) :
   let simple_write ?additional_checks () =
     Async.Thread_safe.block_on_async_exn
     @@ fun () ->
-    File_system.with_temp_dir "disk_cache"
+    Mina_stdlib_unix.File_system.with_temp_dir "disk_cache"
       ~f:(simple_write_impl ?additional_checks)
 
-  let remove_data_on_gc_impl tmp_dir =
+  let remove_data_on_gc_impl ~gc_strict tmp_dir =
     let%map cache = initialize_cache_or_fail tmp_dir ~logger in
 
     let proof = Mock.{ proof = "dummy" } in
@@ -91,16 +95,16 @@ module Make_impl (Cache : Disk_cache_intf.S with module Data := Mock) :
      [%test_eq: string] proof.proof proof_from_cache.proof
        ~message:"invalid proof from cache" ) ;
 
-    Gc.compact () ;
+    if gc_strict then (
+      Gc.compact () ;
+      [%test_eq: int] (Cache.count cache) 0
+        ~message:"cache should be empty after garbage collector run" )
 
-    [%test_eq: int] (Cache.count cache) 0
-      ~message:"cache should be empty after garbage collector run"
-
-  let remove_data_on_gc () =
+  let remove_data_on_gc ?(gc_strict = true) () =
     Async.Thread_safe.block_on_async_exn
     @@ fun () ->
-    File_system.with_temp_dir "disk_cache-remove_data_on_gc"
-      ~f:remove_data_on_gc_impl
+    Mina_stdlib_unix.File_system.with_temp_dir "disk_cache-remove_data_on_gc"
+      ~f:(remove_data_on_gc_impl ~gc_strict)
 
   let initialize_and_expect_failure path ~logger =
     let%bind cache_res = Cache.initialize path ~logger in
@@ -157,11 +161,11 @@ module Make_impl (Cache : Disk_cache_intf.S with module Data := Mock) :
   let initialization_special_cases () =
     Async.Thread_safe.block_on_async_exn
     @@ fun () ->
-    File_system.with_temp_dir "disk_cache-invalid-initialization"
-      ~f:initialization_special_cases_impl
+    Mina_stdlib_unix.File_system.with_temp_dir
+      "disk_cache-invalid-initialization" ~f:initialization_special_cases_impl
 end
 
-module Make (Disk_cache : Disk_cache_intf.F) :
+module Make (Disk_cache : Disk_cache_intf.F_with_count) :
   S with module Cache := Disk_cache(Mock) = struct
   include Make_impl (Disk_cache (Mock))
 end

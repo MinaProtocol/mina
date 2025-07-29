@@ -45,7 +45,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   (** Structure managing cache accumulated since the "base" ledger.
 
-    Its purpose is to optimize lookups through a few consequitive masks
+    Its purpose is to optimize lookups through a few consecutive masks
     (by using just one map lookup instead of [O(number of masks)] map lookups).
 
     With a number of mask around 290, this trick gives a sizeable performance improvement.
@@ -205,11 +205,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       update_maps t ~f:(fun maps ->
           { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
 
-    let set_inner_hash_at_addr_exn t address hash =
-      assert_is_attached t ;
-      assert (Addr.depth address <= t.depth) ;
-      self_set_hash t address hash
-
     let self_set_location t account_id location =
       update_maps t ~f:(fun maps ->
           { maps with
@@ -306,7 +301,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       self_find_or_batch_lookup self_find Base.get_batch t
 
     let empty_hash =
-      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+      Mina_stdlib.Empty_hashes.extensible_cache
+        (module Hash)
+        ~init_hash:Hash.empty_account
 
     let self_path_get_hash ~hashes ~current_location height address =
       match Map.find hashes address with
@@ -339,7 +336,8 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option sibling_hash =
           self_path_get_hash ~hashes ~current_location height sibling
         in
-        Direction.map dir ~left:(`Left sibling_hash) ~right:(`Right sibling_hash)
+        Mina_stdlib.Direction.map dir ~left:(`Left sibling_hash)
+          ~right:(`Right sibling_hash)
       in
       self_path_impl ~element
 
@@ -353,7 +351,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         let%map.Option self_hash =
           self_path_get_hash ~hashes ~current_location height address
         in
-        Direction.map dir
+        Mina_stdlib.Direction.map dir
           ~left:(`Left (self_hash, sibling_hash))
           ~right:(`Right (sibling_hash, self_hash))
       in
@@ -975,7 +973,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let first_location ~ledger_depth =
       Location.Account
         ( Addr.of_directions
-        @@ List.init ledger_depth ~f:(fun _ -> Direction.Left) )
+        @@ List.init ledger_depth ~f:(fun _ -> Mina_stdlib.Direction.Left) )
 
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t account_id account =

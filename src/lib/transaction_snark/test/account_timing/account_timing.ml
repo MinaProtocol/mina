@@ -15,6 +15,8 @@ let%test_module "account timing check" =
   ( module struct
     open Mina_ledger.Ledger.For_tests
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
@@ -444,13 +446,14 @@ let%test_module "account timing check" =
                             "Transaction expected to be applied successfully \
                              but failed with %s"
                             failures_str () ) ) ;
-                  check_transaction_snark ~txn_global_slot:slot
+                  check_transaction_snark ~signature_kind ~txn_global_slot:slot
                     sparse_ledger_before txn ~constraint_constants
               | Error err -> (
                   (*transaction snark should fail as well*)
                   try
-                    check_transaction_snark ~txn_global_slot:slot
-                      sparse_ledger_before txn ~constraint_constants ;
+                    check_transaction_snark ~signature_kind
+                      ~txn_global_slot:slot sparse_ledger_before txn
+                      ~constraint_constants ;
                     failwith
                       "transaction snark successful for a failing transaction"
                   with _exn ->
@@ -496,7 +499,7 @@ let%test_module "account timing check" =
           Quickcheck.Generator.all
           @@ List.map keypairss ~f:(fun (kp1, kp2) ->
                  let%map payment =
-                   Signed_command.Gen.payment ~sign_type:`Real
+                   Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
                      ~key_gen:(return (kp1, kp2))
                      ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
                  in
@@ -554,7 +557,7 @@ let%test_module "account timing check" =
         let amount = 100_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -612,7 +615,7 @@ let%test_module "account timing check" =
         in
         let amount = 100_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -664,7 +667,7 @@ let%test_module "account timing check" =
         let amount = 100_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -723,7 +726,7 @@ let%test_module "account timing check" =
         in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -772,7 +775,7 @@ let%test_module "account timing check" =
         let amount = 9_000_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -819,7 +822,7 @@ let%test_module "account timing check" =
         in
         let amount = 100_000_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -863,7 +866,7 @@ let%test_module "account timing check" =
         in
         let amount = 20 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:5 ()
         in
@@ -908,7 +911,7 @@ let%test_module "account timing check" =
         in
         let amount = 10_000_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -956,7 +959,7 @@ let%test_module "account timing check" =
         in
         let amount = 1_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -1006,7 +1009,7 @@ let%test_module "account timing check" =
         in
         let amount = 1_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -1151,7 +1154,7 @@ let%test_module "account timing check" =
                 (i, i)
           in
           let%bind cmd =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount ~max_amount ~fee_range:0 ()
           in
@@ -1513,7 +1516,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1595,7 +1598,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               match
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1697,7 +1700,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1812,7 +1815,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               match
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 9999)
@@ -2054,7 +2057,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 10_100)
@@ -2211,7 +2214,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 110_000)

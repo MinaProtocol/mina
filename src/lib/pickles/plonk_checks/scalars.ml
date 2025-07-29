@@ -101,8 +101,6 @@ end
 
 module type S = sig
   val constant_term : 'a Env.t -> 'a
-
-  val index_terms : 'a Env.t -> 'a Lazy.t Column.Table.t
 end
 
 (* The constraints are basically the same, but the literals in them differ. *)
@@ -3379,8 +3377,6 @@ module Tick : S = struct
             field
               "0x0000000000000000000000000000000000000000000000000000000000000000"
         )
-
-  let index_terms (type a) (_ : a Env.t) = Column.Table.of_alist_exn []
 end
 
 module Tock : S = struct
@@ -4227,6 +4223,4 @@ module Tock : S = struct
               * cell (var (Witness 3, Curr))
               * cell (var (Witness 4, Curr))
             + cell (var (Coefficient 9, Curr)) ) )
-
-  let index_terms (type a) (_ : a Env.t) = Column.Table.of_alist_exn []
 end

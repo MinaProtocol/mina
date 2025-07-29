@@ -1,0 +1,20 @@
+(library
+ (name pipe_lib)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (public_name pipe_lib)
+ (libraries
+  ;; opam libraries
+  sexplib
+  core_kernel
+  async_kernel
+  core
+  ppx_inline_test.config
+  ;; local libraries
+  run_in_thread
+  logger
+  o1trace)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_mina ppx_version ppx_jane ppx_deriving.make)))

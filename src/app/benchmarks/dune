@@ -2,7 +2,7 @@
 
 (executable
  (name benchmarks)
- (public_name main)
+ (public_name mina-benchmarks)
  (libraries
   core_bench.inline_benchmarks
   vrf_lib_tests
@@ -10,7 +10,7 @@
   core_kernel
   core
   base
-  bounded_types)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

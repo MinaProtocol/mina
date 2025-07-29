@@ -213,6 +213,7 @@ module Protocol = struct
         -> Pasta_bindings.Fp.t Kimchi_types.runtime_table_cfg array
         -> int
         -> SRS.Fp.t
+        -> bool
         -> t
         = "caml_pasta_fp_plonk_index_create_bytecode" "caml_pasta_fp_plonk_index_create"
 
@@ -247,6 +248,7 @@ module Protocol = struct
         -> Pasta_bindings.Fq.t Kimchi_types.runtime_table_cfg array
         -> int
         -> SRS.Fq.t
+        -> bool
         -> t
         = "caml_pasta_fq_plonk_index_create_bytecode" "caml_pasta_fq_plonk_index_create"
 
@@ -429,6 +431,7 @@ module Protocol = struct
 
       external example_with_lookup :
            SRS.Fp.t
+        -> bool
         -> Index.Fp.t
            * Pasta_bindings.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
@@ -438,6 +441,7 @@ module Protocol = struct
 
       external example_with_ffadd :
            SRS.Fp.t
+        -> bool
         -> Index.Fp.t
            * Pasta_bindings.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
@@ -447,6 +451,7 @@ module Protocol = struct
 
       external example_with_xor :
            SRS.Fp.t
+        -> bool
         -> Index.Fp.t
            * (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
@@ -456,6 +461,7 @@ module Protocol = struct
 
       external example_with_rot :
            SRS.Fp.t
+        -> bool
         -> Index.Fp.t
            * (Pasta_bindings.Fp.t * Pasta_bindings.Fp.t)
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
@@ -465,6 +471,7 @@ module Protocol = struct
 
       external example_with_foreign_field_mul :
            SRS.Fp.t
+        -> bool
         -> Index.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
              , Pasta_bindings.Fp.t )
@@ -473,6 +480,7 @@ module Protocol = struct
 
       external example_with_range_check :
            SRS.Fp.t
+        -> bool
         -> Index.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
              , Pasta_bindings.Fp.t )
@@ -481,6 +489,7 @@ module Protocol = struct
 
       external example_with_range_check0 :
            SRS.Fp.t
+        -> bool
         -> Index.Fp.t
            * ( Pasta_bindings.Fq.t Kimchi_types.or_infinity
              , Pasta_bindings.Fp.t )

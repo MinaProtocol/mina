@@ -77,7 +77,7 @@ type t =
 let create (module Context : CONTEXT) (config : Config.t) ~sinks
     ~(get_transition_frontier : unit -> Transition_frontier.t option)
     ~(get_snark_pool : unit -> Snark_pool.t option)
-    ~(get_node_status : unit -> Node_status.t Deferred.Or_error.t)
+    ~(get_node_status : t -> Node_status.t Deferred.Or_error.t)
     ~(snark_job_state : unit -> Work_selector.State.t option) =
   let open Context in
   let gossip_net_ref = ref None in
@@ -106,12 +106,13 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
           (Gossip_net.Message.Any_sinks ((module Sinks), sinks)) )
   in
   gossip_net_ref := Some gossip_net ;
+  let network = { gossip_net; logger; trust_system } in
   (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
   Clock.every' (Time.Span.of_min 1.) (fun () ->
       O1trace.thread "update_node_status" (fun () ->
-          match%bind get_node_status () with
+          match%bind get_node_status network with
           | Error _ ->
               Deferred.unit
           | Ok data ->
@@ -133,7 +134,7 @@ let create (module Context : CONTEXT) (config : Config.t) ~sinks
         For example, some things you really want to not drop (like your outgoing
         block announcement).
   *)
-  { gossip_net; logger; trust_system }
+  network
 
 (* lift and expose select gossip net functions *)
 include struct

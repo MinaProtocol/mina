@@ -7,25 +7,25 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (pps ppx_deriving.std ppx_deriving_yojson ppx_jane ppx_version))
  (libraries
   ;; opam libraries
-  integers
+  base.base_internalhash_types
+  bin_prot.shape
   core_kernel
+  integers
   ppx_inline_test.config
   sexplib0
-  bin_prot.shape
-  base.base_internalhash_types
   ;; local libraries
-  kimchi_bindings
-  kimchi_types
-  pasta_bindings
-  snarkette
-  key_cache
   hex
+  key_cache
   kimchi_backend_common
+  kimchi_bindings
   kimchi_pasta
   kimchi_pasta.basic
   kimchi_pasta.constraint_system
-  sponge
-  snarky.intf))
+  kimchi_types
+  pasta_bindings
+  snarky.intf
+  snarkette
+  sponge))

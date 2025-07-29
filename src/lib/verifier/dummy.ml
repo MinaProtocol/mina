@@ -10,7 +10,7 @@ type t =
   ; blockchain_verification_key : Pickles.Verification_key.t
   ; transaction_verification_key : Pickles.Verification_key.t
   ; verify_transaction_snarks :
-         (Ledger_proof.Prod.t * Mina_base.Sok_message.t) list
+         (Ledger_proof.t * Mina_base.Sok_message.t) list
       -> unit Or_error.t Or_error.t Deferred.t
   }
 
@@ -91,65 +91,52 @@ let verify_commands { proof_level; _ }
     | Common.invalid ]
     list
     Deferred.Or_error.t =
+  let valid { With_status.data = cmd; _ } =
+    (* Since we have stripped the transaction from the result, we reconstruct it here.
+       The use of [to_valid_unsafe] is justified because a [`Valid] result for this
+       command means that it has indeed been validated. *)
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd') =
+      User_command.(cmd |> of_verifiable |> to_valid_unsafe)
+    in
+    `Valid cmd'
+  in
   match proof_level with
   | Check | No_check ->
-      List.map cs ~f:(fun c ->
-          match Common.check c with
-          | `Valid c ->
-              `Valid c
-          | `Valid_assuming (c, _) ->
-              `Valid c
-          | `Invalid_keys keys ->
-              `Invalid_keys keys
-          | `Invalid_signature keys ->
-              `Invalid_signature keys
-          | `Invalid_proof err ->
-              `Invalid_proof err
-          | `Missing_verification_key keys ->
-              `Missing_verification_key keys
-          | `Unexpected_verification_key keys ->
-              `Unexpected_verification_key keys
-          | `Mismatched_authorization_kind keys ->
-              `Mismatched_authorization_kind keys )
-      |> Deferred.Or_error.return
+      let convert_check_res cmd : _ -> [> invalid | `Valid of _ ] = function
+        | Error (#invalid as invalid) ->
+            invalid
+        | Ok (`Assuming _) ->
+            valid cmd
+      in
+      let f cmd = convert_check_res cmd (Common.check cmd) in
+      List.map cs ~f |> Deferred.Or_error.return
   | Full ->
-      let cs = List.map cs ~f:Common.check in
+      let read_proof (vk, stmt, proof) =
+        (vk, stmt, Proof_cache_tag.read_proof_from_disk proof)
+      in
+      let read_proofs (`Assuming ls) = `Assuming (List.map ~f:read_proof ls) in
+      let results =
+        List.map cs ~f:(Fn.compose (Result.map ~f:read_proofs) Common.check)
+      in
       let to_verify =
-        List.concat_map cs ~f:(function
-          | `Valid _ ->
-              []
-          | `Valid_assuming (_, xs) ->
-              xs
-          | `Invalid_keys _
-          | `Invalid_signature _
-          | `Invalid_proof _
-          | `Missing_verification_key _
-          | `Unexpected_verification_key _
-          | `Mismatched_authorization_kind _ ->
-              [] )
+        List.concat_map
+          ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
+          results
       in
       let%map all_verified =
         Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
       in
-      Ok
-        (List.map cs ~f:(function
-          | `Valid c ->
-              `Valid c
-          | `Valid_assuming (c, xs) ->
-              if Or_error.is_ok all_verified then `Valid c
-              else `Valid_assuming xs
-          | `Invalid_keys keys ->
-              `Invalid_keys keys
-          | `Invalid_signature keys ->
-              `Invalid_signature keys
-          | `Invalid_proof err ->
-              `Invalid_proof err
-          | `Missing_verification_key keys ->
-              `Missing_verification_key keys
-          | `Unexpected_verification_key keys ->
-              `Unexpected_verification_key keys
-          | `Mismatched_authorization_kind keys ->
-              `Mismatched_authorization_kind keys ) )
+      let f cmd : _ -> [ invalid | `Valid of _ | `Valid_assuming of _ ] =
+        function
+        | Error (#invalid as invalid) ->
+            invalid
+        | Ok (`Assuming []) ->
+            valid cmd
+        | Ok (`Assuming xs) ->
+            if Or_error.is_ok all_verified then valid cmd
+            else `Valid_assuming xs
+      in
+      Ok (List.map2_exn cs results ~f)
 
 let verify_transaction_snarks { verify_transaction_snarks; _ } ts =
   verify_transaction_snarks ts

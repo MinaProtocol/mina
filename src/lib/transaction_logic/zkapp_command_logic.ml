@@ -230,6 +230,48 @@ module Local_state = struct
     end
   end]
 
+  let map_with_hashes (type with_hashes with_hashes_modified)
+      ~(f : with_hashes -> with_hashes_modified)
+      (t :
+        ( ('token_id, with_hashes) Stack_frame.t
+        , ( (('token_id, with_hashes) Stack_frame.t, 'frame_digest) With_hash.t
+          , 'call_stack_digest )
+          With_stack_hash.t
+          list
+        , 'c
+        , 'd
+        , 'e
+        , 'f
+        , 'g
+        , 'h )
+        t ) :
+      ( ('token_id, with_hashes_modified) Stack_frame.t
+      , ( ( ('token_id, with_hashes_modified) Stack_frame.t
+          , 'frame_digest )
+          With_hash.t
+        , 'call_stack_digest )
+        With_stack_hash.t
+        list
+      , 'c
+      , 'd
+      , 'e
+      , 'f
+      , 'g
+      , 'h )
+      t =
+    let map_frame frame =
+      { frame with Stack_frame.calls = f frame.Stack_frame.calls }
+    in
+    { t with
+      stack_frame = map_frame t.stack_frame
+    ; call_stack =
+        List.map t.call_stack
+          ~f:(fun ({ With_stack_hash.elt = { data; _ } as elt; _ } as wsh) ->
+            { wsh with
+              With_stack_hash.elt = { elt with data = map_frame data }
+            } )
+    }
+
   let typ stack_frame call_stack excess supply_increase ledger bool comm length
       failure_status_tbl =
     Pickles.Impls.Step.Typ.of_hlistable
@@ -351,7 +393,8 @@ module type Account_update_intf = sig
   val implicit_account_creation_fee : t -> bool
 
   val check_authorization :
-       will_succeed:bool
+       signature_kind:Mina_signature_kind.t
+    -> will_succeed:bool
     -> commitment:transaction_commitment
     -> calls:call_forest
     -> t
@@ -450,7 +493,8 @@ module type Call_forest_intf = sig
 
   val is_empty : t -> bool
 
-  val pop_exn : t -> (account_update * t) * t
+  val pop_exn :
+    signature_kind:Mina_signature_kind.t -> t -> (account_update * t) * t
 end
 
 module type Stack_frame_intf = sig
@@ -865,7 +909,11 @@ module type Inputs_intf = sig
     val commitment : account_updates:Call_forest.t -> t
 
     val full_commitment :
-      account_update:Account_update.t -> memo_hash:Field.t -> commitment:t -> t
+         signature_kind:Mina_signature_kind.t
+      -> account_update:Account_update.t
+      -> memo_hash:Field.t
+      -> commitment:t
+      -> t
   end
 
   and Index : sig
@@ -966,7 +1014,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; new_frame : Stack_frame.t
     }
 
-  let get_next_account_update (current_forest : Stack_frame.t)
+  let get_next_account_update ~signature_kind (current_forest : Stack_frame.t)
       (* The stack for the most recent zkApp *)
         (call_stack : Call_stack.t) (* The partially-completed parent stacks *)
       : get_next_account_update_result =
@@ -988,7 +1036,7 @@ module Make (Inputs : Inputs_intf) = struct
       )
     in
     let (account_update, account_update_forest), remainder_of_current_forest =
-      Call_forest.pop_exn (Stack_frame.calls current_forest)
+      Call_forest.pop_exn ~signature_kind (Stack_frame.calls current_forest)
     in
     let may_use_parents_own_token =
       Account_update.may_use_parents_own_token account_update
@@ -1083,7 +1131,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (([ s1; s2; s3; s4; s5 ] : _ Pickles_types.Vector.t), last_action_slot)
 
-  let apply ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+  let apply ~signature_kind
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(is_start : [ `Yes of _ Start_data.t | `No | `Compute of _ Start_data.t ])
       (h :
         (< global_state : Global_state.t
@@ -1165,7 +1214,7 @@ module Make (Inputs : Inputs_intf) = struct
           } =
         with_label ~label:"get next account update" (fun () ->
             (* TODO: Make the stack frame hashed inside of the local state *)
-            get_next_account_update to_pop call_stack )
+            get_next_account_update ~signature_kind to_pop call_stack )
       in
       let local_state =
         with_label ~label:"token owner not caller" (fun () ->
@@ -1198,8 +1247,8 @@ module Make (Inputs : Inputs_intf) = struct
                 ~account_updates:(Stack_frame.calls remaining)
             in
             let full_tx_commitment_on_start =
-              Transaction_commitment.full_commitment ~account_update
-                ~memo_hash:start_data.memo_hash
+              Transaction_commitment.full_commitment ~signature_kind
+                ~account_update ~memo_hash:start_data.memo_hash
                 ~commitment:tx_commitment_on_start
             in
             let tx_commitment =
@@ -1295,7 +1344,7 @@ module Make (Inputs : Inputs_intf) = struct
           ~then_:local_state.full_transaction_commitment
           ~else_:local_state.transaction_commitment
       in
-      Inputs.Account_update.check_authorization
+      Inputs.Account_update.check_authorization ~signature_kind
         ~will_succeed:local_state.will_succeed ~commitment
         ~calls:account_update_forest account_update
     in
