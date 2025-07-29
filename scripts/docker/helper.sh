@@ -40,10 +40,6 @@ function export_suffixes () {
             export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
             export BUILD_FLAG_SUFFIX="-instrumented"
             ;;
-            *)
-            export DOCKER_DEB_SUFFIX=""
-            export BUILD_FLAG_SUFFIX=""
-            ;;
         esac
         ;;
         lightnet)

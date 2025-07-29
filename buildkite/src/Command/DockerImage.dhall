@@ -189,7 +189,6 @@ let generateStep =
                       ++  " --deb-version ${spec.deb_version}"
                       ++  " --deb-profile ${Profiles.lowerName
                                               spec.deb_profile}"
-                      ++  debSuffix
                       ++  " --deb-build-flags ${BuildFlags.lowerName
                                                   spec.build_flags}"
 
