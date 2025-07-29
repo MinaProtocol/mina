@@ -89,9 +89,9 @@ let generateDockerForCodename =
                   MinaArtifact.MinaBuildSpec::{
                   , artifacts =
                     [ Artifacts.Type.LogProc
-                    , Artifacts.Type.Daemon
-                    , Artifacts.Type.Archive
-                    , Artifacts.Type.Rosetta
+                    , Artifacts.Type.DaemonHardfork
+                    , Artifacts.Type.ArchiveHardfork
+                    , Artifacts.Type.RosettaHardfork
                     ]
                   , debVersion = codename
                   , profile = profile
@@ -238,14 +238,15 @@ let generate_hardfork_package =
       ->  \(genesis_timestamp : Optional Text)
       ->  \(config_json_gz_url : Text)
       ->  \(suffix : Text)
-      ->  (pipeline
-            Spec::{
-            , codenames = codenames
-            , network = network
-            , version = "\\\$MINA_DOCKER_TAG"
-            , genesis_timestamp = genesis_timestamp
-            , config_json_gz_url = config_json_gz_url
-            , suffix = suffix
-            }).pipeline
+      ->  ( pipeline
+              Spec::{
+              , codenames = codenames
+              , network = network
+              , version = "\\\$MINA_DOCKER_TAG"
+              , genesis_timestamp = genesis_timestamp
+              , config_json_gz_url = config_json_gz_url
+              , suffix = suffix
+              }
+          ).pipeline
 
 in  { generate_hardfork_package = generate_hardfork_package }

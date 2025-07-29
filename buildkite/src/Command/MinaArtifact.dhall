@@ -195,6 +195,48 @@ let docker_step
                     , deb_legacy_version = spec.deb_legacy_version
                     }
                   ]
+                , ArchiveHardfork =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.Archive
+                            }
+                    , service = Artifacts.Type.ArchiveHardfork
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    }
+                  ]
+                , RosettaHardfork =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.Rosetta
+                            }
+                    , service = Artifacts.Type.RosettaHardfork
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    }
+                  ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
                 , LogProc = [] : List DockerImage.ReleaseSpec.Type
                 , BatchTxn =
