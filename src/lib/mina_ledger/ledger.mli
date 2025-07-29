@@ -17,6 +17,19 @@ module Db :
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
 
+module Unstable_db :
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.Unstable.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+
 module Any_ledger :
   Merkle_ledger.Intf.Ledger.ANY
     with module Location = Location
@@ -58,6 +71,31 @@ module Maskable :
      and type attached_mask := Mask.Attached.t
      and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
+
+module Converting_ledger : sig
+  include
+    Merkle_ledger.Intf.Ledger.S
+      with module Location = Location
+       and module Addr = Location.Addr
+       and type key := Public_key.Compressed.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account := Account.t
+       and type root_hash := Ledger_hash.t
+       and type hash := Ledger_hash.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+
+  val of_ledgers : Db.t -> Unstable_db.t -> t
+
+  val of_ledgers_with_migration : Db.t -> Unstable_db.t -> t
+
+  val primary_ledger : t -> Db.t
+
+  val converting_ledger : t -> Unstable_db.t
+
+  val convert : Account.t -> Account.Unstable.t
+end
 
 module Root : sig
   include module type of Root.Make (Any_ledger) (Db)
