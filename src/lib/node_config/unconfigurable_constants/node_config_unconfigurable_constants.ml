@@ -21,9 +21,9 @@ let zkapp_signed_single_update_cost = 9.14
 
 let zkapp_transaction_cost_limit = 69.45
 
-let max_event_elements = 100
+let max_event_elements = 1024
 
-let max_action_elements = 100
+let max_action_elements = 1024
 
 let zkapp_cmd_limit_hardcap = 128
 
