@@ -447,7 +447,9 @@ replace_runtime_config_and_ledgers_with_hardforked_ones() {
   done
 
   # Overwrite outdated ledgers that are being updated by the hardfork (backing up the outdated ledgers)
-  mv "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
+  if [ -f "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json" ]; then
+    mv "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.old.json"
+  fi
   cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/${NETWORK_NAME}.json"
 }
 
