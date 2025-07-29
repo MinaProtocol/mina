@@ -434,6 +434,9 @@ build_daemon_berkeley_deb() {
 replace_runtime_config_and_ledgers_with_hardforked_ones() {
   local NETWORK_NAME="${1}"
 
+  # Create the directory for the runtime config and ledgers if it doesn't exist
+  mkdir -p "${BUILDDIR}/var/lib/coda"
+
   { [ -z ${RUNTIME_CONFIG_JSON+x} ] || [ -z ${LEDGER_TARBALLS+x} ]; }  \
     && echo "required env vars were not provided" && exit 1
 
