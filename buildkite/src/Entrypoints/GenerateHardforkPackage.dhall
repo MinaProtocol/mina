@@ -180,7 +180,7 @@ let pipeline
     =     \(spec : Spec.Type)
       ->  let pipelineName =
                 "MinaArtifactHardfork${Network.capitalName
-                                         spec.network}${spec.suffix}"
+                                         spec.network}"
 
           let targetVersion =
                     \(codename : DebianVersions.DebVersion)
