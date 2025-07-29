@@ -1599,6 +1599,119 @@ function persist(){
 }
 
 
+#==============
+# pull
+# 
+# PUlls artifacts from cache.
+#==============
+function pull_help(){
+    echo Pulls artifact from cache.
+    echo ""
+    echo "     $CLI_NAME pull [-options]"
+    echo ""
+    echo "Parameters:"
+    echo ""
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "--backend" "[string] backend to persist artifacts. e.g gs,hetzner";
+    printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta";
+    printf "  %-25s %s\n" "--build_id" "[string] buildkite build id to persist artifacts";
+    printf "  %-25s %s\n" "--target" "[string] target local location to persist artifacts";
+    printf "  %-25s %s\n" "--codenames" "[string list] target location to persist artifacts";
+    printf "  %-25s %s\n" "--networks" "[stringlist ] target location to persist artifacts";
+    echo ""
+    echo "Example:"
+    echo ""
+    echo "  " $CLI_NAME pull --backend gs --artifacts mina-logproc,mina-archive,mina-rosetta --build_id 123 --target /debians_legacy
+    echo ""
+    echo " Above command will pull mina-logproc,mina-archive,mina-rosetta artifacts to {backend root}/debians_legacy"
+    echo ""
+    echo ""
+}
+
+function pull(){
+    if [[ ${#} == 0 ]]; then
+        pull_help; exit 0;
+    fi
+
+    local __backend="hetzner"
+    local __artifacts="$DEFAULT_ARTIFACTS"
+    local __buildkite_build_id
+    local __target="."
+    local __codenames="$DEFAULT_CODENAMES"
+    local __networks="$DEFAULT_NETWORKS"
+
+    while [ ${#} -gt 0 ]; do
+        error_message="Error: a value is needed for '$1'";
+        case $1 in
+            -h | --help )
+                pull_help; exit 0;
+            ;;
+            --backend )
+                __backend=${2:?$error_message}
+                shift 2;
+            ;;
+            --artifacts )
+                __artifacts=${2:?$error_message}
+                shift 2;
+            ;;
+            --codenames )
+                __codenames=${2:?$error_message}
+                shift 2;
+            ;;
+            --buildkite-build-id )
+                __buildkite_build_id=${2:?$error_message}
+                shift 2;
+            ;;
+            --target )
+                __target=${2:?$error_message}
+                shift 2;
+            ;;
+            --networks )
+                __networks=${2:?$error_message}
+                shift 2;
+            ;;
+            * )
+                echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
+                echo "";
+                persist_help; exit 1;
+            ;;
+        esac
+    done
+
+    echo ""
+    echo " ℹ️  Pulling mina artifacts with following parameters:"
+    echo " - Backend: $__backend"
+    echo " - Artifacts: $__artifacts"
+    echo " - Buildkite build id: $__buildkite_build_id"
+    echo " - Target: $__target"
+    echo " - Codenames: $__codenames"
+    echo " - Networks: $__networks"
+
+    if [[ -z ${__buildkite_build_id+x} ]]; then
+        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
+        pull_help; exit 1;
+    fi
+    
+    IFS=', '
+    read -r -a __artifacts_arr <<< "$__artifacts"
+    read -r -a __codenames_arr <<< "$__codenames"
+    read -r -a __networks_arr <<< "$__networks"
+
+    for __artifact in "${__artifacts_arr[@]}"; do
+        for __codename in "${__codenames_arr[@]}"; do
+            for network in "${__networks_arr[@]}"; do
+                echo "  📥  Pulling $__artifact for $__codename codename and $network network"
+                local __artifact_full_name
+                __artifact_full_name=$(get_artifact_with_suffix $__artifact $network)
+                storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact_full_name}_*" "$__target"
+            done
+        done
+    done
+
+    echo " ✅  Done."
+    echo ""
+}
+
 function main(){
     if (( ${#} == 0 )); then
         main_help 0;
@@ -1608,7 +1721,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        publish | promote | verify | fix | persist)
+        publish | promote | verify | fix | persist | pull)
             $1 "${@:2}";
         ;;
         * )

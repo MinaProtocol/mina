@@ -88,7 +88,9 @@ create_control_file() {
 Package: ${1}
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
-Vendor: none
+Origin: MinaProtocol
+Label: MinaProtocol
+Vendor: O(1)Labs
 Codename: ${MINA_DEB_CODENAME}
 Suite: ${MINA_DEB_RELEASE}
 Architecture: amd64
