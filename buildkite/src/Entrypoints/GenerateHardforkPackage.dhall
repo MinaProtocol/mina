@@ -90,6 +90,7 @@ let generateDockerForCodename =
                     , Artifacts.Type.DaemonHardfork
                     , Artifacts.Type.ArchiveHardfork
                     , Artifacts.Type.RosettaHardfork
+                    , Artifacts.Type.ZkappTestTransaction
                     ]
                   , debVersion = codename
                   , profile = profile
