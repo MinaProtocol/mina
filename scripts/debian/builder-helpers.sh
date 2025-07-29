@@ -437,10 +437,6 @@ replace_runtime_config_and_ledgers_with_hardforked_ones() {
   { [ -z ${RUNTIME_CONFIG_JSON+x} ] || [ -z ${LEDGER_TARBALLS+x} ]; }  \
     && echo "required env vars were not provided" && exit 1
 
-  # make sure the paths are absolute
-  RUNTIME_CONFIG_JSON=$(realpath -s $RUNTIME_CONFIG_JSON)
-  LEDGER_TARBALLS=$(realpath -s $LEDGER_TARBALLS)
-
   # Replace the runtime config and ledgers with the hardfork ones
   cp "${RUNTIME_CONFIG_JSON}" "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   for ledger_tarball in $LEDGER_TARBALLS; do
