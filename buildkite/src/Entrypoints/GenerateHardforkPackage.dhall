@@ -179,8 +179,7 @@ let pipeline
     : Spec.Type -> Pipeline.Config.Type
     =     \(spec : Spec.Type)
       ->  let pipelineName =
-                "MinaArtifactHardfork${Network.capitalName
-                                         spec.network}"
+                "GenerateHardforkPackage"
 
           let targetVersion =
                     \(codename : DebianVersions.DebVersion)
