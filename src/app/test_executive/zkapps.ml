@@ -82,7 +82,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let send_payment_from_zkapp_account ?expected_failure
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
-      ~node_uri (sender : Signature_lib.Keypair.t) nonce =
+      ~node_uri ~signature_kind (sender : Signature_lib.Keypair.t) nonce =
     let sender_pk = Signature_lib.Public_key.compress sender.public_key in
     let receiver_pk = payment_receiver in
     let amount =
@@ -104,7 +104,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let body = Signed_command_payload.Body.Payment payment_payload in
       { Signed_command_payload.Poly.common; body }
     in
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let raw_signature =
       Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
@@ -121,7 +120,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature node_uri
         |> Malleable_error.ignore_m
 
-  let run network t =
+  let run ~config:(Test_config.{ signature_kind; _ } as config) network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let constants : Test_config.constants =
@@ -693,7 +692,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Send a valid payment from zkApp account"
         (send_payment_from_zkapp_account ~constraint_constants
            ~node_uri:(Network.Node.get_ingress_uri node)
-           ~logger sender nonce )
+           ~logger ~signature_kind sender nonce )
     in
     let%bind () =
       section_hard "Send a zkApp transaction to update permissions"
@@ -711,8 +710,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let sender = List.hd_exn zkapp_keypairs in
       let nonce = Account.Nonce.of_int 1 in
       section_hard "Send an invalid payment from zkApp account"
-        (send_payment_from_zkapp_account ~constraint_constants ~logger sender
-           nonce
+        (send_payment_from_zkapp_account ~constraint_constants ~logger
+           ~signature_kind sender nonce
            ~node_uri:(Network.Node.get_ingress_uri node)
            ~expected_failure:
              Network_pool.Transaction_pool.Diff_versioned.Diff_error.(
@@ -925,7 +924,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "Wait for proof to be emitted"
         (wait_for t
            (Wait_condition.ledger_proofs_emitted_since_genesis
-              ~test_config:(config ~constants) ~num_proofs:1 ) )
+              ~test_config:config ~num_proofs:1 ) )
     in
     Event_router.cancel (event_router t) snark_work_event_subscription () ;
     Event_router.cancel (event_router t) snark_work_failure_subscription () ;
