@@ -73,8 +73,8 @@ module Make (Inputs : Inputs_intf) :
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+      | Ledger_root ledger ->
+          Some (Ledger.Root.as_unmasked ledger)
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
@@ -84,8 +84,8 @@ module Make (Inputs : Inputs_intf) :
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+      | Ledger_root ledger ->
+          Some (Ledger.Root.as_unmasked ledger)
     else None
 
   let answer_query :
