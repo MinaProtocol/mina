@@ -3370,6 +3370,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module type S = sig
     include Verification.S
 
+    val signature_kind : Mina_signature_kind.t
+
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val cache_handle : Pickles.Cache_handle.t
@@ -3973,6 +3975,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   end) =
   struct
     open Inputs
+
+    let signature_kind = signature_kind
 
     let constraint_constants = constraint_constants
 
