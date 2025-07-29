@@ -57,6 +57,7 @@ let generateDockerForCodename =
                   Artifacts.Tag::{
                   , version =
                       "${spec.version}-${DebianVersions.lowerName codename}"
+                  , remove_profile_from_name = True
                   , network = spec.network
                   }
 
