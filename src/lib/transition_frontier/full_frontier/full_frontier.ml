@@ -462,15 +462,15 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           t.persistent_root_instance.factory.directory
       in
       let () =
-        Ledger.Db.make_checkpoint t.persistent_root_instance.snarked_ledger
+        Ledger.Root.make_checkpoint t.persistent_root_instance.snarked_ledger
           ~directory_name:location
       in
       [%log' info t.logger]
         ~metadata:
           [ ( "potential_snarked_ledger_hash"
             , Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash
-              @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger
-            )
+              @@ Ledger.Root.merkle_root
+                   t.persistent_root_instance.snarked_ledger )
           ]
         "Enqueued a snarked ledger" ;
       Persistent_root.Instance.enqueue_snarked_ledger ~location
