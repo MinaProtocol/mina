@@ -23,15 +23,11 @@ let DebianVersions = ../Constants/DebianVersions.dhall
 
 let DebianRepo = ../Constants/DebianRepo.dhall
 
-let DebianChannel = ../Constants/DebianChannel.dhall
-
 let Artifacts = ../Constants/Artifacts.dhall
 
 let Profiles = ../Constants/Profiles.dhall
 
 let Network = ../Constants/Network.dhall
-
-let Publish = ../Command/Packages/Publish.dhall
 
 let Spec =
       { Type =
@@ -165,29 +161,9 @@ let generateDockerForCodename =
                   }
               ]
 
-let new_tags =
-          \(codename : DebianVersions.DebVersion)
-      ->  \(channel : DebianChannel.Type)
-      ->  \(branch : Text)
-      ->  \(profile : Profiles.Type)
-      ->  \(commit : Text)
-      ->  \(latestGitTag : Text)
-      ->  \(todayDate : Text)
-      ->  [ "${latestGitTag}-${commit}-${Profiles.toSuffixLowercase profile}" ]
-
 let pipeline =
           \(spec : Spec.Type)
       ->  let pipelineName = "GenerateHardforkPackage"
-
-          let targetVersion =
-                    \(codename : DebianVersions.DebVersion)
-                ->  \(channel : DebianChannel.Type)
-                ->  \(branch : Text)
-                ->  \(profile : Profiles.Type)
-                ->  \(commit : Text)
-                ->  \(latestGitTag : Text)
-                ->  \(todayDate : Text)
-                ->  "${spec.version}"
 
           in  Pipeline.build
                 Pipeline.Config::{
@@ -202,34 +178,10 @@ let pipeline =
                     ]
                   }
                 , steps =
-                      generateDockerForCodename
-                        spec
-                        DebianVersions.DebVersion.Focal
-                        pipelineName
-                    # Publish.publish
-                        Publish.Spec::{
-                        , artifacts =
-                          [ Artifacts.Type.Daemon
-                          , Artifacts.Type.Archive
-                          , Artifacts.Type.Rosetta
-                          , Artifacts.Type.LogProc
-                          ]
-                        , networks = [ spec.network ]
-                        , debian_repo = DebianRepo.Type.Unstable
-                        , codenames = spec.codenames
-                        , build_id = "\\\$BUILDKITE_BUILD_ID"
-                        , profile = Profiles.fromNetwork spec.network
-                        , source_version = "\\\$MINA_DEB_VERSION"
-                        , target_version = targetVersion
-                        , new_docker_tags = new_tags
-                        , depends_on =
-                          [ { name = pipelineName
-                            , key =
-                                "build-deb-pkg-${DebianVersions.lowerName
-                                                   DebianVersions.DebVersion.Focal}"
-                            }
-                          ]
-                        }
+                    generateDockerForCodename
+                      spec
+                      DebianVersions.DebVersion.Focal
+                      pipelineName
                 }
 
 let generate_hardfork_package =
