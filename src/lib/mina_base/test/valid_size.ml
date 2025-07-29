@@ -76,8 +76,8 @@ let%test_unit "valid_size_errors_actions" =
       [%test_eq: unit Or_error.t]
         (Error
            ( Error.of_string
-           @@ sprintf "too many sequence event elements (%d, max allowed is %d)"
-                (2 * y) y ) )
+           @@ sprintf "too many action elements (%d, max allowed is %d)" (2 * y)
+                y ) )
         ( valid_size
             ~genesis_constants:(genesis_constant_error 100000. (2 * y) y)
         @@ of_wire x ) )

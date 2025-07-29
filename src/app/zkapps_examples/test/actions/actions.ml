@@ -197,11 +197,11 @@ let%test_module "Actions test" =
       let account_updates =
         Zkapp_command.Call_forest.to_list zkapp_command.account_updates
       in
-      (* we haven't added any sequence events *)
+      (* we haven't added any actions *)
       List.iter account_updates ~f:(fun account_update ->
           assert (List.is_empty account_update.body.actions) )
 
-    let%test_unit "Initialize and add sequence events" =
+    let%test_unit "Initialize and add actions" =
       let zkapp_command0, account0 =
         let ledger = create_ledger () in
         []
@@ -265,7 +265,7 @@ let%test_module "Actions test" =
       assert (
         Mina_numbers.Global_slot_since_genesis.(equal zero) last_action_slot1 )
 
-    let%test_unit "Add sequence events in different slots" =
+    let%test_unit "Add actions in different slots" =
       let ledger = create_ledger () in
       let slot1 = Mina_numbers.Global_slot_since_genesis.of_int 1 in
       let _zkapp_command0, account0 =

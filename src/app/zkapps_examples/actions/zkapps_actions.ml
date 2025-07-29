@@ -44,7 +44,7 @@ let initialize_rule public_key : _ Pickles.Inductive_rule.t =
   }
 
 let update_actions_rule public_key : _ Pickles.Inductive_rule.t =
-  { identifier = "Update sequence events"
+  { identifier = "Update actions"
   ; prevs = []
   ; main = update_actions public_key
   ; feature_flags = Pickles_types.Plonk_types.Features.none_bool

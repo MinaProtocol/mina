@@ -1390,7 +1390,7 @@ let valid_size (type aux) ~(genesis_constants : Genesis_constants.t)
       if valid_action_elements then None
       else
         Some
-          (sprintf "too many sequence event elements (%d, max allowed is %d)"
+          (sprintf "too many action elements (%d, max allowed is %d)"
              num_action_elements max_action_elements )
     in
     let err_msg =
