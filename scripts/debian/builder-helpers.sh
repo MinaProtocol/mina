@@ -512,7 +512,7 @@ build_daemon_devnet_hardfork_deb() {
 
   replace_runtime_config_and_ledgers_with_hardforked_ones devnet
 
-  build_deb mina-hardfork-devnet
+  build_deb mina-devnet-hardfork
 
 }
 
@@ -550,7 +550,7 @@ build_daemon_mainnet_hardfork_deb() {
 
   replace_runtime_config_and_ledgers_with_hardforked_ones mainnet
 
-  build_deb mina-hardfork-mainnet
+  build_deb mina-mainnet-hardfork
 
 }
 
