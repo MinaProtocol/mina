@@ -501,18 +501,19 @@ replace_runtime_config_and_ledgers_with_hardforked_ones() {
 
 ## DEVNET HARDFORK PACKAGE ##
 build_daemon_devnet_hardfork_deb() {
+  local __deb_name=mina-devnet-hardfork
 
   echo "------------------------------------------------------------"
   echo "--- Building hardfork testnet signatures deb without keys:"
 
-  create_control_file mina-hardfork-devnet "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
   replace_runtime_config_and_ledgers_with_hardforked_ones devnet
 
-  build_deb mina-devnet-hardfork
+  build_deb "${__deb_name}"
 
 }
 
@@ -520,18 +521,19 @@ build_daemon_devnet_hardfork_deb() {
 
 ## BERKELEY HARDFORK PACKAGE ##
 build_daemon_berkeley_hardfork_deb() {
+  local __deb_name=mina-berkeley-hardfork
 
   echo "------------------------------------------------------------"
   echo "--- Building hardfork berkeley signatures deb without keys:"
 
-  create_control_file mina-hardfork-berkeley "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
 
   replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
 
-  build_deb mina-hardfork-berkeley
+  build_deb "${__deb_name}"
 
 }
 
@@ -539,18 +541,19 @@ build_daemon_berkeley_hardfork_deb() {
 
 ## MAINNET HARDFORK PACKAGE ##
 build_daemon_mainnet_hardfork_deb() {
+  local __deb_name=mina-mainnet-hardfork
 
   echo "------------------------------------------------------------"
   echo "--- Building hardfork mainnet signatures deb without keys:"
 
-  create_control_file mina-hardfork-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" \
+  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Mainnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs mainnet testnet 'seed-lists/mainnet_seeds.txt'
 
   replace_runtime_config_and_ledgers_with_hardforked_ones mainnet
 
-  build_deb mina-mainnet-hardfork
+  build_deb "${__deb_name}"
 
 }
 
@@ -696,3 +699,19 @@ build_zkapp_test_transaction_deb () {
   build_deb mina-zkapp-test-transaction
 }
 ## END ZKAPP TEST TXN PACKAGE ##
+
+
+build_create_legacy_genesis_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley create legacy genesis tool:"
+
+  create_control_file mina-create-legacy-genesis \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+
+  build_deb mina-create-legacy-genesis
+}
