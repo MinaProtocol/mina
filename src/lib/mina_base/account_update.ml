@@ -1087,6 +1087,11 @@ module Body = struct
   let hash_fold_array f init x = Array.fold ~init ~f x
 
   module Events' = struct
+    (* NOTE: in the "Increase events&actions Limit MIP", we claimed that the
+       limit is unbounded, the reason we're still using [Bounded_types.ArrayN],
+       lies in that the serialization of this type is a bit different from a
+       normal array. Setting the array size limit to [max_event_elements] remove
+       the limit on event level in practice. Same goes for types in[Actions']. *)
     module Bounded = Mina_stdlib.Bounded_types.ArrayN (struct
       let max_array_len = Node_config.max_event_elements
     end)
