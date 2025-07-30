@@ -9,11 +9,15 @@ let dir_exists dir =
   else return false
 
 let remove_dir dir =
-  let%bind _ =
-    Monitor.try_with ~here:[%here] (fun () ->
-        Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () )
-  in
-  Deferred.unit
+  Monitor.try_with ~here:[%here] (fun () ->
+      Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] () )
+  |> Deferred.ignore_m
+
+let cp ?(r = false) ~src ~dest =
+  let args = if r then [ "-r"; src; dest ] else [ src; dest ] in
+  Monitor.try_with ~here:[%here] (fun () ->
+      Process.run_exn ~prog:"cp" ~args () )
+  |> Deferred.ignore_m
 
 let rec rmrf path =
   match Core.Sys.is_directory path with
