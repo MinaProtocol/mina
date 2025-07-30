@@ -118,7 +118,6 @@ let generateDockerForCodename =
                   , deb_codename = codename
                   , deb_profile = profile
                   , deb_repo = DebianRepo.Type.Local
-                  , deb_suffix = Some "hardfork"
                   }
               , DockerImage.generateStep
                   DockerImage.ReleaseSpec::{
