@@ -69,8 +69,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
         | None | Some false ->
             failwith "Cannot mutate the time offset"
 
-      let create offset = offset
-
       let basic ~logger () =
         match !time_offset with
         | Some offset ->
