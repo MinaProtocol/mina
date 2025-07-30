@@ -16,7 +16,7 @@
   ppx_deriving_yojson.runtime
   result
   ;; local libraries
-  mina_stdlib
+  bounded_types
   logger
   random_oracle_input
   pickles.backend

@@ -21,7 +21,7 @@
   promise
   kimchi_bindings
   kimchi_pasta_basic
-  mina_stdlib
+  bounded_types
   kimchi_pasta_constraint_system
   kimchi_types
   pasta_bindings

@@ -4,11 +4,16 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_compare ppx_jane ppx_version))
+  (pps ppx_version ppx_jane ppx_compare))
+ (inline_tests
+  (flags -verbose -show-counts))
  (libraries
-  blake2
+  ;; opam libraries
   core_kernel
   digestif
   integers
-  mina_stdlib
-  snarky.backendless))
+  bignum.bigint
+  ;; local libraries
+  blake2
+  snarky.backendless
+  mina_stdlib))

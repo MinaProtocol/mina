@@ -16,64 +16,25 @@ module Make (Data : Binable.S) = struct
 
   module Rw = Read_write (F)
 
-  type t =
-    { env : Rw.t
-    ; db : Rw.holder
-    ; counter : int ref
-    ; reusable_keys : int Queue.t
-          (** A list of ids that are no longer reachable from OCaml runtime, but
-              haven't been cleared inside the LMDB disk cache *)
-    ; queue_guard : Error_checking_mutex.t
-    }
-
-  (** How big can the queue [reusable_keys] be before we do a cleanup *)
-  let reuse_size_limit = 512
+  type t = { env : Rw.t; db : Rw.holder; counter : int ref }
 
   let initialize path ~logger =
-    Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
+    Async.Deferred.Result.map (Utils.initialize_dir path ~logger)
       ~f:(fun path ->
         let env, db = Rw.create path in
-        { env
-        ; db
-        ; counter = ref 0
-        ; reusable_keys = Queue.create ()
-        ; queue_guard = Error_checking_mutex.create ()
-        } )
+        { env; db; counter = ref 0 } )
 
   type id = { idx : int }
 
   let get ({ env; db; _ } : t) ({ idx } : id) : Data.t =
     Rw.get ~env db idx |> Option.value_exn
 
-  let put ({ env; db; counter; reusable_keys; queue_guard } : t) (x : Data.t) :
-      id =
-    let idx =
-      match
-        Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
-            Queue.dequeue reusable_keys )
-      with
-      | None ->
-          (* We don't have reusable keys, assign a new one nobody ever used *)
-          incr counter ; !counter - 1
-      | Some reused_key ->
-          (* Any key inside [reusable_keys] is marked as garbage by GC, so we're
-             free to use them *)
-          reused_key
-    in
+  let put ({ env; db; counter } : t) (x : Data.t) : id =
+    let idx = !counter in
+    incr counter ;
     let res = { idx } in
     (* When this reference is GC'd, delete the file. *)
-    Gc.Expert.add_finalizer_last_exn res (fun () ->
-        (* The actual deletion is delayed, as GC maybe triggered in LMDB's
-           critical section. LMDB critical section then will be re-entered if
-           it's invoked directly in a GC hook.
-           This causes mutex double-acquiring and node freezes. *)
-        Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
-            Queue.enqueue reusable_keys idx ) ) ;
-
-    Error_checking_mutex.critical_section queue_guard ~f:(fun () ->
-        if Queue.length reusable_keys >= reuse_size_limit then (
-          Rw.batch_remove ~env db reusable_keys ;
-          Queue.clear reusable_keys ) ) ;
+    Gc.Expert.add_finalizer_last_exn res (fun () -> Rw.remove ~env db idx) ;
     Rw.set ~env db idx x ;
     res
 
@@ -91,7 +52,7 @@ let%test_module "disk_cache lmdb" =
   ( module struct
     include Disk_cache_test_lib.Make_extended (Make)
 
-    let%test_unit "remove data on gc" = remove_data_on_gc ~gc_strict:false ()
+    let%test_unit "remove data on gc" = remove_data_on_gc ()
 
     let%test_unit "simple read/write (with iteration)" =
       simple_write_with_iteration ()

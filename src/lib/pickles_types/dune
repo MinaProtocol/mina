@@ -38,5 +38,5 @@
   snarky.backendless
   tuple_lib
   ppx_version.runtime
-  mina_stdlib
+  bounded_types
   mina_wire_types))

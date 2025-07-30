@@ -2,6 +2,7 @@
 Module for running replayer which checks datbase integrity of given database
 *)
 
+open Executor
 open Core
 
 module Output = struct
@@ -63,22 +64,14 @@ module InputConfig = struct
     }
 end
 
-module Paths = struct
-  let dune_name = "src/app/replayer/replayer.exe"
+include Executor
 
-  let official_name = "mina-replayer"
-end
+let of_context context =
+  Executor.of_context ~context ~dune_name:"src/app/replayer/replayer.exe"
+    ~official_name:"mina-replayer"
 
-module Executor = Executor.Make (Paths)
-
-let default = Executor.AutoDetect
-
-type t = Executor.t
-
-let run t ~archive_uri ~input_config ~interval_checkpoint ?target_state_hash
+let run t ~archive_uri ~input_config ~interval_checkpoint
     ?checkpoint_output_folder ?checkpoint_file_prefix ~output_ledger =
-  let config_folder = Filename.temp_dir "replayer" "" in
-  let input_file = Filename.of_parts [ config_folder; "replayer_input.json" ] in
   let checkpoint_output_folder =
     match checkpoint_output_folder with
     | Some checkpoint_output_folder ->
@@ -93,23 +86,11 @@ let run t ~archive_uri ~input_config ~interval_checkpoint ?target_state_hash
     | None ->
         []
   in
-  let () =
-    match target_state_hash with
-    | None ->
-        let config =
-          Yojson.Safe.from_file input_config
-          |> InputConfig.of_yojson |> Result.ok_or_failwith
-        in
-        InputConfig.to_yojson_file config input_file
-    | Some hash ->
-        let config = InputConfig.of_checkpoint_file input_config (Some hash) in
-        InputConfig.to_yojson_file config input_file
-  in
   let args =
     [ "--archive-uri"
     ; archive_uri
     ; "--input-file"
-    ; input_file
+    ; input_config
     ; "--checkpoint-interval"
     ; string_of_int interval_checkpoint
     ; "--output-file"
@@ -118,4 +99,4 @@ let run t ~archive_uri ~input_config ~interval_checkpoint ?target_state_hash
     @ checkpoint_output_folder @ checkpoint_file_prefix
   in
 
-  Executor.run t ~args
+  run t ~args

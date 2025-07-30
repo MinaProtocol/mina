@@ -13,10 +13,11 @@
   sexplib0
   async_unix
   ;;local libraries
-  mina_stdlib
+  bounded_types
   o1trace
   mina_metrics
   trust_system
+  truth
   staged_ledger
   precomputed_values
   data_hash_lib
@@ -24,7 +25,7 @@
   otp_lib
   consensus
   mina_ledger
-  mina_stdlib_unix
+  file_system
   transition_frontier_full_frontier
   transition_frontier_persistent_root
   transition_frontier_base
@@ -39,6 +40,7 @@
   verifier
   with_hash
   debug_assert
+  mina_stdlib
   ppx_version.runtime
   pickles.backend
   snark_params

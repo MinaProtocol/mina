@@ -13,6 +13,7 @@ let Filter
       | ToolchainsOnly
       | AllTests
       | Release
+      | HardforkPackageGeneration
       | Promote
       | DebianBuild
       | DockerBuild
@@ -29,9 +30,15 @@ let tags
             , ToolchainsOnly = [ Tag.Type.Toolchain ]
             , DebianBuild = [ Tag.Type.Debian ]
             , DockerBuild = [ Tag.Type.Docker ]
-            , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
+            , AllTests =
+              [ Tag.Type.Lint
+              , Tag.Type.Release
+              , Tag.Type.Test
+              , Tag.Type.Hardfork
+              ]
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
+            , HardforkPackageGeneration = [ Tag.Type.Hardfork ]
             }
             filter
 
@@ -49,6 +56,7 @@ let show
             , Promote = "Promote"
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
+            , HardforkPackageGeneration = "HardforkPackageGeneration"
             }
             filter
 

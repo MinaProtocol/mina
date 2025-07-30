@@ -8,7 +8,7 @@
   async_unix
   graphql-async
   yojson
-  mina_stdlib
+  bounded_types
   genesis_constants)
  (instrumentation
   (backend bisect_ppx))

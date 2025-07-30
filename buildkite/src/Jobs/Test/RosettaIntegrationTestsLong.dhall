@@ -20,13 +20,11 @@ let Network = ../../Constants/Network.dhall
 
 let Profiles = ../../Constants/Profiles.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
-
 let Artifacts = ../../Constants/Artifacts.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let Dockers = ../../Constants/DockerVersions.dhall
 
-let network = Network.Type.Berkeley
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
@@ -57,27 +55,20 @@ in  Pipeline.build
               , Cmd.runInDocker
                   Cmd.Docker::{
                   , image =
-                      Artifacts.fullDockerTag
-                        Artifacts.Tag::{
-                        , artifact = Artifacts.Type.Rosetta
-                        , network = network
-                        }
+                      "gcr.io/o1labs-192920/mina-rosetta:\\\${MINA_DOCKER_TAG}-berkeley"
                   }
                   "buildkite/scripts/rosetta-integration-tests-full.sh"
               ]
             , label = "Rosetta integration tests Bullseye Long"
             , key = "rosetta-integration-tests-bullseye-long"
             , soft_fail = Some (B/SoftFail.Boolean True)
-            , timeout_in_minutes = Some +90
             , target = Size.Small
             , depends_on =
                 Dockers.dependsOn
-                  Dockers.DepsSpec::{
-                  , codename = Dockers.Type.Bullseye
-                  , network = network
-                  , profile = Profiles.Type.Devnet
-                  , artifact = Artifacts.Type.Rosetta
-                  }
+                  Dockers.Type.Bullseye
+                  (Some Network.Type.Berkeley)
+                  Profiles.Type.Standard
+                  Artifacts.Type.Rosetta
             }
         ]
       }

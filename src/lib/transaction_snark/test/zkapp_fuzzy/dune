@@ -40,7 +40,7 @@
   random_oracle
   sexplib0
   zkapp_command_builder
-  mina_stdlib)
+  bounded_types)
  (link_flags (-linkall))
  (preprocess
   (pps ppx_mina ppx_snarky ppx_version ppx_jane))

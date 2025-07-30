@@ -5,6 +5,7 @@
  (libraries
   ;; opam libraries
   async_unix
+  core
   base
   base64
   integers
@@ -19,7 +20,7 @@
   ;; local libraries
   consensus.vrf
   mina_wire_types
-  mina_stdlib
+  bounded_types
   mina_base
   mina_base.import
   kimchi_pasta

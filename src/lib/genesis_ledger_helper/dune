@@ -19,7 +19,7 @@
   ;; local libraries
   mina_ledger
   with_hash
-  mina_stdlib
+  bounded_types
   blockchain_snark
   error_json
   mina_state
@@ -44,7 +44,7 @@
   logger
   mina_base.import
   staged_ledger_diff
-  mina_stdlib_unix)
+  file_system)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

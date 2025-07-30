@@ -23,7 +23,7 @@
   mina_base.import
   mina_numbers
   currency
-  mina_stdlib
+  bounded_types
   data_hash_lib
   signature_lib
   merkle_ledger

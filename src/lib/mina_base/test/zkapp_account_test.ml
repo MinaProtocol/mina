@@ -12,11 +12,11 @@ open Mina_base
 open Zkapp_account
 
 module type Events_list_intf = sig
-  type t
+  type t = Event.t list [@@deriving compare, sexp]
 
-  type var
+  type var = t Data_as_hash.t
 
-  val typ : (var, Event.t list) Typ.t
+  val typ : (var, t) Typ.t
 
   val push_to_data_as_hash : var -> Event.var -> var
 
@@ -65,7 +65,7 @@ let checked_pop_reverses_push (module E : Events_list_intf) () =
               in
               go [] pushed
             in
-            [%test_eq: Event.t list] events popped )
+            [%test_eq: E.t] events popped )
       in
       match Snark_params.Tick.Run.run_and_check f with
       | Ok () ->

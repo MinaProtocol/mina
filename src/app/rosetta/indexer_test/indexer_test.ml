@@ -707,12 +707,9 @@ module Max_block =
 module Offset_limit = struct
   type t = { offset : int; limit : int }
 
-  (* Max value + Max limit value should not exceed valid user_commands count in database
-     otherwise quickcheck will become flaky.
-  *)
-  let offset_generator = Int.gen_incl 1 50
+  let offset_generator = Int.gen_incl 1 100
 
-  let limit_generator = Int.gen_incl 1 20
+  let limit_generator = Int.gen_incl 1 50
 
   let transaction_testable =
     Alcotest.testable

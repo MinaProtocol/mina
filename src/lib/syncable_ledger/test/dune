@@ -30,7 +30,7 @@
   data_hash_lib
   mina_base.import
   signature_lib
-  mina_stdlib
+  bounded_types
   mina_compile_config)
  (preprocess
   (pps ppx_version ppx_jane ppx_compare ppx_deriving_yojson))

@@ -17,6 +17,7 @@
   precomputed_values
   proof_carrying_data
   logger
+  truth
   merkle_list_verifier
   transition_frontier
   mina_base

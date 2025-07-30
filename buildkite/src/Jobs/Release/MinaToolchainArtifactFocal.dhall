@@ -10,8 +10,6 @@ let S = ../../Lib/SelectFiles.dhall
 
 let DockerImage = ../../Command/DockerImage.dhall
 
-let DebianVersions = ../../Constants/DebianVersions.dhall
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -29,14 +27,14 @@ in  Pipeline.build
         , tags = [ PipelineTag.Type.Toolchain ]
         }
       , steps =
-        [ let toolchainBullseyeSpec =
+        [ let toolchainSpec =
                 DockerImage.ReleaseSpec::{
                 , service = Artifacts.Type.Toolchain
-                , deb_codename = DebianVersions.DebVersion.Focal
+                , deb_codename = "focal"
                 , no_cache = True
-                , no_debian = True
+                , step_key = "toolchain-focal-docker-image"
                 }
 
-          in  DockerImage.generateStep toolchainBullseyeSpec
+          in  DockerImage.generateStep toolchainSpec
         ]
       }

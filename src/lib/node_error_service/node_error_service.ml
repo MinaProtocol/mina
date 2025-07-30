@@ -115,7 +115,7 @@ let with_deps ~logger ~f =
           f ~node_state ~node_error_url ~contact_info )
 
 let generate_report ~commit_id ~node_state ~contact_info error =
-  let timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time () in
+  let timestamp = Rfc3339_time.get_rfc3339_time () in
   let id = Uuid_unix.create () |> Uuid.to_string in
   let ({ peer_id
        ; ip_address

@@ -80,6 +80,8 @@ module type S = sig
 
   val block_window_duration : int
 
+  val itn_features : bool
+
   val compaction_interval : int option
 
   val vrf_poll_interval : int

@@ -38,7 +38,7 @@
   with_hash
   signature_lib
   staged_ledger
-  mina_stdlib
+  bounded_types
   mina_compile_config)
  (instrumentation
   (backend bisect_ppx))

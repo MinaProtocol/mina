@@ -25,7 +25,7 @@
   random_oracle_input
   snarky.backendless
   snark_params
-  mina_stdlib
+  bounded_types
   sgn
   signature_lib
   tuple_lib

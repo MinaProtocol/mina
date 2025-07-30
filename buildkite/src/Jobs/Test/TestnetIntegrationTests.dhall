@@ -10,14 +10,25 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let TestExecutive = ../../Command/TestExecutive.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let Dockers = ../../Constants/DockerVersions.dhall
+
+let Network = ../../Constants/Network.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let dependsOn =
-        Dockers.dependsOn Dockers.DepsSpec::{ artifact = Artifacts.Type.Daemon }
+        Dockers.dependsOn
+          Dockers.Type.Bullseye
+          (Some Network.Type.Berkeley)
+          Profiles.Type.Standard
+          Artifacts.Type.Daemon
       # Dockers.dependsOn
-          Dockers.DepsSpec::{ artifact = Artifacts.Type.Archive }
+          Dockers.Type.Bullseye
+          (None Network.Type)
+          Profiles.Type.Standard
+          Artifacts.Type.Archive
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -41,18 +52,18 @@ in  Pipeline.build
         , mode = PipelineMode.Type.Stable
         }
       , steps =
-        [ TestExecutive.executeLocal "block-prod-prio" dependsOn
-        , TestExecutive.executeLocal "block-reward" dependsOn
+        [ TestExecutive.executeLocal "peers-reliability" dependsOn
         , TestExecutive.executeLocal "chain-reliability" dependsOn
-        , TestExecutive.executeLocal "epoch-ledger" dependsOn
+        , TestExecutive.executeLocal "payment" dependsOn
         , TestExecutive.executeLocal "gossip-consis" dependsOn
+        , TestExecutive.executeLocal "block-prod-prio" dependsOn
         , TestExecutive.executeLocal "medium-bootstrap" dependsOn
-        , TestExecutive.executeLocal "payments" dependsOn
-        , TestExecutive.executeLocal "peers-reliability" dependsOn
-        , TestExecutive.executeLocal "slot-end" dependsOn
-        , TestExecutive.executeLocal "verification-key" dependsOn
+        , TestExecutive.executeLocal "block-reward" dependsOn
         , TestExecutive.executeLocal "zkapps" dependsOn
         , TestExecutive.executeLocal "zkapps-timing" dependsOn
         , TestExecutive.executeLocal "zkapps-nonce" dependsOn
+        , TestExecutive.executeLocal "verification-key" dependsOn
+        , TestExecutive.executeLocal "slot-end" dependsOn
+        , TestExecutive.executeLocal "epoch-ledger" dependsOn
         ]
       }

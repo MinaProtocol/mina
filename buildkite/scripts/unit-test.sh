@@ -10,7 +10,6 @@ fi
 profile=$1
 path=$2
 
-# shellcheck disable=SC1090
 source ~/.profile
 
 export MINA_LIBP2P_PASS="naughty blue worm"

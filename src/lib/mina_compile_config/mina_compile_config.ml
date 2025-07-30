@@ -12,6 +12,7 @@ module Inputs = struct
     ; default_transaction_fee_string : string
     ; default_snark_worker_fee_string : string
     ; minimum_user_command_fee_string : string
+    ; itn_features : bool
     ; compaction_interval_ms : int option
     ; block_window_duration_ms : int
     ; vrf_poll_interval_ms : int
@@ -39,6 +40,7 @@ type t =
   ; default_transaction_fee : Currency.Fee.Stable.Latest.t
   ; default_snark_worker_fee : Currency.Fee.Stable.Latest.t
   ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t
+  ; itn_features : bool
   ; compaction_interval : Time.Span.t option
   ; block_window_duration : Time.Span.t
   ; vrf_poll_interval : Time.Span.t
@@ -68,6 +70,7 @@ let make (inputs : Inputs.t) =
       Currency.Fee.of_mina_string_exn inputs.default_snark_worker_fee_string
   ; minimum_user_command_fee =
       Currency.Fee.of_mina_string_exn inputs.minimum_user_command_fee_string
+  ; itn_features = inputs.itn_features
   ; compaction_interval =
       Option.map
         ~f:(fun x -> Float.of_int x |> Time.Span.of_ms)
@@ -103,6 +106,7 @@ let to_yojson t =
       , Currency.Fee.to_yojson t.default_snark_worker_fee )
     ; ( "minimum_user_command_fee"
       , Currency.Fee.to_yojson t.minimum_user_command_fee )
+    ; ("itn_features", `Bool t.itn_features)
     ; ( "compaction_interval"
       , Option.value_map ~default:`Null
           ~f:(fun x -> `Float (Time.Span.to_ms x))
@@ -141,6 +145,7 @@ module Compiled = struct
       ; default_transaction_fee_string = Node_config.default_transaction_fee
       ; default_snark_worker_fee_string = Node_config.default_snark_worker_fee
       ; minimum_user_command_fee_string = Node_config.minimum_user_command_fee
+      ; itn_features = Node_config.itn_features
       ; compaction_interval_ms = Node_config.compaction_interval
       ; block_window_duration_ms = Node_config.block_window_duration
       ; vrf_poll_interval_ms = Node_config.vrf_poll_interval
@@ -178,6 +183,7 @@ module For_unit_tests = struct
           Node_config_for_unit_tests.default_snark_worker_fee
       ; minimum_user_command_fee_string =
           Node_config_for_unit_tests.minimum_user_command_fee
+      ; itn_features = Node_config_for_unit_tests.itn_features
       ; compaction_interval_ms = Node_config_for_unit_tests.compaction_interval
       ; block_window_duration_ms =
           Node_config_for_unit_tests.block_window_duration

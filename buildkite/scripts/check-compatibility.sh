@@ -15,7 +15,7 @@ function image_tag {
     IMAGE_TAG="$SHA-bullseye-berkeley"
 }
 
-function download_docker {
+function download-docker {
    SHA=$1
    image_tag $SHA
    docker pull gcr.io/o1labs-192920/mina-daemon:$IMAGE_TAG
@@ -27,7 +27,7 @@ function try_docker_shas {
     for sha in $DOCKER_SHAS; do
 
         set +e
-        download_docker $sha
+        download-docker $sha
 
         if [ $? -eq 0 ] ; then
             GOT_DOCKER=1
@@ -104,7 +104,7 @@ function boot_and_sync {
         # "connection refused" until GraphQL server up
         GOT_SYNC_STATUS=$(echo ${SYNC_STATUS} | grep "syncStatus")
         if [ ! -z $GOT_SYNC_STATUS ]; then
-            echo "$(date +'%Y-%m-%d %H:%M:%S')" ". Sync status:" $GOT_SYNC_STATUS
+            echo $(date +'%Y-%m-%d %H:%M:%S') ". Sync status:" $GOT_SYNC_STATUS
         fi
 
         SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")

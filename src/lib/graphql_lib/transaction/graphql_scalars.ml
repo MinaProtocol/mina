@@ -49,9 +49,7 @@ let%test_module "Roundtrip tests" =
     let%test_module "TransactionId" =
       ( module struct
         module TransactionId_gen = struct
-          include Mina_base.User_command.Stable.Latest
-
-          let gen = Mina_base.User_command.gen
+          include Mina_transaction.Transaction_id.User_command
         end
 
         include Make_test (TransactionId) (TransactionId_gen)

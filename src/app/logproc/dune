@@ -14,7 +14,8 @@
   ;;local libraries
   logger
   logproc_lib
-  mina_stdlib
+  bounded_types
+  bash_colors
   interpolator_lib)
  (instrumentation
   (backend bisect_ppx))

@@ -59,8 +59,7 @@ module Answer = struct
   module Stable = struct
     module V2 = struct
       type ('hash, 'account) t =
-        | Child_hashes_are of
-            'hash Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t
+        | Child_hashes_are of 'hash Bounded_types.ArrayN4000.Stable.V1.t
             (** The requested addresses' children have these hashes.
             May be any power of 2 number of children, and not necessarily 
             immediate children  *)
@@ -391,8 +390,7 @@ end = struct
             let content_root_addr =
               funpow
                 (MT.depth mt - height)
-                (fun a ->
-                  Addr.child_exn ~ledger_depth a Mina_stdlib.Direction.Left )
+                (fun a -> Addr.child_exn ~ledger_depth a Direction.Left)
                 (Addr.root ())
             in
             Either.First

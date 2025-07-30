@@ -27,7 +27,6 @@ in  Pipeline.build
           , S.exactly "flake" "nix"
           , S.exactly "flake" "lock"
           , S.exactly "default" "nix"
-          , S.exactly "opam" "export"
           ]
         , path = "Test"
         , name = "NixBuildTest"

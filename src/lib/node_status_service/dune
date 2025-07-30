@@ -25,7 +25,7 @@
   transition_frontier
   mina_metrics
   logger
-  mina_stdlib_unix
+  rfc3339_time
   transition_frontier_base
   node_addrs_and_ports
   block_time

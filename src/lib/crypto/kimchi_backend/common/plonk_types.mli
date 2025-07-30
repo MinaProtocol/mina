@@ -102,14 +102,12 @@ end
 
 module Poly_comm : sig
   module Without_degree_bound : sig
-    type 'a t = 'a Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
+    type 'a t = 'a Bounded_types.ArrayN16.Stable.V1.t
   end
 
   module With_degree_bound : sig
     type 'a t =
-      { unshifted : 'a Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t
-      ; shifted : 'a
-      }
+      { unshifted : 'a Bounded_types.ArrayN16.Stable.V1.t; shifted : 'a }
   end
 end
 

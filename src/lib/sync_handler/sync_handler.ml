@@ -190,6 +190,9 @@ module Make (Inputs : Inputs_intf) :
     | Full _ ->
         (* Super catchup *)
         Option.return @@ List.filter_map hashes ~f:get
+    | Hash _ ->
+        (* Normal catchup *)
+        Option.all @@ List.map hashes ~f:get
 
   let best_tip_path ~frontier =
     let rec go acc b =
@@ -252,11 +255,7 @@ module Make (Inputs : Inputs_intf) :
           (Consensus.Hooks.select
              ~context:(module Context)
              ~existing:
-               (With_hash.map
-                  ~f:
-                    (Fn.compose Mina_state.Protocol_state.consensus_state
-                       Mina_block.Header.protocol_state )
-                  best_tip_transition )
+               (With_hash.map ~f:Mina_block.consensus_state best_tip_transition)
              ~candidate )
           `Keep
       in

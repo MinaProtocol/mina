@@ -925,10 +925,10 @@ let _ =
          (* TODO(dw) write tests with runtime tables *)
          let runtime_table_cfg = [||] in
          let index0 =
-           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs false
+           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs
          in
          let index2 =
-           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs false
+           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs
          in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
@@ -980,10 +980,10 @@ let _ =
          (* TODO(dw) write tests with runtime tables *)
          let runtime_table_cfg = [||] in
          let index0 =
-           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs false
+           create gate_vector 0 lookup_tables runtime_table_cfg 0 urs
          in
          let index2 =
-           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs false
+           create gate_vector 2 lookup_tables runtime_table_cfg 0 urs
          in
          assert (max_degree index0 = 16) ;
          assert (max_degree index2 = 16) ;
@@ -1109,11 +1109,11 @@ let _ =
          let runtime_table_cfg = [||] in
          let index0 =
            Pasta_fp_index.create gate_vector 0 lookup_tables runtime_table_cfg 0
-             urs false
+             urs
          in
          let index2 =
            Pasta_fp_index.create gate_vector 2 lookup_tables runtime_table_cfg 0
-             urs false
+             urs
          in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in
@@ -1169,11 +1169,11 @@ let _ =
          let runtime_table_cfg = [||] in
          let index0 =
            Pasta_fq_index.create gate_vector 0 lookup_tables runtime_table_cfg 0
-             urs false
+             urs
          in
          let index2 =
            Pasta_fq_index.create gate_vector 2 lookup_tables runtime_table_cfg 0
-             urs false
+             urs
          in
          let vindex0_0 = create index0 in
          let vindex0_1 = create index0 in

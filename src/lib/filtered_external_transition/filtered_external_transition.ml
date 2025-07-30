@@ -18,8 +18,6 @@ end
 module Transactions = struct
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V2 = struct
       type t =
         { commands :
@@ -57,8 +55,6 @@ end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t =
       { creator : Public_key.Compressed.Stable.V1.t
@@ -72,15 +68,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-type t = Stable.Latest.t =
-  { creator : Public_key.Compressed.t
-  ; winner : Public_key.Compressed.t
-  ; protocol_state : Protocol_state.t
-  ; transactions : Transactions.Stable.Latest.t
-  ; snark_jobs : Transaction_snark_work.Info.t list
-  ; proof : Proof.t
-  }
 
 let participants
     { transactions = { commands; fee_transfers; _ }; creator; winner; _ } =
@@ -115,8 +102,7 @@ let participant_pks
   in
   add (add (union user_command_set fee_transfer_participants) creator) winner
 
-let commands { transactions = { Transactions.Stable.Latest.commands; _ }; _ } =
-  commands
+let commands { transactions = { Transactions.commands; _ }; _ } = commands
 
 let validate_transactions block =
   let consensus_state =
@@ -157,13 +143,13 @@ let of_transition block tracked_participants
   let transactions =
     List.fold calculated_transactions
       ~init:
-        { Transactions.Stable.Latest.commands = []
+        { Transactions.commands = []
         ; fee_transfers = []
         ; coinbase = Currency.Amount.zero
         ; coinbase_receiver = None
         } ~f:(fun acc_transactions -> function
       | { data = Command command; status } -> (
-          let command = User_command.read_all_proofs_from_disk command in
+          let command = (command :> User_command.t) in
           let should_include_transaction command participants =
             List.exists (User_command.accounts_referenced command)
               ~f:(fun account_id ->

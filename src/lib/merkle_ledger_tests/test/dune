@@ -1,0 +1,11 @@
+(tests
+ (names main)
+ (flags
+  (:standard -warn-error +a)
+  -open
+  Merkle_ledger_tests)
+ (libraries alcotest merkle_ledger_tests)
+ (action
+  (run %{test}))
+ (instrumentation
+  (backend bisect_ppx)))

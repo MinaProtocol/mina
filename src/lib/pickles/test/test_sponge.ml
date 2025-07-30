@@ -1,10 +1,10 @@
-(** Testing
-    -------
+(* Testing
+   -------
 
-    Component: Pickles
-    Subject: Test sponge
-    Invocation: \
-     dune exec src/lib/pickles/test/test_sponge.exe
+   Component: Pickles
+   Subject: Test sponge
+   Invocation: \
+    dune exec src/lib/pickles/test/main.exe -- test "Sponge"
 *)
 
 module Test
@@ -50,15 +50,14 @@ module Wrap =
   Test (Impls.Wrap) (Pickles__Tock_field_sponge.Field)
     (Pickles__Wrap_main_inputs.Sponge.S)
 
-let () =
+let tests =
   let open Alcotest in
-  run "Sponge"
-    [ ( "Step"
-      , [ test_case "sponge" `Quick (fun () ->
-              Step.test Pickles__Tick_field_sponge.params )
-        ] )
-    ; ( "Wrap"
-      , [ test_case "sponge" `Quick (fun () ->
-              Wrap.test Pickles__Tock_field_sponge.params )
-        ] )
-    ]
+  [ ( "Sponge:Step"
+    , [ test_case "sponge" `Quick (fun () ->
+            Step.test Pickles__Tick_field_sponge.params )
+      ] )
+  ; ( "Sponge:Wrap"
+    , [ test_case "sponge" `Quick (fun () ->
+            Wrap.test Pickles__Tock_field_sponge.params )
+      ] )
+  ]

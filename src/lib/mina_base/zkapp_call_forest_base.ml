@@ -134,24 +134,17 @@ module type Digest_intf = sig
     module Checked : sig
       include Digest_intf.S_checked
 
-      val create :
-        signature_kind:Mina_signature_kind.t -> Account_update.Checked.t -> t
+      val create : ?chain:Mina_signature_kind.t -> Account_update.Checked.t -> t
 
       val create_body :
-           signature_kind:Mina_signature_kind.t
-        -> Account_update.Body.Checked.t
-        -> t
+        ?chain:Mina_signature_kind.t -> Account_update.Body.Checked.t -> t
     end
 
     include Digest_intf.S_aux with type t := t and type checked := Checked.t
 
-    val create :
-         signature_kind:Mina_signature_kind.t
-      -> (Account_update.Body.t, _, _) Account_update.Poly.t
-      -> t
+    val create : ?chain:Mina_signature_kind.t -> Account_update.t -> t
 
-    val create_body :
-      signature_kind:Mina_signature_kind.t -> Account_update.Body.t -> t
+    val create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
   end
 
   module rec Forest : sig
@@ -261,12 +254,12 @@ module Make_digest_str
       let create_body = Account_update.Body.Checked.digest
     end
 
-    let create ~signature_kind :
-        (Account_update.Body.t, _, _) Account_update.Poly.t -> t =
-      Account_update.digest ~signature_kind
+    let create : ?chain:Mina_signature_kind.t -> Account_update.t -> t =
+      Account_update.digest
 
-    let create_body ~signature_kind : Account_update.Body.t -> t =
-      Account_update.Body.digest ~signature_kind
+    let create_body : ?chain:Mina_signature_kind.t -> Account_update.Body.t -> t
+        =
+      Account_update.Body.digest
   end
 
   module Forest = struct
@@ -470,11 +463,9 @@ let cons_aux (type p) ~(digest_account_update : p -> _) ?(calls = [])
   let tree : _ Tree.t = { account_update; account_update_digest; calls } in
   cons_tree tree xs
 
-let cons (type aux) ~signature_kind ?calls
-    (account_update : (_, _, aux) Account_update.Poly.t) xs =
-  cons_aux
-    ~digest_account_update:(Digest.Account_update.create ~signature_kind)
-    ?calls account_update xs
+let cons ?calls (account_update : Account_update.t) xs =
+  cons_aux ~digest_account_update:Digest.Account_update.create ?calls
+    account_update xs
 
 let rec accumulate_hashes ~hash_account_update (xs : _ t) =
   let go = accumulate_hashes ~hash_account_update in
@@ -496,36 +487,22 @@ let rec accumulate_hashes ~hash_account_update (xs : _ t) =
       let node_hash = Digest.Tree.create node in
       { elt = node; stack_hash = Digest.Forest.cons node_hash (hash xs) } :: xs
 
-let accumulate_hashes_predicated ~signature_kind xs =
-  accumulate_hashes
-    ~hash_account_update:(Digest.Account_update.create ~signature_kind)
-    xs
-
-let forget_hashes =
-  let rec impl = List.map ~f:forget_digest
-  and forget_digest = function
-    | { With_stack_hash.stack_hash = _
-      ; elt = { Tree.account_update; account_update_digest = _; calls }
-      } ->
-        { With_stack_hash.stack_hash = ()
-        ; elt =
-            { Tree.account_update
-            ; account_update_digest = ()
-            ; calls = impl calls
-            }
-        }
+let accumulate_hashes' (type a b) (xs : (Account_update.t, a, b) t) :
+    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) t =
+  let hash_account_update (p : Account_update.t) =
+    Digest.Account_update.create p
   in
-  impl
+  accumulate_hashes ~hash_account_update xs
 
-let forget_hashes_and_proofs_and_aux p =
-  forget_hashes @@ map ~f:Account_update.forget_proofs_and_aux p
+let accumulate_hashes_predicated xs =
+  accumulate_hashes ~hash_account_update:Digest.Account_update.create xs
 
 module With_hashes_and_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('update, 'data) t =
-        ( 'update * 'data
+      type 'data t =
+        ( Account_update.Stable.V1.t * 'data
         , Digest.Account_update.Stable.V1.t
         , Digest.Forest.Stable.V1.t )
         Stable.V1.t
@@ -537,53 +514,42 @@ module With_hashes_and_data = struct
 
   let empty = Digest.Forest.empty
 
-  let hash_account_update ~signature_kind
-      ((p : Account_update.Stable.Latest.t), _) =
-    Digest.Account_update.create ~signature_kind p
+  let hash_account_update ((p : Account_update.t), _) =
+    Digest.Account_update.create p
 
-  let accumulate_hashes ~signature_kind xs : _ t =
-    accumulate_hashes
-      ~hash_account_update:(hash_account_update ~signature_kind)
-      xs
+  let accumulate_hashes xs : _ t = accumulate_hashes ~hash_account_update xs
 
-  let of_zkapp_command_simple_list ~signature_kind
-      (xs : (Account_update.Simple.t * 'a) list) =
+  let of_zkapp_command_simple_list (xs : (Account_update.Simple.t * 'a) list) :
+      _ t =
     of_account_updates xs
       ~account_update_depth:(fun ((p : Account_update.Simple.t), _) ->
         p.body.call_depth )
     |> map ~f:(fun (p, x) -> (Account_update.of_simple p, x))
-    |> accumulate_hashes ~signature_kind
+    |> accumulate_hashes
 
-  let of_account_updates ~signature_kind
-      (xs : (Account_update.Graphql_repr.t * 'a) list) : _ t =
+  let of_account_updates (xs : (Account_update.Graphql_repr.t * 'a) list) : _ t
+      =
     of_account_updates_map
       ~account_update_depth:(fun ((p : Account_update.Graphql_repr.t), _) ->
         p.body.call_depth )
       ~f:(fun (p, x) -> (Account_update.of_graphql_repr p, x))
       xs
-    |> accumulate_hashes ~signature_kind
+    |> accumulate_hashes
 
   let to_account_updates (x : _ t) = to_account_updates x
 
   let to_zkapp_command_with_hashes_list (x : _ t) =
     to_zkapp_command_with_hashes_list x
 
-  let account_updates_hash' ~signature_kind xs =
-    of_account_updates ~signature_kind xs |> hash
+  let account_updates_hash' xs = of_account_updates xs |> hash
 
-  let account_updates_hash ~signature_kind xs =
-    List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash' ~signature_kind
+  let account_updates_hash xs =
+    List.map ~f:(fun x -> (x, ())) xs |> account_updates_hash'
 end
 
 module With_hashes = struct
-  type t =
-    (Account_update.t, Digest.Account_update.t, Digest.Forest.t) Stable.Latest.t
-  [@@deriving sexp_of, to_yojson]
-
   [%%versioned
   module Stable = struct
-    [@@@no_toplevel_latest_type]
-
     module V1 = struct
       type t =
         ( Account_update.Stable.V1.t
@@ -596,49 +562,37 @@ module With_hashes = struct
     end
   end]
 
-  let read_all_proofs_from_disk : t -> Stable.Latest.t =
-    map ~f:Account_update.read_all_proofs_from_disk
-
-  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-    map ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
-
   let empty = Digest.Forest.empty
 
-  let hash_account_update ~signature_kind p =
-    Digest.Account_update.create ~signature_kind p
+  let hash_account_update (p : Account_update.t) =
+    Digest.Account_update.create p
 
-  let accumulate_hashes ~signature_kind xs =
-    accumulate_hashes
-      ~hash_account_update:(hash_account_update ~signature_kind)
-      xs
+  let accumulate_hashes xs : t = accumulate_hashes ~hash_account_update xs
 
-  let of_zkapp_command_simple_list ~signature_kind
-      (xs : Account_update.Simple.t list) =
+  let of_zkapp_command_simple_list (xs : Account_update.Simple.t list) : t =
     of_account_updates xs
       ~account_update_depth:(fun (p : Account_update.Simple.t) ->
         p.body.call_depth )
     |> map ~f:Account_update.of_simple
-    |> accumulate_hashes ~signature_kind
+    |> accumulate_hashes
 
-  let of_account_updates ~signature_kind
-      (xs : Account_update.Graphql_repr.t list) : Stable.Latest.t =
+  let of_account_updates (xs : Account_update.Graphql_repr.t list) : t =
     of_account_updates_map
       ~account_update_depth:(fun (p : Account_update.Graphql_repr.t) ->
         p.body.call_depth )
       ~f:(fun p -> Account_update.of_graphql_repr p)
       xs
-    |> accumulate_hashes ~signature_kind
+    |> accumulate_hashes
 
   let to_account_updates (x : t) = to_account_updates x
 
   let to_zkapp_command_with_hashes_list (x : t) =
     to_zkapp_command_with_hashes_list x
 
-  let account_updates_hash' ~signature_kind xs =
-    of_account_updates ~signature_kind xs |> hash
+  let account_updates_hash' xs = of_account_updates xs |> hash
 
-  let account_updates_hash ~signature_kind xs =
-    List.map ~f:(fun x -> x) xs |> account_updates_hash' ~signature_kind
+  let account_updates_hash xs =
+    List.map ~f:(fun x -> x) xs |> account_updates_hash'
 end
 
 let is_empty : _ t -> bool = List.is_empty

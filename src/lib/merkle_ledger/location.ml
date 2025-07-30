@@ -1,4 +1,3 @@
-open Core_kernel
 open Unsigned
 
 (* add functions to library module Bigstring so we can derive hash for the type t below *)
@@ -15,7 +14,7 @@ module Bigstring = struct
       let hash_fold_t hash_state t =
         String.hash_fold_t hash_state (Bigstring.to_string t)
 
-      include Mina_stdlib.Bounded_types.String.Of_stringable (struct
+      include Bounded_types.String.Of_stringable (struct
         type nonrec t = t
 
         let of_string s = Bigstring.of_string s
@@ -38,7 +37,6 @@ module T = struct
    * and node locations, the bitstring represents the path in the tree where that node exists.
    * For all other locations (generic locations), the prefix is 0xff. Generic locations can contain
    * any bitstring.
-   * Hence, we can have at most (2^(253 - 1)) accounts, where 253 is just 0xfd.
    *)
 
   module Addr = Merkle_address
@@ -51,8 +49,12 @@ module T = struct
     let hash ~ledger_depth depth = UInt8.of_int (ledger_depth - depth)
   end
 
+  [@@@warning "-4"] (* disabled because of deriving sexp *)
+
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
   [@@deriving hash, sexp, compare]
+
+  [@@@warning "+4"]
 
   let is_generic = function Generic _ -> true | Account _ | Hash _ -> false
 
@@ -71,7 +73,7 @@ module T = struct
   let root_hash : t = Hash (Addr.root ())
 
   let last_direction path =
-    Mina_stdlib.Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
+    Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
 
   let build_generic (data : Bigstring.t) : t = Generic data
 
@@ -148,9 +150,9 @@ module T = struct
 
   let order_siblings (location : t) (base : 'a) (sibling : 'a) : 'a * 'a =
     match last_direction (to_path_exn location) with
-    | Mina_stdlib.Direction.Left ->
+    | Left ->
         (base, sibling)
-    | Mina_stdlib.Direction.Right ->
+    | Right ->
         (sibling, base)
 
   (* Returns a reverse of traversal path from top of the tree to the location
@@ -159,8 +161,7 @@ module T = struct
      By reverse it means that head of returned list contains direction from
      location's parent to the location along with the location's sibling.
   *)
-  let merkle_path_dependencies_exn (location : t) :
-      (t * Mina_stdlib.Direction.t) list =
+  let merkle_path_dependencies_exn (location : t) : (t * Direction.t) list =
     let rec loop k =
       if Addr.depth k = 0 then []
       else

@@ -12,7 +12,6 @@ path=$2
 timeout=$3
 individual_test_timeout=$4
 
-# shellcheck disable=SC1090
 source ~/.profile
 
 echo "--- Make build"

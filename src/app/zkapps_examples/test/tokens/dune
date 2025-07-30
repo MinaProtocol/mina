@@ -41,7 +41,7 @@
   with_hash
   zkapps_tokens
   zkapps_examples
-  mina_stdlib)
+  bounded_types)
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess

@@ -383,7 +383,7 @@ let test_with_libp2p_helper ?(logger = Logger.null ())
         (fun () -> f conf_dir helper)
         ~finally:(fun () ->
           let%bind () = shutdown helper in
-          Mina_stdlib_unix.File_system.remove_dir conf_dir ) )
+          File_system.remove_dir conf_dir ) )
 
 let%test_module "bitswap blocks" =
   ( module struct

@@ -1,7 +1,7 @@
 (* generate_keypair.ml -- utility app that only generates keypairs *)
 
-open! Core_kernel
-open! Async
+open Core_kernel
+open Async
 
 let () =
   let is_version_cmd s =

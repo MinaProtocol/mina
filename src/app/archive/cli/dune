@@ -3,20 +3,22 @@
  (public_name archive.cli)
  (libraries
   ;;opam libraries
-  async
-  async.async_command
+  async_kernel
   caqti
-  caqti-async
-  core
-  ;;local libraries
   archive_lib
-  block_time
-  cli_lib
+  core
+  async
+  caqti-async
+  core_kernel
+  async.async_command
+  ;;local libraries
   genesis_constants
-  logger
   mina_runtime_config
+  cli_lib
+  logger
+  block_time
   mina_version)
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version)))
+  (pps ppx_version ppx_jane ppx_mina)))

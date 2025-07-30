@@ -1,3 +1,5 @@
+let Prelude = ../../External/Prelude.dhall
+
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -22,6 +24,8 @@ let password = "codarules"
 
 let db = "archiver"
 
+let port = "5432"
+
 let command_key = "archive-unit-tests"
 
 in  Pipeline.build
@@ -31,7 +35,6 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src")
           , S.strictlyStart
               (S.contains "buildkite/src/Jobs/Test/ArchiveNodeUnitTest")
-          , S.exactly "buildkite/scripts/tests/archive-node-unit-tests" "sh"
           ]
         , path = "Test"
         , name = "ArchiveNodeUnitTest"
@@ -49,12 +52,17 @@ in  Pipeline.build
                   [ "POSTGRES_PASSWORD=${password}"
                   , "POSTGRES_USER=${user}"
                   , "POSTGRES_DB=${db}"
+                  , "MINA_TEST_POSTGRES=postgres://${user}:${password}@localhost:${port}/${db}"
                   , "GO=/usr/lib/go/bin/go"
                   , "DUNE_INSTRUMENT_WITH=bisect_ppx"
                   , "COVERALLS_TOKEN"
                   ]
-                  ( WithCargo.withCargo
-                      "./buildkite/scripts/tests/archive-node-unit-tests.sh ${user} ${password} ${db} ${command_key}"
+                  ( Prelude.Text.concatSep
+                      " && "
+                      [ "bash buildkite/scripts/setup-database-for-archive-node.sh ${user} ${password} ${db} ${port}"
+                      , WithCargo.withCargo
+                          "eval \\\$(opam config env) && dune runtest src/app/archive && buildkite/scripts/upload-partial-coverage-data.sh ${command_key} dev"
+                      ]
                   )
             , label = "Archive node unit tests"
             , key = command_key

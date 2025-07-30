@@ -20,7 +20,7 @@
   mina_base
   mina_transaction_logic
   currency
-  mina_stdlib
+  bounded_types
   mina_state
   signature_lib
   genesis_constants

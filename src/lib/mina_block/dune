@@ -4,7 +4,14 @@
  (libraries
   ;; opam libraries
   integers
+  core_kernel
+  async_kernel
+  bin_prot.shape
+  base.caml
+  sexplib0
   base64
+  result
+  base
   core
   ;; local libraries
   mina_ledger
@@ -14,6 +21,7 @@
   ledger_proof
   logger
   blockchain_snark
+  unix_timestamp
   allocation_functor
   verifier
   staged_ledger_diff
@@ -24,11 +32,12 @@
   mina_net2
   mina_base
   mina_transaction
-  mina_stdlib
+  truth
   transition_chain_verifier
   staged_ledger
   data_hash_lib
   block_time
+  mina_stdlib
   with_hash
   signature_lib
   genesis_constants
@@ -46,8 +55,7 @@
   random_oracle_input
   ppx_version.runtime
   mina_wire_types
-  internal_tracing
-  proof_carrying_data)
+  internal_tracing)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

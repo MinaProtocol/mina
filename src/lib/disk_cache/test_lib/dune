@@ -5,10 +5,10 @@
   ;; opam libraries
   core
   async
-  mina_stdlib
+  bounded_types
   ;; local libraries
   logger
-  mina_stdlib_unix
+  file_system
   disk_cache.intf)
  (preprocess
   (pps ppx_mina ppx_version ppx_jane))

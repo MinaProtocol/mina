@@ -14,16 +14,16 @@ get-go-capnp:
 	$(GO) get capnproto.org/go/capnp/$(GO_CAPNP_VERSION)
 
 build/capnpc-go: get-go-capnp
-	@mkdir -p build && $(GO) build -o build/capnpc-go capnproto.org/go/capnp/v3/capnpc-go
+	mkdir -p build && $(GO) build -o build/capnpc-go capnproto.org/go/capnp/v3/capnpc-go
 
 libp2p_ipc.capnp.go: libp2p_ipc.capnp build/capnpc-go
-	@PATH="build:${PATH}" capnp compile -ogo -I${GO_CAPNP_STD} libp2p_ipc.capnp
+	PATH="build:${PATH}" capnp compile -ogo -I${GO_CAPNP_STD} libp2p_ipc.capnp
 
 libp2p_ipc_capnp.ml libp2p_ipc_capnp.mli: libp2p_ipc.capnp
-	@mkdir -p _codegen
-	@capnp compile -oocaml:_codegen -I${GO_CAPNP_STD} $<
-	@for ext in ml mli; do mv _codegen/libp2p_ipc.$$ext libp2p_ipc_capnp.$$ext; done
-	@rm -rf _codegen
+	mkdir -p _codegen
+	capnp compile -oocaml:_codegen -I${GO_CAPNP_STD} $<
+	for ext in ml mli; do mv _codegen/libp2p_ipc.$$ext libp2p_ipc_capnp.$$ext; done
+	rm -rf _codegen
 
 clean:
-	@rm -Rf libp2p_ipc.ml libp2p_ipc.mli libp2p_ipc.capnp.go build
+	rm -Rf libp2p_ipc.ml libp2p_ipc.mli libp2p_ipc.capnp.go build

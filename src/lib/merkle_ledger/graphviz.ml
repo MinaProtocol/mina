@@ -1,5 +1,4 @@
 open Async
-open Core_kernel
 
 module Make (Inputs : Intf.Graphviz.I) :
   Intf.Graphviz.S
@@ -41,9 +40,7 @@ module Make (Inputs : Intf.Graphviz.I) :
     |> Visualization.display_short_sexp (module Account_id)
 
   let empty_hash =
-    Mina_stdlib.Empty_hashes.extensible_cache
-      (module Hash)
-      ~init_hash:Hash.empty_account
+    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
   let visualize t ~(initial_address : Ledger.Addr.t) =
     let ledger_depth = Inputs.Ledger.depth t in
@@ -86,11 +83,9 @@ module Make (Inputs : Intf.Graphviz.I) :
                      current_hash
               then (
                 Queue.enqueue jobs
-                  (Addr.child_exn ~ledger_depth address
-                     Mina_stdlib.Direction.Left ) ;
+                  (Addr.child_exn ~ledger_depth address Direction.Left) ;
                 Queue.enqueue jobs
-                  (Addr.child_exn ~ledger_depth address
-                     Mina_stdlib.Direction.Right ) ;
+                  (Addr.child_exn ~ledger_depth address Direction.Right) ;
                 Hash current_hash )
               else Empty_hash
             in
@@ -102,10 +97,8 @@ module Make (Inputs : Intf.Graphviz.I) :
       bfs ~edges:[]
         ~accounts:(Set.empty (module Account))
         (Queue.of_list
-           [ Addr.child_exn ~ledger_depth initial_address
-               Mina_stdlib.Direction.Left
-           ; Addr.child_exn ~ledger_depth initial_address
-               Mina_stdlib.Direction.Right
+           [ Addr.child_exn ~ledger_depth initial_address Direction.Left
+           ; Addr.child_exn ~ledger_depth initial_address Direction.Right
            ] )
     in
     let edges =

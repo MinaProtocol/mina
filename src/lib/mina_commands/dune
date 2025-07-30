@@ -15,7 +15,7 @@
   mina_base.import
   kimchi_backend
   mina_metrics
-  mina_stdlib
+  bounded_types
   transition_frontier
   sync_status
   pipe_lib
@@ -37,6 +37,7 @@
   trust_system
   network_pool
   merkle_list_verifier
+  mina_stdlib
   genesis_constants
   block_time
   mina_block

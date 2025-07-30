@@ -1,7 +1,5 @@
 (executable
  (name disk_caching_stats)
- (package mina_disk_caching_stats)
- (public_name mina-disk-caching-stats)
  (libraries
   pickles
   pickles_types

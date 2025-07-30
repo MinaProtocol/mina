@@ -58,8 +58,8 @@
   transaction_snark
   mina_compile_config
   node_error_service
-  mina_stdlib
-  mina_stdlib_unix
+  mina_user_error
+  file_system
   mina_version
   mina_net2
   block_time

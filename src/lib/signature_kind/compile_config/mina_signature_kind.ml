@@ -1,6 +1,6 @@
 include Mina_signature_kind_type
 
-let t_DEPRECATED =
+let t =
   match Node_config.network with
   | "testnet" ->
       Testnet

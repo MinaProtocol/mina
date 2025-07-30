@@ -3,11 +3,11 @@ open Utils
 module Types : sig
   module type S = sig
     module Proof : sig
-      type 'a t
+      type ('a, 'b) t
 
       module Proofs_verified_2 : sig
         module V2 : sig
-          type nonrec t = Pickles_types.Nat.two t
+          type nonrec t = (Pickles_types.Nat.two, Pickles_types.Nat.two) t
         end
       end
     end
@@ -25,7 +25,8 @@ module Types : sig
 
       module Proof : sig
         module V2 : sig
-          type t = Verification_key.Max_width.n Proof.t
+          type t =
+            (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
         end
       end
     end
@@ -154,7 +155,7 @@ module Concrete_ : sig
       end
     end
 
-    type ('s, 'mlmb) with_data =
+    type ('s, 'mlmb, _) with_data =
       | T :
           ( 'mlmb Pickles_reduced_messages_for_next_proof_over_same_field.Wrap.t
           , ( 's
@@ -167,13 +168,13 @@ module Concrete_ : sig
             Pickles_reduced_messages_for_next_proof_over_same_field.Step.V1.t
           )
           Base.Wrap.V2.t
-          -> ('s, 'mlmb) with_data
+          -> ('s, 'mlmb, _) with_data
 
-    type 'mlmb t = (unit, 'mlmb) with_data
+    type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
 
     module Proofs_verified_2 : sig
       module V2 : sig
-        type nonrec t = Pickles_types.Nat.two t
+        type nonrec t = (Pickles_types.Nat.two, Pickles_types.Nat.two) t
       end
     end
   end
@@ -207,7 +208,8 @@ module Concrete_ : sig
 
     module Proof : sig
       module V2 : sig
-        type t = Verification_key.Max_width.n Proof.t
+        type t =
+          (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
       end
     end
   end
@@ -220,7 +222,7 @@ module type Concrete =
     with type Side_loaded.Verification_key.V2.t =
       Concrete_.Side_loaded.Verification_key.V2.t
      and type Backend.Tick.Field.V1.t = Pasta_bindings.Fp.t
-     and type 'a Proof.t = 'a Concrete_.Proof.t
+     and type ('a, 'b) Proof.t = ('a, 'b) Concrete_.Proof.t
 
 module type Local_sig = Signature(Types).S
 

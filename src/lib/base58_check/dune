@@ -5,10 +5,10 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  base
-  base58
-  core_kernel
   digestif
+  core_kernel
+  base58
+  base
   ppx_inline_test.config)
  (library_flags (-linkall))
  (preprocess

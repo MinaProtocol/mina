@@ -74,12 +74,12 @@ module type Resource_pool_diff_intf = sig
 
   val label : string
 
-  type t
+  type t [@@deriving to_yojson]
 
-  type verified
+  type verified [@@deriving to_yojson]
 
   (** Part of the diff that was not added to the resource pool*)
-  type rejected
+  type rejected [@@deriving to_yojson]
 
   val empty : t
 
@@ -258,27 +258,24 @@ end
 module type Snark_resource_pool_intf = sig
   include Resource_pool_base_intf
 
-  val proof_cache_db : t -> Proof_cache_tag.cache_db
-
   val make_config :
        trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> disk_location:string
-    -> proof_cache_db:Proof_cache_tag.cache_db
     -> Config.t
 
   val add_snark :
        ?is_local:bool
     -> t
     -> work:Transaction_snark_work.Statement.t
-    -> proof:Ledger_proof.Cached.t One_or_two.t
+    -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
     -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t
     -> Transaction_snark_work.Statement.t
-    -> Ledger_proof.Cached.t One_or_two.t Priced_proof.t option
+    -> Ledger_proof.t One_or_two.t Priced_proof.t option
 
   val verify_and_act :
        t
@@ -305,24 +302,9 @@ module type Snark_pool_diff_intf = sig
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
+  [@@deriving compare]
 
-  module Cached : sig
-    type t =
-      | Add_solved_work of
-          Transaction_snark_work.Statement.t
-          * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
-      | Empty
-
-    val read_all_proofs_from_disk :
-      t -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
-
-    val write_all_proofs_to_disk :
-         proof_cache_db:Proof_cache_tag.cache_db
-      -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
-      -> t
-  end
-
-  type verified = Cached.t
+  type verified = t [@@deriving compare]
 
   type compact =
     { work_ids : int One_or_two.t
@@ -338,7 +320,7 @@ module type Snark_pool_diff_intf = sig
   include
     Resource_pool_diff_intf
       with type t := t
-       and type verified := Cached.t
+       and type verified := t
        and type pool := resource_pool
 
   val to_compact : t -> compact option
@@ -355,7 +337,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.Stable.Latest.t list
+  type t = User_command.t list [@@deriving of_yojson]
 
   module Diff_error : sig
     type t =
@@ -377,7 +359,7 @@ module type Transaction_pool_diff_intf = sig
   end
 
   module Rejected : sig
-    type t = (User_command.Stable.Latest.t * Diff_error.t) list
+    type t = (User_command.t * Diff_error.t) list [@@deriving yojson]
   end
 
   type Structured_log_events.t +=
@@ -406,10 +388,9 @@ module type Transaction_resource_pool_intf = sig
     -> genesis_constants:Genesis_constants.t
     -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
     -> vk_cache_db:Zkapp_vk_cache_tag.cache_db
-    -> proof_cache_db:Proof_cache_tag.cache_db
     -> Config.t
 
-  val member : t -> Transaction_hash.t -> bool
+  val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
 
   val transactions :
     t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t

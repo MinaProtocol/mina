@@ -152,9 +152,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (node, response) )
 
   let assert_peers_completely_connected nodes_and_responses =
-    (* this check checks if every single peer in the network is connected to
-       every other peer, in graph theory this network would be a complete graph.
-       this property will only hold true on small networks *)
+    (* this check checks if every single peer in the network is connected to every other peer, in graph theory this network would be a complete graph.  this property will only hold true on small networks *)
     let check_peer_connected_to_all_others ~nodes_by_peer_id ~peer_id
         ~connected_peers =
       let get_node_infra_id p =
@@ -189,19 +187,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           ~connected_peers )
 
   let assert_peers_cant_be_partitioned ~max_disconnections nodes_and_responses =
-    (* this check checks that the network does NOT become partitioned into
-       isolated subgraphs, even if n nodes are hypothetically removed from the
-       network.*)
+    (* this check checks that the network does NOT become partitioned into isolated subgraphs, even if n nodes are hypothetically removed from the network.*)
     let _, responses = List.unzip nodes_and_responses in
+    let open Graph_algorithms in
     let () =
       Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
           G.output_graph c (graph_of_adjacency_list responses) )
     in
-    (* Check that the network cannot be disconnected by removing up to
-       max_disconnections number of nodes. *)
+    (* Check that the network cannot be disconnected by removing up to max_disconnections number of nodes. *)
     match
-      Mina_stdlib.Nat.take
-        (Mina_stdlib.Graph_algorithms.connectivity (module String) responses)
+      Nat.take
+        (Graph_algorithms.connectivity (module String) responses)
         max_disconnections
     with
     | `Failed_after n ->
@@ -364,9 +360,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     *)
     let app_states_compat =
       let fs_requested =
-        Mina_base.Zkapp_state.V.to_list requested_update.app_state
+        Pickles_types.Vector.Vector_8.to_list requested_update.app_state
       in
-      let fs_ledger = Mina_base.Zkapp_state.V.to_list ledger_update.app_state in
+      let fs_ledger =
+        Pickles_types.Vector.Vector_8.to_list ledger_update.app_state
+      in
       List.for_all2_exn fs_requested fs_ledger ~f:(fun req ledg ->
           compatible_item req ledg ~equal:Pickles.Backend.Tick.Field.equal )
     in

@@ -1,0 +1,28 @@
+{
+  "name": "echo-service",
+  "version": "1.0.0",
+  "description": "Simple service that sends inverse transactions for each one it recieves.",
+  "main": "index.js",
+  "repository": "https://github.com/CodaProtocol/echo-service",
+  "author": "Carey Janecka <carey@o1labs.org>",
+  "license": "MIT",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "npx nodemon index.js"
+  },
+  "dependencies": {
+    "apollo-cache-inmemory": "^1.6.2",
+    "apollo-client": "^2.6.3",
+    "apollo-link-http": "^1.5.15",
+    "apollo-link-ws": "^1.0.18",
+    "graphql": "^14.4.2",
+    "graphql-tag": "^2.10.1",
+    "node-fetch": "^2.6.0",
+    "subscriptions-transport-ws": "^0.9.16",
+    "winston": "^3.2.1",
+    "ws": "^7.1.0"
+  },
+  "devDependencies": {
+    "prettier": "^1.18.2"
+  }
+}

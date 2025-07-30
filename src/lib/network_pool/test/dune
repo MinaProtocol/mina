@@ -18,7 +18,7 @@
   currency
   data_hash_lib
   genesis_constants
-  mina_stdlib
+  bounded_types
   coda_genesis_ledger
   logger
   mina_base

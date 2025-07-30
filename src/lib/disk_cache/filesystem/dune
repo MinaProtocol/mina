@@ -8,8 +8,7 @@
   async
   ;; local libraries
   logger
-  mina_stdlib_unix
-  disk_cache.utils
+  file_system
   disk_cache.test_lib)
  (preprocess
   (pps ppx_mina ppx_version ppx_jane))

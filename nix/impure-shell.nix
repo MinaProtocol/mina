@@ -21,7 +21,6 @@ pkgs.mkShell {
     wasm-pack
     lmdb
     rosetta-cli
-    rocksdb.tools
   ];
   OPAMSWITCH = "mina";
   MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";

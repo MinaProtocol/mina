@@ -1,5 +1,3 @@
-open Core_kernel
-
 module type S = sig
   type hash
 
@@ -8,8 +6,6 @@ module type S = sig
   val elem_hash : elem -> hash
 
   type t = elem list [@@deriving sexp, equal]
-  (* In the absense of hash clashing, a merkle path uniquely identifies a node
-     in a merkle tree, and how to reach such path from the merkle root. *)
 
   val implied_root : t -> hash -> hash
 

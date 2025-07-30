@@ -153,7 +153,6 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
 let block_base64_of_breadcrumb breadcrumb =
   let external_transition =
     breadcrumb |> Transition_frontier.Breadcrumb.block
-    |> Mina_block.read_all_proofs_from_disk
   in
   let block_string =
     Binable.to_string (module Mina_block.Stable.Latest) external_transition
@@ -185,7 +184,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
       let block_data =
         { Payload.block = block_base64
-        ; created_at = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+        ; created_at = Rfc3339_time.get_rfc3339_time ()
         ; peer_id
         ; snark_work = None
         ; graphql_control_port
@@ -194,11 +193,6 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
       in
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
         ~produced:true block_data
-
-let read_all_proofs_for_work_single_spec =
-  Snark_work_lib.Work.Single.Spec.map
-    ~f_proof:Ledger_proof.Cached.read_proof_from_disk
-    ~f_witness:Transaction_witness.read_all_proofs_from_disk
 
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
     ~url ~snark_worker ~transition_frontier ~peer_id
@@ -231,7 +225,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
         let state_hash = Transition_frontier.Breadcrumb.state_hash best_tip in
         let block_data =
           { Payload.block = block_base64
-          ; created_at = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+          ; created_at = Rfc3339_time.get_rfc3339_time ()
           ; peer_id
           ; snark_work = None
           ; graphql_control_port
@@ -272,7 +266,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
             in
             let block_data =
               { Payload.block = block_base64
-              ; created_at = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+              ; created_at = Rfc3339_time.get_rfc3339_time ()
               ; peer_id
               ; snark_work = None
               ; graphql_control_port
@@ -316,8 +310,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                 in
                 let block_data =
                   { Payload.block = block_base64
-                  ; created_at =
-                      Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+                  ; created_at = Rfc3339_time.get_rfc3339_time ()
                   ; peer_id
                   ; snark_work = None
                   ; graphql_control_port
@@ -331,7 +324,9 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                   make_interruptible
                     (Uptime_snark_worker.perform_single snark_worker
                        ( message
-                       , read_all_proofs_for_work_single_spec single_spec ) )
+                       , Snark_work_lib.Work.Single.Spec.map ~f_witness:ident
+                           ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                           single_spec ) )
                 with
                 | Error e ->
                     (* error in submitting to process *)
@@ -359,8 +354,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                     in
                     let block_data =
                       { Payload.block = block_base64
-                      ; created_at =
-                          Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+                      ; created_at = Rfc3339_time.get_rfc3339_time ()
                       ; peer_id
                       ; snark_work = Some snark_work_base64
                       ; graphql_control_port

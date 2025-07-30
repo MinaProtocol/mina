@@ -44,4 +44,4 @@
   logger
   logger.context_logger
   ppx_version.runtime
-  mina_stdlib))
+  bounded_types))

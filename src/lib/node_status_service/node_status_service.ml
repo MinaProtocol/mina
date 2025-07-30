@@ -200,6 +200,8 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
                  catchup_state )
+        | _ ->
+            None
       in
       let sync_status =
         sync_status |> Mina_incremental.Status.Observer.value_exn
@@ -261,7 +263,7 @@ let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
             ; ip_address =
                 Node_addrs_and_ports.external_ip addrs_and_ports
                 |> Core.Unix.Inet_addr.to_string
-            ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+            ; timestamp = Rfc3339_time.get_rfc3339_time ()
             ; uptime_of_node =
                 Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
             ; peer_count = List.length peers
@@ -431,7 +433,7 @@ let start_simplified ~commit_id ~logger ~node_status_url ~chain_id ~network
        ; chain_id
        ; peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
        ; peer_count = List.length peers
-       ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
+       ; timestamp = Rfc3339_time.get_rfc3339_time ()
        ; block_producer_public_key = block_producer_public_key_base58
        }
      in

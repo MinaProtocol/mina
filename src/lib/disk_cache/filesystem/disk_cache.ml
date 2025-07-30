@@ -1,9 +1,5 @@
 (* Cache proofs using the filesystem, one file per proof. *)
 
-(* TODO:
-   figure out the reason why filesystem cache is much more disk hungry;
-   It takes 4~5 times disk space than LMDB cache. *)
-
 open Core
 
 module Make (B : sig
@@ -15,7 +11,7 @@ struct
   type id = { idx : int }
 
   let initialize path ~logger =
-    Async.Deferred.Result.map (Disk_cache_utils.initialize_dir path ~logger)
+    Async.Deferred.Result.map (Utils.initialize_dir path ~logger)
       ~f:(fun path -> (path, ref 0))
 
   let path root i = root ^ Filename.dir_sep ^ Int.to_string i

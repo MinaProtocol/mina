@@ -14,9 +14,6 @@ let genesis_constants = Genesis_constants.Compiled.genesis_constants
 (* Always run tests with proof-level Full *)
 let proof_level = Genesis_constants.Proof_level.Full
 
-(* The default signature kind for tests is Testnet *)
-let signature_kind = Mina_signature_kind.Testnet
-
 let consensus_constants =
   Consensus.Constants.create ~constraint_constants
     ~protocol_constants:genesis_constants.protocol
@@ -38,8 +35,6 @@ let ledger_depth = constraint_constants.ledger_depth
 let snark_module =
   lazy
     ( module Transaction_snark.Make (struct
-      let signature_kind = Mina_signature_kind.Testnet
-
       let constraint_constants = constraint_constants
 
       let proof_level = proof_level
@@ -108,9 +103,8 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
             in
             let partial_stmt =
               match
-                Ledger.apply_transaction_first_pass ~signature_kind
-                  ~constraint_constants ~global_slot ~txn_state_view:state_view
-                  ledger
+                Ledger.apply_transaction_first_pass ~constraint_constants
+                  ~global_slot ~txn_state_view:state_view ledger
                   (Mina_transaction.Transaction.Command
                      (Zkapp_command zkapp_command) )
               with
@@ -146,7 +140,7 @@ let check_zkapp_command_with_merges_exn ?(logger = logger_null)
            ->
           match
             Or_error.try_with (fun () ->
-                Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
+                Transaction_snark.zkapp_command_witnesses_exn
                   ~constraint_constants ~global_slot ~state_body
                   ~fee_excess:Amount.Signed.zero
                   [ ( `Pending_coinbase_init_stack init_stack
@@ -475,10 +469,8 @@ module Wallet = struct
         ~nonce ~memo ~valid_until:None
         ~body:(Payment { receiver_pk; amount = Amount.of_nanomina_int_exn amt })
     in
-    let signature =
-      Signed_command.sign_payload ~signature_kind fee_payer.private_key payload
-    in
-    Signed_command.check ~signature_kind
+    let signature = Signed_command.sign_payload fee_payer.private_key payload in
+    Signed_command.check
       Signed_command.Poly.Stable.Latest.
         { payload
         ; signer = Public_key.of_private_key_exn fee_payer.private_key
@@ -493,10 +485,8 @@ module Wallet = struct
         ~nonce ~memo ~valid_until:None
         ~body:(Stake_delegation (Set_delegate { new_delegate = delegate_pk }))
     in
-    let signature =
-      Signed_command.sign_payload ~signature_kind fee_payer.private_key payload
-    in
-    Signed_command.check ~signature_kind
+    let signature = Signed_command.sign_payload fee_payer.private_key payload in
+    Signed_command.check
       Signed_command.Poly.Stable.Latest.
         { payload
         ; signer = Public_key.of_private_key_exn fee_payer.private_key
@@ -538,7 +528,6 @@ let check_balance pk balance ledger =
 
 (** Test legacy transactions*)
 let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
-  let signature_kind = Mina_signature_kind.Testnet in
   let open Mina_transaction in
   let to_preunion (t : Transaction.t) =
     match t with
@@ -623,8 +612,8 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
   let expect_snark_failure, applied_transaction =
     match
       Result.( >>= )
-        (Ledger.apply_transaction_first_pass ~signature_kind ledger
-           ~constraint_constants ~global_slot ~txn_state_view txn_unchecked )
+        (Ledger.apply_transaction_first_pass ledger ~constraint_constants
+           ~global_slot ~txn_state_view txn_unchecked )
         (Ledger.apply_transaction_second_pass ledger)
     with
     | Ok res ->
@@ -678,40 +667,36 @@ let test_transaction_union ?expected_failure ?txn_global_slot ledger txn =
           ~constraint_constants txn
         |> Or_error.ok_exn )
   in
-  let k () =
-    Transaction_snark.check_transaction ~constraint_constants ~sok_message
-      ~source_first_pass_ledger ~target_first_pass_ledger
-      ~init_stack:pending_coinbase_stack
-      ~pending_coinbase_stack_state:
-        { Transaction_snark.Pending_coinbase_stack_state.source =
-            pending_coinbase_stack
-        ; target = pending_coinbase_stack_target
-        }
-      ~supply_increase
-      { transaction = txn; block_data = state_body; global_slot }
-      (unstage @@ Sparse_ledger.handler sparse_ledger)
-      ~signature_kind
-  in
-  if expect_snark_failure then
-    match Or_error.try_with k with
-    | Error _ ->
-        ()
-    | Ok _ ->
-        raise
-          (Error.of_string "Expecting an exception but got none" |> Error.to_exn)
-  else k ()
+  match
+    Or_error.try_with (fun () ->
+        Transaction_snark.check_transaction ~constraint_constants ~sok_message
+          ~source_first_pass_ledger ~target_first_pass_ledger
+          ~init_stack:pending_coinbase_stack
+          ~pending_coinbase_stack_state:
+            { Transaction_snark.Pending_coinbase_stack_state.source =
+                pending_coinbase_stack
+            ; target = pending_coinbase_stack_target
+            }
+          ~supply_increase
+          { transaction = txn; block_data = state_body; global_slot }
+          (unstage @@ Sparse_ledger.handler sparse_ledger) )
+  with
+  | Error _e ->
+      assert expect_snark_failure
+  | Ok _ ->
+      assert (not expect_snark_failure)
 
 let test_zkapp_command ?expected_failure ?(memo = Signed_command_memo.empty)
     ?(fee = Currency.Fee.(of_nanomina_int_exn 100)) ~fee_payer_pk ~signers
     ~initialize_ledger ~finalize_ledger zkapp_command =
   let fee_payer : Account_update.Fee_payer.t =
-    Account_update.Fee_payer.make
-      ~body:
+    { body =
         { Account_update.Body.Fee_payer.dummy with
           public_key = fee_payer_pk
         ; fee
         }
-      ~authorization:Signature.dummy
+    ; authorization = Signature.dummy
+    }
   in
   let zkapp_command : Zkapp_command.t =
     Array.fold signers

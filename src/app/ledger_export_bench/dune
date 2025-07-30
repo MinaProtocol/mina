@@ -1,7 +1,5 @@
 (executable
  (name ledger_export_benchmark)
- (package mina_ledger_export_benchmark)
- (public_name mina-ledger-export-benchmark)
  (libraries
   base
   core

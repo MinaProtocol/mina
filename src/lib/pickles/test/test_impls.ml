@@ -1,9 +1,9 @@
-(** Testing
-    -------
+(* Testing
+   -------
 
-    Component: Pickles
-    Subject: Test step and wrap circuits
-    Invocation: dune exec src/lib/pickles/test/test_impls.exe
+   Component: Pickles
+   Subject: Test step and wrap circuits
+   Invocation: dune exec src/lib/pickles/test/main.exe -- test "Impls:"
 *)
 
 let test_step_circuit_behavior () =
@@ -35,15 +35,12 @@ let test_wrap_circuit_behavior () =
   in
   assert ([%equal: string list] str_list expected_list)
 
-let () =
+let tests =
   let open Alcotest in
-  run "Pickles Impls"
-    [ ( "Step"
-      , [ test_case "preserve circuit behavior" `Quick
-            test_step_circuit_behavior
-        ] )
-    ; ( "Wrap"
-      , [ test_case "preserve circuit behavior" `Quick
-            test_wrap_circuit_behavior
-        ] )
-    ]
+  [ ( "Impls:Step"
+    , [ test_case "preserve circuit behavior" `Quick test_step_circuit_behavior
+      ] )
+  ; ( "Impls:Wrap"
+    , [ test_case "preserve circuit behavior" `Quick test_wrap_circuit_behavior
+      ] )
+  ]

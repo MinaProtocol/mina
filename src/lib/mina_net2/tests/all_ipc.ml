@@ -575,7 +575,7 @@ let%test_module "all-ipc test" =
         [%log info] "Shutting down $name"
           ~metadata:[ ("name", `String local_name) ] ;
         let%bind () = shutdown node in
-        Mina_stdlib_unix.File_system.remove_dir conf_dir
+        File_system.remove_dir conf_dir
       in
       return (node, peerid, addr, shutdown)
 

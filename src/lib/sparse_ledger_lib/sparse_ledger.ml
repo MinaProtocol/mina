@@ -345,9 +345,7 @@ let%test_module "sparse-ledger-test" =
     module Account = struct
       module T = struct
         type t =
-          { name : Mina_stdlib.Bounded_types.String.Stable.V1.t
-          ; favorite_number : int
-          }
+          { name : Bounded_types.String.Stable.V1.t; favorite_number : int }
         [@@deriving bin_io, equal, sexp, yojson]
       end
 

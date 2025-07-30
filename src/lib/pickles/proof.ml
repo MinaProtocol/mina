@@ -55,8 +55,7 @@ module Base = struct
               Types.Wrap.Statement.Minimal.Stable.V1.t
           ; prev_evals :
               ( Tick.Field.Stable.V1.t
-              , Tick.Field.Stable.V1.t
-                Mina_stdlib.Bounded_types.ArrayN16.Stable.V1.t )
+              , Tick.Field.Stable.V1.t Bounded_types.ArrayN16.Stable.V1.t )
               Plonk_types.All_evals.Stable.V1.t
           ; proof : Wrap_wire_proof.Stable.V1.t
           }
@@ -91,8 +90,8 @@ module Base = struct
   end
 end
 
-type ('s, 'mlmb) with_data =
-      ('s, 'mlmb) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
+type ('s, 'mlmb, 'c) with_data =
+      ('s, 'mlmb, 'c) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
   | T :
       ( 'mlmb Base.Messages_for_next_proof_over_same_field.Wrap.t
       , ( 's
@@ -104,16 +103,16 @@ type ('s, 'mlmb) with_data =
           Vector.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
       Base.Wrap.t
-      -> ('s, 'mlmb) with_data
+      -> ('s, 'mlmb, _) with_data
 
 module With_data = struct
-  type ('s, 'mlmb) t = ('s, 'mlmb) with_data
+  type ('s, 'mlmb, 'w) t = ('s, 'mlmb, 'w) with_data
 end
 
-type 'mlmb t = (unit, 'mlmb) With_data.t
+type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
 
-let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
-    h t =
+let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
+    (most_recent_width : r Nat.t) ~domain_log2 : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -207,8 +206,8 @@ let dummy (type h r) (h : h Nat.t) (most_recent_width : r Nat.t) ~domain_log2 :
          { ft_eval1 = tick (); evals = ex } )
     }
 
-module Make (MLMB : Nat.Intf) = struct
-  module Max_proofs_verified_at_most = At_most.With_length (MLMB)
+module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
+  module Max_proofs_verified_at_most = At_most.With_length (W)
   module MLMB_vec = Nvector (MLMB)
 
   module Repr = struct
@@ -228,7 +227,7 @@ module Make (MLMB : Nat.Intf) = struct
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
-  type nonrec t = MLMB.n t
+  type nonrec t = (W.n, MLMB.n) t
 
   let to_repr (T { statement; prev_evals; proof }) : Repr.t =
     let lte =
@@ -236,7 +235,7 @@ module Make (MLMB : Nat.Intf) = struct
         (Vector.length
            statement.messages_for_next_step_proof
              .challenge_polynomial_commitments )
-        MLMB.n
+        W.n
     in
     let statement =
       { statement with
@@ -345,7 +344,7 @@ module Make (MLMB : Nat.Intf) = struct
 end
 
 module Proofs_verified_2 = struct
-  module T = Make (Nat.N2)
+  module T = Make (Nat.N2) (Nat.N2)
 
   module Repr = struct
     [%%versioned
@@ -408,7 +407,10 @@ module Proofs_verified_2 = struct
 end
 
 module Proofs_verified_max = struct
-  module T = Make (Side_loaded_verification_key.Width.Max)
+  module T =
+    Make
+      (Side_loaded_verification_key.Width.Max)
+      (Side_loaded_verification_key.Width.Max)
 
   module Repr = struct
     [%%versioned

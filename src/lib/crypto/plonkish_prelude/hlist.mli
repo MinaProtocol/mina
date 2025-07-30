@@ -932,19 +932,18 @@ end
     parameters, but also varies homogeneously over six other type parameters.
     It supports no operations. See {!Hlist0.H1_1}.
 *)
-module H4_6_with_length : sig
+module H4_6 : sig
   module T : functor
     (A : sig
        type (_, _, _, _, _, _, _, _, _, _) t
      end)
     -> sig
-    type ('length, _, _, _, _, 's1, 's2, 's3, 's4, 's5, 's6) t =
-      | [] : (Nat.z, unit, unit, unit, unit, 's1, 's2, 's3, 's4, 's5, 's6) t
+    type (_, _, _, _, 's1, 's2, 's3, 's4, 's5, 's6) t =
+      | [] : (unit, unit, unit, unit, 's1, 's2, 's3, 's4, 's5, 's6) t
       | ( :: ) :
           ('a1, 'a2, 'a3, 'a4, 's1, 's2, 's3, 's4, 's5, 's6) A.t
-          * ('length, 'b1, 'b2, 'b3, 'b4, 's1, 's2, 's3, 's4, 's5, 's6) t
-          -> ( 'length Nat.s
-             , 'a1 * 'b1
+          * ('b1, 'b2, 'b3, 'b4, 's1, 's2, 's3, 's4, 's5, 's6) t
+          -> ( 'a1 * 'b1
              , 'a2 * 'b2
              , 'a3 * 'b3
              , 'a4 * 'b4
@@ -957,8 +956,7 @@ module H4_6_with_length : sig
              t
 
     val length :
-         ('length, 't1, 't2, 't3, 't4, 'e1, 'e2, 'e3, 'e4, 'e5, 'e6) t
-      -> 'length Nat.t * ('t1, 'length) Length.t
+      ('t1, 't2, 't3, 't4, 'e1, 'e2, 'e3, 'e4, 'e5, 'e6) t -> 't1 Length.n
   end
 end
 

@@ -18,11 +18,11 @@ let Size = ../../Command/Size.dhall
 
 let Network = ../../Constants/Network.dhall
 
+let Profiles = ../../Constants/Profiles.dhall
+
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Dockers = ../../Constants/DockerVersions.dhall
-
-let Profiles = ../../Constants/Profiles.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
@@ -34,16 +34,14 @@ let Spec =
           , additionalDirtyWhen : List S.Type
           , softFail : B/SoftFail
           , timeout : Natural
-          , profile : Profiles.Type
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
-          , network = Network.Type.Devnet
+          , network = Network.Type.Berkeley
           , mode = PipelineMode.Type.Stable
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
-          , timeout = 1000
-          , profile = Profiles.Type.Devnet
+          , timeout = 900
           }
       }
 
@@ -69,13 +67,12 @@ let command
             , target = Size.XLarge
             , soft_fail = Some spec.softFail
             , depends_on =
-                Dockers.dependsOn
-                  Dockers.DepsSpec::{
-                  , codename = spec.dockerType
-                  , network = spec.network
-                  , artifact = Artifacts.Type.Rosetta
-                  , profile = spec.profile
-                  }
+                Dockers.dependsOnStep
+                  spec.dockerType
+                  "MinaArtifactMainnet"
+                  (Some spec.network)
+                  Profiles.Type.Standard
+                  Artifacts.Type.Rosetta
             }
 
 let pipeline

@@ -1,10 +1,10 @@
-(** Testing
-    -------
+(* Testing
+   -------
 
-    Component: Pickles
-    Subject: Test Plonk curve operations
-    Invocation: \
-     dune exec src/lib/pickles/test/test_plonk_curve.exe
+   Component: Pickles
+   Subject: Test Plonk curve operations
+   Invocation: \
+    dune exec src/lib/pickles/test/main.exe -- test "Plonk curve operations"
 *)
 
 module Test_make
@@ -95,6 +95,7 @@ module Wrap =
 module Step =
   Test_make (Pickles__Impls.Step) (Pickles__Step_main_inputs.Inner_curve)
 
-let () =
-  let open Alcotest in
-  run "Plonk curve operations" [ ("Wrap", Wrap.tests); ("Step", Step.tests) ]
+let tests =
+  [ ("Plonk curve operations:Wrap", Wrap.tests)
+  ; ("Plonk curve operations:Step", Step.tests)
+  ]

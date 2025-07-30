@@ -103,7 +103,7 @@ let compute_block_trace_metadata transition_with_validation =
     ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
     ]
 
-let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
+let build ?skip_staged_ledger_verification ~proof_cache_db ~logger
     ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~get_completed_work ~sender ~transition_receipt_time () =
@@ -121,12 +121,12 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
       let open Deferred.Let_syntax in
       match%bind
         Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
-          ~get_completed_work ~logger ~precomputed_values ~verifier
-          ~parent_staged_ledger:(staged_ledger parent)
+          ~proof_cache_db ~get_completed_work ~logger ~precomputed_values
+          ~verifier ~parent_staged_ledger:(staged_ledger parent)
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header
             |> Mina_block.Header.protocol_state )
-          ?transaction_pool_proxy transition_with_validation
+          transition_with_validation
       with
       | Ok
           ( `Just_emitted_a_proof just_emitted_a_proof
@@ -283,6 +283,8 @@ module For_tests = struct
   open Currency
   open Signature_lib
 
+  let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
      user if they have at least one coin*)
@@ -338,8 +340,7 @@ module For_tests = struct
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:(Payment { receiver_pk; amount = send_amount })
         in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
-        Signed_command.sign ~signature_kind sender_keypair payload )
+        Signed_command.sign sender_keypair payload )
 
   let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier
@@ -377,9 +378,9 @@ module For_tests = struct
              { fee = Fee.of_nanomina_int_exn 1
              ; proofs =
                  One_or_two.map stmts ~f:(fun statement ->
-                     Ledger_proof.Cached.create ~statement
+                     Ledger_proof.create ~statement
                        ~sok_digest:Sok_message.Digest.default
-                       ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
+                       ~proof:(Lazy.force Proof.transaction_dummy) )
              ; prover
              } )
       in
@@ -420,8 +421,8 @@ module For_tests = struct
                , `Pending_coinbase_update _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
-            ~global_slot:current_global_slot ~coinbase_receiver ~logger
-            staged_ledger_diff
+            ~proof_cache_db ~global_slot:current_global_slot ~coinbase_receiver
+            ~logger staged_ledger_diff
             ~constraint_constants:precomputed_values.constraint_constants
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
             ~zkapp_cmd_limit_hardcap:
@@ -454,8 +455,9 @@ module For_tests = struct
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
           ~staged_ledger_hash ~genesis_ledger_hash
           ~body_reference:
-            ( Body.compute_reference ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
-            @@ Body.read_all_proofs_from_disk body )
+            (Body.compute_reference
+               ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+               body )
           ~ledger_proof_statement
       in
       let previous_state_hashes =
@@ -502,8 +504,9 @@ module For_tests = struct
       in
       let transition_receipt_time = Some (Time.now ()) in
       match%map
-        build ~logger ~precomputed_values ~trust_system ~verifier
-          ~get_completed_work:(Fn.const None) ~parent:parent_breadcrumb
+        build ~proof_cache_db ~logger ~precomputed_values ~trust_system
+          ~verifier ~get_completed_work:(Fn.const None)
+          ~parent:parent_breadcrumb
           ~transition:
             ( next_block |> Mina_block.Validated.remember
             |> Validation.reset_staged_ledger_diff_validation )

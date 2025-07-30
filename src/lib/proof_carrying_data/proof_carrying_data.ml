@@ -12,5 +12,3 @@ module Stable = struct
 end]
 
 let map { data; proof } ~f = { data = f data; proof }
-
-let map_proof { data; proof } ~f = { data; proof = f proof }

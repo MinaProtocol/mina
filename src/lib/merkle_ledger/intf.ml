@@ -1,5 +1,3 @@
-open Core_kernel
-
 module type LOCATION = sig
   module Addr : module type of Merkle_address
 
@@ -24,7 +22,7 @@ module type LOCATION = sig
 
   val root_hash : t
 
-  val last_direction : Addr.t -> Mina_stdlib.Direction.t
+  val last_direction : Addr.t -> Direction.t
 
   val build_generic : Bigstring.t -> t
 
@@ -46,7 +44,7 @@ module type LOCATION = sig
 
   val order_siblings : t -> 'a -> 'a -> 'a * 'a
 
-  val merkle_path_dependencies_exn : t -> (t * Mina_stdlib.Direction.t) list
+  val merkle_path_dependencies_exn : t -> (t * Direction.t) list
 
   include Comparable.S with type t := t
 end
@@ -229,6 +227,8 @@ module type SYNCABLE = sig
   val merkle_path_at_addr_exn : t -> addr -> path
 
   val get_inner_hash_at_addr_exn : t -> addr -> hash
+
+  val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
 
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
@@ -473,7 +473,7 @@ module Ledger = struct
   module type DATABASE = sig
     include S
 
-    val create : ?directory_name:string -> ?fresh:bool -> depth:int -> unit -> t
+    val create : ?directory_name:string -> depth:int -> unit -> t
 
     (** create_checkpoint would create the checkpoint and open a db connection to that checkpoint *)
     val create_checkpoint : t -> directory_name:string -> unit -> t

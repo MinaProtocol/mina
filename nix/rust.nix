@@ -2,20 +2,15 @@
 final: prev:
 let
   rustPlatformFor = rust:
-    let
-      rustWithTargetPlatforms = rust // {
-        # Ensure compatibility with nixpkgs >= 24.11
-        targetPlatforms = final.lib.platforms.all;
-        badTargetPlatforms = [ ];
-      };
-    in prev.makeRustPlatform {
-      cargo = rustWithTargetPlatforms;
-      rustc = rustWithTargetPlatforms;
+    prev.makeRustPlatform {
+      cargo = rust;
+      rustc = rust;
+      # override stdenv.targetPlatform here, if necessary
     };
   toolchainHashes = {
-    "1.81.0" = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
-    "nightly-2024-09-05" =
-      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
+    "1.72" = "sha256-dxE7lmCFWlq0nl/wKcmYvpP9zqQbBitAQgZ1zx9Ooik=";
+    "nightly-2023-09-01" =
+      "sha256-zek9JAnRaoX8V0U2Y5ssXVe9tvoQ0ERGXfUCUGYdrMA=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -91,35 +86,6 @@ in {
     };
     # FIXME: tests fail
     doCheck = false;
-    dontUpdateAutotoolsGnuConfigScripts = true;
-  };
-
-  kimchi_stubs_static_lib = let
-    toolchain = rustChannelFromToolchainFileOf
-      # Using the same toolchain which is used by the local stubs crate
-      ../src/lib/crypto/kimchi_bindings/stubs/rust-toolchain.toml;
-    rust_platform = rustPlatformFor toolchain.rust;
-  in rust_platform.buildRustPackage {
-    pname = "kimchi_stubs_static_lib";
-    version = "0.1.0";
-    src = final.lib.sourceByRegex ../src
-      [ "^lib(/crypto(/proof-systems(/.*)?)?)?$" ];
-    sourceRoot = "source/lib/crypto/proof-systems";
-    nativeBuildInputs = [ final.ocamlPackages_mina.ocaml ];
-    buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
-    cargoLock = let fixupLockFile = path: builtins.readFile path;
-    in {
-      lockFileContents =
-        fixupLockFile ../src/lib/crypto/proof-systems/Cargo.lock;
-    };
-    buildPhase = ''
-      cargo build -p kimchi-stubs --release --lib
-    '';
-    installPhase = ''
-      mkdir -p $out/lib
-      cp target/release/libkimchi_stubs.a $out/lib/
-    '';
-    doCheck = false;
   };
 
   kimchi-rust = rustChannelFromToolchainFileOf
@@ -140,12 +106,12 @@ in {
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
   kimchi-rust-std-deps = final.rustPlatform.importCargoLock {
     lockFile = final.runCommand "cargo.lock" { } ''
-      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/library/Cargo.lock $out
+      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/Cargo.lock $out
     '';
   };
 
   plonk_wasm = let
-    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
+    lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -159,10 +125,10 @@ in {
       version = deps.wasm-bindgen.version;
       src = final.fetchCrate {
         inherit pname version;
-        sha256 = "sha256-IPxP68xtNSpwJjV2yNMeepAS0anzGl02hYlSTvPocz8=";
+        sha256 = "sha256-0u9bl+FkXEK2b54n7/l9JOCtKo+pb42GF9E1EnAUQa0=";
       };
 
-      cargoHash = "sha256-pBeQaG6i65uJrJptZQLuIaCb/WCQMhba1Z1OhYqA8Zc=";
+      cargoSha256 = "sha256-AsZBtE2qHJqQtuCt/wCAgOoxYMfvDh8IzBPAOkYSYko=";
       nativeBuildInputs = [ final.pkg-config ];
 
       buildInputs = with final;
@@ -185,7 +151,7 @@ in {
       "^lib(/crypto(/kimchi_bindings(/wasm(/.*)?)?)?)?$"
       "^lib(/crypto(/proof-systems(/.*)?)?)?$"
     ];
-    sourceRoot = "source/lib/crypto/proof-systems";
+    sourceRoot = "source/lib/crypto/kimchi_bindings/wasm";
     nativeBuildInputs = [ final.wasm-pack wasm-bindgen-cli ];
     buildInputs = with final; lib.optional stdenv.isDarwin libiconv;
     cargoLock.lockFile = lock;
@@ -211,9 +177,9 @@ in {
       runHook preBuild
       (
       set -x
-      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
+      export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--no-check-features -C link-arg=--max-memory=4294967296"
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs
+      wasm-pack build --mode no-install --target web --out-dir $out/web ./.
       )
       runHook postBuild
     '';

@@ -1,7 +1,5 @@
-let verify_functions ~constraint_constants ~proof_level ~signature_kind () =
+let verify_functions ~constraint_constants ~proof_level () =
   let module T = Transaction_snark.Make (struct
-    let signature_kind = signature_kind
-
     let constraint_constants = constraint_constants
 
     let proof_level = proof_level

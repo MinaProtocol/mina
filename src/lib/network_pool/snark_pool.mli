@@ -24,9 +24,8 @@ module type S = sig
   include
     Intf.Network_pool_base_intf
       with type resource_pool := Resource_pool.t
-       and type resource_pool_diff :=
-        Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
-       and type resource_pool_diff_verified := Resource_pool.Diff.Cached.t
+       and type resource_pool_diff := Resource_pool.Diff.t
+       and type resource_pool_diff_verified := Resource_pool.Diff.verified
        and type transition_frontier := transition_frontier
        and type config := Resource_pool.Config.t
        and type transition_frontier_diff :=
@@ -81,22 +80,14 @@ include S with type transition_frontier := Transition_frontier.t
 module Diff_versioned : sig
   [%%versioned:
   module Stable : sig
-    [@@@no_toplevel_latest_type]
-
     module V2 : sig
-      type t = Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t =
+      type t = Resource_pool.Diff.t =
         | Add_solved_work of
             Transaction_snark_work.Statement.Stable.V2.t
             * Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving equal]
+      [@@deriving compare, hash]
     end
   end]
-
-  type t = Resource_pool.Diff.Cached.t =
-    | Add_solved_work of
-        Transaction_snark_work.Statement.t
-        * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
-    | Empty
 end

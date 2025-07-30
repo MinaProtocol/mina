@@ -20,7 +20,6 @@ MAIN_DELAY="${MAIN_DELAY:-20}"
 FORK_DELAY="${FORK_DELAY:-10}"
 
 # script should be run from mina root directory.
-# shellcheck disable=SC1090
 source "$SCRIPT_DIR"/test-helper.sh
 
 # Executable built off mainnet branch
@@ -39,8 +38,7 @@ stop_nodes(){
 # 1. Node is started
 NOW_UNIX_TS=$(date +%s)
 MAIN_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + MAIN_DELAY*60))
-GENESIS_TIMESTAMP="$(date -u -d @$MAIN_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00')"
-export GENESIS_TIMESTAMP
+export GENESIS_TIMESTAMP="$(date -u -d @$MAIN_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00')"
 "$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
   -s "$MAIN_SLOT" --slot-tx-end "$SLOT_TX_END" --slot-chain-end "$SLOT_CHAIN_END" &
 
@@ -139,21 +137,21 @@ fi
 function find_staking_hash(){
   e=$1
   if [[ $e == 0 ]]; then
-    echo "$genesis_epoch_staking_hash"
+    echo $genesis_epoch_staking_hash
   elif [[ $e == 1 ]]; then
-    echo "$genesis_epoch_next_hash"
+    echo $genesis_epoch_next_hash
   else
     ix=0
     e_=$((e-2))
     for el in "${epochs[@]}"; do
-      [[ "$el" == "$e_" ]] && break
+      [[ "$el" == $e_ ]] && break
       ix=$((ix+1))
     done
-    if [[ $ix == "${#epochs[@]}" ]]; then
+    if [[ $ix == ${#epochs[@]} ]]; then
       echo "Assertion failed: last snarked ledger for epoch $e_ wasn't captured" >&2
       exit 3
     fi
-    echo "${last_snarked_hash_pe[$ix]}"
+    echo ${last_snarked_hash_pe[$ix]}
   fi
 }
 
@@ -184,8 +182,7 @@ mkdir localnet/hf_ledgers
 
 NOW_UNIX_TS=$(date +%s)
 FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
-GENESIS_TIMESTAMP="$( date -u -d @$FORK_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00' )"
-export GENESIS_TIMESTAMP
+export GENESIS_TIMESTAMP="$( date -u -d @$FORK_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00' )"
 FORKING_FROM_CONFIG_JSON=localnet/config/base.json SECONDS_PER_SLOT="$MAIN_SLOT" FORK_CONFIG_JSON=localnet/fork_config.json LEDGER_HASHES_JSON=localnet/hf_ledger_hashes.json "$SCRIPT_DIR"/create_runtime_config.sh > localnet/config.json
 
 expected_genesis_slot=$(((FORK_GENESIS_UNIX_TS-MAIN_GENESIS_UNIX_TS)/MAIN_SLOT))

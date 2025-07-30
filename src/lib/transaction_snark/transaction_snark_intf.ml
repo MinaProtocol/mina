@@ -62,8 +62,7 @@ module type Full = sig
   end
 
   val check_transaction :
-       signature_kind:Mina_signature_kind.t
-    -> ?preeval:bool
+       ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
@@ -76,8 +75,7 @@ module type Full = sig
     -> unit
 
   val check_user_command :
-       signature_kind:Mina_signature_kind.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
     -> target_first_pass_ledger:Frozen_ledger_hash.t
@@ -89,8 +87,7 @@ module type Full = sig
     -> unit
 
   val generate_transaction_witness :
-       signature_kind:Mina_signature_kind.t
-    -> ?preeval:bool
+       ?preeval:bool
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> sok_message:Sok_message.t
     -> source_first_pass_ledger:Frozen_ledger_hash.t
@@ -187,8 +184,7 @@ module type Full = sig
       logic without an exception.
    *)
   val zkapp_command_witnesses_exn :
-       signature_kind:Mina_signature_kind.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
     -> global_slot:Mina_numbers.Global_slot_since_genesis.t
     -> state_body:Transaction_protocol_state.Block_data.t
     -> fee_excess:Currency.Amount.Signed.t
@@ -207,16 +203,13 @@ module type Full = sig
        list
 
   module Make (Inputs : sig
-    val signature_kind : Mina_signature_kind.t
-
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val proof_level : Genesis_constants.Proof_level.t
   end) : S
 
   val constraint_system_digests :
-       signature_kind:Mina_signature_kind.t
-    -> constraint_constants:Genesis_constants.Constraint_constants.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
     -> unit
     -> (string * Md5.t) list
 
@@ -259,8 +252,7 @@ module type Full = sig
 
     module Zkapp_command_snark : sig
       val main :
-           signature_kind:Mina_signature_kind.t
-        -> ?witness:Zkapp_command_segment.Witness.t
+           ?witness:Zkapp_command_segment.Witness.t
         -> Zkapp_command_segment.Spec.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> Statement.With_sok.var
@@ -302,10 +294,8 @@ module type Full = sig
         ; zkapp_account_keypair : Signature_lib.Keypair.t
         ; memo : Signed_command_memo.t
         ; update : Account_update.Update.t
-        ; actions :
-            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events :
-            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         }
     end
@@ -316,12 +306,14 @@ module type Full = sig
            , unit
            , unit
            , Zkapp_statement.t
-           , (unit * unit * Nat.N2.n Pickles.Proof.t) Async.Deferred.t )
+           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+             Async.Deferred.t )
            Pickles.Prover.t
            * ( Pickles.Side_loaded.Verification_key.t
              , Snark_params.Tick.Field.t )
              With_hash.t
              Async.Deferred.t
+      -> chain:Mina_signature_kind.t
       -> constraint_constants:Genesis_constants.Constraint_constants.t
       -> Single_account_update_spec.t
       -> Zkapp_command.t Async.Deferred.t
@@ -340,10 +332,8 @@ module type Full = sig
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
         ; current_auth : Permissions.Auth_required.t
-        ; actions :
-            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events :
-            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         }
@@ -357,7 +347,8 @@ module type Full = sig
            , unit
            , unit
            , Zkapp_statement.t
-           , (unit * unit * Nat.N2.n Pickles.Proof.t) Async.Deferred.t )
+           , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+             Async.Deferred.t )
            Pickles.Prover.t
            * ( Pickles.Side_loaded.Verification_key.t
              , Snark_params.Tick.Field.t )
@@ -399,43 +390,9 @@ module type Full = sig
               , unit
               , unit
               , Zkapp_statement.t
-              , (unit * unit * Nat.N2.n Pickles.Proof.t) Async.Deferred.t )
+              , (unit * unit * (Nat.N2.n, Nat.N2.n) Pickles.Proof.t)
+                Async.Deferred.t )
               Pickles.Prover.t ]
-
-    module Signature_transfers_spec : sig
-      type t =
-        { fee : Currency.Fee.t
-        ; sender : Signature_lib.Keypair.t * Mina_base.Account.Nonce.t
-        ; fee_payer :
-            (Signature_lib.Keypair.t * Mina_base.Account.Nonce.t) option
-        ; receivers :
-            ( ( Signature_lib.Keypair.t
-              , Signature_lib.Public_key.Compressed.t )
-              Either.t
-            * Currency.Amount.t )
-            list
-        ; amount : Currency.Amount.t
-        ; zkapp_account_keypairs : Signature_lib.Keypair.t list
-        ; memo : Signed_command_memo.t
-        ; new_zkapp_account : bool
-        ; snapp_update : Account_update.Update.t
-              (* Authorization for the update being performed *)
-        ; actions :
-            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events :
-            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
-        ; transfer_parties_get_actions_events : bool
-        ; call_data : Tick.Field.t
-        ; preconditions : Account_update.Preconditions.t option
-        }
-      [@@deriving sexp]
-    end
-
-    val signature_transfers :
-         ?receiver_auth:Control.Tag.t
-      -> constraint_constants:Genesis_constants.Constraint_constants.t
-      -> Signature_transfers_spec.t
-      -> Zkapp_command.t
 
     module Multiple_transfers_spec : sig
       type t =
@@ -451,10 +408,8 @@ module type Full = sig
         ; new_zkapp_account : bool
         ; snapp_update : Account_update.Update.t
               (* Authorization for the update being performed *)
-        ; actions :
-            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
-        ; events :
-            Tick.Field.t Mina_stdlib.Bounded_types.ArrayN4000.Stable.V1.t list
+        ; actions : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
+        ; events : Tick.Field.t Bounded_types.ArrayN4000.Stable.V1.t list
         ; call_data : Tick.Field.t
         ; preconditions : Account_update.Preconditions.t option
         }

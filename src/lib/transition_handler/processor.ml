@@ -23,6 +23,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -105,8 +107,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
 
 let process_transition ~context:(module Context : CONTEXT) ~trust_system
     ~verifier ~get_completed_work ~frontier ~catchup_scheduler
-    ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb
-    ?transaction_pool_proxy =
+    ~processed_transition_writer ~time_controller ~block_or_header ~valid_cb =
   let is_block_in_frontier =
     Fn.compose Option.is_some @@ Transition_frontier.find frontier
   in
@@ -222,7 +223,7 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
             | ( _
               , _
               , _
-              , (`Delta_block_chain, Mina_stdlib.Truth.True delta_state_hashes)
+              , (`Delta_block_chain, Truth.True delta_state_hashes)
               , _
               , _
               , _ ) ->
@@ -246,11 +247,11 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       let%bind breadcrumb =
         cached_transform_deferred_result cached_initially_validated_transition
           ~transform_cached:(fun _ ->
-            Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-              ~verifier ~get_completed_work ~trust_system
+            Transition_frontier.Breadcrumb.build ~proof_cache_db ~logger
+              ~precomputed_values ~verifier ~get_completed_work ~trust_system
               ~transition_receipt_time ~sender:(Some sender)
               ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-              ?transaction_pool_proxy (* TODO: Can we skip here? *) () )
+              (* TODO: Can we skip here? *) () )
           ~transform_result:(function
             | Error (`Invalid_staged_ledger_hash error)
             | Error (`Invalid_staged_ledger_diff error) ->
@@ -304,24 +305,24 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~(catchup_breadcrumbs_reader :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
-         Mina_stdlib.Rose_tree.t
+         Rose_tree.t
          list
        * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ] )
        Reader.t )
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
-         Mina_stdlib.Rose_tree.t
+         Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
        , unit )
-       Writer.t ) ~processed_transition_writer ?transaction_pool_proxy =
+       Writer.t ) ~processed_transition_writer =
   let open Context in
   let catchup_scheduler =
-    Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
-      ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
-      ~clean_up_signal:clean_up_catchup_scheduler
+    Catchup_scheduler.create ~proof_cache_db ~logger ~precomputed_values
+      ~verifier ~trust_system ~frontier ~time_controller ~catchup_job_writer
+      ~catchup_breadcrumbs_writer ~clean_up_signal:clean_up_catchup_scheduler
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
@@ -361,7 +362,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   ( match%map
                       Deferred.Or_error.List.iter breadcrumb_subtrees
                         ~f:(fun subtree ->
-                          Mina_stdlib.Rose_tree.Deferred.Or_error.iter
+                          Rose_tree.Deferred.Or_error.iter
                             subtree
                             (* It could be the case that by the time we try and
                                * add the breadcrumb, it's no longer relevant when
@@ -391,7 +392,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       ()
                   | Error err ->
                       List.iter breadcrumb_subtrees ~f:(fun tree ->
-                          Mina_stdlib.Rose_tree.iter tree
+                          Rose_tree.iter tree
                             ~f:(fun (cached_breadcrumb, _vc) ->
                               let (_ : Transition_frontier.Breadcrumb.t) =
                                 Cached.invalidate_with_failure cached_breadcrumb
@@ -459,8 +460,7 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
                       Transition_frontier_controller.transitions_being_processed)
               | `Partially_valid_transition (block_or_header, `Valid_cb valid_cb)
                 ->
-                  process_transition ~block_or_header ~valid_cb
-                    ?transaction_pool_proxy ) ) )
+                  process_transition ~block_or_header ~valid_cb ) ) )
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
@@ -511,6 +511,8 @@ let%test_module "Transition_handler.Processor tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
     end
 
     let downcast_breadcrumb breadcrumb =
@@ -565,7 +567,7 @@ let%test_module "Transition_handler.Processor tests" =
                   ~primary_transition_reader:valid_transition_reader
                   ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-                  ~processed_transition_writer ?transaction_pool_proxy:None ;
+                  ~processed_transition_writer ;
                 List.iter branch ~f:(fun breadcrumb ->
                     let b =
                       downcast_breadcrumb breadcrumb

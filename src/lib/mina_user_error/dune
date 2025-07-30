@@ -1,0 +1,8 @@
+(library
+ (name mina_user_error)
+ (public_name mina_user_error)
+ (libraries base)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version)))

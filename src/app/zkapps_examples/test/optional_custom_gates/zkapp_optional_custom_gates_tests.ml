@@ -31,6 +31,7 @@ struct
 
   let tag, _cache_handle, proof, Pickles.Provers.[ prove ] =
     Zkapps_examples.compile ~auxiliary_typ:Typ.unit
+      ~branches:(module Nat.N1)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"custom gates"
       ~choices:(fun ~self:_ ->
@@ -96,7 +97,7 @@ let%test_module "Zkapp with optional custom gates" =
       let account_updates =
         []
         |> Zkapp_command.Call_forest.cons_tree account_update
-        |> Zkapp_command.Call_forest.cons ~signature_kind
+        |> Zkapp_command.Call_forest.cons
              (Zkapps_examples.Deploy_account_update.full ~access:Either
                 Account_info.public_key Account_info.token_id vk )
       in

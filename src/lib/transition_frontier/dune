@@ -3,10 +3,19 @@
  (public_name transition_frontier)
  (libraries
   ;;opam libraries
+  core_kernel.uuid
   async_unix
   integers
+  base.caml
+  sexplib0
   async
   core
+  core_kernel
+  async_kernel
+  bin_prot.shape
+  base.base_internalhash_types
+  result
+  core.uuid
   ;;local libraries
   o1trace
   mina_metrics
@@ -37,7 +46,7 @@
   block_time
   trust_system
   with_hash
-  mina_stdlib
+  rose_tree
   quickcheck_lib
   protocol_version
   mina_net2

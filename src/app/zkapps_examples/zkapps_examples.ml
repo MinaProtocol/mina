@@ -31,7 +31,16 @@ module Account_update_under_construction = struct
             ; nonce = Ignore
             ; receipt_chain_hash = Ignore
             ; delegate = Ignore
-            ; state = Zkapp_state.V.init ~f:(const Zkapp_basic.Or_ignore.Ignore)
+            ; state =
+                [ Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ; Ignore
+                ]
             ; action_state = Ignore
             ; proved_state = Ignore
             ; is_new = Ignore
@@ -69,7 +78,7 @@ module Account_update_under_construction = struct
       type t = { app_state : Field.t option Zkapp_state.V.t }
 
       let create () =
-        { app_state = Mina_base.Zkapp_state.V.init ~f:(const None) }
+        { app_state = [ None; None; None; None; None; None; None; None ] }
 
       let to_zkapp_command_update ({ app_state } : t) :
           Account_update.Update.Checked.t =
@@ -85,9 +94,7 @@ module Account_update_under_construction = struct
         let default =
           var_of_t
             (Account_update.Update.typ ())
-            { app_state =
-                Mina_base.Zkapp_state.V.init
-                  ~f:(const Zkapp_basic.Set_or_keep.Keep)
+            { app_state = [ Keep; Keep; Keep; Keep; Keep; Keep; Keep; Keep ]
             ; delegate = Keep
             ; verification_key = Keep
             ; permissions = Keep
@@ -110,14 +117,24 @@ module Account_update_under_construction = struct
         { default with app_state }
 
       let set_full_state app_state (_t : t) =
-        { app_state =
-            Pickles_types.Vector.map ~f:(fun a -> Some a)
-            @@ Zkapp_state.V.of_list_exn app_state
-        }
+        match app_state with
+        | [ a0; a1; a2; a3; a4; a5; a6; a7 ] ->
+            { app_state =
+                [ Some a0
+                ; Some a1
+                ; Some a2
+                ; Some a3
+                ; Some a4
+                ; Some a5
+                ; Some a6
+                ; Some a7
+                ]
+            }
+        | _ ->
+            failwith "Incorrect length of app_state"
 
       let set_state i value (t : t) =
-        if i < 0 || i >= Zkapp_state.max_size_int then
-          failwith "Incorrect index" ;
+        if i < 0 || i >= 8 then failwith "Incorrect index" ;
         { app_state =
             Pickles_types.Vector.mapi t.app_state ~f:(fun j old_value ->
                 if i = j then Some value else old_value )
@@ -209,7 +226,6 @@ module Account_update_under_construction = struct
 
     let to_account_update_and_calls (t : t) :
         Account_update.Body.Checked.t * Zkapp_call_forest.Checked.t =
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       (* TODO: Don't do this. *)
       let var_of_t (type var value) (typ : (var, value) Typ.t) (x : value) : var
           =
@@ -285,8 +301,7 @@ module Account_update_under_construction = struct
         | Rev_calls rev_calls ->
             List.fold_left ~init:(Zkapp_call_forest.Checked.empty ()) rev_calls
               ~f:(fun acc (account_update, calls) ->
-                Zkapp_call_forest.Checked.push ~signature_kind ~account_update
-                  ~calls acc )
+                Zkapp_call_forest.Checked.push ~account_update ~calls acc )
         | Calls calls ->
             calls
       in
@@ -471,7 +486,6 @@ type return_type =
 
 let to_account_update (account_update : account_update) :
     Zkapp_statement.Checked.t * return_type Prover_value.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   dummy_constraints () ;
   let account_update, calls =
     Account_update_under_construction.In_circuit.to_account_update_and_calls
@@ -479,7 +493,7 @@ let to_account_update (account_update : account_update) :
   in
   let account_update_digest =
     Zkapp_command.Call_forest.Digest.Account_update.Checked.create
-      ~signature_kind account_update
+      account_update
   in
   let public_output : Zkapp_statement.Checked.t =
     { account_update = (account_update_digest :> Field.t)
@@ -514,8 +528,6 @@ let wrap_main ~public_key ?token_id ?may_use_token f
   ; auxiliary_output
   }
 
-let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
-
 let compile :
     type auxiliary_var auxiliary_value prev_varss prev_valuess widthss heightss max_proofs_verified branches.
        ?self:
@@ -529,6 +541,7 @@ let compile :
     -> ?disk_keys:(_, branches) Vector.t * _
     -> ?override_wrap_domain:_
     -> auxiliary_typ:(auxiliary_var, auxiliary_value) Typ.t
+    -> branches:(module Nat.Intf with type n = branches)
     -> max_proofs_verified:
          (module Nat.Add.Intf with type n = max_proofs_verified)
     -> name:string
@@ -539,8 +552,7 @@ let compile :
                , max_proofs_verified
                , branches )
                Pickles.Tag.t
-          -> ( branches
-             , prev_varss
+          -> ( prev_varss
              , prev_valuess
              , widthss
              , heightss
@@ -550,7 +562,7 @@ let compile :
              , unit (* TODO: Remove? *)
              , auxiliary_var
              , auxiliary_value )
-             H4_6_with_length.T(Pickles.Inductive_rule).t )
+             H4_6.T(Pickles.Inductive_rule).t )
     -> unit
     -> ( Zkapp_statement.Checked.t
        , Zkapp_statement.t
@@ -559,7 +571,9 @@ let compile :
        Pickles.Tag.t
        * _
        * (module Pickles.Proof_intf
-            with type t = max_proofs_verified Pickles.Proof.t
+            with type t = ( max_proofs_verified
+                          , max_proofs_verified )
+                          Pickles.Proof.t
              and type statement = Zkapp_statement.t )
        * ( prev_valuess
          , widthss
@@ -573,13 +587,12 @@ let compile :
            Deferred.t )
          H3_2.T(Pickles.Prover).t =
  fun ?self ?cache ?proof_cache ?disk_keys ?override_wrap_domain ~auxiliary_typ
-     ~max_proofs_verified ~name ~choices () ->
+     ~branches ~max_proofs_verified ~name ~choices () ->
   let vk_hash = ref None in
   let choices ~self =
     let rec go :
-        type branches prev_varss prev_valuess widthss heightss.
-           ( branches
-           , prev_varss
+        type prev_varss prev_valuess widthss heightss.
+           ( prev_varss
            , prev_valuess
            , widthss
            , heightss
@@ -589,9 +602,8 @@ let compile :
            , unit
            , auxiliary_var
            , auxiliary_value )
-           H4_6_with_length.T(Pickles.Inductive_rule).t
-        -> ( branches
-           , prev_varss
+           H4_6.T(Pickles.Inductive_rule).t
+        -> ( prev_varss
            , prev_valuess
            , widthss
            , heightss
@@ -601,7 +613,7 @@ let compile :
            , Zkapp_statement.t
            , return_type Prover_value.t * auxiliary_var
            , return_type * auxiliary_value )
-           H4_6_with_length.T(Pickles.Inductive_rule.Deferred).t = function
+           H4_6.T(Pickles.Inductive_rule.Deferred).t = function
       | [] ->
           []
       | { identifier; prevs; main; feature_flags } :: choices ->
@@ -636,7 +648,7 @@ let compile :
     Pickles.compile_async () ?self ?cache ?proof_cache ?disk_keys
       ?override_wrap_domain ~public_input:(Output Zkapp_statement.typ)
       ~auxiliary_typ:Typ.(Prover_value.typ () * auxiliary_typ)
-      ~max_proofs_verified ~name ~choices
+      ~branches ~max_proofs_verified ~name ~choices
   in
   let () =
     vk_hash :=
@@ -654,7 +666,7 @@ let compile :
            , unit
            , ( Zkapp_statement.t
              * (return_type * auxiliary_value)
-             * max_proofs_verified Pickles.Proof.t )
+             * (max_proofs_verified, max_proofs_verified) Pickles.Proof.t )
              Deferred.t )
            H3_2.T(Pickles.Prover).t
         -> ( prev_valuess
@@ -680,11 +692,9 @@ let compile :
               prover ?handler ()
             in
             let account_update : Account_update.t =
-              Account_update.with_aux ~body:account_update
-                ~authorization:
-                  (Control.Poly.Proof
-                     ( Proof_cache_tag.write_proof_to_disk proof_cache_db
-                     @@ Pickles.Side_loaded.Proof.of_proof proof ) )
+              { body = account_update
+              ; authorization = Proof (Pickles.Side_loaded.Proof.of_proof proof)
+              }
             in
             ( { Zkapp_command.Call_forest.Tree.account_update
               ; account_update_digest
@@ -770,14 +780,13 @@ module Deploy_account_update = struct
 
   let full ?balance_change ?access public_key token_id vk : Account_update.t =
     (* TODO: This is a pain. *)
-    Account_update.with_aux
-      ~body:(body ?balance_change ?access public_key token_id vk)
-      ~authorization:(Control.Poly.Signature Signature.dummy)
+    { body = body ?balance_change ?access public_key token_id vk
+    ; authorization = Signature Signature.dummy
+    }
 end
 
 let insert_signatures pk_compressed sk
     ({ fee_payer; account_updates; memo } : Zkapp_command.t) : Zkapp_command.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let transaction_commitment : Zkapp_command.Transaction_commitment.t =
     (* TODO: This is a pain. *)
     let account_updates_hash = Zkapp_command.Call_forest.hash account_updates in
@@ -788,7 +797,7 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Transaction_commitment.create_complete transaction_commitment
       ~memo_hash
       ~fee_payer_hash:
-        (Zkapp_command.Call_forest.Digest.Account_update.create ~signature_kind
+        (Zkapp_command.Call_forest.Digest.Account_update.create
            (Account_update.of_fee_payer fee_payer) )
   in
   let fee_payer =
@@ -797,7 +806,7 @@ let insert_signatures pk_compressed sk
       when Public_key.Compressed.equal public_key pk_compressed ->
         { fee_payer with
           authorization =
-            Schnorr.Chunked.sign ~signature_kind sk
+            Schnorr.Chunked.sign sk
               (Random_oracle.Input.Chunked.field full_commitment)
         }
     | fee_payer ->
@@ -807,7 +816,6 @@ let insert_signatures pk_compressed sk
     Zkapp_command.Call_forest.map account_updates ~f:(function
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
-         ; aux = _
          } as account_update :
           Account_update.t )
         when Public_key.Compressed.equal public_key pk_compressed ->
@@ -817,8 +825,8 @@ let insert_signatures pk_compressed sk
           in
           { account_update with
             authorization =
-              Control.Poly.Signature
-                (Schnorr.Chunked.sign ~signature_kind sk
+              Signature
+                (Schnorr.Chunked.sign sk
                    (Random_oracle.Input.Chunked.field commitment) )
           }
       | account_update ->

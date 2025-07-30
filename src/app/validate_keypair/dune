@@ -10,7 +10,7 @@
   async_unix
   ;; local libraries
   mina_version
-  mina_stdlib
+  bounded_types
   cli_lib)
  (instrumentation
   (backend bisect_ppx))

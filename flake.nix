@@ -12,8 +12,7 @@
   };
 
   inputs.utils.url = "github:gytis-ivaskevicius/flake-utils-plus";
-  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11-small";
-  inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11-small";
 
   inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
@@ -33,12 +32,7 @@
   inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
   inputs.o1-opam-repository.flake = false;
 
-  # The version must be the same as the version used in:
-  # - dockerfiles/1-build-deps
-  # - flake.nix (and flake.lock after running
-  #   `nix flake update opam-repository`).
-  # - scripts/update_opam_switch.sh
-  inputs.opam-repository.url = "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
+  inputs.opam-repository.url = "github:ocaml/opam-repository";
   inputs.opam-repository.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
@@ -60,7 +54,7 @@
 
   outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
-    , nix-utils, flockenzeit, nixpkgs-old, ... }:
+    , nix-utils, flockenzeit, ... }:
     let
       inherit (nixpkgs) lib;
 
@@ -101,6 +95,7 @@
             requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
         };
       };
+
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
       # Mina Demo container
       # Use `nixos-container create --flake mina`
@@ -267,15 +262,11 @@
     } // utils.lib.eachDefaultSystem (system:
       let
         rocksdbOverlay = pkgs: prev:
-          if prev.stdenv.isx86_64 then {
-            rocksdb-mina = pkgs.rocksdb511;
-          } else {
+          if prev.stdenv.isDarwin then {
             rocksdb-mina = pkgs.rocksdb;
+          } else {
+            rocksdb-mina = pkgs.rocksdb511;
           };
-        go119Overlay = (_: _: {
-          inherit (nixpkgs-old.legacyPackages.${system})
-            go_1_19 buildGo119Module;
-        });
 
         # nixpkgs with all relevant overlays applied
         pkgs = nixpkgs.legacyPackages.${system}.extend
@@ -290,8 +281,7 @@
                   nodejs = pkgs.nodejs-16_x;
                 };
             })
-          ] ++ builtins.attrValues self.overlays
-            ++ [ rocksdbOverlay go119Overlay ]));
+          ] ++ builtins.attrValues self.overlays ++ [ rocksdbOverlay ]));
 
         checks = import ./nix/checks.nix inputs pkgs;
 
@@ -313,27 +303,24 @@
           nodejs
           binaryen
           zip
-          libiconv
-          cargo
-          curl
-          (pkgs.python3.withPackages
-            (python-pkgs: [ python-pkgs.click python-pkgs.requests ]))
+          (pkgs.python3.withPackages (python-pkgs: [
+              python-pkgs.click
+              python-pkgs.requests
+            ]))
           jq
-          rocksdb.tools
         ];
       in {
-
         inherit ocamlPackages;
-
+        
         # Main user-facing binaries.
-        packages = (rec {
+        packages = rec {
           inherit (ocamlPackages)
             mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
             test_executive with-instrumentation;
           # Granular nix
           inherit (ocamlPackages)
-            src exes all all-tested all-exes files tested info dune-description
-            base-libs external-libs;
+            src exes all all-tested pkgs all-exes files tested info
+            dune-description base-libs external-libs;
           # ^ TODO move elsewhere, external-libs isn't a package
           # TODO consider the following: inherit (ocamlPackages) default;
           granular = ocamlPackages.default;
@@ -345,9 +332,6 @@
             mina-image-slim mina-image-full mina-archive-image-full
             mina-image-instr-full;
           mina-deb = debianPackages.mina;
-          impure-shell = (import ./nix/impure-shell.nix pkgs).inputDerivation;
-        }) // {
-          inherit (ocamlPackages) pkgs;
         };
 
         # Pure dev shell, from which you can build Mina yourself manually, or hack on it.
@@ -384,8 +368,12 @@
           shellHook = ''
             export MINA_BRANCH=$()
           '';
-          buildInputs = [ self.packages.${system}.test_executive ];
+          buildInputs = [
+            self.packages.${system}.test_executive
+          ];
         };
+        packages.impure-shell =
+          (import ./nix/impure-shell.nix pkgs).inputDerivation;
 
         # An "impure" shell, giving you the system deps of Mina, opam, cargo and go.
         devShells.impure = import ./nix/impure-shell.nix pkgs;
@@ -418,6 +406,6 @@
 
         inherit checks;
 
-        formatter = pkgs.nixfmt-classic;
+        formatter = pkgs.nixfmt;
       });
 }

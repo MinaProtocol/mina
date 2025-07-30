@@ -130,7 +130,8 @@ let targetToAgent =
             , Small = toMap { size = "generic" }
             , Integration = toMap { size = "integration" }
             , QA = toMap { size = "qa" }
-            , Perf = toMap { size = "performance" }
+            , Hardfork = toMap { size = "hardfork" }
+            , Perf = toMap { size = "perf" }
             , Multi = toMap { size = "generic-multi" }
             }
             target

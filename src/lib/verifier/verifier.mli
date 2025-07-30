@@ -1,5 +1,3 @@
-module Common : module type of Common
-
 module Failure = Verification_failure
 
 module Dummy : module type of Dummy

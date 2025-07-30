@@ -114,8 +114,6 @@ let%test_module "Protocol state precondition tests" =
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
-    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
-
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
 
     let constraint_constants = U.constraint_constants
@@ -239,7 +237,6 @@ let%test_module "Protocol state precondition tests" =
             ~snapp_pk:(Public_key.compress new_kp.public_key) )
 
     let%test_unit "invalid protocol state predicate in other zkapp_command" =
-      let signature_kind = U.signature_kind in
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
       let gen =
@@ -279,20 +276,19 @@ let%test_module "Protocol state precondition tests" =
                     Signature_lib.Public_key.compress new_kp.public_key
                   in
                   let fee_payer =
-                    Account_update.Fee_payer.make
-                      ~body:
+                    { Account_update.Fee_payer.body =
                         { public_key = sender_pk
                         ; fee
                         ; valid_until = None
                         ; nonce = sender_nonce
                         }
                         (*To be updated later*)
-                      ~authorization:Signature.dummy
+                    ; authorization = Signature.dummy
+                    }
                   in
                   let sender_account_update : Account_update.Simple.t =
-                    Account_update.with_no_aux
-                      ~body:
-                        { Account_update.Body.Simple.public_key = sender_pk
+                    { body =
+                        { public_key = sender_pk
                         ; update = Account_update.Update.noop
                         ; token_id = Token_id.default
                         ; balance_change =
@@ -316,12 +312,12 @@ let%test_module "Protocol state precondition tests" =
                         ; authorization_kind = Signature
                         }
                         (*To be updated later*)
-                      ~authorization:(Control.Poly.Signature Signature.dummy)
+                    ; authorization = Control.Signature Signature.dummy
+                    }
                   in
                   let snapp_account_update : Account_update.Simple.t =
-                    Account_update.with_no_aux
-                      ~body:
-                        { Account_update.Body.Simple.public_key = snapp_pk
+                    { body =
+                        { public_key = snapp_pk
                         ; update = snapp_update
                         ; token_id = Token_id.default
                         ; balance_change =
@@ -348,12 +344,14 @@ let%test_module "Protocol state precondition tests" =
                         ; may_use_token = No
                         ; authorization_kind = Signature
                         }
+                    ; authorization =
+                        Control.Signature Signature.dummy
                         (*To be updated later*)
-                      ~authorization:(Control.Poly.Signature Signature.dummy)
+                    }
                   in
                   let ps =
                     Zkapp_command.Call_forest.With_hashes
-                    .of_zkapp_command_simple_list ~signature_kind
+                    .of_zkapp_command_simple_list
                       [ sender_account_update; snapp_account_update ]
                   in
                   let account_updates_hash =
@@ -365,7 +363,7 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let memo_hash = Signed_command_memo.hash memo in
                   let fee_payer_hash =
-                    Zkapp_command.Digest.Account_update.create ~signature_kind
+                    Zkapp_command.Digest.Account_update.create
                       (Account_update.of_fee_payer fee_payer)
                   in
                   let full_commitment =
@@ -374,30 +372,27 @@ let%test_module "Protocol state precondition tests" =
                   in
                   let fee_payer =
                     let fee_payer_signature_auth =
-                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
-                        sender.private_key
+                      Signature_lib.Schnorr.Chunked.sign sender.private_key
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
                     { fee_payer with authorization = fee_payer_signature_auth }
                   in
                   let sender_account_update : Account_update.Simple.t =
                     let signature_auth : Signature.t =
-                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
-                        sender.private_key
+                      Signature_lib.Schnorr.Chunked.sign sender.private_key
                         (Random_oracle.Input.Chunked.field commitment)
                     in
                     { sender_account_update with
-                      authorization = Control.Poly.Signature signature_auth
+                      authorization = Control.Signature signature_auth
                     }
                   in
                   let snapp_account_update =
                     let signature_auth =
-                      Signature_lib.Schnorr.Chunked.sign ~signature_kind
-                        new_kp.private_key
+                      Signature_lib.Schnorr.Chunked.sign new_kp.private_key
                         (Random_oracle.Input.Chunked.field full_commitment)
                     in
                     { snapp_account_update with
-                      authorization = Control.Poly.Signature signature_auth
+                      authorization = Control.Signature signature_auth
                     }
                   in
                   let zkapp_command_with_valid_fee_payer =
@@ -406,7 +401,7 @@ let%test_module "Protocol state precondition tests" =
                     ; account_updates =
                         [ sender_account_update; snapp_account_update ]
                     }
-                    |> Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+                    |> Zkapp_command.of_simple
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Mina_ledger.Ledger.Ledger_inner)
@@ -427,8 +422,6 @@ let%test_module "Account precondition tests" =
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
 
     let `VK vk, `Prover zkapp_prover = Lazy.force U.trivial_zkapp
-
-    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
     let zkapp_prover_and_vk = (zkapp_prover, vk)
 
@@ -657,7 +650,6 @@ let%test_module "Account precondition tests" =
           else update )
 
     let%test_unit "delegate precondition on new account" =
-      let signature_kind = U.signature_kind in
       let gen = U.gen_snapp_ledger in
       Quickcheck.test ~trials:5 gen ~f:(fun ({ specs; _ }, new_kp) ->
           Mina_ledger.Ledger.with_ledger ~depth:U.ledger_depth ~f:(fun ledger ->
@@ -705,7 +697,7 @@ let%test_module "Account precondition tests" =
                           add_account_precondition ~at:1 delegate_precondition
                             zkapp_command0.account_updates
                           |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated ~signature_kind
+                             .accumulate_hashes_predicated
                       }
                     in
                     let keymap =
@@ -722,7 +714,6 @@ let%test_module "Account precondition tests" =
     let%test_unit "unsatisfied delegate precondition, custom token" =
       (* when new account has a custom token, it doesn't get a self-delegation *)
       let constraint_constants = U.constraint_constants in
-      let signature_kind = U.signature_kind in
       let account_creation_fee =
         Currency.Fee.to_nanomina_int constraint_constants.account_creation_fee
       in
@@ -785,7 +776,7 @@ let%test_module "Account precondition tests" =
                           add_account_precondition ~at:1 delegate_precondition
                             zkapp0.account_updates
                           |> Zkapp_command.Call_forest
-                             .accumulate_hashes_predicated ~signature_kind
+                             .accumulate_hashes_predicated
                       }
                     in
                     replace_authorizations ~keymap zkapp_dummy_signatures
@@ -865,7 +856,6 @@ let%test_module "Account precondition tests" =
                     ~state_body ledger [ zkapp_command ] ) ) )
 
     let%test_unit "invalid account predicate in fee payer" =
-      let signature_kind = U.signature_kind in
       let state_body = U.genesis_state_body in
       let psv = Mina_state.Protocol_state.Body.view state_body in
       Quickcheck.test ~trials:1 U.gen_snapp_ledger
@@ -882,20 +872,19 @@ let%test_module "Account precondition tests" =
                 Signature_lib.Public_key.compress new_kp.public_key
               in
               let fee_payer =
-                Account_update.Fee_payer.make
-                  ~body:
+                { Account_update.Fee_payer.body =
                     { public_key = sender_pk
                     ; fee
                     ; valid_until = None
                     ; nonce = Account.Nonce.succ sender_nonce (*Invalid nonce*)
                     }
                     (*To be updated later*)
-                  ~authorization:Signature.dummy
+                ; authorization = Signature.dummy
+                }
               in
               let sender_account_update : Account_update.Simple.t =
-                Account_update.with_no_aux
-                  ~body:
-                    { Account_update.Body.Simple.public_key = sender_pk
+                { body =
+                    { public_key = sender_pk
                     ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -919,12 +908,12 @@ let%test_module "Account precondition tests" =
                     ; authorization_kind = Signature
                     }
                     (*To be updated later*)
-                  ~authorization:(Control.Poly.Signature Signature.dummy)
+                ; authorization = Control.Signature Signature.dummy
+                }
               in
               let snapp_account_update : Account_update.Simple.t =
-                Account_update.with_no_aux
-                  ~body:
-                    { Account_update.Body.Simple.public_key = snapp_pk
+                { body =
+                    { public_key = snapp_pk
                     ; update = snapp_update
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -949,12 +938,13 @@ let%test_module "Account precondition tests" =
                     ; may_use_token = No
                     ; authorization_kind = Signature
                     }
-                    (*To be updated later*)
-                  ~authorization:(Control.Poly.Signature Signature.dummy)
+                ; authorization =
+                    Control.Signature Signature.dummy (*To be updated later*)
+                }
               in
               let ps =
                 Zkapp_command.Call_forest.With_hashes
-                .of_zkapp_command_simple_list ~signature_kind
+                .of_zkapp_command_simple_list
                   [ sender_account_update; snapp_account_update ]
               in
               let account_updates_hash = Zkapp_command.Call_forest.hash ps in
@@ -964,7 +954,7 @@ let%test_module "Account precondition tests" =
               in
               let memo_hash = Signed_command_memo.hash memo in
               let fee_payer_hash =
-                Zkapp_command.Digest.Account_update.create ~signature_kind
+                Zkapp_command.Digest.Account_update.create
                   (Account_update.of_fee_payer fee_payer)
               in
               let full_commitment =
@@ -973,34 +963,31 @@ let%test_module "Account precondition tests" =
               in
               let fee_payer =
                 let fee_payer_signature_auth =
-                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
-                    sender.private_key
+                  Signature_lib.Schnorr.Chunked.sign sender.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
                 { fee_payer with authorization = fee_payer_signature_auth }
               in
               let sender_account_update =
                 let signature_auth : Signature.t =
-                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
-                    sender.private_key
+                  Signature_lib.Schnorr.Chunked.sign sender.private_key
                     (Random_oracle.Input.Chunked.field commitment)
                 in
                 { sender_account_update with
-                  authorization = Control.Poly.Signature signature_auth
+                  authorization = Control.Signature signature_auth
                 }
               in
               let snapp_account_update =
                 let signature_auth =
-                  Signature_lib.Schnorr.Chunked.sign ~signature_kind
-                    new_kp.private_key
+                  Signature_lib.Schnorr.Chunked.sign new_kp.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
                 in
                 { snapp_account_update with
-                  authorization = Control.Poly.Signature signature_auth
+                  authorization = Control.Signature signature_auth
                 }
               in
               let zkapp_command_with_invalid_fee_payer =
-                Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+                Zkapp_command.of_simple
                   { fee_payer
                   ; memo
                   ; account_updates =
@@ -1011,7 +998,7 @@ let%test_module "Account precondition tests" =
                 (module Mina_ledger.Ledger.Ledger_inner)
                 init_ledger ledger ;
               match
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked
                   ~constraint_constants
                   ~global_slot:psv.global_slot_since_genesis ~state_view:psv
                   ledger zkapp_command_with_invalid_fee_payer

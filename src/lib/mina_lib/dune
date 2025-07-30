@@ -22,7 +22,7 @@
   result
   bin_prot.shape
   ;; local libraries
-  mina_stdlib
+  bounded_types
   transition_chain_prover
   best_tip_prover
   proof_carrying_data
@@ -36,13 +36,15 @@
   transition_frontier_base
   with_hash
   currency
+  mina_stdlib
+  mina_user_error
   gossip_net
   transition_frontier
   trust_system
   node_status_service
   vrf_evaluator
   uptime_service
-  mina_stdlib_unix
+  exit_handlers
   daemon_rpcs
   sync_status
   node_addrs_and_ports
@@ -53,6 +55,7 @@
   mina_networking
   consensus
   o1trace
+  unix_timestamp
   filtered_external_transition
   pipe_lib
   user_command_input
@@ -81,6 +84,7 @@
   prover
   verifier
   snark_work_lib
+  truth
   ledger_catchup
   genesis_ledger_helper
   coda_genesis_proof

@@ -1,6 +1,11 @@
 open Core
 open Async
-module Client = Graphql_lib.Client
+
+module Client = Graphql_lib.Client.Make (struct
+  let preprocess_variables_string = Fn.id
+
+  let headers = String.Map.empty
+end)
 
 let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
   let log_location_detail =

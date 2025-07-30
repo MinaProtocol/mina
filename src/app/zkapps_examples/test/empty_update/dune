@@ -41,7 +41,7 @@
   with_hash
   zkapps_empty_update
   zkapps_examples
-  mina_stdlib)
+  bounded_types)
  (preprocess
   (pps ppx_snarky ppx_version ppx_jane))
  (instrumentation

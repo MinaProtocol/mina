@@ -36,9 +36,7 @@ module Schema = struct
         [@@@no_toplevel_latest_type]
 
         module V1 = struct
-          type t =
-            Mina_stdlib.Bounded_types.String.Stable.V1.t
-            * State_hash.Stable.V1.t
+          type t = Bounded_types.String.Stable.V1.t * State_hash.Stable.V1.t
 
           let to_latest = Fn.id
         end
@@ -351,8 +349,7 @@ let check t ~genesis_state_hash =
       let%bind () = check_version () in
       let%bind root_hash, root_block = check_base () in
       let root_protocol_state =
-        root_block |> Mina_block.Stable.Latest.header
-        |> Mina_block.Header.protocol_state
+        root_block |> Mina_block.header |> Mina_block.Header.protocol_state
       in
       let%bind () =
         let persisted_genesis_state_hash =
@@ -363,7 +360,7 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let%map () = check_arcs root_hash in
-      root_block |> Mina_block.Stable.Latest.header |> Header.protocol_state
+      root_block |> Mina_block.header |> Header.protocol_state
       |> Mina_state.Protocol_state.blockchain_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
@@ -377,7 +374,6 @@ let initialize t ~root_data =
     ( State_hash.With_state_hashes.state_hash t
     , State_hash.With_state_hashes.data t )
   in
-  let root_transition = Mina_block.read_all_proofs_from_disk root_transition in
   [%log' trace t.logger]
     ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
     "Initializing persistent frontier database with $root_data" ;
@@ -429,11 +425,8 @@ let add ~arcs_cache ~transition =
   let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
   State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
   State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
-  let transition_unwrapped =
-    With_hash.data transition |> Mina_block.read_all_proofs_from_disk
-  in
   fun batch ->
-    Batch.set batch ~key:(Transition hash) ~data:transition_unwrapped ;
+    Batch.set batch ~key:(Transition hash) ~data:(With_hash.data transition) ;
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
@@ -459,7 +452,7 @@ let move_root ~old_root_hash ~new_root ~garbage =
         Batch.remove batch ~key:(Transition node_hash) ;
         Batch.remove batch ~key:(Arcs node_hash) )
 
-let get_transition ~proof_cache_db t hash =
+let get_transition t hash =
   let%map transition =
     get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
   in
@@ -470,17 +463,14 @@ let get_transition ~proof_cache_db t hash =
     }
   in
   let parent_hash =
-    block |> With_hash.data |> Mina_block.Stable.Latest.header
+    block |> With_hash.data |> Mina_block.header
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
-  in
-  let cached_block =
-    With_hash.map ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) block
   in
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
   Mina_block.Validated.unsafe_of_trusted_block
     ~delta_block_chain_proof:(Mina_stdlib.Nonempty_list.singleton parent_hash)
-    (`This_block_is_trusted_to_be_safe cached_block)
+    (`This_block_is_trusted_to_be_safe block)
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
@@ -492,17 +482,15 @@ let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
 let set_best_tip data = Batch.set ~key:Best_tip ~data
 
-let rec crawl_successors ~proof_cache_db t hash ~init ~f =
+let rec crawl_successors t hash ~init ~f =
   let open Deferred.Result.Let_syntax in
   let%bind successors = Deferred.return (get_arcs t hash) in
   deferred_list_result_iter successors ~f:(fun succ_hash ->
-      let%bind transition =
-        Deferred.return (get_transition ~proof_cache_db t succ_hash)
-      in
+      let%bind transition = Deferred.return (get_transition t succ_hash) in
       let%bind init' =
         Deferred.map (f init transition)
           ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
       in
-      crawl_successors ~proof_cache_db t succ_hash ~init:init' ~f )
+      crawl_successors t succ_hash ~init:init' ~f )
 
 let with_batch t = Batch.with_batch t.db

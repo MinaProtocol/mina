@@ -11,7 +11,7 @@ module type Message_intf = sig
   type curve_scalar
 
   val derive :
-       signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_signature_kind.t
     -> t
     -> private_key:curve_scalar
     -> public_key:curve
@@ -24,7 +24,7 @@ module type Message_intf = sig
     t -> private_key:curve_scalar -> public_key:curve -> curve_scalar
 
   val hash :
-       signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_signature_kind.t
     -> t
     -> public_key:curve
     -> r:field
@@ -47,11 +47,7 @@ module type Message_intf = sig
   type _ checked
 
   val hash_checked :
-       signature_kind:Mina_signature_kind.t
-    -> var
-    -> public_key:curve_var
-    -> r:field_var
-    -> curve_scalar_var checked
+    var -> public_key:curve_var -> r:field_var -> curve_scalar_var checked
 end
 
 module type S = sig
@@ -108,16 +104,14 @@ module type S = sig
     val compress : curve_var -> Boolean.var list Checked.t
 
     val verifies :
-         signature_kind:Mina_signature_kind.t
-      -> (module Shifted.S with type t = 't)
+         (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
       -> Boolean.var Checked.t
 
     val assert_verifies :
-         signature_kind:Mina_signature_kind.t
-      -> (module Shifted.S with type t = 't)
+         (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
@@ -127,13 +121,13 @@ module type S = sig
   val compress : curve -> bool list
 
   val sign :
-       signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_signature_kind.t
     -> Private_key.t
     -> Message.t
     -> Signature.t
 
   val verify :
-       signature_kind:Mina_signature_kind.t
+       ?signature_kind:Mina_signature_kind.t
     -> Signature.t
     -> Public_key.t
     -> Message.t
@@ -228,25 +222,25 @@ module Make
 
   let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)
 
-  let sign ~signature_kind (d_prime : Private_key.t) (m : Message.t) =
+  let sign ?signature_kind (d_prime : Private_key.t) (m : Message.t) =
     let public_key =
       (* TODO: Don't recompute this. *) Curve.scale Curve.one d_prime
     in
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
-    let derive = Message.derive ~signature_kind in
+    let derive = Message.derive ?signature_kind in
     let k_prime = derive m ~public_key ~private_key:d in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, ry = Curve.(to_affine_exn (scale Curve.one k_prime)) in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    let hash = Message.hash ~signature_kind in
+    let hash = Message.hash ?signature_kind in
     let e = hash m ~public_key ~r in
     let s = Curve.Scalar.(k + (e * d)) in
     (r, s)
 
-  let verify ~signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
+  let verify ?signature_kind ((r, s) : Signature.t) (pk : Public_key.t)
       (m : Message.t) =
-    let hash = Message.hash ~signature_kind in
+    let hash = Message.hash ?signature_kind in
     let e = hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine_exn r_pt with
@@ -268,12 +262,12 @@ module Make
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef_ verifier (type s) ~signature_kind ~equal ~final_check
+    let%snarkydef_ verifier (type s) ~equal ~final_check
         ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s) )
         ((r, s) : Signature.var) (public_key : Public_key.var) (m : Message.var)
         =
-      let%bind e = Message.hash_checked ~signature_kind m ~public_key ~r in
+      let%bind e = Message.hash_checked m ~public_key ~r in
       (* s * g - e * public_key *)
       let%bind e_pk =
         Curve.Checked.scale shifted
@@ -291,12 +285,11 @@ module Make
       let%bind r_correct = equal r rx in
       final_check r_correct y_even
 
-    let verifies ~signature_kind s =
-      verifier ~signature_kind ~equal:Field.Checked.equal
-        ~final_check:Boolean.( && ) s
+    let verifies s =
+      verifier ~equal:Field.Checked.equal ~final_check:Boolean.( && ) s
 
-    let assert_verifies ~signature_kind s =
-      verifier ~signature_kind ~equal:Field.Checked.Assert.equal
+    let assert_verifies s =
+      verifier ~equal:Field.Checked.Assert.equal
         ~final_check:(fun () ry_even -> Boolean.Assert.is_true ry_even)
         s
   end
@@ -311,8 +304,8 @@ module Message = struct
 
   let network_id_other chain_name = chain_name
 
-  let network_id ~(signature_kind : Mina_signature_kind.t) =
-    match signature_kind with
+  let network_id =
+    match Mina_signature_kind.t with
     | Mainnet ->
         network_id_mainnet
     | Testnet ->
@@ -342,7 +335,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ~(signature_kind : Mina_signature_kind.t) =
+    let derive ?(signature_kind = Mina_signature_kind.t) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -368,8 +361,8 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash ~signature_kind =
-      make_hash ~init:(Hash_prefix_states.signature_legacy ~signature_kind)
+    let hash ?signature_kind =
+      make_hash ~init:(Hash_prefix_states.signature_legacy ?signature_kind)
 
     let hash_for_mainnet =
       make_hash ~init:Hash_prefix_states.signature_for_mainnet_legacy
@@ -379,7 +372,7 @@ module Message = struct
 
     type var = (Field.Var.t, Boolean.var) Random_oracle.Input.Legacy.t
 
-    let%snarkydef_ hash_checked ~signature_kind t ~public_key ~r =
+    let%snarkydef_ hash_checked t ~public_key ~r =
       let input =
         let px, py = public_key in
         Random_oracle.Input.Legacy.append t
@@ -388,7 +381,7 @@ module Message = struct
       make_checked (fun () ->
           let open Random_oracle.Legacy.Checked in
           hash
-            ~init:(Hash_prefix_states.signature_legacy ~signature_kind)
+            ~init:(Hash_prefix_states.signature_legacy ?signature_kind:None)
             (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list )
@@ -416,7 +409,7 @@ module Message = struct
       |> Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1))
       |> Tock.Field.project
 
-    let derive ~(signature_kind : Mina_signature_kind.t) =
+    let derive ?(signature_kind = Mina_signature_kind.t) =
       make_derive
         ~network_id:
           ( match signature_kind with
@@ -442,8 +435,8 @@ module Message = struct
       |> Digest.to_bits ~length:Field.size_in_bits
       |> Inner_curve.Scalar.of_bits
 
-    let hash ~signature_kind =
-      make_hash ~init:(Hash_prefix_states.signature ~signature_kind)
+    let hash ?signature_kind =
+      make_hash ~init:(Hash_prefix_states.signature ?signature_kind)
 
     let hash_for_mainnet =
       make_hash ~init:Hash_prefix_states.signature_for_mainnet
@@ -453,7 +446,7 @@ module Message = struct
 
     type var = Field.Var.t Random_oracle.Input.Chunked.t
 
-    let%snarkydef_ hash_checked ~signature_kind t ~public_key ~r =
+    let%snarkydef_ hash_checked t ~public_key ~r =
       let input =
         let px, py = public_key in
         Random_oracle.Input.Chunked.append t
@@ -462,7 +455,7 @@ module Message = struct
       make_checked (fun () ->
           let open Random_oracle.Checked in
           hash
-            ~init:(Hash_prefix_states.signature ~signature_kind)
+            ~init:(Hash_prefix_states.signature ?signature_kind:None)
             (pack_input input)
           |> Digest.to_bits ~length:Field.size_in_bits
           |> Bitstring_lib.Bitstring.Lsb_first.of_list )
@@ -528,11 +521,10 @@ let chunked_message_typ () : (Message.Chunked.var, Message.Chunked.t) Tick.Typ.t
     ~value_of_hlist:of_hlist
 
 let%test_unit "schnorr checked + unchecked" =
-  let signature_kind = Mina_signature_kind.Testnet in
   Quickcheck.test ~trials:5 gen_legacy ~f:(fun (pk, msg) ->
-      let s = Legacy.sign ~signature_kind pk msg in
+      let s = Legacy.sign pk msg in
       let pubkey = Tick.Inner_curve.(scale one pk) in
-      assert (Legacy.verify ~signature_kind s pubkey msg) ;
+      assert (Legacy.verify s pubkey msg) ;
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(
            tuple3 Tick.Inner_curve.typ (legacy_message_typ ())
@@ -543,18 +535,15 @@ let%test_unit "schnorr checked + unchecked" =
            let%bind (module Shifted) =
              Tick.Inner_curve.Checked.Shifted.create ()
            in
-           Legacy.Checked.verifies ~signature_kind
-             (module Shifted)
-             s public_key msg )
+           Legacy.Checked.verifies (module Shifted) s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )
 
 let%test_unit "schnorr checked + unchecked" =
-  let signature_kind = Mina_signature_kind.Testnet in
   Quickcheck.test ~trials:5 gen_chunked ~f:(fun (pk, msg) ->
-      let s = Chunked.sign ~signature_kind pk msg in
+      let s = Chunked.sign pk msg in
       let pubkey = Tick.Inner_curve.(scale one pk) in
-      assert (Chunked.verify ~signature_kind s pubkey msg) ;
+      assert (Chunked.verify s pubkey msg) ;
       (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
          Tick.Typ.(
            tuple3 Tick.Inner_curve.typ (chunked_message_typ ())
@@ -565,8 +554,6 @@ let%test_unit "schnorr checked + unchecked" =
            let%bind (module Shifted) =
              Tick.Inner_curve.Checked.Shifted.create ()
            in
-           Chunked.Checked.verifies ~signature_kind
-             (module Shifted)
-             s public_key msg )
+           Chunked.Checked.verifies (module Shifted) s public_key msg )
          (fun _ -> true) )
         (pubkey, msg, s) )

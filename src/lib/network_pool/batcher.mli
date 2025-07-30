@@ -9,24 +9,15 @@ module Snark_pool : sig
 
   type t [@@deriving sexp]
 
-  val create :
-       proof_cache_db:Proof_cache_tag.cache_db
-    -> logger:Logger.t
-    -> Verifier.t
-    -> t
+  val create : logger:Logger.t -> Verifier.t -> t
 
-  val verify :
-       t
-    -> proof_envelope
-    -> (unit, [> `Crash of Error.t | `Invalid of Verifier.invalid ]) Result.t
-       Deferred.t
+  val verify : t -> proof_envelope -> bool Deferred.Or_error.t
 end
 
 type ('initial, 'partially_validated, 'result) t
 
 val create :
-     proof_cache_db:Proof_cache_tag.cache_db
-  -> ?how_to_add:[ `Insert | `Enqueue_back ]
+     ?how_to_add:[ `Insert | `Enqueue_back ]
   -> logger:Logger.t
   -> ?compare_init:('init -> 'init -> int)
   -> ?weight:('init -> int)
@@ -49,13 +40,9 @@ val compare_envelope : _ Envelope.Incoming.t -> _ Envelope.Incoming.t -> int
 module Transaction_pool : sig
   open Mina_base
 
-  type t [@@deriving sexp_of]
+  type t [@@deriving sexp]
 
-  val create :
-       proof_cache_db:Proof_cache_tag.cache_db
-    -> logger:Logger.t
-    -> Verifier.t
-    -> t
+  val create : logger:Logger.t -> Verifier.t -> t
 
   val verify :
        t

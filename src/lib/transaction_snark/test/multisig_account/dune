@@ -43,7 +43,7 @@
   random_oracle_input
   with_hash
   data_hash_lib
-  mina_stdlib)
+  bounded_types)
  (library_flags -linkall)
  (inline_tests
   (flags -verbose -show-counts)

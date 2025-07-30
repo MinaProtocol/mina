@@ -1,5 +1,3 @@
-open Core_kernel
-
 module type Inputs_intf = sig
   module Location : Location_intf.S
 
@@ -208,7 +206,7 @@ end = struct
         Inputs.set_location_batch ~last_location t key_locations )
 
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
-     simultaneously for full atomicity. *)
+     simulatenously for full atomicity. *)
   let set_batch ?hash_cache t locations_and_accounts =
     set_raw_addresses t locations_and_accounts ;
     Inputs.set_raw_account_batch t locations_and_accounts ;

@@ -80,6 +80,8 @@ module type S = sig
   val fee : t -> Fee.t
 
   val prover : t -> Public_key.Compressed.t
+
+  val proofs : t -> Ledger_proof.t One_or_two.t
 end
 
 module T = struct
@@ -93,45 +95,27 @@ module T = struct
         ; proofs : Ledger_proof.Stable.V2.t One_or_two.Stable.V1.t
         ; prover : Public_key.Compressed.Stable.V1.t
         }
-      [@@deriving equal, fields, sexp, yojson]
-
-      let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
-
-      let proofs t = t.proofs
+      [@@deriving equal, sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t =
+  type t = Stable.Latest.t =
     { fee : Fee.t
-    ; proofs : Ledger_proof.Cached.t One_or_two.t
+    ; proofs : Ledger_proof.t One_or_two.t
     ; prover : Public_key.Compressed.t
     }
   [@@deriving fields]
 
-  let statement t = One_or_two.map t.proofs ~f:Ledger_proof.Cached.statement
+  let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
 
   let info t =
-    let statements = One_or_two.map t.proofs ~f:Ledger_proof.Cached.statement in
+    let statements = One_or_two.map t.proofs ~f:Ledger_proof.statement in
     { Info.statements
     ; work_ids = One_or_two.map statements ~f:Transaction_snark.Statement.hash
     ; fee = t.fee
     ; prover = t.prover
-    }
-
-  let write_all_proofs_to_disk ~proof_cache_db
-      { Stable.Latest.fee; proofs = uncached; prover } =
-    let proofs =
-      One_or_two.map uncached
-        ~f:(Ledger_proof.Cached.write_proof_to_disk ~proof_cache_db)
-    in
-    { fee; proofs; prover }
-
-  let read_all_proofs_from_disk { fee; proofs; prover } =
-    { Stable.Latest.fee
-    ; proofs = One_or_two.map proofs ~f:Ledger_proof.Cached.read_proof_from_disk
-    ; prover
     }
 end
 

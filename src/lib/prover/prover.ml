@@ -94,8 +94,6 @@ module Worker_state = struct
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
         let module T = Transaction_snark.Make (struct
-          let signature_kind = Mina_signature_kind.t_DEPRECATED
-
           let constraint_constants = constraint_constants
 
           let proof_level = proof_level
@@ -553,7 +551,8 @@ let prove t ~prev_state ~prev_state_proof ~next_state
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
   Blockchain_snark.Blockchain.proof chain
 
-let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
+let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
+  let start_time = Core.Time.now () in
   let genesis_ledger = Genesis_ledger.Packed.t genesis_inputs.genesis_ledger in
   let constraint_constants = genesis_inputs.constraint_constants in
   let consensus_constants = genesis_inputs.consensus_constants in
@@ -572,7 +571,7 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
   in
   let open Pickles_types in
   let blockchain_dummy =
-    Pickles.Proof.dummy Nat.N2.n Nat.N2.n ~domain_log2:16
+    Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:16
   in
   let snark_transition =
     let open Staged_ledger_diff in
@@ -590,40 +589,11 @@ let create_genesis_block_inputs (genesis_inputs : Genesis_proof.Inputs.t) =
   let prover_state : Consensus_mechanism.Data.Prover_state.t =
     Consensus.Data.Prover_state.genesis_data ~genesis_epoch_ledger
   in
-  ( Blockchain.create ~proof:blockchain_dummy ~state:prev_state
-  , genesis_inputs.protocol_state_with_hashes.data
-  , snark_transition
-  , None
-  , prover_state
-  , pending_coinbase )
-
-let create_genesis_block_locally (worker_state : Worker_state.t)
-    (genesis_inputs : Genesis_proof.Inputs.t) =
-  let ( blockchain
-      , protocol_state
-      , snark_transition
-      , ledger_proof_opt
-      , prover_state
-      , pending_coinbase ) =
-    create_genesis_block_inputs genesis_inputs
-  in
-  let module Worker_state = (val worker_state) in
-  Worker_state.extend_blockchain blockchain protocol_state snark_transition
-    ledger_proof_opt prover_state pending_coinbase
-
-let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
-  let start_time = Core.Time.now () in
-  let ( blockchain
-      , protocol_state
-      , snark_transition
-      , ledger_proof_opt
-      , prover_state
-      , pending_coinbase ) =
-    create_genesis_block_inputs genesis_inputs
-  in
   let%map chain =
-    extend_blockchain t blockchain protocol_state snark_transition
-      ledger_proof_opt prover_state pending_coinbase
+    extend_blockchain t
+      (Blockchain.create ~proof:blockchain_dummy ~state:prev_state)
+      genesis_inputs.protocol_state_with_hashes.data snark_transition None
+      prover_state pending_coinbase
   in
   Mina_metrics.(
     Gauge.set Cryptography.blockchain_proving_time_ms

@@ -28,6 +28,7 @@
   ;; local libraries
   mina_wire_types
   mina_base.util
+  bounded_types
   unsigned_extended
   kimchi_pasta
   kimchi_pasta.basic
@@ -55,6 +56,7 @@
   block_time
   perf_histograms
   test_util
+  unix_timestamp
   non_zero_curve_point
   mina_metrics
   mina_numbers
@@ -65,7 +67,7 @@
   crypto_params
   data_hash_lib
   currency
-  mina_stdlib_unix
+  file_system
   coda_genesis_ledger
   interruptible
   network_peer

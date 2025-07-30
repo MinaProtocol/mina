@@ -93,8 +93,7 @@ val move_root :
   -> unit
 
 val get_transition :
-     proof_cache_db:Proof_cache_tag.cache_db
-  -> t
+     t
   -> State_hash.t
   -> ( Mina_block.Validated.t
      , [> `Not_found of [> `Transition of State_hash.t ] ] )
@@ -123,8 +122,7 @@ val get_best_tip :
 val set_best_tip : State_hash.t -> batch_t -> unit
 
 val crawl_successors :
-     proof_cache_db:Proof_cache_tag.cache_db
-  -> t
+     t
   -> State_hash.t
   -> init:'a
   -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)

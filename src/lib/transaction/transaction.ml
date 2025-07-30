@@ -26,13 +26,18 @@ module Poly = struct
 end
 
 module Valid = struct
-  type t = User_command.Valid.t Poly.t [@@deriving sexp_of, to_yojson]
+  module T = struct
+    type t = User_command.Valid.t Poly.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+  end
+
+  include T
+  include Hashable.Make (T)
+  include Comparable.Make (T)
 end
 
 [%%versioned
 module Stable = struct
-  [@@@no_toplevel_latest_type]
-
   module V2 = struct
     type t = User_command.Stable.V2.t Poly.Stable.V2.t
     [@@deriving sexp, compare, equal, hash, yojson]
@@ -41,17 +46,8 @@ module Stable = struct
   end
 end]
 
-type t = User_command.t Poly.t [@@deriving sexp_of, to_yojson]
-
-type ('a, 'b, 'c) with_forest = ('a, 'b, 'c) User_command.with_forest Poly.t
-
-let read_all_proofs_from_disk : t -> Stable.Latest.t =
-  Poly.Stable.Latest.map ~f:User_command.read_all_proofs_from_disk
-
-let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  Poly.Stable.Latest.map
-    ~f:(User_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db)
+include Hashable.Make (Stable.Latest)
+include Comparable.Make (Stable.Latest)
 
 type 'command t_ = 'command Poly.t =
   | Command of 'command
@@ -95,7 +91,7 @@ let expected_supply_increase = function
   | Coinbase t ->
       Coinbase.expected_supply_increase t
 
-let public_keys (t : (_, _, _) with_forest) =
+let public_keys (t : t) =
   let account_ids =
     match t with
     | Command (Signed_command cmd) ->
@@ -109,8 +105,7 @@ let public_keys (t : (_, _, _) with_forest) =
   in
   List.map account_ids ~f:Account_id.public_key
 
-let account_access_statuses (t : (_, _, _) with_forest)
-    (status : Transaction_status.t) =
+let account_access_statuses (t : t) (status : Transaction_status.t) =
   match t with
   | Command (Signed_command cmd) ->
       Signed_command.account_access_statuses cmd status
@@ -123,11 +118,11 @@ let account_access_statuses (t : (_, _, _) with_forest)
   | Coinbase cb ->
       Coinbase.account_access_statuses cb status
 
-let accounts_referenced (t : (_, _, _) with_forest) =
+let accounts_referenced (t : t) =
   List.map (account_access_statuses t Applied) ~f:(fun (acct_id, _status) ->
       acct_id )
 
-let fee_payer_pk (t : (_, _, _) with_forest) =
+let fee_payer_pk (t : t) =
   match t with
   | Command (Signed_command cmd) ->
       Signed_command.fee_payer_pk cmd
@@ -138,14 +133,14 @@ let fee_payer_pk (t : (_, _, _) with_forest) =
   | Coinbase cb ->
       Coinbase.fee_payer_pk cb
 
-let valid_size ~genesis_constants (t : (_, _, _) with_forest) =
+let valid_size ~genesis_constants (t : t) =
   match t with
   | Command cmd ->
       User_command.valid_size ~genesis_constants cmd
   | Fee_transfer _ | Coinbase _ ->
       Ok ()
 
-let check_well_formedness ~genesis_constants (t : (_, _, _) with_forest) =
+let check_well_formedness ~genesis_constants (t : t) =
   match t with
   | Command cmd ->
       User_command.check_well_formedness ~genesis_constants cmd
@@ -154,11 +149,7 @@ let check_well_formedness ~genesis_constants (t : (_, _, _) with_forest) =
 
 let yojson_summary_of_command =
   let is_proof upd =
-    match upd.Account_update.Poly.authorization with
-    | Control.Poly.Proof _ ->
-        true
-    | _ ->
-        false
+    match Account_update.authorization upd with Proof _ -> true | _ -> false
   in
   let zkapp_type cmd =
     let updates = Zkapp_command.account_updates_list cmd in
@@ -174,7 +165,7 @@ let yojson_summary_of_command =
   in
   function
   | User_command.Zkapp_command cmd ->
-      mk_record (zkapp_type cmd) cmd.Zkapp_command.Poly.memo
+      mk_record (zkapp_type cmd) (Zkapp_command.memo cmd)
         ( Zkapp_command.fee_payer_account_update cmd
         |> Account_update.Fee_payer.authorization )
   | Signed_command cmd ->

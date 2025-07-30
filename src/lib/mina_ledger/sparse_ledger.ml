@@ -28,8 +28,7 @@ let of_ledger_subset_exn_impl ~path_query ~path_add (oledger : Ledger.t) keys =
     let next_location_exn loc = Option.value_exn (Ledger.Location.next loc) in
     let empty_address =
       Ledger.Addr.of_directions
-      @@ List.init (Ledger.depth oledger)
-           ~f:(Fn.const Mina_stdlib.Direction.Left)
+      @@ List.init (Ledger.depth oledger) ~f:(Fn.const Direction.Left)
     in
     let empty_locations =
       if num_new_accounts = 0 then []
@@ -118,19 +117,16 @@ let apply_user_command ~constraint_constants ~txn_global_slot =
 
 let apply_transaction_first_pass ~constraint_constants ~global_slot
     ~txn_state_view =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   apply_transaction_logic
-    (T.apply_transaction_first_pass ~signature_kind ~constraint_constants
-       ~global_slot ~txn_state_view )
+    (T.apply_transaction_first_pass ~constraint_constants ~global_slot
+       ~txn_state_view )
 
 let apply_transaction_second_pass =
   apply_transaction_logic T.apply_transaction_second_pass
 
 let apply_transactions ~constraint_constants ~global_slot ~txn_state_view =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   apply_transaction_logic
-    (T.apply_transactions ~signature_kind ~constraint_constants ~global_slot
-       ~txn_state_view )
+    (T.apply_transactions ~constraint_constants ~global_slot ~txn_state_view)
 
 let apply_zkapp_first_pass_unchecked_with_states ~constraint_constants
     ~global_slot ~state_view ~fee_excess ~supply_increase ~first_pass_ledger

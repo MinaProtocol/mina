@@ -1,10 +1,10 @@
 let Artifacts = ../Constants/Artifacts.dhall
 
-let BuildFlags = ../Constants/BuildFlags.dhall
-
 let Command = ./Base.dhall
 
 let Size = ./Size.dhall
+
+let Network = ../Constants/Network.dhall
 
 let RunWithPostgres = ./RunWithPostgres.dhall
 
@@ -20,12 +20,8 @@ in  { step =
                     , "NETWORK_DATA_FOLDER=/etc/mina/test/archive/sample_db"
                     ]
                     "./src/test/archive/sample_db/archive_db.sql"
-                    ( Artifacts.fullDockerTag
-                        Artifacts.Tag::{
-                        , artifact = Artifacts.Type.FunctionalTestSuite
-                        , buildFlags = BuildFlags.Type.Instrumented
-                        }
-                    )
+                    Artifacts.Type.FunctionalTestSuite
+                    (None Network.Type)
                     "./scripts/patch-archive-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
                 ]
               , label = "Archive: Patch Archive test"

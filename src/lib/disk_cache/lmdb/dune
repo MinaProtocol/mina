@@ -8,10 +8,9 @@
   core
   ;; local libraries
   lmdb_storage
-  disk_cache.utils
   disk_cache.test_lib)
  (preprocess
-  (pps ppx_version ppx_jane ppx_mina))
+  (pps ppx_version ppx_jane))
  (inline_tests
   (flags -verbose -show-counts))
  (instrumentation

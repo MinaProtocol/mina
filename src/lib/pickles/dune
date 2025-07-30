@@ -69,4 +69,4 @@
   logger.context_logger
   ppx_version.runtime
   error_json
-  mina_stdlib))
+  bounded_types))

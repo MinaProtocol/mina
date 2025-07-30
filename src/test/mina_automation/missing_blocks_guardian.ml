@@ -2,7 +2,9 @@
 Module to run missing_block_guardian app which should fill any gaps in given archive database
 *)
 
+open Executor
 open Core
+include Executor
 
 module Config = struct
   type mode = Audit | Run
@@ -40,17 +42,10 @@ module Config = struct
       ]
 end
 
-module Paths = struct
-  let dune_name = "scripts/archive/missing-blocks-guardian.sh"
-
-  let official_name = "mina-missing-blocks-guardian"
-end
-
-module Executor = Executor.Make (Paths)
-
-type t = Executor.t
-
-let default = Executor.default
+let of_context context =
+  Executor.of_context ~context
+    ~dune_name:"scripts/archive/missing-blocks-guardian.sh"
+    ~official_name:"mina-missing-blocks-guardian"
 
 let run t ~config =
-  Executor.run t ~args:(Config.to_args config) ~env:(Config.to_envs config) ()
+  run t ~args:(Config.to_args config) ~env:(Config.to_envs config) ()

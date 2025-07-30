@@ -1,15 +1,14 @@
-let Network = ./Network.dhall
-
 let Profile
     : Type
-    = < Devnet | Mainnet | Lightnet | Dev >
+    = < Standard | Mainnet | Lightnet | Hardfork | Dev >
 
 let capitalName =
           \(profile : Profile)
       ->  merge
-            { Devnet = "Devnet"
+            { Standard = "Standard"
             , Mainnet = "Mainnet"
             , Lightnet = "Lightnet"
+            , Hardfork = "Hardfork"
             , Dev = "Dev"
             }
             profile
@@ -17,9 +16,10 @@ let capitalName =
 let lowerName =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
+            { Standard = "standard"
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
+            , Hardfork = "hardfork"
             , Dev = "dev"
             }
             profile
@@ -27,30 +27,21 @@ let lowerName =
 let duneProfile =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
+            { Standard = "devnet"
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
+            , Hardfork = "hardfork"
             , Dev = "dev"
             }
             profile
 
-let fromNetwork =
-          \(network : Network.Type)
-      ->  merge
-            { Devnet = Profile.Devnet
-            , Mainnet = Profile.Mainnet
-            , Berkeley = Profile.Devnet
-            , DevnetLegacy = Profile.Devnet
-            , MainnetLegacy = Profile.Mainnet
-            }
-            network
-
 let toSuffixUppercase =
           \(profile : Profile)
       ->  merge
-            { Devnet = "Devnet"
+            { Standard = ""
             , Mainnet = "Mainnet"
             , Lightnet = "Lightnet"
+            , Hardfork = "Hardfork"
             , Dev = "Dev"
             }
             profile
@@ -58,9 +49,10 @@ let toSuffixUppercase =
 let toSuffixLowercase =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
+            { Standard = ""
             , Mainnet = "mainnet"
             , Lightnet = "lightnet"
+            , Hardfork = "hardfork"
             , Dev = "dev"
             }
             profile
@@ -68,9 +60,10 @@ let toSuffixLowercase =
 let toLabelSegment =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
+            { Standard = ""
             , Mainnet = "-mainnet"
             , Lightnet = "-lightnet"
+            , Hardfork = "-hardfork"
             , Dev = "-dev"
             }
             profile
@@ -80,7 +73,6 @@ in  { Type = Profile
     , lowerName = lowerName
     , duneProfile = duneProfile
     , toSuffixUppercase = toSuffixUppercase
-    , fromNetwork = fromNetwork
     , toSuffixLowercase = toSuffixLowercase
     , toLabelSegment = toLabelSegment
     }

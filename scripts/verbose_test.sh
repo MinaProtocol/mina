@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 cat /dev/null > test_results.txt
 
 echo "TESTING..."

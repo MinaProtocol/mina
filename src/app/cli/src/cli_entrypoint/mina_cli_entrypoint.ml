@@ -69,8 +69,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
         | Error err -> (
             match handle_missing with
             | `Must_exist ->
-                Mina_stdlib.Mina_user_error.raisef
-                  ~where:"reading configuration file"
+                Mina_user_error.raisef ~where:"reading configuration file"
                   "The configuration file %s could not be read:\n%s" config_file
                   (Error.to_string_hum err)
             | `May_be_missing ->
@@ -366,6 +365,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   and is_seed =
     flag "--seed" ~aliases:[ "seed" ] ~doc:"Start the node as a seed node"
       no_arg
+  and no_super_catchup =
+    flag "--no-super-catchup" ~aliases:[ "no-super-catchup" ]
+      ~doc:"Don't use super-catchup" no_arg
   and enable_flooding =
     flag "--enable-flooding" ~aliases:[ "enable-flooding" ]
       ~doc:
@@ -539,7 +541,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
            Option.value_map opt ~default:None ~f:(fun s ->
                if String.length s < 200 then Some s
                else
-                 Mina_stdlib.Mina_user_error.raisef
+                 Mina_user_error.raisef
                    "The length of contact info exceeds 200 characters:\n %s" s ) )
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
@@ -585,7 +587,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
     O1trace.thread "mina" (fun () ->
         let open Deferred.Let_syntax in
         let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
-        let%bind () = Mina_stdlib_unix.File_system.create_dir conf_dir in
+        let%bind () = File_system.create_dir conf_dir in
         let () =
           if is_background then (
             Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
@@ -687,7 +689,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let make_version () =
             let%map () =
               (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
-              Mina_stdlib_unix.File_system.remove_dir (conf_dir ^/ "trace")
+              File_system.remove_dir (conf_dir ^/ "trace")
             in
             Yojson.Safe.to_file version_filename (`Assoc version_metadata)
           in
@@ -903,15 +905,14 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    | Ok key -> (
                        match Public_key.decompress key with
                        | None ->
-                           Mina_stdlib.Mina_user_error.raisef
+                           Mina_user_error.raisef
                              ~where:"decompressing a public key"
                              "The %s public key %s could not be decompressed."
                              which pk_str
                        | Some _ ->
                            Some key )
                    | Error _e ->
-                       Mina_stdlib.Mina_user_error.raisef
-                         ~where:"decoding a public key"
+                       Mina_user_error.raisef ~where:"decoding a public key"
                          "The %s public key %s could not be decoded." which
                          pk_str )
           in
@@ -979,11 +980,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               , Sys.getenv "MINA_BP_PRIVKEY" )
             with
             | Some _, Some _, _ ->
-                Mina_stdlib.Mina_user_error.raise
+                Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
             | None, Some _, Some _ ->
-                Mina_stdlib.Mina_user_error.raise
+                Mina_user_error.raise
                   "You cannot provide both `MINA_BP_PRIVKEY` and \
                    `block_production_pubkey`"
             | None, None, None ->
@@ -1169,7 +1170,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                 | Ok contents ->
                     return (Mina_net2.Multiaddr.of_file_contents contents)
                 | Error _ ->
-                    Mina_stdlib.Mina_user_error.raisef
+                    Mina_user_error.raisef
                       ~where:"reading libp2p peer address file"
                       "The file %s could not be read.\n\n\
                        It must be a newline-separated list of libp2p \
@@ -1179,8 +1180,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           List.iter libp2p_peers_raw ~f:(fun raw_peer ->
               if not Mina_net2.Multiaddr.(valid_as_peer @@ of_string raw_peer)
               then
-                Mina_stdlib.Mina_user_error.raisef
-                  ~where:"decoding peer as a multiaddress"
+                Mina_user_error.raisef ~where:"decoding peer as a multiaddress"
                   "The given peer \"%s\" is not a valid multiaddress (ex: \
                    /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
                   raw_peer ) ;
@@ -1244,7 +1244,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           else if
             List.is_empty initial_peers && Option.is_none seed_peer_list_url
           then
-            Mina_stdlib.Mina_user_error.raise
+            Mina_user_error.raise
               {|No peers were given.
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
@@ -1318,7 +1318,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           | Some _, Some _, None | Some _, None, Some _ | None, None, None ->
               ()
           | _ ->
-              Mina_stdlib.Mina_user_error.raise
+              Mina_user_error.raise
                 "Must provide both --uptime-url and exactly one of \
                  --uptime-submitter-key or --uptime-submitter-pubkey" ) ;
           let uptime_url =
@@ -1337,7 +1337,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                            not decompress)"
                           s () )
                 | Error err ->
-                    Mina_stdlib.Mina_user_error.raisef
+                    Mina_user_error.raisef
                       "Invalid public key %s for uptime submitter, %s" s
                       (Error.to_string_hum err) () )
           in
@@ -1368,7 +1368,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                   "Cannot provide both uptime submitter public key and uptime \
                    submitter keyfile"
           in
-          if itn_features then
+          if compile_config.itn_features then
             (* set queue bound directly in Itn_logger
                adding bound to Mina_lib config introduces cycle
             *)
@@ -1377,7 +1377,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let%map mina =
             Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
+                 ~chain_id ~is_seed ~super_catchup:(not no_super_catchup)
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
                  ~gossip_net_params ~proposed_protocol_version_opt
                  ~work_selection_method:
@@ -1405,7 +1405,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~uptime_send_node_commit ~stop_time ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config () )
+                 ~compile_config () )
           in
           { mina
           ; client_trustlist
@@ -1464,11 +1464,11 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         let () = Mina_plugins.init_plugins ~logger mina plugins in
         return mina )
 
-let daemon logger ~itn_features =
+let daemon logger =
   let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Mina daemon"
     (Command.Param.map
-       (setup_daemon logger ~itn_features
+       (setup_daemon logger ~itn_features:compile_config.itn_features
           ~default_snark_worker_fee:compile_config.default_snark_worker_fee )
        ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
@@ -1478,7 +1478,7 @@ let daemon logger ~itn_features =
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ) )
 
-let replay_blocks logger ~itn_features =
+let replay_blocks logger =
   let replay_flag =
     let open Command.Param in
     flag "--blocks-filename" ~aliases:[ "-blocks-filename" ] (required string)
@@ -1492,7 +1492,7 @@ let replay_blocks logger ~itn_features =
   let compile_config = Mina_compile_config.Compiled.t in
   Command.async ~summary:"Start mina daemon with blocks replayed from a file"
     (Command.Param.map3 replay_flag read_kind
-       (setup_daemon logger ~itn_features
+       (setup_daemon logger ~itn_features:compile_config.itn_features
           ~default_snark_worker_fee:compile_config.default_snark_worker_fee )
        ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
@@ -1585,9 +1585,9 @@ let primitive_ok = function
       true
   | "kimchi_backend_bigint_32_V1" ->
       true
-  | "Mina_stdlib.Bounded_types.String.t"
-  | "Mina_stdlib.Bounded_types.String.Tagged.t"
-  | "Mina_stdlib.Bounded_types.Array.t" ->
+  | "Bounded_types.String.t"
+  | "Bounded_types.String.Tagged.t"
+  | "Bounded_types.Array.t" ->
       true
   | "8fabab0a-4992-11e6-8cca-9ba2c4686d9e" ->
       true (* hashtbl *)
@@ -1685,7 +1685,7 @@ let snark_hashes =
       let json = Cli_lib.Flag.json in
       fun () -> if json then Core.printf "[]\n%!"]
 
-let internal_commands logger ~itn_features =
+let internal_commands logger =
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
@@ -1735,10 +1735,9 @@ let internal_commands logger ~itn_features =
                 Reader.read_sexp reader )
           with
           | `Ok sexp -> (
-              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let%bind worker_state =
-                Snark_worker.Inputs.Worker_state.create ~proof_level
-                  ~constraint_constants ~signature_kind ()
+                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
+                  ~constraint_constants ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1747,12 +1746,12 @@ let internal_commands logger ~itn_features =
               in
               let spec =
                 [%of_sexp:
-                  ( Transaction_witness.Stable.Latest.t
+                  ( Transaction_witness.t
                   , Ledger_proof.t )
                   Snark_work_lib.Work.Single.Spec.t] sexp
               in
               match%map
-                Snark_worker.Inputs.perform_single worker_state
+                Snark_worker.Prod.Inputs.perform_single worker_state
                   ~message:sok_message spec
               with
               | Ok _ ->
@@ -1919,7 +1918,7 @@ let internal_commands logger ~itn_features =
               () ) ;
           Deferred.return ()) )
   ; ("dump-type-shapes", dump_type_shapes)
-  ; ("replay-blocks", replay_blocks logger ~itn_features)
+  ; ("replay-blocks", replay_blocks logger)
   ; ("audit-type-shapes", audit_type_shapes)
   ; ( "test-genesis-block-generation"
     , Command.async ~summary:"Generate a genesis proof"
@@ -1986,14 +1985,13 @@ let internal_commands logger ~itn_features =
 
 let mina_commands logger ~itn_features =
   [ ("accounts", Client.accounts)
-  ; ("daemon", daemon logger ~itn_features)
+  ; ("daemon", daemon logger)
   ; ("client", Client.client)
   ; ("advanced", Client.advanced ~itn_features)
   ; ("ledger", Client.ledger)
   ; ("libp2p", Client.libp2p)
   ; ( "internal"
-    , Command.group ~summary:"Internal commands"
-        (internal_commands logger ~itn_features) )
+    , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
   ]
@@ -2017,8 +2015,8 @@ let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
   Random.self_init () ;
-  let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
-  let logger = Logger.create ~itn_features () in
+  let compile_config = Mina_compile_config.Compiled.t in
+  let logger = Logger.create ~itn_features:compile_config.itn_features () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky_backendless.Snark.set_eval_constraints true ;
@@ -2034,7 +2032,8 @@ let () =
    | _ ->
        Command.run
          (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
-            (mina_commands logger ~itn_features) ) ) ;
+            (mina_commands logger ~itn_features:compile_config.itn_features) )
+  ) ;
   Core.exit 0
 
 let linkme = ()

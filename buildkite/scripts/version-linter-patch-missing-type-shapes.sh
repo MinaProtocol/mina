@@ -27,7 +27,7 @@ function checkout_and_dump() {
     git checkout $__commit
     git submodule sync
     git submodule update --init --recursive
-    eval "$(opam config env)"
+    eval $(opam config env)
     TYPE_SHAPE_FILE=${__commit:0:7}-type_shape.txt
     dune exec src/app/cli/src/mina.exe internal dump-type-shapes > /tmp/${TYPE_SHAPE_FILE}
     revert_checkout
@@ -35,10 +35,8 @@ function checkout_and_dump() {
 }
 
 
-source ./buildkite/scripts/handle-fork.sh
-
 if [[ $FORK == 1 ]]; then 
-    echo "⏩  Skipping type shape patching on a forked repository" 
+    echo "⏩  Skipping type shape patching on for forked repository" 
     exit 0
 fi
 
@@ -47,7 +45,7 @@ if ! $(source buildkite/scripts/cache/manager.sh read mina-type-shapes/"$RELEASE
 fi
 
 if [[ -n "${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-}" ]]; then 
-    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
+    BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT=$(git log -n 1 --format="%h" --abbrev=7 ${REMOTE}/${BUILDKITE_PULL_REQUEST_BASE_BRANCH} )
     if ! gsutil ls "gs://mina-type-shapes/${BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT}*"; then
         checkout_and_dump $BUILDKITE_PULL_REQUEST_BASE_BRANCH_COMMIT
     fi

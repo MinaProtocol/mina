@@ -21,7 +21,7 @@
   kimchi_pasta
   kimchi_pasta.basic
   mina_base
-  mina_stdlib
+  bounded_types
   mina_numbers
   mina_wire_types
   pickles

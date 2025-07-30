@@ -1,7 +1,5 @@
-(executable
- (name command_line_tests)
- (package mina_command_line_tests)
- (public_name mina-command-line-tests)
+(tests
+ (names command_line_tests)
  (libraries
   ;; opam libraries
   async_kernel

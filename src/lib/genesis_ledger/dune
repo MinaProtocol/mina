@@ -3,7 +3,8 @@
  (name genesis_ledger)
  (libraries
   ;; opam libraries
-  core
+  core_kernel
+  base
   ;; local libraries
   key_gen
   mina_base
@@ -13,7 +14,8 @@
   genesis_constants
   data_hash_lib
   mina_ledger
-  mina_stdlib)
+  mina_base.import
+  bounded_types)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

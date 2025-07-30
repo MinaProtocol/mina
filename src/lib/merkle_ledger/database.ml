@@ -1,11 +1,10 @@
-open Core_kernel
-
 module Make (Inputs : Intf.Inputs.DATABASE) = struct
-  (* The max depth of a merkle tree can never be greater than 253,
-     due to the way we encode locations. *)
+  (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
 
   module Db_error = struct
+    [@@@warning "-4"] (* due to deriving sexp below *)
+
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
   end
@@ -44,7 +43,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   let depth t = t.depth
 
-  let create ?directory_name ?(fresh = false) ~depth () =
+  let create ?directory_name ~depth () =
     let open Core in
     (* for ^/ and Unix below *)
     assert (depth < 0xfe) ;
@@ -59,7 +58,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       | Some name ->
           name
     in
-    if fresh then Mina_stdlib_unix.File_system.rmrf directory ;
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
     { uuid
@@ -98,9 +96,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     with exn -> close t ; raise exn
 
   let empty_hash =
-    Mina_stdlib.Empty_hashes.extensible_cache
-      (module Hash)
-      ~init_hash:Hash.empty_account
+    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
   let get_raw { kvdb; depth; _ } location =
     Kvdb.get kvdb ~key:(Location.serialize ~ledger_depth:depth location)
@@ -175,6 +171,10 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     assert (Addr.depth address <= mdb.depth) ;
     get_hash mdb (Location.Hash address)
 
+  let set_inner_hash_at_addr_exn mdb address hash =
+    assert (Addr.depth address <= mdb.depth) ;
+    set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
+
   let get_generic mdb location =
     assert (Location.is_generic location) ;
     get_raw mdb location
@@ -248,7 +248,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
           let first_location =
             Location.Account
               ( Addr.of_directions
-              @@ List.init mdb.depth ~f:(fun _ -> Mina_stdlib.Direction.Left) )
+              @@ List.init mdb.depth ~f:(fun _ -> Direction.Left) )
           in
           set_raw mdb location (Location.serialize ~ledger_depth first_location) ;
           Result.return first_location
@@ -510,13 +510,12 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   module For_tests = struct
     let gen_account_location ~ledger_depth =
       let open Quickcheck.Let_syntax in
-      let build_account (path : Mina_stdlib.Direction.t list) =
+      let build_account (path : Direction.t list) =
         assert (List.length path = ledger_depth) ;
         Location.Account (Addr.of_directions path)
       in
       let%map dirs =
-        Quickcheck.Generator.list_with_length ledger_depth
-          Mina_stdlib.Direction.gen
+        Quickcheck.Generator.list_with_length ledger_depth Direction.gen
       in
       build_account dirs
   end
@@ -623,7 +622,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     in
     let dependency_hashes = get_hash_batch_exn mdb dependency_locs in
     List.map2_exn dependency_dirs dependency_hashes ~f:(fun dir hash ->
-        Mina_stdlib.Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
+        Direction.map dir ~left:(`Left hash) ~right:(`Right hash) )
 
   let path_batch_impl ~expand_query ~compute_path mdb locations =
     let locations =
@@ -653,7 +652,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let res =
           List.map2_exn loc_and_dir_list sibling_hashes
             ~f:(fun (_, direction) sibling_hash ->
-              Mina_stdlib.Direction.map direction ~left:(`Left sibling_hash)
+              Direction.map direction ~left:(`Left sibling_hash)
                 ~right:(`Right sibling_hash) )
         in
         (rest_hashes, res) )
@@ -669,7 +668,7 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         let res =
           List.map3_exn loc_and_dir_list sibling_hashes self_hashes
             ~f:(fun (_, direction) sibling_hash self_hash ->
-              Mina_stdlib.Direction.map direction
+              Direction.map direction
                 ~left:(`Left (self_hash, sibling_hash))
                 ~right:(`Right (sibling_hash, self_hash)) )
         in

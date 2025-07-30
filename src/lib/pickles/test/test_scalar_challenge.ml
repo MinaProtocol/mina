@@ -1,9 +1,9 @@
-(** Testing
-    -------
+(* Testing
+   -------
 
-    Component: Pickles
-    Subject: Test step and wrap scalar challenges
-    Invocation: dune exec src/lib/pickles/test/test_scalar_challenge.exe
+   Component: Pickles
+   Subject: Test step and wrap scalar challenges
+   Invocation: dune exec src/lib/pickles/test/main.exe -- test "scalar challenge"
 *)
 
 module SC = Pickles__Import.Scalar_challenge
@@ -90,17 +90,16 @@ module Step =
     (Impls.Step.Challenge)
     (Endo.Step_inner_curve)
 
-let () =
+let tests =
   let open Alcotest in
-  run "Pickles Scalar Challenge"
-    [ ( "Wrap"
-      , [ test_case "test endo" `Quick Wrap.test_endo
-        ; test_case "test scalar" `Quick
-            (Wrap.test_scalar ~endo:Endo.Step_inner_curve.scalar)
-        ] )
-    ; ( "Step"
-      , [ test_case "test endo" `Quick Step.test_endo
-        ; test_case "test scalar" `Quick
-            (Step.test_scalar ~endo:Endo.Wrap_inner_curve.scalar)
-        ] )
-    ]
+  [ ( "Wrap scalar challenge "
+    , [ test_case "test endo" `Quick Wrap.test_endo
+      ; test_case "test scalar" `Quick
+          (Wrap.test_scalar ~endo:Endo.Step_inner_curve.scalar)
+      ] )
+  ; ( "Step scalar challenge"
+    , [ test_case "test endo" `Quick Step.test_endo
+      ; test_case "test scalar" `Quick
+          (Step.test_scalar ~endo:Endo.Wrap_inner_curve.scalar)
+      ] )
+  ]

@@ -14,24 +14,18 @@ export MINA_PRIVKEY_PASS='naughty blue worm'
 MINA_APP=_build/default/src/app/cli/src/mina.exe
 RUNTIME_LEDGER_APP=_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
 
-BENCHMARK_FILE=${BENCHMARK_FILE:-ledger_test_apply_bench.json}
 TEMP_FOLDER=$(mktemp -d)
 ACCOUNTS_FILE=$TEMP_FOLDER/accounts.json
 TEMP_ACCOUNTS_FILE=$TEMP_FOLDER/accounts_tmp.json
 GENESIS_LEDGER=$TEMP_FOLDER/genesis_ledger.config
 SENDER=$TEMP_FOLDER/sender
 
-ACTIONS_EVENTS_OPT="--transfer-parties-get-actions-events"
-FULL_ACTIONS_EVENTS=""
-
 while [[ "$#" -gt 0 ]]; do case $1 in
-  -m|--mina-app) MINA_APP="$2"; shift; shift;;
-  -r|--runtime-ledger-app) RUNTIME_LEDGER_APP="$2"; shift; shift;;
-  "$ACTIONS_EVENTS_OPT") 
-    # shellcheck disable=SC2034
-    FULL_ACTIONS_EVENTS="$ACTIONS_EVENTS_OPT"; shift;;
+  -m|--mina-app) MINA_APP="$2"; shift;;
+  -r|--runtime-ledger-app) RUNTIME_LEDGER_APP="$2"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
-esac; done
+esac; shift; done
+
 
 echo "Exporting ledger to $TEMP_FOLDER"
 echo "20k accounts is way less than the size of a mainnet ledger (200k), but good enough for testing"
@@ -52,7 +46,7 @@ $RUNTIME_LEDGER_APP --config-file $GENESIS_LEDGER --genesis-dir $TEMP_FOLDER/gen
 
 
 # Silently passing MINA_PRIVKEY_PASS & CODA_PRIVKEY
-CODA_PRIVKEY=$(cat $ACCOUNTS_FILE | jq -r .[0].sk) MINA_PRIVKEY_PASS=$MINA_PRIVKEY_PASS $MINA_APP advanced wrap-key --privkey-path $SENDER
+CODA_PRIVKEY=$(cat $ACCOUNTS_FILE | jq -r .[0].sk) MINA_PRIVKEY_PASS=$MINA_PRIVKEY_PASS mina advanced wrap-key --privkey-path $SENDER
 chmod 700 $SENDER
 
 mkdir $TEMP_FOLDER/genesis/ledger
@@ -60,4 +54,5 @@ mkdir $TEMP_FOLDER/genesis/ledger
 tar -zxf  $TEMP_FOLDER/genesis/genesis_ledger_*.tar.gz -C $TEMP_FOLDER/genesis/ledger
 
 echo "running test:"
-time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200 --dump-benchmark $BENCHMARK_FILE $ACTIONS_EVENTS_OPT
+time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200
+

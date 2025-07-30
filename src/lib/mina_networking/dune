@@ -48,7 +48,7 @@
   transition_handler
   o1trace
   ppx_version.runtime
-  mina_stdlib
+  bounded_types
   sync_handler
   transition_chain_prover
   work_selector)
