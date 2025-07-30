@@ -55,6 +55,9 @@ mina-poseidon = { path = "../../proof-systems/poseidon" }
 o1-utils = { path = "../../proof-systems/utils" }
 poly-commitment = { path = "../../proof-systems/poly-commitment" }
 
+wasm-types = { path = "./src/wasm-types" }
+
+
 [dev-dependencies]
 wasm-bindgen-test = ">=0.3.0"
 
