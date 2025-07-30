@@ -95,7 +95,7 @@ let received_bad_proof ({ context = (module Context); _ } as t) host e =
             , [ ("error", Error_json.error_to_yojson e) ] ) ))
 
 let done_syncing_root root_sync_ledger =
-  Option.is_some (Sync_ledger.Any_ledger.peek_valid_tree root_sync_ledger)
+  Option.is_some (Sync_ledger.Root.peek_valid_tree root_sync_ledger)
 
 let should_sync ~root_sync_ledger t candidate_state =
   (not @@ done_syncing_root root_sync_ledger)
@@ -127,7 +127,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger
   return
   @@
   match
-    Sync_ledger.Any_ledger.new_goal root_sync_ledger
+    Sync_ledger.Root.new_goal root_sync_ledger
       (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
       ~data:
         ( State_hash.With_state_hashes.state_hash
@@ -204,8 +204,8 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
 let sync_ledger ({ context = (module Context); _ } as t) ~preferred
     ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
   let open Context in
-  let query_reader = Sync_ledger.Any_ledger.query_reader root_sync_ledger in
-  let response_writer = Sync_ledger.Any_ledger.answer_writer root_sync_ledger in
+  let query_reader = Sync_ledger.Root.query_reader root_sync_ledger in
+  let response_writer = Sync_ledger.Root.answer_writer root_sync_ledger in
   Mina_networking.glue_sync_ledger ~preferred t.network query_reader
     response_writer ;
   Pipe_lib.Choosable_synchronous_pipe.iter sync_ledger_reader
@@ -272,9 +272,7 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
     ~sync_ledger_reader ~context t temp_snarked_ledger =
   time_deferred
     (let root_sync_ledger =
-       Sync_ledger.Any_ledger.create
-         (Ledger.Root.as_unmasked temp_snarked_ledger)
-         ~context ~trust_system
+       Sync_ledger.Root.create temp_snarked_ledger ~context ~trust_system
      in
      don't_wait_for
        (sync_ledger t ~preferred:preferred_peers ~root_sync_ledger
@@ -282,8 +280,8 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
      (* We ignore the resulting ledger returned here since it will always
         * be the same as the ledger we started with because we are syncing
         * a db ledger. *)
-     let%map _, data = Sync_ledger.Any_ledger.valid_tree root_sync_ledger in
-     Sync_ledger.Any_ledger.destroy root_sync_ledger ;
+     let%map _, data = Sync_ledger.Root.valid_tree root_sync_ledger in
+     Sync_ledger.Root.destroy root_sync_ledger ;
      data )
 
 (** Run one bootstrap cycle *)
@@ -835,9 +833,8 @@ let%test_module "Bootstrap_controller tests" =
             make_non_running_bootstrap ~genesis_root ~network:me.network
           in
           let root_sync_ledger =
-            Sync_ledger.Any_ledger.create
-              ( Ledger.Root.as_unmasked
-              @@ Transition_frontier.root_snarked_ledger me.state.frontier )
+            Sync_ledger.Root.create
+              (Transition_frontier.root_snarked_ledger me.state.frontier)
               ~context:(module Context)
               ~trust_system
           in

@@ -20,6 +20,8 @@ check_filter:
 	# Ensure Jobs.dhall is generated before proceeding
 	(cd ../ && ./buildkite/scripts/generate-jobs.sh > ./buildkite/src/gen/Jobs.dhall)
 	python3 ./unit-tests/parse_triage.py
+	# Clean up
+	git checkout -- ./src/gen/Jobs.dhall
 	
 dump_pipelines:
 	$(eval TMP := $(shell mktemp -d))

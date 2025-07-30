@@ -2602,8 +2602,8 @@ module Queries = struct
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           l ->
           Ledger.Any_ledger.cast (module Ledger) l
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db l ->
-          Ledger.Any_ledger.cast (module Ledger.Db) l
+      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
+          Ledger.Root.as_unmasked l
     in
     let root_consensus_state =
       let frontier =

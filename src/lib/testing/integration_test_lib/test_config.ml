@@ -83,6 +83,7 @@ type t =
   ; network_id : string option
   ; block_window_duration_ms : int
   ; transaction_capacity_log_2 : int
+  ; signature_kind : Mina_signature_kind.t
   }
 
 let proof_config_default : Runtime_config.Proof_keys.t =
@@ -144,6 +145,7 @@ let default ~(constants : constants) =
   ; network_id = None
   ; block_window_duration_ms = constraint_constants.block_window_duration_ms
   ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2
+  ; signature_kind = Mina_signature_kind.t_DEPRECATED
   }
 
 let transaction_capacity_log_2 (config : t) =
