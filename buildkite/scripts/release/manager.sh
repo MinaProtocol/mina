@@ -372,6 +372,7 @@ function publish_debian() {
     local __backend=$9
     local __debian_repo=${10}
     local __debian_sign_key=${11}
+    local __new_artifact_name=${12:-""}
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network"
     local __artifact_full_name
@@ -386,6 +387,11 @@ function publish_debian() {
         local __signed_arg=""
     fi
 
+    if [[ -z ${__new_artifact_name+x} || -z ${__new_artifact_name} || ${__new_artifact_name} == "" ]]; then
+        __new_artifact_name=$__artifact_full_name
+    fi
+
+
     if [[ $__source_version != "$__target_version" ]]; then
         echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__target_version"
         prefix_cmd "$SUBCOMMAND_TAB" reversion --deb ${__deb} \
@@ -394,7 +400,7 @@ function publish_debian() {
                 --new-version ${__target_version} \
                 --suite "unstable" \
                 --new-suite ${__channel} \
-                --new-name ${__artifact_full_name}
+                --new-name ${__new_artifact_name}
     fi
 
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
@@ -402,7 +408,7 @@ function publish_debian() {
     if [[ $__dry_run == 0 ]]; then
         # shellcheck disable=SC2068
         prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
-            --names "$DEBIAN_CACHE_FOLDER/$__codename/${__artifact_full_name}_${__target_version}.deb" \
+            --names "$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}.deb" \
             --version $__target_version \
             --bucket $__debian_repo \
             -c $__codename \
@@ -411,10 +417,10 @@ function publish_debian() {
 
         if [[ $__verify == 1 ]]; then
 
-            echo "     📋 Verifying: $__artifact debian to $__channel channel with $__target_version version"
+            echo "     📋 Verifying: $__new_artifact_name debian to $__channel channel with $__target_version version"
 
             prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/verify.sh \
-                -p $__artifact_full_name \
+                -p $__new_artifact_name \
                 --version $__target_version \
                 -m $__codename \
                 -r $__debian_repo \
@@ -515,13 +521,13 @@ function promote_debian() {
                 --suite ${__source_channel} \
                 --repo ${__debian_repo} \
                 --new-suite ${__target_channel} \
-                --new-name ${__artifact_full_name}
+                --new-name ${__new_artifact_name}
 
         if [[ $__verify == 1 ]]; then
             echo "     📋 Verifying: $__artifact debian to $__target_channel channel with $__target_version version"
 
             prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/debian/verify.sh \
-                -p $__artifact_full_name \
+                -p $__new_artifact_name \
                 --version $__target_version \
                 -m $__codename \
                 -r $__debian_repo \
@@ -588,6 +594,7 @@ function publish(){
     local __backend="gs"
     local __debian_repo=$DEBIAN_REPO
     local __debian_sign_key=""
+    local __strip_network_from_archive=0
 
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
@@ -655,6 +662,10 @@ function publish(){
                 __debian_sign_key=${2:?$error_message}
                 shift 2;
             ;;
+            --strip-network-from-archive )
+                __strip_network_from_archive=1
+                shift 1;
+            ;;
             * )
                 echo -e "❌ ${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -700,6 +711,7 @@ function publish(){
     echo " - Backend: $__backend"
     echo " - Debian repo: $__debian_repo"
     echo " - Debian sign key: $__debian_sign_key"
+    echo " - Strip network from archive: $__strip_network_from_archive"
     echo ""
 
     if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
@@ -749,6 +761,14 @@ function publish(){
                         ;;
                         mina-archive)
                             for network in "${__networks_arr[@]}"; do
+
+                                if [[ $__strip_network_from_archive == 1 ]]; then
+                                    new_name="mina-archive"
+                                else 
+                                    new_name=""
+                                fi
+
+
                                 if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                             $__codename \
@@ -760,7 +780,8 @@ function publish(){
                                             $__dry_run \
                                             $__backend \
                                             $__debian_repo \
-                                            "$__debian_sign_key"
+                                            "$__debian_sign_key" \
+                                            "$new_name"
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
@@ -929,6 +950,10 @@ function promote(){
                 __verify=1
                 shift 1;
             ;;
+            --strip-network-from-archive )
+                __strip_network_from_archive=1
+                shift 1;
+            ;;
             --dry-run )
                 __dry_run=1
                 shift 1;
@@ -993,6 +1018,7 @@ function promote(){
     echo " - Only debians: $__only_debians"
     echo " - Verify: $__verify"
     echo " - Dry run: $__dry_run"
+    echo " - Strip network from archive: $__strip_network_from_archive"
     echo ""
 
     #check environment setup
@@ -1049,7 +1075,8 @@ function promote(){
                                         $__verify \
                                         $__dry_run \
                                         $__debian_repo \
-                                        $__debian_sign_key
+                                        $__debian_sign_key \
+                                        $new_name
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
