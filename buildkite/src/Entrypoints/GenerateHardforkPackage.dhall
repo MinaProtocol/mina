@@ -138,7 +138,10 @@ let generateDockerForCodename =
               , Command.build
                   Command.Config::{
                   , commands =
-                    [ Cmd.runInDocker
+                    [ Cmd.run
+                        "export MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                                      codename} && source ./buildkite/scripts/export-git-env-vars.sh"
+                    , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
                         "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed -e '0,/20.000001/{s/20.000001/20.01/}' -i config.json && ! (mina-verify-packaged-fork-config ${Network.lowerName
                                                                                                                                                                                                            spec.network} config.json /workdir/verification)"
@@ -154,7 +157,10 @@ let generateDockerForCodename =
               , Command.build
                   Command.Config::{
                   , commands =
-                    [ Cmd.runInDocker
+                    [ Cmd.run
+                        "export MINA_DEB_CODENAME=${DebianVersions.lowerName
+                                                      codename} && source ./buildkite/scripts/export-git-env-vars.sh"
+                    , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
                         "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config ${Network.lowerName
                                                                                                                                            spec.network} config.json /workdir/verification"
