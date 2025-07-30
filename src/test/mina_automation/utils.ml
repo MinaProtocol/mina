@@ -57,27 +57,48 @@ let get_memory_usage_mb pid =
         None
   with _ -> None
 
-(** [get_memory_usage_mb_of_user_process username] returns the total memory usage
-  in megabytes for all processes belonging to the specified user [username].
+(** [get_memory_usage_mb_of_user_process process] returns the total memory usage
+  in megabytes for all processes matching the specified process name [process].
 
   This function executes the 'ps' command to retrieve RSS (Resident Set Size) values
-  for all processes owned by the given user, sums them up, and converts the result
+  for all processes matching the given process name, sums them up, and converts the result
   from kilobytes to megabytes.
 
-  @param username The username whose processes' memory usage should be calculated
+  @param process The process name whose instances' memory usage should be calculated
   @return A deferred float representing the total memory usage in megabytes
   
   @raise If the 'ps' command fails to execute, an exception will be raised by [Util.run_cmd_exn] *)
-let get_memory_usage_mb_of_user_process username =
+let get_memory_usage_mb_of_user_process process =
+  (* Use 'ps' to get the memory usage of all processes with the given name *)
+  (* The command 'ps -eo comm,rss' lists the command name and RSS in kilobytes *)
+  (* We filter out empty lines and sum the RSS values for processes matching [process] *)
+  (* Example output:
+     postgres 29520
+     postgres 8544
+     postgres 5876
+     postgres 10072
+     postgres 8612
+     postgres 6976
+     bash 3488
+     ps 3892
+  *)
   let%bind output =
-    Util.run_cmd_exn "." "ps" [ "-u"; username; "-o"; "rss=" ]
+    Util.run_cmd_exn "." "ps" [ "-eo"; "comm,rss"; "--no-headers" ]
   in
   let lines = String.split_lines output in
   let total_memory_mb =
     lines
-    |> List.fold ~init:0 ~f:(fun acc line ->
-           acc + (String.strip line |> Int.of_string) )
-    |> Float.of_int
+    |> List.filter_map ~f:(fun line ->
+           let parts =
+             String.split ~on:' ' line
+             |> List.filter ~f:(fun s -> not (String.is_empty s))
+           in
+           match parts with
+           | proc_name :: rss_str :: _ when String.equal proc_name process ->
+               Some (Int.of_string rss_str)
+           | _ ->
+               None )
+    |> List.fold ~init:0 ~f:( + ) |> Float.of_int
     |> fun kb -> kb /. 1024.0
   in
   Deferred.return total_memory_mb
