@@ -199,6 +199,12 @@ function calculate_debian_version() {
     echo "$__artifact:$__target_version-$__codename$__network_suffix"
 }
 
+function extract_version_from_deb() {
+    local __deb_file=$1
+    echo "$__deb_file" | sed -n 's/.*_\([^_]*\)\.deb$/\1/p'
+}
+
+
 
 function calculate_docker_tag() {
     local __publish_to_docker_io=$1
@@ -1519,6 +1525,8 @@ function persist(){
     local __buildkite_build_id
     local __target
     local __codename
+    local __new_version
+    local __suite="unstable"
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -1542,8 +1550,16 @@ function persist(){
                 __buildkite_build_id=${2:?$error_message}
                 shift 2;
             ;;
+            --new-version )
+                __new_version=${2:?$error_message}
+                shift 2;
+            ;;
             --target )
                 __target=${2:?$error_message}
+                shift 2;
+            ;;
+            --suite )
+                __suite=${2:?$error_message}
                 shift 2;
             ;;
             * )
@@ -1553,13 +1569,6 @@ function persist(){
             ;;
         esac
     done
-
-    echo ""
-    echo " ℹ️  Persisting mina artifacts with following parameters:"
-    echo " - Backend: $__backend"
-    echo " - Artifacts: $__artifacts"
-    echo " - Buildkite build id: $__buildkite_build_id"
-    echo " - Target: $__target"
 
     if [[ -z ${__buildkite_build_id+x} ]]; then
         echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
@@ -1581,6 +1590,18 @@ function persist(){
         persist_help; exit 1;
     fi
 
+    echo ""
+    echo " ℹ️  Persisting mina artifacts with following parameters:"
+    echo " - Backend: $__backend"
+    echo " - Artifacts: $__artifacts"
+    echo " - Buildkite build id: $__buildkite_build_id"
+    echo " - Codename: $__codename"
+    echo " - Suite: $__suite"
+    echo " - Target: $__target"
+    if [[ -n ${__new_version+x} ]]; then
+        echo " - New version: $__new_version"
+    fi
+
     IFS=', '
     read -r -a __artifacts_arr <<< "$__artifacts"
 
@@ -1590,6 +1611,28 @@ function persist(){
 
     for __artifact in "${__artifacts_arr[@]}"; do
         storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*" "$tmp_dir"
+      
+        if [[ -n ${__new_version+x} ]]; then
+            local __source_version
+            __source_version=$(extract_version_from_deb "$(ls $tmp_dir/${__artifact}_*.deb | head -1)")
+            
+            local __deb
+            __deb=$(ls $tmp_dir/${__artifact}_*.deb | head -1)
+
+            local __artifact_full_name
+            __artifact_full_name=$(get_artifact_with_suffix $__artifact)
+
+            echo " 🗃️  Rebuilding $__artifact debian from $__source_version to $__new_version"
+            prefix_cmd "$SUBCOMMAND_TAB" reversion --deb "$tmp_dir/${__artifact_full_name}" \
+                --package ${__artifact_full_name} \
+                --source-version ${__source_version} \
+                --new-version ${__new_version} \
+                --suite "unstable" \
+                --new-suite ${__suite} \
+                --new-name ${__artifact_full_name}
+        fi
+
+      
         storage_upload "$__backend" "$tmp_dir/${__artifact}_*" "$(storage_root "$__backend")/$__target/debians/$__codename/"
     done
 
