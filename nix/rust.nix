@@ -15,7 +15,7 @@ let
   toolchainHashes = {
     "1.81.0" = "sha256-VZZnlyP69+Y3crrLHQyJirqlHrTtGTsyiSnZB8jEvVo=";
     "nightly-2024-09-05" =
-      "sha256-s5nlYcYG9EuO2HK2BU3PkI928DZBKCTJ4U9bz3RX1t4=";
+      "sha256-3aoA7PuH09g8F+60uTUQhnHrb/ARDLueSOD08ZVsWe0=";
     # copy the placeholder line with the correct toolchain name when adding a new toolchain
     # That is,
     # 1. Put the correct version name;
@@ -140,12 +140,12 @@ in {
   # Work around https://github.com/rust-lang/wg-cargo-std-aware/issues/23
   kimchi-rust-std-deps = final.rustPlatform.importCargoLock {
     lockFile = final.runCommand "cargo.lock" { } ''
-      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/Cargo.lock $out
+      cp ${final.kimchi-rust.rust-src}/lib/rustlib/src/rust/library/Cargo.lock $out
     '';
   };
 
   plonk_wasm = let
-    lock = ../src/lib/crypto/proof-systems/Cargo.lock;
+    lock = ../src/lib/crypto/kimchi_bindings/wasm/Cargo.lock;
 
     deps = builtins.listToAttrs (map (pkg: {
       inherit (pkg) name;
@@ -212,8 +212,8 @@ in {
       (
       set -x
       export RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals -C link-arg=--max-memory=4294967296"
-      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs plonk-wasm -- --features nodejs -Z build-std=panic_abort,std
-      wasm-pack build --mode no-install --target web --out-dir $out/web plonk-wasm -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target nodejs --out-dir $out/nodejs ./. -- --features nodejs -Z build-std=panic_abort,std
+      wasm-pack build --mode no-install --target web --out-dir $out/web ./. -Z build-std=panic_abort,std
       )
       runHook postBuild
     '';
