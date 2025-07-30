@@ -28,8 +28,8 @@ ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # - mina-devnet
 # - mina-devnet-lightnet etc.
 ENV MINA_DEB=mina-${network}${SUFFIX}
-ENV MINA_ARCHIVE_DEB=mina-${network}${SUFFIX}
-ENV MINA_ROSETTA_DEB=mina-${network}${SUFFIX}
+ENV MINA_ARCHIVE_DEB=mina-archive-${network}${SUFFIX}
+ENV MINA_ROSETTA_DEB=mina-rosetta-${network}${SUFFIX}
 
 
 # We do not install the below platform-specific dependencies,
