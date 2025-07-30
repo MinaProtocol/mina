@@ -199,7 +199,7 @@ let generate_hardfork_package =
               Spec::{
               , codenames = codenames
               , network = network
-              , version = "\\\$MINA_DOCKER_TAG"
+              , version = "\\\$MINA_DEB_VERSION"
               , genesis_timestamp = genesis_timestamp
               , config_json_gz_url = config_json_gz_url
               , suffix = suffix
