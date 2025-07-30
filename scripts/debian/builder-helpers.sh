@@ -521,3 +521,20 @@ build_zkapp_test_transaction_deb () {
   build_deb mina-zkapp-test-transaction
 }
 ## END ZKAPP TEST TXN PACKAGE ##
+
+
+
+build_create_legacy_genesis_deb() {
+  echo "------------------------------------------------------------"
+  echo "--- Building Mina Berkeley create legacy genesis tool:"
+
+  create_control_file mina-create-legacy-genesis \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
+    'Utility to verify post hardfork ledger for Mina'
+
+  # Binaries
+  cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+    "${BUILDDIR}/usr/local/bin/mina-create-legacy-genesis"
+
+  build_deb mina-create-legacy-genesis
+}
