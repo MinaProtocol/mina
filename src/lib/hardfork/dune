@@ -1,5 +1,10 @@
 (library
  (name hardfork)
  (public_name hardfork)
+ (libraries
+   mina_ledger
+   precomputed_values)
+ (preprocess
+   (pps ppx_let))
  (instrumentation
   (backend bisect_ppx)))
