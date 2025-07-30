@@ -17,8 +17,6 @@ let isEssential =
             , FunctionalTestSuite = True
             , Toolchain = True
             , DaemonHardfork = True
-            , ArchiveHardfork = True
-            , RosettaHardfork = True
             }
             service
 

@@ -88,8 +88,8 @@ let generateDockerForCodename =
                   , artifacts =
                     [ Artifacts.Type.LogProc
                     , Artifacts.Type.DaemonHardfork
-                    , Artifacts.Type.ArchiveHardfork
-                    , Artifacts.Type.RosettaHardfork
+                    , Artifacts.Type.Archive
+                    , Artifacts.Type.Rosetta
                     , Artifacts.Type.ZkappTestTransaction
                     ]
                   , debVersion = codename
@@ -144,7 +144,7 @@ let generateDockerForCodename =
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
                         "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed -e '0,/20.000001/{s/20.000001/20.01/}' -i config.json && ! (FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config ${Network.lowerName
-                                                                                                                                                                                                           spec.network} config.json /workdir/verification)"
+                                                                                                                                                                                                                                                spec.network} config.json /workdir/verification)"
                     ]
                   , label =
                       "Assert corrupted packaged artifacts are unverifiable"
@@ -163,7 +163,7 @@ let generateDockerForCodename =
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
                         "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config ${Network.lowerName
-                                                                                                                                           spec.network} config.json /workdir/verification"
+                                                                                                                                                                                spec.network} config.json /workdir/verification"
                     ]
                   , label = "Verify packaged artifacts"
                   , key = "verify-packaged-artifacts"

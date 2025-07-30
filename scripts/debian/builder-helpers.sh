@@ -350,51 +350,6 @@ build_rosetta_berkeley_deb() {
 }
 ## END BERKELEY PACKAGE ##
 
-build_rosetta_berkeley_hardfork_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building berkeley rosetta hardfork deb"
-
-  create_control_file mina-rosetta-berkeley-hardfork "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones "testnet"
-
-  build_deb mina-rosetta-berkeley-hardfork
-}
-
-build_rosetta_devnet_hardfork_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building devnet rosetta hardfork deb"
-
-  create_control_file mina-rosetta-devnet-hardfork "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones "testnet"
-
-  build_deb mina-rosetta-devnet-hardfork
-}
-
-build_rosetta_mainnet_hardfork_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building mainnet rosetta hardfork deb"
-
-  create_control_file mina-rosetta-mainnet-hardfork "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "mainnet"
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones "mainnet"
-
-  build_deb mina-rosetta-mainnet-hardfork
-}
-
 ## MAINNET PACKAGE ##
 build_daemon_mainnet_deb() {
 
@@ -629,59 +584,6 @@ build_archive_mainnet_deb () {
 
 }
 ## END ARCHIVE MAINNET PACKAGE ##
-
-## ARCHIVE HARDFORK PACKAGE ##
-build_archive_mainnet_hardfork_deb() {
-  ARCHIVE_DEB=mina-archive-mainnet-hardfork
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive mainnet hardfork deb"
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones mainnet
-
-}
-
-## END ARCHIVE HARDFORK PACKAGE ##
-
-## ARCHIVE DEVNET HARDFORK PACKAGE ##
-
-build_archive_devnet_hardfork_deb() {
-  ARCHIVE_DEB=mina-archive-devnet-hardfork
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive devnet hardfork deb"
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones devnet
-}
-
-## END ARCHIVE DEVNET HARDFORK PACKAGE ##
-
-## ARCHIVE BERKELEY HARDFORK PACKAGE ##
-build_archive_berkeley_hardfork_deb() {
-  ARCHIVE_DEB=mina-archive-berkeley-hardfork
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive berkeley hardfork deb"
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
-}
-
-## END ARCHIVE BERKELEY HARDFORK PACKAGE ##
 
 ## ZKAPP TEST TXN ##
 build_zkapp_test_transaction_deb () {
