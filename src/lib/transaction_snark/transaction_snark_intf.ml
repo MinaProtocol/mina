@@ -130,6 +130,8 @@ module type Full = sig
   module type S = sig
     include Verification.S
 
+    val signature_kind : Mina_signature_kind.t
+
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val cache_handle : Pickles.Cache_handle.t

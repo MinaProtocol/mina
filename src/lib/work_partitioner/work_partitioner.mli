@@ -26,6 +26,7 @@ val create :
      reassignment_timeout:Time.Span.t
   -> logger:Logger.t
   -> proof_cache_db:Proof_cache_tag.cache_db
+  -> signature_kind:Mina_signature_kind.t
   -> t
 
 type work_from_selector =
