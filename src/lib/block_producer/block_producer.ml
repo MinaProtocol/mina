@@ -1092,18 +1092,20 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
                  ~frontier_reader () ) ;
             schedule_block_production (scheduled_time, data, winner_pk) )
 
-(** Create a [Deferred.t] that becomes resolved at the given time. Waiting for
-    this value to be determined can be used to delay starting an action until
-    that time. Like the other times in this module, scheduling is done relative
-    to blockchain time (the [Block_time.t]) and not, say, system time.
+(** Create a [unit Deferred.t] that becomes resolved at the given [instant]. 
+    Waiting for this value to be determined can be used to delay starting an 
+    action until that time. Like the other times in this module, scheduling is 
+    done relative to blockchain time (the [Block_time.t]) and not system time.
     @param time The [Block_time.t] after which the action should start
     @param time_controller The controller used to determine the current
       [Block_time.t]
 *)
-let schedule ~time_controller time =
-  let span_till_time = Block_time.diff time (Block_time.now time_controller) in
+let after_block_time ~time_controller ~instant =
+  let span_till_time =
+    Block_time.diff instant (Block_time.now time_controller)
+  in
   Block_time.Timeout.create time_controller span_till_time ~f:Fn.id
-  |> Block_time.Timeout.to_deferred
+  |> Block_time.Timeout.to_deferred |> Deferred.ignore_m
 
 let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
     ~trust_system ~get_completed_work ~transaction_resource_pool
@@ -1201,13 +1203,13 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             let produce_block_now data =
               produce data >>| const (new_global_slot, new_epoch)
             in
-            let schedule_next_vrf_check time =
-              let%map _ = schedule ~time_controller time in
+            let schedule_next_vrf_check instant =
+              let%map () = after_block_time ~time_controller ~instant in
               (new_global_slot, new_epoch)
             in
-            let schedule_block_production (time, data, winner) =
-              let%bind _ = schedule ~time_controller time in
-              produce_block_now (time, data, winner)
+            let schedule_block_production (instant, data, winner) =
+              let%bind () = after_block_time ~time_controller ~instant in
+              produce_block_now (instant, data, winner)
             in
             iteration ~schedule_next_vrf_check ~produce_block_now
               ~schedule_block_production ~next_vrf_check_now ~genesis_breadcrumb
@@ -1240,7 +1242,11 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
             ]
           "Node started before genesis: waiting $time_till_genesis \
            milliseconds before starting block producer" ;
-      upon (schedule ~time_controller genesis_state_timestamp) start )
+      Deferred.don't_wait_for
+        (let%map () =
+           after_block_time ~time_controller ~instant:genesis_state_timestamp
+         in
+         start () ) )
 
 let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
     ~time_controller ~frontier_reader ~transition_writer ~precomputed_blocks =
