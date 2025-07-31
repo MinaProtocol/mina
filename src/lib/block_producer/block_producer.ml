@@ -937,7 +937,7 @@ let iteration ~schedule_next_vrf_check ~produce_block_now
     ~context:(module Context : CONTEXT) ~vrf_evaluator ~time_controller
     ~coinbase_receiver ~frontier_reader ~set_next_producer_timing
     ~transition_frontier ~vrf_evaluation_state ~epoch_data_for_vrf
-    ~ledger_snapshot ~epoch slot =
+    ~ledger_snapshot ~epoch ~slot =
   O1trace.thread "block_producer_iteration"
   @@ fun () ->
   let consensus_state =
@@ -1215,7 +1215,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
               ~vrf_evaluator ~time_controller ~coinbase_receiver
               ~frontier_reader ~set_next_producer_timing ~transition_frontier
               ~vrf_evaluation_state ~epoch_data_for_vrf ~ledger_snapshot ~epoch
-              slot
+              ~slot
       in
       let start _ =
         Deferred.forever
