@@ -187,9 +187,7 @@ let%test_module "Epoch ledger sync tests" =
         Strict_pipe.create Synchronous
       in
       let precomputed_values = Context.precomputed_values in
-      let time_controller =
-        Block_time.Controller.create @@ Block_time.Controller.basic ~logger
-      in
+      let time_controller = Block_time.Controller.basic ~logger in
       let on_remote_push () = Deferred.unit in
       let%bind verifier = make_verifier (module Context) in
       let block_reader, block_sink =
