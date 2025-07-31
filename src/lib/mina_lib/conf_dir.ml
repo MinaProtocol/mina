@@ -32,13 +32,14 @@ let rec check_and_set_lockfile ~logger conf_dir =
       | Ok () ->
           [%log debug] "Created daemon lockfile $lockfile"
             ~metadata:[ ("lockfile", `String lockfile) ] ;
-          Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler ~logger
-            ~description:"Remove daemon lockfile" (fun () ->
-              match%bind Sys.file_exists lockfile with
-              | `Yes ->
-                  Unix.unlink lockfile
-              | _ ->
-                  return () )
+          Mina_stdlib_unix.Exit_handlers.(
+            register_async_shutdown_handler ~priority:Priority.Exclusion ~logger
+              ~description:"Remove daemon lockfile" (fun () ->
+                match%bind Sys.file_exists lockfile with
+                | `Yes ->
+                    Unix.unlink lockfile
+                | _ ->
+                    return () ))
       | Error exn ->
           Error.tag_arg (Error.of_exn exn)
             "Could not create the daemon lockfile" ("lockfile", lockfile)

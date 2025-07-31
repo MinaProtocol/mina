@@ -63,6 +63,8 @@ module type Transition_frontier_intf = sig
 
   val work_is_referenced : t -> Transaction_snark_work.Statement.t -> bool
 
+  val all_referenced_work : t -> Transaction_snark_work.Statement.Set.t
+
   val best_tip_table : t -> Transaction_snark_work.Statement.Set.t
 end
 

@@ -126,7 +126,7 @@ let%test_module "transaction_status" =
           ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
           ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
       in
-      let transaction_pool, _, local_sink =
+      let%bind transaction_pool, _, local_sink =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants

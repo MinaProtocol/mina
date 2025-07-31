@@ -27,11 +27,27 @@ let write_proof_to_disk db proof =
   | Identity_cache ->
       Identity proof
 
-let create_db path ~logger =
-  Cache.initialize ~logger path
+let create_db ~logger ?disk_meta_location path =
+  Cache.initialize ~logger ?disk_meta_location path ()
   |> Deferred.Result.map ~f:(fun cache -> Lmdb_cache cache)
 
 let create_identity_db () = Identity_cache
+
+type id = Cache.id [@@deriving bin_io_unversioned]
+
+let to_id = function
+  | Lmdb { cache_id; _ } ->
+      Some cache_id
+  | Identity _ ->
+      None
+
+let of_id_deserialized ~id ~cache_db =
+  match cache_db with
+  | Lmdb_cache cache_db ->
+      let%map.Option _ = Cache.try_get_deserialized cache_db id in
+      Lmdb { cache_id = id; cache_db }
+  | Identity_cache ->
+      None
 
 module For_tests = struct
   let create_db = create_identity_db
