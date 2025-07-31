@@ -317,24 +317,23 @@ let submit_into_combining_result ~submitted_result ~partitioner
     [Processed (Some result)] and removes the pairing from the pool;
     If pairing pool doesn't contain the job, it's most likely that another
     worker have submitted it previously and it was removed. In this case,
-    [Spec_unmatched] is returned. *)
-let submit_single ~partitioner
+    [Spec_unmatched] is returned. 
+    If it's from zkapp pool(by setting [is_from_zkapp]), this function won't 
+    check reschedule because it's never in sent single job pool in the first
+    place. 
+    *)
+let submit_single ?(is_from_zkapp = false) ~partitioner
     ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
-    ~job_id =
+    ~job_id () =
   let Work.Id.Single.{ which_one = submitted_half; pairing_id } = job_id in
-  match Hashtbl.find partitioner.pairing_pool pairing_id with
-  | None ->
-      [%log' debug partitioner.logger]
-        "Worker submit a work that's already removed from pairing pool, \
-         meaning it's completed/no longer needed, ignoring"
-        ~metadata:
-          [ ( "result"
-            , Work.Result.Single.Poly.to_yojson
-                (fun () -> `Null)
-                Ledger_proof.to_yojson submitted_result )
-          ] ;
-      Removed
-  | Some combining_result -> (
+  match
+    ( Sent_single_job_pool.remove ~id:job_id
+        partitioner.single_jobs_sent_by_partitioner
+    , Hashtbl.find partitioner.pairing_pool pairing_id
+    , is_from_zkapp )
+  with
+  | (None as removed_job), Some combining_result, true
+  | (Some _ as removed_job), Some combining_result, _ -> (
       match
         submit_into_combining_result ~submitted_result ~partitioner
           ~combining_result ~submitted_half
@@ -348,7 +347,21 @@ let submit_single ~partitioner
       | `Removed ->
           Removed
       | `SpecUnmatched ->
+          Option.iter removed_job ~f:(fun job ->
+              Sent_single_job_pool.bring_back ~id:job_id ~job
+                partitioner.single_jobs_sent_by_partitioner ) ;
           SpecUnmatched )
+  | _ ->
+      [%log' debug partitioner.logger]
+        "Worker submit a work that's already removed from pairing pool, \
+         meaning it's completed/no longer needed, ignoring"
+        ~metadata:
+          [ ( "result"
+            , Work.Result.Single.Poly.to_yojson
+                (const `Null)
+                Ledger_proof.to_yojson submitted_result )
+          ] ;
+      Removed
 
 (** Submits a sub-zkapp job result to the pool. It removes the job id from
     [zkapp_jobs_sent_by_partitioner] pool.
@@ -379,9 +392,9 @@ let submit_into_pending_zkapp_command ~partitioner
       | Some ({ job_id; _ }, proof, elapsed) ->
           partitioner.pending_zkapp_commands <-
             Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
-          submit_single ~partitioner
+          submit_single ~is_from_zkapp:true ~partitioner
             ~submitted_result:{ spec = (); proof; elapsed }
-            ~job_id )
+            ~job_id () )
   | None, _ | _, None ->
       [%log' debug partitioner.logger]
         "Worker submit a work that's already removed from sent sub-zkapp job \
@@ -402,7 +415,7 @@ let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
       ; data = { proof; data = elapsed }
       } ->
       let submitted_result = Work.Result.Single.Poly.{ spec; proof; elapsed } in
-      submit_single ~partitioner ~submitted_result ~job_id
+      submit_single ~partitioner ~submitted_result ~job_id ()
   | Work.Spec.Partitioned.Poly.Sub_zkapp_command
       { job = Work.With_job_meta.{ job_id; _ }; data } ->
       submit_into_pending_zkapp_command ~partitioner ~job_id ~data

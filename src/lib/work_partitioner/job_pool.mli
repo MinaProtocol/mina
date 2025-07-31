@@ -43,4 +43,9 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
   (** [add_exn ~id ~job ~message t] add a job [job] with id [id] to [t]. If that
       job is already in the pool failwith [message] *)
   val add_exn : id:Id.t -> job:job -> message:string -> t -> unit
+
+  (** [bring_back ~id ~job t] attempts to add a job [job] with id [id] to [t].
+      It differs from [add] and [add_exn] in that it doesn't enqueue the job
+      into timeline. Useful for canceling mis-removing jobs from the pool. *)
+  val bring_back : id:Id.t -> job:job -> t -> unit
 end
