@@ -2,6 +2,8 @@ FROM build-deps AS build-deps-noble
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+USER root
+
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \

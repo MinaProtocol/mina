@@ -2,6 +2,8 @@ FROM build-deps AS build-deps-focal
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+USER root
+
 RUN apt-get update --quiet \
   && apt-get upgrade --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes \
@@ -10,3 +12,5 @@ RUN apt-get update --quiet \
     awscli \
     '(^lld-10$|^lld-11$)' \
   && rm -rf /var/lib/apt/lists/*
+
+USER opam
