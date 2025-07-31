@@ -19,6 +19,7 @@ in  Pipeline.build
             , Artifacts.Type.TestExecutive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.CreateLegacyGenesis
             ]
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]

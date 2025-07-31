@@ -16,6 +16,7 @@ in  Pipeline.build
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.FunctionalTestSuite
+            , Artifacts.Type.CreateLegacyGenesis
             ]
           , buildFlags = BuildFlags.Type.Instrumented
           , tags =

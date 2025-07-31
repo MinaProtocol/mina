@@ -17,6 +17,7 @@ let isEssential =
             , FunctionalTestSuite = True
             , Toolchain = True
             , DaemonHardfork = True
+            , CreateLegacyGenesis = False
             }
             service
 
