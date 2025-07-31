@@ -566,6 +566,25 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
+  and hardfork_mode =
+    (*
+      There's 2 hardfork mode, namely Legacy and Auto:
+        In Legacy Mode:
+          - Behavior matching Berkeley hardfork;
+          - No automatic shutdown at network transition;
+          - No automatic data extraction;
+        In Auto Mode:
+          - New behavior for seamless transitions;
+          - Default behavior for Fall2025 hardfork;
+          - Automatic shutdown after last slot of previous network;
+          - Automatic data dump to specified directory;
+          - Integration with Docker script logicl;
+      For more, see: https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e *)
+    flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
+      ~doc:
+        "MODE of Hardfork (auto|legacy, not applying any hardfork-mode when \
+         this flag is not set)"
+      (optional hardfork_mode)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -1405,7 +1424,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~uptime_send_node_commit ~stop_time ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config () )
+                 ~itn_features ~compile_config ?hardfork_mode () )
           in
           { mina
           ; client_trustlist
