@@ -1200,6 +1200,10 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~local_state:consensus_local_state
                    = None ) ; *)
             let next_vrf_check_now () =
+              (* WARN: This recursive call will update [epoch_data_for_vrf] and
+                 in turn [new_epoch] and [new_global_slot]. Refactors aiming at
+                 removing this should consider structuring the code so updating
+                 on those data are included. *)
               iteration_wrapped (new_global_slot, new_epoch)
             in
             let produce_block_now data =
