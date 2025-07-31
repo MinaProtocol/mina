@@ -208,3 +208,16 @@ module M13 = struct
     end
   end]
 end
+
+module Functor (X : sig type x val foo :int end) = struct
+  type x = X.x
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = string
+      let to_latest =
+        let _ = X.foo
+        in Fn.id
+    end
+  end]
+end
