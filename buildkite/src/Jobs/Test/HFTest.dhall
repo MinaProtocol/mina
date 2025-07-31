@@ -53,7 +53,7 @@ in  Pipeline.build
                   , privileged = True
                   , useBash = False
                   }
-                  "./scripts/hardfork/build-and-test.py \$BUILDKITE_BRANCH"
+                  "./scripts/hardfork/build_and_test.py \$BUILDKITE_BRANCH"
               ]
             , label = "hard fork test"
             , key = "hard-fork-test"
