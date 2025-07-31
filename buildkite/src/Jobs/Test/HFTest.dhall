@@ -53,7 +53,7 @@ in  Pipeline.build
                   , privileged = True
                   , useBash = False
                   }
-                  "./scripts/hardfork/build_and_test.py \$BUILDKITE_BRANCH"
+                  "nix-env -iA nixpkgs.python3 && ./scripts/hardfork/build_and_test.py \$BUILDKITE_BRANCH"
               ]
             , label = "hard fork test"
             , key = "hard-fork-test"
