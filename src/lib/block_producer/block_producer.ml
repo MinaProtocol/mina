@@ -1134,7 +1134,7 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
           ~zkapp_cmd_limit_hardcap
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let iteration_wrapped (slot, epoch) =
+      let rec iteration_wrapped (slot, epoch) =
         (* Begin checking for the ability to produce a block *)
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -1199,7 +1199,9 @@ let run ~context:(module Context : CONTEXT) ~vrf_evaluator ~prover ~verifier
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
                    = None ) ; *)
-            let next_vrf_check_now () = return (new_global_slot, new_epoch) in
+            let next_vrf_check_now () =
+              iteration_wrapped (new_global_slot, new_epoch)
+            in
             let produce_block_now data =
               produce data >>| const (new_global_slot, new_epoch)
             in
