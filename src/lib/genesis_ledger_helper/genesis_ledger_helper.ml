@@ -6,6 +6,12 @@ include Genesis_ledger_helper_lib
 
 type exn += Genesis_state_initialization_error
 
+type genesis_ledger_source =
+  | Any
+      (** The default, look for genesis ledger in mina config folder or s3 
+          bucket. *)
+  | MinaConfig  (** This is needed for hardfork auto mode. *)
+
 module Tar = struct
   let create ~root ~directory ~file () =
     match%map
@@ -419,7 +425,7 @@ module Ledger = struct
 
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
-      (config : Runtime_config.Ledger.t) =
+      ?(genesis_ledger_source = Any) (config : Runtime_config.Ledger.t) =
     Monitor.try_with_join_or_error ~here:[%here] (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
@@ -430,8 +436,8 @@ module Ledger = struct
           find_tar ~logger ~genesis_dir ~constraint_constants
             ~ledger_name_prefix config
         in
-        match tar_path with
-        | Some tar_path -> (
+        match (genesis_ledger_source, tar_path) with
+        | Any, Some tar_path -> (
             match%map
               load_from_tar ~genesis_dir ~logger ~constraint_constants
                 ~expected_merkle_root:
@@ -447,7 +453,7 @@ module Ledger = struct
                     ; ("error", Error_json.error_to_yojson err)
                     ] ;
                 Error err )
-        | None -> (
+        | _ -> (
             match padded_accounts_opt with
             | None -> (
                 match config.base with
