@@ -35,4 +35,4 @@
  (targets libp2p_ipc_capnp.ml libp2p_ipc_capnp.mli)
  (deps Makefile libp2p_ipc.capnp)
  (action
-  (run make %{targets})))
+  (ignore-stdout (run make %{targets}))))
