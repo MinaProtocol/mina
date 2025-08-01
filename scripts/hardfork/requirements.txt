@@ -1,0 +1,6 @@
+# Requirements for scripts/hardfork/build_and_test.py and related modules
+# This script is used for building and testing Mina Protocol hardfork functionality
+
+# HTTP library for making REST API calls to Mina daemon
+# Used in test_helper.py for GraphQL queries to daemon endpoints
+requests>=2.25.0
