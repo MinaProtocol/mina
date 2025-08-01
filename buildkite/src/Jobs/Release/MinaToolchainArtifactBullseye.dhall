@@ -26,7 +26,7 @@ in  Pipeline.build
           ]
         , path = "Release"
         , name = "MinaToolchainArtifactBullseye"
-        , tags = [ PipelineTag.Type.Toolchain, PipelineTag.Type.Long, PipelineTag.Type.Docker ]
+        , tags = [ PipelineTag.Type.Toolchain, PipelineTag.Type.Release ]
         }
       , steps =
         [ let toolchainBullseyeSpec =
