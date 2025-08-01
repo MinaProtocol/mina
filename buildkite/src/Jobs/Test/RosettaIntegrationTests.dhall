@@ -59,7 +59,7 @@ in  Pipeline.build
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{ image = rosettaDocker }
-                  "buildkite/scripts/rosetta-integration-tests-fast.sh"
+                  "buildkite/scripts/rosetta-integration-tests.sh"
               ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"
