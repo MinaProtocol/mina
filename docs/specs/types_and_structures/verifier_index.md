@@ -1,6 +1,7 @@
 # VerifierIndex
 
-The in-memory verifier index structure contains the verifier key and is defined as follows.
+The in-memory verifier index structure contains the verifier key and is defined
+as follows.
 
 | Field              | Type                            | Description                                                            |
 | ------------------ | ------------------------------- | ---------------------------------------------------------------------- |

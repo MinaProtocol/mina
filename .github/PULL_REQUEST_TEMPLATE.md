@@ -27,19 +27,23 @@ _must_ ensure that CI is building all possible code paths. Don't land something
 that doesn't build in CI.
 
 ## PLEASE DELETE EVERYTHING ABOVE THIS LINE
+
 ---
 
 Explain your changes:
-*
+
+-
 
 Explain how you tested your changes:
-*
+
+-
 
 Checklist:
 
 - [ ] Dependency versions are unchanged
   - Notify Velocity team if dependencies must change in CI
-- [ ] Modified the current draft of release notes with details on what is completed or incomplete within this project
+- [ ] Modified the current draft of release notes with details on what is
+      completed or incomplete within this project
 - [ ] Document code purpose, how to use it
   - Mention expected invariants, implicit constraints
 - [ ] Tests were added for the new behavior

@@ -5,9 +5,9 @@
 1. Checkout `Mina` repository.
 2. Go to its root directory and execute commands staying in this root directory.
 3. Install dependencies.
-
    - OS dependencies:
-     - `PostgreSQL`, its client and credentials configuration, if you'd like to also run the Archive Node.
+     - `PostgreSQL`, its client and credentials configuration, if you'd like to
+       also run the Archive Node.
      - `Python3`.
      - `jq` tool.
    - Python dependencies:
@@ -17,9 +17,8 @@
      ```
 
 4. Build `Mina` executables.
-
-   - Perhaps the easiest way is to use [Nix](https://github.com/MinaProtocol/mina/tree/develop/nix).
-
+   - Perhaps the easiest way is to use
+     [Nix](https://github.com/MinaProtocol/mina/tree/develop/nix).
      - After installation open the `devShell`:
 
        ```shell
@@ -37,15 +36,17 @@
            src/app/logproc/logproc.exe
        ```
 
-     - If you’d like to work with [zkApps](https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0004-zkapps.md) using [SnarkyJS](https://github.com/o1-labs/snarkyjs) locally.
-
+     - If you’d like to work with
+       [zkApps](https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0004-zkapps.md)
+       using [SnarkyJS](https://github.com/o1-labs/snarkyjs) locally.
        - Build the `SnarkyJS`:
 
          ```shell
          ./scripts/update-snarkyjs-bindings.sh
          ```
 
-5. Execute the `./scripts/mina-local-network/mina-local-network.sh` script, for example:
+5. Execute the `./scripts/mina-local-network/mina-local-network.sh` script, for
+   example:
 
    ```shell
    ./scripts/mina-local-network/mina-local-network.sh \
@@ -59,12 +60,15 @@
      -a
    ```
 
-   Please use `-h` argument to get more information about script's possible options.
+   Please use `-h` argument to get more information about script's possible
+   options.
 
 ## SnarkyJS and zkApps
 
-- Now, if you’d like to work with `zkApps` using `SnarkyJS` locally, you need to update the `SnarkyJS` reference for your `zkApp` project (e.g. created using [zkApp-CLI](https://github.com/o1-labs/zkapp-cli) like this: `zk project foo`).
-
+- Now, if you’d like to work with `zkApps` using `SnarkyJS` locally, you need to
+  update the `SnarkyJS` reference for your `zkApp` project (e.g. created using
+  [zkApp-CLI](https://github.com/o1-labs/zkapp-cli) like this:
+  `zk project foo`).
   - Suppose you’ve created `zkApp` at following path:
     - `~/projcts/zkapps/foo`
   - Go to `zkApp` project root (☝️).
@@ -76,14 +80,18 @@
     npm i ${HOME}/<path_to_Mina_repo>/src/lib/snarkyjs
     ```
 
-  - Note: you can also refer to [this repo](https://github.com/o1-labs/e2e-zkapp/) in order to get environment setting up scripts.
+  - Note: you can also refer to
+    [this repo](https://github.com/o1-labs/e2e-zkapp/) in order to get
+    environment setting up scripts.
 
 ## Mina Lightweight Network
 
 It is possible to run faster and less resources demanding networks.  
 First of all you need to either:
 
-- Build `Mina` using [lightnet](https://github.com/MinaProtocol/mina/tree/develop/src/config/lightnet.mlh) Dune profile:
+- Build `Mina` using
+  [lightnet](https://github.com/MinaProtocol/mina/tree/develop/src/config/lightnet.mlh)
+  Dune profile:
 
   ```shell
        MINA_COMMIT_SHA1=$(git rev-parse HEAD) \
@@ -123,7 +131,8 @@ First of all you need to either:
   }
   ```
 
-Then you will need to run the network manager script with additional `-pl` argument:
+Then you will need to run the network manager script with additional `-pl`
+argument:
 
 ```shell
 ./scripts/mina-local-network/mina-local-network.sh \
@@ -144,15 +153,19 @@ Resulting network will have the following qualities:
 - Transactions finality will be `30` blocks.
 - The network proving will be disabled (dummy proofs will be in use).
   - Please be cautious with this one.
-  - You should **ALWAYS** double check your changes or run your final tests against the networks with the `proof_level=full` configured.
+  - You should **ALWAYS** double check your changes or run your final tests
+    against the networks with the `proof_level=full` configured.
 
-Note though, that such a network might be unstable and cause different issues like this one: https://github.com/MinaProtocol/mina/issues/8331.  
+Note though, that such a network might be unstable and cause different issues
+like this one: https://github.com/MinaProtocol/mina/issues/8331.  
 Thus, don't overload it with too many transactions.
 
 ## Notes
 
-- `Always run` at least `2` block producers, for example `-w 2`, otherwise the network might halt.
-- Don’t forget to provide additional `PostgreSQL` connection configuration in case of using the `-a` argument.
+- `Always run` at least `2` block producers, for example `-w 2`, otherwise the
+  network might halt.
+- Don’t forget to provide additional `PostgreSQL` connection configuration in
+  case of using the `-a` argument.
 - Work directory will be:
   - `${HOME}/.mina-network`
 - Accounts private key passphrase will be: `naughty blue worm`.
@@ -160,7 +173,8 @@ Thus, don't overload it with too many transactions.
   - [http://localhost:4001/graphql](http://localhost:4001/graphql)
   - [http://localhost:4006/graphql](http://localhost:4006/graphql)
   - Etc. (you will see more details in the script's output).
-- In order to get `encoded private key` instead of the raw data generated, you can use the following command:
+- In order to get `encoded private key` instead of the raw data generated, you
+  can use the following command:
 
   ```shell
   ./_build/default/src/app/cli/src/mina.exe \
@@ -173,7 +187,8 @@ Thus, don't overload it with too many transactions.
     Private key: EKDp...
   ```
 
-- In order to start sending payments using GraphQL endpoint or do else account related activities, you first need to import and unlock the account:
+- In order to start sending payments using GraphQL endpoint or do else account
+  related activities, you first need to import and unlock the account:
 
   ```shell
   _build/default/src/app/cli/src/mina.exe \

@@ -22,25 +22,25 @@ network delays into account. These involved lots of concurrency, and so it's
 very hard to trace information and there are subtle bugs.
 
 Since refactoring the control flow requires a rewrite, we decided to think
-carefully about more of the other pieces as well now that we know more about
-the design of the rest of the protocol code.
+carefully about more of the other pieces as well now that we know more about the
+design of the rest of the protocol code.
 
 The new transition-frontier-controller is responsible for handling incoming
 transitions created by proposers either locally or remotely by: (a) validating
-them, (b) adding them to a `Transition_frontier` as described below if
-possible, if not, (c) carefully triggering a sync-ledger catchup job to
-populate more information in our transition-frontier and completing the
-add. It is also responsible for handling sync-ledger answers that catchup
-jobs started by other nodes trigger via sending queries.
+them, (b) adding them to a `Transition_frontier` as described below if possible,
+if not, (c) carefully triggering a sync-ledger catchup job to populate more
+information in our transition-frontier and completing the add. It is also
+responsible for handling sync-ledger answers that catchup jobs started by other
+nodes trigger via sending queries.
 
 The expected outcome is to have something with feature parity to the existing
-ledger-builder-controller from the outside. Internally, aside from having
-rigor around the async control flow, we also will take advantage of merkle
-masks to remove a large chunk of complex logic from the existing
+ledger-builder-controller from the outside. Internally, aside from having rigor
+around the async control flow, we also will take advantage of merkle masks to
+remove a large chunk of complex logic from the existing
 ledger-builder-controller code.
 
-It should also be much easier to unit-test and trace the flow of information
-for debugging purposes.
+It should also be much easier to unit-test and trace the flow of information for
+debugging purposes.
 
 ## Detailed design
 
@@ -48,9 +48,9 @@ for debugging purposes.
 
 ### Introduction
 
-`Ledger_builder_controller` was far too big in its scope. In this rewrite,
-we're not only breaking apart the code into more modules, but also breaking it
-up across several libraries.
+`Ledger_builder_controller` was far too big in its scope. In this rewrite, we're
+not only breaking apart the code into more modules, but also breaking it up
+across several libraries.
 
 There will be a new top-level `Transition_frontier_controller` module that will
 just wire the pipes together for the new components:
@@ -61,10 +61,11 @@ just wire the pipes together for the new components:
 - [Query Handler](#query-handler)
 
 Note that all components communicate between each other solely through the use
-of pipes. By solely using pipes to connect components we can be more explicit about the [Async Control Flow](#async-control-flow).
+of pipes. By solely using pipes to connect components we can be more explicit
+about the [Async Control Flow](#async-control-flow).
 
-After describing all the components, we'll cover the specific behavior of
-the [Async Control Flow](#async-control-flow) holistically.
+After describing all the components, we'll cover the specific behavior of the
+[Async Control Flow](#async-control-flow) holistically.
 
 Before covering any of the components it's worth going over some fundamental
 changes in behavior and structure in more detail in [big Changes](#big-changes)
@@ -85,20 +86,26 @@ so we must get enough info to go back to the locked state (where we know we've
 achieved consensus).
 
 2. There is now a notion of a `Breadcrumb.t` which contains an
-   `External_transition.t` and a now light-weight `Staged_ledger.t` it also has a
-   notion of the prior breadcrumb. We take advantage of the merkle-mask to put
+   `External_transition.t` and a now light-weight `Staged_ledger.t` it also has
+   a notion of the prior breadcrumb. We take advantage of the merkle-mask to put
    these breadcrumbs in each node of the transition-tree. See
-   [RFC-0008](0008-persistent-ledger-builder-controller.md) for more info on merkle
-   masks, and [Transition frontier](#transition-frontier) for more info about how
-   these masks are configured.
+   [RFC-0008](0008-persistent-ledger-builder-controller.md) for more info on
+   merkle masks, and [Transition frontier](#transition-frontier) for more info
+   about how these masks are configured.
 
 Rationale: The frequent operation of answering sync-ledger queries no longer
 require materializing staged-ledgers. We should optimize for operations that
 occur frequently.
 
-3. The `Ktree.t` is mutable and exposes an $O(1)$ `lookup : State_hash.t -> node_entry` where `node_entry` contains (in our case) a `Breadcrumb.t`.
+3. The `Ktree.t` is mutable and exposes an $O(1)$
+   `lookup : State_hash.t -> node_entry` where `node_entry` contains (in our
+   case) a `Breadcrumb.t`.
 
-Rationale: We perform `lookup` and `add` frequently on this structure and `add` can be $O(1)$ in the presence of this `lookup` too. `lookup` also lets us traverse the tree forwards and backwards without explicit backedges in our [rose tree](https://en.wikipedia.org/wiki/Rose_tree) -- further simplifying the `Ktree.t` implementation.
+Rationale: We perform `lookup` and `add` frequently on this structure and `add`
+can be $O(1)$ in the presence of this `lookup` too. `lookup` also lets us
+traverse the tree forwards and backwards without explicit backedges in our
+[rose tree](https://en.wikipedia.org/wiki/Rose_tree) -- further simplifying the
+`Ktree.t` implementation.
 
 <a href="transition-handler"></a>
 
@@ -132,8 +139,10 @@ neighbors.
 
 #### Processor
 
-- Input: `External_transition.t` (from validator) and `Breadcrumb.t list` (from catchup)
-- Outputs: `External_transition.t` (to ledger catchup); modifying transition frontier
+- Input: `External_transition.t` (from validator) and `Breadcrumb.t list` (from
+  catchup)
+- Outputs: `External_transition.t` (to ledger catchup); modifying transition
+  frontier
 
 The processor receives a single validated external transitions from the
 validator and then attempts to add the transition to the breadcrumb tree. The
@@ -150,9 +159,15 @@ table and not applying an staged-ledger-diffs.
 
 The add process runs in two phases:
 
-1. Perform a `lookup` on the `Transition_frontier` for the previous `State_hash.t` of this transition. If it is absent, send to [catchup scheduler](#catchup-scheduler). If present, continue.
-2. Derive a mask from the parent retrieved in (1) and apply the `Staged_ledger_diff.t` of the breadcrumb to that new mask. See [Transition Frontier](#transition-frontier) for more.
-3. Construct the new `Breadcrumb.t` from the new mask and transition, and attempt a true mutate-add to the underlying [Transition Frontier](#transition-frontier) data.
+1. Perform a `lookup` on the `Transition_frontier` for the previous
+   `State_hash.t` of this transition. If it is absent, send to
+   [catchup scheduler](#catchup-scheduler). If present, continue.
+2. Derive a mask from the parent retrieved in (1) and apply the
+   `Staged_ledger_diff.t` of the breadcrumb to that new mask. See
+   [Transition Frontier](#transition-frontier) for more.
+3. Construct the new `Breadcrumb.t` from the new mask and transition, and
+   attempt a true mutate-add to the underlying
+   [Transition Frontier](#transition-frontier) data.
 
 <a href="catchup-scheduler"></a>
 
@@ -169,14 +184,14 @@ connected to the existing tree.
 
 ### Transition Frontier
 
-The Transition Frontier is essentially a root `Breadcrumb.t` with some
-metadata. The root has a merkle database corresponding to the snarked ledger.
-This is needed for consensus with proof-of-stake. It then has the first mask
-layer exposing the staged-database and staged-ledger for the locked-tip. Each
-subsequent breadcrumb contains a light-weight staged-ledger with a masked
-merkle database built off of the breadcrumb prior. We store a hashtable of
-breadcrumb children and keep references to the root and best-tip hashes (which
-we can lookup later in the table).
+The Transition Frontier is essentially a root `Breadcrumb.t` with some metadata.
+The root has a merkle database corresponding to the snarked ledger. This is
+needed for consensus with proof-of-stake. It then has the first mask layer
+exposing the staged-database and staged-ledger for the locked-tip. Each
+subsequent breadcrumb contains a light-weight staged-ledger with a masked merkle
+database built off of the breadcrumb prior. We store a hashtable of breadcrumb
+children and keep references to the root and best-tip hashes (which we can
+lookup later in the table).
 
 It's two orders of magnitude more computationally expensive to constantly
 coalesce masked merkle databases in the worst case than to just keep them
@@ -187,8 +202,8 @@ sync ledger queries if we have staged ledgers at every position.
 
 ### Ledger Catchup
 
-Input: `External_transition.t` (from catchup scheduler)
-Output: `Breadcrumb.t list` (to processor)
+Input: `External_transition.t` (from catchup scheduler) Output:
+`Breadcrumb.t list` (to processor)
 
 Ledger catchup runs a single catchup worker job at a time. Whenever catchup
 scheduler decides it's time for a new catchup job to start, it will send
@@ -198,8 +213,8 @@ something on the pipe.
 
 A worker is responsible for performing a history sync.
 
-In the future, we will support multiple catchup workers at once. This prevents
-a potential DoS attack where we're forced to catchup between two different forks
+In the future, we will support multiple catchup workers at once. This prevents a
+potential DoS attack where we're forced to catchup between two different forks
 and can never complete anything.
 
 New jobs handed to the same worker cause a retargeting action where we don't
@@ -230,9 +245,9 @@ additional step of invoking the sync ledger process.
 #### Post Attachment
 
 We may receive additional external transitions that would connect to the
-existing catchup job in process. Rather than dropping those we can buffer
-them in a post-attachment pool. When a catchup job finishes we can dispatch
-a post attachment job that can breadcrumbify these transitions.
+existing catchup job in process. Rather than dropping those we can buffer them
+in a post-attachment pool. When a catchup job finishes we can dispatch a post
+attachment job that can breadcrumbify these transitions.
 
 This should not block catchup breadcrumbs from being added to the
 transition-frontier, however.
@@ -274,7 +289,8 @@ and not processes.
 
 This will be fleshed out here later, or in a separate RFC. @bkase has thought
 about this, but we're not prioritizing this yet. This is required to prevent
-against an adversary forcing us to switch between catching up of two forks. Always preempting and cancelling one another.
+against an adversary forcing us to switch between catching up of two forks.
+Always preempting and cancelling one another.
 
 ## Drawbacks
 
@@ -293,15 +309,15 @@ processes we shouldn't have a problem here.
 [rationale-and-alternatives]: #rationale-and-alternatives
 
 The main rationale for doing this redesign is to ease the difficulty of
-debugging asynchronous control. And to avoid debugging all the edge-cases
-we've never explored in the existing ledger-builder-controller (what happens in
-the presense of particular looking forks).
+debugging asynchronous control. And to avoid debugging all the edge-cases we've
+never explored in the existing ledger-builder-controller (what happens in the
+presense of particular looking forks).
 
 One alternative is to instead prioritize in investing in debugging
 infrastructure such as visualizations and logging tooling to get through these
-asynchronous bugs. However, we will need to do a medium-sized refactor anyway to integrate the
-merkle masks properly and the new correct history catchup anyway, so we're not
-actually saving much work.
+asynchronous bugs. However, we will need to do a medium-sized refactor anyway to
+integrate the merkle masks properly and the new correct history catchup anyway,
+so we're not actually saving much work.
 
 This seems to be a good point to do a full-rewrite given that we have these new
 components we wish to hook in and we also are running into debugging issues and
@@ -311,9 +327,9 @@ new bugs.
 
 [prior-art]: #prior-art
 
-The main piece of prior art is the existing Ledger-builder-controller
-component. Ledger-builder-controller as is supports the same external interface
-and a lot of similar behavior, but in a more adhoc way. The existing
+The main piece of prior art is the existing Ledger-builder-controller component.
+Ledger-builder-controller as is supports the same external interface and a lot
+of similar behavior, but in a more adhoc way. The existing
 ledger-builder-controller handles incoming transitions by spawning one of two
 types of asynchronous jobs, a catchup and a path traversal. As a short-cut,
 catchup did not differentiate between the "from nothing" case and the "small
@@ -328,9 +344,9 @@ entities that have materialized staged-ledgers in them.
 Ledger-builder-controller also handled sync-ledger answers as it had to access
 the path traversal logic and the current transition logic state.
 
-This component grew organically and did not have any rigorous design
-thought put behind it as we did not realize how central such a component would
-be in our system until it was too late.
+This component grew organically and did not have any rigorous design thought put
+behind it as we did not realize how central such a component would be in our
+system until it was too late.
 
 Moreover, we did not think carefully about the flow of information through this
 component and the implications of various async points from getting backed up.
