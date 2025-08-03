@@ -53,9 +53,9 @@ in  Pipeline.build
                   , privileged = True
                   , useBash = False
                   }
-                  (     "nix-env -iA nixpkgs.python3 nixpkgs.python3Packages.pip "
-                    ++  "&& pip install -r scripts/hardfork/requirements.txt "
-                    ++  "&& ./scripts/hardfork/build_and_test.py \\\$BUILDKITE_BRANCH"
+                  ( "nix-env -iA nixpkgs.python3 nixpkgs.python3Packages.pip nixpkgs.python3Packages.virtualenv" ++ 
+                    "&& python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -r scripts/hardfork/requirements.txt" ++
+                    "&& ./scripts/hardfork/build_and_test.py dkijania/migrate_hf_to_py"
                   )
               ]
             , label = "hard fork test"
