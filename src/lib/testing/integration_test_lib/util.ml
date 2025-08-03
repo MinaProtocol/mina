@@ -1,6 +1,6 @@
 open Core
 open Async
-module Timeout = Timeout_lib.Core_time
+module Timeout = Mina_stdlib.Timeout_lib.Core_time
 
 let create_process_exn dir prog args ?env () =
   let envs =
