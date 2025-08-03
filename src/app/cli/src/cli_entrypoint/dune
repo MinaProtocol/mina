@@ -47,7 +47,6 @@
   consensus
   child_processes
   node_addrs_and_ports
-  mina_plugins
   logger.file_system
   cli_lib
   genesis_constants
