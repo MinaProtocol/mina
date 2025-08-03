@@ -191,8 +191,11 @@ RUN mkdir go-tmp
 WORKDIR /home/opam/go-tmp
 RUN /usr/lib/go/bin/go mod init local/build \
   && /usr/lib/go/bin/go get capnproto.org/go/capnp/v3@$GO_CAPNP_VERSION \
-  && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go \
-  && mv capnpc-go /usr/local/bin
+  && /usr/lib/go/bin/go build -o capnpc-go capnproto.org/go/capnp/v3/capnpc-go
+
+USER root
+RUN mv /home/opam/go-tmp/capnpc-go /usr/local/bin
+USER opam
 
 WORKDIR /home/opam
 RUN rm -rf go-tmp
