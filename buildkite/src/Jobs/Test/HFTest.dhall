@@ -52,8 +52,15 @@ in  Pipeline.build
                   , image = ContainerImages.nixos
                   , privileged = True
                   , useBash = False
+                  , extraEnv =
+                    [ "NIX_CONFIG='experimental-features = nix-command flakes'"
+                    ]
                   }
-                  "./scripts/hardfork/build-and-test.sh \$BUILDKITE_BRANCH"
+                  (     "nix shell nixpkgs#python311Full nixpkgs#bash  --command bash "
+                    ++  "-c 'python3 -m venv .venv && source .venv/bin/activate "
+                    ++  "&& pip install -r ./scripts/hardfork/requirements.txt "
+                    ++  "&& python3 ./scripts/hardfork/build_and_test.py '"
+                  )
               ]
             , label = "hard fork test"
             , key = "hard-fork-test"
