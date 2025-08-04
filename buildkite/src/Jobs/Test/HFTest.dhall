@@ -52,10 +52,14 @@ in  Pipeline.build
                   , image = ContainerImages.nixos
                   , privileged = True
                   , useBash = False
+                  , extraEnv =
+                    [ "NIX_CONFIG='experimental-features = nix-command flakes'"
+                    ]
                   }
-                  ( "nix-env -iA nixpkgs.python3 nixpkgs.python3Packages.pip nixpkgs.python3Packages.virtualenv" ++ 
-                    "&& python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -r scripts/hardfork/requirements.txt" ++
-                    "&& ./scripts/hardfork/build_and_test.py dkijania/migrate_hf_to_py"
+                  (     "nix shell nixpkgs#python311Full nixpkgs#bash  --command sh "
+                    ++  "-c 'python3 -m venv .venv && source .venv/bin/activate "
+                    ++  "&& pip install -r ./scripts/hardfork/requirements.txt "
+                    ++  "&& python3 ./scripts/hardfork/build_and_test.py ./scripts/hardfork/build_and_test.py"
                   )
               ]
             , label = "hard fork test"
