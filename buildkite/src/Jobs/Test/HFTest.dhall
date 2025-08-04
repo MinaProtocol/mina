@@ -59,7 +59,7 @@ in  Pipeline.build
                   (     "nix shell nixpkgs#python311Full nixpkgs#bash  --command sh "
                     ++  "-c 'python3 -m venv .venv && source .venv/bin/activate "
                     ++  "&& pip install -r ./scripts/hardfork/requirements.txt "
-                    ++  "&& python3 ./scripts/hardfork/build_and_test.py ./scripts/hardfork/build_and_test.py"
+                    ++  "&& python3 ./scripts/hardfork/build_and_test.py ./scripts/hardfork/build_and_test.py'"
                   )
               ]
             , label = "hard fork test"
