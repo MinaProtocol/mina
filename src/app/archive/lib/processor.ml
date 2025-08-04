@@ -3983,8 +3983,9 @@ module Block = struct
     in
     return ()
 
-  let add_from_extensional ~logger (module Conn : Mina_caqti.CONNECTION) ~proof_cache_db
-      ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
+  let add_from_extensional ~logger (module Conn : Mina_caqti.CONNECTION)
+      ~proof_cache_db ?(v1_transaction_hash = false)
+      (block : Extensional.Block.t) =
     let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
