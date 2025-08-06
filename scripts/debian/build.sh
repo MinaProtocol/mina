@@ -2,7 +2,7 @@
 
 # Script collects binaries and keys and builds deb archives.
 
-set -eou pipefail
+set -eox pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 BUILD_DIR=${BUILD_DIR:-"${SCRIPTPATH}/../../_build"}
