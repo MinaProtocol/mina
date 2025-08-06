@@ -1,7 +1,9 @@
 #!/bin/bash
 set -euox pipefail
 
-BUILD_DIR=${BUILD_DIR:-"../../_build"}
+
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+BUILD_DIR=${BUILD_DIR:-"${SCRIPTPATH}/../../_build"}
 BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
   host"}}
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
