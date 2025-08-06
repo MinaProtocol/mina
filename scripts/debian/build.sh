@@ -5,7 +5,7 @@
 set -eox pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-BUILD_DIR=${BUILD_DIR:-"../../_build"}
+BUILD_DIR=${BUILD_DIR:-"${SCRIPTPATH}/../../_build"}
 
 # Check if BUILD_DIR exists
 if [[ ! -d "$BUILD_DIR" ]]; then
