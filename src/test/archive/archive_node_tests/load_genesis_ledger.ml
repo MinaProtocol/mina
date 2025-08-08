@@ -49,7 +49,7 @@ let test_case (test_data : t) =
   Archive.Process.start_logging process ~log_file ;
 
   let max_postgres_memory = 4000.0 in
-  let sleep_duration = Time.Span.of_sec 10.0 in
+  let sleep_duration = Time.Span.of_sec 20.0 in
   let max_archive_memory = 1000.0 in
   let postgres_memory_increase_threshold = 500.0 in
 
