@@ -26,7 +26,6 @@ let Artifact
 
 let AllButTests =
       [ Artifact.Daemon
-      , Artifact.DaemonHardfork
       , Artifact.LogProc
       , Artifact.Archive
       , Artifact.BatchTxn
@@ -107,7 +106,7 @@ let toDebianName =
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonHardfork = ""
+            , DaemonHardfork = "daemon_${Network.lowerName network}_hardfork"
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"

@@ -41,7 +41,7 @@ function export_suffixes () {
             export BUILD_FLAG_SUFFIX="-instrumented"
             ;;
             *)
-            export DOCKER_DEB_SUFFIX=""
+            export DOCKER_DEB_SUFFIX="${DOCKER_DEB_SUFFIX:-}"
             export BUILD_FLAG_SUFFIX=""
             ;;
         esac
