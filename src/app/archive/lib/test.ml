@@ -35,15 +35,15 @@ let%test_module "Archive node unit tests" =
       lazy
         ( Thread_safe.block_on_async_exn
         @@ fun () ->
-        match%map Caqti_async.connect archive_uri with
+        match%bind Mina_caqti.connect archive_uri with
         | Ok conn ->
-            conn
+            return conn
         | Error e ->
             failwith @@ Caqti_error.show e )
 
     let conn_pool_lazy =
       lazy
-        ( match Caqti_async.connect_pool archive_uri with
+        ( match Mina_caqti.connect_pool archive_uri with
         | Ok pool ->
             pool
         | Error e ->
@@ -320,7 +320,7 @@ let%test_module "Archive node unit tests" =
           match%map
             Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
-                Caqti_async.Pool.use
+                Mina_caqti.Pool.use
                   (fun conn ->
                     let open Deferred.Result.Let_syntax in
                     match%bind

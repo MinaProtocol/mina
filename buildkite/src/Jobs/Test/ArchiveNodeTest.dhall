@@ -27,6 +27,7 @@ in  Pipeline.build
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
           , S.exactly "scripts/patch-archive-test" "sh"
+          , S.exactly "scripts/tests/archive-node-test" "sh"
           , S.exactly "buildkite/src/Jobs/Test/ArchiveNodeTest" "dhall"
           , S.exactly "buildkite/src/Command/ArchiveNodeTest" "dhall"
           , S.exactly "buildkite/src/Command/Bench/Base" "dhall"

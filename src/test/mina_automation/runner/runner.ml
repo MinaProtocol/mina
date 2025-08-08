@@ -28,7 +28,13 @@ let run (module F : Intf.Fixture) =
           Intf.Failed (Error.to_string_hum err) )
 
 let run_blocking test_case () =
-  let (_ : Intf.test_result) =
+  let (result : Intf.test_result) =
     Async.Thread_safe.block_on_async_exn (fun () -> run test_case)
   in
-  ()
+  match result with
+  | Intf.Passed ->
+      ()
+  | Intf.Warning msg ->
+      Alcotest.fail msg
+  | Intf.Failed msg ->
+      Alcotest.fail msg
