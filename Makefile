@@ -63,7 +63,9 @@ clean: ## Remove build artifacts
 
 .PHONY: switch
 switch: ## Set up the opam switch
+ifeq ($(OPAMSWITCH), )
 	./scripts/update-opam-switch.sh
+endif
 
 .PHONY: ocaml_version
 ocaml_version: switch ## Check OCaml version
@@ -106,7 +108,7 @@ check: ocaml_checks libp2p_helper ## Check that all OCaml packages build without
 	dune build @src/check
 
 .PHONY: build
-build: ocaml_checks reformat-diff libp2p_helper ## Build the main project executables
+build: libp2p_helper ## Build the main project executables
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
@@ -116,7 +118,56 @@ build: ocaml_checks reformat-diff libp2p_helper ## Build the main project execut
 		src/app/generate_keypair/generate_keypair.exe \
 		src/app/validate_keypair/validate_keypair.exe \
 		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+		src/lib/snark_worker/standalone/run_snark_worker.exe \
 		--profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
+.PHONY: build_daemon_utils
+build_daemon_utils: ocaml_checks reformat-diff libp2p_helper ## Build daemon utilities
+	$(info Starting Build)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune build \
+		src/app/generate_keypair/generate_keypair.exe \
+		src/app/validate_keypair/validate_keypair.exe \
+		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
+		src/lib/snark_worker/standalone/run_snark_worker.exe \
+		--profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
+
+.PHONY: build_logproc
+build_logproc: ocaml_checks reformat-diff libp2p_helper ## Build the logproc executable
+	$(info Starting Build)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune build \
+		src/app/logproc/logproc.exe \
+		--profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
+.PHONY: build_mainnet_sigs
+build_mainnet_sigs: ocaml_checks reformat-diff libp2p_helper build ## Build mainnet signature variants of the daemon
+	$(info Starting Build)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune build \
+		src/app/cli/src/mina_mainnet_signatures.exe \
+		src/app/rosetta/rosetta_mainnet_signatures.exe \
+		src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe \
+		--profile=mainnet
+	$(info Build complete)
+
+.PHONY: build_testnet_sigs
+build_testnet_sigs: ocaml_checks reformat-diff libp2p_helper build ## Build testnet signature variants of the daemon
+	$(info Starting Build)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
+	dune build \
+		src/app/cli/src/mina_testnet_signatures.exe \
+		src/app/rosetta/rosetta_testnet_signatures.exe \
+		src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
+		--profile=devnet
 	$(info Build complete)
 
 .PHONY: build_all_sigs
@@ -151,6 +202,28 @@ build_archive_utils: ocaml_checks reformat-diff ## Build archive node and relate
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
 		--profile=$(DUNE_PROFILE)
 	$(info Build complete)
+
+.PHONY: build_test_utils
+build_test_utils: ocaml_checks reformat-diff ## Build test utilities
+	$(info Starting Build)
+	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
+	dune build \
+		src/app/test_executive/test_executive.exe \
+		src/app/benchmarks/benchmarks.exe \
+		src/app/batch_txn_tool/batch_txn_tool.exe \
+		src/app/zkapp_test_transaction/zkapp_test_transaction.exe \
+		src/app/rosetta/indexer_test/indexer_test.exe \
+		src/app/ledger_export_bench/ledger_export_benchmark.exe \
+		src/app/disk_caching_stats/disk_caching_stats.exe \
+		src/app/heap_usage/heap_usage.exe \
+		src/app/zkapp_limits/zkapp_limits.exe \
+		src/lib/snark_worker/standalone/run_snark_worker.exe \
+		src/test/command_line_tests/command_line_tests.exe \
+		src/test/archive/patch_archive_test/patch_archive_test.exe \
+		src/test/archive/archive_node_tests/archive_node_tests.exe \
+		--profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
 
 .PHONY: build_rosetta
 build_rosetta: ocaml_checks ## Build Rosetta API components
@@ -189,8 +262,8 @@ build_intgtest: ocaml_checks ## Build integration test tools
 		src/app/logproc/logproc.exe
 	$(info Build complete)
 
-.PHONY: rosetta_lib_encodings
-rosetta_lib_encodings: ocaml_checks ## Test Rosetta library encodings
+.PHONY: build_rosetta_lib_encodings
+build_rosetta_lib_encodings: ocaml_checks ## Test Rosetta library encodings
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -198,8 +271,8 @@ rosetta_lib_encodings: ocaml_checks ## Test Rosetta library encodings
 	  --profile=mainnet
 	$(info Build complete)
 
-.PHONY: replayer
-replayer: ocaml_checks ## Build the replayer tool
+.PHONY: build_replayer
+build_replayer: ocaml_checks ## Build the replayer tool
 	$(info Starting Build)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
@@ -207,8 +280,8 @@ replayer: ocaml_checks ## Build the replayer tool
 		--profile=devnet
 	$(info Build complete)
 
-.PHONY: missing_blocks_auditor
-missing_blocks_auditor: ocaml_checks ## Build missing blocks auditor tool
+.PHONY: build_missing_blocks_auditor
+build_missing_blocks_auditor: ocaml_checks ## Build missing blocks auditor tool
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -217,7 +290,7 @@ missing_blocks_auditor: ocaml_checks ## Build missing blocks auditor tool
 	$(info Build complete)
 
 .PHONY: extract_blocks
-extract_blocks: ocaml_checks ## Build the extract_blocks executable
+build_extract_blocks: ocaml_checks ## Build the extract_blocks executable
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -225,8 +298,8 @@ extract_blocks: ocaml_checks ## Build the extract_blocks executable
 		--profile=testnet_postake_medium_curves
 	$(info Build complete)
 
-.PHONY: archive_blocks
-archive_blocks: ocaml_checks ## Build the archive_blocks executable
+.PHONY: build_archive_blocks
+build_archive_blocks: ocaml_checks ## Build the archive_blocks executable
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	dune build \
@@ -235,7 +308,7 @@ archive_blocks: ocaml_checks ## Build the archive_blocks executable
 	$(info Build complete)
 
 .PHONY: patch_archive_test
-patch_archive_test: ocaml_checks ## Build the patch archive test
+build_patch_archive_test: ocaml_checks ## Build the patch archive test
 	$(info Starting Build)
 	@ulimit -s 65532 && (ulimit -n 10240 || true) && \
 	dune build \
@@ -443,16 +516,149 @@ doc_diagram_sources+=$(addprefix src/lib/transition_frontier/res/,*.dot *.tex *.
 .PHONY: doc_diagrams
 doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources))) ## Generate documentation diagrams
 
+.PHONY: export_git_env_vars
+export_git_env_vars: ## Export git environment variables for use in scripts
+	KEEP_MY_TAGS_INTACT=true \
+		./scripts/export-git-env-vars.sh
+
+########################################
+# Debian packages
+
+# Helper function for building Debian packages
+define build_debian_package
+	BUILD_DIR="${PWD}/_build" \
+	DUNE_PROFILE=$(DUNE_PROFILE) \
+	MINA_DEB_CODENAME="$(CODENAME)" \
+	./scripts/debian/build.sh $(1)
+endef
+
+
+.PHONY: debian-build-logproc
+debian-build-logproc: ## Build the Debian logproc package
+	$(call build_debian_package,logproc)
+
+.PHONY: debian-build-daemon
+debian-build-daemon: ## Build the Debian daemon package
+	$(call build_debian_package,daemon)
+	
+.PHONY: debian-build-daemon-devnet
+debian-build-daemon-devnet: ## Build the Debian daemon package for devnet
+	$(call build_debian_package,daemon_devnet)
+
+.PHONY: debian-build-daemon-mainnet
+debian-build-daemon-mainnet: ## Build the Debian daemon package for mainnet
+	$(call build_debian_package,daemon_mainnet)
+
+.PHONY: debian-build-archive
+debian-build-archive: ## Build the Debian archive package
+	$(call build_debian_package,archive_berkeley)
+		
+.PHONY: debian-build-archive-devnet
+debian-build-archive-devnet: ## Build the Debian archive package for devnet
+	$(call build_debian_package,archive_devnet)
+
+.PHONY: debian-build-archive-mainnet
+debian-build-archive-mainnet: ## Build the Debian archive package for mainnet
+	$(call build_debian_package,archive_mainnet)
+
+.PHONY: debian-build-rosetta
+debian-build-rosetta: ## Build the Debian Rosetta package
+	$(call build_debian_package,rosetta_berkeley)
+
+.PHONY: debian-build-rosetta-devnet
+debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
+	$(call build_debian_package,rosetta_devnet)
+
+.PHONY: debian-build-rosetta-mainnet
+debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
+	$(call build_debian_package,rosetta_mainnet)
+
 ########################################
 # Docker images
 
+.PHONY: start-local-debian-repo
+start-local-debian-repo: ## Start a local Debian repository
+	./scripts/debian/aptly.sh stop || true
+
+	./scripts/debian/aptly.sh start \
+		--codename $(CODENAME) \
+		--debians _build \
+		--component unstable \
+		--clean \
+		--background \
+		--wait
+	
+
 .PHONY: docker-build-toolchain
 docker-build-toolchain: ## Build the toolchain to be used in CI
-	./scripts/docker/build.sh \
+	BUILD_DIR=./_build \
+		./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service mina-toolchain \
 		--version mina-toolchain-$(CODENAME)-$(GITHASH)
 
+# General function for building Docker images
+define build_docker_image
+	BUILD_DIR=./_build \
+	MINA_DEB_CODENAME=$(CODENAME) \
+	KEEP_MY_TAGS_INTACT=true \
+	. ./scripts/export-git-env-vars.sh \
+	&& ./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service $(1) \
+		--version "$$MINA_DEB_VERSION" \
+		--branch "$$GITBRANCH" \
+		--network $(2) \
+		--no-cache
+
+	./scripts/debian/aptly.sh stop
+endef
+
+.PHONY: docker-build-daemon
+docker-build-daemon: SHELL := /bin/bash
+docker-build-daemon: start-local-debian-repo ## Build the daemon Docker image
+	$(call build_docker_image,mina-daemon,berkeley)
+
+.PHONY: docker-build-daemon-devnet
+docker-build-daemon-devnet: SHELL := /bin/bash
+docker-build-daemon-devnet: start-local-debian-repo ## Build the daemon Docker image for devnet
+	$(call build_docker_image,mina-daemon,devnet)
+
+.PHONY: docker-build-daemon-mainnet
+docker-build-daemon-mainnet: SHELL := /bin/bash
+docker-build-daemon-mainnet: start-local-debian-repo ## Build the daemon Docker image for mainnet
+	$(call build_docker_image,mina-daemon,mainnet)
+
+.PHONY: docker-build-archive
+docker-build-archive: SHELL := /bin/bash
+docker-build-archive: start-local-debian-repo ## Build the archive Docker image
+	$(call build_docker_image,mina-archive,berkeley)
+
+.PHONY: docker-build-archive-devnet
+docker-build-archive-devnet: SHELL := /bin/bash
+docker-build-archive-devnet: start-local-debian-repo ## Build the archive Docker image for devnet
+	$(call build_docker_image,mina-archive,devnet)
+
+.PHONY: docker-build-archive-mainnet
+docker-build-archive-mainnet: SHELL := /bin/bash
+docker-build-archive-mainnet: start-local-debian-repo ## Build the archive Docker image for mainnet
+	$(call build_docker_image,mina-archive,mainnet)
+
+.PHONY: docker-build-rosetta
+docker-build-rosetta: SHELL := /bin/bash
+docker-build-rosetta: start-local-debian-repo ## Build the Rosetta Docker image
+	$(call build_docker_image,mina-rosetta,berkeley)
+
+.PHONY: docker-build-rosetta-devnet
+docker-build-rosetta-devnet: SHELL := /bin/bash
+docker-build-rosetta-devnet: start-local-debian-repo ## Build the Rosetta Docker image for devnet
+	$(call build_docker_image,mina-rosetta,devnet)
+
+.PHONY: docker-build-rosetta-mainnet
+docker-build-rosetta-mainnet: SHELL := /bin/bash
+docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docker image for mainnet
+	$(call build_docker_image,mina-rosetta,mainnet)
+	
 ########################################
 # Generate odoc documentation
 

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euox pipefail
 
+
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+BUILD_DIR=${BUILD_DIR:-"${SCRIPTPATH}/../../_build"}
 BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
   host"}}
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
@@ -10,9 +13,8 @@ MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
 # Helper script to include when building deb archives.
 
 echo "--- Setting up the environment to build debian packages..."
+cd "${BUILD_DIR}" || exit 1
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
@@ -43,6 +45,7 @@ case "${MINA_DEB_CODENAME}" in
 esac
 
 MINA_DEB_NAME="mina-berkeley"
+DUNE_PROFILE="${DUNE_PROFILE}"
 DEB_SUFFIX=""
 
 # Add suffix to debian to distinguish different profiles
