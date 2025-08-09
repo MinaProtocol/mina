@@ -108,7 +108,7 @@ check: ocaml_checks libp2p_helper ## Check that all OCaml packages build without
 	dune build @src/check
 
 .PHONY: build
-build:  ## Build the main project executables
+build: libp2p_helper ## Build the main project executables
 	$(info Starting Build)
 	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
 	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
