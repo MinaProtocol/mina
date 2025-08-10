@@ -186,6 +186,8 @@ NOW_UNIX_TS=$(date +%s)
 MAIN_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + MAIN_DELAY*60))
 GENESIS_TIMESTAMP="$(date -u -d @$MAIN_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00')"
 
+start_prefork_network "$MAIN_MINA_EXE" "$GENESIS_TIMESTAMP" "$MAIN_SLOT" "$SLOT_TX_END" "$SLOT_CHAIN_END"
+
 # Wait for network to be ready for testing
 log_info "Waiting for pre-fork network to reach slot $BEST_CHAIN_QUERY_FROM"
 sleep $((MAIN_SLOT * BEST_CHAIN_QUERY_FROM - NOW_UNIX_TS%60 + MAIN_DELAY*60))s
