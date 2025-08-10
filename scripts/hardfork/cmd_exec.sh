@@ -100,7 +100,7 @@ run_cmd_timeout() {
 
 # Execute command in background and return PID
 run_cmd_background() {
-    log_cmd "$@ &"
+    log_cmd "$@" "&"
     "$@" &
     local pid=$!
     log_debug "Command started in background with PID $pid: $*"
