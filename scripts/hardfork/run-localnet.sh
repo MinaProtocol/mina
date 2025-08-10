@@ -1,122 +1,168 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -euo pipefail
 
 export MINA_LIBP2P_PASS=
 export MINA_PRIVKEY_PASS=
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-# Interval at which to send transactions
-TX_INTERVAL=${TX_INTERVAL:-30s}
+# Source shared libraries
+# shellcheck disable=SC1090
+source "$SCRIPT_DIR/logging.sh"
+# shellcheck disable=SC1090
+source "$SCRIPT_DIR/cmd_exec.sh"
 
-# Delay between now and genesis timestamp, in minutes
-# Ignored if GENESIS_TIMESTAMP variable is specified
-DELAY_MIN=${DELAY_MIN:-20}
+# Default configuration values
+TX_INTERVAL=${TX_INTERVAL:-30s}           # Interval at which to send transactions
+DELAY_MIN=${DELAY_MIN:-20}               # Delay between now and genesis timestamp, in minutes
+CONF_SUFFIX=${CONF_SUFFIX:-}             # Allows to use develop ledger when equals to .develop
+CUSTOM_CONF=${CUSTOM_CONF:-}             # Custom configuration file path
+SLOT_TX_END=${SLOT_TX_END:-}             # Specify slot_tx_end parameter in the config
+SLOT_CHAIN_END=${SLOT_CHAIN_END:-}       # Specify slot_chain_end parameter in the config
+MINA_EXE=${MINA_EXE:-mina}               # Mina executable
+GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-} # Genesis ledger directory
+SLOT=${SLOT:-30}                         # Slot duration (a.k.a. block window duration), seconds
 
-# Allows to use develop ledger when equals to .develop
-CONF_SUFFIX=${CONF_SUFFIX:-}
+show_usage() {
+    cat >&2 << EOF
+Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes
 
-# Allows to specify a specific configuration file.
-# If specified, ledger will not be generated.
-# Specified config file is applied the latest and
-# will override settings set by this script.
-CUSTOM_CONF=${CUSTOM_CONF:-}
+Usage: $0 [OPTIONS]
 
-# Specify slot_tx_end parameter in the config
-SLOT_TX_END=${SLOT_TX_END:-}
+OPTIONS:
+  -m, --mina EXECUTABLE         Mina executable path (default: $MINA_EXE)
+  -i, --tx-interval INTERVAL    Transaction interval (default: $TX_INTERVAL)
+  -d, --delay-min MINUTES       Genesis delay in minutes (default: $DELAY_MIN)
+  -s, --slot SECONDS            Slot duration in seconds (default: $SLOT)
+  --develop                     Use develop ledger
+  -c, --config FILE             Custom config file path
+  --slot-tx-end SLOT            Slot tx end parameter
+  --slot-chain-end SLOT         Slot chain end parameter
+  --genesis-ledger-dir DIR      Genesis ledger directory
 
-# Specify slot_chain_end parameter in the config
-SLOT_CHAIN_END=${SLOT_CHAIN_END:-}
+Consider reading script's code for information on optional arguments
+EOF
+}
 
-# Mina executable
-MINA_EXE=${MINA_EXE:-mina}
+parse_arguments() {
+    local keys=()
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_usage; exit 0 ;;
+            -d|--delay-min)
+                DELAY_MIN="$2"; shift 2 ;;
+            -i|--tx-interval)
+                TX_INTERVAL="$2"; shift 2 ;;
+            --develop)
+                CONF_SUFFIX=".develop"; shift ;;
+            -m|--mina)
+                MINA_EXE="$2"; shift 2 ;;
+            -s|--slot)
+                SLOT="$2"; shift 2 ;;
+            -c|--config)
+                CUSTOM_CONF="$2"; shift 2 ;;
+            --slot-chain-end)
+                SLOT_CHAIN_END="$2"; shift 2 ;;
+            --slot-tx-end)
+                SLOT_TX_END="$2"; shift 2 ;;
+            --genesis-ledger-dir)
+                GENESIS_LEDGER_DIR="$2"; shift 2 ;;
+            -*)
+                log_error "Unknown option: $1"
+                show_usage; exit 1 ;;
+            *)
+                keys+=("$1"); shift ;;
+        esac
+    done
+    
+    # Return unused positional arguments
+    printf '%s\n' "${keys[@]}"
+}
 
-# Genesis ledger directory
-GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
+validate_configuration() {
+    if [[ -n "$CONF_SUFFIX" ]] && [[ -n "$CUSTOM_CONF" ]]; then
+        log_error "Cannot use both --develop and --config options"
+        return 1
+    fi
 
-# Slot duration (a.k.a. block window duration), seconds
-SLOT=${SLOT:-30}
+    if ! command -v "$MINA_EXE" >/dev/null; then
+        log_error "Mina executable not found: $MINA_EXE"
+        return 1
+    fi
+    
+    log_debug "Configuration validated successfully"
+    return 0
+}
 
-echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
-echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [--develop] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
-echo "Consider reading script's code for information on optional arguments" >&2
+# Parse command line arguments
+readarray -t KEYS < <(parse_arguments "$@")
+validate_configuration
 
-##########################################################
-# Parse arguments
-##########################################################
+calculate_genesis_timestamp() {
+    local delay_min="$1"
+    local current_time
+    current_time=$(date +%s)
+    date -u -d "@$((current_time - current_time % 60 + delay_min * 60))" '+%F %H:%M:%S+00:00'
+}
 
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    -d|--delay-min)
-      DELAY_MIN="$2"; shift; shift ;;
-    -i|--tx-interval)
-      TX_INTERVAL="$2"; shift; shift ;;
-    --develop)
-      CONF_SUFFIX=".develop"; shift ;;
-    -m|--mina)
-      MINA_EXE="$2"; shift; shift ;;
-    -s|--slot)
-      SLOT="$2"; shift; shift ;;
-    -c|--config)
-      CUSTOM_CONF="$2"; shift; shift ;;
-    --slot-chain-end)
-      SLOT_CHAIN_END="$2"; shift; shift ;;
-    --slot-tx-end)
-      SLOT_TX_END="$2"; shift; shift ;;
-    --genesis-ledger-dir)
-      GENESIS_LEDGER_DIR="$2"; shift; shift ;;
-    -*)
-      echo "Unknown option $1"; exit 1 ;;
-    *)
-      KEYS+=("$1") ; shift ;;
-  esac
-done
+setup_configuration_directory() {
+    local conf_dir="$1"
+    
+    log_env_setup "configuration directory" "$conf_dir"
+    
+    log_file_op "mkdir" "$conf_dir"
+    mkdir -p "$conf_dir"
+    
+    log_file_op "chmod" "0700 $conf_dir"
+    chmod 0700 "$conf_dir"
+    
+    if [[ ! -f "$conf_dir/bp" ]]; then
+        log_info "Generating block producer keypair"
+        run_cmd "$MINA_EXE" advanced generate-keypair --privkey-path "$conf_dir/bp"
+    fi
+    
+    log_info "Generating libp2p keypairs"
+    run_cmd "$MINA_EXE" libp2p generate-keypair --privkey-path "$conf_dir/libp2p_1"
+    run_cmd "$MINA_EXE" libp2p generate-keypair --privkey-path "$conf_dir/libp2p_2"
+    
+    if [[ -z "$CUSTOM_CONF" ]] && [[ ! -f "$conf_dir/ledger.json" ]]; then
+        log_info "Generating test ledger"
+        log_cmd "(cd $conf_dir && $SCRIPT_DIR/../prepare-test-ledger.sh -c 100000 -b 1000000 \$(cat bp.pub) > ledger.json)"
+        if ! (cd "$conf_dir" && "$SCRIPT_DIR/../prepare-test-ledger.sh" -c 100000 -b 1000000 "$(cat bp.pub)" > ledger.json); then
+            log_error "Failed to generate test ledger"
+            return 1
+        fi
+    fi
+}
 
-if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
-  echo "Can't use both --develop and --config options" >&2
-  exit 1
-fi
-
-# Check mina command exists
-command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
-
-# Genesis timestamp to use in config
-calculated_timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) '+%F %H:%M:%S+00:00' )"
-GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:-"$calculated_timestamp"}
-
-##########################################################
-# Generate configuration in localnet/config
-##########################################################
-
-CONF_DIR=localnet/config
-
-mkdir -p $CONF_DIR
-chmod 0700 $CONF_DIR
-
-if [[ ! -f $CONF_DIR/bp ]]; then
-  "$MINA_EXE" advanced generate-keypair --privkey-path $CONF_DIR/bp
-fi
-
-NODE_ARGS_1=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" )
-NODE_ARGS_2=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
-
-"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 
-"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 
-
-if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
-  ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" -c 100000 -b 1000000 "$(cat bp.pub)" >ledger.json )
-fi
-
-if [[ "$SLOT_TX_END" != "" ]]; then
-  slot_ends=".daemon.slot_tx_end = $SLOT_TX_END | "
-fi
-if [[ "$SLOT_CHAIN_END" != "" ]]; then
-  slot_ends="$slot_ends .daemon.slot_chain_end = $SLOT_CHAIN_END | "
-fi
-
-update_config_expr="$slot_ends .genesis.genesis_state_timestamp = \"$GENESIS_TIMESTAMP\""
-
-jq "$update_config_expr" > $CONF_DIR/base.json << EOF
+generate_base_config() {
+    local conf_dir="$1"
+    local genesis_timestamp="$2"
+    local slot="$3"
+    local slot_tx_end="$4"
+    local slot_chain_end="$5"
+    
+    log_config "generate" "base configuration"
+    log_debug "Genesis timestamp: $genesis_timestamp, Slot: ${slot}s"
+    log_debug "Slot TX end: ${slot_tx_end:-none}, Slot chain end: ${slot_chain_end:-none}"
+    
+    local slot_ends=""
+    if [[ -n "$slot_tx_end" ]]; then
+        slot_ends=".daemon.slot_tx_end = $slot_tx_end | "
+        log_config "set" "slot_tx_end = $slot_tx_end"
+    fi
+    if [[ -n "$slot_chain_end" ]]; then
+        slot_ends="$slot_ends .daemon.slot_chain_end = $slot_chain_end | "
+        log_config "set" "slot_chain_end = $slot_chain_end"
+    fi
+    
+    local update_config_expr="$slot_ends .genesis.genesis_state_timestamp = \"$genesis_timestamp\""
+    
+    log_file_op "create" "$conf_dir/base.json"
+    log_cmd jq "$update_config_expr"
+    jq "$update_config_expr" > "$conf_dir/base.json" << EOF
 {
   "genesis": {
     "slots_per_epoch": 48,
@@ -127,80 +173,187 @@ jq "$update_config_expr" > $CONF_DIR/base.json << EOF
     "work_delay": 1,
     "level": "full",
     "transaction_capacity": { "2_to_the": 2 },
-    "block_window_duration_ms": ${SLOT}000
+    "block_window_duration_ms": ${slot}000
   }
 }
 EOF
+}
 
-if [[ "$CUSTOM_CONF" == "" ]]; then
-  { echo '{"ledger": {"accounts": '; cat $CONF_DIR/ledger.json; echo '}}'; } > $CONF_DIR/daemon.json
-else
-  cp "$CUSTOM_CONF" $CONF_DIR/daemon.json
-fi
-##############################################################
-# Launch two Mina nodes and send transactions on an interval
-##############################################################
-
-COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
-COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
-COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
-
-if [[ "$GENESIS_LEDGER_DIR" != "" ]]; then
-  rm -Rf localnet/genesis_{1,2}
-  cp -Rf "$GENESIS_LEDGER_DIR" localnet/genesis_1
-  cp -Rf "$GENESIS_LEDGER_DIR" localnet/genesis_2
-  NODE_ARGS_1+=( --genesis-ledger-dir "$PWD/localnet/genesis_1" )
-  NODE_ARGS_2+=( --genesis-ledger-dir "$PWD/localnet/genesis_2" )
-fi
-
-# Clean runtime directories
-rm -Rf localnet/runtime_1 localnet/runtime_2
-
-"$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
-  --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
-  "${NODE_ARGS_1[@]}" \
-  --block-producer-key "$PWD/$CONF_DIR/bp" \
-  --config-directory "$PWD/localnet/runtime_1" \
-  --client-port 10301 --external-port 10302 --rest-port 10303 &
-
-bp_pid=$!
-
-echo "Block producer PID: $bp_pid"
-
-"$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
-  "${NODE_ARGS_2[@]}" \
-  --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat $CONF_DIR/libp2p_1.peerid)" \
-  --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
-  --config-directory "$PWD/localnet/runtime_2" \
-  --client-port 10311 --external-port 10312 --rest-port 10313 &
-
-sw_pid=$!
-
-echo "Snark worker PID: $sw_pid"
-
-while ! "$MINA_EXE" accounts import --privkey-path "$PWD/$CONF_DIR/bp" --rest-server 10313 2>/dev/null; do
-  sleep 1m
-done
-
-# Export staged ledger
-# Will succeed after bootstrap is over
-while ! "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 > localnet/exported_staged_ledger.json; do
-  sleep 1m
-done
-
-i=0
-while kill -0 $sw_pid 2>/dev/null; do
-  # shuf's exit code is masked by `true` because we do not expect
-  # all of the output to be read
-  <localnet/exported_staged_ledger.json jq -r '.[].pk' | { shuf || true; } | while read acc; do
-    if ! kill -0 $sw_pid 2>/dev/null; then
-      break
+setup_daemon_config() {
+    local conf_dir="$1"
+    local custom_conf="$2"
+    
+    if [[ -z "$custom_conf" ]]; then
+        log_config "generate" "daemon configuration from ledger"
+        log_file_op "read" "$conf_dir/ledger.json"
+        log_file_op "create" "$conf_dir/daemon.json"
+        { echo '{"ledger": {"accounts": '; cat "$conf_dir/ledger.json"; echo '}}'; } > "$conf_dir/daemon.json"
+    else
+        log_config "use" "custom daemon configuration: $custom_conf"
+        log_file_op "copy" "$custom_conf" "$conf_dir/daemon.json"
+        cp "$custom_conf" "$conf_dir/daemon.json"
     fi
-    "$MINA_EXE" client send-payment --sender "$(cat $CONF_DIR/bp.pub)" --receiver "$acc" \
-      --amount 0.1 --memo "payment_$i" --rest-server 10313 2>/dev/null \
-      && i=$((i+1)) && echo "Sent tx #$i" || echo "Failed to send tx #$i"
-    sleep "$TX_INTERVAL"
-  done
-done
+}
 
+# Calculate genesis timestamp
+calculated_timestamp=$(calculate_genesis_timestamp "$DELAY_MIN")
+GENESIS_TIMESTAMP=${GENESIS_TIMESTAMP:-"$calculated_timestamp"}
+
+log_info "Starting localnet setup"
+log_info "Genesis timestamp: $GENESIS_TIMESTAMP"
+
+# Setup configuration
+CONF_DIR="localnet/config"
+setup_configuration_directory "$CONF_DIR"
+generate_base_config "$CONF_DIR" "$GENESIS_TIMESTAMP" "$SLOT" "$SLOT_TX_END" "$SLOT_CHAIN_END"
+setup_daemon_config "$CONF_DIR" "$CUSTOM_CONF"
+
+prepare_node_arguments() {
+    local conf_dir="$1"
+    local conf_suffix="$2"
+    local genesis_ledger_dir="$3"
+    
+    # Common arguments for both nodes
+    COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
+    COMMON_ARGS+=( --config-file "$PWD/$conf_dir/base.json" )
+    COMMON_ARGS+=( --config-file "$PWD/$conf_dir/daemon$conf_suffix.json" )
+    
+    # Node-specific arguments
+    NODE_ARGS_1=( --libp2p-keypair "$PWD/$conf_dir/libp2p_1" )
+    NODE_ARGS_2=( --libp2p-keypair "$PWD/$conf_dir/libp2p_2" )
+    
+    if [[ -n "$genesis_ledger_dir" ]]; then
+        log_info "Setting up genesis ledger directories"
+        rm -rf localnet/genesis_{1,2}
+        cp -rf "$genesis_ledger_dir" localnet/genesis_1
+        cp -rf "$genesis_ledger_dir" localnet/genesis_2
+        NODE_ARGS_1+=( --genesis-ledger-dir "$PWD/localnet/genesis_1" )
+        NODE_ARGS_2+=( --genesis-ledger-dir "$PWD/localnet/genesis_2" )
+    fi
+}
+
+launch_nodes() {
+    local conf_dir="$1"
+    
+    log_info "Cleaning runtime directories"
+    log_file_op "delete" "localnet/runtime_1 localnet/runtime_2"
+    rm -rf localnet/runtime_1 localnet/runtime_2
+    
+    log_process_op "start" "block producer node"
+    local peer_id
+    peer_id=$(cat "$conf_dir/libp2p_2.peerid")
+    log_debug "Block producer will connect to peer: /ip4/127.0.0.1/tcp/10312/p2p/$peer_id"
+    
+    log_cmd "$MINA_EXE daemon with block producer configuration"
+    "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
+        --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat "$conf_dir/libp2p_2.peerid")" \
+        "${NODE_ARGS_1[@]}" \
+        --block-producer-key "$PWD/$conf_dir/bp" \
+        --config-directory "$PWD/localnet/runtime_1" \
+        --client-port 10301 --external-port 10302 --rest-port 10303 &
+    
+    local bp_pid=$!
+    log_process_op "start" "block producer with PID $bp_pid"
+    
+    log_process_op "start" "snark worker node"
+    peer_id=$(cat "$conf_dir/libp2p_1.peerid")
+    log_debug "Snark worker will connect to peer: /ip4/127.0.0.1/tcp/10302/p2p/$peer_id"
+    
+    log_cmd "$MINA_EXE daemon with snark worker configuration"
+    "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
+        "${NODE_ARGS_2[@]}" \
+        --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat "$conf_dir/libp2p_1.peerid")" \
+        --run-snark-worker "$(cat "$conf_dir/bp.pub")" --work-selection seq \
+        --config-directory "$PWD/localnet/runtime_2" \
+        --client-port 10311 --external-port 10312 --rest-port 10313 &
+    
+    local sw_pid=$!
+    log_process_op "start" "snark worker with PID $sw_pid"
+    
+    echo "$bp_pid $sw_pid"
+}
+
+wait_for_node_ready() {
+    local conf_dir="$1"
+    
+    log_info "Waiting for nodes to be ready"
+    log_timing "wait" "for accounts import to succeed"
+    while ! run_cmd "$MINA_EXE" accounts import --privkey-path "$PWD/$conf_dir/bp" --rest-server 10313; do
+        log_debug "Waiting for accounts import to succeed..."
+        log_timing "sleep" "1 minute"
+        sleep 1m
+    done
+    log_info "Accounts imported successfully"
+    
+    log_info "Exporting staged ledger"
+    log_timing "wait" "for ledger export to succeed"
+    while ! run_cmd "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 --output localnet/exported_staged_ledger.json; do
+        log_debug "Waiting for ledger export to succeed..."
+        log_timing "sleep" "1 minute"
+        sleep 1m
+    done
+    log_file_op "create" "localnet/exported_staged_ledger.json"
+    log_info "Staged ledger exported successfully"
+}
+
+send_transactions() {
+    local conf_dir="$1"
+    local sw_pid="$2"
+    local tx_interval="$3"
+    
+    log_info "Starting transaction sender with interval: $tx_interval"
+    log_timing "wait" "for process $sw_pid to end while sending transactions"
+    
+    local i=0
+    while kill -0 "$sw_pid" 2>/dev/null; do
+        log_debug "Transaction sending loop iteration, checking if process $sw_pid is still running"
+        
+        # Send transactions to random accounts from the ledger
+        # shuf's exit code is masked by `true` because we do not expect
+        # all of the output to be read
+        log_cmd "jq -r '.[].pk' < localnet/exported_staged_ledger.json | shuf"
+        if ! jq -r '.[].pk' < localnet/exported_staged_ledger.json | { shuf || true; } | while IFS= read -r acc; do
+            if ! kill -0 "$sw_pid" 2>/dev/null; then
+                log_debug "Process $sw_pid ended, stopping transaction sending"
+                break
+            fi
+            
+            log_cmd "$MINA_EXE client send-payment --sender $(cat $conf_dir/bp.pub) --receiver $acc --amount 0.1 --memo payment_$i --rest-server 10313"
+            if "$MINA_EXE" client send-payment \
+                --sender "$(cat "$conf_dir/bp.pub")" \
+                --receiver "$acc" \
+                --amount 0.1 \
+                --memo "payment_$i" \
+                --rest-server 10313 2>/dev/null; then
+                i=$((i+1))
+                log_info "Sent transaction #$i to $acc"
+            else
+                log_debug "Failed to send transaction #$i to $acc"
+            fi
+            
+            log_timing "sleep" "$tx_interval"
+            sleep "$tx_interval"
+        done; then
+            log_debug "Transaction sending loop completed"
+        fi
+    done
+    
+    log_process_op "stop" "transaction sender (node process $sw_pid ended)"
+}
+
+# Launch nodes and handle transactions
+log_info "Preparing node arguments and launching localnet"
+prepare_node_arguments "$CONF_DIR" "$CONF_SUFFIX" "$GENESIS_LEDGER_DIR"
+
+log_debug "Node launch configuration:"
+log_debug "  Config directory: $CONF_DIR"
+log_debug "  Config suffix: ${CONF_SUFFIX:-none}"
+log_debug "  Genesis ledger dir: ${GENESIS_LEDGER_DIR:-none}"
+
+read -r BP_PID SW_PID < <(launch_nodes "$CONF_DIR")
+
+wait_for_node_ready "$CONF_DIR"
+send_transactions "$CONF_DIR" "$SW_PID" "$TX_INTERVAL"
+
+log_process_op "wait" "for all background nodes to finish"
 wait
