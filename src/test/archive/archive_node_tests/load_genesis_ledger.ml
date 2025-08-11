@@ -27,6 +27,9 @@ let check_postgres_memory_increase_is_below_threshold logger threshold
     Utils.get_memory_usage_mib_of_user_process postgres_user_name
   in
   let increase = Float.( - ) current_memory !previous_postgres_memory in
+  (* We are also interested in sudden peak of memory usage  for postgres db,
+     which might indicate a memory leak.
+  *)
   if Float.( > ) increase threshold then
     failwith
       (Printf.sprintf
