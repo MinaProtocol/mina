@@ -8,6 +8,11 @@ module Priority = struct
   type t =
     | Normal
         (** default handler level, ran before exclusion cleanup is issued *)
+    | Hardfork_config
+        (** ran after all other components of mina is closed, so to avoid race condition *)
+    (* TODO: when we're actually trying to pull hardfork config from running DB,
+       we need to put this priority higher than `Normal`. For now since we're
+       just copying the folder, it should be at this level. *)
     | Exclusion
         (** after such cleanup is ran, a new execution of program could be started *)
   [@@deriving compare]
