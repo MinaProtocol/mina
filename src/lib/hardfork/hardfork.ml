@@ -52,6 +52,8 @@ end
    [migrate_*] will need to be reimplemented once Ledger Migration PRs are
    merged. *)
 module AutoPolyfilled = struct
+  [@@@warning "-32"]
+
   let create_config_dir ?(fresh = false) ~fork_config_dir () =
     if fresh then Mina_stdlib_unix.File_system.rmrf fork_config_dir ;
     Unix.mkdir ~p:() fork_config_dir
