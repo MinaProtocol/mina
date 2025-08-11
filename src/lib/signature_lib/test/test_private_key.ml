@@ -181,9 +181,103 @@ let test_of_string_mixed_invalid_formats () =
           ("Invalid format " ^ s ^ " raises exception")
           true true )
 
+let test_to_string_basic () =
+  (* Test basic to_string functionality *)
+  let test_values = [ "0"; "1"; "2"; "10"; "42"; "100"; "1000" ] in
+  List.iter test_values ~f:(fun s ->
+      let key = Private_key.of_string s in
+      let result = Private_key.to_string key in
+      Alcotest.(check string)
+        ("to_string should return correct value for " ^ s)
+        s result )
+
+let test_to_string_large_values () =
+  (* Test to_string with large values *)
+  let large_values =
+    [ "12345678901234567890123456789012345678901234567890123456789012345678901234567"
+    ; "28948022309329048855892746252171976963363056481941647379679742748393362948096"
+    ; (* modulus - 1 *)
+      "1000000000000000000000000000000000000000000000000000000000000000000000000000"
+    ]
+  in
+  List.iter large_values ~f:(fun s ->
+      try
+        let key = Private_key.of_string s in
+        let result = Private_key.to_string key in
+        Alcotest.(check string)
+          ("to_string should return correct value for large number " ^ s)
+          s result
+      with _ ->
+        (* If the value is >= modulus, of_string should raise an exception *)
+        let modulus = Bignum_bigint.of_string modulus_string in
+        let value = Bignum_bigint.of_string s in
+        if Bignum_bigint.(value >= modulus) then
+          Alcotest.(check bool)
+            ("Large value " ^ s ^ " >= modulus as expected")
+            true true
+        else Alcotest.fail ("Unexpected exception for valid large value " ^ s) )
+
+let test_roundtrip_of_string_to_string () =
+  (* Test that of_string and to_string are inverse functions *)
+  let test_values =
+    [ "0"
+    ; "1"
+    ; "2"
+    ; "10"
+    ; "42"
+    ; "100"
+    ; "1000"
+    ; "999999999999"
+    ; "12345678901234567890123456789012345678901234567890123456789012345678901234567"
+    ]
+  in
+  List.iter test_values ~f:(fun original ->
+      try
+        let key = Private_key.of_string original in
+        let roundtrip = Private_key.to_string key in
+        Alcotest.(check string)
+          ( "Roundtrip of_string -> to_string should preserve value for "
+          ^ original )
+          original roundtrip
+      with _ ->
+        (* If the value is >= modulus, of_string should raise an exception *)
+        let modulus = Bignum_bigint.of_string modulus_string in
+        let value = Bignum_bigint.of_string original in
+        if Bignum_bigint.(value >= modulus) then
+          Alcotest.(check bool)
+            ("Value " ^ original ^ " >= modulus as expected")
+            true true
+        else Alcotest.fail ("Unexpected exception for valid value " ^ original) )
+
+let test_roundtrip_to_string_of_string () =
+  (* Test that to_string -> of_string is also inverse for generated keys *)
+  let gen_key1 = Private_key.of_string "42" in
+  let gen_key2 = Private_key.of_string "999999" in
+  let gen_key3 = Private_key.of_string "12345678901234567890" in
+  let test_keys = [ gen_key1; gen_key2; gen_key3 ] in
+
+  List.iteri test_keys ~f:(fun i key ->
+      let str_repr = Private_key.to_string key in
+      let roundtrip_key = Private_key.of_string str_repr in
+      Alcotest.(check bool)
+        ( "Roundtrip to_string -> of_string should preserve key "
+        ^ Int.to_string i )
+        true
+        (Snark_params.Tick.Inner_curve.Scalar.equal key roundtrip_key) )
+
+let test_to_string_modulus_minus_one () =
+  (* Test to_string with the largest valid value *)
+  let modulus_minus_one =
+    Bignum_bigint.(modulus_string |> of_string |> pred |> to_string)
+  in
+  let key = Private_key.of_string modulus_minus_one in
+  let result = Private_key.to_string key in
+  Alcotest.(check string)
+    "to_string should handle modulus - 1 correctly" modulus_minus_one result
+
 let () =
   let open Alcotest in
-  run "Private_key.of_string tests"
+  run "Private_key string conversion tests"
     [ ( "Basic value tests"
       , [ test_case "of_string with zero" `Quick test_of_string_zero
         ; test_case "of_string with one" `Quick test_of_string_one
@@ -217,5 +311,18 @@ let () =
             test_of_string_hexadecimal_values
         ; test_case "of_string with mixed invalid formats" `Quick
             test_of_string_mixed_invalid_formats
+        ] )
+    ; ( "to_string tests"
+      , [ test_case "to_string with basic values" `Quick test_to_string_basic
+        ; test_case "to_string with large values" `Quick
+            test_to_string_large_values
+        ; test_case "to_string with modulus - 1" `Quick
+            test_to_string_modulus_minus_one
+        ] )
+    ; ( "Roundtrip tests"
+      , [ test_case "of_string -> to_string roundtrip" `Quick
+            test_roundtrip_of_string_to_string
+        ; test_case "to_string -> of_string roundtrip" `Quick
+            test_roundtrip_to_string_of_string
         ] )
     ]
