@@ -512,7 +512,7 @@ test_step_9_start_fork_network() {
     
     # Validate fork continuity
     local expected_height=$((latest_height+1))
-    if [[ $earliest_height != $expected_height ]]; then
+    if [[ $earliest_height != "$expected_height" ]]; then
         log_error "Unexpected block height $earliest_height at fork start (expected: $expected_height)"
         stop_nodes "$FORK_MINA_EXE"
         exit 3
