@@ -142,6 +142,26 @@ let test_other_network_failures () =
     "Other network signature fails with different other network" false
     (verify ~signature_kind:(Other_network "Bar") signature keypair.public_key s)
 
+let test_secret_key_between_scalar_field_and_base_field () =
+  (* There are 86663725065984043395317760 values between the two moduli.
+     - Base:
+       28948022309329048855892746252171976963363056481941560715954676764349967630337
+     - Scalar:
+       28948022309329048855892746252171976963363056481941647379679742748393362948097
+  *)
+  (* scalar modulus minus one *)
+  let sk_str =
+    "28948022309329048855892746252171976963363056481941647379679742748393362948096"
+  in
+  let secret_key = Signature_lib.Private_key.of_string sk_str in
+  let keypair = Signature_lib.Keypair.of_private_key_exn secret_key in
+
+  let s = "Rain and Spain don't rhyme with cheese" in
+  let signature = sign ~signature_kind:Mainnet keypair.private_key s in
+  Alcotest.(check bool)
+    "Sign and verify with secret key in scalar field" true
+    (verify ~signature_kind:Mainnet signature keypair.public_key s)
+
 (* Define the test suite *)
 let () =
   Alcotest.run "String_sign"
@@ -158,5 +178,9 @@ let () =
         ; Alcotest.test_case "Mainnet failures" `Quick test_mainnet_failures
         ; Alcotest.test_case "Other network failures" `Quick
             test_other_network_failures
+        ] )
+    ; ( "Corner cases"
+      , [ Alcotest.test_case "Secret key between scalar and base field" `Quick
+            test_secret_key_between_scalar_field_and_base_field
         ] )
     ]
