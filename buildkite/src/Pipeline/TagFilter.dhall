@@ -16,6 +16,7 @@ let Filter
       | Promote
       | DebianBuild
       | DockerBuild
+      | Hardfork
       >
 
 let tags
