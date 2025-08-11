@@ -14,7 +14,7 @@ end
 module type CONTEXT = sig
   val precomputed_values : Precomputed_values.t
 
-  val runtime_config_ledger : Runtime_config.Ledger.t
+  val runtime_config : Runtime_config.t
 end
 
 module Locations = struct
@@ -39,6 +39,9 @@ module Locations = struct
 
   let genesis_ledger config_dir ~hash =
     config_dir ^/ "genesis" ^/ "genesis_ledger_" ^ hash
+
+  let genesis_epoch_ledger config_dir ~hash =
+    config_dir ^/ "genesis" ^/ "epoch_ledger_" ^ hash
 
   (***************)
 
@@ -85,13 +88,17 @@ module AutoPolyfilled = struct
       ~target:(Locations.wallets source_config_dir)
       ~link_name:(Locations.wallets fork_config_dir)
 
-  let create_genesis ~context:(module Context : CONTEXT) ~fork_config_dir =
+  let migrate_genesis_ledger ~context:(module Context : CONTEXT)
+      ~fork_config_dir =
     let open Context in
-    let%map.Deferred () =
+    let%bind.Deferred () =
       Unix.mkdir ~p:() (Locations.genesis fork_config_dir)
     in
-    (* Transfer genesis ledger *)
     let ledger_depth = Precomputed_values.ledger_depth precomputed_values in
+    let runtime_config_ledger =
+      runtime_config.ledger
+      |> Option.value_exn ~message:"No ledger provided from runtime config"
+    in
     let genesis_ledger_hash =
       runtime_config_ledger.hash
       |> Option.value_exn
@@ -108,13 +115,39 @@ module AutoPolyfilled = struct
     let source_genesis_ledger =
       Lazy.force @@ Precomputed_values.genesis_ledger precomputed_values
     in
-    let%bind.Deferred.Or_error _ =
-      Deferred.return
-      @@ Ledger_transfer.transfer_accounts ~src:source_genesis_ledger
-           ~dest:dest_genesis_ledger
+    Deferred.return
+    @@ Ledger_transfer.transfer_accounts ~src:source_genesis_ledger
+         ~dest:dest_genesis_ledger
+
+  let migrate_epoch_ledgers ~context:(module Context : CONTEXT)
+      ~source_config_dir ~fork_config_dir =
+    let open Context in
+    let%bind.Deferred () =
+      Unix.mkdir ~p:() (Locations.genesis fork_config_dir)
     in
-    (* Create epoch ledger from fresh *)
-    failwith "TODO"
+    let migrate_epoch_ledger ~hash =
+      Mina_stdlib_unix.File_system.cp ~r:true
+        ~src:(Locations.genesis_epoch_ledger ~hash source_config_dir)
+        ~dest:(Locations.genesis_epoch_ledger ~hash fork_config_dir)
+    in
+    let epoch_data =
+      runtime_config.epoch_data
+      |> Option.value_exn ~message:"No epoch data provided from runtime config"
+    in
+    let staking_hash =
+      epoch_data.staking.ledger.hash
+      |> Option.value_exn ~message:"No hash found for staking ledger"
+    in
+    let%bind.Deferred () = migrate_epoch_ledger ~hash:staking_hash in
+    match epoch_data.next with
+    | None ->
+        Deferred.unit
+    | Some next ->
+        let next_hash =
+          next.ledger.hash
+          |> Option.value_exn ~message:"No hash found for staking ledger"
+        in
+        migrate_epoch_ledger ~hash:next_hash
 
   let transfer_frontier ~source_config_dir ~fork_config_dir =
     (* TODO: figure out what should we do exactly on frontier database instead of a copy-paste *)
