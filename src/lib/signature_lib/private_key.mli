@@ -86,26 +86,26 @@ val of_yojson : [> `String of string ] -> (t, string) result
     is greater than or equal to the field modulus
 
     Examples:
-    - [of_string "0"] returns the private key corresponding to zero
-    - [of_string "1"] returns the private key corresponding to one
-    - [of_string "28948022309329048855892746252171976963363056481941647379679742748393362948096"]
+    - [of_string_exn "0"] returns the private key corresponding to zero
+    - [of_string_exn "1"] returns the private key corresponding to one
+    - [of_string_exn "28948022309329048855892746252171976963363056481941647379679742748393362948096"]
       returns the private key corresponding to (modulus - 1)
-    - [of_string "28948022309329048855892746252171976963363056481941647379679742748393362948097"]
+    - [of_string_exn "28948022309329048855892746252171976963363056481941647379679742748393362948097"]
       raises an exception (value equals modulus)
-    - [of_string "invalid"] raises an exception (not a valid decimal string) *)
-val of_string : string -> t
+    - [of_string_exn "invalid"] raises an exception (not a valid decimal string) *)
+val of_string_exn : string -> t
 
 (** Convert a private key to its decimal string representation.
 
     Returns the private key value as a decimal string. This function is the
-    inverse of [of_string], meaning that [of_string (to_string t) = t] for any
+    inverse of [of_string_exn], meaning that [of_string_exn (to_string t) = t] for any
     valid private key [t].
 
     @param t A private key to convert
     @return A decimal string representation of the private key value
 
     Examples:
-    - [to_string (of_string "0")] returns ["0"]
-    - [to_string (of_string "42")] returns ["42"]
-    - [to_string (of_string "1000")] returns ["1000"] *)
+    - [to_string (of_string_exn "0")] returns ["0"]
+    - [to_string (of_string_exn "42")] returns ["42"]
+    - [to_string (of_string_exn "1000")] returns ["1000"] *)
 val to_string : t -> string

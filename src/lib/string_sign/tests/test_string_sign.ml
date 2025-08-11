@@ -153,7 +153,7 @@ let test_secret_key_between_scalar_field_and_base_field () =
   let sk_str =
     "28948022309329048855892746252171976963363056481941647379679742748393362948096"
   in
-  let secret_key = Signature_lib.Private_key.of_string sk_str in
+  let secret_key = Signature_lib.Private_key.of_string_exn sk_str in
   let keypair = Signature_lib.Keypair.of_private_key_exn secret_key in
 
   let s = "Rain and Spain don't rhyme with cheese" in
