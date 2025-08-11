@@ -32,6 +32,7 @@ let tags
             , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
+            , Hardfork = [ Tag.Type.Hardfork ]
             }
             filter
 
@@ -49,6 +50,7 @@ let show
             , Promote = "Promote"
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
+            , Hardfork = "Hardfork"
             }
             filter
 
