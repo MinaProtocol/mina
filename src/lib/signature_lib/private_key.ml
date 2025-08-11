@@ -64,3 +64,5 @@ let of_yojson = function
           Error ("Signature_lib.Private_key.of_yojson: " ^ Exn.to_string exn) )
   | _ ->
       Error "Signature_lib.Private_key.of_yojson: Expected a string"
+
+let of_string s = Inner_curve.Scalar.of_string s

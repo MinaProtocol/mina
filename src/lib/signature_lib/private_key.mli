@@ -72,3 +72,25 @@ val to_yojson : t -> [> `String of string ]
     Only accepts a JSON string containing a Base58Check encoded private key.
     Returns [Ok private_key] on success or [Error message] on failure. *)
 val of_yojson : [> `String of string ] -> (t, string) result
+
+(** Parse a private key from a string containing a private key encoded in
+    decimal representation.
+
+    The string must represent a non-negative integer in decimal format that is
+    strictly less than the field modulus
+    (28948022309329048855892746252171976963363056481941647379679742748393362948097).
+
+    @param s A decimal string representation of a private key value
+    @return A private key corresponding to the given value
+    @raise Failure if the string is not a valid decimal integer or if the value
+    is greater than or equal to the field modulus
+
+    Examples:
+    - [of_string "0"] returns the private key corresponding to zero
+    - [of_string "1"] returns the private key corresponding to one
+    - [of_string "28948022309329048855892746252171976963363056481941647379679742748393362948096"]
+      returns the private key corresponding to (modulus - 1)
+    - [of_string "28948022309329048855892746252171976963363056481941647379679742748393362948097"]
+      raises an exception (value equals modulus)
+    - [of_string "invalid"] raises an exception (not a valid decimal string) *)
+val of_string : string -> t
