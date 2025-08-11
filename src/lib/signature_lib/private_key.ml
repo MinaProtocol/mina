@@ -25,9 +25,7 @@ end]
 
 [%%define_locally Stable.Latest.(gen)]
 
-let create () =
-  (* This calls into libsnark which uses /dev/urandom *)
-  Inner_curve.Scalar.random ()
+let create () = Inner_curve.Scalar.random ()
 
 include Comparable.Make_binable (Stable.Latest)
 
