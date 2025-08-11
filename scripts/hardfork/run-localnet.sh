@@ -114,8 +114,8 @@ setup_configuration_directory() {
     
     log_file_op "mkdir" "$conf_dir"
     mkdir -p "$conf_dir"
-    
-    log_file_op "chmod" "0700 $conf_dir"
+
+    log_file_op "chmod" "0700" "$conf_dir"
     chmod 0700 "$conf_dir"
     
     if [[ ! -f "$conf_dir/bp" ]]; then

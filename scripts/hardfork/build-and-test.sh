@@ -66,8 +66,8 @@ setup_ci_environment() {
     
     log_file_op "create" "/etc/localtime symlink"
     run_cmd ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-    
-    log_file_op "chmod" "recursive ownership for ${USER} on /workdir"
+
+    log_file_op "chmod" "-R" "recursive ownership for ${USER} on /workdir"
     run_cmd chown -R "${USER}" /workdir
     
     log_config "set" "git safe directory"
@@ -175,7 +175,7 @@ aws_access_key_id=$NIX_CACHE_GCP_ID
 aws_secret_access_key=$NIX_CACHE_GCP_SECRET
 EOF
 
-        log_file_op "chmod" "600 $HOME/.aws/credentials"
+        log_file_op "chmod" "600" "$HOME/.aws/credentials"
         chmod 600 "$HOME/.aws/credentials"
         if [[ -f /tmp/nix-paths ]]; then
             log_info "Uploading nix paths to GCP storage"
