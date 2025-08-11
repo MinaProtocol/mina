@@ -1,5 +1,6 @@
 open Core_kernel
 open Signature_lib
+open Base_quickcheck
 
 let modulus_string =
   "28948022309329048855892746252171976963363056481941647379679742748393362948097"
@@ -19,7 +20,10 @@ let test_of_string_exn_one () =
        Snark_params.Tick.Inner_curve.Scalar.one )
 
 let test_of_string_exn_small_values () =
-  let test_values = [ "2"; "10"; "42"; "100"; "1000" ] in
+  let gen = Generator.int_inclusive 1 1000000 in
+  let test_values =
+    List.init 5 ~f:(fun _ -> Quickcheck.random_value gen |> Int.to_string)
+  in
   List.iter test_values ~f:(fun s ->
       let key = Private_key.of_string_exn s in
       let expected = Snark_params.Tick.Inner_curve.Scalar.of_string s in
@@ -40,77 +44,51 @@ let test_of_string_exn_modulus_minus_one () =
     "Private key from string (modulus - 1) should create valid key" true
     (Snark_params.Tick.Inner_curve.Scalar.equal key expected)
 
-let test_of_string_exn_modulus () =
-  (* Test that passing the modulus value raises an exception *)
-  try
-    let _key = Private_key.of_string_exn modulus_string in
-    Alcotest.fail "Modulus string should raise an exception"
-  with _ -> Alcotest.(check bool) "Modulus string raises exception" true true
+let test_of_string_exn_values_exceeding_modulus () =
+  (* Test with various values >= modulus - should raise exceptions *)
+  let modulus = Bignum_bigint.of_string modulus_string in
+  let modulus_plus_one = Bignum_bigint.(modulus |> succ |> to_string) in
 
-let test_of_string_exn_higher_than_modulus () =
-  (* Test with modulus + 1 - should raise exception *)
-  let modulus_plus_one =
-    Bignum_bigint.(modulus_string |> of_string |> succ |> to_string)
+  (* Generate random offsets to add to modulus *)
+  let offset_gen = Generator.int_inclusive 1 1000000 in
+  let random_offsets =
+    List.init 3 ~f:(fun _ -> Quickcheck.random_value offset_gen)
   in
-  try
-    let _key = Private_key.of_string_exn modulus_plus_one in
-    Alcotest.fail "Values >= modulus should raise an exception"
-  with _ ->
-    Alcotest.(check bool) "Values >= modulus raise exception" true true
+  let random_values =
+    List.map random_offsets ~f:(fun offset ->
+        Bignum_bigint.(modulus + of_int offset |> to_string) )
+  in
 
-let test_of_string_exn_much_higher_than_modulus () =
-  (* Test with modulus + 42 - should raise exception *)
-  let modulus_plus_42 =
-    Bignum_bigint.(
-      modulus_string |> of_string |> ( + ) (of_int 42) |> to_string)
-  in
-  try
-    let _key = Private_key.of_string_exn modulus_plus_42 in
-    Alcotest.fail "Values >= modulus should raise an exception"
-  with _ ->
-    Alcotest.(check bool) "Values >= modulus raise exception" true true
+  (* Include fixed test cases and random cases *)
+  let test_values = modulus_string :: modulus_plus_one :: random_values in
 
-let test_of_string_exn_very_large () =
-  (* Test with a much larger number: 2 * modulus + 123 - should raise exception *)
-  let two_times_modulus_plus_123 =
-    let modulus = Bignum_bigint.of_string modulus_string in
-    Bignum_bigint.((modulus * of_int 2) + of_int 123 |> to_string)
-  in
-  try
-    let _key = Private_key.of_string_exn two_times_modulus_plus_123 in
-    Alcotest.fail "Values >= modulus should raise an exception"
-  with _ ->
-    Alcotest.(check bool) "Values >= modulus raise exception" true true
+  List.iter test_values ~f:(fun s ->
+      try
+        let _key = Private_key.of_string_exn s in
+        Alcotest.fail ("Value >= modulus " ^ s ^ " should raise an exception")
+      with _ ->
+        Alcotest.(check bool)
+          ("Value >= modulus " ^ s ^ " raises exception")
+          true true )
 
 let test_of_string_exn_random_values () =
-  (* Test with some random large values less than modulus *)
+  (* Test with randomly generated values less than modulus *)
+  let modulus = Bignum_bigint.of_string modulus_string in
+  let offset_gen = Generator.int_inclusive 1 10000000 in
   let random_values =
-    [ "12345678901234567890123456789012345678901234567890123456789012345678901234567"
-    ; "28948022309329048855892746252171976963363056481941647379679742748393362948096"
-    ; (* modulus - 1 *)
-      "1000000000000000000000000000000000000000000000000000000000000000000000000000"
-    ]
+    List.init 5 ~f:(fun _ ->
+        let random_offset = Quickcheck.random_value offset_gen in
+        Bignum_bigint.(modulus - of_int random_offset |> to_string) )
   in
   List.iter random_values ~f:(fun s ->
-      try
-        let key = Private_key.of_string_exn s in
-        let expected = Snark_params.Tick.Inner_curve.Scalar.of_string s in
-        Alcotest.(check bool)
-          ("Private key from random string should match expected for " ^ s)
-          true
-          (Snark_params.Tick.Inner_curve.Scalar.equal key expected)
-      with _ ->
-        (* If the value is >= modulus, it should raise an exception *)
-        let modulus = Bignum_bigint.of_string modulus_string in
-        let value = Bignum_bigint.of_string s in
-        if Bignum_bigint.(value >= modulus) then
-          Alcotest.(check bool)
-            ("Value " ^ s ^ " >= modulus raises exception")
-            true true
-        else Alcotest.fail ("Unexpected exception for valid value " ^ s) )
+      let key = Private_key.of_string_exn s in
+      let expected = Snark_params.Tick.Inner_curve.Scalar.of_string s in
+      Alcotest.(check bool)
+        ("Private key from random string should match expected for " ^ s)
+        true
+        (Snark_params.Tick.Inner_curve.Scalar.equal key expected) )
 
 let test_of_string_exn_edge_case_empty () =
-  (* Test edge case: empty string should be treated as zero *)
   try
     let _key = Private_key.of_string_exn "" in
     Alcotest.fail "Empty string should raise an exception"
@@ -125,7 +103,12 @@ let test_of_string_exn_edge_case_invalid () =
 
 let test_of_string_exn_negative_values () =
   (* Test negative values - should raise exceptions *)
-  let negative_values = [ "-1"; "-42"; "-100"; "-1000000000" ] in
+  let gen = Generator.int_inclusive 1 1000000000 in
+  let negative_values =
+    List.init 5 ~f:(fun _ ->
+        let random_negative = Quickcheck.random_value gen in
+        "-" ^ Int.to_string random_negative )
+  in
   List.iter negative_values ~f:(fun s ->
       try
         let _key = Private_key.of_string_exn s in
@@ -183,7 +166,11 @@ let test_of_string_exn_mixed_invalid_formats () =
 
 let test_to_string_basic () =
   (* Test basic to_string functionality *)
-  let test_values = [ "0"; "1"; "2"; "10"; "42"; "100"; "1000" ] in
+  let gen = Generator.int_inclusive 1 1000000 in
+  let random_values =
+    List.init 5 ~f:(fun _ -> Quickcheck.random_value gen |> Int.to_string)
+  in
+  let test_values = "0" :: "1" :: random_values in
   List.iter test_values ~f:(fun s ->
       let key = Private_key.of_string_exn s in
       let result = Private_key.to_string key in
@@ -192,14 +179,16 @@ let test_to_string_basic () =
         s result )
 
 let test_to_string_large_values () =
-  (* Test to_string with large values *)
-  let large_values =
-    [ "12345678901234567890123456789012345678901234567890123456789012345678901234567"
-    ; "28948022309329048855892746252171976963363056481941647379679742748393362948096"
-    ; (* modulus - 1 *)
-      "1000000000000000000000000000000000000000000000000000000000000000000000000000"
-    ]
+  (* Test to_string with random large values *)
+  let modulus = Bignum_bigint.of_string modulus_string in
+  let modulus_minus_one = Bignum_bigint.(modulus |> pred |> to_string) in
+  let offset_gen = Generator.int_inclusive 1000000 100000000 in
+  let random_large_values =
+    List.init 4 ~f:(fun _ ->
+        let random_offset = Quickcheck.random_value offset_gen in
+        Bignum_bigint.(modulus - of_int random_offset |> to_string) )
   in
+  let large_values = modulus_minus_one :: random_large_values in
   List.iter large_values ~f:(fun s ->
       try
         let key = Private_key.of_string_exn s in
@@ -219,18 +208,18 @@ let test_to_string_large_values () =
 
 let test_roundtrip_of_string_exn_to_string () =
   (* Test that of_string_exn and to_string are inverse functions *)
-  let test_values =
-    [ "0"
-    ; "1"
-    ; "2"
-    ; "10"
-    ; "42"
-    ; "100"
-    ; "1000"
-    ; "999999999999"
-    ; "12345678901234567890123456789012345678901234567890123456789012345678901234567"
-    ]
+  let modulus = Bignum_bigint.of_string modulus_string in
+  let small_gen = Generator.int_inclusive 1 1000000 in
+  let small_randoms =
+    List.init 3 ~f:(fun _ -> Quickcheck.random_value small_gen |> Int.to_string)
   in
+  let large_gen = Generator.int_inclusive 1000 10000000 in
+  let large_randoms =
+    List.init 3 ~f:(fun _ ->
+        let random_offset = Quickcheck.random_value large_gen in
+        Bignum_bigint.(modulus - of_int random_offset |> to_string) )
+  in
+  let test_values = [ "0"; "1" ] @ small_randoms @ large_randoms in
   List.iter test_values ~f:(fun original ->
       try
         let key = Private_key.of_string_exn original in
@@ -287,15 +276,9 @@ let () =
     ; ( "Modulus boundary tests"
       , [ test_case "of_string_exn with modulus - 1" `Quick
             test_of_string_exn_modulus_minus_one
-        ; test_case "of_string_exn with modulus (should raise exception)" `Quick
-            test_of_string_exn_modulus
-        ; test_case "of_string_exn with modulus + 1 (should raise exception)"
-            `Quick test_of_string_exn_higher_than_modulus
-        ; test_case "of_string_exn with modulus + 42 (should raise exception)"
-            `Quick test_of_string_exn_much_higher_than_modulus
         ; test_case
-            "of_string_exn with 2 * modulus + 123 (should raise exception)"
-            `Quick test_of_string_exn_very_large
+            "of_string_exn with values >= modulus (should raise exception)"
+            `Quick test_of_string_exn_values_exceeding_modulus
         ] )
     ; ( "Random and edge cases"
       , [ test_case "of_string_exn with random large values" `Quick

@@ -1,6 +1,7 @@
 open Core_kernel
 open String_sign
 open Mina_signature_kind
+open Base_quickcheck
 
 (* Create a keypair for testing *)
 let keypair : Signature_lib.Keypair.t =
@@ -149,10 +150,20 @@ let test_secret_key_between_scalar_field_and_base_field () =
      - Scalar:
        28948022309329048855892746252171976963363056481941647379679742748393362948097
   *)
-  (* scalar modulus minus one *)
-  let sk_str =
-    "28948022309329048855892746252171976963363056481941647379679742748393362948096"
+  let base_modulus =
+    Bignum_bigint.of_string
+      "28948022309329048855892746252171976963363056481941560715954676764349967630337"
   in
+
+  (* Generate random offset within the range between base and scalar moduli *)
+  let offset_gen = Generator.int64_inclusive 1L Int64.max_value in
+  let random_offset =
+    Quickcheck.random_value offset_gen
+    |> Int64.to_string |> Bignum_bigint.of_string
+  in
+  let sk_bignum = Bignum_bigint.(base_modulus + random_offset) in
+  let sk_str = Bignum_bigint.to_string sk_bignum in
+
   let secret_key = Signature_lib.Private_key.of_string_exn sk_str in
   let keypair = Signature_lib.Keypair.of_private_key_exn secret_key in
 
