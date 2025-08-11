@@ -50,8 +50,7 @@ let get_memory_usage_mib pid =
       Scanf.sscanf line "%d %d %d %d %d %d %d"
         (fun size resident shared text lib data dt -> resident)
     in
-    let resident_pages = Int32.of_string resident in
-    let kib = Int32.( * ) resident_pages 4 in
+    let kib = Int32.( * ) resident 4 in
     let mib = Int32.(to_float kib /. 1024.0) in
     Some mib
   with _ -> None
