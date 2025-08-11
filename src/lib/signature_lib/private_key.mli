@@ -94,3 +94,18 @@ val of_yojson : [> `String of string ] -> (t, string) result
       raises an exception (value equals modulus)
     - [of_string "invalid"] raises an exception (not a valid decimal string) *)
 val of_string : string -> t
+
+(** Convert a private key to its decimal string representation.
+
+    Returns the private key value as a decimal string. This function is the
+    inverse of [of_string], meaning that [of_string (to_string t) = t] for any
+    valid private key [t].
+
+    @param t A private key to convert
+    @return A decimal string representation of the private key value
+
+    Examples:
+    - [to_string (of_string "0")] returns ["0"]
+    - [to_string (of_string "42")] returns ["42"]
+    - [to_string (of_string "1000")] returns ["1000"] *)
+val to_string : t -> string
