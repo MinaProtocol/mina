@@ -49,7 +49,7 @@ let pipeline
                   , "COVERALLS_TOKEN"
                   , "BENCHMARK_FILE=input.json"
                   ]
-                  "buildkite/scripts/tests/ledger_test_apply.sh && buildkite/scripts/upload-partial-coverage-data.sh ${spec.key}"
+                  "buildkite/scripts/tests/ledger_test_apply.sh --transfer-parties-get-actions-events && buildkite/scripts/upload-partial-coverage-data.sh ${spec.key}"
             }
 
 in  { pipeline = pipeline, Spec = Spec }
