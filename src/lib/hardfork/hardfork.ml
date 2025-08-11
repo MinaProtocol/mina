@@ -42,17 +42,13 @@ module Locations = struct
 
   (***************)
 
-  let frontier config_dir = config_dir ^/ "frontier" [@@warning "-32"]
+  let frontier config_dir = config_dir ^/ "frontier"
 end
 
 (* This is the Polyfilling API used for hardfork in AUTO mode. Functions named
    [migrate_*] will need to be reimplemented once Ledger Migration PRs are
    merged. *)
 module AutoPolyfilled = struct
-  [@@@warning "-32"]
-  (* Have it for now as all functions are not referred. This is a WIP. And
-     should be removed once we complete this feature. *)
-
   let create_config_dir ?(fresh = false) ~fork_config_dir () =
     if fresh then Mina_stdlib_unix.File_system.rmrf fork_config_dir ;
     Unix.mkdir ~p:() fork_config_dir
@@ -119,4 +115,10 @@ module AutoPolyfilled = struct
     in
     (* Create epoch ledger from fresh *)
     failwith "TODO"
+
+  let transfer_frontier ~source_config_dir ~fork_config_dir =
+    (* TODO: figure out what should we do exactly on frontier database instead of a copy-paste *)
+    Mina_stdlib_unix.File_system.cp ~r:true
+      ~src:(Locations.frontier source_config_dir)
+      ~dest:(Locations.frontier fork_config_dir)
 end
