@@ -55,13 +55,6 @@ module Tar = struct
     String.chop_suffix_if_exists ~suffix:".tar.gz"
 end
 
-let file_exists ?follow_symlinks filename =
-  match%map Sys.file_exists ?follow_symlinks filename with
-  | `Yes ->
-      true
-  | _ ->
-      false
-
 let sha3_hash ledger_file =
   let st = ref (Digestif.SHA3_256.init ()) in
   match%map
@@ -141,17 +134,18 @@ module Ledger = struct
     let search_paths = Cache_dir.possible_paths "" @ [ genesis_dir ] in
     let file_exists filename path =
       let filename = path ^/ filename in
-      if%map file_exists ~follow_symlinks:true filename then (
-        [%log trace] "Found $ledger file at $path"
-          ~metadata:
-            [ ("ledger", `String ledger_name_prefix)
-            ; ("path", `String filename)
-            ] ;
-        Some filename )
-      else (
-        [%log trace] "Ledger file $path does not exist"
-          ~metadata:[ ("path", `String filename) ] ;
-        None )
+      match%map Sys.file_exists ~follow_symlinks:true filename with
+      | `Yes ->
+          [%log trace] "Found $ledger file at $path"
+            ~metadata:
+              [ ("ledger", `String ledger_name_prefix)
+              ; ("path", `String filename)
+              ] ;
+          Some filename
+      | _ ->
+          [%log trace] "Ledger file $path does not exist"
+            ~metadata:[ ("path", `String filename) ] ;
+          None
     in
     let load_from_s3 filename =
       match config.s3_data_hash with
@@ -653,14 +647,15 @@ module Genesis_proof = struct
     let search_paths = genesis_dir :: Cache_dir.possible_paths "" in
     let file_exists filename path =
       let filename = path ^/ filename in
-      if%map file_exists ~follow_symlinks:true filename then (
-        [%log info] "Found genesis proof file at $path"
-          ~metadata:[ ("path", `String filename) ] ;
-        Some filename )
-      else (
-        [%log info] "Genesis proof file $path does not exist"
-          ~metadata:[ ("path", `String filename) ] ;
-        None )
+      match%map Sys.file_exists ~follow_symlinks:true filename with
+      | `Yes ->
+          [%log info] "Found genesis proof file at $path"
+            ~metadata:[ ("path", `String filename) ] ;
+          Some filename
+      | _ ->
+          [%log info] "Genesis proof file $path does not exist"
+            ~metadata:[ ("path", `String filename) ] ;
+          None
     in
     let filename = filename ~base_hash in
     match%bind
