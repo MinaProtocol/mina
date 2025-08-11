@@ -56,6 +56,7 @@ module AutoPolyfilled = struct
     if fresh then Mina_stdlib_unix.File_system.rmrf fork_config_dir ;
     Unix.mkdir ~p:() fork_config_dir
 
+  (* WARN: be careful of race condition!! *)
   let keep_mina_net2 ~source_config_dir ~fork_config_dir =
     Mina_stdlib_unix.File_system.cp ~r:true
       ~src:(Locations.mina_net2 source_config_dir)
@@ -119,6 +120,7 @@ module AutoPolyfilled = struct
     @@ Ledger_transfer.transfer_accounts ~src:source_genesis_ledger
          ~dest:dest_genesis_ledger
 
+  (* WARN: be careful of race condition!! *)
   let migrate_epoch_ledgers ~context:(module Context : CONTEXT)
       ~source_config_dir ~fork_config_dir =
     let open Context in
@@ -149,7 +151,8 @@ module AutoPolyfilled = struct
         in
         migrate_epoch_ledger ~hash:next_hash
 
-  let transfer_frontier ~source_config_dir ~fork_config_dir =
+  (* WARN: be careful of race condition!! *)
+  let migrate_frontier ~source_config_dir ~fork_config_dir =
     (* TODO: figure out what should we do exactly on frontier database instead of a copy-paste *)
     Mina_stdlib_unix.File_system.cp ~r:true
       ~src:(Locations.frontier source_config_dir)
