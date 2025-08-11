@@ -77,8 +77,8 @@ module Process = struct
            @@ [%log debug] "Archive stdout: $stdout"
                 ~metadata:[ ("stdout", `String stdout) ] )
 
-  let get_memory_usage_mb t =
-    Utils.get_memory_usage_mb @@ (Process.pid t.process |> Pid.to_int)
+  let get_memory_usage_mib t =
+    Utils.get_memory_usage_mib @@ (Process.pid t.process |> Pid.to_int)
 end
 
 (** [start t] starts the archive process using the given configuration [t].
