@@ -47,8 +47,8 @@ let get_memory_usage_mib pid =
   try
     let line = In_channel.read_all filename |> String.strip in
     let resident =
-      Scanf.sscanf line "%d %d %d %d %d %d %d"
-        (fun size resident shared text lib data dt -> resident)
+      Scanf.sscanf line "%d %d %d %d %d %d %d" (fun _ resident _ _ _ _ _ ->
+          resident )
     in
     let kib = Int.( * ) resident 4 in
     let mib = Int.(to_float kib /. 1024.0) in
