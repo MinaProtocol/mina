@@ -13,6 +13,8 @@ end
 
 module type CONTEXT = sig
   val precomputed_values : Precomputed_values.t
+
+  val runtime_config_ledger : Runtime_config.Ledger.t
 end
 
 module Locations = struct
@@ -33,7 +35,10 @@ module Locations = struct
 
   (* genesis: FRESH *)
 
-  let genesis config_dir = config_dir ^/ "genesis" [@@warning "-32"]
+  let genesis config_dir = config_dir ^/ "genesis"
+
+  let genesis_ledger config_dir ~hash =
+    config_dir ^/ "genesis" ^/ "genesis_ledger_" ^ hash
 
   (***************)
 
@@ -84,5 +89,34 @@ module AutoPolyfilled = struct
       ~target:(Locations.wallets source_config_dir)
       ~link_name:(Locations.wallets fork_config_dir)
 
-  let create_genesis ~source_config_dir:_ ~fork_config_dir:_ = failwith "TODO"
+  let create_genesis ~context:(module Context : CONTEXT) ~fork_config_dir =
+    let open Context in
+    let%map.Deferred () =
+      Unix.mkdir ~p:() (Locations.genesis fork_config_dir)
+    in
+    (* Transfer genesis ledger *)
+    let ledger_depth = Precomputed_values.ledger_depth precomputed_values in
+    let genesis_ledger_hash =
+      runtime_config_ledger.hash
+      |> Option.value_exn
+           ~message:
+             "No hash found for runtime config ledger, can't locate genesis \
+              ledger"
+    in
+    let dest_genesis_ledger =
+      Ledger.Db.create
+        ~directory_name:
+          (Locations.genesis_ledger fork_config_dir ~hash:genesis_ledger_hash)
+        ~fresh:true ~depth:ledger_depth ()
+    in
+    let source_genesis_ledger =
+      Lazy.force @@ Precomputed_values.genesis_ledger precomputed_values
+    in
+    let%bind.Deferred.Or_error _ =
+      Deferred.return
+      @@ Ledger_transfer.transfer_accounts ~src:source_genesis_ledger
+           ~dest:dest_genesis_ledger
+    in
+    (* Create epoch ledger from fresh *)
+    failwith "TODO"
 end
