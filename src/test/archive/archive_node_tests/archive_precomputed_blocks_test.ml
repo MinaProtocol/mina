@@ -10,21 +10,29 @@ open Mina_automation_fixture.Archive
 (* asserts count of archive blocked (we are skipping genesis block) *)
 let assert_archived_blocks ~archive_uri ~expected =
   let connection = Psql.Conn_str archive_uri in
-  let%bind actual_blocks_count =
-    Psql.run_command ~connection
-      "SELECT COUNT(*) FROM blocks WHERE global_slot_since_genesis > 1"
+  let rec check_blocks_count ~attempts_left =
+    let%bind actual_blocks_count =
+      Psql.run_command ~connection
+        "SELECT COUNT(*) FROM blocks WHERE global_slot_since_genesis > 1"
+    in
+    let actual_blocks_count =
+      match actual_blocks_count with
+      | Ok count ->
+          count |> Int.of_string
+      | Error err ->
+          failwith ("Failed to query blocks count: " ^ Error.to_string_hum err)
+    in
+    if Int.( = ) actual_blocks_count expected then Deferred.unit
+    else if attempts_left <= 1 then
+      failwithf
+        "Invalid number of archive blocks after 10 attempts. Actual (%d) vs \
+         Expected (%d)"
+        actual_blocks_count expected ()
+    else
+      let%bind () = after (sec 3.0) in
+      check_blocks_count ~attempts_left:(attempts_left - 1)
   in
-  let actual_blocks_count =
-    match actual_blocks_count with
-    | Ok count ->
-        count |> Int.of_string
-    | Error err ->
-        failwith ("Failed to query blocks count: " ^ Error.to_string_hum err)
-  in
-  if Int.( <> ) actual_blocks_count expected then
-    failwithf "Invalid number of archive blocks. Actual (%d) vs Expected (%d)"
-      actual_blocks_count expected ()
-  else Deferred.unit
+  check_blocks_count ~attempts_left:10
 
 (* Convert performance metrics to a JSON format suitable for output *)
 (* The metrics are expected to be a list of tuples (operation, avg_time) *)
