@@ -196,7 +196,7 @@ setup_config_directory() {
     log_file_op "mkdir" "$CONF_DIR"
     run_cmd mkdir -p "$CONF_DIR"
     
-    log_file_op "chmod" "0700 $CONF_DIR"
+    log_file_op "chmod" "0700" "$CONF_DIR"
     run_cmd chmod 0700 "$CONF_DIR"
 }
 
