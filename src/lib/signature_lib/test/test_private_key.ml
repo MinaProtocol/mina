@@ -10,8 +10,11 @@ let seed =
   in
   `Deterministic seed_str
 
-let modulus_string =
-  "28948022309329048855892746252171976963363056481941647379679742748393362948097"
+(* Should be equal to
+   28948022309329048855892746252171976963363056481941647379679742748393362948097,
+   the scalar field of Pallas.
+*)
+let modulus_string = Bigint.to_string Snark_params.Tick.Inner_curve.Scalar.size
 
 let test_of_string_exn_zero () =
   let key = Private_key.of_string_exn "0" in
