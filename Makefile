@@ -69,9 +69,7 @@ clean: ## Remove build artifacts
 
 .PHONY: switch
 switch: ## Set up the opam switch
-ifeq ($(OPAMSWITCH), )
 	./scripts/update-opam-switch.sh
-endif
 
 .PHONY: ocaml_version
 ocaml_version: switch ## Check OCaml version
