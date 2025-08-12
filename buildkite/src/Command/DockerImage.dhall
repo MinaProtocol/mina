@@ -211,7 +211,6 @@ let generateStep =
                         (     exportMinaDebCmd
                           ++  " && "
                           ++  pruneDockerImages
-                          ++  " && "
                           ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
