@@ -1,7 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-set -x
-
 
 # If enabled, keep my tags intact, it won't run git fetch --prune
 KEEP_MY_TAGS_INTACT=${KEEP_MY_TAGS_INTACT:-1}
