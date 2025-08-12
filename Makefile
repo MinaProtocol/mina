@@ -94,7 +94,8 @@ ocaml_checks: switch ocaml_version ocaml_word_size check_opam_switch ## Run OCam
 libp2p_helper: ## Build libp2p helper
 ifeq (, $(MINA_LIBP2P_HELPER_PATH))
 	$(info 🏗️  Building libp2p_helper)
-	make -C src/app/libp2p_helper
+	@make -C src/app/libp2p_helper \
+	&& echo "✅ libp2p_helper build complete"
 endif
 
 .PHONY: genesis_ledger
@@ -559,9 +560,9 @@ debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 start-local-debian-repo: ## Start a local Debian repository
 	$(info 📦 Starting local Debian repository with codename $(CODENAME))
 
-	./scripts/debian/aptly.sh stop || true
+	@./scripts/debian/aptly.sh stop || true
 
-	./scripts/debian/aptly.sh start \
+	@./scripts/debian/aptly.sh start \
 		--codename $(CODENAME) \
 		--debians _build \
 		--component unstable \
@@ -578,7 +579,7 @@ define build_docker_image
 		and branch $$GITBRANCH \
 		and network $(2))
 
-	BUILD_DIR=./_build \
+	@BUILD_DIR=./_build \
 	MINA_DEB_CODENAME=$(CODENAME) \
 	KEEP_MY_TAGS_INTACT=true \
 	. ./scripts/export-git-env-vars.sh \
@@ -590,13 +591,14 @@ define build_docker_image
 		--network $(2) \
 		--no-cache
 
-	./scripts/debian/aptly.sh stop
+	$(info 📦 stopping local Debian repository)
+	@./scripts/debian/aptly.sh stop
 endef
 
 
 .PHONY: docker-build-toolchain
 docker-build-toolchain: ## Build the toolchain to be used in CI
-	BUILD_DIR=./_build \
+	@BUILD_DIR=./_build \
 		./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service mina-toolchain \

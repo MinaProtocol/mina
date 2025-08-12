@@ -2,7 +2,7 @@
 
 # Enable debug output only in CI environments
 if [[ -n "$CI" || -n "$BUILDKITE" || -n "$GITHUB_ACTIONS" ]]; then
-    set -x
+  set -x
 fi
 
 # Author's Note: Because the structure of this repo is inconsistent (Dockerfiles and build contexts placed willy-nilly)
@@ -211,3 +211,6 @@ if [[ -z "${DOCKER_CONTEXT}" ]]; then
 else
   docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
+
+echo "✅ Docker image for service ${SERVICE} built successfully."
+echo "🐳 Full image name: ${HASHTAG}"

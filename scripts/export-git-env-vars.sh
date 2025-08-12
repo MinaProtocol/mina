@@ -4,10 +4,6 @@ set -euo pipefail
 # If enabled, keep my tags intact, it won't run git fetch --prune
 KEEP_MY_TAGS_INTACT=${KEEP_MY_TAGS_INTACT:-1}
 
-# In case of running this script on detached head, script has difficulties in finding out
-# what is the current
-echo "Exporting Git Variables: "
-
 function find_most_recent_numeric_tag() {
 
     local keep_tags_values=("1" "true" "t" "T" "y" "yes" "Y" "YES")
