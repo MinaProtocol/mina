@@ -346,3 +346,15 @@ module Get_object_lifetime_statistics = struct
     Rpc.Rpc.create ~name:"Get_object_lifetime_statistics" ~version:0 ~bin_query
       ~bin_response
 end
+
+(* NOTE: Multiple hardfork methods might be used in parallel in Fall2025 HF,
+   hence the name is pinned onto "2025 fall" *)
+module Prepare_hardfork_2025_fall = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = unit [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Prepare_hardfork_2025_fall" ~version:0 ~bin_query
+      ~bin_response
+end

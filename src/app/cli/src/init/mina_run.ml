@@ -366,6 +366,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 (s, Yojson.Safe.from_string value) )
           in
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
+    ; implement Daemon_rpcs.Prepare_hardfork_2025_fall.rpc (fun () () ->
+          Mina_stdlib_unix.Exit_handlers.(
+            register_async_shutdown_handler ~priority:Hardfork_config ~logger
+              ~description:"migrating hardfork config" (fun () ->
+                failwith "TODO" )) ;
+          Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
+          Deferred.unit )
     ]
   in
   let log_snark_work_metrics
