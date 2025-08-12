@@ -17,5 +17,5 @@
    mina_automation.runner
  )
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_compare))
+ (preprocess (pps ppx_version ppx_jane ppx_mina ppx_compare))
 )
