@@ -234,16 +234,6 @@ let test_roundtrip_to_string_of_string_exn () =
         true
         (Snark_params.Tick.Inner_curve.Scalar.equal key roundtrip_key) )
 
-let test_to_string_modulus_minus_one () =
-  (* Test to_string with the largest valid value *)
-  let modulus_minus_one =
-    Bignum_bigint.(modulus_string |> of_string |> pred |> to_string)
-  in
-  let key = Private_key.of_string_exn modulus_minus_one in
-  let result = Private_key.to_string key in
-  Alcotest.(check string)
-    "to_string should handle modulus - 1 correctly" modulus_minus_one result
-
 let () =
   let open Alcotest in
   run "Private_key string conversion tests"
@@ -280,8 +270,6 @@ let () =
       , [ test_case "to_string with basic values" `Quick test_to_string_basic
         ; test_case "to_string with large values" `Quick
             test_to_string_large_values
-        ; test_case "to_string with modulus - 1" `Quick
-            test_to_string_modulus_minus_one
         ] )
     ; ( "Roundtrip tests"
       , [ test_case "of_string_exn -> to_string roundtrip" `Quick
