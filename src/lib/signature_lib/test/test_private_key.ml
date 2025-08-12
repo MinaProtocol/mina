@@ -220,12 +220,12 @@ let test_roundtrip_of_string_exn_to_string () =
 
 let test_roundtrip_to_string_of_string_exn () =
   (* Test that to_string -> of_string_exn is also inverse for generated keys *)
-  let gen_key1 = Private_key.of_string_exn "42" in
-  let gen_key2 = Private_key.of_string_exn "999999" in
-  let gen_key3 = Private_key.of_string_exn "12345678901234567890" in
-  let test_keys = [ gen_key1; gen_key2; gen_key3 ] in
-
-  List.iteri test_keys ~f:(fun i key ->
+  let randoms =
+    List.init 5 ~f:(fun _ ->
+        Quickcheck.random_value (Generator.int_inclusive 1 10000000)
+        |> Int.to_string |> Private_key.of_string_exn )
+  in
+  List.iteri randoms ~f:(fun i key ->
       let str_repr = Private_key.to_string key in
       let roundtrip_key = Private_key.of_string_exn str_repr in
       Alcotest.(check bool)
