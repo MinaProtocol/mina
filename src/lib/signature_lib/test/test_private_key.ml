@@ -190,21 +190,11 @@ let test_to_string_large_values () =
   in
   let large_values = modulus_minus_one :: random_large_values in
   List.iter large_values ~f:(fun s ->
-      try
-        let key = Private_key.of_string_exn s in
-        let result = Private_key.to_string key in
-        Alcotest.(check string)
-          ("to_string should return correct value for large number " ^ s)
-          s result
-      with _ ->
-        (* If the value is >= modulus, of_string_exn should raise an exception *)
-        let modulus = Bignum_bigint.of_string modulus_string in
-        let value = Bignum_bigint.of_string s in
-        if Bignum_bigint.(value >= modulus) then
-          Alcotest.(check bool)
-            ("Large value " ^ s ^ " >= modulus as expected")
-            true true
-        else Alcotest.fail ("Unexpected exception for valid large value " ^ s) )
+      let key = Private_key.of_string_exn s in
+      let result = Private_key.to_string key in
+      Alcotest.(check string)
+        ("to_string should return correct value for large number " ^ s)
+        s result )
 
 let test_roundtrip_of_string_exn_to_string () =
   (* Test that of_string_exn and to_string are inverse functions *)
@@ -221,22 +211,12 @@ let test_roundtrip_of_string_exn_to_string () =
   in
   let test_values = [ "0"; "1" ] @ small_randoms @ large_randoms in
   List.iter test_values ~f:(fun original ->
-      try
-        let key = Private_key.of_string_exn original in
-        let roundtrip = Private_key.to_string key in
-        Alcotest.(check string)
-          ( "Roundtrip of_string_exn -> to_string should preserve value for "
-          ^ original )
-          original roundtrip
-      with _ ->
-        (* If the value is >= modulus, of_string_exn should raise an exception *)
-        let modulus = Bignum_bigint.of_string modulus_string in
-        let value = Bignum_bigint.of_string original in
-        if Bignum_bigint.(value >= modulus) then
-          Alcotest.(check bool)
-            ("Value " ^ original ^ " >= modulus as expected")
-            true true
-        else Alcotest.fail ("Unexpected exception for valid value " ^ original) )
+      let key = Private_key.of_string_exn original in
+      let roundtrip = Private_key.to_string key in
+      Alcotest.(check string)
+        ( "Roundtrip of_string_exn -> to_string should preserve value for "
+        ^ original )
+        original roundtrip )
 
 let test_roundtrip_to_string_of_string_exn () =
   (* Test that to_string -> of_string_exn is also inverse for generated keys *)
