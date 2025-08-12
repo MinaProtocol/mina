@@ -157,11 +157,10 @@ let test_secret_key_between_scalar_field_and_base_field () =
        28948022309329048855892746252171976963363056481941560715954676764349967630337
      - Scalar:
        28948022309329048855892746252171976963363056481941647379679742748393362948097
-  *)
-  let base_modulus =
-    Bignum_bigint.of_string
-      "28948022309329048855892746252171976963363056481941560715954676764349967630337"
-  in
+     We use the predefined value of the scalar field of Vesta for the base
+     field of Pallas, the size not being available in the exported interface for
+     Tick.Inner_curve.Base_field *)
+  let base_modulus = Snark_params.Tock.Inner_curve.Scalar.size in
 
   (* Generator for random offset within the range between base and scalar moduli *)
   let offset_gen = Generator.int64_inclusive 1L Int64.max_value in
