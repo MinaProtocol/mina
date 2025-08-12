@@ -21,14 +21,14 @@ echo "Rust Version: $(rustc --version)"
 
 make libp2p_helper
 
-make build_logproc
+make build-logproc
 
-[[ ${MINA_BUILD_MAINNET} ]] && make build_mainnet_sigs
+[[ ${MINA_BUILD_MAINNET} ]] && make build-mainnet-sigs
 
-make build_testnet_sigs
+make build-testnet-sigs
 
-make build_daemon_utils
+make build-daemon-utils
 
-make build_archive_utils
+make build-archive-utils
 
-make build_test_utils
+make build-test-utils
