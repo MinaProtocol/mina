@@ -148,7 +148,8 @@ let generateStep =
 
                 else  ""
 
-          let pruneDockerImages = "docker system prune --all --force --filter until=24h"
+          let pruneDockerImages =
+                "docker system prune --all --force --filter until=24h"
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
