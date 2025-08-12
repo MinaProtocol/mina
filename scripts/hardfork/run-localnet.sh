@@ -33,6 +33,10 @@ declare -g GENESIS_LEDGER_DIR="${GENESIS_LEDGER_DIR:-}"
 declare -g SLOT="${SLOT:-30}"
 declare -g GENESIS_TIMESTAMP=""
 
+# Runtime directory paths
+declare -g RUNTIME_1_DIR="${RUNTIME_1_DIR:-localnet/runtime_1}"
+declare -g RUNTIME_2_DIR="${RUNTIME_2_DIR:-localnet/runtime_2}"
+
 # Runtime configuration
 declare -g CONF_DIR="localnet/config"
 declare -ga NODE_ARGS_1=()
@@ -82,6 +86,8 @@ ENVIRONMENT:
     DELAY_MIN          Genesis delay in minutes (default: 20)
     MINA_EXE          Mina executable path (default: mina)
     SLOT              Slot duration in seconds (default: 30)
+    RUNTIME_1_DIR     Block producer runtime directory (default: localnet/runtime_1)
+    RUNTIME_2_DIR     Snark worker runtime directory (default: localnet/runtime_2)
     GENESIS_TIMESTAMP Genesis timestamp (auto-calculated if not set)
 EOF
 }
@@ -363,7 +369,7 @@ setup_genesis_ledger_dirs() {
 # Clean runtime directories
 clean_runtime_directories() {
     log_info "Cleaning runtime directories"
-    run_cmd rm -Rf localnet/runtime_1 localnet/runtime_2
+    run_cmd rm -Rf "$RUNTIME_1_DIR" "$RUNTIME_2_DIR"
 }
 
 # Start block producer node
@@ -378,7 +384,7 @@ start_block_producer_node() {
         --peer "/ip4/127.0.0.1/tcp/10312/p2p/$libp2p_2_peerid" \
         "${NODE_ARGS_1[@]}" \
         --block-producer-key "$PWD/$CONF_DIR/bp" \
-        --config-directory "$PWD/localnet/runtime_1" \
+        --config-directory "$PWD/$RUNTIME_1_DIR" \
         --client-port 10301 --external-port 10302 --rest-port 10303)
     
     log_info "Block producer started with PID: $bp_pid"
@@ -399,7 +405,7 @@ start_snark_worker_node() {
         "${NODE_ARGS_2[@]}" \
         --peer "/ip4/127.0.0.1/tcp/10302/p2p/$libp2p_1_peerid" \
         --run-snark-worker "$bp_pubkey" --work-selection seq \
-        --config-directory "$PWD/localnet/runtime_2" \
+        --config-directory "$PWD/$RUNTIME_2_DIR" \
         --client-port 10311 --external-port 10312 --rest-port 10313)
     
     log_info "Snark worker started with PID: $sw_pid"
@@ -419,6 +425,9 @@ wait_for_account_import() {
         attempts=$((attempts + 1))
         if [[ $attempts -ge $max_attempts ]]; then
             log_error "Account import failed after $max_attempts attempts"
+            # Kill background processes and tail logs for debugging
+            kill_background_processes
+            tail_runtime_logs
             exit 1
         fi
         
@@ -428,6 +437,38 @@ wait_for_account_import() {
     done
     
     log_validation "account-import" "pass" "Account imported successfully"
+}
+
+# Tail Mina logs from runtime directories for debugging
+tail_runtime_logs() {
+    log_info "Tailing Mina logs from runtime directories for debugging"
+    
+    if [[ -f "$RUNTIME_1_DIR/mina.log" ]]; then
+        echo "=== Block Producer Log ($RUNTIME_1_DIR/mina.log) ==="
+        tail -20 "$RUNTIME_1_DIR/mina.log"
+        echo
+    fi
+    
+    if [[ -f "$RUNTIME_2_DIR/mina.log" ]]; then
+        echo "=== Snark Worker Log ($RUNTIME_2_DIR/mina.log) ==="
+        tail -20 "$RUNTIME_2_DIR/mina.log"
+        echo
+    fi
+}
+
+# Kill background processes (block producer and snark worker)
+kill_background_processes() {
+    log_info "Killing background processes for cleanup"
+    
+    if [[ -n "$bp_pid" ]] && kill -0 "$bp_pid" 2>/dev/null; then
+        log_process_op "kill" "block producer (PID: $bp_pid)"
+        kill "$bp_pid" 2>/dev/null || true
+    fi
+    
+    if [[ -n "$sw_pid" ]] && kill -0 "$sw_pid" 2>/dev/null; then
+        log_process_op "kill" "snark worker (PID: $sw_pid)"
+        kill "$sw_pid" 2>/dev/null || true
+    fi
 }
 
 # Export staged ledger for transaction sending
@@ -443,6 +484,8 @@ export_staged_ledger() {
         attempts=$((attempts + 1))
         if [[ $attempts -ge $max_attempts ]]; then
             log_error "Staged ledger export failed after $max_attempts attempts"
+            kill_background_processes
+            tail_runtime_logs
             exit 1
         fi
         
