@@ -2,6 +2,14 @@ open Core_kernel
 open Signature_lib
 open Base_quickcheck
 
+let seed =
+  let () = Random.self_init () in
+  let seed_phrase = List.init 32 ~f:(fun _ -> Random.int 256) in
+  let seed_str =
+    List.map seed_phrase ~f:Char.of_int_exn |> String.of_char_list
+  in
+  `Deterministic seed_str
+
 let modulus_string =
   "28948022309329048855892746252171976963363056481941647379679742748393362948097"
 
@@ -21,10 +29,8 @@ let test_of_string_exn_one () =
 
 let test_of_string_exn_small_values () =
   let gen = Generator.int_inclusive 1 1000000 in
-  let test_values =
-    List.init 5 ~f:(fun _ -> Quickcheck.random_value gen |> Int.to_string)
-  in
-  List.iter test_values ~f:(fun s ->
+  Quickcheck.test ~seed ~trials:5 gen ~f:(fun value ->
+      let s = Int.to_string value in
       let key = Private_key.of_string_exn s in
       let expected = Snark_params.Tick.Inner_curve.Scalar.of_string s in
       Alcotest.(check bool)
@@ -49,20 +55,21 @@ let test_of_string_exn_values_exceeding_modulus () =
   let modulus = Bignum_bigint.of_string modulus_string in
   let modulus_plus_one = Bignum_bigint.(modulus |> succ |> to_string) in
 
+  (* Test fixed cases first *)
+  let fixed_test_values = [ modulus_string; modulus_plus_one ] in
+  List.iter fixed_test_values ~f:(fun s ->
+      try
+        let _key = Private_key.of_string_exn s in
+        Alcotest.fail ("Value >= modulus " ^ s ^ " should raise an exception")
+      with _ ->
+        Alcotest.(check bool)
+          ("Value >= modulus " ^ s ^ " raises exception")
+          true true ) ;
+
   (* Generate random offsets to add to modulus *)
   let offset_gen = Generator.int_inclusive 1 1000000 in
-  let random_offsets =
-    List.init 3 ~f:(fun _ -> Quickcheck.random_value offset_gen)
-  in
-  let random_values =
-    List.map random_offsets ~f:(fun offset ->
-        Bignum_bigint.(modulus + of_int offset |> to_string) )
-  in
-
-  (* Include fixed test cases and random cases *)
-  let test_values = modulus_string :: modulus_plus_one :: random_values in
-
-  List.iter test_values ~f:(fun s ->
+  Quickcheck.test ~seed ~trials:3 offset_gen ~f:(fun offset ->
+      let s = Bignum_bigint.(modulus + of_int offset |> to_string) in
       try
         let _key = Private_key.of_string_exn s in
         Alcotest.fail ("Value >= modulus " ^ s ^ " should raise an exception")
@@ -75,12 +82,8 @@ let test_of_string_exn_random_values () =
   (* Test with randomly generated values less than modulus *)
   let modulus = Bignum_bigint.of_string modulus_string in
   let offset_gen = Generator.int_inclusive 1 10000000 in
-  let random_values =
-    List.init 5 ~f:(fun _ ->
-        let random_offset = Quickcheck.random_value offset_gen in
-        Bignum_bigint.(modulus - of_int random_offset |> to_string) )
-  in
-  List.iter random_values ~f:(fun s ->
+  Quickcheck.test ~seed ~trials:5 offset_gen ~f:(fun random_offset ->
+      let s = Bignum_bigint.(modulus - of_int random_offset |> to_string) in
       let key = Private_key.of_string_exn s in
       let expected = Snark_params.Tick.Inner_curve.Scalar.of_string s in
       Alcotest.(check bool)
@@ -104,12 +107,8 @@ let test_of_string_exn_edge_case_invalid () =
 let test_of_string_exn_negative_values () =
   (* Test negative values - should raise exceptions *)
   let gen = Generator.int_inclusive 1 1000000000 in
-  let negative_values =
-    List.init 5 ~f:(fun _ ->
-        let random_negative = Quickcheck.random_value gen in
-        "-" ^ Int.to_string random_negative )
-  in
-  List.iter negative_values ~f:(fun s ->
+  Quickcheck.test ~seed ~trials:5 gen ~f:(fun random_negative ->
+      let s = "-" ^ Int.to_string random_negative in
       try
         let _key = Private_key.of_string_exn s in
         Alcotest.fail ("Negative value " ^ s ^ " should raise an exception")
@@ -166,12 +165,17 @@ let test_of_string_exn_mixed_invalid_formats () =
 
 let test_to_string_basic () =
   (* Test basic to_string functionality *)
+  let fixed_values = [ "0"; "1" ] in
+  List.iter fixed_values ~f:(fun s ->
+      let key = Private_key.of_string_exn s in
+      let result = Private_key.to_string key in
+      Alcotest.(check string)
+        ("to_string should return correct value for " ^ s)
+        s result ) ;
+
   let gen = Generator.int_inclusive 1 1000000 in
-  let random_values =
-    List.init 5 ~f:(fun _ -> Quickcheck.random_value gen |> Int.to_string)
-  in
-  let test_values = "0" :: "1" :: random_values in
-  List.iter test_values ~f:(fun s ->
+  Quickcheck.test ~seed ~trials:5 gen ~f:(fun value ->
+      let s = Int.to_string value in
       let key = Private_key.of_string_exn s in
       let result = Private_key.to_string key in
       Alcotest.(check string)
@@ -182,14 +186,18 @@ let test_to_string_large_values () =
   (* Test to_string with random large values *)
   let modulus = Bignum_bigint.of_string modulus_string in
   let modulus_minus_one = Bignum_bigint.(modulus |> pred |> to_string) in
+
+  (* Test fixed case first *)
+  let key = Private_key.of_string_exn modulus_minus_one in
+  let result = Private_key.to_string key in
+  Alcotest.(check string)
+    ( "to_string should return correct value for large number "
+    ^ modulus_minus_one )
+    modulus_minus_one result ;
+
   let offset_gen = Generator.int_inclusive 1000000 100000000 in
-  let random_large_values =
-    List.init 4 ~f:(fun _ ->
-        let random_offset = Quickcheck.random_value offset_gen in
-        Bignum_bigint.(modulus - of_int random_offset |> to_string) )
-  in
-  let large_values = modulus_minus_one :: random_large_values in
-  List.iter large_values ~f:(fun s ->
+  Quickcheck.test ~seed ~trials:4 offset_gen ~f:(fun random_offset ->
+      let s = Bignum_bigint.(modulus - of_int random_offset |> to_string) in
       let key = Private_key.of_string_exn s in
       let result = Private_key.to_string key in
       Alcotest.(check string)
@@ -199,18 +207,34 @@ let test_to_string_large_values () =
 let test_roundtrip_of_string_exn_to_string () =
   (* Test that of_string_exn and to_string are inverse functions *)
   let modulus = Bignum_bigint.of_string modulus_string in
+
+  (* Test fixed values first *)
+  let fixed_values = [ "0"; "1" ] in
+  List.iter fixed_values ~f:(fun original ->
+      let key = Private_key.of_string_exn original in
+      let roundtrip = Private_key.to_string key in
+      Alcotest.(check string)
+        ( "Roundtrip of_string_exn -> to_string should preserve value for "
+        ^ original )
+        original roundtrip ) ;
+
+  (* Test small random values *)
   let small_gen = Generator.int_inclusive 1 1000000 in
-  let small_randoms =
-    List.init 3 ~f:(fun _ -> Quickcheck.random_value small_gen |> Int.to_string)
-  in
+  Quickcheck.test ~seed ~trials:3 small_gen ~f:(fun value ->
+      let original = Int.to_string value in
+      let key = Private_key.of_string_exn original in
+      let roundtrip = Private_key.to_string key in
+      Alcotest.(check string)
+        ( "Roundtrip of_string_exn -> to_string should preserve value for "
+        ^ original )
+        original roundtrip ) ;
+
+  (* Test large random values *)
   let large_gen = Generator.int_inclusive 1000 10000000 in
-  let large_randoms =
-    List.init 3 ~f:(fun _ ->
-        let random_offset = Quickcheck.random_value large_gen in
-        Bignum_bigint.(modulus - of_int random_offset |> to_string) )
-  in
-  let test_values = [ "0"; "1" ] @ small_randoms @ large_randoms in
-  List.iter test_values ~f:(fun original ->
+  Quickcheck.test ~seed ~trials:3 large_gen ~f:(fun random_offset ->
+      let original =
+        Bignum_bigint.(modulus - of_int random_offset |> to_string)
+      in
       let key = Private_key.of_string_exn original in
       let roundtrip = Private_key.to_string key in
       Alcotest.(check string)
@@ -220,17 +244,14 @@ let test_roundtrip_of_string_exn_to_string () =
 
 let test_roundtrip_to_string_of_string_exn () =
   (* Test that to_string -> of_string_exn is also inverse for generated keys *)
-  let randoms =
-    List.init 5 ~f:(fun _ ->
-        Quickcheck.random_value (Generator.int_inclusive 1 10000000)
-        |> Int.to_string |> Private_key.of_string_exn )
-  in
-  List.iteri randoms ~f:(fun i key ->
+  let gen = Generator.int_inclusive 1 10000000 in
+  Quickcheck.test ~seed ~trials:5 gen ~f:(fun value ->
+      let key = Int.to_string value |> Private_key.of_string_exn in
       let str_repr = Private_key.to_string key in
       let roundtrip_key = Private_key.of_string_exn str_repr in
       Alcotest.(check bool)
         ( "Roundtrip to_string -> of_string_exn should preserve key "
-        ^ Int.to_string i )
+        ^ Int.to_string value )
         true
         (Snark_params.Tick.Inner_curve.Scalar.equal key roundtrip_key) )
 
