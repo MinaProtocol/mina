@@ -25,7 +25,7 @@ make build-logproc
 
 [[ ${MINA_BUILD_MAINNET} ]] && make build-mainnet-sigs
 
-make build-testnet-sigs
+make build-devnet-sigs
 
 make build-daemon-utils
 
