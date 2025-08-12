@@ -3,6 +3,14 @@ open String_sign
 open Mina_signature_kind
 open Base_quickcheck
 
+let seed =
+  let () = Random.self_init () in
+  let seed_phrase = List.init 32 ~f:(fun _ -> Random.int 256) in
+  let seed_str =
+    List.map seed_phrase ~f:Char.of_int_exn |> String.of_char_list
+  in
+  `Deterministic seed_str
+
 (* Create a keypair for testing *)
 let keypair : Signature_lib.Keypair.t =
   let public_key =
@@ -155,23 +163,34 @@ let test_secret_key_between_scalar_field_and_base_field () =
       "28948022309329048855892746252171976963363056481941560715954676764349967630337"
   in
 
-  (* Generate random offset within the range between base and scalar moduli *)
+  (* Generator for random offset within the range between base and scalar moduli *)
   let offset_gen = Generator.int64_inclusive 1L Int64.max_value in
-  let random_offset =
-    Quickcheck.random_value offset_gen
-    |> Int64.to_string |> Bignum_bigint.of_string
+
+  (* Combined generator for both signature kind and offset *)
+  let combined_gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind signature_kind =
+      Mina_signature_kind_type.signature_kind_gen seed
+    in
+    let%map offset = offset_gen in
+    (signature_kind, offset)
   in
-  let sk_bignum = Bignum_bigint.(base_modulus + random_offset) in
-  let sk_str = Bignum_bigint.to_string sk_bignum in
 
-  let secret_key = Signature_lib.Private_key.of_string_exn sk_str in
-  let keypair = Signature_lib.Keypair.of_private_key_exn secret_key in
+  Quickcheck.test ~seed ~trials:10 combined_gen
+    ~f:(fun (signature_kind, random_offset) ->
+      let sk_bignum =
+        Bignum_bigint.(base_modulus + of_string (Int64.to_string random_offset))
+      in
+      let sk_str = Bignum_bigint.to_string sk_bignum in
 
-  let s = "Rain and Spain don't rhyme with cheese" in
-  let signature = sign ~signature_kind:Mainnet keypair.private_key s in
-  Alcotest.(check bool)
-    "Sign and verify with secret key in scalar field" true
-    (verify ~signature_kind:Mainnet signature keypair.public_key s)
+      let secret_key = Signature_lib.Private_key.of_string_exn sk_str in
+      let keypair = Signature_lib.Keypair.of_private_key_exn secret_key in
+
+      let s = "Rain and Spain don't rhyme with cheese" in
+      let signature = sign ~signature_kind keypair.private_key s in
+      Alcotest.(check bool)
+        "Sign and verify with secret key in scalar field" true
+        (verify ~signature_kind signature keypair.public_key s) )
 
 (* Define the test suite *)
 let () =
