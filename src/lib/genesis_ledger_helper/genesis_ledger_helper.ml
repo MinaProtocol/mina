@@ -303,10 +303,23 @@ module Ledger = struct
     (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
        time to stablize *)
     let%bind () = after (Time.Span.of_int_sec 5) in
-    let%map.Deferred.Or_error () =
-      Tar.create ~root:dirname ~file:tar_path ~directory:"." ()
-    in
-    tar_path
+    match%map Tar.create ~root:dirname ~file:tar_path ~directory:"." () with
+    | Ok () ->
+        Ok tar_path
+    | Error err ->
+        let root_hash =
+          Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
+        in
+        let tar_path =
+          genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
+        in
+        [%log error] "Could not generate a $ledger file at $path: $error"
+          ~metadata:
+            [ ("ledger", `String ledger_name_prefix)
+            ; ("path", `String tar_path)
+            ; ("error", Error_json.error_to_yojson err)
+            ] ;
+        Error err
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
       ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
@@ -485,7 +498,7 @@ module Ledger = struct
                     ~depth:constraint_constants.ledger_depth accounts
                 in
                 let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
-                let%bind tar_path =
+                let%bind.Deferred.Or_error tar_path =
                   generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
                 in
                 let config =
@@ -507,8 +520,8 @@ module Ledger = struct
                   | _, Some name ->
                       (Some name, None)
                 in
-                match (tar_path, name) with
-                | Ok tar_path, Some name ->
+                match name with
+                | Some name ->
                     let link_name =
                       genesis_dir
                       ^/ named_filename ~constraint_constants
@@ -531,24 +544,8 @@ module Ledger = struct
                         ; ("named_tar_path", `String link_name)
                         ] ;
                     Ok (packed, config, link_name)
-                | Ok tar_path, _ ->
-                    return (Ok (packed, config, tar_path))
-                | Error err, _ ->
-                    let root_hash =
-                      Ledger_hash.to_base58_check
-                      @@ Mina_ledger.Ledger.merkle_root ledger
-                    in
-                    let tar_path =
-                      genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
-                    in
-                    [%log error]
-                      "Could not generate a $ledger file at $path: $error"
-                      ~metadata:
-                        [ ("ledger", `String ledger_name_prefix)
-                        ; ("path", `String tar_path)
-                        ; ("error", Error_json.error_to_yojson err)
-                        ] ;
-                    return (Error err) ) ) )
+                | None ->
+                    return (Ok (packed, config, tar_path)) ) ) )
 end
 
 module Epoch_data = struct
