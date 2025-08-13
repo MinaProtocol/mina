@@ -219,7 +219,7 @@ module Ledger = struct
         | _, Some name ->
             search_local_and_s3 name )
 
-  let load_from_tar ?(genesis_dir = Cache_dir.autogen_path) ~logger
+  let load_ledger_by_spec ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ?accounts ~ledger_name_prefix ~expected_merkle_root filename =
     [%log trace] "Loading $ledger from $path"
@@ -465,7 +465,7 @@ module Ledger = struct
         match tar_path with
         | Some tar_path -> (
             match%map
-              load_from_tar ~genesis_dir ~logger ~constraint_constants
+              load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
                 ~expected_merkle_root:
                   (Option.map config.hash ~f:Ledger_hash.of_base58_check_exn)
                 ?accounts:padded_accounts_opt ~ledger_name_prefix tar_path
