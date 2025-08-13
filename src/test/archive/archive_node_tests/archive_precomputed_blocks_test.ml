@@ -8,6 +8,11 @@ open Mina_automation_fixture.Archive
  *)
 
 (* asserts count of archive blocked (we are skipping genesis block) *)
+(* NOTE: first assertion is failing occasionally due to race condition issue,
+   where we are asserting count of precomputed blocks in database.
+   From time to time not all blocks are processed before running assertion,
+   as a result we are receiving false failures. That's why a retry mechanism is implemented.
+*)
 let assert_archived_blocks ~archive_uri ~expected =
   let connection = Psql.Conn_str archive_uri in
   let rec check_blocks_count ~attempts_left =
