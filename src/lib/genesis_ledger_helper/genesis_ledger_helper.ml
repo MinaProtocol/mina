@@ -403,16 +403,11 @@ module Ledger = struct
                   ] ;
               None )
     in
-    let padded_accounts_with_balances_opt =
-      Option.map accounts_opt
-        ~f:
-          (Lazy.map
-             ~f:(Accounts.pad_with_rev_balances (List.rev config.balances)) )
-    in
-    Option.map padded_accounts_with_balances_opt
-      ~f:
-        (Lazy.map
-           ~f:(Accounts.pad_to (Option.value ~default:0 config.num_accounts)) )
+    let%map.Option accounts_lazy = accounts_opt in
+    let%map.Lazy accounts = accounts_lazy in
+    Accounts.(
+      pad_with_rev_balances (List.rev config.balances) accounts
+      |> pad_to (Option.value ~default:0 config.num_accounts))
 
   let packed_genesis_ledger_of_accounts ~depth accounts :
       Genesis_ledger.Packed.t =
