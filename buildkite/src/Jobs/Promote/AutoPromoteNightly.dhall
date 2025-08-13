@@ -64,7 +64,8 @@ in  Pipeline.build
           PublishPackages.publish
             PublishPackages.Spec::{
             , artifacts =
-              [ Artifacts.Type.Daemon
+              [ Artifacts.Type.LogProc
+              , Artifacts.Type.Daemon
               , Artifacts.Type.Archive
               , Artifacts.Type.Rosetta
               ]
@@ -73,6 +74,8 @@ in  Pipeline.build
             , codenames =
               [ DebianVersions.DebVersion.Bullseye
               , DebianVersions.DebVersion.Focal
+              , DebianVersions.DebVersion.Bookworm
+              , DebianVersions.DebVersion.Noble
               ]
             , debian_repo = DebianRepo.Type.Nightly
             , channel = DebianChannel.Type.Compatible

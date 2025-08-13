@@ -21,6 +21,7 @@ in  Pipeline.build
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.CreateLegacyGenesis
             ]
           , network = Network.Type.Devnet
           , tags =

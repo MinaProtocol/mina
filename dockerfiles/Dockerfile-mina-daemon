@@ -75,6 +75,7 @@ RUN echo "Building image with version $deb_version from repo $deb_release $deb_c
   && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
   && apt-get update --quiet --yes \
   && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" \
+  && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "mina-create-legacy-genesis=3.2.0-d06c972" \
   && rm -rf /var/lib/apt/lists/*
 
 
