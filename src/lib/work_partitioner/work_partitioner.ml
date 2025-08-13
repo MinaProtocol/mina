@@ -347,9 +347,6 @@ let submit_single ?(is_from_zkapp = false) ~partitioner
       | `Removed ->
           Removed
       | `SpecUnmatched ->
-          Option.iter removed_job ~f:(fun job ->
-              Sent_single_job_pool.bring_back ~id:job_id ~job
-                partitioner.single_jobs_sent_by_partitioner ) ;
           SpecUnmatched )
   | _ ->
       [%log' debug partitioner.logger]
