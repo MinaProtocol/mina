@@ -45,4 +45,5 @@ let for_unit_tests =
     ; protocol_state_with_hashes
     ; constraint_system_digests = hashes
     ; proof_data = None
+    ; signature_kind = Mina_signature_kind.Testnet
     })
