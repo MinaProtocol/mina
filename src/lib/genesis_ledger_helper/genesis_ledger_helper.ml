@@ -229,7 +229,7 @@ module Ledger = struct
   let load_ledger_by_spec ~genesis_dir:_ ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~ledger_name_prefix ~(load_ledger_spec : load_ledger_spec)
-      ~expected_merkle_root =
+      ~(config : Runtime_config.Ledger.t) =
     match load_ledger_spec with
     | Accounts { link_path = None; _ } ->
         failwith "TODO"
@@ -255,6 +255,9 @@ module Ledger = struct
         in
         let%map.Deferred.Or_error () =
           Tar.extract ~root:extracted_path ~file:tar_file ()
+        in
+        let expected_merkle_root =
+          Option.map config.hash ~f:Ledger_hash.of_base58_check_exn
         in
         let (packed : Genesis_ledger.Packed.t) =
           ( module Genesis_ledger.Of_ledger (struct
@@ -489,10 +492,7 @@ module Ledger = struct
             in
             match%map
               load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
-                ~ledger_name_prefix
-                ~expected_merkle_root:
-                  (Option.map config.hash ~f:Ledger_hash.of_base58_check_exn)
-                ~load_ledger_spec
+                ~ledger_name_prefix ~config ~load_ledger_spec
             with
             | Ok ledger ->
                 Ok (ledger, config, tar_file)
