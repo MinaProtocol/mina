@@ -389,6 +389,7 @@ module Ledger = struct
         { accounts : (Private_key.t option * Account.value) list lazy_t
         ; link_path : string option
         }
+    | Extracted of { extracted_path : string }
     | Tar of { tar_file : string; extracted_path : string }
 
   let load_extracted_ledger ~(config : Runtime_config.Ledger.t) ~logger
@@ -500,8 +501,17 @@ module Ledger = struct
             let depth = constraint_constants.ledger_depth
           end) )
         in
-
         Deferred.Or_error.return (packed, config, link_path)
+    | Extracted { extracted_path } ->
+        let packed =
+          load_extracted_ledger ~config ~logger ~constraint_constants
+            ~extracted_path
+        in
+        let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
+        let%map.Deferred.Or_error tar_file =
+          generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
+        in
+        (packed, config, tar_file)
     | Tar { tar_file; extracted_path } ->
         [%log trace] "Loading $ledger from $path"
           ~metadata:
