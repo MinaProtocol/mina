@@ -419,6 +419,36 @@ module Ledger = struct
       let depth = depth
     end) )
 
+  let report_no_genesis_ledger ~constraint_constants ~ledger_name_prefix ~logger
+      ~(config : Runtime_config.Ledger.t) () =
+    match config.base with
+    | Accounts _ ->
+        assert false
+    | Hash ->
+        let missing_hash = Option.value ~default:"not specified" config.hash in
+        [%log error] "Could not find or generate a $ledger for $root_hash"
+          ~metadata:
+            [ ("ledger", `String ledger_name_prefix)
+            ; ("root_hash", `String missing_hash)
+            ] ;
+        Error.createf "Could not find a ledger tar file for hash '%s'"
+          missing_hash
+    | Named ledger_name ->
+        let ledger_filename =
+          named_filename ~constraint_constants ~num_accounts:config.num_accounts
+            ~balances:config.balances ~ledger_name_prefix ledger_name
+        in
+        [%log error]
+          "Bad config $config: $ledger named $ledger_name is not built in, and \
+           no ledger file was found at $ledger_filename"
+          ~metadata:
+            [ ("ledger", `String ledger_name_prefix)
+            ; ("config", Runtime_config.Ledger.to_yojson config)
+            ; ("ledger_name", `String ledger_name)
+            ; ("ledger_filename", `String ledger_filename)
+            ] ;
+        Error.createf "ledger '%s' not found" ledger_name
+
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ?(ledger_name_prefix = "genesis_ledger") ?overwrite_version
       (config : Runtime_config.Ledger.t) =
@@ -451,42 +481,11 @@ module Ledger = struct
                 Error err )
         | None -> (
             match padded_accounts_opt with
-            | None -> (
-                match config.base with
-                | Accounts _ ->
-                    assert false
-                | Hash ->
-                    let missing_hash =
-                      Option.value ~default:"not specified" config.hash
-                    in
-                    [%log error]
-                      "Could not find or generate a $ledger for $root_hash"
-                      ~metadata:
-                        [ ("ledger", `String ledger_name_prefix)
-                        ; ("root_hash", `String missing_hash)
-                        ] ;
-                    Deferred.Or_error.errorf
-                      "Could not find a ledger tar file for hash '%s'"
-                      missing_hash
-                | Named ledger_name ->
-                    let ledger_filename =
-                      named_filename ~constraint_constants
-                        ~num_accounts:config.num_accounts
-                        ~balances:config.balances ~ledger_name_prefix
-                        ledger_name
-                    in
-                    [%log error]
-                      "Bad config $config: $ledger named $ledger_name is not \
-                       built in, and no ledger file was found at \
-                       $ledger_filename"
-                      ~metadata:
-                        [ ("ledger", `String ledger_name_prefix)
-                        ; ("config", Runtime_config.Ledger.to_yojson config)
-                        ; ("ledger_name", `String ledger_name)
-                        ; ("ledger_filename", `String ledger_filename)
-                        ] ;
-                    Deferred.Or_error.errorf "ledger '%s' not found" ledger_name
-                )
+            | None ->
+                return
+                @@ Error
+                     (report_no_genesis_ledger ~constraint_constants
+                        ~ledger_name_prefix ~logger ~config () )
             | Some accounts -> (
                 let packed =
                   packed_genesis_ledger_of_accounts
