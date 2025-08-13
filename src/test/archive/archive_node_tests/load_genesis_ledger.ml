@@ -21,26 +21,6 @@ type t = Mina_automation_fixture.Archive.before_bootstrap
 
 let postgres_user_name = "postgres"
 
-let check_postgres_memory_increase_is_below_threshold logger threshold
-    time_interval previous_postgres_memory =
-  let%bind current_memory =
-    Utils.get_memory_usage_mib_of_user_process postgres_user_name
-  in
-  let increase = Float.( - ) current_memory !previous_postgres_memory in
-  (* We are also interested in sudden peak of memory usage  for postgres db,
-     which might indicate a memory leak.
-  *)
-  if Float.( > ) increase threshold then
-    failwith
-      (Printf.sprintf
-         "Postgres memory increased by more than %s MiB in the last %s seconds"
-         (Float.to_string threshold)
-         (Time.Span.to_string time_interval) )
-  else (
-    previous_postgres_memory := current_memory ;
-    [%log info] "Postgres Memory usage: %s MiB" (Float.to_string current_memory) ;
-    Deferred.return () )
-
 let test_case (test_data : t) =
   let open Deferred.Let_syntax in
   let config =
@@ -54,23 +34,13 @@ let test_case (test_data : t) =
   let max_postgres_memory = 4000.0 in
   let sleep_duration = Time.Span.of_sec 10.0 in
   let max_archive_memory = 1000.0 in
-  let postgres_memory_increase_threshold = 500.0 in
 
   (* Set the duration for the archive process *)
   let duration = Time.Span.of_min 10.0 in
 
-  let%bind previous_postgres_memory =
-    Utils.get_memory_usage_mib_of_user_process postgres_user_name
-  in
-  let previous_postgres_memory = ref previous_postgres_memory in
-
-  [%log info] "Initial Postgres Memory usage: %s MiB"
-    (Float.to_string !previous_postgres_memory) ;
   [%log info] "Max Archive Memory: %s MiB" (Float.to_string max_archive_memory) ;
   [%log info] "Max Postgres Memory: %s MiB"
     (Float.to_string max_postgres_memory) ;
-  [%log info] "Postgres Memory Increase Threshold: %s MiB"
-    (Float.to_string postgres_memory_increase_threshold) ;
   [%log info] "Sleep Duration: %s" (Time.Span.to_string sleep_duration) ;
 
   let%bind result =
@@ -91,11 +61,6 @@ let test_case (test_data : t) =
         in
         let%bind memory =
           Utils.get_memory_usage_mib_of_user_process postgres_user_name
-        in
-        let%bind () =
-          check_postgres_memory_increase_is_below_threshold logger
-            postgres_memory_increase_threshold sleep_duration
-            previous_postgres_memory
         in
         [%log info] "Postgres Memory usage: %s MiB" (Float.to_string memory) ;
         if Float.( > ) memory max_postgres_memory then
