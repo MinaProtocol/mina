@@ -234,15 +234,17 @@ module Ledger = struct
     | Accounts { link_path = None; _ } ->
         failwith "TODO"
     | Accounts { accounts; link_path = Some link_path } ->
-        Deferred.Or_error.return
-          ( ( module Genesis_ledger.Make (struct
-              let accounts = accounts
+        let (packed : Genesis_ledger.Packed.t) =
+          ( module Genesis_ledger.Make (struct
+            let accounts = accounts
 
-              let directory = `Path link_path
+            let directory = `Path link_path
 
-              let depth = constraint_constants.ledger_depth
-            end) )
-            : Genesis_ledger.Packed.t )
+            let depth = constraint_constants.ledger_depth
+          end) )
+        in
+
+        Deferred.Or_error.return (packed, config, link_path)
     | Tar { tar_file; extracted_path } ->
         [%log trace] "Loading $ledger from $path"
           ~metadata:
@@ -297,7 +299,7 @@ module Ledger = struct
             let depth = constraint_constants.ledger_depth
           end) )
         in
-        packed
+        (packed, config, extracted_path)
 
   let generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
     Mina_ledger.Ledger.commit ledger ;
@@ -494,8 +496,8 @@ module Ledger = struct
               load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
                 ~ledger_name_prefix ~config ~load_ledger_spec
             with
-            | Ok ledger ->
-                Ok (ledger, config, tar_file)
+            | Ok result ->
+                Ok result
             | Error err ->
                 [%log error] "Could not load ledger from $path: $error"
                   ~metadata:
