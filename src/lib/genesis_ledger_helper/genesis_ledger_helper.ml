@@ -391,13 +391,63 @@ module Ledger = struct
         }
     | Tar of { tar_file : string; extracted_path : string }
 
-  let load_ledger_by_spec ~genesis_dir:_ ~logger
+  let load_ledger_by_spec ~genesis_dir ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~ledger_name_prefix ~(load_ledger_spec : load_ledger_spec)
       ~(config : Runtime_config.Ledger.t) =
     match load_ledger_spec with
-    | Accounts { link_path = None; _ } ->
-        failwith "TODO"
+    | Accounts { accounts; link_path = None } -> (
+        let packed =
+          packed_genesis_ledger_of_accounts
+            ~depth:constraint_constants.ledger_depth accounts
+        in
+        let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
+        let%bind.Deferred.Or_error tar_path =
+          generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
+        in
+        let config =
+          { config with
+            hash =
+              Some
+                ( Ledger_hash.to_base58_check
+                @@ Mina_ledger.Ledger.merkle_root ledger )
+          }
+        in
+        let name, other_data =
+          match (config.base, config.name) with
+          | Named name, _ ->
+              (Some name, None)
+          | Accounts accounts, _ ->
+              (Some "accounts", Some (accounts_hash accounts))
+          | Hash, None ->
+              (None, None)
+          | _, Some name ->
+              (Some name, None)
+        in
+        match name with
+        | Some name ->
+            let link_name =
+              genesis_dir
+              ^/ named_filename ~constraint_constants
+                   ~num_accounts:config.num_accounts ~balances:config.balances
+                   ~ledger_name_prefix ?other_data name
+            in
+            (* Delete the file if it already exists. *)
+            let%bind () =
+              Deferred.Or_error.try_with ~here:[%here] (fun () ->
+                  Sys.remove link_name )
+              |> Deferred.ignore_m
+            in
+            (* Add a symlink from the named path to the hash path. *)
+            let%map () = Unix.symlink ~target:tar_path ~link_name in
+            [%log trace] "Linking ledger file $tar_path to $named_tar_path"
+              ~metadata:
+                [ ("tar_path", `String tar_path)
+                ; ("named_tar_path", `String link_name)
+                ] ;
+            Ok (packed, config, link_name)
+        | None ->
+            Deferred.Or_error.return (packed, config, tar_path) )
     | Accounts { accounts; link_path = Some link_path } ->
         let (packed : Genesis_ledger.Packed.t) =
           ( module Genesis_ledger.Make (struct
@@ -512,60 +562,10 @@ module Ledger = struct
                 @@ Error
                      (report_no_genesis_ledger ~constraint_constants
                         ~ledger_name_prefix ~logger ~config () )
-            | Some accounts -> (
-                let packed =
-                  packed_genesis_ledger_of_accounts
-                    ~depth:constraint_constants.ledger_depth accounts
-                in
-                let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
-                let%bind.Deferred.Or_error tar_path =
-                  generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
-                in
-                let config =
-                  { config with
-                    hash =
-                      Some
-                        ( Ledger_hash.to_base58_check
-                        @@ Mina_ledger.Ledger.merkle_root ledger )
-                  }
-                in
-                let name, other_data =
-                  match (config.base, config.name) with
-                  | Named name, _ ->
-                      (Some name, None)
-                  | Accounts accounts, _ ->
-                      (Some "accounts", Some (accounts_hash accounts))
-                  | Hash, None ->
-                      (None, None)
-                  | _, Some name ->
-                      (Some name, None)
-                in
-                match name with
-                | Some name ->
-                    let link_name =
-                      genesis_dir
-                      ^/ named_filename ~constraint_constants
-                           ~num_accounts:config.num_accounts
-                           ~balances:config.balances ~ledger_name_prefix
-                           ?other_data name
-                    in
-                    (* Delete the file if it already exists. *)
-                    let%bind () =
-                      Deferred.Or_error.try_with ~here:[%here] (fun () ->
-                          Sys.remove link_name )
-                      |> Deferred.ignore_m
-                    in
-                    (* Add a symlink from the named path to the hash path. *)
-                    let%map () = Unix.symlink ~target:tar_path ~link_name in
-                    [%log trace]
-                      "Linking ledger file $tar_path to $named_tar_path"
-                      ~metadata:
-                        [ ("tar_path", `String tar_path)
-                        ; ("named_tar_path", `String link_name)
-                        ] ;
-                    Ok (packed, config, link_name)
-                | None ->
-                    return (Ok (packed, config, tar_path)) ) ) )
+            | Some accounts ->
+                load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
+                  ~ledger_name_prefix ~config
+                  ~load_ledger_spec:(Accounts { accounts; link_path = None }) ) )
 end
 
 module Epoch_data = struct
