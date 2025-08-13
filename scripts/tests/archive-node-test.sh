@@ -17,4 +17,4 @@ MINA_TEST_POSTGRES_URI=${POSTGRES_URI:-"postgres://postgres:postgres@localhost:5
 
 echo "Running archive node test"
 echo "WARN: Silencing the errors from the archive node test app. One of the tests is expected to fail."
-MINA_TEST_POSTGRES_URI=$MINA_TEST_POSTGRES_URI $ARCHIVE_TEST_APP || true
+MINA_TEST_POSTGRES_URI=$MINA_TEST_POSTGRES_URI $ARCHIVE_TEST_APP -v
