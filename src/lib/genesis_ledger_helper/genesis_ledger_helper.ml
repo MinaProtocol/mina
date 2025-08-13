@@ -524,48 +524,34 @@ module Ledger = struct
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
             ~ledger_name_prefix ?overwrite_version config
         in
-        let open Deferred.Let_syntax in
-        let%bind tar_path =
+        let%bind tar_file =
           find_tar ~logger ~genesis_dir ~constraint_constants
             ~ledger_name_prefix config
         in
-        match tar_path with
-        | Some tar_file -> (
-            let extracted_folder =
-              Tar.filename_without_extension @@ Filename.basename tar_file
-            in
-            let extracted_path = genesis_dir ^/ extracted_folder in
-            let load_ledger_spec =
-              match padded_accounts_opt with
-              | Some accounts ->
-                  Accounts { accounts; link_path = Some extracted_path }
-              | None ->
-                  Tar { tar_file; extracted_path }
-            in
-            match%map
-              load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
-                ~ledger_name_prefix ~config ~load_ledger_spec
-            with
-            | Ok result ->
-                Ok result
-            | Error err ->
-                [%log error] "Could not load ledger from $path: $error"
-                  ~metadata:
-                    [ ("path", `String tar_file)
-                    ; ("error", Error_json.error_to_yojson err)
-                    ] ;
-                Error err )
-        | None -> (
-            match padded_accounts_opt with
-            | None ->
-                return
-                @@ Error
-                     (report_no_genesis_ledger ~constraint_constants
-                        ~ledger_name_prefix ~logger ~config () )
-            | Some accounts ->
-                load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
-                  ~ledger_name_prefix ~config
-                  ~load_ledger_spec:(Accounts { accounts; link_path = None }) ) )
+        let extracted_path_of_tar_file tar_file =
+          let extracted_folder =
+            Tar.filename_without_extension @@ Filename.basename tar_file
+          in
+          genesis_dir ^/ extracted_folder
+        in
+        let%bind.Deferred.Or_error load_ledger_spec =
+          match (tar_file, padded_accounts_opt) with
+          | None, None ->
+              return
+              @@ Error
+                   (report_no_genesis_ledger ~constraint_constants
+                      ~ledger_name_prefix ~logger ~config () )
+          | tar_file, Some accounts ->
+              let link_path =
+                Option.map tar_file ~f:extracted_path_of_tar_file
+              in
+              Deferred.Or_error.return (Accounts { accounts; link_path })
+          | Some tar_file, None ->
+              let extracted_path = extracted_path_of_tar_file tar_file in
+              Deferred.Or_error.return (Tar { tar_file; extracted_path })
+        in
+        load_ledger_by_spec ~genesis_dir ~logger ~constraint_constants
+          ~ledger_name_prefix ~config ~load_ledger_spec )
 end
 
 module Epoch_data = struct
