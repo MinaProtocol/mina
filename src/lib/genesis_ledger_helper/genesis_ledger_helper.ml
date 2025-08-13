@@ -423,7 +423,7 @@ module Ledger = struct
            | None ->
                [%log warn]
                  "Config file did not specify expected hash for ledger loaded \
-                  from $filename"
+                  from $path"
                  ~metadata:
                    [ ("path", `String extracted_path)
                    ; ("root_hash", Ledger_hash.to_yojson ledger_root)
