@@ -25,9 +25,7 @@ end]
 
 [%%define_locally Stable.Latest.(gen)]
 
-let create () =
-  (* This calls into libsnark which uses /dev/urandom *)
-  Inner_curve.Scalar.random ()
+let create () = Inner_curve.Scalar.random ()
 
 include Comparable.Make_binable (Stable.Latest)
 
@@ -66,3 +64,7 @@ let of_yojson = function
           Error ("Signature_lib.Private_key.of_yojson: " ^ Exn.to_string exn) )
   | _ ->
       Error "Signature_lib.Private_key.of_yojson: Expected a string"
+
+let of_string_exn s = Inner_curve.Scalar.of_string s
+
+let to_string t = Inner_curve.Scalar.to_string t

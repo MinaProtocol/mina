@@ -8,6 +8,7 @@
   ;; local libraries
   mina_base
   mina_signature_kind
+  mina_signature_kind.type
   signature_lib
   string_sign)
  (instrumentation

@@ -37,8 +37,8 @@ function checkout_and_dump() {
 
 source ./buildkite/scripts/handle-fork.sh
 
-if [[ $FORK == 1 ]]; then 
-    echo "⏩  Skipping type shape patching on a forked repository" 
+if [[ $FORK == 1 ]]; then
+    echo "⏩  Skipping type shape patching on a forked repository"
     exit 0
 fi
 

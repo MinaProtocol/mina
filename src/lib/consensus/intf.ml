@@ -317,7 +317,7 @@ module type S = sig
         module Ledger_snapshot : sig
           type t =
             | Genesis_epoch_ledger of Mina_ledger.Ledger.t
-            | Ledger_db of Mina_ledger.Ledger.Db.t
+            | Ledger_root of Mina_ledger.Ledger.Root.t
 
           val close : t -> unit
 

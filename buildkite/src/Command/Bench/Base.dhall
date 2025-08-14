@@ -78,7 +78,7 @@ let command
             , label = "Perf: ${spec.label}"
             , key = spec.key
             , target = spec.size
-            , soft_fail = Some (B/SoftFail.Boolean True)
+            , soft_fail = Some (B/SoftFail.Boolean False)
             , docker = None Docker.Type
             , depends_on = spec.dependsOn
             }

@@ -1,6 +1,15 @@
 open Core_kernel
 open String_sign
 open Mina_signature_kind
+open Base_quickcheck
+
+let seed =
+  let () = Random.self_init () in
+  let seed_phrase = List.init 32 ~f:(fun _ -> Random.int 256) in
+  let seed_str =
+    List.map seed_phrase ~f:Char.of_int_exn |> String.of_char_list
+  in
+  `Deterministic seed_str
 
 (* Create a keypair for testing *)
 let keypair : Signature_lib.Keypair.t =
@@ -142,6 +151,46 @@ let test_other_network_failures () =
     "Other network signature fails with different other network" false
     (verify ~signature_kind:(Other_network "Bar") signature keypair.public_key s)
 
+let test_secret_key_between_scalar_field_and_base_field () =
+  (* There are 86663725065984043395317760 values between the two moduli.
+     - Base:
+       28948022309329048855892746252171976963363056481941560715954676764349967630337
+     - Scalar:
+       28948022309329048855892746252171976963363056481941647379679742748393362948097
+     We use the predefined value of the scalar field of Vesta for the base
+     field of Pallas, the size not being available in the exported interface for
+     Tick.Inner_curve.Base_field *)
+  let base_modulus = Snark_params.Tock.Inner_curve.Scalar.size in
+
+  (* Generator for random offset within the range between base and scalar moduli *)
+  let offset_gen = Generator.int64_inclusive 1L Int64.max_value in
+
+  (* Combined generator for both signature kind and offset *)
+  let combined_gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind signature_kind =
+      Mina_signature_kind_type.signature_kind_gen seed
+    in
+    let%map offset = offset_gen in
+    (signature_kind, offset)
+  in
+
+  Quickcheck.test ~seed ~trials:10 combined_gen
+    ~f:(fun (signature_kind, random_offset) ->
+      let sk_bignum =
+        Bignum_bigint.(base_modulus + of_string (Int64.to_string random_offset))
+      in
+      let sk_str = Bignum_bigint.to_string sk_bignum in
+
+      let secret_key = Signature_lib.Private_key.of_string_exn sk_str in
+      let keypair = Signature_lib.Keypair.of_private_key_exn secret_key in
+
+      let s = "Rain and Spain don't rhyme with cheese" in
+      let signature = sign ~signature_kind keypair.private_key s in
+      Alcotest.(check bool)
+        "Sign and verify with secret key in scalar field" true
+        (verify ~signature_kind signature keypair.public_key s) )
+
 (* Define the test suite *)
 let () =
   Alcotest.run "String_sign"
@@ -158,5 +207,9 @@ let () =
         ; Alcotest.test_case "Mainnet failures" `Quick test_mainnet_failures
         ; Alcotest.test_case "Other network failures" `Quick
             test_other_network_failures
+        ] )
+    ; ( "Corner cases"
+      , [ Alcotest.test_case "Secret key between scalar and base field" `Quick
+            test_secret_key_between_scalar_field_and_base_field
         ] )
     ]

@@ -22,6 +22,7 @@ let Artifact
       | ZkappTestTransaction
       | FunctionalTestSuite
       | Toolchain
+      | CreateLegacyGenesis
       >
 
 let AllButTests =
@@ -34,6 +35,7 @@ let AllButTests =
       , Artifact.Rosetta
       , Artifact.ZkappTestTransaction
       , Artifact.Toolchain
+      , Artifact.CreateLegacyGenesis
       ]
 
 let Main =
@@ -59,6 +61,7 @@ let capitalName =
             , ZkappTestTransaction = "ZkappTestTransaction"
             , FunctionalTestSuite = "FunctionalTestSuite"
             , Toolchain = "Toolchain"
+            , CreateLegacyGenesis = "CreateLegacyGenesis"
             }
             artifact
 
@@ -74,6 +77,7 @@ let lowerName =
             , Rosetta = "rosetta"
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
+            , CreateLegacyGenesis = "create_legacy_genesis"
             , Toolchain = "toolchain"
             }
             artifact
@@ -91,6 +95,7 @@ let dockerName =
             , ZkappTestTransaction = "mina-zkapp-test-transaction"
             , FunctionalTestSuite = "mina-test-suite"
             , Toolchain = "mina-toolchain"
+            , CreateLegacyGenesis = "mina-create-legacy-genesis"
             }
             artifact
 
@@ -116,6 +121,7 @@ let toDebianName =
             , ZkappTestTransaction = "zkapp_test_transaction"
             , FunctionalTestSuite = "functional_test_suite"
             , Toolchain = ""
+            , CreateLegacyGenesis = "create_legacy_genesis"
             }
             artifact
 
@@ -137,6 +143,7 @@ let toDebianNames =
                           , Rosetta = [ toDebianName a network ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
+                          , CreateLegacyGenesis = [ "create_legacy_genesis" ]
                           , Toolchain = [] : List Text
                           }
                           a
@@ -204,6 +211,7 @@ let dockerTag =
                 , ZkappTestTransaction = "${spec.version}"
                 , FunctionalTestSuite = "${spec.version}${build_flags_part}"
                 , Toolchain = "${spec.version}"
+                , CreateLegacyGenesis = "${spec.version}"
                 }
                 spec.artifact
 
