@@ -69,7 +69,7 @@ case $PACKAGE in
 esac
 
 if [[ "$SIGNED" == 1 ]]; then
-  SIGNED=" (wget -q https://'$REPO'/repo-signing-key.asc -O- | apt-key add) && apt-get update > /dev/null && "
+  SIGNED=" (wget -q https://'$REPO'/repo-signing-key.gpg -O /etc/apt/trusted.gpg.d/minaprotocol.gpg ) && apt-get update > /dev/null && "
 else 
   SIGNED=""
 fi

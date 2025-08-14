@@ -67,7 +67,7 @@ in  Pipeline.build
               ]
             , label = "Rosetta integration tests Bullseye Long"
             , key = "rosetta-integration-tests-bullseye-long"
-            , soft_fail = Some (B/SoftFail.Boolean True)
+            , soft_fail = Some (B/SoftFail.Boolean False)
             , timeout_in_minutes = Some +90
             , target = Size.Small
             , depends_on =
