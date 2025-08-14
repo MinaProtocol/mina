@@ -56,7 +56,7 @@ let MinaBuildSpec =
           , channel : DebianChannel.Type
           , debianRepo : DebianRepo.Type
           , deb_legacy_version : Text
-          , if : Optional B/If
+          , `if` : Optional B/If
           }
       , default =
           { prefix = "MinaArtifact"
@@ -71,7 +71,7 @@ let MinaBuildSpec =
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
-          , if = None B/If
+          , `if` = None B/If
           }
       }
 
@@ -123,7 +123,7 @@ let build_artifacts
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg"
             , target = Size.XLarge
-            , if = spec.if
+            , `if` = spec.`if`
             , retries =
               [ Command.Retry::{
                 , exit_status = Command.ExitStatus.Code +2
@@ -164,7 +164,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
-                    , if = spec.if
+                    , `if` = spec.`if`
                     }
                   ]
                 , DaemonHardfork =
@@ -202,7 +202,7 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
-                    , if = spec.if
+                    , `if` = spec.`if`
                     }
                   ]
                 , Archive =
@@ -217,7 +217,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
-                    , if = spec.if
+                    , `if` = spec.`if`
                     }
                   ]
                 , Rosetta =
@@ -231,7 +231,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
-                    , if = spec.if
+                    , `if` = spec.`if`
                     }
                   ]
                 , ZkappTestTransaction =
@@ -244,7 +244,7 @@ let docker_step
                     , deb_profile = spec.profile
                     , deb_codename = spec.debVersion
                     , deb_legacy_version = spec.deb_legacy_version
-                    , if = spec.if
+                    , `if` = spec.`if`
                     }
                   ]
                 , FunctionalTestSuite =
@@ -258,7 +258,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_legacy_version = spec.deb_legacy_version
-                    , if = spec.if
+                    , `if` = spec.`if`
                     }
                   ]
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type
