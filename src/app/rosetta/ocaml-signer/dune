@@ -18,8 +18,8 @@
   pickles
   rosetta_coding
   rosetta_lib
-  string_sign
   signature_lib
+  random_oracle
   mina_base
   snark_params
   pickles.backend
