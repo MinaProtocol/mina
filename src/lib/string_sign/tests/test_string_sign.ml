@@ -191,6 +191,42 @@ let test_secret_key_between_scalar_field_and_base_field () =
         "Sign and verify with secret key in scalar field" true
         (verify ~signature_kind signature keypair.public_key s) )
 
+let test_regression_signature () =
+  let inputs =
+    [ ( Signature_lib.Private_key.of_string_exn
+          "28948022309329048855892746252171976963363056481941560715954676764349967630337"
+      , Mina_signature_kind_type.Mainnet )
+    ; ( Signature_lib.Private_key.of_string_exn
+          "28948022309329048855892746252171976963363056481941560715954676764349967630337"
+      , Mina_signature_kind_type.Testnet )
+    ]
+  in
+  let exp_output =
+    [ ( "10098659636052751402960513659673534058318534694837361110423199873688986365908"
+      , "7844530585816769124362208605281765856859093320029640751494040544682079710450"
+      )
+    ; ( "19528641019288828403170135634909672400537532147682562327700497341129840775560"
+      , "24640829174932073706335857230587954505385529622139330517748682166416541732513"
+      )
+    ]
+  in
+  let l = List.zip_exn inputs exp_output in
+  List.iter l ~f:(fun ((sk, signature_kind), (exp_r_str, exp_s_str)) ->
+      (* Create a keypair from the secret key *)
+      let keypair = Signature_lib.Keypair.of_private_key_exn sk in
+      let msg = "Bitcoin: A Peer-to-Peer Electronic Cash System" in
+      let r, s = sign ~signature_kind keypair.private_key msg in
+      Alcotest.(check bool)
+        "r values match expected output" true
+        (String.equal
+           (Snark_params.Tock.Inner_curve.Scalar.to_string r)
+           exp_r_str ) ;
+      Alcotest.(check bool)
+        "s values match expected output" true
+        (String.equal
+           (Snark_params.Tick.Inner_curve.Scalar.to_string s)
+           exp_s_str ) )
+
 (* Define the test suite *)
 let () =
   Alcotest.run "String_sign"
@@ -211,5 +247,9 @@ let () =
     ; ( "Corner cases"
       , [ Alcotest.test_case "Secret key between scalar and base field" `Quick
             test_secret_key_between_scalar_field_and_base_field
+        ] )
+    ; ( " Regression signature test"
+      , [ Alcotest.test_case "Signature regression" `Quick
+            test_regression_signature
         ] )
     ]
