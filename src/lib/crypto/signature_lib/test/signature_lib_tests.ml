@@ -47,35 +47,13 @@ let test_signature_of_signature_matches () =
     && Snark_params.Tock.Field.equal (snd signature_expected)
          (snd signature_got) )
 
-let test_signature_of_fields_123_matches () =
-  let signature_got =
-    Schnorr.Chunked.sign ~signature_kind secondPrivkey
-      (Random_oracle_input.Chunked.field_elements
-         [| Snark_params.Tick.Field.of_int 1
-          ; Snark_params.Tick.Field.of_int 2
-          ; Snark_params.Tick.Field.of_int 3
-         |] )
-  in
-  (* The expected value has been generated using the commit [19872b9] of
-     [MinaProtocol/mina] *)
-  let signature_expected =
-    ( Snark_params.Tick.Field.of_string
-        "20765817320000234273433345899587917625188885976914380365037035465312392849949"
-    , Snark_params.Tock.Field.of_string
-        "1002418623751815063744079415040141105602079382674393704838141255389705661040"
-    )
-  in
-  Alcotest.(check bool)
-    "signature of fields 1,2,3 matches" true
-    ( Snark_params.Tick.Field.equal (fst signature_expected) (fst signature_got)
-    && Snark_params.Tock.Field.equal (snd signature_expected)
-         (snd signature_got) )
-
 (* Test vectors generated from commit 25c79e98fd15381846e00567ddc9400f230d8778
    from the repository MinaProtocol/Mina *)
 let test_regtest_chunked () =
   let inputs =
-    [ ("1", Mina_signature_kind_type.Mainnet)
+    [ ( Signature_lib.Private_key.to_string secondPrivkey
+      , Mina_signature_kind_type.Testnet )
+    ; ("1", Mina_signature_kind_type.Mainnet)
     ; ("1", Mina_signature_kind_type.Testnet)
     ; ( "28948022309329048855892746252171976963363056481941560715954676764349967630337"
       , Mina_signature_kind_type.Mainnet )
@@ -92,7 +70,10 @@ let test_regtest_chunked () =
       |]
   in
   let exp_output =
-    [ ( "22084905263324308757092642598591805622573916921561788090659474572435157367756"
+    [ ( "20765817320000234273433345899587917625188885976914380365037035465312392849949"
+      , "1002418623751815063744079415040141105602079382674393704838141255389705661040"
+      )
+    ; ( "22084905263324308757092642598591805622573916921561788090659474572435157367756"
       , "19351823962922404057512863823076292367935996544780933374359034777579697928791"
       )
     ; ( "9365513903930360449644312393516794745401878006145737752476277731408665582105"
@@ -125,8 +106,6 @@ let () =
             test_signature_of_empty_random_oracle_input_matches
         ; test_case "signature of signature matches" `Quick
             test_signature_of_signature_matches
-        ; test_case "signature of fields 1,2,3 matches" `Quick
-            test_signature_of_fields_123_matches
         ] )
     ; ( "Regtest test vectors"
       , [ test_case "chunked" `Quick test_regtest_chunked ] )
