@@ -183,7 +183,6 @@
 (package (name staged_ledger_diff))
 (package (name staged_ledger))
 (package (name storage))
-(package (name string_sign))
 (package (name structured_log_events))
 (package (name syncable_ledger))
 (package (name sync_handler))

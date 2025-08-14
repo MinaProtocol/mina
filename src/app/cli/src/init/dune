@@ -119,7 +119,6 @@
   pickles.backend
   snark_params
   mina_signature_kind
-  string_sign
   zkapp_command_builder
   internal_tracing
   transaction_snark_scan_state)
