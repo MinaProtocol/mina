@@ -32,8 +32,8 @@ type t =
   }
 
 let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
-    ~(proof_cache_db : Proof_cache_tag.cache_db) : t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~(proof_cache_db : Proof_cache_tag.cache_db)
+    ~(signature_kind : Mina_signature_kind.t) : t =
   let module T = Transaction_snark.Make (struct
     let constraint_constants = Genesis_constants.Compiled.constraint_constants
 
