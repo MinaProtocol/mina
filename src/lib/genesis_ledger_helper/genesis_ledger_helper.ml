@@ -492,6 +492,10 @@ module Ledger = struct
         | None ->
             Deferred.Or_error.return (packed, config, tar_path) )
     | Accounts { accounts; link_path = Some link_path } ->
+        let%bind () =
+          Mina_stdlib_unix.File_system.create_dir ~clear_if_exists:true
+            link_path
+        in
         let (packed : Genesis_ledger.Packed.t) =
           ( module Genesis_ledger.Make (struct
             let accounts = accounts
