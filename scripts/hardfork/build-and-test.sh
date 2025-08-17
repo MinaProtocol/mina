@@ -114,8 +114,10 @@ build_branch() {
         export BYPASS_OPAM_SWITCH_UPDATE=1
       fi
       make build
-      make build_testnet_sigs
+      make build_logproc
+      make build-devnet-sigs
       make build-daemon-utils
+      make debian-build-logproc
       make debian-build-daemon-devnet
       make docker-build-daemon-devnet
     fi
