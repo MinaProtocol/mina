@@ -19,17 +19,68 @@
 
 set -exo pipefail
 
-NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
-if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
-  echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
-  echo "Configuring the NAR signing secret"
-  NIX_SECRET_KEY=/tmp/nix-cache-secret
+# Parse command line arguments
+MODE="nix"
+FORK_BRANCH=""
+CONTEXT="local"
+OVERRIDE_COMPATIBLE_TMP_DIR="${OVERRIDE_COMPATIBLE_TMP_DIR}"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --mode)
+      MODE="$2"
+      shift 2
+      ;;
+    --fork-branch)
+      FORK_BRANCH="$2"
+      shift 2
+      ;;
+    --context)
+      CONTEXT="$2"
+      shift 2
+      ;;
+    *)
+      # For backwards compatibility, treat first positional arg as fork branch
+      if [[ -z "$FORK_BRANCH" ]]; then
+        FORK_BRANCH="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+# Validate mode
+if [[ "$MODE" != "nix" && "$MODE" != "docker" ]]; then
+  echo "Error: --mode must be either 'nix' or 'docker'"
+  exit 1
 fi
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
-  echo "GCP uploading configured (for nix binaries)"
-  cat <<'EOF'> /tmp/nix-post-build
+# Validate context
+if [[ "$CONTEXT" != "ci" && "$CONTEXT" != "local" ]]; then
+  echo "Error: --context must be either 'ci' or 'local'"
+  exit 1
+fi
+
+
+# For backwards compatibility, if no fork branch specified but we have positional args
+# treat the script as being run in CI mode
+if [[ -n "$FORK_BRANCH" ]]; then
+  set -- "$FORK_BRANCH"
+fi
+
+init_nix() {
+  NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
+
+  if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
+    echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
+    echo "Configuring the NAR signing secret"
+    NIX_SECRET_KEY=/tmp/nix-cache-secret
+  fi
+
+  if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
+    echo "GCP uploading configured (for nix binaries)"
+    cat <<'EOF'> /tmp/nix-post-build
 #!/bin/sh
 
 set -eu
@@ -38,15 +89,40 @@ export IFS=' '
 
 echo $OUT_PATHS | tr ' ' '\n' >> /tmp/nix-paths
 EOF
-  chmod +x /tmp/nix-post-build
-  NIX_POST_BUILD_HOOK=/tmp/nix-post-build
-fi
+    chmod +x /tmp/nix-post-build
+    NIX_POST_BUILD_HOOK=/tmp/nix-post-build
+  fi
 
-if [[ "$NIX_POST_BUILD_HOOK" != "" ]]; then
-  NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
-fi
-if [[ "$NIX_SECRET_KEY" != "" ]]; then
-  NIX_OPTS+=( --secret-key-files "$NIX_SECRET_KEY" )
+  if [[ "$NIX_POST_BUILD_HOOK" != "" ]]; then
+    NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
+  fi
+  if [[ "$NIX_SECRET_KEY" != "" ]]; then
+    NIX_OPTS+=( --secret-key-files "$NIX_SECRET_KEY" )
+  fi
+}
+
+build_branch() {
+    local build_dir="$1"
+    local output_link="$2"
+
+    if [[ "$MODE" == "nix" ]]; then
+      nix "${NIX_OPTS[@]}" build "$build_dir?submodules=1#devnet" --out-link "$output_link"
+      nix "${NIX_OPTS[@]}" build "$build_dir?submodules=1#devnet.genesis" --out-link "$output_link"
+    elif [[ "$MODE" == "docker" ]]; then
+      cd "$build_dir"
+      if [[ "$CONTEXT" == "local" ]]; then
+        export BYPASS_OPAM_SWITCH_UPDATE=1
+      fi
+      make build
+      make build_testnet_sigs
+      make build-daemon-utils
+      make debian-build-daemon-devnet
+      make docker-build-daemon-devnet
+    fi
+}
+
+if [[ "$MODE" == "nix" ]]; then
+  init_nix
 fi
 
 INIT_DIR="$PWD"
@@ -58,15 +134,22 @@ if [[ $# -gt 0 ]]; then
   chown -R "${USER}" /workdir
   git config --global --add safe.directory /workdir
   git fetch
-  nix-env -iA unstable.jq
-  nix-env -iA unstable.curl
-  nix-env -iA unstable.gnused
-  nix-env -iA unstable.git-lfs
+
+  if [[ "$MODE" == "nix" ]]; then
+    nix-env -iA unstable.jq
+    nix-env -iA unstable.curl
+    nix-env -iA unstable.gnused
+    nix-env -iA unstable.git-lfs
+  fi
 fi
 
 if [[ ! -L compatible-devnet ]]; then
-  if [[ $# == 0 ]]; then
-    compatible_build=$(mktemp -d)
+  if [[ "$CONTEXT" == "local" ]]; then
+    if [[ -n "$OVERRIDE_COMPATIBLE_TMP_DIR" ]]; then
+      compatible_build="$OVERRIDE_COMPATIBLE_TMP_DIR"
+    else
+      compatible_build=$(mktemp -d)
+    fi
     git clone -b compatible --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
     cd "$compatible_build"
   else
@@ -77,26 +160,26 @@ if [[ ! -L compatible-devnet ]]; then
   fi
   git submodule sync --recursive
   git submodule update --init --recursive
-  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet" --out-link "$INIT_DIR/compatible-devnet"
-  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet.genesis" --out-link "$INIT_DIR/compatible-devnet"
-  if [[ $# == 0 ]]; then
-    cd -
-    rm -Rf "$compatible_build"
+
+  build_branch "$compatible_build" "$INIT_DIR/compatible-devnet"
+  if [[ "$CONTEXT" == "local" ]]; then
+      cd -
+      rm -Rf "$compatible_build"
   fi
 fi
 
-if [[ $# -gt 0 ]]; then
+if [[ "$CONTEXT" == "ci" ]]; then
   # Branch is specified, this is a CI run
   git checkout -f $1
   git submodule sync --recursive
   git submodule update --init --recursive
 fi
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
+
+build_branch "$INIT_DIR" "$INIT_DIR/fork-devnet"
 
 if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws
-  cat <<EOF> $HOME/.aws/credentials
+  cat << EOF > $HOME/.aws/credentials
 [default]
 aws_access_key_id=$NIX_CACHE_GCP_ID
 aws_secret_access_key=$NIX_CACHE_GCP_SECRET
