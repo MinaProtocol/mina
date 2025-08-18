@@ -2625,6 +2625,20 @@ let best_chain_block_before_stop_slot (t : t) =
           in
           find_block_older_than_stop_slot breadcrumb )
 
+type hard_fork_breadcrumb_spec =
+  [ `Stop_slot
+  | `State_hash of State_hash.t
+  | `Block_height of Unsigned.UInt32.t ]
+
+let hard_fork_breadcrumb ~(breadcrumb_spec : hard_fork_breadcrumb_spec) t =
+  match breadcrumb_spec with
+  | `Stop_slot ->
+      best_chain_block_before_stop_slot t
+  | `State_hash state_hash_base58 ->
+      best_chain_block_by_state_hash t state_hash_base58 |> Deferred.return
+  | `Block_height block_height ->
+      best_chain_block_by_height t block_height |> Deferred.return
+
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
 
 let proof_cache_db t = t.proof_cache_db

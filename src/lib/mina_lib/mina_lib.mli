@@ -260,6 +260,16 @@ val best_chain_block_by_state_hash :
 val best_chain_block_before_stop_slot :
   t -> (Transition_frontier.Breadcrumb.t, string) Deferred.Result.t
 
+type hard_fork_breadcrumb_spec =
+  [ `Stop_slot
+  | `State_hash of State_hash.t
+  | `Block_height of Unsigned.UInt32.t ]
+
+val hard_fork_breadcrumb :
+     breadcrumb_spec:hard_fork_breadcrumb_spec
+  -> t
+  -> (Transition_frontier.Breadcrumb.t, string) Deferred.Result.t
+
 val zkapp_cmd_limit : t -> int option ref
 
 val proof_cache_db : t -> Proof_cache_tag.cache_db
