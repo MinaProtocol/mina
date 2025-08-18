@@ -2613,44 +2613,16 @@ module Queries = struct
           | Some _, Some _ ->
               Deferred.Result.fail "Cannot specify both state hash and height"
         in
-        let%bind breadcrumb =
-          Mina_lib.Hardfork_config.breadcrumb ~breadcrumb_spec mina
-        in
-        let block = Transition_frontier.Breadcrumb.block breadcrumb in
-        let blockchain_length = Mina_block.blockchain_length block in
-        let global_slot_since_genesis =
-          Mina_block.consensus_state block
-          |> Consensus.Data.Consensus_state.global_slot_since_genesis
-        in
-        let staged_ledger =
-          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-          |> Staged_ledger.ledger
-        in
-        let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-        let protocol_state =
-          Transition_frontier.Breadcrumb.protocol_state breadcrumb
-        in
-        let consensus =
-          Mina_state.Protocol_state.consensus_state protocol_state
-        in
-        let staking_epoch =
-          Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
-            consensus
-        in
-        let next_epoch =
-          Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-            consensus
-        in
-        let staking_epoch_seed =
-          Mina_base.Epoch_seed.to_base58_check
-            staking_epoch.Mina_base.Epoch_data.Poly.seed
-        in
-        let next_epoch_seed =
-          Mina_base.Epoch_seed.to_base58_check
-            next_epoch.Mina_base.Epoch_data.Poly.seed
-        in
-        let%bind staking_ledger, next_epoch_ledger =
-          Mina_lib.Hardfork_config.epoch_ledgers ~breadcrumb mina
+        let%bind { staged_ledger
+                 ; global_slot_since_genesis
+                 ; state_hash
+                 ; staking_ledger
+                 ; staking_epoch_seed
+                 ; next_epoch_ledger
+                 ; next_epoch_seed
+                 ; blockchain_length
+                 } =
+          Mina_lib.Hardfork_config.prepare_inputs ~breadcrumb_spec mina
         in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger

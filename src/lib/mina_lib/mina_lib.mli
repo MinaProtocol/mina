@@ -280,6 +280,22 @@ module Hardfork_config : sig
          * Mina_ledger.Ledger.Any_ledger.witness
        , string )
        Deferred.Result.t
+
+  type inputs =
+    { staged_ledger : Mina_ledger.Ledger.t
+    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; state_hash : State_hash.t
+    ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
+    ; staking_epoch_seed : string
+    ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
+    ; next_epoch_seed : string
+    ; blockchain_length : Mina_numbers.Length.t
+    }
+
+  val prepare_inputs :
+       breadcrumb_spec:breadcrumb_spec
+    -> mina_lib
+    -> (inputs, string) Deferred.Result.t
 end
 
 val zkapp_cmd_limit : t -> int option ref

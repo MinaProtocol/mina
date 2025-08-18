@@ -2725,6 +2725,63 @@ module Hardfork_config = struct
         (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
         next_epoch.ledger.hash ) ;
     (staking_ledger, next_epoch_ledger)
+
+  type inputs =
+    { staged_ledger : Ledger.t
+    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; state_hash : State_hash.t
+    ; staking_ledger : Ledger.Any_ledger.witness
+    ; staking_epoch_seed : string
+    ; next_epoch_ledger : Ledger.Any_ledger.witness
+    ; next_epoch_seed : string
+    ; blockchain_length : Mina_numbers.Length.t
+    }
+
+  let prepare_inputs ~breadcrumb_spec mina : (inputs, string) Deferred.Result.t
+      =
+    let open Deferred.Result.Let_syntax in
+    let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
+    let block = Transition_frontier.Breadcrumb.block breadcrumb in
+    let blockchain_length = Mina_block.blockchain_length block in
+    let global_slot_since_genesis =
+      Mina_block.consensus_state block
+      |> Consensus.Data.Consensus_state.global_slot_since_genesis
+    in
+    let staged_ledger =
+      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+      |> Staged_ledger.ledger
+    in
+    let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+    let protocol_state =
+      Transition_frontier.Breadcrumb.protocol_state breadcrumb
+    in
+    let consensus = Mina_state.Protocol_state.consensus_state protocol_state in
+    let staking_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data consensus
+    in
+    let next_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
+    in
+    let staking_epoch_seed =
+      Mina_base.Epoch_seed.to_base58_check
+        staking_epoch.Mina_base.Epoch_data.Poly.seed
+    in
+    let next_epoch_seed =
+      Mina_base.Epoch_seed.to_base58_check
+        next_epoch.Mina_base.Epoch_data.Poly.seed
+    in
+    let%map staking_ledger, next_epoch_ledger =
+      epoch_ledgers ~breadcrumb mina
+    in
+    { staged_ledger
+    ; global_slot_since_genesis
+    ; state_hash
+    ; staking_ledger
+    ; staking_epoch_seed
+    ; next_epoch_ledger
+    ; next_epoch_seed
+    ; blockchain_length
+    }
 end
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
