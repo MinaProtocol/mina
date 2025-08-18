@@ -9,23 +9,20 @@ module type S = sig
 
   type account
 
-  type location
-
   type hash
 
   type key
 
-  type token_id
-
-  type token_id_set
-
-  type account_id
-
-  type account_id_set
-
   module Location : Merkle_ledger.Location_intf.S
 
   module Addr = Location.Addr
+
+  module Token_id : Merkle_ledger.Intf.Token_id
+
+  module Account_id :
+    Merkle_ledger.Intf.Account_id
+      with type key := key
+       and type token_id := Token_id.t
 
   (** create a mask with no parent *)
   val create : depth:int -> unit -> t
@@ -37,16 +34,14 @@ module type S = sig
   module Attached : sig
     include
       Base_merkle_tree_intf.S
-        with module Addr = Addr
-        with module Location = Location
         with type account := account
          and type root_hash := hash
          and type hash := hash
          and type key := key
-         and type token_id := token_id
-         and type token_id_set := token_id_set
-         and type account_id := account_id
-         and type account_id_set := account_id_set
+        with module Addr = Addr
+         and module Location = Location
+         and module Token_id = Token_id
+         and module Account_id = Account_id
 
     exception
       Dangling_parent_reference of
@@ -85,7 +80,7 @@ module type S = sig
        from parent on each lookup. I.e. these accounts will be cached in mask and accessing
        them during processing of a transaction won't use disk I/O.
     *)
-    val unsafe_preload_accounts_from_parent : t -> account_id list -> unit
+    val unsafe_preload_accounts_from_parent : t -> Account_id.t list -> unit
 
     val to_accumulated : t -> accumulated_t
 
@@ -97,7 +92,7 @@ module type S = sig
 
     (** already have module For_testing from include above *)
     module For_testing : sig
-      val location_in_mask : t -> location -> bool
+      val location_in_mask : t -> Location.t -> bool
 
       val address_in_mask : t -> Addr.t -> bool
 

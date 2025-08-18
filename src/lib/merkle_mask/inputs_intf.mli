@@ -28,14 +28,12 @@ module type S = sig
 
   module Base :
     Base_merkle_tree_intf.S
-      with module Addr = Location.Addr
-       and module Location = Location
-       and type account := Account.t
+      with type account := Account.t
        and type root_hash := Hash.t
        and type hash := Hash.t
        and type key := Key.t
-       and type token_id := Token_id.t
-       and type token_id_set := Token_id.Set.t
-       and type account_id := Account_id.t
-       and type account_id_set := Account_id.Set.t
+      with module Addr = Location.Addr
+       and module Location = Location
+       and module Token_id := Token_id
+       and module Account_id := Account_id
 end
