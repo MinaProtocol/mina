@@ -212,7 +212,20 @@ module Ledger_inner = struct
        and type parent := Any_ledger.M.t =
   Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
-    module Base = Any_ledger.M
+
+    module Base = struct
+      include Any_ledger.M
+
+      type maps_fold_mask =
+        { fold_accounts : (Location.t * Account.t) list
+        ; fold_token_owners : (Token_id.t * Account_id.t) list
+        ; fold_hashes : (Location.Addr.t * Hash.t) list
+        ; fold_locations : (Account_id.t * Location.t) list
+        ; fold_non_existent_accounts : Account_id.Set.t
+        }
+
+      let accumulate_maps_dup ~init _ = init
+    end
   end)
 
   module Maskable :
@@ -233,7 +246,21 @@ module Ledger_inner = struct
        and type t := Any_ledger.M.t =
   Merkle_mask.Maskable_merkle_tree.Make (struct
     include Inputs
-    module Base = Any_ledger.M
+
+    module Base = struct
+      include Any_ledger.M
+
+      type maps_fold_mask =
+        { fold_accounts : (Location.t * Account.t) list
+        ; fold_token_owners : (Token_id.t * Account_id.t) list
+        ; fold_hashes : (Location.Addr.t * Hash.t) list
+        ; fold_locations : (Account_id.t * Location.t) list
+        ; fold_non_existent_accounts : Account_id.Set.t
+        }
+
+      let accumulate_maps_dup ~init _ = init
+    end
+
     module Mask = Mask
 
     let mask_to_base m = Any_ledger.cast (module Mask.Attached) m

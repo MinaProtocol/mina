@@ -690,7 +690,20 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     Database.Make (Inputs)
 
   module Any_base = Merkle_ledger.Any_ledger.Make_base (Inputs)
-  module Base = Any_base.M
+
+  module Base = struct
+    include Any_base.M
+
+    type maps_fold_mask =
+      { fold_accounts : (Location.t * Inputs.Account.t) list
+      ; fold_token_owners : (Inputs.Token_id.t * Inputs.Account_id.t) list
+      ; fold_hashes : (Location.Addr.t * Inputs.Hash.t) list
+      ; fold_locations : (Inputs.Account_id.t * Location.t) list
+      ; fold_non_existent_accounts : Inputs.Account_id.Set.t
+      }
+
+    let accumulate_maps_dup ~init _ = init
+  end
 
   (* the mask tree *)
   module Mask :
