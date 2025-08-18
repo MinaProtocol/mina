@@ -2614,7 +2614,7 @@ module Queries = struct
               Deferred.Result.fail "Cannot specify both state hash and height"
         in
         let%bind breadcrumb =
-          Mina_lib.hard_fork_breadcrumb ~breadcrumb_spec mina
+          Mina_lib.Hardfork_config.breadcrumb ~breadcrumb_spec mina
         in
         let block = Transition_frontier.Breadcrumb.block breadcrumb in
         let blockchain_length = Mina_block.blockchain_length block in
@@ -2650,7 +2650,7 @@ module Queries = struct
             next_epoch.Mina_base.Epoch_data.Poly.seed
         in
         let%bind staking_ledger, next_epoch_ledger =
-          Mina_lib.Hardfork_config.get_epoch_ledgers ~mina breadcrumb
+          Mina_lib.Hardfork_config.epoch_ledgers ~breadcrumb mina
         in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger

@@ -260,20 +260,22 @@ val best_chain_block_by_state_hash :
 val best_chain_block_before_stop_slot :
   t -> (Transition_frontier.Breadcrumb.t, string) Deferred.Result.t
 
-type hard_fork_breadcrumb_spec =
-  [ `Stop_slot
-  | `State_hash of State_hash.t
-  | `Block_height of Unsigned.UInt32.t ]
-
-val hard_fork_breadcrumb :
-     breadcrumb_spec:hard_fork_breadcrumb_spec
-  -> t
-  -> (Transition_frontier.Breadcrumb.t, string) Deferred.Result.t
-
 module Hardfork_config : sig
-  val get_epoch_ledgers :
-       mina:t
-    -> Transition_frontier.Breadcrumb.t
+  type mina_lib = t
+
+  type breadcrumb_spec =
+    [ `Stop_slot
+    | `State_hash of State_hash.t
+    | `Block_height of Unsigned.UInt32.t ]
+
+  val breadcrumb :
+       breadcrumb_spec:breadcrumb_spec
+    -> mina_lib
+    -> (Transition_frontier.Breadcrumb.t, string) Deferred.Result.t
+
+  val epoch_ledgers :
+       breadcrumb:Transition_frontier.Breadcrumb.t
+    -> mina_lib
     -> ( Mina_ledger.Ledger.Any_ledger.witness
          * Mina_ledger.Ledger.Any_ledger.witness
        , string )
