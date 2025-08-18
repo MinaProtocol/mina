@@ -123,6 +123,18 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     type path = Path.t
 
+    (* WARN: this type should mirror [maps_t], we can't pull that definition here directly because
+       - Map are result of functors application
+       - [ppx-version] doesn't work well with functors application
+    *)
+    type maps_fold_mask =
+      { fold_accounts : (Location.t * Account.t) list
+      ; fold_token_owners : (Token_id.t * Account_id.t) list
+      ; fold_hashes : (Addr.t * Hash.t) list
+      ; fold_locations : (Account_id.t * Location.t) list
+      ; fold_non_existent_accounts : Account_id.Set.t
+      }
+
     exception
       Dangling_parent_reference of
         Uuid.t * (* Location where null was set*) string
