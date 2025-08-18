@@ -385,10 +385,13 @@ module Ledger = struct
         Error.createf "ledger '%s' not found" ledger_name
 
   type load_ledger_spec =
-    | Accounts of
+    | AccountsWithTar of
         { accounts : (Private_key.t option * Account.value) list lazy_t
-        ; link_path : string option
+        ; tar_file : string
+        ; extracted_path : string
         }
+    | AccountsOnly of
+        { accounts : (Private_key.t option * Account.value) list lazy_t }
     | Extracted of { extracted_path : string }
     | Tar of { tar_file : string; extracted_path : string }
 
@@ -439,7 +442,7 @@ module Ledger = struct
       ~ledger_name_prefix ~(load_ledger_spec : load_ledger_spec)
       ~(config : Runtime_config.Ledger.t) =
     match load_ledger_spec with
-    | Accounts { accounts; link_path = None } -> (
+    | AccountsOnly { accounts } -> (
         let packed =
           packed_genesis_ledger_of_accounts
             ~depth:constraint_constants.ledger_depth accounts
@@ -491,21 +494,29 @@ module Ledger = struct
             Ok (packed, config, link_name)
         | None ->
             Deferred.Or_error.return (packed, config, tar_path) )
-    | Accounts { accounts; link_path = Some link_path } ->
-        let%bind () =
+    | AccountsWithTar { accounts; tar_file; extracted_path } ->
+        [%log trace] "Loading $ledger from $path"
+          ~metadata:
+            [ ("ledger", `String ledger_name_prefix)
+            ; ("path", `String tar_file)
+            ] ;
+        let%bind.Deferred () =
           Mina_stdlib_unix.File_system.create_dir ~clear_if_exists:true
-            link_path
+            extracted_path
+        in
+        let%map.Deferred.Or_error () =
+          Tar.extract ~root:extracted_path ~file:tar_file ()
         in
         let (packed : Genesis_ledger.Packed.t) =
           ( module Genesis_ledger.Make (struct
             let accounts = accounts
 
-            let directory = `Path link_path
+            let directory = `Path extracted_path
 
             let depth = constraint_constants.ledger_depth
           end) )
         in
-        Deferred.Or_error.return (packed, config, link_path)
+        (packed, config, extracted_path)
     | Extracted { extracted_path } ->
         let packed =
           load_extracted_ledger ~config ~logger ~constraint_constants
@@ -560,11 +571,12 @@ module Ledger = struct
               @@ Error
                    (report_no_genesis_ledger ~constraint_constants
                       ~ledger_name_prefix ~logger ~config () )
-          | tar_file, Some accounts ->
-              let link_path =
-                Option.map tar_file ~f:extracted_path_of_tar_file
-              in
-              Deferred.Or_error.return (Accounts { accounts; link_path })
+          | Some tar_file, Some accounts ->
+              let extracted_path = extracted_path_of_tar_file tar_file in
+              Deferred.Or_error.return
+                (AccountsWithTar { accounts; tar_file; extracted_path })
+          | None, Some accounts ->
+              Deferred.Or_error.return (AccountsOnly { accounts })
           | Some tar_file, None ->
               let extracted_path = extracted_path_of_tar_file tar_file in
               Deferred.Or_error.return (Tar { tar_file; extracted_path })
