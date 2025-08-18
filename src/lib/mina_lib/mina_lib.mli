@@ -270,6 +270,16 @@ val hard_fork_breadcrumb :
   -> t
   -> (Transition_frontier.Breadcrumb.t, string) Deferred.Result.t
 
+module Hardfork_config : sig
+  val get_epoch_ledgers :
+       mina:t
+    -> Transition_frontier.Breadcrumb.t
+    -> ( Mina_ledger.Ledger.Any_ledger.witness
+         * Mina_ledger.Ledger.Any_ledger.witness
+       , string )
+       Deferred.Result.t
+end
+
 val zkapp_cmd_limit : t -> int option ref
 
 val proof_cache_db : t -> Proof_cache_tag.cache_db
