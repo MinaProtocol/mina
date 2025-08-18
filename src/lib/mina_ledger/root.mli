@@ -63,9 +63,11 @@ module Make
     (** Delete a backing of any type that might exist with this config, if present *)
     val delete_any_backing : t -> unit
 
-    (** Move the root backing at [src] to [dst]. The [src] and [dst] configs
-        must have the same configured backing, and there must be a root backing
-        of the appropriate type at [src]. *)
+    (** Move the root backing at [src] to [dst]. Assumptions: the [src] and
+        [dst] configs must have the same configured backing, there must be a
+        root backing of the appropriate type at [src], there must not be a root
+        backing at [dst], and there must be no database connections open for
+        [src]. *)
     val move_backing_exn : src:t -> dst:t -> unit
 
     (** The primary directory of this ledger *)
