@@ -2682,48 +2682,10 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
         let open Deferred.Result.Let_syntax in
-        let runtime_config = Mina_lib.runtime_config mina in
         let%bind breadcrumb =
           match (state_hash_opt, block_height_opt) with
-          | None, None -> (
-              match Mina_lib.best_tip mina with
-              | `Bootstrapping ->
-                  Deferred.Result.fail "Daemon is bootstrapping"
-              | `Active breadcrumb -> (
-                  let txn_stop_slot_opt =
-                    Runtime_config.slot_tx_end runtime_config
-                  in
-                  match txn_stop_slot_opt with
-                  | None ->
-                      return breadcrumb
-                  | Some stop_slot ->
-                      let rec find_block_older_than_stop_slot breadcrumb =
-                        let protocol_state =
-                          Transition_frontier.Breadcrumb.protocol_state
-                            breadcrumb
-                        in
-                        let global_slot =
-                          Mina_state.Protocol_state.consensus_state
-                            protocol_state
-                          |> Consensus.Data.Consensus_state.curr_global_slot
-                        in
-                        if
-                          Mina_numbers.Global_slot_since_hard_fork.( < )
-                            global_slot stop_slot
-                        then return breadcrumb
-                        else
-                          let parent_hash =
-                            Transition_frontier.Breadcrumb.parent_hash
-                              breadcrumb
-                          in
-                          let%bind breadcrumb =
-                            Deferred.return
-                            @@ Mina_lib.best_chain_block_by_state_hash mina
-                                 parent_hash
-                          in
-                          find_block_older_than_stop_slot breadcrumb
-                      in
-                      find_block_older_than_stop_slot breadcrumb ) )
+          | None, None ->
+              Mina_lib.best_chain_block_before_stop_slot mina
           | Some state_hash_base58, None ->
               let open Result.Monad_infix in
               State_hash.of_base58_check state_hash_base58

@@ -2590,6 +2590,41 @@ let best_chain_block_by_state_hash (t : t) hash =
          (sprintf "Block with state hash %s not found in transition frontier"
             (State_hash.to_base58_check hash) )
 
+let best_chain_block_before_stop_slot (t : t) =
+  let open Deferred.Result.Let_syntax in
+  let runtime_config = t.config.precomputed_values.runtime_config in
+  match best_tip t with
+  | `Bootstrapping ->
+      Deferred.Result.fail "Daemon is bootstrapping"
+  | `Active breadcrumb -> (
+      let txn_stop_slot_opt = Runtime_config.slot_tx_end runtime_config in
+      match txn_stop_slot_opt with
+      | None ->
+          return breadcrumb
+      | Some stop_slot ->
+          let rec find_block_older_than_stop_slot breadcrumb =
+            let protocol_state =
+              Transition_frontier.Breadcrumb.protocol_state breadcrumb
+            in
+            let global_slot =
+              Mina_state.Protocol_state.consensus_state protocol_state
+              |> Consensus.Data.Consensus_state.curr_global_slot
+            in
+            if
+              Mina_numbers.Global_slot_since_hard_fork.( < ) global_slot
+                stop_slot
+            then return breadcrumb
+            else
+              let parent_hash =
+                Transition_frontier.Breadcrumb.parent_hash breadcrumb
+              in
+              let%bind breadcrumb =
+                Deferred.return @@ best_chain_block_by_state_hash t parent_hash
+              in
+              find_block_older_than_stop_slot breadcrumb
+          in
+          find_block_older_than_stop_slot breadcrumb )
+
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
 
 let proof_cache_db t = t.proof_cache_db
