@@ -319,21 +319,20 @@ let submit_into_combining_result ~submitted_result ~partitioner
     worker have submitted it previously and it was removed. In this case,
     [Spec_unmatched] is returned. 
     If it's from zkapp pool(by setting [is_from_zkapp]), this function won't 
-    check reschedule because it's never in sent single job pool in the first
-    place. 
+    try to remove from [single_jobs_sent_by_partitioner] because it didn't enter
+    the pool in the first place. 
     *)
-let submit_single ?(is_from_zkapp = false) ~partitioner
+let submit_single ~is_from_zkapp ~partitioner
     ~(submitted_result : (unit, Ledger_proof.t) Work.Result.Single.Poly.t)
-    ~job_id () =
+    ~job_id =
   let Work.Id.Single.{ which_one = submitted_half; pairing_id } = job_id in
-  match
-    ( Sent_single_job_pool.remove ~id:job_id
-        partitioner.single_jobs_sent_by_partitioner
-    , Hashtbl.find partitioner.pairing_pool pairing_id
-    , is_from_zkapp )
-  with
-  | (None as removed_job), Some combining_result, true
-  | (Some _ as removed_job), Some combining_result, _ -> (
+  let removed_from_single_pool =
+    Sent_single_job_pool.remove ~id:job_id
+      partitioner.single_jobs_sent_by_partitioner
+    |> Option.is_some
+  in
+  match Hashtbl.find partitioner.pairing_pool pairing_id with
+  | Some combining_result when removed_from_single_pool || is_from_zkapp -> (
       match
         submit_into_combining_result ~submitted_result ~partitioner
           ~combining_result ~submitted_half
@@ -391,7 +390,7 @@ let submit_into_pending_zkapp_command ~partitioner
             Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
           submit_single ~is_from_zkapp:true ~partitioner
             ~submitted_result:{ spec = (); proof; elapsed }
-            ~job_id () )
+            ~job_id )
   | None, _ | _, None ->
       [%log' debug partitioner.logger]
         "Worker submit a work that's already removed from sent sub-zkapp job \
@@ -412,7 +411,7 @@ let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
       ; data = { proof; data = elapsed }
       } ->
       let submitted_result = Work.Result.Single.Poly.{ spec; proof; elapsed } in
-      submit_single ~partitioner ~submitted_result ~job_id ()
+      submit_single ~is_from_zkapp:false ~partitioner ~submitted_result ~job_id
   | Work.Spec.Partitioned.Poly.Sub_zkapp_command
       { job = Work.With_job_meta.{ job_id; _ }; data } ->
       submit_into_pending_zkapp_command ~partitioner ~job_id ~data
