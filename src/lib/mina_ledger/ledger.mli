@@ -59,6 +59,12 @@ module Maskable :
      and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
 
+module Root : sig
+  include module type of Root.Make (Any_ledger) (Db)
+
+  val as_masked : t -> Mask.Attached.t
+end
+
 include
   Merkle_mask.Maskable_merkle_tree_intf.S
     with module Location := Location

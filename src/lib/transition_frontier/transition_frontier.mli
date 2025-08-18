@@ -87,7 +87,7 @@ val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
 
-val root_snarked_ledger : t -> Mina_ledger.Ledger.Db.t
+val root_snarked_ledger : t -> Mina_ledger.Ledger.Root.t
 
 val extensions : t -> Extensions.t
 
@@ -152,8 +152,10 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:
-         Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
+    -> ?populate_root_and_accounts:
+         (   Mina_ledger.Ledger.Root.t
+          -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
+         * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
          * Mina_state.Protocol_state.value
@@ -171,8 +173,10 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:
-         Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
+    -> ?populate_root_and_accounts:
+         (   Mina_ledger.Ledger.Root.t
+          -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
+         * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
          * Mina_state.Protocol_state.value

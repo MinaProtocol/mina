@@ -51,7 +51,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* this test is the medium bootstrap test *)
 
-  let run network t =
+  let run ~config:_ network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in

@@ -1,8 +1,9 @@
-(library
- (name signature_lib_tests)
+(tests
+ (names signature_lib_tests test_private_key)
  (libraries
   ;; opam libraries
-  ppx_inline_test.config
+  alcotest
+  bignum
   ;; local libraries
   pickles
   random_oracle
@@ -10,8 +11,4 @@
   signature_lib
   snark_params)
  (instrumentation
-  (backend bisect_ppx))
- (inline_tests
-  (flags -verbose -show-counts))
- (preprocess
-  (pps ppx_inline_test ppx_version)))
+  (backend bisect_ppx)))

@@ -69,7 +69,7 @@ case $PACKAGE in
 esac
 
 if [[ "$SIGNED" == 1 ]]; then
-  SIGNED=" (wget -q https://'$REPO'/repo-signing-key.asc -O- | apt-key add) && apt-get update > /dev/null && "
+  SIGNED=" (wget -q https://'$REPO'/repo-signing-key.gpg -O /etc/apt/trusted.gpg.d/minaprotocol.gpg ) && apt-get update > /dev/null && "
 else 
   SIGNED=""
 fi
@@ -80,7 +80,7 @@ SCRIPT=' set -x \
     && echo installing '$PACKAGE' \
     && apt-get update > /dev/null \
     && apt-get install -y lsb-release ca-certificates wget gnupg > /dev/null \
-    && '$SIGNED' echo "deb [trusted=yes] https://'$REPO' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
+    && '$SIGNED' echo "deb https://'$REPO' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
     && apt list -a '$PACKAGE' \
     && apt-get install -y --allow-downgrades '$PACKAGE'='$VERSION' \

@@ -1572,7 +1572,7 @@ module Zkapp_account_update_body = struct
 
   let table_name = "zkapp_account_update_body"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist ~logger (module Conn : CONNECTION)
       (body : Account_update.Body.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let account_identifier = Account_id.create body.public_key body.token_id in
@@ -1580,16 +1580,16 @@ module Zkapp_account_update_body = struct
       Account_identifiers.add_if_doesn't_exist (module Conn) account_identifier
     in
     let%bind update_id =
-      Metrics.time ~label:"zkapp_updates.add"
+      Metrics.time ~label:"zkapp_updates.add" ~logger
       @@ fun () -> Zkapp_updates.add_if_doesn't_exist (module Conn) body.update
     in
     let increment_nonce = body.increment_nonce in
     let%bind events_id =
-      Metrics.time ~label:"Zkapp_events.add"
+      Metrics.time ~label:"Zkapp_events.add" ~logger
       @@ fun () -> Zkapp_events.add_if_doesn't_exist (module Conn) body.events
     in
     let%bind actions_id =
-      Metrics.time ~label:"Zkapp_actions.add"
+      Metrics.time ~label:"Zkapp_actions.add" ~logger
       @@ fun () -> Zkapp_events.add_if_doesn't_exist (module Conn) body.actions
     in
     let%bind call_data_id =
@@ -1688,13 +1688,13 @@ module Zkapp_account_update = struct
 
   let table_name = "zkapp_account_update"
 
-  let add_if_doesn't_exist (module Conn : CONNECTION)
+  let add_if_doesn't_exist ~logger (module Conn : CONNECTION)
       (account_update : Account_update.Simple.t) =
     let open Deferred.Result.Let_syntax in
     let%bind body_id =
-      Metrics.time ~label:"Zkapp_account_update_body.add"
+      Metrics.time ~label:"Zkapp_account_update_body.add" ~logger
       @@ fun () ->
-      Zkapp_account_update_body.add_if_doesn't_exist
+      Zkapp_account_update_body.add_if_doesn't_exist ~logger
         (module Conn)
         account_update.body
     in
@@ -1997,21 +1997,22 @@ module User_command = struct
         @@ Mina_caqti.select_cols_from_id ~table_name ~cols:Fields.names )
         id
 
-    let add_if_doesn't_exist (module Conn : CONNECTION) (ps : Zkapp_command.t) =
+    let add_if_doesn't_exist ~logger (module Conn : CONNECTION)
+        (ps : Zkapp_command.t) =
       let open Deferred.Result.Let_syntax in
       let zkapp_command = Zkapp_command.to_simple ps in
       let%bind zkapp_fee_payer_body_id =
-        Metrics.time ~label:"Zkapp_fee_payer_body.add"
+        Metrics.time ~label:"Zkapp_fee_payer_body.add" ~logger
         @@ fun () ->
         Zkapp_fee_payer_body.add_if_doesn't_exist
           (module Conn)
           zkapp_command.fee_payer.body
       in
       let%bind zkapp_account_updates_ids =
-        Metrics.time ~label:"Zkapp_account_update.add"
+        Metrics.time ~label:"Zkapp_account_update.add" ~logger
         @@ fun () ->
         Mina_caqti.deferred_result_list_map zkapp_command.account_updates
-          ~f:(Zkapp_account_update.add_if_doesn't_exist (module Conn))
+          ~f:(Zkapp_account_update.add_if_doesn't_exist ~logger (module Conn))
         >>| Array.of_list
       in
       let memo = ps.memo |> Signed_command_memo.to_base58_check in
@@ -2034,13 +2035,14 @@ module User_command = struct
     | Zkapp_command _ ->
         `Zkapp_command
 
-  let add_if_doesn't_exist conn (t : User_command.t) ~v1_transaction_hash =
+  let add_if_doesn't_exist ~logger conn (t : User_command.t)
+      ~v1_transaction_hash =
     match t with
     | Signed_command sc ->
         Signed_command.add_if_doesn't_exist conn ~via:(via t)
           ~v1_transaction_hash sc
     | Zkapp_command ps ->
-        Zkapp_command.add_if_doesn't_exist conn ps
+        Zkapp_command.add_if_doesn't_exist ~logger conn ps
 
   let find conn ~(transaction_hash : Transaction_hash.t) ~v1_transaction_hash =
     let open Deferred.Result.Let_syntax in
@@ -2830,7 +2832,7 @@ module Block = struct
          (Mina_caqti.select_cols_from_id ~table_name:"blocks" ~cols:Fields.names) )
       id
 
-  let add_parts_if_doesn't_exist (module Conn : CONNECTION)
+  let add_parts_if_doesn't_exist (module Conn : CONNECTION) ~logger
       ~constraint_constants ~protocol_state ~staged_ledger_diff
       ~protocol_version ~proposed_protocol_version ~hash ~v1_transaction_hash =
     let open Deferred.Result.Let_syntax in
@@ -2996,7 +2998,7 @@ module Block = struct
               (failed_str, Some display)
         in
         let%bind _seq_no =
-          Metrics.time ~label:"adding_transactions"
+          Metrics.time ~label:"adding_transactions" ~logger
           @@ fun () ->
           Mina_caqti.deferred_result_list_fold transactions ~init:0
             ~f:(fun sequence_no -> function
@@ -3007,7 +3009,7 @@ module Block = struct
                   { Mina_base.With_status.status; data = command }
                 in
                 let%bind id =
-                  User_command.add_if_doesn't_exist
+                  User_command.add_if_doesn't_exist ~logger
                     (module Conn)
                     ~v1_transaction_hash user_command.data
                 in
@@ -3025,6 +3027,7 @@ module Block = struct
                       in
                       Metrics.time
                         ~label:"block_and_zkapp_command.add_if_doesn't_exist"
+                        ~logger
                       @@ fun () ->
                       Block_and_zkapp_command.add_if_doesn't_exist
                         (module Conn)
@@ -4002,7 +4005,7 @@ module Block = struct
     in
     return ()
 
-  let add_from_extensional (module Conn : CONNECTION) ~proof_cache_db
+  let add_from_extensional (module Conn : CONNECTION) ~logger ~proof_cache_db
       ?(v1_transaction_hash = false) (block : Extensional.Block.t) =
     let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Deferred.Result.Let_syntax in
@@ -4185,7 +4188,7 @@ module Block = struct
                     ~authorization:Control.Poly.None_given )
             in
             let%map cmd_id =
-              User_command.Zkapp_command.add_if_doesn't_exist
+              User_command.Zkapp_command.add_if_doesn't_exist ~logger
                 (module Conn)
                 (Zkapp_command.of_simple ~signature_kind ~proof_cache_db
                    { fee_payer; account_updates; memo } )
@@ -4309,7 +4312,7 @@ module Block = struct
       (state_hash, height)
 
   (* update chain_status for blocks now known to be canonical or orphaned *)
-  let update_chain_status (module Conn : CONNECTION)
+  let update_chain_status (module Conn : CONNECTION) ~logger
       ~(genesis_constants : Genesis_constants.t) ~block_id =
     let open Deferred.Result.Let_syntax in
     match%bind get_highest_canonical_block_opt (module Conn) () with
@@ -4325,7 +4328,7 @@ module Block = struct
         then
           (* a new block, allows marking some pending blocks as canonical *)
           let%bind subchain_blocks =
-            Metrics.time ~label:"get_subchain (> canonical_height + k)"
+            Metrics.time ~label:"get_subchain (> canonical_height + k)" ~logger
               (fun () ->
                 get_subchain
                   (module Conn)
@@ -4339,7 +4342,7 @@ module Block = struct
                 Int64.( <= ) subchain_block.height block_height_less_k_int64 )
           in
           Metrics.time ~label:"mark_as_canonical (> canonical_height + k)"
-            (fun () ->
+            ~logger (fun () ->
               Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
                 ~f:(fun () block ->
                   let%bind () =
@@ -4351,23 +4354,26 @@ module Block = struct
         else if Int64.( < ) block.height greatest_canonical_height then
           (* a missing block added in the middle of canonical chain *)
           let%bind canonical_block_above_id, _above_height =
-            Metrics.time ~label:"get_nearest_canonical_block_above" (fun () ->
+            Metrics.time ~label:"get_nearest_canonical_block_above" ~logger
+              (fun () ->
                 get_nearest_canonical_block_above (module Conn) block.height )
           in
           let%bind canonical_block_below_id, _below_height =
-            Metrics.time ~label:"get_neareast_canonical_block_below" (fun () ->
+            Metrics.time ~label:"get_neareast_canonical_block_below" ~logger
+              (fun () ->
                 get_nearest_canonical_block_below (module Conn) block.height )
           in
           (* we can always find this chain: the genesis block should be marked as canonical, and we've found a
              canonical block above this one *)
           let%bind canonical_blocks =
-            Metrics.time ~label:"get_subchain (< canonical_height)" (fun () ->
+            Metrics.time ~label:"get_subchain (< canonical_height)" ~logger
+              (fun () ->
                 get_subchain
                   (module Conn)
                   ~start_block_id:canonical_block_below_id
                   ~end_block_id:canonical_block_above_id )
           in
-          Metrics.time ~label:"mark_as_canonical (< canonical_height)"
+          Metrics.time ~label:"mark_as_canonical (< canonical_height)" ~logger
             (fun () ->
               Mina_caqti.deferred_result_list_fold canonical_blocks ~init:()
                 ~f:(fun () block ->
@@ -4510,7 +4516,7 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
           let%bind block_id =
             O1trace.thread "archive_processor.add_block"
             @@ fun () ->
-            Metrics.time ~label:"add_block"
+            Metrics.time ~label:"add_block" ~logger
             @@ fun () -> add_block (module Conn : CONNECTION) block
           in
           (* if an existing block has a parent hash that's for the block just added,
@@ -4523,10 +4529,10 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
           in
           (* update chain status for existing blocks *)
           let%bind () =
-            Metrics.time ~label:"update_chain_status" (fun () ->
+            Metrics.time ~label:"update_chain_status" ~logger (fun () ->
                 Block.update_chain_status
                   (module Conn)
-                  ~genesis_constants ~block_id )
+                  ~logger ~genesis_constants ~block_id )
           in
           let%bind () =
             match delete_older_than with
@@ -4631,7 +4637,7 @@ let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
     ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:
-      (Block.add_from_precomputed ~proof_cache_db ~constraint_constants)
+      (Block.add_from_precomputed ~logger ~proof_cache_db ~constraint_constants)
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~accounts_accessed:block.Precomputed.accounts_accessed
@@ -4643,7 +4649,8 @@ let add_block_aux_extensional ~proof_cache_db ~logger ?retries ~pool
     ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:
-      (Block.add_from_extensional ~proof_cache_db ~v1_transaction_hash:false)
+      (Block.add_from_extensional ~logger ~proof_cache_db
+         ~v1_transaction_hash:false )
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~accounts_accessed:block.Extensional.Block.accounts_accessed
     ~accounts_created:block.Extensional.Block.accounts_created
@@ -4656,7 +4663,9 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
     | Diff.Transition_frontier
         (Breadcrumb_added
           { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
-        let add_block = Block.add_if_doesn't_exist ~constraint_constants in
+        let add_block =
+          Block.add_if_doesn't_exist ~logger ~constraint_constants
+        in
         let hash = State_hash.With_state_hashes.state_hash in
         let block =
           With_hash.map
@@ -4684,7 +4693,7 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
 
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
-    ~(genesis_constants : Genesis_constants.t)
+    ~(genesis_constants : Genesis_constants.t) ~chunks_length
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
   match runtime_config_opt with
   | None ->
@@ -4717,81 +4726,91 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
         With_hash.{ data = block; hash = the_hash }
       in
       let add_accounts () =
-        Caqti_async.Pool.use
-          (fun (module Conn : CONNECTION) ->
-            let%bind.Deferred.Result genesis_block_id =
-              Block.add_if_doesn't_exist
-                (module Conn)
-                ~constraint_constants:precomputed_values.constraint_constants
-                genesis_block
-            in
-            let%bind.Deferred.Result { ledger_hash; _ } =
-              Block.load (module Conn) ~id:genesis_block_id
-            in
-            let db_ledger_hash = Ledger_hash.of_base58_check_exn ledger_hash in
-            let actual_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
-            if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
-              [%log info]
-                "Archived genesis block ledger hash equals actual genesis \
-                 ledger hash"
-                ~metadata:
-                  [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash) ]
-            else (
-              [%log error]
-                "Archived genesis block ledger hash different than actual \
-                 genesis ledger hash"
-                ~metadata:
-                  [ ( "archived_ledger_hash"
-                    , Ledger_hash.to_yojson db_ledger_hash )
-                  ; ( "actual_ledger_hash"
-                    , Ledger_hash.to_yojson actual_ledger_hash )
-                  ] ;
-              exit 1 ) ;
-            let%bind.Deferred.Result () = Conn.start () in
-            let open Deferred.Let_syntax in
-            let%bind () =
-              Deferred.List.iter account_ids ~f:(fun acct_id ->
-                  match
-                    Mina_ledger.Ledger.location_of_account ledger acct_id
-                  with
-                  | None ->
-                      [%log error] "Could not get location for account"
-                        ~metadata:
-                          [ ("account_id", Account_id.to_yojson acct_id) ] ;
-                      failwith "Could not get location for genesis account"
-                  | Some loc -> (
-                      let index =
-                        Mina_ledger.Ledger.index_of_account_exn ledger acct_id
-                      in
-                      let acct =
-                        match Mina_ledger.Ledger.get ledger loc with
-                        | None ->
-                            [%log error]
-                              "Could not get account, given a location"
-                              ~metadata:
-                                [ ("account_id", Account_id.to_yojson acct_id) ] ;
-                            failwith
-                              "Could not get genesis account, given a location"
-                        | Some acct ->
-                            acct
-                      in
-                      match%bind
-                        Accounts_accessed.add_if_doesn't_exist
-                          (module Conn)
-                          genesis_block_id (index, acct)
-                      with
-                      | Ok _ ->
-                          return ()
-                      | Error err ->
-                          [%log error] "Could not add genesis account"
-                            ~metadata:
-                              [ ("account_id", Account_id.to_yojson acct_id)
-                              ; ("error", `String (Caqti_error.show err))
-                              ] ;
-                          failwith "Could not add add genesis account" ) )
-            in
-            Conn.commit () )
-          pool
+        let%bind.Deferred.Result ledger_hash, genesis_block_id =
+          Pool.use
+            (fun (module Conn : CONNECTION) ->
+              let%bind.Deferred.Result genesis_block_id =
+                Block.add_if_doesn't_exist
+                  (module Conn)
+                  ~logger
+                  ~constraint_constants:precomputed_values.constraint_constants
+                  genesis_block
+              in
+              let%bind.Deferred.Result { ledger_hash; _ } =
+                Block.load (module Conn) ~id:genesis_block_id
+              in
+              return (Ok (ledger_hash, genesis_block_id)) )
+            pool
+        in
+        let db_ledger_hash = Ledger_hash.of_base58_check_exn ledger_hash in
+        let actual_ledger_hash = Mina_ledger.Ledger.merkle_root ledger in
+        if Ledger_hash.equal db_ledger_hash actual_ledger_hash then
+          [%log info]
+            "Archived genesis block ledger hash equals actual genesis ledger \
+             hash"
+            ~metadata:
+              [ ("ledger_hash", Ledger_hash.to_yojson actual_ledger_hash) ]
+        else (
+          [%log error]
+            "Archived genesis block ledger hash different than actual genesis \
+             ledger hash"
+            ~metadata:
+              [ ("archived_ledger_hash", Ledger_hash.to_yojson db_ledger_hash)
+              ; ("actual_ledger_hash", Ledger_hash.to_yojson actual_ledger_hash)
+              ] ;
+          exit 1 ) ;
+        let open Deferred.Let_syntax in
+        let genesis_accounts_count = List.length account_ids in
+        [%log info] "Archiving genesis accounts"
+          ~metadata:[ ("count", `Int genesis_accounts_count) ] ;
+
+        let acccount_with_index_of_id ~ledger acct_id =
+          match Mina_ledger.Ledger.location_of_account ledger acct_id with
+          | None ->
+              [%log error] "Could not get location for account"
+                ~metadata:[ ("account_id", Account_id.to_yojson acct_id) ] ;
+              failwith "Could not get location for genesis account"
+          | Some loc -> (
+              let index =
+                Mina_ledger.Ledger.index_of_account_exn ledger acct_id
+              in
+              match Mina_ledger.Ledger.get ledger loc with
+              | None ->
+                  [%log error] "Could not get account, given a location"
+                    ~metadata:[ ("account_id", Account_id.to_yojson acct_id) ] ;
+                  failwith "Could not get genesis account, given a location"
+              | Some acct ->
+                  (index, acct) )
+        in
+        let%bind list_of_results =
+          List.map account_ids ~f:(fun acct_id ->
+              acccount_with_index_of_id ~ledger acct_id )
+          |> List.chunks_of ~length:chunks_length
+          |> Deferred.List.mapi ~f:(fun i batch ->
+                 match%bind
+                   Pool.use
+                     (fun (module Conn : CONNECTION) ->
+                       Accounts_accessed.add_accounts_if_don't_exist
+                         (module Conn)
+                         genesis_block_id batch )
+                     pool
+                 with
+                 | Ok _ ->
+                     [%log trace] "Archived batch of account %d of %d"
+                       (i * chunks_length) genesis_accounts_count ;
+                     return (Result.Ok ())
+                 | Error err ->
+                     [%log error] "Could not add batch of genesis account"
+                       ~metadata:
+                         [ ("batch number", `Int i)
+                         ; ("error", `String (Caqti_error.show err))
+                         ] ;
+                     return (Result.Error err) )
+        in
+
+        return
+          ( List.find list_of_results ~f:(fun result -> Result.is_error result)
+          |> Option.value ~default:(Result.Ok ()) )
       in
       match%map
         retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
@@ -4829,7 +4848,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
 (* for running the archive process *)
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~metrics_server_port ~logger ~postgres_address ~server_port
+    ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
@@ -4861,7 +4880,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
   | Ok pool ->
       let%bind () =
         add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt
+          ~constraint_constants ~runtime_config_opt ~chunks_length
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than

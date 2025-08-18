@@ -20,6 +20,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -47,9 +49,7 @@ let targetVersion =
       ->  \(commit : Text)
       ->  \(latestGitTag : Text)
       ->  \(todayDate : Text)
-      ->  "${latestGitTag}-${todayDate}-${DebianVersions.lowerName
-                                            codename}-${DebianChannel.lowerName
-                                                          channel}"
+      ->  "${latestGitTag}-${todayDate}"
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -58,12 +58,14 @@ in  Pipeline.build
         , path = "Promote"
         , tags = [ PipelineTag.Type.Promote, PipelineTag.Type.TearDown ]
         , name = "AutoPromoteNightly"
+        , scope = [ PipelineScope.Type.MainlineNightly ]
         }
       , steps =
           PublishPackages.publish
             PublishPackages.Spec::{
             , artifacts =
-              [ Artifacts.Type.Daemon
+              [ Artifacts.Type.LogProc
+              , Artifacts.Type.Daemon
               , Artifacts.Type.Archive
               , Artifacts.Type.Rosetta
               ]
@@ -72,6 +74,8 @@ in  Pipeline.build
             , codenames =
               [ DebianVersions.DebVersion.Bullseye
               , DebianVersions.DebVersion.Focal
+              , DebianVersions.DebVersion.Bookworm
+              , DebianVersions.DebVersion.Noble
               ]
             , debian_repo = DebianRepo.Type.Nightly
             , channel = DebianChannel.Type.Compatible

@@ -253,13 +253,13 @@ module Ledger = struct
           end) )
       | None ->
           ( module Genesis_ledger.Of_ledger (struct
-            let t =
+            let backing_ledger =
               lazy
                 (let ledger =
-                   Mina_ledger.Ledger.create ~directory_name:dirname
+                   Mina_ledger.Ledger.Root.create_single ~directory_name:dirname
                      ~depth:constraint_constants.ledger_depth ()
                  in
-                 let ledger_root = Mina_ledger.Ledger.merkle_root ledger in
+                 let ledger_root = Mina_ledger.Ledger.Root.merkle_root ledger in
                  ( match expected_merkle_root with
                  | Some expected_merkle_root ->
                      if not (Ledger_hash.equal ledger_root expected_merkle_root)
@@ -692,6 +692,7 @@ module Genesis_proof = struct
     ; constraint_system_digests = None
     ; genesis_constants
     ; genesis_body_reference
+    ; signature_kind = Mina_signature_kind.t_DEPRECATED
     }
 
   let generate (inputs : Genesis_proof.Inputs.t) =
@@ -710,6 +711,7 @@ module Genesis_proof = struct
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
              ; genesis_body_reference = inputs.genesis_body_reference
+             ; signature_kind = Mina_signature_kind.t_DEPRECATED
              }
     | _ ->
         Deferred.return (Genesis_proof.create_values_no_proof inputs)

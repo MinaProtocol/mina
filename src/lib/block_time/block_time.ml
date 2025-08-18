@@ -71,7 +71,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       let create offset = offset
 
-      let basic ~logger:_ () =
+      let basic ~logger () =
         match !time_offset with
         | Some offset ->
             offset
@@ -84,10 +84,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
                     Int.of_string tm
                 | None ->
                     let default = 0 in
-                    eprintf
-                      "Environment variable %s not found, using default of %d\n\
-                       %!"
-                      env default ;
+                    [%log warn]
+                      "Environment variable $env not found, using default of \
+                       $default"
+                      ~metadata:
+                        [ ("env", `String env); ("default", `Int default) ] ;
                     default
               in
               Core_kernel.Time.Span.of_int_sec env_offset
