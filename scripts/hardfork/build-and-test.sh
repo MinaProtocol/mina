@@ -118,7 +118,7 @@ build_branch() {
       make build-devnet-sigs
       make build-daemon-utils
       make debian-build-logproc
-      make debian-build-daemon-devnet
+      DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet
       make docker-build-daemon-devnet
     fi
 }
@@ -150,9 +150,9 @@ if [[ ! -L compatible-devnet ]]; then
     if [[ -n "$OVERRIDE_COMPATIBLE_TMP_DIR" ]]; then
       compatible_build="$OVERRIDE_COMPATIBLE_TMP_DIR"
     else
-      compatible_build=$(mktemp -d)
+      compatible_build=/tmp/tmp.OE1ju0JZiS
     fi
-    git clone -b compatible --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
+    #git clone -b compatible --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
     cd "$compatible_build"
   else
     git checkout -f $1

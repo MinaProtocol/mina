@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 
 set -eox pipefail
+set -T
+PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 export MINA_LIBP2P_PASS=
 export MINA_PRIVKEY_PASS=
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 
 # Interval at which to send transactions
 TX_INTERVAL=${TX_INTERVAL:-30s}
@@ -182,12 +185,13 @@ fi
 # Launch two Mina nodes and send transactions on an interval
 ##############################################################
 
+COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
+COMMON_ARGS+=("--insecure-rest-server")
+
 if [[ "$MODE" == "docker" ]]; then
-  COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
   COMMON_ARGS+=( --config-file "/$CONF_DIR/base.json" )
   COMMON_ARGS+=( --config-file "/$CONF_DIR/daemon$CONF_SUFFIX.json" )
 else
-  COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
   COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
   COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
 fi
@@ -210,7 +214,7 @@ rm -Rf localnet/runtime_1 localnet/runtime_2
 
 
 if [[ "$MODE" == "docker" ]]; then
-   bp_container_id=$(docker run -n "$BP_CONTAINER_NAME" --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS -p 10301:10301 -p 10302:10302 -p 10303:10303 -d -v "$PWD/localnet:/localnet" "$MINA_DOCKER" daemon "${COMMON_ARGS[@]}" \
+   bp_container_id=$(docker run --name "$BP_CONTAINER_NAME" --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS -p 10301:10301 -p 10302:10302 -p 10303:10303 -d -v "$PWD/localnet:/localnet" "$MINA_DOCKER" daemon "${COMMON_ARGS[@]}" \
      --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
      "${NODE_ARGS_1[@]}" \
      --block-producer-key "/$CONF_DIR/bp" \
@@ -230,7 +234,7 @@ else
 fi
 
 if [[ "$MODE" == "docker" ]]; then
-  sw_container_id=$(docker run -n "$SW_CONTAINER_NAME" --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS -p 10311:10311 -p 10312:10312 -p 10313:10313 -d -v "$PWD/localnet:/localnet" "$MINA_DOCKER" daemon "${COMMON_ARGS[@]}" \
+  sw_container_id=$(docker run --name "$SW_CONTAINER_NAME" --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS -p 10311:10311 -p 10312:10312 -p 10313:10313 -d -v "$PWD/localnet:/localnet" "$MINA_DOCKER" daemon "${COMMON_ARGS[@]}" \
     --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat $CONF_DIR/libp2p_1.peerid)" \
     "${NODE_ARGS_2[@]}" \
     --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \

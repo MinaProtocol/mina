@@ -182,12 +182,17 @@ copy_common_daemon_configs() {
   mkdir -p "${BUILDDIR}/var/lib/coda"
 
   # Include all useful genesis ledgers
-  cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
-  cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
-  cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
-  # Set the default configuration based on Network name ($1)
-  cp ../genesis_ledgers/"${1}".json \
-    "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+  # Check if we should skip copying ledgers
+  if [[ -v DEBIAN_SKIP_LEDGERS_COPY ]]; then
+    echo 'Skipping genesis ledgers copy'
+  else
+    cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/mainnet.json"
+    cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
+    cp ../genesis_ledgers/berkeley.json "${BUILDDIR}/var/lib/coda/berkeley.json"
+    # Set the default configuration based on Network name ($1)
+    cp ../genesis_ledgers/"${1}".json \
+      "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+  fi
   cp ../scripts/hardfork/create_runtime_config.sh \
     "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
   cp ../scripts/hardfork/mina-verify-packaged-fork-config \

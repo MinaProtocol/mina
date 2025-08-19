@@ -2,6 +2,10 @@
 
 set -eox pipefail
 
+set -T
+PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
+
+
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 SLOT_TX_END="${SLOT_TX_END:-30}"
