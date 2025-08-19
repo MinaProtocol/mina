@@ -114,7 +114,7 @@ build_branch() {
       if [[ "$CONTEXT" == "local" ]]; then
         export BYPASS_OPAM_SWITCH_UPDATE=1
       fi
-      sudo chown -R opam .
+      chown -R opam .
       docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" sh -c "
       && git config --global --add safe.directory /workdir \
       && eval $(opam env) \
