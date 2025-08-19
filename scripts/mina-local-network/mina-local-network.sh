@@ -665,7 +665,7 @@ if ${DEMO_MODE}; then
     --snark-worker-fee 0.001 \
     --proof-level ${PROOF_LEVEL} \
     --demo-mode \
-    --external-ip $(hostname -i) \
+    --external-ip "$(hostname -i)" \
     --seed \
     ${ARCHIVE_ADDRESS_CLI_ARG}
 
