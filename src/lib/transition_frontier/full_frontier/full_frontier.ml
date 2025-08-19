@@ -457,13 +457,13 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-      let location =
-        Persistent_root.Instance.Locations.make_potential_snarked_ledger
+      let config =
+        Persistent_root.Instance.Config.make_potential_snarked_ledger
           t.persistent_root_instance.factory
       in
       let () =
         Ledger.Root.make_checkpoint t.persistent_root_instance.snarked_ledger
-          ~directory_name:location
+          ~config
       in
       [%log' info t.logger]
         ~metadata:
@@ -473,7 +473,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
                    t.persistent_root_instance.snarked_ledger )
           ]
         "Enqueued a snarked ledger" ;
-      Persistent_root.Instance.enqueue_snarked_ledger ~location
+      Persistent_root.Instance.enqueue_snarked_ledger ~config
         t.persistent_root_instance ;
       let s = t.root_ledger in
       (* STEP 4 *)

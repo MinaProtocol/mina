@@ -45,6 +45,33 @@ module Make
 
   type path = Stable_db.path
 
+  module Config : sig
+    type t
+
+    (** The kind of database that should be used for this root. Only a single
+        database of [Account.Stable.Latest.t] accounts is supported. A future
+        update will add a converting merkle tree backing. *)
+    type backing_type = Stable_db
+
+    (** Create a root ledger configuration with the given backing type, using
+        the [directory_name] as a template for its location *)
+    val with_directory : backing_type:backing_type -> directory_name:string -> t
+
+    (** Test if a root ledger backing already exists with this config *)
+    val exists_backing : t -> bool
+
+    (** Delete a backing of any type that might exist with this config, if present *)
+    val delete_any_backing : t -> unit
+
+    (** Move the root backing at [src] to [dst]. The [src] and [dst] configs
+        must have the same configured backing, and there must be a root backing
+        of the appropriate type at [src]. *)
+    val move_backing_exn : src:t -> dst:t -> unit
+
+    (** The primary directory of this ledger *)
+    val primary_directory : t -> string
+  end
+
   (** Close the root ledger instance *)
   val close : t -> unit
 
@@ -53,14 +80,17 @@ module Make
 
   (** Create a root ledger backed by a single database in the given
       directory. *)
-  val create_single : ?directory_name:string -> depth:int -> unit -> t
+  val create : config:Config.t -> depth:int -> unit -> t
+
+  val create_temporary :
+    backing_type:Config.backing_type -> depth:int -> unit -> t
 
   (** Make a checkpoint of the root ledger and return a new root ledger backed
       by that checkpoint *)
-  val create_checkpoint : t -> directory_name:string -> unit -> t
+  val create_checkpoint : t -> config:Config.t -> unit -> t
 
   (** Make a checkpoint of the root ledger *)
-  val make_checkpoint : t -> directory_name:string -> unit
+  val make_checkpoint : t -> config:Config.t -> unit
 
   (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
       that does not need to know how the root is implemented *)

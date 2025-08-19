@@ -171,7 +171,8 @@ let%test_module "Epoch ledger sync tests" =
     (* TODO: single for now, but the tests might need to be expanded to cover
        other types of Root ledgers when they are implemented *)
     let make_empty_root_ledger (module Context : CONTEXT) =
-      Mina_ledger.Ledger.Root.create_single
+      Mina_ledger.Ledger.Root.create_temporary
+        ~backing_type:Mina_ledger.Ledger.Root.Config.Stable_db
         ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
 
     (* [instance] and [test_number] are used to make ports distinct
