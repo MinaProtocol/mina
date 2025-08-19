@@ -115,7 +115,9 @@ build_branch() {
         export BYPASS_OPAM_SWITCH_UPDATE=1
       fi
       docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" sh -c \
-      "eval $(opam env) \
+      "chown -R \"${USER}\" /workdir \
+      && git config --global --add safe.directory /workdir \
+      && eval $(opam env) \
       && make build \
       && make build-logproc \
       && make build-devnet-sigs \
