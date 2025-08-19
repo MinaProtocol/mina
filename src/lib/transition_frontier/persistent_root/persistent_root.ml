@@ -42,25 +42,6 @@ let with_file ?size filename access_level ~f =
   Unix.close fd ;
   x
 
-module Locations = struct
-  let snarked_ledger root = Filename.concat root "snarked_ledger"
-
-  let tmp_snarked_ledger root = Filename.concat root "tmp_snarked_ledger"
-
-  (** potential_snarked_ledgers is a json file that stores a list of potential
-      snarked ledgeres *)
-  let potential_snarked_ledgers root =
-    Filename.concat root "potential_snarked_ledgers.json"
-
-  (** potential_snarked_ledger is the actual location of each potential snarked
-      ledger *)
-  let potential_snarked_ledger root =
-    let uuid = Uuid_unix.create () in
-    Filename.concat root ("snarked_ledger" ^ Uuid.to_string_hum uuid)
-
-  let root_identifier root = Filename.concat root "root"
-end
-
 (* TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
   type t =
@@ -87,6 +68,35 @@ open Factory_type
 module Instance = struct
   type t = Instance_type.t
 
+  module Locations = struct
+    (** Helper to create a filesystem location (for a file or directory) inside
+        the [Factory_type.t] directory. *)
+    let make_instance_location filename t = Filename.concat t.directory filename
+
+    (** The directory name for the actual snarked ledger that is initialized and
+        used by the daemon *)
+    let snarked_ledger = make_instance_location "snarked_ledger"
+
+    (** The directory name for a temporary snarked ledger, used while recovering
+        a vaild potential snarked ledger during startup *)
+    let tmp_snarked_ledger = make_instance_location "tmp_snarked_ledger"
+
+    (** The name of a json file that lists the directory names of the potential
+        snarked ledgers in the [potential_snarked_ledgers] queue *)
+    let potential_snarked_ledgers =
+      make_instance_location "potential_snarked_ledgers.json"
+
+    (** A method that generates fresh potential snarked ledger directory
+        names *)
+    let make_potential_snarked_ledger t =
+      let uuid = Uuid_unix.create () in
+      make_instance_location ("snarked_ledger" ^ Uuid.to_string_hum uuid) t
+
+    (** The name of the file recording the [Root_identifier.t] of the snarked
+        root *)
+    let root_identifier = make_instance_location "root"
+  end
+
   let potential_snarked_ledgers_to_yojson queue =
     `List (List.map (Queue.to_list queue) ~f:(fun filename -> `String filename))
 
@@ -94,14 +104,14 @@ module Instance = struct
     Yojson.Safe.Util.to_list json |> List.map ~f:Yojson.Safe.Util.to_string
 
   let load_potential_snarked_ledgers_from_disk factory =
-    let location = Locations.potential_snarked_ledgers factory.directory in
+    let location = Locations.potential_snarked_ledgers factory in
     if phys_equal (Sys.file_exists location) `Yes then
       Yojson.Safe.from_file location |> potential_snarked_ledgers_of_yojson
     else []
 
   let write_potential_snarked_ledgers_to_disk t =
     Yojson.Safe.to_file
-      (Locations.potential_snarked_ledgers t.factory.directory)
+      (Locations.potential_snarked_ledgers t.factory)
       (potential_snarked_ledgers_to_yojson t.potential_snarked_ledgers)
 
   let enqueue_snarked_ledger ~location t =
@@ -118,7 +128,7 @@ module Instance = struct
       (Queue.to_list t.potential_snarked_ledgers)
       ~f:Mina_stdlib_unix.File_system.rmrf ;
     Mina_stdlib_unix.File_system.rmrf
-      (Locations.potential_snarked_ledgers t.factory.directory) ;
+      (Locations.potential_snarked_ledgers t.factory) ;
     Ledger.Root.close t.snarked_ledger ;
     t.factory.instance <- None
 
@@ -129,7 +139,7 @@ module Instance = struct
   let create factory =
     let snarked_ledger =
       Ledger.Root.create_single ~depth:factory.ledger_depth
-        ~directory_name:(Locations.snarked_ledger factory.directory)
+        ~directory_name:(Locations.snarked_ledger factory)
         ()
     in
     { snarked_ledger; potential_snarked_ledgers = Queue.create (); factory }
@@ -168,7 +178,7 @@ module Instance = struct
           then (
             let snarked_ledger =
               Ledger.Root.create_single ~depth:factory.ledger_depth
-                ~directory_name:(Locations.tmp_snarked_ledger factory.directory)
+                ~directory_name:(Locations.tmp_snarked_ledger factory)
                 ()
             in
             match
@@ -178,21 +188,21 @@ module Instance = struct
             | Ok _ ->
                 Ledger.Root.close potential_snarked_ledger ;
                 Mina_stdlib_unix.File_system.rmrf
-                @@ Locations.snarked_ledger factory.directory ;
+                @@ Locations.snarked_ledger factory ;
                 Sys.rename
-                  (Locations.tmp_snarked_ledger factory.directory)
-                  (Locations.snarked_ledger factory.directory) ;
+                  (Locations.tmp_snarked_ledger factory)
+                  (Locations.snarked_ledger factory) ;
                 List.iter potential_snarked_ledgers
                   ~f:Mina_stdlib_unix.File_system.rmrf ;
                 Mina_stdlib_unix.File_system.rmrf
-                  (Locations.potential_snarked_ledgers factory.directory) ;
+                  (Locations.potential_snarked_ledgers factory) ;
                 Stop (Some snarked_ledger)
             | Error e ->
                 Ledger.Root.close potential_snarked_ledger ;
                 List.iter potential_snarked_ledgers
                   ~f:Mina_stdlib_unix.File_system.rmrf ;
                 Mina_stdlib_unix.File_system.rmrf
-                  (Locations.potential_snarked_ledgers factory.directory) ;
+                  (Locations.potential_snarked_ledgers factory) ;
                 [%log' error factory.logger]
                   ~metadata:[ ("error", `String (Error.to_string_hum e)) ]
                   "Ledger_transfer failed" ;
@@ -204,14 +214,14 @@ module Instance = struct
           List.iter potential_snarked_ledgers
             ~f:Mina_stdlib_unix.File_system.rmrf ;
           Mina_stdlib_unix.File_system.rmrf
-            (Locations.potential_snarked_ledgers factory.directory) ;
+            (Locations.potential_snarked_ledgers factory) ;
           None )
     in
     match snarked_ledger with
     | None ->
         let snarked_ledger =
           Ledger.Root.create_single ~depth:factory.ledger_depth
-            ~directory_name:(Locations.snarked_ledger factory.directory)
+            ~directory_name:(Locations.snarked_ledger factory)
             ()
         in
         let potential_snarked_ledger_hash =
@@ -245,8 +255,7 @@ module Instance = struct
         [ ("root_identifier", Root_identifier.to_yojson new_root_identifier) ]
       "Setting persistent root identifier" ;
     let size = Root_identifier.Stable.Latest.bin_size_t new_root_identifier in
-    with_file (Locations.root_identifier t.factory.directory) `Write ~size
-      ~f:(fun buf ->
+    with_file (Locations.root_identifier t.factory) `Write ~size ~f:(fun buf ->
         ignore
           ( Root_identifier.Stable.Latest.bin_write_t buf ~pos:0
               new_root_identifier
@@ -254,7 +263,7 @@ module Instance = struct
 
   (* defaults to genesis *)
   let load_root_identifier t =
-    let file = Locations.root_identifier t.factory.directory in
+    let file = Locations.root_identifier t.factory in
     match Unix.access file [ `Exists; `Read ] with
     | Error _ ->
         None

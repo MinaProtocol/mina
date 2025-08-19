@@ -458,8 +458,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
       let location =
-        Persistent_root.Locations.potential_snarked_ledger
-          t.persistent_root_instance.factory.directory
+        Persistent_root.Instance.Locations.make_potential_snarked_ledger
+          t.persistent_root_instance.factory
       in
       let () =
         Ledger.Root.make_checkpoint t.persistent_root_instance.snarked_ledger
