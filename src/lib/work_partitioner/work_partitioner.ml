@@ -371,6 +371,18 @@ let submit_into_pending_zkapp_command ~partitioner
       ({ proof; data = elapsed } :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
   let single_id = Work.Id.Sub_zkapp.to_single job_id in
+  let finalize_zkapp_proof pending =
+    match Pending_zkapp_command.try_finalize pending with
+    | None ->
+        Processed None
+    | Some ({ job_id; _ }, proof, elapsed) ->
+        [%log' debug partitioner.logger] "Finalized proof for zkapp command" ;
+        partitioner.pending_zkapp_commands <-
+          Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
+        submit_single ~is_from_zkapp:true ~partitioner
+          ~submitted_result:{ spec = (); proof; elapsed }
+          ~job_id
+  in
   match
     ( Sent_zkapp_job_pool.remove ~id:job_id
         partitioner.zkapp_jobs_sent_by_partitioner
@@ -380,19 +392,8 @@ let submit_into_pending_zkapp_command ~partitioner
       match
         Pending_zkapp_command.submit_proof ~proof ~elapsed ~range pending
       with
-      | Ok () -> (
-          match Pending_zkapp_command.try_finalize pending with
-          | None ->
-              Processed None
-          | Some ({ job_id; _ }, proof, elapsed) ->
-              [%log' debug partitioner.logger]
-                "Finalized proof for zkapp command" ;
-              partitioner.pending_zkapp_commands <-
-                Single_id_map.remove partitioner.pending_zkapp_commands
-                  single_id ;
-              submit_single ~is_from_zkapp:true ~partitioner
-                ~submitted_result:{ spec = (); proof; elapsed }
-                ~job_id )
+      | Ok () ->
+          finalize_zkapp_proof pending
       | Error exn ->
           [%log' debug partitioner.logger]
             "Worker submit a work that's rejected by the pending zkapp \
