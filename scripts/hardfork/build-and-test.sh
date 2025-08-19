@@ -130,19 +130,17 @@ fi
 INIT_DIR="$PWD"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-if [[ $# -gt 0 ]]; then
-  # Branch is specified, this is a CI run
-  ln -sf /usr/share/zoneinfo/UTC /etc/localtime
-  chown -R "${USER}" /workdir
-  git config --global --add safe.directory /workdir
-  git fetch
+if [[ "$CONTEXT" == "ci"  ]] && [[ "$MODE" == "nix" ]]; then
+    # Branch is specified, this is a CI run
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+    chown -R "${USER}" /workdir
+    git config --global --add safe.directory /workdir
+    git fetch
 
-  if [[ "$MODE" == "nix" ]]; then
     nix-env -iA unstable.jq
     nix-env -iA unstable.curl
     nix-env -iA unstable.gnused
     nix-env -iA unstable.git-lfs
-  fi
 fi
 
 if [[ ! -L compatible-devnet ]]; then
