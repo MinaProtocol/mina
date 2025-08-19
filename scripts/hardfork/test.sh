@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -eox pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -24,25 +24,94 @@ FORK_DELAY="${FORK_DELAY:-10}"
 source "$SCRIPT_DIR"/test-helper.sh
 
 # Executable built off mainnet branch
-MAIN_MINA_EXE="$1"
-MAIN_RUNTIME_GENESIS_LEDGER_EXE="$2"
+MAIN_MINA_EXE=""
+MAIN_RUNTIME_GENESIS_LEDGER_EXE=""
 
 # Executables built off fork branch (e.g. develop)
-FORK_MINA_EXE="$3"
-FORK_RUNTIME_GENESIS_LEDGER_EXE="$4"
+FORK_MINA_EXE=""
+FORK_RUNTIME_GENESIS_LEDGER_EXE=""
 
 stop_nodes(){
-  "$1" client stop-daemon --daemon-port 10301
-  "$1" client stop-daemon --daemon-port 10311
+  if [[ "$MODE" == "docker" ]]; then
+    docker stop "$SW_CONTAINER_NAME"
+    docker stop "$BP_CONTAINER_NAME"
+  else
+    "$1" client stop-daemon --daemon-port 10301
+    "$1" client stop-daemon --daemon-port 10311
+  fi
 }
+
+# Parse command line arguments
+
+MINA_DOCKER=""
+MODE="nix"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --mina-app)
+      MAIN_MINA_EXE="$2"
+      shift 2
+      ;;
+    --runtime-genesis-ledger)
+      MAIN_RUNTIME_GENESIS_LEDGER_EXE="$2"
+      shift 2
+      ;;
+    --fork-mina-app)
+      FORK_MINA_EXE="$2"
+      shift 2
+      ;;
+    --fork-runtime-genesis-ledger)
+      FORK_RUNTIME_GENESIS_LEDGER_EXE="$2"
+      shift 2
+      ;;
+    --mina-docker)
+      MINA_DOCKER="$2"
+      MODE="docker"
+      BP_CONTAINER_NAME=mina_bp
+      SW_CONTAINER_NAME=mina_sw
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Validate required arguments
+if [[ "$MODE" == "docker" && (-n "$MAIN_MINA_EXE" || -n "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" || -n "$FORK_MINA_EXE" || -n "$FORK_RUNTIME_GENESIS_LEDGER_EXE") ]]; then
+  echo "Error: Cannot specify both --mina-docker and native executable options (--mina-app, --runtime-genesis-ledger, --fork-mina-app, --fork-runtime-genesis-ledger)" >&2
+  exit 1
+fi
+
+if [[ "$MODE" == "nix" ]]; then
+  if [[ -z "$MAIN_MINA_EXE" || -z "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" || -z "$FORK_MINA_EXE" || -z "$FORK_RUNTIME_GENESIS_LEDGER_EXE" ]]; then
+    echo "Usage: $0 --mina-app <path> --runtime-genesis-ledger <path> --fork-mina-app <path> --fork-runtime-genesis-ledger <path> [--mina-docker <path>]" >&2
+    exit 1
+  fi
+fi
 
 # 1. Node is started
 NOW_UNIX_TS=$(date +%s)
 MAIN_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + MAIN_DELAY*60))
 GENESIS_TIMESTAMP="$(date -u -d @$MAIN_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00')"
 export GENESIS_TIMESTAMP
-"$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
-  -s "$MAIN_SLOT" --slot-tx-end "$SLOT_TX_END" --slot-chain-end "$SLOT_CHAIN_END" &
+
+COMMON_ARGS=(
+  -i "$MAIN_SLOT"
+  -s "$MAIN_SLOT"
+  --slot-tx-end "$SLOT_TX_END"
+  --slot-chain-end "$SLOT_CHAIN_END"
+)
+
+if [[ "$MODE" == "docker" ]]; then
+  "$SCRIPT_DIR"/run-localnet.sh --mina-docker "$MINA_DOCKER" \
+     --bp-container-name "$BP_CONTAINER_NAME" \
+     --sw-container-name "$SW_CONTAINER_NAME" \
+     "${COMMON_ARGS[@]}" &
+else
+  "$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" "${COMMON_ARGS[@]}" &
+fi
 
 MAIN_NETWORK_PID=$!
 
@@ -133,7 +202,11 @@ if [[ "$fork_data" != "$expected_fork_data" ]]; then
   exit 3
 fi
 
-"$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
+if [[ "$MODE" == "docker" ]]; then
+  "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
+fi
+
+
 
 # Finds staking ledger hash corresponding to an epoch given as $1 parameter
 function find_staking_hash(){
@@ -189,7 +262,7 @@ FORKING_FROM_CONFIG_JSON=localnet/config/base.json SECONDS_PER_SLOT="$MAIN_SLOT"
 
 expected_genesis_slot=$(((FORK_GENESIS_UNIX_TS-MAIN_GENESIS_UNIX_TS)/MAIN_SLOT))
 expected_modified_fork_data="{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$expected_genesis_slot,\"state_hash\":\"$latest_shash\"}"
-modified_fork_data="$(jq -cS '.proof.fork' localnet/config.json)"
+modified_fork_data=$(jq -cS '.proof.fork' localnet/config.json)
 if [[ "$modified_fork_data" != "$expected_modified_fork_data" ]]; then
   echo "Assertion failed: unexpected modified fork data" >&2
   exit 3

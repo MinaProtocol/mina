@@ -114,7 +114,7 @@ build_branch() {
         export BYPASS_OPAM_SWITCH_UPDATE=1
       fi
       make build
-      make build_logproc
+      make build-logproc
       make build-devnet-sigs
       make build-daemon-utils
       make debian-build-logproc
@@ -195,4 +195,15 @@ export SLOT_TX_END
 
 echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
 
-"$SCRIPT_DIR"/test.sh compatible-devnet{/bin/mina,-genesis/bin/runtime_genesis_ledger} fork-devnet{/bin/mina,-genesis/bin/runtime_genesis_ledger} && echo "HF test completed successfully"
+
+source ./scripts/export-git-env-vars.sh
+
+if [[ "$MODE" == "docker" ]]; then
+  "$SCRIPT_DIR"/test.sh --mina-docker "gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG" && echo "HF test completed successfully"
+else
+  "$SCRIPT_DIR"/test.sh --mina-app compatible-devnet/bin/mina \
+    --runtime-genesis-ledger compatible-devnet/bin/runtime_genesis_ledger \
+    --fork-mina-app fork-devnet/bin/mina \
+    --fork-runtime-genesis-ledger fork-devnet/bin/runtime_genesis_ledger \
+   && echo "HF test completed successfully"
+fi
