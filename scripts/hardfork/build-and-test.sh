@@ -24,6 +24,7 @@ set -exo pipefail
 MODE="nix"
 FORK_BRANCH=""
 CONTEXT="local"
+DOCKER_TOOLCHAIN="${DOCKER_TOOLCHAIN:-gcr.io/o1labs-192920/mina-toolchain@sha256:cb775fd01376736f4942255b63f8e9745f3f23e15839836b0fe60c3e2dfe9e4b}"
 OVERRIDE_COMPATIBLE_TMP_DIR="${OVERRIDE_COMPATIBLE_TMP_DIR}"
 
 while [[ $# -gt 0 ]]; do
@@ -113,13 +114,15 @@ build_branch() {
       if [[ "$CONTEXT" == "local" ]]; then
         export BYPASS_OPAM_SWITCH_UPDATE=1
       fi
-      make build
-      make build-logproc
-      make build-devnet-sigs
-      make build-daemon-utils
-      make debian-build-logproc
-      DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet
-      make docker-build-daemon-devnet
+      docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" sh -c \
+      "eval $(opam env) \
+      && make build \
+      && make build-logproc \
+      && make build-devnet-sigs \
+      && make build-daemon-utils \
+      && make debian-build-logproc \
+      && DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet \
+      && make docker-build-daemon-devnet"
     fi
 }
 
