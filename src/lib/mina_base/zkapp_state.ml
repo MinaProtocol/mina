@@ -1,10 +1,10 @@
 open Core_kernel
 open Pickles_types
-module Max_state_size = Nat.N8
+module Max_state_size = Nat.N32
 
 module State_length_vec :
   Vector.VECTOR with type 'a t = ('a, Max_state_size.n) Vector.vec =
-  Vector.Vector_8
+  Vector.Vector_32
 
 module V = struct
   (* Think about versioning here! These vector types *will* change
