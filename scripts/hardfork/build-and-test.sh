@@ -114,8 +114,8 @@ build_branch() {
       if [[ "$CONTEXT" == "local" ]]; then
         export BYPASS_OPAM_SWITCH_UPDATE=1
       fi
+      chown -R opam .
       docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" sh -c "
-      chown -R opam . \
       && git config --global --add safe.directory /workdir \
       && eval $(opam env) \
       && make build \
@@ -124,7 +124,8 @@ build_branch() {
       && make build-daemon-utils \
       && make debian-build-logproc \
       && DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet \
-      && make docker-build-daemon-devnet"
+      "
+      make docker-build-daemon-devnet
     fi
 }
 
