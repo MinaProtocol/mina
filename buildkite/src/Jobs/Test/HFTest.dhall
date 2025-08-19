@@ -47,7 +47,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "./scripts/hardfork/build-and-test.sh --mode docker --contex ci --fork-branch \$BUILDKITE_BRANCH"
+                  "./scripts/hardfork/build-and-test.sh --mode docker --context ci --fork-branch \$BUILDKITE_BRANCH"
               ]
             , label = "hard fork test"
             , key = "hard-fork-test"
