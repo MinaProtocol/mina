@@ -126,12 +126,12 @@ build_branch() {
           && opam switch list \
           && ls -la \
           && git config --global --add safe.directory /workdir \
-          && make -d libp2p_helper \
-          && OPAMSWITCH=4.14.2 make -d build-logproc \
-          && OPAMSWITCH=4.14.2 make -d build-devnet-sigs \
-          && OPAMSWITCH=4.14.2 make -d build-daemon-utils \
-          && OPAMSWITCH=4.14.2 make -d debian-build-logproc \
-          && DEBIAN_SKIP_LEDGERS_COPY=y OPAMSWITCH=4.14.2 make -d debian-build-daemon-devnet \
+          && make libp2p_helper \
+          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-logproc \
+          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-devnet-sigs \
+          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-daemon-utils \
+          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-logproc \
+          && DEBIAN_SKIP_LEDGERS_COPY=y OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-daemon-devnet \
         "
       fi
 
