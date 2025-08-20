@@ -131,7 +131,7 @@ build_branch() {
           && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-devnet-sigs \
           && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-daemon-utils \
           && make debian-build-logproc \
-          && make debian-download-create-legacy-genesis-devnet \
+          && BUILDKITE_BUILD_ID=$BUILDKITE_BUILD_ID make debian-download-create-legacy-genesis-devnet \
           && DEBIAN_SKIP_LEDGERS_COPY=y OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-daemon-devnet \
         "
       fi
