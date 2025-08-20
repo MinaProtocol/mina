@@ -276,19 +276,22 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Snapshot = struct
         module Ledger_snapshot = struct
           type t =
-            | Genesis_epoch_ledger of Mina_ledger.Ledger.t
+            | Genesis_epoch_ledger of Genesis_ledger.Packed.t
             | Ledger_root of Mina_ledger.Ledger.Root.t
 
           let merkle_root = function
-            | Genesis_epoch_ledger ledger ->
-                Mina_ledger.Ledger.merkle_root ledger
+            | Genesis_epoch_ledger packed ->
+                Genesis_ledger.Packed.t packed
+                |> Lazy.force |> Mina_ledger.Ledger.merkle_root
             | Ledger_root ledger ->
                 Mina_ledger.Ledger.Root.merkle_root ledger
 
           let compute_delegatee_table keys ledger =
             match ledger with
             | Genesis_epoch_ledger ledger ->
-                compute_delegatee_table_genesis_ledger keys ledger
+                Genesis_ledger.Packed.t ledger
+                |> Lazy.force
+                |> compute_delegatee_table_genesis_ledger keys
             | Ledger_root ledger ->
                 compute_delegatee_table_ledger_root keys ledger
 
@@ -308,7 +311,8 @@ module Make_str (A : Wire_types.Concrete) = struct
           let ledger_subset keys ledger =
             let open Mina_ledger in
             match ledger with
-            | Genesis_epoch_ledger ledger ->
+            | Genesis_epoch_ledger packed ->
+                let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed in
                 Sparse_ledger.of_ledger_subset_exn ledger keys
             | Ledger_root db_ledger ->
                 let ledger = Ledger.Root.as_masked db_ledger in
@@ -454,7 +458,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Snapshot.Ledger_snapshot.Ledger_root
             (Mina_ledger.Ledger.Root.create_single ~directory_name:location
                ~depth:constraint_constants.ledger_depth () ) )
-        else Genesis_epoch_ledger (Lazy.force genesis_epoch_ledger)
+        else Genesis_epoch_ledger genesis_epoch_ledger
 
       let create block_producer_pubkeys ~context:(module Context : CONTEXT)
           ~genesis_ledger ~genesis_epoch_data ~epoch_ledger_location
@@ -965,7 +969,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ]
 
         let genesis ~(genesis_epoch_data : Genesis_epoch_data.Data.t) =
-          { Poly.ledger = Epoch_ledger.genesis ~ledger:genesis_epoch_data.ledger
+          let ledger = Genesis_ledger.Packed.t genesis_epoch_data.ledger in
+          { Poly.ledger = Epoch_ledger.genesis ~ledger
           ; seed = genesis_epoch_data.seed
           ; start_checkpoint = Mina_base.State_hash.(of_hash zero)
           ; lock_checkpoint = Lock_checkpoint.null
@@ -1995,7 +2000,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                  (Length.to_int constants.sub_windows_per_window - 1)
                  ~f:(Fn.const max_sub_window_density)
         ; last_vrf_output = Vrf.Output.Truncated.dummy
-        ; total_currency = genesis_ledger_total_currency ~ledger:genesis_ledger
+        ; total_currency =
+            genesis_ledger_total_currency
+              ~ledger:(Genesis_ledger.Packed.t genesis_ledger)
         ; curr_global_slot_since_hard_fork = Global_slot.zero ~constants
         ; global_slot_since_genesis
         ; staking_epoch_data =
@@ -2027,7 +2034,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
         in
         let snarked_ledger_hash =
-          Lazy.force genesis_ledger |> Mina_ledger.Ledger.merkle_root
+          Genesis_ledger.Packed.t genesis_ledger
+          |> Lazy.force |> Mina_ledger.Ledger.merkle_root
           |> Mina_base.Frozen_ledger_hash.of_ledger_hash
         in
         let genesis_winner_pk = fst Vrf.Precomputed.genesis_winner in
@@ -2642,26 +2650,15 @@ module Make_str (A : Wire_types.Concrete) = struct
                       match snapshot.ledger with
                       | Ledger_snapshot.Ledger_root ledger ->
                           Ok ledger
-                      | Ledger_snapshot.Genesis_epoch_ledger ledger ->
-                          let module Ledger_transfer =
-                            Mina_ledger.Ledger_transfer.Make
-                              (Mina_ledger.Ledger)
-                              (Mina_ledger.Ledger.Any_ledger.M)
-                          in
+                      | Ledger_snapshot.Genesis_epoch_ledger packed ->
                           let fresh_root_ledger =
                             Mina_ledger.Ledger.Root.create_single
                               ~directory_name:snapshot_location
                               ~depth:Context.constraint_constants.ledger_depth
                               ()
                           in
-                          (* TODO: replace with more efficient root->root transfer *)
-                          let%map.Or_error _fresh_root_ledger =
-                            Ledger_transfer.transfer_accounts ~src:ledger
-                              ~dest:
-                                (Mina_ledger.Ledger.Root.as_unmasked
-                                   fresh_root_ledger )
-                          in
-                          fresh_root_ledger )
+                          Genesis_ledger.Packed.populate_root packed
+                            fresh_root_ledger )
                 in
                 match snapshot_id with
                 | Staking_epoch_snapshot ->
@@ -3103,7 +3100,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
     let%test "Receive a valid consensus_state with a bit of delay" =
       let constants = Lazy.force Constants.for_unit_tests in
-      let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
+      let genesis_ledger = Genesis_ledger.for_unit_tests in
       let genesis_epoch_data = Genesis_epoch_data.for_unit_tests in
       let negative_one =
         Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
@@ -3126,7 +3123,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     let%test "Receive an invalid consensus_state" =
       let epoch = Epoch.of_int 5 in
       let constants = Lazy.force Constants.for_unit_tests in
-      let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
+      let genesis_ledger = Genesis_ledger.for_unit_tests in
       let genesis_epoch_data = Genesis_epoch_data.for_unit_tests in
       let negative_one =
         Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
@@ -3428,8 +3425,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let previous_consensus_state =
           Consensus_state.create_genesis
             ~negative_one_protocol_state_hash:previous_protocol_state_hash
-            ~genesis_ledger:Genesis_ledger.t ~genesis_epoch_data
-            ~constraint_constants ~constants
+            ~genesis_ledger:(module Genesis_ledger)
+            ~genesis_epoch_data ~constraint_constants ~constants
         in
         (*If this is a fork then check blockchain length and global_slot_since_genesis have been set correctly*)
         ( match constraint_constants.fork with
@@ -3646,8 +3643,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let previous_consensus_state =
           Consensus_state.create_genesis
             ~negative_one_protocol_state_hash:previous_protocol_state_hash
-            ~genesis_ledger:Genesis_ledger.t ~genesis_epoch_data
-            ~constraint_constants ~constants
+            ~genesis_ledger:(module Genesis_ledger)
+            ~genesis_epoch_data ~constraint_constants ~constants
         in
         let seed = previous_consensus_state.staking_epoch_data.seed in
         let maybe_sk, account = Genesis_ledger.largest_account_exn () in
@@ -3665,7 +3662,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let epoch_snapshot =
           { Local_state.Snapshot.delegatee_table
-          ; ledger = Genesis_epoch_ledger ledger
+          ; ledger = Genesis_epoch_ledger (module Genesis_ledger)
           }
         in
         let balance = Balance.to_nanomina_int account.balance in
