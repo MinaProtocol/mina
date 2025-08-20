@@ -371,7 +371,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics
+  let _log_snark_work_metrics
       (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
@@ -464,7 +464,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 , Snark_work_lib.Selector.Spec.Stable.Latest.to_yojson work.spec
                 )
               ] ;
-          log_snark_work_metrics work ;
+          (* log_snark_work_metrics work ; *)
           Deferred.return @@ Mina_lib.add_work mina work )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
         (fun

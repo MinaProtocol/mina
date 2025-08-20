@@ -37,7 +37,7 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
-let emit_proof_metrics metrics instances logger =
+let _emit_proof_metrics metrics instances logger =
   One_or_two.iter (One_or_two.zip_exn metrics instances)
     ~f:(fun ((time, tag), single) ->
       match tag with
@@ -198,9 +198,9 @@ let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
-            emit_proof_metrics result.metrics
-              (Selector.Result.Stable.Latest.transactions result)
-              logger ;
+            (* emit_proof_metrics result.metrics *)
+            (*   (Selector.Result.Stable.Latest.transactions result) *)
+            (*   logger ; *)
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", `String (Host_and_port.to_string daemon_address))
