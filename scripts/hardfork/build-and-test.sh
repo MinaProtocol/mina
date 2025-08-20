@@ -119,7 +119,6 @@ build_branch() {
         make build-daemon-utils
         make debian-build-logproc
         DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet
-        make debian-download-create-legacy-genesis-devnet
       else
          docker run --rm -v "$PWD:/workdir" --env DUNE_PROFILE=devnet -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
           sudo chown -R opam . \
@@ -132,6 +131,7 @@ build_branch() {
           && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-devnet-sigs \
           && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-daemon-utils \
           && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-logproc \
+          && make debian-download-create-legacy-genesis-devnet \
           && DEBIAN_SKIP_LEDGERS_COPY=y OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-daemon-devnet \
         "
       fi
