@@ -120,7 +120,7 @@ build_branch() {
         make debian-build-logproc
         DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet
       else
-         docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" sh -c "
+         docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
           sudo chown -R opam . \
           && source ~/.profile \
           && git config --global --add safe.directory /workdir \
