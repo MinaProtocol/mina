@@ -87,35 +87,18 @@ end)
                     and type root_hash := Inputs.Hash.t
                     and type hash := Inputs.Hash.t
                     and type account_id := Inputs.Account_id.t
-                    and type account_id_set := Inputs.Account_id.Set.t) : sig
-  include module type of Make (Inputs) (Primary_db) (Converting_db)
-
-  module Config : sig
-    type t = { primary_directory : string; converting_directory : string }
-
-    type create =
-      | Temporary
-          (** Create a converting ledger with databases in temporary directories *)
-      | In_directories of t
-          (** Create a converting ledger with databases in explicit directories *)
-
-    (** Create a [checkpoint] config with the default converting directory
-        name *)
-    val with_primary : directory_name:string -> t
-  end
-
-  (** Create a new converting merkle tree with the given configuration. If
-      [In_directories] is given, existing databases will be opened and used to
-      back the converting merkle tree. If the converting database does not exist
-      in the directory, or exists but is empty, one will be created by migrating
-      the primary database. Existing but incompatible converting databases (such
-      as out-of-sync databases) will be deleted and re-migrated. *)
-  val create : config:Config.create -> logger:Logger.t -> depth:int -> unit -> t
-
-  (** Make checkpoints of the databases backing the converting merkle tree and
-      create a new converting ledger based on those checkpoints *)
-  val create_checkpoint : t -> config:Config.t -> unit -> t
-
-  (** Make checkpoints of the databases backing the converting merkle tree *)
-  val make_checkpoint : t -> config:Config.t -> unit
-end
+                    and type account_id_set := Inputs.Account_id.Set.t) :
+  Intf.Ledger.CONVERTING_WITH_DATABASE
+    with module Location = Inputs.Location
+     and module Addr = Inputs.Location.Addr
+     and type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account := Inputs.Account.t
+     and type root_hash := Inputs.Hash.t
+     and type hash := Inputs.Hash.t
+     and type account_id := Inputs.Account_id.t
+     and type account_id_set := Inputs.Account_id.Set.t
+     and type primary_ledger := Primary_db.t
+     and type converting_ledger := Converting_db.t
+     and type converted_account := Inputs.converted_account

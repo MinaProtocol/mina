@@ -518,6 +518,40 @@ module Ledger = struct
     (** The input account conversion method, re-exposed for convenience *)
     val convert : account -> converted_account
   end
+
+  module type CONVERTING_WITH_DATABASE = sig
+    include CONVERTING
+
+    module Config : sig
+      type t = { primary_directory : string; converting_directory : string }
+
+      type create =
+        | Temporary
+            (** Create a converting ledger with databases in temporary directories *)
+        | In_directories of t
+            (** Create a converting ledger with databases in explicit directories *)
+
+      (** Create a [checkpoint] config with the default converting directory
+        name *)
+      val with_primary : directory_name:string -> t
+    end
+
+    (** Create a new converting merkle tree with the given configuration. If
+      [In_directories] is given, existing databases will be opened and used to
+      back the converting merkle tree. If the converting database does not exist
+      in the directory, or exists but is empty, one will be created by migrating
+      the primary database. Existing but incompatible converting databases (such
+      as out-of-sync databases) will be deleted and re-migrated. *)
+    val create :
+      config:Config.create -> logger:Logger.t -> depth:int -> unit -> t
+
+    (** Make checkpoints of the databases backing the converting merkle tree and
+      create a new converting ledger based on those checkpoints *)
+    val create_checkpoint : t -> config:Config.t -> unit -> t
+
+    (** Make checkpoints of the databases backing the converting merkle tree *)
+    val make_checkpoint : t -> config:Config.t -> unit
+  end
 end
 
 module Graphviz = struct
