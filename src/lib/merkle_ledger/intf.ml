@@ -488,6 +488,36 @@ module Ledger = struct
         ledger_depth:int -> Location.t Quickcheck.Generator.t
     end
   end
+
+  module type CONVERTING = sig
+    include S
+
+    type primary_ledger
+
+    type converting_ledger
+
+    type converted_account
+
+    (** Create a converting ledger based on two component ledgers. No migration is
+      performed (use [of_ledgers_with_migration] if you need this) but all
+      subsequent write operations on the converting merkle tree will be applied
+      to both ledgers. *)
+    val of_ledgers : primary_ledger -> converting_ledger -> t
+
+    (** Create a converting ledger with an already-existing [Primary_ledger.t] and
+      an empty [Converting_ledger.t] that will be initialized with the migrated
+      account data. *)
+    val of_ledgers_with_migration : primary_ledger -> converting_ledger -> t
+
+    (** Retrieve the primary ledger backing the converting merkle tree *)
+    val primary_ledger : t -> primary_ledger
+
+    (** Retrieve the converting ledger backing the converting merkle tree *)
+    val converting_ledger : t -> converting_ledger
+
+    (** The input account conversion method, re-exposed for convenience *)
+    val convert : account -> converted_account
+  end
 end
 
 module Graphviz = struct
