@@ -48,10 +48,10 @@ struct
        and type hash = hash
        and type account = account
        and type key = Signature_lib.Public_key.Compressed.t
-       and type token_id := Token_id.t
-       and type token_id_set := Token_id.Set.t
-       and type account_id := Account_id.t
-       and type account_id_set := Account_id.Set.t
+       and type token_id = Token_id.t
+       and type token_id_set = Token_id.Set.t
+       and type account_id = Account_id.t
+       and type account_id_set = Account_id.Set.t
 
   type converting_witness =
     | T :
