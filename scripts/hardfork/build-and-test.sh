@@ -113,18 +113,27 @@ build_branch() {
       cd "$build_dir"
       if [[ "$CONTEXT" == "local" ]]; then
         export BYPASS_OPAM_SWITCH_UPDATE=1
+        make build
+        make build-logproc
+        make build-devnet-sigs
+        make build-daemon-utils
+        make debian-build-logproc
+        DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet
+      else
+         docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" sh -c "
+          sudo chown -R opam . \
+          && git config --global --add safe.directory /workdir \
+          && EXPORT OPAMSWITCH=4.14.2
+          && make build \
+          && make build-logproc \
+          && make build-devnet-sigs \
+          && make build-daemon-utils \
+          && make debian-build-logproc \
+          && DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet \
+        "
       fi
-      docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" sh -c "
-      sudo chown -R opam . \
-      && git config --global --add safe.directory /workdir \
-      && eval $(opam env) \
-      && make build \
-      && make build-logproc \
-      && make build-devnet-sigs \
-      && make build-daemon-utils \
-      && make debian-build-logproc \
-      && DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet \
-      "
+
+
       make docker-build-daemon-devnet
     fi
 }
