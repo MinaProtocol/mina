@@ -123,8 +123,10 @@ build_branch() {
          docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
           sudo chown -R opam . \
           && source ~/.profile \
+          && opam switch list \
+          && ls -la \
           && git config --global --add safe.directory /workdir \
-          && make build \
+          && make libp2p_helper \
           && make build-logproc \
           && make build-devnet-sigs \
           && make build-daemon-utils \
