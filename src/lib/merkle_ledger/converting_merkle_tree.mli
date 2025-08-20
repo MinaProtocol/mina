@@ -38,7 +38,7 @@ end)
                         and type hash := Inputs.Hash.t
                         and type account_id := Inputs.Account_id.t
                         and type account_id_set := Inputs.Account_id.Set.t) :
-  Intf.Ledger.CONVERTING
+  Intf.Ledger.Converting.S
     with module Location = Inputs.Location
      and module Addr = Inputs.Location.Addr
      and type key := Inputs.Key.t
@@ -52,6 +52,8 @@ end)
      and type primary_ledger := Primary_ledger.t
      and type converting_ledger := Converting_ledger.t
      and type converted_account := Inputs.converted_account
+
+module With_database_config : Intf.Ledger.Converting.Config
 
 (** A variant of [Make] that works with DATABASE ledgers and provides checkpoint operations *)
 module With_database (Inputs : sig
@@ -88,7 +90,7 @@ end)
                     and type hash := Inputs.Hash.t
                     and type account_id := Inputs.Account_id.t
                     and type account_id_set := Inputs.Account_id.Set.t) :
-  Intf.Ledger.CONVERTING_WITH_DATABASE
+  Intf.Ledger.Converting.WITH_DATABASE
     with module Location = Inputs.Location
      and module Addr = Inputs.Location.Addr
      and type key := Inputs.Key.t
