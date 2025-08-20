@@ -15,7 +15,6 @@ type t =
   { logger : Logger.t
   ; transaction_snark : (module Transaction_snark.S)
   ; single_id_gen : Id_generator.t
-  ; subzkapp_id_gen : Id_generator.t
   ; pairing_pool : (int64, Combining_result.t) Hashtbl.t
         (** if one single work from underlying Work_selector is completed but
            not the other. throw it here. *)
@@ -44,7 +43,6 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
   { logger
   ; transaction_snark = (module T)
   ; single_id_gen = Id_generator.create ~logger
-  ; subzkapp_id_gen = Id_generator.create ~logger
   ; pairing_pool = Hashtbl.create (module Int64)
   ; pending_zkapp_commands = Single_id_map.empty
   ; reassignment_timeout
@@ -92,12 +90,9 @@ let reschedule_old_single_job
   Ok (Work.Spec.Partitioned.Poly.Single { job; data = () })
 
 let register_pending_zkapp_command_job ~(id : Work.Id.Single.t)
-    ~(partitioner : t) ~sub_zkapp_spec ~(pending : Pending_zkapp_command.t) =
-  let job_id =
-    Work.Id.Sub_zkapp.of_single
-      ~job_id:(Id_generator.next_id partitioner.subzkapp_id_gen ())
-      id
-  in
+    ~(partitioner : t) ~range ~sub_zkapp_spec
+    ~(pending : Pending_zkapp_command.t) =
+  let job_id = Work.Id.Sub_zkapp.of_single ~range id in
   let job =
     Work.With_job_meta.
       { spec = sub_zkapp_spec
@@ -116,10 +111,11 @@ let register_pending_zkapp_command_job ~(id : Work.Id.Single.t)
 
 let schedule_from_pending_zkapp_command ~(id : Work.Id.Single.t)
     ~(partitioner : t) (pending : Pending_zkapp_command.t) =
-  let%map.Option sub_zkapp_spec =
+  let%map.Option sub_zkapp_spec, range =
     Pending_zkapp_command.next_subzkapp_job_spec pending
   in
-  register_pending_zkapp_command_job ~id ~partitioner ~sub_zkapp_spec ~pending
+  register_pending_zkapp_command_job ~id ~partitioner ~sub_zkapp_spec ~range
+    ~pending
 
 let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
     Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
@@ -148,13 +144,13 @@ let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
            Work.Spec.Sub_zkapp.Stable.Latest.Segment
              { statement; witness; spec } )
   in
-  let pending_zkapp_command, first_segment =
+  let pending_zkapp_command, first_segment, first_range =
     Pending_zkapp_command.create_and_yield_segment ~job ~unscheduled_segments
   in
   partitioner.pending_zkapp_commands <-
     Single_id_map.add_exn ~key:pairing ~data:pending_zkapp_command
       partitioner.pending_zkapp_commands ;
-  register_pending_zkapp_command_job ~id:pairing ~partitioner
+  register_pending_zkapp_command_job ~id:pairing ~partitioner ~range:first_range
     ~sub_zkapp_spec:first_segment ~pending:pending_zkapp_command
 
 let convert_single_work_from_selector ~(partitioner : t)
@@ -370,27 +366,46 @@ let submit_single ~is_from_zkapp ~partitioner
     If either sub-zkapp job spec or pending zkapp command aren't present,
     returns [Removed]. *)
 let submit_into_pending_zkapp_command ~partitioner
-    ~(job_id : Work.Id.Sub_zkapp.t)
+    ~job_id:({ range; _ } as job_id : Work.Id.Sub_zkapp.t)
     ~data:
       ({ proof; data = elapsed } :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
   let single_id = Work.Id.Sub_zkapp.to_single job_id in
+  let finalize_zkapp_proof pending =
+    match Pending_zkapp_command.try_finalize pending with
+    | None ->
+        Processed None
+    | Some ({ job_id; _ }, proof, elapsed) ->
+        [%log' debug partitioner.logger] "Finalized proof for zkapp command" ;
+        partitioner.pending_zkapp_commands <-
+          Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
+        submit_single ~is_from_zkapp:true ~partitioner
+          ~submitted_result:{ spec = (); proof; elapsed }
+          ~job_id
+  in
   match
     ( Sent_zkapp_job_pool.remove ~id:job_id
         partitioner.zkapp_jobs_sent_by_partitioner
     , Single_id_map.find partitioner.pending_zkapp_commands single_id )
   with
   | Some _, Some pending -> (
-      Pending_zkapp_command.submit_proof ~proof ~elapsed pending ;
-      match Pending_zkapp_command.try_finalize pending with
-      | None ->
-          Processed None
-      | Some ({ job_id; _ }, proof, elapsed) ->
-          partitioner.pending_zkapp_commands <-
-            Single_id_map.remove partitioner.pending_zkapp_commands single_id ;
-          submit_single ~is_from_zkapp:true ~partitioner
-            ~submitted_result:{ spec = (); proof; elapsed }
-            ~job_id )
+      match
+        Pending_zkapp_command.submit_proof ~proof ~elapsed ~range pending
+      with
+      | Ok () ->
+          finalize_zkapp_proof pending
+      | Error exn ->
+          [%log' debug partitioner.logger]
+            "Worker submit a work that's rejected by the pending zkapp \
+             command, this probably means a same subzkapp work has been \
+             distributed to more than one worker"
+            ~metadata:
+              [ ("job_id", Work.Id.Sub_zkapp.to_yojson job_id)
+              ; ("proof", Ledger_proof.to_yojson proof)
+              ; ("elapsed", Mina_stdlib.Time.Span.to_yojson elapsed)
+              ; ("reason", `String (Error.to_string_hum exn))
+              ] ;
+          SpecUnmatched )
   | None, _ | _, None ->
       [%log' debug partitioner.logger]
         "Worker submit a work that's already removed from sent sub-zkapp job \
