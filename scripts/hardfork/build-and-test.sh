@@ -120,7 +120,7 @@ build_branch() {
         make debian-build-logproc
         DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet
       else
-         docker run --rm -v "$PWD:/workdir" --env DUNE_PROFILE=devnet -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
+         docker run --rm -v "$PWD:/workdir" -v /var/storagebox:/var/storagebox --env DUNE_PROFILE=devnet -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
           sudo chown -R opam . \
           && source ~/.profile \
           && opam switch list \
