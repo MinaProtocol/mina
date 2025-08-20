@@ -161,7 +161,6 @@ module Impl = struct
                     (M.of_zkapp_command_segment_exn ~witness)
                     ()
                 in
-
                 let%bind (p : Ledger_proof.t) =
                   Deferred.List.fold ~init:(Ok p1) rest
                     ~f:(fun acc (witness, spec, statement) ->
@@ -290,8 +289,7 @@ module Impl = struct
       ~state:
         ({ proof_level_snark; proof_cache_db; logger; signature_kind } :
           Worker_state.t )
-      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) :
-      Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t =
+      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) =
     let open Deferred.Or_error.Let_syntax in
     let sok_digest =
       Work.Spec.Partitioned.Poly.sok_message partitioned_spec
@@ -312,9 +310,7 @@ module Impl = struct
                    ~sok_digest ~signature_kind )
             in
             Work.Spec.Partitioned.Poly.Single
-              { job = { job with spec = () }
-              ; data = { Proof_carrying_data.data = elapsed; proof }
-              }
+              { job; data = { Proof_carrying_data.data = elapsed; proof } }
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
             { job =
                 { spec =
@@ -343,9 +339,7 @@ module Impl = struct
             in
 
             Work.Spec.Partitioned.Poly.Sub_zkapp_command
-              { job = { job with spec = () }
-              ; data = { Proof_carrying_data.data = elapsed; proof }
-              }
+              { job; data = { Proof_carrying_data.data = elapsed; proof } }
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
             { job =
                 { spec =
@@ -365,9 +359,7 @@ module Impl = struct
                            sub_zkapp_spec ) )
             in
             Work.Spec.Partitioned.Poly.Sub_zkapp_command
-              { job = { job with spec = () }
-              ; data = { Proof_carrying_data.data = elapsed; proof }
-              } )
+              { job; data = { Proof_carrying_data.data = elapsed; proof } } )
     | Worker_state.Check | Worker_state.No_check ->
         let elapsed = Time.Span.zero in
         let statement =
@@ -383,11 +375,9 @@ module Impl = struct
         let result =
           match partitioned_spec with
           | Work.Spec.Partitioned.Poly.Single { job; _ } ->
-              Work.Spec.Partitioned.Poly.Single
-                { job = { job with spec = () }; data }
+              Work.Spec.Partitioned.Poly.Single { job; data }
           | Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; _ } ->
-              Work.Spec.Partitioned.Poly.Sub_zkapp_command
-                { job = { job with spec = () }; data }
+              Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data }
         in
         Deferred.Or_error.return result
 end
