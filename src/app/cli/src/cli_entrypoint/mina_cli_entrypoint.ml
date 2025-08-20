@@ -725,9 +725,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         in
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
-        let time_controller =
-          Block_time.Controller.create @@ Block_time.Controller.basic ~logger
-        in
+        let time_controller = Block_time.Controller.basic ~logger in
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
           let config_file_installed =
