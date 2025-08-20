@@ -172,7 +172,7 @@ if [[ ! -L compatible-devnet ]]; then
     cd "$compatible_build"
   else
     git checkout -f $1
-    git checkout -f dkijania/migrate_hf_to_py
+    git checkout -f origin/dkijania/migrate_hf_to_py
     git checkout -f $1 -- Makefile
     git checkout -f $1 -- scripts/hardfork
     compatible_build="$INIT_DIR"
