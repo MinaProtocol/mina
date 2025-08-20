@@ -918,8 +918,8 @@ let%test_unit "user_command application on converting ledger" =
                 Mina_base.Account.Key.(
                   equal account.public_key account_converted.public_key) ) ;
               assert (
-                Mina_base.Account.Nonce.(
-                  equal account_converted.nonce account_converted.unstable_field) ) ) ;
+                Mina_base.Account.Unstable.(
+                  equal account_converted (of_stable account)) ) ) ;
           (* Assert that the converted ledger doesn't have anything "extra" compared to the primary ledger *)
           Unstable_db.iteri cl ~f:(fun index account_converted ->
               let account = L.get_at_index_exn l index in

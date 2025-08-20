@@ -1037,50 +1037,58 @@ let deriver obj =
        ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
        obj
 
-(* An unstable account is needed when we're doing ledger migration. The main
-   idea is we provide a function converting from Stable account to this type,
-   and storing all writes to the original ledger to the new ledger. *)
+(** A testing ledger account type that represents the changes to the account
+    format intended in the next hardfork, and other necessary hard fork account
+    migration. The current changes are:
+
+   - The zkapp state size increase, from 8 to 32. Migration: padding the state
+     with 24 zero field elements. *)
 module Unstable = struct
   type t =
-    { public_key : Public_key.Compressed.Stable.V1.t
-    ; token_id : Token_id.Stable.V2.t
-    ; token_symbol : Token_symbol.Stable.V1.t
-    ; balance : Balance.Stable.V1.t
-    ; nonce : Nonce.Stable.V1.t
-    ; receipt_chain_hash : Receipt.Chain_hash.Stable.V1.t
-    ; delegate : Public_key.Compressed.Stable.V1.t option
-    ; voting_for : State_hash.Stable.V1.t
-    ; timing : Timing.Stable.V2.t
-    ; permissions : Permissions.Stable.V2.t
-    ; zkapp : Zkapp_account.Stable.V2.t option
-    ; unstable_field : Nonce.Stable.V1.t
+    { public_key : Public_key.Compressed.Stable.Latest.t
+    ; token_id : Token_id.Stable.Latest.t
+    ; token_symbol : Token_symbol.Stable.Latest.t
+    ; balance : Balance.Stable.Latest.t
+    ; nonce : Nonce.Stable.Latest.t
+    ; receipt_chain_hash : Receipt.Chain_hash.Stable.Latest.t
+    ; delegate : Public_key.Compressed.Stable.Latest.t option
+    ; voting_for : State_hash.Stable.Latest.t
+    ; timing : Timing.Stable.Latest.t
+    ; permissions : Permissions.Stable.Latest.t
+    ; zkapp : Zkapp_account.Unstable.t option
     }
   [@@deriving
     sexp, equal, hash, compare, yojson, hlist, fields, bin_io_unversioned]
 
+  (** Migrate a stable account to the post-hardfork account format *)
+  let of_stable (account : Stable.Latest.t) : t =
+    { public_key = account.public_key
+    ; token_id = account.token_id
+    ; token_symbol = account.token_symbol
+    ; balance = account.balance
+    ; nonce = account.nonce
+    ; receipt_chain_hash = account.receipt_chain_hash
+    ; delegate = account.delegate
+    ; voting_for = account.voting_for
+    ; timing = account.timing
+    ; permissions = account.permissions
+    ; zkapp = Option.map ~f:Zkapp_account.Unstable.of_stable account.zkapp
+    }
+
   let balance { balance; _ } = balance
 
-  let empty =
-    { public_key = Public_key.Compressed.empty
-    ; token_id = Token_id.default
-    ; token_symbol = Token_symbol.default
-    ; balance = Balance.zero
-    ; nonce = Nonce.zero
-    ; receipt_chain_hash = Receipt.Chain_hash.empty
-    ; delegate = None
-    ; voting_for = State_hash.dummy
-    ; timing = Timing.Untimed
-    ; permissions =
-        Permissions.user_default
-        (* TODO: This should maybe be Permissions.empty *)
-    ; zkapp = None
-    ; unstable_field = Nonce.zero
-    }
+  let empty = of_stable empty
 
   let identifier ({ public_key; token_id; _ } : t) =
     Account_id.create public_key token_id
 
   let token_id ({ token_id; _ } : t) = token_id
+
+  let hash_zkapp_account_opt = function
+    | None ->
+        Lazy.force Zkapp_account.default_digest
+    | Some (a : Zkapp_account.Unstable.t) ->
+        Zkapp_account.Unstable.digest a
 
   let to_input (t : t) =
     let open Random_oracle.Input.Chunked in
@@ -1093,7 +1101,7 @@ module Unstable = struct
       ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
       ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
       ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
-      ~permissions:(f Permissions.to_input) ~unstable_field:(f Nonce.to_input)
+      ~permissions:(f Permissions.to_input)
     |> List.reduce_exn ~f:append
 
   let digest t =
@@ -1101,19 +1109,4 @@ module Unstable = struct
       (Random_oracle.pack_input (to_input t))
 
   let empty_digest = lazy (digest empty)
-
-  let of_stable (account : Stable.Latest.t) : t =
-    { public_key = account.public_key
-    ; token_id = account.token_id
-    ; token_symbol = account.token_symbol
-    ; balance = account.balance
-    ; nonce = account.nonce
-    ; receipt_chain_hash = account.receipt_chain_hash
-    ; delegate = account.delegate
-    ; voting_for = account.voting_for
-    ; timing = account.timing
-    ; permissions = account.permissions
-    ; zkapp = account.zkapp
-    ; unstable_field = account.nonce
-    }
 end

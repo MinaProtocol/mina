@@ -456,3 +456,50 @@ let gen : t Quickcheck.Generator.t =
   ; proved_state = false
   ; zkapp_uri
   }
+
+module Unstable = struct
+  type t =
+    ( Zkapp_state.Unstable.Value.t
+    , Verification_key_wire.Stable.V1.t option
+    , Mina_numbers.Zkapp_version.Stable.V1.t
+    , F.Stable.V1.t
+    , Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+    , bool
+    , Zkapp_uri.Stable.V1.t )
+    Poly.Stable.Latest.t
+  [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
+
+  let of_stable (account : Stable.Latest.t) : t =
+    { app_state = Zkapp_state.Unstable.Value.of_stable account.app_state
+    ; verification_key = account.verification_key
+    ; zkapp_version = account.zkapp_version
+    ; action_state = account.action_state
+    ; last_action_slot = account.last_action_slot
+    ; proved_state = account.proved_state
+    ; zkapp_uri = account.zkapp_uri
+    }
+
+  let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
+    let open Random_oracle.Input.Chunked in
+    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    let app_state v =
+      Random_oracle.Input.Chunked.field_elements
+        (Pickles_types.Vector.to_array v)
+    in
+    Poly.Fields.fold ~init:[] ~app_state:(f app_state)
+      ~verification_key:
+        (f
+           (Fn.compose field
+              (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+      ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
+      ~action_state:(f app_state)
+      ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
+      ~proved_state:
+        (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
+      ~zkapp_uri:(f zkapp_uri_to_input)
+    |> List.reduce_exn ~f:append
+
+  let digest (t : t) =
+    Random_oracle.(
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+end
