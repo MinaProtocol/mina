@@ -130,7 +130,7 @@ build_branch() {
           && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-logproc \
           && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-devnet-sigs \
           && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-daemon-utils \
-          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-logproc \
+          && make debian-build-logproc \
           && make debian-download-create-legacy-genesis-devnet \
           && DEBIAN_SKIP_LEDGERS_COPY=y OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-daemon-devnet \
         "
@@ -172,7 +172,7 @@ if [[ ! -L compatible-devnet ]]; then
     cd "$compatible_build"
   else
     git checkout -f $1
-    git checkout -f compatible
+    git checkout -f dkijania/migrate_hf_to_py
     git checkout -f $1 -- Makefile
     git checkout -f $1 -- scripts/hardfork
     compatible_build="$INIT_DIR"
