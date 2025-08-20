@@ -173,6 +173,7 @@ if [[ ! -L compatible-devnet ]]; then
   else
     git checkout -f $1
     git checkout -f compatible
+    git checkout -f $1 -- Makefile
     git checkout -f $1 -- scripts/hardfork
     compatible_build="$INIT_DIR"
   fi
