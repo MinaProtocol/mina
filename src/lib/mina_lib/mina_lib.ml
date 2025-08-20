@@ -107,7 +107,8 @@ type t =
   ; pipes : pipes
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
-  ; snark_job_state : Work_selector.State.t
+  ; work_selector : Work_selector.State.t
+  ; work_partitioner : Work_partitioner.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
@@ -796,7 +797,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       let%map account = get_account t account_id in
       account.Account.nonce
 
-let snark_job_state t = t.snark_job_state
+let work_selector t = t.work_selector
 
 let add_block_subscriber t public_key =
   Mina_subscriptions.add_block_subscriber t.subscriptions public_key
@@ -869,45 +870,83 @@ let best_chain ?max_length t =
 
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
-  let fee = snark_work_fee t in
-  let instances_opt =
-    Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) (snark_job_state t)
+  let%bind.Option prover =
+    Option.merge (snark_worker_key t) (snark_coordinator_key t) ~f:Fn.const
   in
-  Option.map instances_opt ~f:(fun instances ->
-      { Snark_work_lib.Work.Spec.instances; fee } )
+  let fee = snark_work_fee t in
+  let sok_message = Sok_message.create ~fee ~prover in
+  [%log' info t.config.logger] "Received work request with sok message"
+    ~metadata:[ ("sok_message", Sok_message.to_yojson sok_message) ] ;
+  let work_from_selector =
+    lazy
+      (Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
+         ~logger:t.config.logger t.work_selector )
+  in
+  Work_partitioner.request_partitioned_work ~work_from_selector ~sok_message
+    ~partitioner:t.work_partitioner
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
+let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
       Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
     in
     let pending_work =
-      Work_selector.pending_work_statements ~snark_pool ~fee_opt
-        t.snark_job_state
+      Work_selector.pending_work_statements ~snark_pool ~fee_opt t.work_selector
       |> List.length
     in
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec =
-    One_or_two.map work.spec.instances
-      ~f:Snark_work_lib.Work.Single.Spec.statement
-  in
-  let cb _ =
-    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
-     * If the diff is accepted then remove it from the seen jobs.
-     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selector.remove t.snark_job_state spec
-  in
-  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
-  Network_pool.Snark_pool.(
-    Local_sink.push t.pipes.snark_local_sink
-      (Resource_pool.Diff.of_result work, cb))
-  |> Deferred.don't_wait_for
+  match
+    Work_partitioner.submit_partitioned_work ~result:work
+      ~partitioner:t.work_partitioner
+  with
+  | SpecUnmatched ->
+      `SpecUnmatched
+  | Removed ->
+      `Removed
+  | Processed None ->
+      `Ok
+  | Processed (Some { spec_with_proof; fee; prover }) ->
+      let proofs = spec_with_proof |> One_or_two.map ~f:Tuple2.get2 in
+      let fee_with_prover = Fee_with_prover.{ fee; prover } in
+      let stmts =
+        spec_with_proof
+        |> One_or_two.map ~f:(fun (spec, _) ->
+               Snark_work_lib.Selector.Single.Spec.Poly.statement spec )
+      in
+      [%log' info t.config.logger] "Partitioner combined work"
+        ~metadata:
+          [ ( "stmts"
+            , One_or_two.to_yojson Mina_state.Snarked_ledger_state.to_yojson
+                stmts )
+          ; ("fee_with_prover", Fee_with_prover.to_yojson fee_with_prover)
+          ; ("proofs", proofs |> One_or_two.to_yojson Ledger_proof.to_yojson)
+          ] ;
+      ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
+      Network_pool.Snark_pool.(
+        Local_sink.push t.pipes.snark_local_sink
+          ( Add_solved_work
+              ( stmts
+              , Network_pool.Priced_proof.
+                  { proof = proofs; fee = fee_with_prover } )
+          , Result.iter_error ~f:(fun err ->
+                [%log' info t.config.logger]
+                  "Failed to push completed work to local snark sink, \
+                   returning them to work selector"
+                  ~metadata:
+                    [ ( "stmts"
+                      , One_or_two.to_yojson
+                          Mina_state.Snarked_ledger_state.to_yojson stmts )
+                    ; ("error", `String (Error.to_string_hum err))
+                    ] ;
+                let _spec = One_or_two.map ~f:Tuple2.get1 spec_with_proof in
+                failwith "TODO: bring back work to work selector here" ) ))
+      |> Deferred.don't_wait_for ;
+      `Ok
 
 let add_work_graphql t diff =
   let results_ivar = Ivar.create () in
@@ -2076,11 +2115,19 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; constraint_constants
               }
           in
-          let snark_jobs_state =
+          let work_selector =
             Work_selector.State.init
               ~reassignment_wait:config.work_reassignment_wait
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~logger:config.logger
+          in
+          (* NOTE: [reassignment_wait] is interpreted as milliseconds *)
+          let work_partitioner =
+            Work_partitioner.create
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED
+              ~reassignment_timeout:
+                (Time.Span.of_ms (Float.of_int config.work_reassignment_wait))
+              ~logger:config.logger ~proof_cache_db
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
@@ -2091,7 +2138,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   ~get_transition_frontier:(fun () ->
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
                   ~get_snark_pool:(fun () -> Some snark_pool)
-                  ~snark_job_state:(fun () -> Some snark_jobs_state)
+                  ~snark_job_state:(fun () -> Some work_selector)
                   ~get_node_status )
           in
           let user_command_input_reader, user_command_input_writer =
@@ -2511,7 +2558,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               }
           ; wallets
           ; coinbase_receiver = ref config.coinbase_receiver
-          ; snark_job_state = snark_jobs_state
+          ; work_selector
+          ; work_partitioner
           ; subscriptions
           ; sync_status
           ; precomputed_block_writer
