@@ -89,6 +89,10 @@ val current_epoch_delegators :
 val last_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
 
+(** [replace_snark_worker_key t key_opt] Replace all SNARK worker's key
+    associated with current coordinator.
+    - If the new key is [None], SNARK worker will be turned off if it's running;
+    - If the new key is [Some k], SNARK worker will be turn on if it's not running. *)
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t
 
@@ -107,11 +111,15 @@ val snark_work_fee : t -> Currency.Fee.t
 
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
-val request_work : t -> Work_selector.work Snark_work_lib.Work.Spec.t option
+val request_work :
+  t -> Snark_work_lib.Spec.Partitioned.Stable.Latest.t Or_error.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_work_lib.Selector.Result.Stable.Latest.t -> unit
+val add_work :
+     t
+  -> Snark_work_lib.Result.Partitioned.Stable.Latest.t
+  -> [> `Ok | `Removed | `SpecUnmatched ]
 
 val add_work_graphql :
      t
@@ -121,7 +129,7 @@ val add_work_graphql :
      * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
      Deferred.Or_error.t
 
-val snark_job_state : t -> Work_selector.State.t
+val work_selector : t -> Work_selector.State.t
 
 val get_current_nonce :
      t
