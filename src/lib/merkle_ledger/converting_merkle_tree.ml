@@ -29,7 +29,7 @@ end)
                         and type hash := Inputs.Hash.t
                         and type account_id := Inputs.Account_id.t
                         and type account_id_set := Inputs.Account_id.Set.t) :
-  Intf.Ledger.CONVERTING
+  Intf.Ledger.Converting.S
     with module Location = Inputs.Location
      and module Addr = Inputs.Location.Addr
      and type key := Inputs.Key.t
@@ -204,6 +204,20 @@ end)
   let detached_signal t = Primary_ledger.detached_signal t.primary_ledger
 end
 
+module With_database_config = struct
+  type t = { primary_directory : string; converting_directory : string }
+
+  type create = Temporary | In_directories of t
+
+  let default_converting_directory_name primary_directory_name =
+    primary_directory_name ^ "_converting"
+
+  let with_primary ~directory_name =
+    { primary_directory = directory_name
+    ; converting_directory = default_converting_directory_name directory_name
+    }
+end
+
 module With_database (Inputs : sig
   include Intf.Inputs.Intf
 
@@ -237,20 +251,7 @@ end)
                     and type account_id_set := Inputs.Account_id.Set.t) =
 struct
   include Make (Inputs) (Primary_db) (Converting_db)
-
-  module Config = struct
-    type t = { primary_directory : string; converting_directory : string }
-
-    type create = Temporary | In_directories of t
-
-    let default_converting_directory_name primary_directory_name =
-      primary_directory_name ^ "_converting"
-
-    let with_primary ~directory_name =
-      { primary_directory = directory_name
-      ; converting_directory = default_converting_directory_name directory_name
-      }
-  end
+  module Config = With_database_config
 
   let dbs_synced db1 db2 =
     Primary_db.num_accounts db1 = Converting_db.num_accounts db2
