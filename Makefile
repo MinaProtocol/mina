@@ -555,14 +555,15 @@ debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
 debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 	$(call build_debian_package,rosetta_mainnet)
 
+.PHONY: debian-download-create-legacy-genesis-devnet
+debian-download-create-legacy-genesis-devnet: ## Download and create the legacy genesis block for devnet
+	$(info 📦 Downloading create legacy genesis block for devnet)
+	@./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$(CODENAME)/mina-create-legacy-genesis*" _build
+
 .PHONY: debian-build-daemon-devnet-hardfork
 debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
 	$(call build_debian_package,daemon_devnet_hardfork)
 
-.PHONY: debian-download-create-legacy-hardfork
-debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
-	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
 ########################################
 # Docker images
 
