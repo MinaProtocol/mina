@@ -2096,10 +2096,8 @@ module Queries = struct
             ; hash = { State_hash.State_hashes.state_hash = hash; _ }
             } =
           let open Staged_ledger_diff in
-          Genesis_protocol_state.t
-            ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
-            ~genesis_epoch_data ~constraint_constants ~consensus_constants
-            ~genesis_body_reference
+          Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
         in
         let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data =
@@ -2601,7 +2599,8 @@ module Queries = struct
     let cast_ledger = function
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           l ->
-          Ledger.Any_ledger.cast (module Ledger) l
+          let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+          Ledger.Any_ledger.cast (module Ledger) l_inner
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
           Ledger.Root.as_unmasked l
     in

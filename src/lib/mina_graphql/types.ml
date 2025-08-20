@@ -1494,11 +1494,14 @@ module AccountObj = struct
                  let account_id = account_id account in
                  match%bind Mina_lib.staking_ledger mina with
                  | Genesis_epoch_ledger staking_ledger -> (
+                     let staking_ledger_inner =
+                       Lazy.force @@ Genesis_ledger.Packed.t staking_ledger
+                     in
                      match
                        let open Option.Let_syntax in
                        account_id
-                       |> Ledger.location_of_account staking_ledger
-                       >>= Ledger.get staking_ledger
+                       |> Ledger.location_of_account staking_ledger_inner
+                       >>= Ledger.get staking_ledger_inner
                      with
                      | Some account ->
                          let%bind delegate_key = account.delegate in

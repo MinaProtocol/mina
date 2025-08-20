@@ -470,16 +470,15 @@ let state_body ~(genesis_constants : Genesis_constants.t)
      (* TODO: Do we really need to create a whole ledger just to compute this?
         Probably not..
      *)
-     let module Test_genesis_ledger = struct
-       include Genesis_ledger.Make (struct
-         include Test_genesis_ledger
+     let module Test_genesis_ledger = Genesis_ledger.Make (struct
+       include Test_genesis_ledger
 
-         let directory = `Ephemeral
+       let directory = `Ephemeral
 
-         let depth = constraint_constants.ledger_depth
-       end)
-     end in
-     Mina_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+       let depth = constraint_constants.ledger_depth
+     end) in
+     Mina_state.Genesis_protocol_state.t
+       ~genesis_ledger:(module Test_genesis_ledger)
        ~genesis_epoch_data ~constraint_constants ~consensus_constants
        ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
      |> With_hash.data |> Mina_state.Protocol_state.body )
