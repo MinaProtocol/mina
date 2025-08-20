@@ -120,18 +120,18 @@ build_branch() {
         make debian-build-logproc
         DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet
       else
-         docker run --rm -v "$PWD:/workdir" -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
+         docker run --rm -v "$PWD:/workdir" --env DUNE_PROFILE=devnet -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
           sudo chown -R opam . \
           && source ~/.profile \
           && opam switch list \
           && ls -la \
           && git config --global --add safe.directory /workdir \
           && make libp2p_helper \
-          && make build-logproc \
-          && make build-devnet-sigs \
-          && make build-daemon-utils \
-          && debian-build-logproc \
-          && DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet \
+          && OPAMSWITCH=4.14.2 make build-logproc \
+          && OPAMSWITCH=4.14.2 make build-devnet-sigs \
+          && OPAMSWITCH=4.14.2 make build-daemon-utils \
+          && OPAMSWITCH=4.14.2 make debian-build-logproc \
+          && DEBIAN_SKIP_LEDGERS_COPY=y OPAMSWITCH=4.14.2 make debian-build-daemon-devnet \
         "
       fi
 
