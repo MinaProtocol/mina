@@ -37,40 +37,21 @@ end)
                         and type root_hash := Inputs.Hash.t
                         and type hash := Inputs.Hash.t
                         and type account_id := Inputs.Account_id.t
-                        and type account_id_set := Inputs.Account_id.Set.t) : sig
-  include
-    Intf.Ledger.S
-      with module Location = Inputs.Location
-       and module Addr = Inputs.Location.Addr
-       and type key := Inputs.Key.t
-       and type token_id := Inputs.Token_id.t
-       and type token_id_set := Inputs.Token_id.Set.t
-       and type account := Inputs.Account.t
-       and type root_hash := Inputs.Hash.t
-       and type hash := Inputs.Hash.t
-       and type account_id := Inputs.Account_id.t
-       and type account_id_set := Inputs.Account_id.Set.t
-
-  (** Create a converting ledger based on two component ledgers. No migration is
-      performed (use [of_ledgers_with_migration] if you need this) but all
-      subsequent write operations on the converting merkle tree will be applied
-      to both ledgers. *)
-  val of_ledgers : Primary_ledger.t -> Converting_ledger.t -> t
-
-  (** Create a converting ledger with an already-existing [Primary_ledger.t] and
-      an empty [Converting_ledger.t] that will be initialized with the migrated
-      account data. *)
-  val of_ledgers_with_migration : Primary_ledger.t -> Converting_ledger.t -> t
-
-  (** Retrieve the primary ledger backing the converting merkle tree *)
-  val primary_ledger : t -> Primary_ledger.t
-
-  (** Retrieve the converting ledger backing the converting merkle tree *)
-  val converting_ledger : t -> Converting_ledger.t
-
-  (** The input account conversion method, re-exposed for convenience *)
-  val convert : Inputs.Account.t -> Inputs.converted_account
-end
+                        and type account_id_set := Inputs.Account_id.Set.t) :
+  Intf.Ledger.CONVERTING
+    with module Location = Inputs.Location
+     and module Addr = Inputs.Location.Addr
+     and type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account := Inputs.Account.t
+     and type root_hash := Inputs.Hash.t
+     and type hash := Inputs.Hash.t
+     and type account_id := Inputs.Account_id.t
+     and type account_id_set := Inputs.Account_id.Set.t
+     and type primary_ledger := Primary_ledger.t
+     and type converting_ledger := Converting_ledger.t
+     and type converted_account := Inputs.converted_account
 
 (** A variant of [Make] that works with DATABASE ledgers and provides checkpoint operations *)
 module With_database (Inputs : sig

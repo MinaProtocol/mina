@@ -28,30 +28,21 @@ end)
                         and type root_hash := Inputs.Hash.t
                         and type hash := Inputs.Hash.t
                         and type account_id := Inputs.Account_id.t
-                        and type account_id_set := Inputs.Account_id.Set.t) : sig
-  include
-    Intf.Ledger.S
-      with module Location = Inputs.Location
-       and module Addr = Inputs.Location.Addr
-       and type key := Inputs.Key.t
-       and type token_id := Inputs.Token_id.t
-       and type token_id_set := Inputs.Token_id.Set.t
-       and type account := Inputs.Account.t
-       and type root_hash := Inputs.Hash.t
-       and type hash := Inputs.Hash.t
-       and type account_id := Inputs.Account_id.t
-       and type account_id_set := Inputs.Account_id.Set.t
-
-  val of_ledgers : Primary_ledger.t -> Converting_ledger.t -> t
-
-  val of_ledgers_with_migration : Primary_ledger.t -> Converting_ledger.t -> t
-
-  val primary_ledger : t -> Primary_ledger.t
-
-  val converting_ledger : t -> Converting_ledger.t
-
-  val convert : Inputs.Account.t -> Inputs.converted_account
-end = struct
+                        and type account_id_set := Inputs.Account_id.Set.t) :
+  Intf.Ledger.CONVERTING
+    with module Location = Inputs.Location
+     and module Addr = Inputs.Location.Addr
+     and type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account := Inputs.Account.t
+     and type root_hash := Inputs.Hash.t
+     and type hash := Inputs.Hash.t
+     and type account_id := Inputs.Account_id.t
+     and type account_id_set := Inputs.Account_id.Set.t
+     and type primary_ledger := Primary_ledger.t
+     and type converting_ledger := Converting_ledger.t
+     and type converted_account := Inputs.converted_account = struct
   let convert = Inputs.convert
 
   module Location = Inputs.Location
