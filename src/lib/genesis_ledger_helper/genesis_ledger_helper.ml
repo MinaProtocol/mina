@@ -604,8 +604,7 @@ module Epoch_data = struct
           in
           [%log trace] "Loaded staking epoch ledger from $ledger_file"
             ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-          ( { Consensus.Genesis_epoch_data.Data.ledger =
-                Genesis_ledger.Packed.t staking_ledger
+          ( { Consensus.Genesis_epoch_data.Data.ledger = staking_ledger
             ; seed = Epoch_seed.of_base58_check_exn config.staking.seed
             }
           , { config.staking with ledger = config' } )
@@ -622,8 +621,7 @@ module Epoch_data = struct
               [%log trace] "Loaded next epoch ledger from $ledger_file"
                 ~metadata:[ ("ledger_file", `String ledger_file) ] ;
               ( Some
-                  { Consensus.Genesis_epoch_data.Data.ledger =
-                      Genesis_ledger.Packed.t next_ledger
+                  { Consensus.Genesis_epoch_data.Data.ledger = next_ledger
                   ; seed = Epoch_seed.of_base58_check_exn seed
                   }
               , Some { Runtime_config.Epoch_data.Data.ledger = config''; seed }
@@ -707,8 +705,7 @@ module Genesis_proof = struct
     in
     let open Staged_ledger_diff in
     let protocol_state_with_hashes =
-      Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
+      Mina_state.Genesis_protocol_state.t ~genesis_ledger:ledger
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
         ~genesis_body_reference
     in

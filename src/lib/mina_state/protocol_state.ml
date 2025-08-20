@@ -302,7 +302,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             Blockchain_state.negative_one ~constraint_constants
               ~consensus_constants
               ~genesis_ledger_hash:
-                (Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger))
+                (Mina_ledger.Ledger.merkle_root
+                   (Lazy.force (Genesis_ledger.Packed.t genesis_ledger)) )
               ~genesis_body_reference
         ; genesis_state_hash = State_hash.of_hash Outside_hash_image.t
         ; consensus_state =

@@ -128,12 +128,7 @@ let%test_module "Epoch ledger sync tests" =
             ~compile_config:Mina_compile_config.For_unit_tests.t
             ~max_subtree_depth:None ~default_subtree_depth:None ()
       end in
-      let genesis_ledger =
-        lazy
-          (Mina_ledger.Ledger.create
-             ~directory_name:(make_dirname "genesis_ledger")
-             ~depth:precomputed_values.constraint_constants.ledger_depth () )
-      in
+      let genesis_ledger = Genesis_ledger.for_unit_tests in
       let genesis_epoch_data : Consensus.Genesis_epoch_data.t = None in
       let genesis_state_hash = Quickcheck.random_value Ledger_hash.gen in
       let consensus_local_state =
@@ -147,7 +142,7 @@ let%test_module "Epoch ledger sync tests" =
       let module Context = struct
         include Context
 
-        let genesis_ledger = genesis_ledger
+        let genesis_ledger = Genesis_ledger.Packed.t genesis_ledger
 
         let consensus_local_state = consensus_local_state
 
@@ -164,9 +159,15 @@ let%test_module "Epoch ledger sync tests" =
         ~conf_dir:(Some (make_dirname "verifier"))
         ()
 
-    let make_empty_ledger (module Context : CONTEXT) =
-      Mina_ledger.Ledger.create
-        ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
+    let make_empty_ledger (module Context : CONTEXT) : Genesis_ledger.Packed.t =
+      let module Test_genesis_ledger = Genesis_ledger.Make (struct
+        include Test_genesis_ledger
+
+        let directory = `New
+
+        let depth = constraint_constants.ledger_depth
+      end) in
+      (module Test_genesis_ledger)
 
     (* TODO: single for now, but the tests might need to be expanded to cover
        other types of Root ledgers when they are implemented *)
@@ -558,10 +559,11 @@ let%test_module "Epoch ledger sync tests" =
     let make_genesis_ledger (module Context : CONTEXT)
         (accounts : Account.t list) =
       let ledger = make_empty_ledger (module Context) in
+      let ledger_inner = Lazy.force @@ Genesis_ledger.Packed.t ledger in
       List.iter accounts ~f:(fun acct ->
           let acct_id = Account_id.create acct.public_key Token_id.default in
           match
-            Mina_ledger.Ledger.get_or_create_account ledger acct_id acct
+            Mina_ledger.Ledger.get_or_create_account ledger_inner acct_id acct
           with
           | Ok _ ->
               ()

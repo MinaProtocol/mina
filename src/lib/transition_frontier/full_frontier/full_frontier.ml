@@ -999,7 +999,8 @@ module For_tests = struct
     let consensus_local_state =
       Consensus.Data.Local_state.create
         ~context:(module Context)
-        Public_key.Compressed.Set.empty ~genesis_ledger:Genesis_ledger.t
+        Public_key.Compressed.Set.empty
+        ~genesis_ledger:(module Genesis_ledger)
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:

@@ -1144,8 +1144,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let consensus_local_state =
             Consensus.Data.Local_state.create
               ~context:(module Context)
-              ~genesis_ledger:
-                (Precomputed_values.genesis_ledger precomputed_values)
+              ~genesis_ledger:precomputed_values.genesis_ledger
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
               ( Option.map block_production_keypair ~f:(fun keypair ->
