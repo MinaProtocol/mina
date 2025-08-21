@@ -2560,7 +2560,8 @@ let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values
 
 let get_transition_frontier (t : t) =
   transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
-  |> Result.of_option ~error:"Could not obtain transition frontier"
+  |> Result.of_option
+       ~error:(Error.of_string "Could not obtain transition frontier")
 
 let best_chain_block_by_height (t : t) height =
   let open Result.Let_syntax in
@@ -2578,7 +2579,8 @@ let best_chain_block_by_height (t : t) height =
          Unsigned.UInt32.equal block_height height )
   |> Result.of_option
        ~error:
-         (sprintf "Could not find block in transition frontier with height %s"
+         (Error.createf
+            !"Could not find block in transition frontier with height %s"
             (Unsigned.UInt32.to_string height) )
 
 let best_chain_block_by_state_hash (t : t) hash =
@@ -2587,7 +2589,8 @@ let best_chain_block_by_state_hash (t : t) hash =
   Transition_frontier.find transition_frontier hash
   |> Result.of_option
        ~error:
-         (sprintf "Block with state hash %s not found in transition frontier"
+         (Error.createf
+            !"Block with state hash %s not found in transition frontier"
             (State_hash.to_base58_check hash) )
 
 let best_chain_block_before_stop_slot (t : t) =
@@ -2595,7 +2598,7 @@ let best_chain_block_before_stop_slot (t : t) =
   let runtime_config = t.config.precomputed_values.runtime_config in
   match best_tip t with
   | `Bootstrapping ->
-      Deferred.Result.fail "Daemon is bootstrapping"
+      Deferred.Or_error.error_string "Daemon is bootstrapping"
   | `Active breadcrumb -> (
       let txn_stop_slot_opt = Runtime_config.slot_tx_end runtime_config in
       match txn_stop_slot_opt with
@@ -2711,7 +2714,6 @@ module Hardfork_config = struct
           *)
           let%map next_epoch_ledger =
             get_snarked_ledger_full mina (Some epoch_transition_state_hash)
-            |> Deferred.Result.map_error ~f:Error.to_string_hum
           in
           ( cast_ledger staking_ledger
           , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
@@ -2737,8 +2739,7 @@ module Hardfork_config = struct
     ; blockchain_length : Mina_numbers.Length.t
     }
 
-  let prepare_inputs ~breadcrumb_spec mina : (inputs, string) Deferred.Result.t
-      =
+  let prepare_inputs ~breadcrumb_spec mina =
     let open Deferred.Result.Let_syntax in
     let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
     let block = Transition_frontier.Breadcrumb.block breadcrumb in

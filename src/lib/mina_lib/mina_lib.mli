@@ -252,13 +252,13 @@ val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
 val vrf_evaluation_state : t -> Block_producer.Vrf_evaluation_state.t
 
 val best_chain_block_by_height :
-  t -> Unsigned.UInt32.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+  t -> Unsigned.UInt32.t -> Transition_frontier.Breadcrumb.t Or_error.t
 
 val best_chain_block_by_state_hash :
-  t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+  t -> State_hash.t -> Transition_frontier.Breadcrumb.t Or_error.t
 
 val best_chain_block_before_stop_slot :
-  t -> (Transition_frontier.Breadcrumb.t, string) Deferred.Result.t
+  t -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
 
 module Hardfork_config : sig
   type mina_lib = t
@@ -271,15 +271,14 @@ module Hardfork_config : sig
   val breadcrumb :
        breadcrumb_spec:breadcrumb_spec
     -> mina_lib
-    -> (Transition_frontier.Breadcrumb.t, string) Deferred.Result.t
+    -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
 
   val epoch_ledgers :
        breadcrumb:Transition_frontier.Breadcrumb.t
     -> mina_lib
     -> ( Mina_ledger.Ledger.Any_ledger.witness
-         * Mina_ledger.Ledger.Any_ledger.witness
-       , string )
-       Deferred.Result.t
+       * Mina_ledger.Ledger.Any_ledger.witness )
+       Deferred.Or_error.t
 
   type inputs =
     { staged_ledger : Mina_ledger.Ledger.t
@@ -293,9 +292,7 @@ module Hardfork_config : sig
     }
 
   val prepare_inputs :
-       breadcrumb_spec:breadcrumb_spec
-    -> mina_lib
-    -> (inputs, string) Deferred.Result.t
+    breadcrumb_spec:breadcrumb_spec -> mina_lib -> inputs Deferred.Or_error.t
 end
 
 val zkapp_cmd_limit : t -> int option ref

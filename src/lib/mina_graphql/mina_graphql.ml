@@ -2287,12 +2287,9 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () (state_hash_base58_opt : string option)
                     (height_opt : int option) ->
-        let open Result.Let_syntax in
+        (let open Or_error.Let_syntax in
         let block_from_state_hash state_hash_base58 =
-          let%bind state_hash =
-            State_hash.of_base58_check state_hash_base58
-            |> Result.map_error ~f:Error.to_string_hum
-          in
+          let%bind state_hash = State_hash.of_base58_check state_hash_base58 in
           let%map breadcrumb =
             Mina_lib.best_chain_block_by_state_hash mina state_hash
           in
@@ -2318,7 +2315,9 @@ module Queries = struct
         | None, Some height ->
             block_from_height height
         | None, None | Some _, Some _ ->
-            Error "Must provide exactly one of state hash, height" )
+            Or_error.error_string
+              "Must provide exactly one of state hash, height")
+        |> result_of_or_error )
 
   let initial_peers =
     field "initialPeers"
@@ -2596,22 +2595,21 @@ module Queries = struct
               ~doc:"The height of the desired block in the best chain" ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
-        let open Deferred.Result.Let_syntax in
+        (let open Deferred.Or_error.Let_syntax in
         let%bind breadcrumb_spec =
           match (state_hash_opt, block_height_opt) with
           | None, None ->
               return `Stop_slot
           | Some state_hash_base58, None ->
               let%map state_hash =
-                State_hash.of_base58_check state_hash_base58
-                |> Result.map_error ~f:Error.to_string_hum
-                |> Deferred.return
+                State_hash.of_base58_check state_hash_base58 |> Deferred.return
               in
               `State_hash state_hash
           | None, Some block_height ->
               return (`Block_height (Unsigned.UInt32.of_int block_height))
           | Some _, Some _ ->
-              Deferred.Result.fail "Cannot specify both state hash and height"
+              Deferred.Or_error.error_string
+                "Cannot specify both state hash and height"
         in
         let%bind { staged_ledger
                  ; global_slot_since_genesis
@@ -2634,7 +2632,8 @@ module Queries = struct
           let open Async.Deferred.Infix in
           Async_unix.Scheduler.yield () >>| Result.return
         in
-        Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
+        Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic)
+        |> Deferred.Result.map_error ~f:Error.to_string_hum )
 
   let thread_graph =
     field "threadGraph"
@@ -2771,7 +2770,7 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () state_hash_base58_opt height_opt
                     encoding_opt ->
-        let open Deferred.Result.Let_syntax in
+        (let open Deferred.Result.Let_syntax in
         let%map breadcrumb =
           match (state_hash_base58_opt, height_opt) with
           | None, None -> (
@@ -2779,11 +2778,10 @@ module Queries = struct
               | `Active best_tip ->
                   Deferred.Result.return best_tip
               | `Bootstrapping ->
-                  Deferred.Result.fail "Node is bootstrapping" )
+                  Deferred.Or_error.error_string "Node is bootstrapping" )
           | Some state_hash_base58, None ->
               let%bind state_hash =
                 Deferred.return (State_hash.of_base58_check state_hash_base58)
-                |> Deferred.Result.map_error ~f:Error.to_string_hum
               in
               Deferred.return
                 (Mina_lib.best_chain_block_by_state_hash mina state_hash)
@@ -2792,7 +2790,7 @@ module Queries = struct
               Deferred.return
                 (Mina_lib.best_chain_block_by_height mina height_uint32)
           | Some _, Some _ ->
-              Deferred.Result.fail
+              Deferred.Or_error.error_string
                 "Must provide exactly one of state hash, height"
         in
         let protocol_state =
@@ -2807,7 +2805,8 @@ module Queries = struct
         | Some `JSON | None ->
             (* Default to JSON if no encoding is specified *)
             Mina_state.Protocol_state.value_to_yojson protocol_state
-            |> Yojson.Safe.to_string )
+            |> Yojson.Safe.to_string)
+        |> Deferred.Result.map_error ~f:Error.to_string_hum )
 
   let commands =
     [ sync_status
