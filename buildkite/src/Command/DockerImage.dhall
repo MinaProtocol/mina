@@ -94,10 +94,7 @@ let stepLabel =
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->  let installBuildx =
-                    "docker buildx create --name xbuilder --driver docker-container --use"
-                ++  "&& docker buildx inspect --bootstrap"
-                ++  "&& docker run --privileged --rm tonistiigi/binfmt --install arm64"
+      ->  let installBuildx = "./scripts/docker/setup_buildx.sh"
 
           let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
