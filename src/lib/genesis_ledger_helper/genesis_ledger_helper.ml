@@ -398,12 +398,17 @@ module Ledger = struct
   let load_extracted_ledger ~(config : Runtime_config.Ledger.t) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~extracted_path : Genesis_ledger.Packed.t =
+    (* TODO: pass in from above *)
+    let genesis_backing_type = Mina_ledger.Ledger.Root.Config.Stable_db in
+    let genesis_config =
+      Mina_ledger.Ledger.Root.Config.with_directory
+        ~backing_type:genesis_backing_type ~directory_name:extracted_path
+    in
     ( module Genesis_ledger.Of_ledger (struct
       let backing_ledger =
         lazy
           (let ledger =
-             Mina_ledger.Ledger.Root.create_single
-               ~directory_name:extracted_path
+             Mina_ledger.Ledger.Root.create ~config:genesis_config
                ~depth:constraint_constants.ledger_depth ()
            in
            let ledger_root = Mina_ledger.Ledger.Root.merkle_root ledger in

@@ -131,10 +131,21 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       | `Ephemeral ->
           lazy (`Ephemeral (Ledger.create_ephemeral ~depth ()), true)
       | `New ->
-          lazy (`Root (Ledger.Root.create_single ~depth ()), true)
+          lazy
+            ( `Root
+                (Ledger.Root.create_temporary
+                   ~backing_type:Ledger.Root.Config.Stable_db ~depth () )
+            , true )
       | `Path directory_name ->
           lazy
-            (`Root (Ledger.Root.create_single ~directory_name ~depth ()), false)
+            ( `Root
+                (Ledger.Root.create
+                   ~config:
+                     (Ledger.Root.Config.with_directory
+                        ~backing_type:Ledger.Root.Config.Stable_db
+                        ~directory_name )
+                   ~depth () )
+            , false )
     in
     let masked =
       match ledger with

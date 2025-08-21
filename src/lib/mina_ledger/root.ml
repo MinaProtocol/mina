@@ -28,6 +28,22 @@ module Make
                    with module Location = Any_ledger.M.Location
                     and module Addr = Any_ledger.M.Addr) =
 struct
+  module Config = struct
+    type t = string
+
+    type backing_type = Stable_db
+
+    let exists_backing = Sys.file_exists
+
+    let with_directory ~backing_type:Stable_db ~directory_name = directory_name
+
+    let delete_any_backing = Mina_stdlib_unix.File_system.rmrf
+
+    let move_backing_exn ~src ~dst = Sys.rename src dst
+
+    let primary_directory = Fn.id
+  end
+
   type root_hash = Ledger_hash.t
 
   type hash = Ledger_hash.t
@@ -44,15 +60,18 @@ struct
 
   let merkle_root t = match t with Stable_db db -> Stable_db.merkle_root db
 
-  let create_single ?directory_name ~depth () =
-    Stable_db (Stable_db.create ?directory_name ~depth ())
+  let create ~config:directory_name ~depth () =
+    Stable_db (Stable_db.create ~directory_name ~depth ())
 
-  let create_checkpoint t ~directory_name () =
+  let create_temporary ~backing_type:Config.Stable_db ~depth () =
+    Stable_db (Stable_db.create ~depth ())
+
+  let create_checkpoint t ~config:directory_name () =
     match t with
     | Stable_db db ->
         Stable_db (Stable_db.create_checkpoint db ~directory_name ())
 
-  let make_checkpoint t ~directory_name =
+  let make_checkpoint t ~config:directory_name =
     match t with Stable_db db -> Stable_db.make_checkpoint db ~directory_name
 
   let as_unmasked t =
