@@ -51,16 +51,20 @@ let MinaBuildSpec =
           , network : Network.Type
           , buildFlags : BuildFlags.Type
           , toolchainSelectMode : Toolchain.SelectionMode
+          , extraBuildEnvs : List Text
           , scope : List PipelineScope.Type
           , tags : List PipelineTag.Type
           , channel : DebianChannel.Type
           , debianRepo : DebianRepo.Type
+          , buildScript : Text
           , deb_legacy_version : Text
+          , suffix : Text
           , if : Optional B/If
           }
       , default =
           { prefix = "MinaArtifact"
           , artifacts = Artifacts.AllButTests
+          , buildScript = "./buildkite/scripts/build-release.sh"
           , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
@@ -70,6 +74,8 @@ let MinaBuildSpec =
           , scope = PipelineScope.Full
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
+          , extraBuildEnvs = [] : List Text
+          , suffix = ""
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , if = None B/If
           }
@@ -112,16 +118,17 @@ let build_artifacts
                         , Network.buildMainnetEnv spec.network
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
+                      # spec.extraBuildEnvs
                     )
-                    "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames
-                                                              spec.artifacts
-                                                              spec.network}"
+                    "${spec.buildScript} ${Artifacts.toDebianNames
+                                             spec.artifacts
+                                             spec.network}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                         spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
-            , key = "build-deb-pkg"
+            , key = "build-deb-pkg${spec.suffix}"
             , target = Size.XLarge
             , if = spec.if
             , retries =
@@ -323,4 +330,5 @@ in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
+    , buildArtifacts = build_artifacts
     }
