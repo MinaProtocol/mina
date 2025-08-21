@@ -2719,11 +2719,11 @@ module Hardfork_config = struct
           , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
     in
     assert (
-      Mina_base.Ledger_hash.equal
+      Ledger_hash.equal
         (Ledger.Any_ledger.M.merkle_root staking_ledger)
         staking_epoch.ledger.hash ) ;
     assert (
-      Mina_base.Ledger_hash.equal
+      Ledger_hash.equal
         (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
         next_epoch.ledger.hash ) ;
     (staking_ledger, next_epoch_ledger)
@@ -2763,8 +2763,8 @@ module Hardfork_config = struct
     let next_epoch =
       Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
     in
-    let staking_epoch_seed = staking_epoch.Mina_base.Epoch_data.Poly.seed in
-    let next_epoch_seed = next_epoch.Mina_base.Epoch_data.Poly.seed in
+    let staking_epoch_seed = staking_epoch.Epoch_data.Poly.seed in
+    let next_epoch_seed = next_epoch.Epoch_data.Poly.seed in
     let%map staking_ledger, next_epoch_ledger =
       epoch_ledgers ~breadcrumb mina
     in
