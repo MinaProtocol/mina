@@ -23,7 +23,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   end
 
   type maps_t =
-    { accounts : Account.t Location_binable.Map.t
+    { accounts : Account.t Location.Map.t
     ; token_owners : Account_id.t Token_id.Map.t
     ; hashes : Hash.t Addr.Map.t
     ; locations : Location.t Account_id.Map.t
@@ -92,7 +92,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type unattached = t
 
   let empty_maps =
-    { accounts = Location_binable.Map.empty
+    { accounts = Location.Map.empty
     ; token_owners = Token_id.Map.empty
     ; hashes = Addr.Map.empty
     ; locations = Account_id.Map.empty
@@ -122,6 +122,18 @@ module Make (Inputs : Inputs_intf.S) = struct
     type index = int
 
     type path = Path.t
+
+    (* WARN: this type should mirror [maps_t], we can't pull that definition here directly because
+       - Map are result of functors application
+       - [ppx-version] doesn't work well with functors application
+    *)
+    type maps_fold_mask = Base.maps_fold_mask =
+      { fold_accounts : (Location.t * Account.t) list
+      ; fold_token_owners : (Token_id.t * Account_id.t) list
+      ; fold_hashes : (Addr.t * Hash.t) list
+      ; fold_locations : (Account_id.t * Location.t) list
+      ; fold_non_existent_accounts : Account_id.Set.t
+      }
 
     exception
       Dangling_parent_reference of
@@ -1012,6 +1024,30 @@ module Make (Inputs : Inputs_intf.S) = struct
                 add_location () )
       | Some location ->
           Ok (`Existed, location)
+
+    let accumulate_maps_dup ~(init : maps_fold_mask) (t : t) =
+      let parent = get_parent t in
+
+      let { fold_accounts
+          ; fold_token_owners
+          ; fold_hashes
+          ; fold_locations
+          ; fold_non_existent_accounts
+          } =
+        Base.accumulate_maps_dup ~init parent
+      in
+
+      let { accounts; token_owners; hashes; locations; non_existent_accounts } =
+        t.maps
+      in
+      { fold_accounts = Location.Map.to_alist accounts @ fold_accounts
+      ; fold_token_owners =
+          Token_id.Map.to_alist token_owners @ fold_token_owners
+      ; fold_hashes = Addr.Map.to_alist hashes @ fold_hashes
+      ; fold_locations = Account_id.Map.to_alist locations @ fold_locations
+      ; fold_non_existent_accounts =
+          Account_id.Set.union fold_non_existent_accounts non_existent_accounts
+      }
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =
