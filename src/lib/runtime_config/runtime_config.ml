@@ -640,8 +640,8 @@ module Accounts = struct
         ; permissions = Some (Permissions.of_permissions a.permissions)
         }
 
-    let to_account ?(ignore_missing_fields = false) (a : t) :
-        Mina_base.Account.t =
+    let to_account ?(ignore_missing_fields = false) ?(pad_app_state = false)
+        (a : t) : Mina_base.Account.t =
       let open Signature_lib in
       let timing =
         let open Mina_base.Account_timing.Poly in
@@ -716,6 +716,20 @@ module Accounts = struct
         | true, _ ->
             Mina_base.Permissions.user_default
       in
+      let pad_app_state_do app_state =
+        if pad_app_state then
+          let max = Mina_base.Zkapp_state.max_size_int in
+          let len = List.length app_state in
+          if len > max then
+            failwithf "zkapp app_state length (%d) exceeds max allowed (%d)" len
+              max ()
+          else
+            let zeros =
+              List.init (max - len) ~f:(const Snark_params.Tick.Field.zero)
+            in
+            app_state @ zeros
+        else app_state
+      in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
           , Mina_base.Verification_key_wire.t option
@@ -727,7 +741,9 @@ module Accounts = struct
           Mina_base.Zkapp_account.Poly.t =
         let hash_data = Mina_base.Verification_key_wire.digest_vk in
         Zkapp_account.
-          { app_state = Mina_base.Zkapp_state.V.of_list_exn app.app_state
+          { app_state =
+              Mina_base.Zkapp_state.V.of_list_exn
+              @@ pad_app_state_do app.app_state
           ; verification_key =
               Option.map ~f:With_hash.(of_data ~hash_data) app.verification_key
           ; zkapp_version = app.zkapp_version
