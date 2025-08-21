@@ -38,6 +38,7 @@ let ReleaseSpec =
           , version : Text
           , branch : Text
           , repo : Text
+          , arch : Arch.Type
           , no_cache : Bool
           , no_debian : Bool
           , deb_codename : DebianVersions.DebVersion
@@ -55,6 +56,7 @@ let ReleaseSpec =
       , default =
           { deps = [] : List Command.TaggedKey.Type
           , network = Network.Type.Berkeley
+          , arch = Arch.Type.Amd64
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"

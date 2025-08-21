@@ -51,10 +51,10 @@ RUN curl -sLO https://github.com/MinaProtocol/deb-s3/releases/download/${DEBS3_V
 # --- influx db tool
 # Custom version, with lock only on manifest upload
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -L -o influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${BUILDPLATFORM}.tar.gz https://download.influxdata.com/influxdb/releases/influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${BUILDPLATFORM}.tar.gz \
-    && mkdir -p "influx_dir" && tar xvzf influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${BUILDPLATFORM}.tar.gz -C influx_dir \
+RUN curl -L -o influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz https://download.influxdata.com/influxdb/releases/influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz \
+    && mkdir -p "influx_dir" && tar xvzf influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz -C influx_dir \
     && cp influx_dir/influx /usr/local/bin/ \
-    && rm influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${BUILDPLATFORM}.tar.gz \
+    && rm influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.gz \
     && rm -rf influx_dir
 
 # --- Docker Daemon
