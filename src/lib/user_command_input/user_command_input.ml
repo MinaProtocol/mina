@@ -133,9 +133,8 @@ let create ?nonce ~fee ~fee_payer_pk ~valid_until ~memo ~body ~signer
   in
   { payload; signer; signature = sign_choice }
 
-let sign ~signer ~(user_command_payload : Signed_command_payload.t) =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
-  function
+let sign ~signer ~(user_command_payload : Signed_command_payload.t)
+    ~signature_kind = function
   | Sign_choice.Signature signature ->
       Option.value_map
         ~default:(Deferred.return (Error "Invalid_signature"))
@@ -199,7 +198,8 @@ let warn_if_unable_to_pay_account_creation_fee ~get_account
       ()
 
 let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    ~get_account ~constraint_constants ~logger (client_input : t) =
+    ~get_account ~constraint_constants ~logger ~signature_kind (client_input : t)
+    =
   Deferred.map
     ~f:
       (Result.map_error ~f:(fun str ->
@@ -222,13 +222,13 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
       ~constraint_constants ~logger user_command_payload
   in
   let%map signed_user_command =
-    sign ~signer:client_input.signer ~user_command_payload
+    sign ~signature_kind ~signer:client_input.signer ~user_command_payload
       client_input.signature
   in
   (Signed_command.forget_check signed_user_command, updated_nonce_map)
 
 let to_user_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    ~get_account ~constraint_constants ~logger uc_inputs :
+    ~get_account ~constraint_constants ~logger ~signature_kind uc_inputs :
     Signed_command.t list Deferred.Or_error.t =
   (* When batching multiple user commands, keep track of the nonces and send
       all the user commands if they are valid or none if there is an error in
@@ -240,7 +240,7 @@ let to_user_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
       ~f:(fun (valid_user_commands, nonce_map) uc_input ->
         let%map res, updated_nonce_map =
           to_user_command ~nonce_map ~get_current_nonce ~get_account
-            ~constraint_constants ~logger uc_input
+            ~constraint_constants ~logger ~signature_kind uc_input
         in
         (res :: valid_user_commands, updated_nonce_map) )
   in
