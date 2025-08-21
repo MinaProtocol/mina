@@ -213,7 +213,7 @@ export SLOT_TX_END
 echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
 
 
-MINA_DEB_CODENAME=bullseye source ./scripts/export-git-env-vars.sh
+MINA_DEB_CODENAME=focal source ./scripts/export-git-env-vars.sh
 
 if [[ "$MODE" == "docker" ]]; then
   "$SCRIPT_DIR"/test.sh --mina-docker "gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-devnet" && echo "HF test completed successfully"
