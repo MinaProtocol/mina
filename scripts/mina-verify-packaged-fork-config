@@ -56,16 +56,16 @@ MINA_EXE=${MINA_EXE:-$(source_build_fallback mina ./_build/default/src/app/cli/s
 MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback mina-create-genesis ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
 MINA_LEGACY_GENESIS_EXE=${MINA_LEGACY_GENESIS_EXE:-$(source_build_fallback mina-create-legacy-genesis ./runtime_genesis_ledger_of_mainnet.exe)}
 CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback mina-hf-create-runtime-config ./scripts/hardfork/create_runtime_config.sh)}
-GSUTIL=${GSUTIL:-$(source_build_fallback gsutil false)}
+GSUTIL=${GSUTIL:-$(command -v gsutil || echo "")}
 
-if [[ -e "$PRECOMPUTED_FORK_BLOCK"  && ! -x "$GSUTIL" ]]; then
+if [[ ! -e "$PRECOMPUTED_FORK_BLOCK" && ( -z "$GSUTIL" || ! -x "$GSUTIL" ) ]]; then
     echo "Error: gsutil is required when PRECOMPUTED_FORK_BLOCK is nonexistent path"
     exit 1
 fi
 
 installed_config=$(echo /var/lib/coda/config_*.json)
 PACKAGED_DAEMON_CONFIG=${PACKAGED_DAEMON_CONFIG:-$installed_config}
-if [ ! -e "$installed_config" ]; then
+if [ ! -e "$PACKAGED_DAEMON_CONFIG" ]; then
     echo "Error: set PACKAGED_DAEMON_CONFIG to the path to the JSON file to verify"
     exit 1
 fi
@@ -143,9 +143,11 @@ function extract_ledgers() {
     config_file=$1
     ledger_dir=$2
     json_prefix=$3
+    
     "$MINA_EXE" daemon --libp2p-keypair "$workdir/keys/p2p" \
       --config-file "$config_file" --config-file "$override_file" \
-      --seed --genesis-ledger-dir "$ledger_dir" &
+      --seed --genesis-ledger-dir "$ledger_dir" \
+      --log-level "${MINA_LOG_LEVEL:-info}" &
 
     while ! "$MINA_EXE" ledger export staged-ledger  | jq . 2>/dev/null >"$json_prefix-staged.json"; do
         sleep 1m
@@ -212,7 +214,9 @@ for file in "$workdir"/ledgers/*.tar.gz; do
     mkdir -p "$tardir"/{packaged,generated,web}
     tar -xzf "$file" -C "$tardir/generated"
     tar -xzf "$GENESIS_LEDGER_DIR/$tarname.tar.gz" -C "$tardir/packaged"
-    curl "https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net/$tarname.tar.gz" | tar -xz -C "$tardir/web"
+
+    base_s3_url="${MINA_LEDGER_S3_BUCKET:-https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net}"
+    curl "$base_s3_url/$tarname.tar.gz" | tar -xz -C "$tardir/web"
 
     $ldb_cmd --hex --db="$tardir/packaged" scan > "$workdir/packaged.scan"
     $ldb_cmd --hex --db="$tardir/web" scan > "$workdir/web.scan"
