@@ -74,9 +74,12 @@ end
 module type S = sig
   val t : Mina_ledger.Ledger.t Lazy.t
 
-  (** Populate a root ledger with the content of the genesis ledger *)
-  val populate_root :
-    Mina_ledger.Ledger.Root.t -> Mina_ledger.Ledger.Root.t Or_error.t
+  (** Create a new root ledger that is equal in state to the genesis ledger *)
+  val create_root :
+       config:Mina_ledger.Ledger.Root.Config.t
+    -> depth:int
+    -> unit
+    -> Mina_ledger.Ledger.Root.t Or_error.t
 
   val depth : int
 
