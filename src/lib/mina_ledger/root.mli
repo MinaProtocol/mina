@@ -1,8 +1,9 @@
 open Core_kernel
 open Mina_base
+open Merkle_ledger
 
 module type Stable_db_intf =
-  Merkle_ledger.Intf.Ledger.DATABASE
+  Intf.Ledger.DATABASE
     with type account := Account.t
      and type key := Signature_lib.Public_key.Compressed.t
      and type token_id := Token_id.t
@@ -13,7 +14,7 @@ module type Stable_db_intf =
      and type root_hash := Ledger_hash.t
 
 module type Any_ledger_intf =
-  Merkle_ledger.Intf.Ledger.ANY
+  Intf.Ledger.ANY
     with type account := Account.t
      and type key := Signature_lib.Public_key.Compressed.t
      and type token_id := Token_id.t
@@ -21,6 +22,17 @@ module type Any_ledger_intf =
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
      and type hash := Ledger_hash.t
+
+module type Converting_intf =
+  Intf.Ledger.Converting.WITH_DATABASE
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Signature_lib.Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
 
 (** Make a root ledger. A root ledger is a database-backed, unmasked ledger used
     at the root of a mina ledger mask tree. Currently only a single stable
@@ -32,7 +44,10 @@ module Make
     (Any_ledger : Any_ledger_intf)
     (Stable_db : Stable_db_intf
                    with module Location = Any_ledger.M.Location
-                    and module Addr = Any_ledger.M.Addr) : sig
+                    and module Addr = Any_ledger.M.Addr)
+    (Converting_ledger : Converting_intf
+                           with module Location = Any_ledger.M.Location
+                            and module Addr = Any_ledger.M.Addr) : sig
   type t
 
   type root_hash = Ledger_hash.t

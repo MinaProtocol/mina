@@ -244,7 +244,21 @@ module Ledger_inner = struct
 
   type maskable_ledger = t
 
-  module Converting_ledger =
+  module Converting_ledger :
+    Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+      with module Location = Location_at_depth
+       and module Addr = Location_at_depth.Addr
+      with type root_hash := Ledger_hash.t
+       and type hash := Ledger_hash.t
+       and type account := Account.t
+       and type key := Signature_lib.Public_key.Compressed.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type primary_ledger := Db.t
+       and type converting_ledger := Unstable_db.t
+       and type converted_account := Account.Unstable.t =
     Converting_merkle_tree.With_database
       (struct
         type converted_account = Account.Unstable.t
@@ -293,7 +307,7 @@ module Ledger_inner = struct
     , Converting_ledger.converting_ledger converting_ledger )
 
   module Root = struct
-    include Root.Make (Any_ledger) (Db)
+    include Root.Make (Any_ledger) (Db) (Converting_ledger)
 
     let as_masked t = as_unmasked t |> of_any_ledger
   end
