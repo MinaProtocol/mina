@@ -30,6 +30,8 @@ let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
 let Extensions = ../Lib/Extensions.dhall
 
+let Arch = ../Constants/Arch.dhall
+
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -92,10 +94,10 @@ let stepLabel =
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->
-          let installBuildx = "docker buildx create --name xbuilder --driver docker-container --use"
-++ "&& docker buildx inspect --bootstrap"
-++ "&& docker run --privileged --rm tonistiigi/binfmt --install arm64"
+      ->  let installBuildx =
+                    "docker buildx create --name xbuilder --driver docker-container --use"
+                ++  "&& docker buildx inspect --bootstrap"
+                ++  "&& docker run --privileged --rm tonistiigi/binfmt --install arm64"
 
           let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
@@ -151,6 +153,7 @@ let generateStep =
                             , version = spec.deb_version
                             , codenames = [ spec.deb_codename ]
                             , suffix = suffix
+                            , arch = spec.arch
                             }
 
                 else  ""
@@ -175,6 +178,7 @@ let generateStep =
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  " --repo ${spec.repo}"
+                ++  " --platform ${Arch.platform spec.arch}"
 
           let releaseDockerCmd =
                       if DockerPublish.shouldPublish
@@ -215,9 +219,8 @@ let generateStep =
                   , Stable = remoteRepoCmds
                   , Local =
                     [ Cmd.run
-                        (
-                          installBuildx
-                          ++ " && "
+                        (     installBuildx
+                          ++  " && "
                           ++  exportMinaDebCmd
                           ++  " && "
                           ++  pruneDockerImages
