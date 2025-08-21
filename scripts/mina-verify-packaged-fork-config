@@ -170,7 +170,8 @@ if [ -z ${NO_TEST_LEDGER_DOWNLOAD+z} ]; then
     # We removed all *.tar.gz from GENESIS_LEDGER_DIR (in case it's one of default paths)
     # and expect Mina node to be able to download these from S3
     extract_ledgers "$PACKAGED_DAEMON_CONFIG" "$workdir/ledgers-downloaded" "$workdir/downloaded"
-    rm -Rf /tmp/coda_cache_dir/*.tar.gz /tmp/s3_cache_dir/*.tar.gz
+    TMPDIR="${TMPDIR:-/tmp}"
+    rm -Rf "$TMPDIR"/coda_cache_dir/*.tar.gz "$TMPDIR"/s3_cache_dir/*.tar.gz
 fi
 extract_ledgers "$workdir/config-substituted.json" "$workdir/ledgers" "$workdir/reference"
 mv -t "$GENESIS_LEDGER_DIR" "$workdir/ledgers-backup"/*
