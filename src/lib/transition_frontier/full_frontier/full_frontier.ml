@@ -1029,7 +1029,8 @@ module For_tests = struct
         ~directory:(Filename.temp_file "snarked_ledger" "")
         ~ledger_depth
     in
-    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ) ;
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in

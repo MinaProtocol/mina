@@ -66,19 +66,19 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
 end
 
 module Utils = struct
-  (* Populate a [Ledger.Root.t] ledger with the components of a root
+  (* Create a new [Ledger.Root.t] ledger with the components of a root
      backing_ledger for a genesis ledger. These components are the underlying
      root ledger and the stored mask on top of that root that is presented to
      users of the genesis root. The mask is passed in to this function so we can
-     assert that there are no uncommitted changes to it, allowing us to use the
-     potentially much faster Ledger.Root.transfer_accounts_with function. *)
-  let populate_root_with_backing_root genesis_mask ~src ~dest =
+     assert that there are no uncommitted changes to it, so we can simply
+     checkpoint the root instead of performing a much slower account transfer. *)
+  let create_root_from_backing_root genesis_mask root ~config ~depth () =
     assert (
       Ledger_hash.equal
         (Ledger.merkle_root genesis_mask)
-        (Ledger.Root.merkle_root src) ) ;
-    Ledger.Root.transfer_accounts_with
-      ~stable:Ledger_transfer_stable.transfer_accounts ~src ~dest
+        (Ledger.Root.merkle_root root) ) ;
+    assert (Ledger.Root.depth root = depth) ;
+    Ledger.Root.create_checkpoint ~config root () |> Or_error.return
 
   let keypair_of_account_record_exn (private_key, account) =
     let open Account in
@@ -166,11 +166,12 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
 
   let t = Lazy.map ~f:snd backing_ledger
 
-  let populate_root root =
+  let create_root ~config ~depth () =
     let backing_ledger, mask = Lazy.force backing_ledger in
     match backing_ledger with
     | `Ephemeral ledger ->
         let open Or_error.Let_syntax in
+        let root = Ledger.Root.create ~config ~depth () in
         (* We are transferring to an unmasked view of the root, so this is
            used solely for the transfer side effect *)
         let%map _dest =
@@ -179,7 +180,7 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
         in
         root
     | `Root ledger ->
-        populate_root_with_backing_root mask ~src:ledger ~dest:root
+        create_root_from_backing_root mask ledger ~config ~depth ()
 
   include Utils
 
@@ -217,7 +218,7 @@ module Packed = struct
 
   let t ((module L) : t) = L.t
 
-  let populate_root ((module L) : t) ledger = L.populate_root ledger
+  let create_root ((module L) : t) = L.create_root
 
   let depth ((module L) : t) = L.depth
 
@@ -261,9 +262,9 @@ end) : Intf.S = struct
 
   include Utils
 
-  let populate_root dest =
+  let create_root ~config ~depth () =
     let genesis_root, mask = Lazy.force backing_ledger in
-    populate_root_with_backing_root mask ~src:genesis_root ~dest
+    create_root_from_backing_root mask genesis_root ~config ~depth ()
 
   let find_account_record_exn ~f =
     find_account_record_exn ~f (Lazy.force accounts)

@@ -2677,14 +2677,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                       | Ledger_snapshot.Ledger_root ledger ->
                           Ok ledger
                       | Ledger_snapshot.Genesis_epoch_ledger packed ->
-                          let fresh_root_ledger =
-                            Mina_ledger.Ledger.Root.create
-                              ~config:snapshot_config
-                              ~depth:Context.constraint_constants.ledger_depth
-                              ()
-                          in
-                          Genesis_ledger.Packed.populate_root packed
-                            fresh_root_ledger )
+                          Genesis_ledger.Packed.create_root packed
+                            ~config:snapshot_config
+                            ~depth:Context.constraint_constants.ledger_depth () )
                 in
                 match snapshot_id with
                 | Staking_epoch_snapshot ->

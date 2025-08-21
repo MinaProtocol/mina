@@ -320,15 +320,27 @@ let with_instance_exn t ~f =
   let x = f instance in
   Instance.close instance ; x
 
-let reset_to_genesis_exn t ~precomputed_values =
+(** Clear the factory directory and recreate the snarked ledger instance for
+    this factory with [create_root] and [setup] *)
+let reset_factory_root_exn t ~create_root ~setup =
+  let open Async.Deferred.Let_syntax in
   assert (Option.is_none t.instance) ;
-  Mina_stdlib_unix.File_system.rmrf t.directory ;
-  with_instance_exn t ~f:(fun instance ->
-      ignore
-        ( Precomputed_values.populate_root precomputed_values
-            (Instance.snarked_ledger instance)
-          |> Or_error.map ~f:Ledger.Root.as_unmasked
-          : Ledger.Any_ledger.witness Or_error.t ) ;
+  let%map () =
+    Mina_stdlib_unix.File_system.create_dir ~clear_if_exists:true t.directory
+  in
+  let root =
+    create_root
+      ~config:(Instance.Config.snarked_ledger t)
+      ~depth:t.ledger_depth ()
+    |> Or_error.ok_exn
+  in
+  Ledger.Root.close root ;
+  with_instance_exn t ~f:setup
+
+let reset_to_genesis_exn t ~precomputed_values =
+  reset_factory_root_exn t
+    ~create_root:(Precomputed_values.create_root precomputed_values)
+    ~setup:(fun instance ->
       Instance.set_root_identifier instance
         (genesis_root_identifier
            ~genesis_state_hash:
