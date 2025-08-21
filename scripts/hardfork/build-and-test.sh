@@ -196,7 +196,7 @@ fi
 
 build_branch "$INIT_DIR" "$INIT_DIR/fork-devnet"
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
+if  [[ "$MODE" == "nix" ]] && [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws
   cat << EOF > $HOME/.aws/credentials
 [default]
