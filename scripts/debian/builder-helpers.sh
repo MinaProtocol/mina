@@ -9,6 +9,7 @@ BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
 MINA_DEB_VERSION=${MINA_DEB_VERSION:-"0.0.0-experimental"}
 MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
+ARCHITECTURE=${ARCHITECTURE:-"amd64"}
 
 # Helper script to include when building deb archives.
 
@@ -101,7 +102,7 @@ Label: MinaProtocol
 Vendor: O(1)Labs
 Codename: ${MINA_DEB_CODENAME}
 Suite: ${MINA_DEB_RELEASE}
-Architecture: amd64
+Architecture: ${ARCHITECTURE}
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${2}

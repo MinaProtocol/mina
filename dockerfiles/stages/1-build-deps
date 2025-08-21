@@ -15,7 +15,7 @@ FROM ${image} AS build-deps
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
-ARG SYSTEM
+ARG RUSTARCH
 
 # OCaml Version
 # The version must be the same as the version used in:
@@ -105,7 +105,7 @@ RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
-  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${SYSTEM}-linux" \
+  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${TARGETARCH}-linux" \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
@@ -123,7 +123,7 @@ RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz
 USER opam
 RUN curl --proto "=https" \
   --tlsv1.2 -sSf -o /tmp/rustup-init \
-  https://static.rust-lang.org/rustup/dist/$SYSTEM-unknown-linux-gnu/rustup-init \
+  https://static.rust-lang.org/rustup/dist/$RUSTARCH-unknown-linux-gnu/rustup-init \
   && chmod +x /tmp/rustup-init \
   && /tmp/rustup-init -y --default-toolchain \
     "${RUST_VERSION}" \
