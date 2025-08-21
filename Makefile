@@ -597,7 +597,8 @@ define build_docker_image
 	&& ./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service $(1) \
-		--version "$$MINA_DEB_VERSION" \
+		--deb-version "$$MINA_DEB_VERSION" \
+		--version "$$MINA_DOCKER_VERSION" \
 		--branch "$$GITBRANCH" \
 		--network $(2) \
 		--no-cache
