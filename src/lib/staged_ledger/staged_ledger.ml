@@ -2198,6 +2198,7 @@ module T = struct
               Transaction_validator.apply_transaction_first_pass
                 ~constraint_constants ~global_slot validating_ledger
                 ~txn_state_view:current_state_view
+                ~signature_kind:Mina_signature_kind.t_DEPRECATED
             in
             (* Transactions in reverse order for faster removal if there is no
                space when creating the diff *)
