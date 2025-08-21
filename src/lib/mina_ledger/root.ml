@@ -77,11 +77,6 @@ struct
   let as_unmasked t =
     match t with Stable_db db -> Any_ledger.cast (module Stable_db) db
 
-  let transfer_accounts_with ~stable ~src ~dest =
-    match (src, dest) with
-    | Stable_db db1, Stable_db db2 ->
-        stable ~src:db1 ~dest:db2 |> Or_error.map ~f:(fun x -> Stable_db x)
-
   let depth t = match t with Stable_db db -> Stable_db.depth db
 
   let num_accounts t = match t with Stable_db db -> Stable_db.num_accounts db

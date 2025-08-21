@@ -98,19 +98,6 @@ module Make
       that does not need to know how the root is implemented *)
   val as_unmasked : t -> Any_ledger.witness
 
-  (** Use the given [stable] account transfer method to transfer the accounts
-      from one root ledger instance to another. For a root ledger backed by a
-      single database (currently the only option) it is equivalent to using
-      [stable] or a normal ledger transfer on the root. Future root backings
-      should be able to support more efficient transfers (e.g., for a converting
-      databases the accounts could be transferred directly between the
-      underlying pair of databases)*)
-  val transfer_accounts_with :
-       stable:(src:Stable_db.t -> dest:Stable_db.t -> Stable_db.t Or_error.t)
-    -> src:t
-    -> dest:t
-    -> t Or_error.t
-
   (** Retrieve the depth of the root ledger *)
   val depth : t -> int
 
