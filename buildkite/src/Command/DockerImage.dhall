@@ -90,7 +90,12 @@ let stepLabel =
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->  let exportMinaDebCmd =
+      ->
+          let installBuildx = "docker buildx create --name xbuilder --driver docker-container --use"
+++ "&& docker buildx inspect --bootstrap"
+++ "&& docker run --privileged --rm tonistiigi/binfmt --install arm64"
+
+          let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                               spec.deb_codename}"
 
@@ -208,7 +213,10 @@ let generateStep =
                   , Stable = remoteRepoCmds
                   , Local =
                     [ Cmd.run
-                        (     exportMinaDebCmd
+                        (
+                          installBuildx
+                          ++ " && "
+                          ++  exportMinaDebCmd
                           ++  " && "
                           ++  pruneDockerImages
                           ++  maybeStartDebianRepo
