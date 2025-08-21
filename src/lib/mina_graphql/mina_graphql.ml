@@ -2565,7 +2565,7 @@ module Queries = struct
             ~constraint_constants:
               (Mina_lib.config mina).precomputed_values.constraint_constants
             ~logger:(Mina_lib.top_level_logger mina)
-            user_command_input
+            ~signature_kind:Mina_signature_kind.t_DEPRECATED user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         let signature_kind = Mina_signature_kind.t_DEPRECATED in

@@ -2105,7 +2105,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   match%bind
                     User_command_input.to_user_commands ~get_current_nonce
                       ~get_account ~constraint_constants ~logger:config.logger
-                      uc_inputs
+                      ~signature_kind:Mina_signature_kind.t_DEPRECATED uc_inputs
                   with
                   | Ok signed_commands ->
                       if List.is_empty signed_commands then (
