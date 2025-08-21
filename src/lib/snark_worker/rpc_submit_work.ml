@@ -26,7 +26,7 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 module Stable = struct
   module V2 = struct
     module T = struct
-      type query = Selector.Result.Stable.V1.t
+      type query = Selector.Result.Stable.V2.t
 
       type response = unit
 
