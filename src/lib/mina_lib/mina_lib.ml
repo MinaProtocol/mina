@@ -2733,9 +2733,9 @@ module Hardfork_config = struct
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
     ; state_hash : State_hash.t
     ; staking_ledger : Ledger.Any_ledger.witness
-    ; staking_epoch_seed : string
+    ; staking_epoch_seed : Epoch_seed.t
     ; next_epoch_ledger : Ledger.Any_ledger.witness
-    ; next_epoch_seed : string
+    ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
     }
 
@@ -2763,14 +2763,8 @@ module Hardfork_config = struct
     let next_epoch =
       Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
     in
-    let staking_epoch_seed =
-      Mina_base.Epoch_seed.to_base58_check
-        staking_epoch.Mina_base.Epoch_data.Poly.seed
-    in
-    let next_epoch_seed =
-      Mina_base.Epoch_seed.to_base58_check
-        next_epoch.Mina_base.Epoch_data.Poly.seed
-    in
+    let staking_epoch_seed = staking_epoch.Mina_base.Epoch_data.Poly.seed in
+    let next_epoch_seed = next_epoch.Mina_base.Epoch_data.Poly.seed in
     let%map staking_ledger, next_epoch_ledger =
       epoch_ledgers ~breadcrumb mina
     in

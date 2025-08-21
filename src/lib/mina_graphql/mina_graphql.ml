@@ -2625,8 +2625,10 @@ module Queries = struct
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger
             ~global_slot_since_genesis ~state_hash ~staking_ledger
-            ~staking_epoch_seed ~next_epoch_ledger:(Some next_epoch_ledger)
-            ~next_epoch_seed ~blockchain_length
+            ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
+            ~next_epoch_ledger:(Some next_epoch_ledger)
+            ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
+            ~blockchain_length
         in
         let%map () =
           let open Async.Deferred.Infix in

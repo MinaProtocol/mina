@@ -285,9 +285,9 @@ module Hardfork_config : sig
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
     ; state_hash : State_hash.t
     ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
-    ; staking_epoch_seed : string
+    ; staking_epoch_seed : Epoch_seed.t
     ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
-    ; next_epoch_seed : string
+    ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
     }
 
