@@ -207,7 +207,9 @@ if [[ "$fork_data" != "$expected_fork_data" ]]; then
 fi
 
 if [[ "$MODE" == "docker" ]]; then
-  "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
+    docker run --rm -v "$PWD:/localnet" "mina-create-legacy-genesis" --config-file /localnet/fork_config.json --genesis-dir /localnet/prefork_hf_ledgers --hash-output-file /localnet/prefork_hf_ledger_hashes.json
+else
+    "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
 fi
 
 
