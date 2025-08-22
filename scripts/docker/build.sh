@@ -111,6 +111,19 @@ case "${INPUT_PLATFORM}" in
 esac
 RUSTARCH_ARG="--build-arg RUSTARCH=$RUSTARCH"
 
+case "${INPUT_PLATFORM}" in
+      linux/amd64)
+        OPAMARCH="x86_64"
+        ;;
+      linux/arm64)
+        OPAMARCH="arm64"
+        ;;
+      *)
+        echo "unsupported platform"; exit 1
+        ;;
+esac
+OPAMARCH_ARG="--build-arg OPAMARCH=$OPAMARCH"
+
 
 DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 if [[ -z "$INPUT_RELEASE" ]]; then
@@ -227,9 +240,9 @@ BUILD_NETWORK="--network=host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker buildx build $PLATFORM $RUSTARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker buildx build $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
-  docker buildx build $PLATFORM $RUSTARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx build $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

@@ -16,6 +16,7 @@ ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
 ARG RUSTARCH
+ARG OPAMARCH
 
 # OCaml Version
 # The version must be the same as the version used in:
@@ -105,7 +106,7 @@ RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
-  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${TARGETARCH}-linux" \
+  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${OPAMARCH}-linux" \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
