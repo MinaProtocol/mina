@@ -193,6 +193,7 @@ let generateStep =
                                               spec.deb_profile}"
                       ++  " --deb-build-flags ${BuildFlags.lowerName
                                                   spec.build_flags}"
+                      ++  " --arch ${Arch.lowerName spec.arch}"
 
                 else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
                                                                                                                                                                                                 spec.docker_publish}."

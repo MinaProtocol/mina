@@ -35,6 +35,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-version) export DEB_VERSION="--build-arg deb_version=$2"; shift;;
   --deb-profile) export DEB_PROFILE="$2"; shift;;
   --deb-build-flags) export DEB_BUILD_FLAGS="$2"; shift;;
+  --arch) export INPUT_PLATFORM="$2"; shift;;
   --help) usage "$@"; exit 0;;
   *) echo "Unknown parameter passed: $1"; usage "$@"; exit 1;;
 esac; shift; done
