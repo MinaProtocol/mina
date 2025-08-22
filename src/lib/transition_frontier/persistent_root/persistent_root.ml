@@ -314,9 +314,11 @@ let with_instance_exn t ~f =
 let reset_factory_root_exn t ~create_root ~setup =
   let open Async.Deferred.Let_syntax in
   assert (Option.is_none t.instance) ;
-  let%map () =
-    Mina_stdlib_unix.File_system.create_dir ~clear_if_exists:true t.directory
-  in
+  (* Certain database initialization methods, e.g. creation from a checkpoint,
+     depend on the parent directory existing and the target directory _not_
+     existing. *)
+  let%bind () = Mina_stdlib_unix.File_system.remove_dir t.directory in
+  let%map () = Mina_stdlib_unix.File_system.create_dir t.directory in
   let root =
     create_root
       ~config:(Instance.Config.snarked_ledger t)
