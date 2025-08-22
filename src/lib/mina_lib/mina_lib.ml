@@ -2670,12 +2670,9 @@ module Hardfork_config = struct
           Ledger.Root.as_unmasked l
     in
     let root_consensus_state =
-      let frontier =
-        Option.value_exn @@ Pipe_lib.Broadcast_pipe.Reader.peek
-        @@ transition_frontier mina
-      in
-      let frontier_root = Transition_frontier.root frontier in
-      frontier_root |> Transition_frontier.Breadcrumb.protocol_state
+      transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
+      |> Option.value_exn |> Transition_frontier.root
+      |> Transition_frontier.Breadcrumb.protocol_state
       |> Mina_state.Protocol_state.consensus_state
     in
     let%map staking_ledger, next_epoch_ledger =
