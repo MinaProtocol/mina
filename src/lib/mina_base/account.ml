@@ -1037,6 +1037,80 @@ let deriver obj =
        ~zkapp:!.(option ~js_type:Or_undefined (Zkapp_account.deriver @@ o ()))
        obj
 
+(** An account type that reflects the account format changes or other account
+    migrations that may occur during the next hard fork. The changes reflected
+    in this type are:
+
+    - The zkapp state size increase from 8 to 32 slots. Migration: padding the
+      zkapp state size with 24 zero field elements.
+*)
+module Hardfork = struct
+  type t =
+    { public_key : Public_key.Compressed.Stable.Latest.t
+    ; token_id : Token_id.Stable.Latest.t
+    ; token_symbol : Token_symbol.Stable.Latest.t
+    ; balance : Balance.Stable.Latest.t
+    ; nonce : Nonce.Stable.Latest.t
+    ; receipt_chain_hash : Receipt.Chain_hash.Stable.Latest.t
+    ; delegate : Public_key.Compressed.Stable.Latest.t option
+    ; voting_for : State_hash.Stable.Latest.t
+    ; timing : Timing.Stable.Latest.t
+    ; permissions : Permissions.Stable.Latest.t
+    ; zkapp : Zkapp_account.Hardfork.t option
+    }
+  [@@deriving
+    sexp, equal, hash, compare, yojson, hlist, fields, bin_io_unversioned]
+
+  let of_stable (account : Stable.Latest.t) : t =
+    { public_key = account.public_key
+    ; token_id = account.token_id
+    ; token_symbol = account.token_symbol
+    ; balance = account.balance
+    ; nonce = account.nonce
+    ; receipt_chain_hash = account.receipt_chain_hash
+    ; delegate = account.delegate
+    ; voting_for = account.voting_for
+    ; timing = account.timing
+    ; permissions = account.permissions
+    ; zkapp = Option.map ~f:Zkapp_account.Hardfork.of_stable account.zkapp
+    }
+
+  let balance { balance; _ } = balance
+
+  let empty = of_stable empty
+
+  let identifier ({ public_key; token_id; _ } : t) =
+    Account_id.create public_key token_id
+
+  let token_id ({ token_id; _ } : t) = token_id
+
+  let hash_zkapp_account_opt = function
+    | None ->
+        Lazy.force Zkapp_account.Hardfork.default_digest
+    | Some (a : Zkapp_account.Hardfork.t) ->
+        Zkapp_account.Hardfork.digest a
+
+  let to_input (t : t) =
+    let open Random_oracle.Input.Chunked in
+    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    Fields.fold ~init:[]
+      ~public_key:(f Public_key.Compressed.to_input)
+      ~token_id:(f Token_id.to_input) ~balance:(f Balance.to_input)
+      ~token_symbol:(f Token_symbol.to_input) ~nonce:(f Nonce.to_input)
+      ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
+      ~delegate:(f (Fn.compose Public_key.Compressed.to_input delegate_opt))
+      ~voting_for:(f State_hash.to_input) ~timing:(f Timing.to_input)
+      ~zkapp:(f (Fn.compose field hash_zkapp_account_opt))
+      ~permissions:(f Permissions.to_input)
+    |> List.reduce_exn ~f:append
+
+  let digest t =
+    Random_oracle.hash ~init:crypto_hash_prefix
+      (Random_oracle.pack_input (to_input t))
+
+  let empty_digest = lazy (digest empty)
+end
+
 (* An unstable account is needed when we're doing ledger migration. The main
    idea is we provide a function converting from Stable account to this type,
    and storing all writes to the original ledger to the new ledger. *)
