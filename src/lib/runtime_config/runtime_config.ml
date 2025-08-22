@@ -606,7 +606,7 @@ module Accounts = struct
 
     let default = Json_layout.Accounts.Single.default
 
-    let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
+    let of_account (a : Mina_base.Account.t) : t Or_error.t =
       let open Result.Let_syntax in
       let open Signature_lib in
       return
@@ -792,7 +792,7 @@ module Accounts = struct
     let gen =
       Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
           (* This will never fail with a proper account generator. *)
-          of_account a |> Result.ok_or_failwith )
+          of_account a |> Or_error.ok_exn )
   end
 
   type single = Single.t =
@@ -1545,7 +1545,7 @@ let gen =
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
-  let open Async.Deferred.Result.Let_syntax in
+  let open Async.Deferred.Or_error.Let_syntax in
   let yield = Async_unix.Scheduler.yield_every ~n:100 |> Staged.unstage in
   let%bind accounts =
     Mina_ledger.Ledger.Any_ledger.M.to_list ledger
@@ -1576,7 +1576,7 @@ let ledger_of_accounts accounts =
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed =
-  let open Async.Deferred.Result.Let_syntax in
+  let open Async.Deferred.Or_error.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in
