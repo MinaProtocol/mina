@@ -6,6 +6,8 @@ let Prelude = ../External/Prelude.dhall
 
 let List/map = Prelude.List.map
 
+let Optional/default = Prelude.Optional.default
+
 let Command = ./Base.dhall
 
 let Cmd = ../Lib/Cmds.dhall
@@ -58,7 +60,7 @@ let MinaBuildSpec =
           , debianRepo : DebianRepo.Type
           , buildScript : Text
           , deb_legacy_version : Text
-          , suffix : Text
+          , suffix : Optional Text
           , if : Optional B/If
           }
       , default =
@@ -75,7 +77,7 @@ let MinaBuildSpec =
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
           , extraBuildEnvs = [] : List Text
-          , suffix = ""
+          , suffix = None Text
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , if = None B/If
           }
@@ -128,7 +130,7 @@ let build_artifacts
                                                                         spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
-            , key = "build-deb-pkg${spec.suffix}"
+            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
             , target = Size.XLarge
             , if = spec.if
             , retries =
