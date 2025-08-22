@@ -5,19 +5,19 @@ open Mina_base
 
 module Ledger_inner = struct
   module Location_at_depth : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.T
+    Merkle_ledger.Location
 
   module Location_binable = struct
     module Arg = struct
       type t = Location_at_depth.t =
-        | Generic of Location.Bigstring.Stable.Latest.t
+        | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
         | Account of Location_at_depth.Addr.Stable.Latest.t
         | Hash of Location_at_depth.Addr.Stable.Latest.t
       [@@deriving bin_io_unversioned, hash, sexp, compare]
     end
 
     type t = Arg.t =
-      | Generic of Location.Bigstring.t
+      | Generic of Mina_stdlib.Bigstring.t
       | Account of Location_at_depth.Addr.t
       | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
