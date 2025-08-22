@@ -34,7 +34,7 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:4
         ~f:(fun make_breadcrumb ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier =
+              let%bind frontier =
                 create_frontier ~epoch_ledger_backing_type:Stable_db ()
               in
               let root = Full_frontier.root frontier in
@@ -58,7 +58,7 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test gen_branches ~trials:4
         ~f:(fun (make_short_branch, make_long_branch) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier =
+              let%bind frontier =
                 create_frontier ~epoch_ledger_backing_type:Stable_db ()
               in
               let test_best_tip ?message breadcrumb =
@@ -93,7 +93,7 @@ let%test_module "Full_frontier tests" =
         ~trials:4
         ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier =
+              let%bind frontier =
                 create_frontier ~epoch_ledger_backing_type:Stable_db ()
               in
               let root = Full_frontier.root frontier in
@@ -123,7 +123,7 @@ let%test_module "Full_frontier tests" =
         ~trials:2
         ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier =
+              let%bind frontier =
                 create_frontier ~epoch_ledger_backing_type:Stable_db ()
               in
               let root = Full_frontier.root frontier in
@@ -152,7 +152,7 @@ let%test_module "Full_frontier tests" =
       in
       Quickcheck.test gen ~trials:4 ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier =
+              let%bind frontier =
                 create_frontier ~epoch_ledger_backing_type:Stable_db ()
               in
               let root = Full_frontier.root frontier in
@@ -181,7 +181,7 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test gen ~trials:4
         ~f:(fun (make_ancestors, make_branch_a, make_branch_b) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier =
+              let%bind frontier =
                 create_frontier ~epoch_ledger_backing_type:Stable_db ()
               in
               let root = Full_frontier.root frontier in
