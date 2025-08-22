@@ -678,10 +678,9 @@ hardfork-debian: ocaml_checks ## Generate hardfork packages
 
 .PHONY: hardfork-docker
 hardfork-docker: SHELL := /bin/bash
-hardfork-docker: ocaml_checks ## Generate hardfork packages
+hardfork-docker: ## Generate hardfork packages
 	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
 
-	$(MAKE) hardfork-debian
 	$(MAKE) start-local-debian-repo
 
 	@BUILD_DIR=./_build \
