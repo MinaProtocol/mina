@@ -74,7 +74,7 @@ function export_suffixes () {
 }
 
 function get_arch_suffix() {
-    case "${PLATFORM}" in
+    case "${INPUT_PLATFORM}" in
         linux/amd64)
             echo ""
             ;;
