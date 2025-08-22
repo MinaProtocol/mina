@@ -18,6 +18,14 @@ ARG BUILDPLATFORM
 ARG RUSTARCH
 ARG OPAMARCH
 
+
+RUN echo $TARGETPLATFORM
+
+RUN echo $TARGETARCH
+
+RUN echo $BUILDPLATFORM
+
+
 # OCaml Version
 # The version must be the same as the version used in:
 # - dockerfiles/1-build-deps
