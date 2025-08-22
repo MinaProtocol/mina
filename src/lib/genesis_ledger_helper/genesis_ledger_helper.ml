@@ -349,7 +349,7 @@ module Ledger = struct
     ( module Genesis_ledger.Make (struct
       let accounts = accounts
 
-      let directory = `New
+      let directory = `Ephemeral
 
       let depth = depth
     end) )
