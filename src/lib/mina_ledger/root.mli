@@ -1,4 +1,3 @@
-open Core_kernel
 open Mina_base
 
 module type Stable_db_intf =
