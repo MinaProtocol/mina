@@ -90,7 +90,8 @@ let stepLabel =
                                          spec.network} ${DebianVersions.capitalName
                                                            spec.deb_codename} ${Profiles.toSuffixUppercase
                                                                                   spec.deb_profile} ${BuildFlags.toSuffixUppercase
-                                                                                                        spec.build_flags}"
+                                                                                                        spec.build_flags} ${Arch.capitalName
+                                                                                                                              spec.arch}"
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
