@@ -98,6 +98,8 @@ if [[ -z "$INPUT_PLATFORM" ]]; then
   INPUT_PLATFORM="linux/amd64"
 fi
 
+PLATFORM="--platform ${INPUT_PLATFORM}"
+
 case "${INPUT_PLATFORM}" in
       linux/amd64)
         RUSTARCH="x86_64"
