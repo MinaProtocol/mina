@@ -14,7 +14,7 @@ ARG HADOLINT_VERSION=2.12.0
 ARG TARGETPLATFORM
 ARG TARGETARCH
 ARG BUILDPLATFORM
-ARG SYSTEM
+ARG RUSTARCH
 
 USER root
 
@@ -58,7 +58,7 @@ RUN curl -L -o influxdb2-client-${INFLUXDB_CLI_VERSION}-linux-${TARGETARCH}.tar.
     && rm -rf influx_dir
 
 # --- Docker Daemon
-RUN curl -sL https://download.docker.com/linux/static/stable/${SYSTEM}/docker-${DOCKER_VERSION}.tgz \
+RUN curl -sL https://download.docker.com/linux/static/stable/${RUSTARCH}/docker-${DOCKER_VERSION}.tgz \
     | tar --extract --gzip --strip-components 1 --directory=/usr/bin --file=-
 
 # --- Google Cloud tools
@@ -92,7 +92,7 @@ RUN apt-get install --yes --no-install-recommends dhall=${DHALL_VERSION} \
         dhall-json=${DHALL_JSON_VERSION}
 
 # --- Hadolint
-RUN curl -sL https://github.com/hadolint/hadolint/releases/download/v$HADOLINT_VERSION/hadolint-Linux-${SYSTEM} \
+RUN curl -sL https://github.com/hadolint/hadolint/releases/download/v$HADOLINT_VERSION/hadolint-Linux-${TARGETARCH} \
     -o /usr/bin/hadolint \
     && chmod +x /usr/bin/hadolint
 

@@ -10,10 +10,12 @@ ARG image=ubuntu:focal
 # any other stages.
 ARG deb_codename
 
-FROM ${image} AS build-deps
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
+
+FROM --platform=$TARGETPLATFORM ${image} AS build-deps
+
 ARG BUILDPLATFORM
 ARG RUSTARCH
 ARG OPAMARCH
