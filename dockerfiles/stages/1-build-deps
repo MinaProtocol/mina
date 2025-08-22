@@ -20,13 +20,13 @@ ARG RUSTARCH
 ARG OPAMARCH
 ARG TARGETARCH
 
-RUN "echo $TARGETPLATFORM"
+RUN echo $TARGETPLATFORM
 
-RUN "echo $TARGETARCH"
+RUN echo $TARGETARCH
 
-RUN "echo $BUILDPLATFORM"
+RUN echo $BUILDPLATFORM
 
-RUN echo "uname -m"
+RUN echo "$(uname -m)"
 
 
 # OCaml Version
