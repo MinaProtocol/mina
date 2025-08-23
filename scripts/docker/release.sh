@@ -4,7 +4,7 @@
 # we have to trustlist and configure image builds individually because each one is going to be slightly different.
 # This is needed as opposed to trusting the structure of the each project to be consistent for every deployable.
 
-set -eo pipefail
+set -eox pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 # shellcheck disable=SC1090
@@ -22,6 +22,7 @@ function usage() {
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
+  echo "      --arch                The architecture to build the docker image for (amd64, arm64). Default=amd64"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
