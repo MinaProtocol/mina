@@ -139,13 +139,13 @@ build_deb() {
   # Docker image, we're examining those packages in buildkite's agent, where
   # `zstd` might not be available.
   fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" \
-    "${1}"_"${MINA_DEB_VERSION}".deb
+    "${1}"_"${MINA_DEB_VERSION}"_"${ARCHITECTURE}".deb
   echo "build_deb outputs:"
   ls -lh "${1}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
 
-  echo "--- Built ${1}_${MINA_DEB_VERSION}.deb"
+  echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
 }
 
 # Function to DRY copying config files into daemon packages
