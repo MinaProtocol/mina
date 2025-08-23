@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Config (override via env or args)
 NAME="${1:-${BUILDX_NAME:-xbuilder}}"
-DRIVER="${DRIVER:-docker-container}"
+DRIVER="${DRIVER:-docker}"
 ARCHS="${ARCHS:-arm64}"            # binfmt architectures to install
 INSTALL_BINFMT="${INSTALL_BINFMT:-1}"
 
