@@ -68,7 +68,7 @@ let MinaBuildSpec =
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
-          , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
+          , toolchainSelectMode = Toolchain.SelectionMode.ByDebianAndArch
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , scope = PipelineScope.Full
           , channel = DebianChannel.Type.Unstable
@@ -108,6 +108,7 @@ let build_artifacts
                   Toolchain.select
                     spec.toolchainSelectMode
                     spec.debVersion
+                    spec.arch
                     (   [ "DUNE_PROFILE=${Profiles.duneProfile spec.profile}"
                         , "AWS_ACCESS_KEY_ID"
                         , "AWS_SECRET_ACCESS_KEY"
