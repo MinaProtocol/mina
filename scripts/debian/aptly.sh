@@ -48,9 +48,9 @@ function start_aptly() {
     aptly publish snapshot -distribution="${__distribution}" -skip-signing "${__component}"
 
     if [ "${__background}" = 1 ]; then
-        aptly serve -listen localhost:"${__port}" &
+        aptly serve -listen 0.0.0.0:"${__port}" &
     else
-        aptly serve -listen localhost:"${__port}"
+        aptly serve -listen 0.0.0.0:"${__port}"
     fi
 
     if [ $__wait = 1 ]; then

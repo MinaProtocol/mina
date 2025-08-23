@@ -154,16 +154,15 @@ if [[ -z "$INPUT_CACHE" ]]; then
 fi
 
 DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
-LOCALHOST_REPLACEMENT="deb-repo"
+LOCALHOST_REPLACEMENT="host.docker.internal"
 if [[ -z "$INPUT_REPO" ]]; then
   echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
   DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
 else
-  echo "Converting localhost to host.docker.internal in repository URL"
+  echo "Converting localhost to $LOCALHOST_REPLACEMENT in repository URL"
   CONVERTED_REPO=$(echo "$INPUT_REPO" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
   DEB_REPO="--build-arg deb_repo=$CONVERTED_REPO"
 fi
-
 
 if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
 
@@ -244,15 +243,11 @@ esac
 export_version
 export_docker_tag
 
-BUILD_NETWORK="--network=host"
-
-docker network create buildnet || true
-docker run -d --name deb-repo --network buildnet -p 8080:8080 \
-  -v /path/to/repo:/usr/share/nginx/html:ro nginx:alpine
+BUILD_NETWORK="--add-host=host.docker.internal:host-gateway"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker buildx build \
+  cat $DOCKERFILE_PATH | docker buildx build --add-host=host.docker.internal:host-gateway \
  --load --progress=plain $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
   docker buildx build --progress=plain $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
