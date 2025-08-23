@@ -75,7 +75,7 @@ function export_suffixes () {
     esac
 }
 
-function get_arch_suffix() {
+function get_platform_suffix() {
     case "${INPUT_PLATFORM}" in
         linux/amd64)
             echo ""
@@ -95,12 +95,12 @@ function export_docker_tag() {
 
     export DOCKER_REGISTRY="gcr.io/o1labs-192920"
 
-    ARCH_SUFFIX="$(get_arch_suffix)"
-    export TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}${ARCH_SUFFIX}"
+    PLATFORM_SUFFIX="$(get_platform_suffix)"
+    export TAG="${DOCKER_REGISTRY}/${SERVICE}:${VERSION}${BUILD_FLAG_SUFFIX}${PLATFORM_SUFFIX}"
     # friendly, predictable tag
     GITHASH=$(git rev-parse --short=7 HEAD)
-    export ARCH_SUFFIX
+    export PLATFORM_SUFFIX
     export GITHASH
-    export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${BUILD_FLAG_SUFFIX}${ARCH_SUFFIX}"
+    export HASHTAG="${DOCKER_REGISTRY}/${SERVICE}:${GITHASH}-${DEB_CODENAME##*=}-${NETWORK##*=}${BUILD_FLAG_SUFFIX}${PLATFORM_SUFFIX}"
 
 }
