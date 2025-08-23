@@ -154,7 +154,7 @@ if [[ -z "$INPUT_CACHE" ]]; then
 fi
 
 DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
-LOCALHOST_REPLACEMENT="host.docker.internal"
+LOCALHOST_REPLACEMENT="deb-repo"
 if [[ -z "$INPUT_REPO" ]]; then
   echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
   DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
@@ -246,9 +246,13 @@ export_docker_tag
 
 BUILD_NETWORK="--network=host"
 
+docker network create buildnet || true
+docker run -d --name deb-repo --network buildnet -p 8080:8080 \
+  -v /path/to/repo:/usr/share/nginx/html:ro nginx:alpine
+
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker buildx build --add-host=host.docker.internal:host-gateway \
+  cat $DOCKERFILE_PATH | docker buildx build \
  --load --progress=plain $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
   docker buildx build --progress=plain $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
