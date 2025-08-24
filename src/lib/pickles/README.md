@@ -55,8 +55,8 @@ library. Refer to the file header for a content description:
   - [`Tick_field_sponge`](tick_field_sponge.mli)
   - [`Tock_field_sponge`](tock_field_sponge.mli)
 - Polynomial commitment scheme:
-  - [`Commitment_length`](commitment_length.mli)
-  - [`Evaluation_length`](evaluation_length.mli)
+  - [`Commitment_length`](commitment_lengths.mli)
+  - [`Evaluation_length`](evaluation_lengths.mli)
 - Main protocol:
   - [`Impls`](impls.mli)
 - Optimisations:
