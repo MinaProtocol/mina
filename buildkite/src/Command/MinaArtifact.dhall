@@ -42,6 +42,8 @@ let Artifacts = ../Constants/Artifacts.dhall
 
 let Toolchain = ../Constants/Toolchain.dhall
 
+let Arch = ../Constants/Arch.dhall
+
 let MinaBuildSpec =
       { Type =
           { prefix : Text
@@ -55,6 +57,7 @@ let MinaBuildSpec =
           , tags : List PipelineTag.Type
           , channel : DebianChannel.Type
           , debianRepo : DebianRepo.Type
+          , arch : Arch.Type
           , deb_legacy_version : Text
           , if : Optional B/If
           }
@@ -65,12 +68,13 @@ let MinaBuildSpec =
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
-          , toolchainSelectMode = Toolchain.SelectionMode.ByDebian
+          , toolchainSelectMode = Toolchain.SelectionMode.ByDebianAndArch
           , tags = [ PipelineTag.Type.Long, PipelineTag.Type.Release ]
           , scope = PipelineScope.Full
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
+          , arch = Arch.Type.Amd64
           , if = None B/If
           }
       }
@@ -82,7 +86,8 @@ let labelSuffix
                spec.debVersion} ${Network.capitalName
                                     spec.network} ${Profiles.toSuffixUppercase
                                                       spec.profile} ${BuildFlags.toSuffixUppercase
-                                                                        spec.buildFlags}"
+                                                                        spec.buildFlags}${Arch.labelSuffix
+                                                                                            spec.arch}"
 
 let nameSuffix
     : MinaBuildSpec.Type -> Text
@@ -91,7 +96,8 @@ let nameSuffix
                spec.debVersion}${Network.capitalName
                                    spec.network}${Profiles.toSuffixUppercase
                                                     spec.profile}${BuildFlags.toSuffixUppercase
-                                                                     spec.buildFlags}"
+                                                                     spec.buildFlags}${Arch.nameSuffix
+                                                                                         spec.arch}"
 
 let build_artifacts
     : MinaBuildSpec.Type -> Command.Type
@@ -102,6 +108,7 @@ let build_artifacts
                   Toolchain.select
                     spec.toolchainSelectMode
                     spec.debVersion
+                    spec.arch
                     (   [ "DUNE_PROFILE=${Profiles.duneProfile spec.profile}"
                         , "AWS_ACCESS_KEY_ID"
                         , "AWS_SECRET_ACCESS_KEY"
@@ -109,6 +116,7 @@ let build_artifacts
                         , "MINA_COMMIT_SHA1=\$BUILDKITE_COMMIT"
                         , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                  spec.debVersion}"
+                        , "ARCHITECTURE=${Arch.lowerName spec.arch}"
                         , Network.buildMainnetEnv spec.network
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
@@ -164,6 +172,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
+                    , arch = spec.arch
                     , if = spec.if
                     }
                   ]
@@ -186,6 +195,7 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , arch = spec.arch
                     }
                   ]
                 , TestExecutive = [] : List DockerImage.ReleaseSpec.Type
@@ -202,6 +212,7 @@ let docker_step
                     , docker_publish = docker_publish
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
+                    , arch = spec.arch
                     , if = spec.if
                     }
                   ]
@@ -217,6 +228,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
+                    , arch = spec.arch
                     , if = spec.if
                     }
                   ]
@@ -231,6 +243,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
+                    , arch = spec.arch
                     , if = spec.if
                     }
                   ]
@@ -244,6 +257,7 @@ let docker_step
                     , deb_profile = spec.profile
                     , deb_codename = spec.debVersion
                     , deb_legacy_version = spec.deb_legacy_version
+                    , arch = spec.arch
                     , if = spec.if
                     }
                   ]
@@ -258,6 +272,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_profile = spec.profile
                     , deb_legacy_version = spec.deb_legacy_version
+                    , arch = spec.arch
                     , if = spec.if
                     }
                   ]

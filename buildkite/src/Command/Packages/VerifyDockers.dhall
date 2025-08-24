@@ -14,6 +14,8 @@ let Artifact = ../../Constants/Artifacts.dhall
 
 let DebianVersions = ../../Constants/DebianVersions.dhall
 
+let Arch = ../../Constants/Arch.dhall
+
 let Spec =
       { Type =
           { artifacts : List Artifact.Type
@@ -22,6 +24,7 @@ let Spec =
           , codenames : List DebianVersions.DebVersion
           , published_to_docker_io : Bool
           , suffix : Optional Text
+          , arch : Arch.Type
           }
       , default =
           { artifacts = [] : List Package.Type
@@ -32,6 +35,7 @@ let Spec =
             ]
           , published_to_docker_io = False
           , suffix = None Text
+          , arch = Arch.Type.Amd64
           }
       }
 
@@ -68,17 +72,52 @@ let joinCodenames
 let verify
     : Spec.Type -> Text
     =     \(spec : Spec.Type)
-      ->      ". ./buildkite/scripts/export-git-env-vars.sh && "
-          ++  "./buildkite/scripts/release/manager.sh verify "
-          ++  "--artifacts ${joinArtifacts spec} "
-          ++  "--networks ${joinNetworks spec} "
-          ++  "--version ${spec.version} "
-          ++  "--codenames ${joinCodenames spec} "
-          ++  merge
-                { None = ""
-                , Some = \(suffix : Text) -> "--docker-suffix ${suffix} "
-                }
-                spec.suffix
-          ++  "--only-dockers "
+      ->  let arch = Arch.toOptionalSuffixLowercase spec.arch
+
+          let suffixAndArchFlag =
+                let archFlag =
+                      Prelude.Optional.map
+                        Text
+                        Text
+                        (\(archValue : Text) -> "--arch ${archValue} ")
+                        arch
+
+                let suffixFlag =
+                      Prelude.Optional.map
+                        Text
+                        Text
+                        (\(suffix : Text) -> "--docker-suffix ${suffix} ")
+                        spec.suffix
+
+                in      Prelude.Optional.default Text "" archFlag
+                    ++  Prelude.Optional.default Text "" suffixFlag
+
+          in      ". ./buildkite/scripts/export-git-env-vars.sh && "
+              ++  suffixAndArchFlag
+              ++  "./buildkite/scripts/release/manager.sh verify "
+              ++  "--artifacts ${joinArtifacts spec} "
+              ++  "--networks ${joinNetworks spec} "
+              ++  "--version ${spec.version} "
+              ++  "--codenames ${joinCodenames spec} "
+              ++  merge
+                    { None =
+                        merge
+                          { Some =
+                              \(suffix : Text) -> "--docker-suffix ${suffix} "
+                          , None = ""
+                          }
+                          arch
+                    , Some =
+                            \(suffix : Text)
+                        ->  merge
+                              { Some =
+                                      \(arch_suffix : Text)
+                                  ->  "--docker-suffix ${suffix}${arch_suffix} "
+                              , None = "--docker-suffix ${suffix} "
+                              }
+                              arch
+                    }
+                    spec.suffix
+              ++  "--only-dockers "
 
 in  { verify = verify, Spec = Spec }

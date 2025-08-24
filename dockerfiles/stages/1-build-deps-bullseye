@@ -1,5 +1,9 @@
 FROM build-deps AS build-deps-bullseye
 
+ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG BUILDPLATFORM
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 USER root

@@ -1,5 +1,10 @@
 FROM build-deps AS build-deps-bookworm
 
+ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG BUILDPLATFORM
+ARG RUSTARCH
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 USER root
@@ -11,7 +16,7 @@ RUN apt-get update --quiet \
     libproc2-0 \
   && rm -rf /var/lib/apt/lists/*
 
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-${RUSTARCH}.zip" -o "awscliv2.zip" \
   && unzip awscliv2.zip \
   && ./aws/install \
   && rm -rf awscliv2.zip aws
