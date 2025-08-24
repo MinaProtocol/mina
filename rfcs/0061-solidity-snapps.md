@@ -1,9 +1,8 @@
 # Overview of solidity features for snapps
 
 This document aims to examine the features of the solidity smart contract
-language, to describe how they can be simulated by snapps, and proposing
-changes to the snapp transaction model for those that it currently cannot
-simulate.
+language, to describe how they can be simulated by snapps, and proposing changes
+to the snapp transaction model for those that it currently cannot simulate.
 
 This document refers to the features of v0.8.5 of the solidity language, and
 makes reference to the snapp parties transaction RFC at MinaProtocol/mina#8068
@@ -13,9 +12,11 @@ makes reference to the snapp parties transaction RFC at MinaProtocol/mina#8068
 
 ### State variables
 
-Solidity uses [state variables](https://docs.soliditylang.org/en/v0.8.5/structure-of-a-contract.html#state-variables)
+Solidity uses
+[state variables](https://docs.soliditylang.org/en/v0.8.5/structure-of-a-contract.html#state-variables)
 to manage the internal state of a contract. We intend to simulate this state
-with a 'snapp state' formed of [8 field elements](https://github.com/MinaProtocol/mina/blob/b137fbd750d9de1b5dfe009c12de134de0eb7200/src/lib/mina_base/snapp_state.ml#L17).
+with a 'snapp state' formed of
+[8 field elements](https://github.com/MinaProtocol/mina/blob/b137fbd750d9de1b5dfe009c12de134de0eb7200/src/lib/mina_base/snapp_state.ml#L17).
 Where the state holds more data than will fit in 8 field elements, we can
 simulate this larger storage by holding a hash of some of these variables in
 place of their contents.
@@ -28,9 +29,9 @@ below for details.
 
 When the variables do not fit within the field elements, the data for the snapp
 will not be directly available on-chain, and must be computed or retrieved from
-some off-chain source. It is important to provide primitives for revealing
-the updated states, otherwise updating a snapp's state may only reveal a hash,
-and the new underlying data may be rendered inaccessible.
+some off-chain source. It is important to provide primitives for revealing the
+updated states, otherwise updating a snapp's state may only reveal a hash, and
+the new underlying data may be rendered inaccessible.
 
 To this end, it may be useful to add support for the poseidon hash used by mina
 to IPFS, so that this data can be stored (ephemerally) in IPFS. We will also
@@ -40,10 +41,10 @@ with the parties; see the events section below for details.
 ### Functions
 
 [Functions](https://docs.soliditylang.org/en/v0.8.5/structure-of-a-contract.html#functions)
-are the primary interface of solidity contracts; in order to interact
-with a smart contract, you submit a transaction that calls one of the functions
-the contract exposes. These may call other functions from the same contract or
-from other contracts.
+are the primary interface of solidity contracts; in order to interact with a
+smart contract, you submit a transaction that calls one of the functions the
+contract exposes. These may call other functions from the same contract or from
+other contracts.
 
 We propose simulating functions with snark proofs, where each function call
 corresponds to a single snark proof. Our current snark model uses a 'wrapping'
@@ -56,12 +57,12 @@ or inlining, depending on the use case).
 
 #### Arguments and returned values
 
-In order to simulate calling functions with arguments, and returning values
-from functions, snapp parties must be able to expose some 'witness' to these
-values. The format is determined by the circuit statement, but usually this
-will be `hash(arguments, returned_values)`.
+In order to simulate calling functions with arguments, and returning values from
+functions, snapp parties must be able to expose some 'witness' to these values.
+The format is determined by the circuit statement, but usually this will be
+`hash(arguments, returned_values)`.
 
-*This is currently not supported by the snapp transaction model RFC.*
+_This is currently not supported by the snapp transaction model RFC._
 
 **Proposal:** add an additional field element (`aux_data`) that is passed as
 part of the input to the snapp proof, which may be used to bind the function's
@@ -86,9 +87,9 @@ calls or deeply nested calls, by letting them avoid walking arbitrarily far
 along the stack of parties to find the one they care about.
 
 **Proposal:** use a stack of stacks for the parties involved in a transaction,
-allowing each snapp to access its inner transactions by examining its stack.
-For example, a snapp which calls other snapps might have a stack that looks
-like
+allowing each snapp to access its inner transactions by examining its stack. For
+example, a snapp which calls other snapps might have a stack that looks like
+
 ```ocaml
 [ transfer_for_fee
 ; [ snapp1
@@ -99,9 +100,11 @@ like
   ; transfer3 (* Sent by snapp1 *)
   ; [snapp4] ] ] (* Called by snapp1 *)
 ```
+
 Concretely, this allows snapp1 to access `transfer3` and `snapp4` without
-needing to know or care about the transfers and snapps executed by `snapp2`.
-In the implementation, this could look something like:
+needing to know or care about the transfers and snapps executed by `snapp2`. In
+the implementation, this could look something like:
+
 ```ocaml
 let get_next_party
     current_stack (* The stack for the most recent snapp *)
@@ -166,13 +169,13 @@ the contracts themselves. They are used to signal state transitions or other
 information about the contract, and can be used to expose information without
 the need to replay all past contract executions to discover the current state.
 
-*This is currently not supported by the snapp transaction model RFC.*
+_This is currently not supported by the snapp transaction model RFC._
 
 **Proposal:** add an additional field to each party that contains a list of
 events generated by executing a snapp, or none if it is a non-snapp party. This
-event stack should be passed as part of the input to the snapp, as the output
-of hash-consing the list in reverse order. (*TODO-protocol-team: decide on the
-maximum number / how the number affects the txn fee / etc. to avoid abuse.*)
+event stack should be passed as part of the input to the snapp, as the output of
+hash-consing the list in reverse order. (_TODO-protocol-team: decide on the
+maximum number / how the number affects the txn fee / etc. to avoid abuse._)
 
 #### Exposing internal state variables
 
@@ -186,9 +189,9 @@ snapp.
 
 This is likely to be an important feature: it's not possible to execute a snapp
 without knowing the internal state, and this appears to be the easiest and most
-reliable way to ensure that it is available. Without such support, it's
-possible and relatively likely for a snapp's state to become unknown /
-unavailable, effectively locking the snapp.
+reliable way to ensure that it is available. Without such support, it's possible
+and relatively likely for a snapp's state to become unknown / unavailable,
+effectively locking the snapp.
 
 ### Errors
 
@@ -198,10 +201,10 @@ are triggered by a `revert` statement, and are able to carry additional
 metadata.
 
 In the current snapp transaction RFC, this matches the behaviour of invalid
-proofs, where the errors correspond to an unsatisfiable statement for a
-circuit. In this model, we lose the ability to expose the additional metadata
-on-chain; however, execution is not on-chain, so the relevant error metadata
-can be exposed at proof-generation time instead.
+proofs, where the errors correspond to an unsatisfiable statement for a circuit.
+In this model, we lose the ability to expose the additional metadata on-chain;
+however, execution is not on-chain, so the relevant error metadata can be
+exposed at proof-generation time instead.
 
 ### Struct and enum types
 
@@ -223,9 +226,9 @@ supported by solidity are also supported by snarky.
 
 [Reference types](https://docs.soliditylang.org/en/v0.8.5/types.html#reference-types)
 in solidity refer to blocks of memory. These don't have a direct analog in
-snarks, but can be simulated -- albeit at a much higher computational cost --
-by cryptographic primitives. Many of these primitives are already implemented
-in snarky.
+snarks, but can be simulated -- albeit at a much higher computational cost -- by
+cryptographic primitives. Many of these primitives are already implemented in
+snarky.
 
 ### Mapping types
 
@@ -248,40 +251,41 @@ primitives available for this, but has no impact upon the transaction model.
 The
 [block and transaction properties](https://docs.soliditylang.org/en/v0.8.5/units-and-global-variables.html#block-and-transaction-properties)
 available in solidity are, at time of writing:
-* `blockhash(uint blockNumber)`
+
+- `blockhash(uint blockNumber)`
   - Can be easily supported using the protocol state hash, although the timing
     is tight for successful execution (receive a block, create the snapp proof,
     send it, have it included in the next block).
   - **Proposal:** support the previous `protocol_state_hash` in snapp
     predicates.
-* `block.chainid`
+- `block.chainid`
   - **Proposal:** expose the chain ID in the genesis constants, allow it to be
     used in the snapp predicate.
-* `block.coinbase`
+- `block.coinbase`
   - Snapp proofs are generated before the block producer is known. Not possible
     to support.
-* `block.difficulty`
+- `block.difficulty`
   - Not applicable, block difficulty is fixed.
-* `block.gaslimit`
+- `block.gaslimit`
   - Not applicable, we don't have a gas model.
-* `block.number`
+- `block.number`
   - Available by using `blockchain_length` in the snapp predicate.
-* `block.timestamp`
+- `block.timestamp`
   - Available by using `timestamp` in the snapp predicate.
-* `gasleft()`
+- `gasleft()`
   - Not applicable, we don't have a gas model.
-* `msg.data`
+- `msg.data`
   - Available as part of the snapp input
-* `msg.sender`
+- `msg.sender`
   - **Proposal:** Expose the party at the head of the parent stack as part of
     the snapp input.
-* `msg.sig`
+- `msg.sig`
   - As above.
-* `msg.value`
+- `msg.value`
   - As above.
-* `tx.gasprice`
+- `tx.gasprice`
   - Not applicable, we don't have a gas model.
-* `tx.origin`
+- `tx.origin`
   - Can be retrieved from the `parties` stack of parties. May be one or more
     parties, depending on the structure of the transaction.
 
@@ -289,27 +293,27 @@ available in solidity are, at time of writing:
 
 Solidity supports the following
 [accessors on addresses](https://docs.soliditylang.org/en/v0.8.5/units-and-global-variables.html#members-of-address-types):
-* `balance`
+
+- `balance`
   - Could use the `staged_ledger_hash` snapp predicate (currently disabled) and
     perform a merkle lookup. However, this doesn't account for changes made by
     previous parties in the same transaction, or previous transactions in the
     block.
   - **Proposal:** Add a 'lookup' transaction kind that returns the state of an
     account using `aux_data`, with filters to select only the relevant data.
-    Snapps can then 'call' this by including this party as one of their
-    parties.
+    Snapps can then 'call' this by including this party as one of their parties.
   - Note: using this will make the snapp transaction fail if the balance of the
     account differs from the one used to build the proof at proving time.
-* `code`, `codehash`
+- `code`, `codehash`
   - Snapp equivalent is the `verification_key`.
   - Options are as above for `balance`. If this key is for one of the
     snapp-permissioned parties, the key can assumed to be statically known,
-    since their snapp proof will be rejected and the transaction reverted if
-    the key has changed.
-* `transfer(uint256 amount)`
+    since their snapp proof will be rejected and the transaction reverted if the
+    key has changed.
+- `transfer(uint256 amount)`
   - Executed by including a transfer to the party as part of the snapp's party
     stack.
-* `call`, `delegatecall`, `staticcall`
+- `call`, `delegatecall`, `staticcall`
   - Executed by including a snapp party as part of the snapp's party stack.
 
 ### Contract-specific functions
@@ -320,5 +324,5 @@ Solidity supports
 We can support `this` by checking the address of the party for a particular
 snapp proof, or by otherwise including its address in the snapp input.
 
-We currently do not support account deletion, so it is not possible to
-implement an equivalent to `selfdestruct`.
+We currently do not support account deletion, so it is not possible to implement
+an equivalent to `selfdestruct`.

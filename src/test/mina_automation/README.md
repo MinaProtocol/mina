@@ -1,17 +1,23 @@
-mina automation
-==============
+# mina automation
 
-The `mina_automation` lib is a small utility which helps to automate local app execution
+The `mina_automation` lib is a small utility which helps to automate local app
+execution
 
-Library can be used in various local test and automation. For example to test if archive and extract blocks apps gives expected archive state. Main feature of an lib is ability to detect location of apps. App can be build locally and resides in _build/default folder, or can be installed globally and put in /usr/local/bin folder.
+Library can be used in various local test and automation. For example to test if
+archive and extract blocks apps gives expected archive state. Main feature of an
+lib is ability to detect location of apps. App can be build locally and resides
+in \_build/default folder, or can be installed globally and put in
+/usr/local/bin folder.
 
-It also has automation for docker if we would like to run docker command locally and use some output further in the test.
+It also has automation for docker if we would like to run docker command locally
+and use some output further in the test.
 
 Below list of all modules with short introduction
 
 ### archive blocks
 
-Responsible for archiving extensional or precomputed blocks into archive database
+Responsible for archiving extensional or precomputed blocks into archive
+database
 
 Example of usage:
 
@@ -26,10 +32,11 @@ Example of usage:
 
 ```
 
-where: 
+where:
 
 - `extensional_files : String.t list` - list of paths to files
-- `target_db: String.t` - db connection string (e.g: postgres://postgres:postgres@localhost:5432/archive)
+- `target_db: String.t` - db connection string (e.g:
+  postgres://postgres:postgres@localhost:5432/archive)
 
 ### archive dumps
 
@@ -45,7 +52,7 @@ Example of usage:
 
 where:
 
-- prefix : String.t - dump prefix usually corresponds to network name 
+- prefix : String.t - dump prefix usually corresponds to network name
 - date : String.t - date suffix of dump
 - target: String.t - path to local dump destination
 
@@ -59,21 +66,25 @@ Example of usage:
   open Mina_automation
 
   let client = Docker.Client.default in
-  let logs = Docker.Client.run_cmd_in_image t ~image:"gcr.io....-mina-archive-blocks" ~cmd:"mina-archive blocks ..." ~workdir:"/workdir" ~volume:"/home/darek/work/mina:/workdir" ~network:"localhost" 
+  let logs = Docker.Client.run_cmd_in_image t ~image:"gcr.io....-mina-archive-blocks" ~cmd:"mina-archive blocks ..." ~workdir:"/workdir" ~volume:"/home/darek/work/mina:/workdir" ~network:"localhost"
 
 ```
 
 where :
- - `image : String.t` - docker image in which command will be run. If does not exist locally it will be pulled
- - `cmd: String.t` - command which will be run in docker
- - `workdir: String.t` - working directory off command
- - `volume: String.t` - volume mapping between docker and localhost
- - `network: String.t` - network which docker will be attached to when executing command. In our example we are using `localhost` which allows to connect to db from within docker
-  
+
+- `image : String.t` - docker image in which command will be run. If does not
+  exist locally it will be pulled
+- `cmd: String.t` - command which will be run in docker
+- `workdir: String.t` - working directory off command
+- `volume: String.t` - volume mapping between docker and localhost
+- `network: String.t` - network which docker will be attached to when executing
+  command. In our example we are using `localhost` which allows to connect to db
+  from within docker
 
 ### extract blocks
 
-Extract blocks apps dumps blocks stored in database in form of Extensional blocks.
+Extract blocks apps dumps blocks stored in database in form of Extensional
+blocks.
 
 Example of usage:
 
@@ -92,11 +103,13 @@ Example of usage:
   let%bind _ = Extract_blocks.run extract_blocks ~config in
 
 ```
-  
+
 ### missing block auditor
 
-Missing block auditor is an shell script which detect any gaps in database that can be fixed with missing block guardian. Currently it is used as a sub component for missing_blocks_guardian app so there is no features rather than path to app detection
-
+Missing block auditor is an shell script which detect any gaps in database that
+can be fixed with missing block guardian. Currently it is used as a sub
+component for missing_blocks_guardian app so there is no features rather than
+path to app detection
 
 ### missing block guardian
 
@@ -105,7 +118,7 @@ Missing block guardian fills gaps of archive database
 Example of usage:
 
 ```
-  let%bind missing_blocks_auditor_path = Missing_blocks_auditor.standalone_path_exn 
+  let%bind missing_blocks_auditor_path = Missing_blocks_auditor.standalone_path_exn
 
   let%bind archive_blocks_path =  Archive_blocks.standalone_path_exn in
 
@@ -126,7 +139,7 @@ Example of usage:
   let%bind _ = Missing_blocks_guardian.run missing_blocks_guardian ~config
 ```
 
-where: 
+where:
 
 - target_db : String.t - connection string to database
 
@@ -151,5 +164,6 @@ Example of usage:
 where:
 
 - input_config: String.t - path to replayer input config
-- interval_checkpoint: String.t - how frequent replayer should dump checkpoint (per slots)
+- interval_checkpoint: String.t - how frequent replayer should dump checkpoint
+  (per slots)
 - output_ledger: String.t - path to output ledger folder

@@ -1,6 +1,7 @@
 # Rosetta
 
-Implementation of the [Rosetta API](https://docs.cloud.coinbase.com/rosetta/docs/welcome) for Mina.
+Implementation of the
+[Rosetta API](https://docs.cloud.coinbase.com/rosetta/docs/welcome) for Mina.
 
 ## How to build your Docker image
 
@@ -22,44 +23,48 @@ This creates an image (`mina-rosetta:v2.0.0`) based on Debian Bullseye that
 includes the Mina daemon along with the Mina archive node, PostgreSQL, and Mina
 Rosetta node. Each build argument is configurable and defines the following:
 
-* `image`: base image used to build this image
-* `deb_version`: Debian package version of the artifacts to install
-* `deb_release`: Debian package repository
-* `deb_codename`: Debian repository codename
-* `network`: network version of the artifacts to install
+- `image`: base image used to build this image
+- `deb_version`: Debian package version of the artifacts to install
+- `deb_release`: Debian package repository
+- `deb_codename`: Debian repository codename
+- `network`: network version of the artifacts to install
 
-To build an image with just the minimal requirements to run a Rosetta node (e.g. when connecting to an existing Mina node and archive DB) you can run the same
+To build an image with just the minimal requirements to run a Rosetta node (e.g.
+when connecting to an existing Mina node and archive DB) you can run the same
 command but use `dockerfiles/Dockerfile-mina-daemon` instead.
 
-Alternatively, you could use an official image that is built in exactly this way by buildkite CI/CD.
+Alternatively, you could use an official image that is built in exactly this way
+by buildkite CI/CD.
 
 ## How to run
 
 ### All-in-one container
 
-The container includes 3 scripts in `/etc/mina/rosetta/scripts` that run a different set of services connected to a particular network
+The container includes 3 scripts in `/etc/mina/rosetta/scripts` that run a
+different set of services connected to a particular network
 
-* `docker-standalone-start.sh` is the most straightforward, it starts only the
+- `docker-standalone-start.sh` is the most straightforward, it starts only the
   Rosetta API endpoint and any flags passed into the script go to
   `mina-rosetta`. Use this to connect to an existing Mina node and archive.
-* `docker-demo-start.sh` launches a Mina node with a very simple 1-address
+- `docker-demo-start.sh` launches a Mina node with a very simple 1-address
   genesis ledger as a sandbox for developing and playing around. This script
-  starts a full suite of tools (a Mina node, Mina archive, a PostgreSQL DB,
-  and Rosetta node), but for a demo network with all operations occurring inside
+  starts a full suite of tools (a Mina node, Mina archive, a PostgreSQL DB, and
+  Rosetta node), but for a demo network with all operations occurring inside
   this container and no external network activity.
-* `docker-start.sh` connects the Mina node to a network (by default,
+- `docker-start.sh` connects the Mina node to a network (by default,
   [Mainnet](https://docs.minaprotocol.com/node-operators/block-producer-node/connecting-to-the-network))
-  and initializes the archive database from publicly available nightly
-  O(1) Labs backups. As with `docker-demo-start.sh`, this script runs a Mina
-  node, a Mina archive, a PostgreSQL DB, and Rosetta. The script also
-  periodically checks for blocks that may be missing between the nightly backup
-  and the tip of the chain and will fill in those gaps by walking back the
-  linked list of blocks in the canonical chain and importing them one at a time.
-  After this initial bootstrap, it will query once every 60 minutes for missing
-  blocks and import them as needed. This script is most useful for connecting
-  to a real network and is the default script used when running the container.
-  This can also be used to connect to other networks and has several
-  configuration parameters. Take a look at the [source](https://github.com/MinaProtocol/mina/blob/11513e679fae11e3cd0d3a91dd242628fd712ff5/src/app/rosetta/scripts/docker-start.sh)
+  and initializes the archive database from publicly available nightly O(1) Labs
+  backups. As with `docker-demo-start.sh`, this script runs a Mina node, a Mina
+  archive, a PostgreSQL DB, and Rosetta. The script also periodically checks for
+  blocks that may be missing between the nightly backup and the tip of the chain
+  and will fill in those gaps by walking back the linked list of blocks in the
+  canonical chain and importing them one at a time. After this initial
+  bootstrap, it will query once every 60 minutes for missing blocks and import
+  them as needed. This script is most useful for connecting to a real network
+  and is the default script used when running the container. This can also be
+  used to connect to other networks and has several configuration parameters.
+  Take a look at the
+  [source](https://github.com/MinaProtocol/mina/blob/11513e679fae11e3cd0d3a91dd242628fd712ff5/src/app/rosetta/scripts/docker-start.sh)
   for more information about what you can configure and how.
 
 For example, to run the `docker-start.sh` and connect to a network:
@@ -71,21 +76,22 @@ docker run -it --rm --name rosetta \
     <DOCKER_IMAGE>
 ```
 
-* Port 8302 is the default P2P port and must be exposed to the open internet
-* The daemon listens to client requests on port 3081
-* The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
-* Archive node runs on port 3086
-* Rosetta runs on port 3087
-* `<DOCKER_IMAGE>` should be the name of an image compatible with the
-  network you wish to connect to.
+- Port 8302 is the default P2P port and must be exposed to the open internet
+- The daemon listens to client requests on port 3081
+- The GraphQL API runs on port 3085 (accessible via `localhost:3085/graphql`)
+- Archive node runs on port 3086
+- Rosetta runs on port 3087
+- `<DOCKER_IMAGE>` should be the name of an image compatible with the network
+  you wish to connect to.
 
-Note: this image does not define a volume for DB data. If you want to persist it,
-please create a volume mapping pointing to the DB directory of the container
+Note: this image does not define a volume for DB data. If you want to persist
+it, please create a volume mapping pointing to the DB directory of the container
 (default: `/data/postgresql`).
 
 ### Standalone container
 
-If you want to run the Rosetta server in a standalone container, you can do so by running the following command:
+If you want to run the Rosetta server in a standalone container, you can do so
+by running the following command:
 
 ```bash
 docker run -it --rm --name rosetta \
@@ -96,21 +102,23 @@ docker run -it --rm --name rosetta \
     <DOCKER_IMAGE>
 ```
 
-* `--graphql-uri` is the address of the Mina node's GraphQL API
-* `--archive-uri` is the address of the PostgreSQL database
-* `<DOCKER_IMAGE>` should be the name of an image compatible with the
-  network you wish to connect to. For standalone use, you can use the same
-  image as the one used for the all-in-one use or the same image as the one
-  used for the Mina node.
+- `--graphql-uri` is the address of the Mina node's GraphQL API
+- `--archive-uri` is the address of the PostgreSQL database
+- `<DOCKER_IMAGE>` should be the name of an image compatible with the network
+  you wish to connect to. For standalone use, you can use the same image as the
+  one used for the all-in-one use or the same image as the one used for the Mina
+  node.
 
 #### Using Docker Compose
 
-If you want to run the Rosetta server in a standalone container using Docker Compose, you can look at the `docker-compose.yml` file [here](docker-compose/docker-compose.yml) for an example.
+If you want to run the Rosetta server in a standalone container using Docker
+Compose, you can look at the `docker-compose.yml` file
+[here](docker-compose/docker-compose.yml) for an example.
 
 ## Example queries via Rosetta
 
-* `curl --data '{ metadata: {} }' 'localhost:3087/network/list'`
-* `curl --data '{ network_identifier: { blockchain: "mina", network: "devnet" }, metadata: {} }' 'localhost:3087/network/status'`
+- `curl --data '{ metadata: {} }' 'localhost:3087/network/list'`
+- `curl --data '{ network_identifier: { blockchain: "mina", network: "devnet" }, metadata: {} }' 'localhost:3087/network/status'`
 
 Any queries that rely on historical data will fail until the archive database is
 populated. This happens automatically with the relevant entrypoints.
@@ -143,8 +151,8 @@ The `--graphql-uri` parameter gives the address at which Rosetta can connect to
 the daemon's GraphQL service. It should point to the address where the Mina
 daemon is running.
 
-The `--archive-uri` parameter describes the connection to the database we
-have just set up. It has the following form:
+The `--archive-uri` parameter describes the connection to the database we have
+just set up. It has the following form:
 
 ```text
 postgres://{POSTGRES_USER}:{POSTGRES_USER}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}
@@ -189,13 +197,15 @@ Operations are always `Pending` if retrieved from the mempool. `Success` if they
 are in a block and fully applied. A transaction status of `Failed` occurs for
 transactions within a block whenever certain invariants are not met such as not
 sending enough to cover the account creation fee. Other reasons include
-misconfiguring new tokens or zkapps. See [this section of the
-code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/mina_base/transaction_status.ml#L10-L50)
+misconfiguring new tokens or zkapps. See
+[this section of the code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/mina_base/transaction_status.ml#L10-L50)
 for an exhaustive list.
 
 ### Operations Types
 
-See [this section of the code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/rosetta_lib/operation_types.ml#L4-L13) for an exhaustive list of operation types.
+See
+[this section of the code](https://github.com/MinaProtocol/mina/blob/03e11970387b05dd970c6ab0d1a0b01f18e3a8db/src/lib/rosetta_lib/operation_types.ml#L4-L13)
+for an exhaustive list of operation types.
 
 ### Account metadata
 
@@ -212,7 +222,7 @@ The following supported transactions for the Construction API are `payment` and
 
 ## Future Work and Known Issues
 
-* Not fully robust to crashes on adversarial input.
+- Not fully robust to crashes on adversarial input.
 
 ---
 
@@ -238,8 +248,9 @@ developing locally run `./start.sh CURL`.
 
 #### Integration Test Agent
 
-A separate agent binary is optionally run on top of the Mina, Archive,
-Rosetta triplet. This agent manipulates the Mina node through GraphQL and Rosetta to ensure certain invariants.
+A separate agent binary is optionally run on top of the Mina, Archive, Rosetta
+triplet. This agent manipulates the Mina node through GraphQL and Rosetta to
+ensure certain invariants.
 
 To test the Data API, for every kind of transaction supported in the Mina
 protocol, we turn off block production send this transaction via the Mina
@@ -267,15 +278,13 @@ directly.
 
 The signer library used by the test agent can be used as a reference for further
 signer implementations. An executable interface is also provided via the
-[`signer.exe`
-binary](https://github.com/MinaProtocol/mina/blob/develop/src/app/rosetta/ocaml-signer/signer.ml).
+[`signer.exe` binary](https://github.com/MinaProtocol/mina/blob/develop/src/app/rosetta/ocaml-signer/signer.ml).
 
 #### Rosetta CLI Validation
 
-The Data API is fully validated using the official `rosetta-cli`
-against private networks that issue every different type of
-transaction. For instructions on how to run these tests manually,
-see [README.md](rosetta-cli-config/README.md).
+The Data API is fully validated using the official `rosetta-cli` against private
+networks that issue every different type of transaction. For instructions on how
+to run these tests manually, see [README.md](rosetta-cli-config/README.md).
 
 ##### Run a fast sandbox network forever and test with rosetta-cli
 
@@ -303,8 +312,8 @@ $ rosetta-cli --configuration-file rosetta.conf check:data
 
 To regenerate the models:
 
-Install openapi-generator, instructions [here](https://openapi-generator.tech/docs/installation/),
-then
+Install openapi-generator, instructions
+[here](https://openapi-generator.tech/docs/installation/), then
 
 ```bash
 git clone https://github.com/coinbase/rosetta-specifications.git
@@ -314,9 +323,7 @@ cp -p out/src/models/* out/src/support/enums.ml $MINA/src/lib/rosetta_models/
 ```
 
 In the generated files, the type `deriving` clauses will need to have `eq` added
-manually.
-Any record types with a field named `_type` will need to annotate that field
-with `[@key "type"]`.
-In `lib/network.ml`, update the two instances of the version number.
-Check the diff after regeneration and be sure to add `[@default None]` and
-`[@default []]` to all relevant fields of the models
+manually. Any record types with a field named `_type` will need to annotate that
+field with `[@key "type"]`. In `lib/network.ml`, update the two instances of the
+version number. Check the diff after regeneration and be sure to add
+`[@default None]` and `[@default []]` to all relevant fields of the models

@@ -9,24 +9,25 @@ ledger.
 
 Staged ledger mainly consists of-
 
-  1. Ledger
-  2. Scan state
-  3. Pending coinbase collection
+1. Ledger
+2. Scan state
+3. Pending coinbase collection
 
 ## Glossary
-| Name | Description |
-|------|-------------|
-|Snarked ledger | A ledger state that can be verified by a snark|
-|Proof | Used interchangeably with snark, refers to transaction snark|
-| Snark work | A bundle of at most two proofs along with the prover pk and fees. Also referred to as completed work and is defined in transaction_snark_work.ml|
-| Ledger proof | A transaction snark that certifies a ledger state. A ledger proof is emitted from the scan state when all the proofs for a set of transactions are included in blocks, certifying the ledger that is obtained from applying those transactions |
-| Work statement/ Statement | A fact about the ledger state that is proven by transaction snark |
-| Snark worker | A node in Mina that generates transaction snarks for a fee|
-| Protocol state | Representation of the state in a chain, defined in `src/lib/mina_state/protocol_state.ml`|
-| Protocol state view | A selected few fields from the protocol state that is required to update the staged ledger
-| User command | user transactions namely payments, stake delegations, snapp transactions  |
-| Fee transfer | A transaction created by block producers to pay transaction fees or snark fees|
-| Coinbase | A transaction created by block producers to pay themselves the coinbase amount for winning the block|
+
+| Name                      | Description                                                                                                                                                                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Snarked ledger            | A ledger state that can be verified by a snark                                                                                                                                                                                                 |
+| Proof                     | Used interchangeably with snark, refers to transaction snark                                                                                                                                                                                   |
+| Snark work                | A bundle of at most two proofs along with the prover pk and fees. Also referred to as completed work and is defined in transaction_snark_work.ml                                                                                               |
+| Ledger proof              | A transaction snark that certifies a ledger state. A ledger proof is emitted from the scan state when all the proofs for a set of transactions are included in blocks, certifying the ledger that is obtained from applying those transactions |
+| Work statement/ Statement | A fact about the ledger state that is proven by transaction snark                                                                                                                                                                              |
+| Snark worker              | A node in Mina that generates transaction snarks for a fee                                                                                                                                                                                     |
+| Protocol state            | Representation of the state in a chain, defined in `src/lib/mina_state/protocol_state.ml`                                                                                                                                                      |
+| Protocol state view       | A selected few fields from the protocol state that is required to update the staged ledger                                                                                                                                                     |
+| User command              | user transactions namely payments, stake delegations, snapp transactions                                                                                                                                                                       |
+| Fee transfer              | A transaction created by block producers to pay transaction fees or snark fees                                                                                                                                                                 |
+| Coinbase                  | A transaction created by block producers to pay themselves the coinbase amount for winning the block                                                                                                                                           |
 
 ## Ledger
 
@@ -58,9 +59,8 @@ included in a block. These are currently defined at compile time as
 `scan_state_transaction_capacity_log_2` or `scan_state_tps_goal_x10`. It also
 specifies the order and the number of proofs required for every set of new
 transactions or pending work added. The goal is to complete existing pending
-work before adding new ones.
-The abstract structure of scan state is defined in <a>src/lib/parallel_scan/</a>
-and instantiated in
+work before adding new ones. The abstract structure of scan state is defined in
+<a>src/lib/parallel_scan/</a> and instantiated in
 <a>src/lib/transaction_snark_scan_state/transaction_snark_scan_state.ml</a> with
 the values that are stored in it. The data structure itself is described in
 detail in [this](https://minaprotocol.com/blog/scanning-for-scans) blog post and
@@ -101,11 +101,10 @@ The generated diff should pass the following checks:
    represents a bundle of at most two proofs.
 4. Snark fees, if any, is paid using the transaction fees and therefore the diff
    can only include snark work that can be paid for. Snark work required to add
-   a coinbase transaction is paid for using the coinbase amount.
-  a) Total transaction fees - snark fees (except the ones paid for using
-  coinbase) = transaction fees to the block producer
-  b) Total coinbase amount - snark fee to include coinbase = coinbase amount to
-  the block producer
+   a coinbase transaction is paid for using the coinbase amount. a) Total
+   transaction fees - snark fees (except the ones paid for using coinbase) =
+   transaction fees to the block producer b) Total coinbase amount - snark fee
+   to include coinbase = coinbase amount to the block producer
 5. The transaction fees from all the user transactions included in the diff ia
    settled in the same diff.
 
@@ -120,10 +119,9 @@ fee-excess keeps track of fees resulting from the transaction that should be
 accounted for in another transaction (a fee transfer). The total fee excess from
 transactions within a block should be zero i.e., debited from the fee payer
 account and credited to the fee recipient account. This is ensured when creating
-the diff.
-However, the zero fee excess is also required for transactions in a tree in the
-scan state. In other words, the statement of the ledger proof emitted by the
-scan state should have zero fee excess.
+the diff. However, the zero fee excess is also required for transactions in a
+tree in the scan state. In other words, the statement of the ledger proof
+emitted by the scan state should have zero fee excess.
 
 For example, consider the following tree of depth 3 showing only the fee excess
 when all the transactions included in a block fit in one tree. A positive fee
@@ -144,7 +142,7 @@ some leaves are empty)
                         ?
                 1                   ?
            2       -1           ?        ?
-        1    1   1    -2    -1   _   _    _ 
+        1    1   1    -2    -1   _   _    _
 
 Now when a new block arrives that has more than three transactions, some of the
 transactions are added to the first tree and the rest are added the next tree.
@@ -182,12 +180,11 @@ for the user transaction and two slots for fee transfers)
 When the diff is split into two prediffs and if after adding user transactions
 and fee transfers to it, the first prediff has two spots remaining and cannot
 not accommodate user transactions, then those spots are filled by two coinbase
-transactions that split the coinbase amount.
-If it has one spot, then we simply add one coinbase transaction. It is also
-possible that the first prediff may have no slots left after adding transactions
-(For example, when there are three slots and all the required snark work is from
-a different prover), in which case, we simply add one coinbase as part of the
-second prediff.
+transactions that split the coinbase amount. If it has one spot, then we simply
+add one coinbase transaction. It is also possible that the first prediff may
+have no slots left after adding transactions (For example, when there are three
+slots and all the required snark work is from a different prover), in which
+case, we simply add one coinbase as part of the second prediff.
 
 It could also happen that after adding transactions to the first prediff, there
 is not enough work to add a coinbase transaction to the second prediff. In this
@@ -212,9 +209,8 @@ In the resulting staged ledger `s'`,
 
 Along with the conditions mentioned [above](###Creating a staged-ledger-diff),
 the `apply` function also checks if the snark work is valid and that the
-invariants of the scan state are maintained.
-If any of the validations fail, the block consisting of the staged-ledger-diff
-is rejected.
+invariants of the scan state are maintained. If any of the validations fail, the
+block consisting of the staged-ledger-diff is rejected.
 
 `apply_diff_unchecked` is the same as `apply` but is called for diffs generated
 by the node itself. It skips verification of snark work since they get verified

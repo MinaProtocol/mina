@@ -357,6 +357,14 @@ reformat-diff: ## Reformat only modified OCaml files
 	@FILES=$$(git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done); \
 	if [ -n "$$FILES" ]; then ocamlformat --doc-comments=before --inplace $$FILES; fi
 
+.PHONY: reformat-markdown
+reformat-markdown: ## Format markdown files with 80-character line wrapping
+	npm run format-markdown
+
+.PHONY: check-markdown
+check-markdown: ## Check formatting of markdown files
+	npm run check-markdown
+
 .PHONY: check-format
 check-format: ocaml_checks ## Check formatting of OCaml code
 	dune exec \

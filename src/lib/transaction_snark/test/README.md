@@ -20,7 +20,9 @@ mode where it will generate the circuit witness, but skips the expensive proving
 step, using a cache.
 
 The recommended way to enable this cache is:
-* add the lines
+
+- add the lines
+
   ```ocaml
     let proof_cache =
       Result.ok_or_failwith @@ Pickles.Proof_cache.of_yojson
@@ -28,9 +30,11 @@ The recommended way to enable this cache is:
 
     let () = Transaction_snark.For_tests.set_proof_cache proof_cache
   ```
+
   to the top of the first `%test_module` in the file, to load a proof cache from
   the `proof_cache.json` file in the directory;
-* add the lines
+
+- add the lines
   ```ocaml
     let () =
       match Sys.getenv_opt "PROOF_CACHE_OUT" with
@@ -42,13 +46,13 @@ The recommended way to enable this cache is:
   to the bottom of the last `%test_module` in the file, to output the updated
   proof cache to the path given in the `PROOF_CACHE_OUT` environment variable,
   when provided;
-* update the `dune` file in the test directory to include the libraries
+- update the `dune` file in the test directory to include the libraries
   ```
    ppx_deriving_yojson.runtime
    result
   ```
-* update the same `dune` file's `inline_tests` stanza to include `(deps
-  proof_cache.json)`, for example
+- update the same `dune` file's `inline_tests` stanza to include
+  `(deps proof_cache.json)`, for example
   ```diff
   - (inline_tests (flags -verbose -show-counts))
   + (inline_tests (flags -verbose -show-counts) (deps proof_cache.json))
@@ -59,9 +63,10 @@ For a concrete example, see commit
 
 Then, to update the cache for a set of tests, we can run the tests to update
 their contents. For example, to update the tests in all of the directories
-containing a `proof_cache.json` file, we can run: `./scripts/regenerate-proof-cache.sh`
+containing a `proof_cache.json` file, we can run:
+`./scripts/regenerate-proof-cache.sh`
 
-**In case an error *is* generated, you should not commit the cache before making
+**In case an error _is_ generated, you should not commit the cache before making
 the test deterministic.**
 
 If none of the updates generated an error, the results can be committed to the

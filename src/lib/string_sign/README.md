@@ -11,7 +11,8 @@ The library provides a simple interface for:
 1. Converting strings to a format suitable for signing
 2. Signing strings using Schnorr signatures
 3. Verifying signatures for strings
-4. Supporting different network types (mainnet, testnet, and other custom networks)
+4. Supporting different network types (mainnet, testnet, and other custom
+   networks)
 
 ## Usage
 
@@ -100,7 +101,8 @@ Signatures are only valid for the network they were created for.
 
 ## Testing
 
-Tests for this library have been implemented using Alcotest. The test suite includes:
+Tests for this library have been implemented using Alcotest. The test suite
+includes:
 
 1. Basic signing and verification tests:
    - Default network

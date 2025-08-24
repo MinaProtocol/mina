@@ -1,16 +1,26 @@
 # Buildkite CI
 
-This folder contains all dhall code which is a backbone for our CI related code for buildkite.
+This folder contains all dhall code which is a backbone for our CI related code
+for buildkite.
 
 # Structure
 
-Buildkite CI consist of two layers dhall and scripts. Basically idea is to use [Dhall](https://dhall-lang.org/) to create pipeline configuration in yaml. Pipeline configuration defines execution setup for scripts under `buildkite/scripts` folder. All Dhall files can be find in `buildkite/src` files. Each individual job is placed in `buildkite/src/Jobs` folder. Then `Prepare.dhall` file generates jobs collection based on content of `buildkite/src/Jobs`. Another important module is `Monorepo.dhall` which selects which jobs are meant to run (based on `BUILDKITE_PIPELINE_MODE` env in pipeline definition)
+Buildkite CI consist of two layers dhall and scripts. Basically idea is to use
+[Dhall](https://dhall-lang.org/) to create pipeline configuration in yaml.
+Pipeline configuration defines execution setup for scripts under
+`buildkite/scripts` folder. All Dhall files can be find in `buildkite/src`
+files. Each individual job is placed in `buildkite/src/Jobs` folder. Then
+`Prepare.dhall` file generates jobs collection based on content of
+`buildkite/src/Jobs`. Another important module is `Monorepo.dhall` which selects
+which jobs are meant to run (based on `BUILDKITE_PIPELINE_MODE` env in pipeline
+definition)
 
 ## Entrypoints
 
 ### Prepare and Monorepo modules
 
-Main entrypoint for dhall project is a `Prepare.dhall` file which starts CI utilizing buildkite pipeline like below:
+Main entrypoint for dhall project is a `Prepare.dhall` file which starts CI
+utilizing buildkite pipeline like below:
 
 ```
 steps:
@@ -38,22 +48,31 @@ You can notice three environment variables which controls how CI works:
 
 Possible values: PullRequest|Stable
 
-It controls job selection mode. If `PullRequest` is chosen then jobs will be selected based on changes made in PR. Each job has a configuration (namely `dirtyWhen` attribute) which allows to configure it individually.
+It controls job selection mode. If `PullRequest` is chosen then jobs will be
+selected based on changes made in PR. Each job has a configuration (namely
+`dirtyWhen` attribute) which allows to configure it individually.
 
-However, if you choose `Stable` then all defined jobs should be run. This mode is usually used in nightly and stable pipelines
+However, if you choose `Stable` then all defined jobs should be run. This mode
+is usually used in nightly and stable pipelines
 
 #### BUILDKITE_PIPELINE_STAGE
 
 Possible values: UserDefined
 
-User defined value which describe current pipeline chunk of jobs to be executed. Staging is introduced to allow specific pipeline configuration in which we would like to block certain set of jobs which are heavy and long. For instance, let us design our pipeline to have 3 stages :
+User defined value which describe current pipeline chunk of jobs to be executed.
+Staging is introduced to allow specific pipeline configuration in which we would
+like to block certain set of jobs which are heavy and long. For instance, let us
+design our pipeline to have 3 stages :
 
 - fast jobs only - which provides quick feedback for developer regarding linting
-- long jobs - depends on fast jobs only stage and requires that all jobs are green before running any heavy job 
-- coverage gathering - which gathers coverage artifacts and uploads it to coveralls.io
+- long jobs - depends on fast jobs only stage and requires that all jobs are
+  green before running any heavy job
+- coverage gathering - which gathers coverage artifacts and uploads it to
+  coveralls.io
 
 To reach above pipeline configuration below configuration can be provided:
 (non-important attributes were omitted)
+
 ```
 steps:
   - commands:
@@ -80,9 +99,12 @@ steps:
 
 #### BUILDKITE_PIPELINE_FILTER
 
-Possible values: FastOnly,Long,LongAndVeryLong,TearDownOnly,ToolchainsOnly,AllTests,Release
+Possible values:
+FastOnly,Long,LongAndVeryLong,TearDownOnly,ToolchainsOnly,AllTests,Release
 
-Pipeline filter env variable a mechanism to limit collection of jobs to be run in single pipeline run. This is done by using Tag and Filter structures. Tag can be used in Job definition for example:
+Pipeline filter env variable a mechanism to limit collection of jobs to be run
+in single pipeline run. This is done by using Tag and Filter structures. Tag can
+be used in Job definition for example:
 
 ```
 in  Pipeline.build
@@ -100,10 +122,12 @@ in  Pipeline.build
 
 ```
 
-Above job definition defines Job which is tagged by Fast and Lint tags. In the next step you can define Filter variant value which fetch only Fast and Lint tags:
+Above job definition defines Job which is tagged by Fast and Lint tags. In the
+next step you can define Filter variant value which fetch only Fast and Lint
+tags:
 
 ```
-let tags: Filter -> List Tag.Type = \(filter: Filter) -> 
+let tags: Filter -> List Tag.Type = \(filter: Filter) ->
   merge {
     QuickLints = [ Tag.Type.Fast , Tag.Type.Fast ]
     ....
@@ -115,7 +139,11 @@ Above QuickLints variant can be used as a value for `BUILDKITE_PIPELINE_FILTER`
 
 ### Promote Package
 
-Another dhall entrypoint which can be used as separate utility pipeline is PromotePackage module located in `buildkite/src/Entrypoints/PromotePackage.dhall`. As a UX improvement we provided `buildkite/scripts/run_promote_build_job.sh` job which converts env variables into dhall structures greatly simplifying pipeline definition:
+Another dhall entrypoint which can be used as separate utility pipeline is
+PromotePackage module located in
+`buildkite/src/Entrypoints/PromotePackage.dhall`. As a UX improvement we
+provided `buildkite/scripts/run_promote_build_job.sh` job which converts env
+variables into dhall structures greatly simplifying pipeline definition:
 
 ```
 steps:
@@ -142,41 +170,64 @@ steps:
         propagate-environment: true
 ```
 
-Above definition one need to paste into steps edit box for given pipeline and then run from branch which contains this README.md (presumably develop). 
+Above definition one need to paste into steps edit box for given pipeline and
+then run from branch which contains this README.md (presumably develop).
 
-All list of available parameters: 
+All list of available parameters:
 
-- DEBIANS - The comma delimited debian names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/DebianPackage.dhall` files. Only CamelCase format is supported
+- DEBIANS - The comma delimited debian names. For example: `Daemon,Archive`. All
+  available names are located in `buildkite/src/Constans/DebianPackage.dhall`
+  files. Only CamelCase format is supported
 
-- DOCKERS - The comma delimited docker names. For example: `Daemon,Archive`. All available names are located in `buildkite/src/Constans/Artifacts.dhall` files. Only CamelCase format is supported 
+- DOCKERS - The comma delimited docker names. For example: `Daemon,Archive`. All
+  available names are located in `buildkite/src/Constans/Artifacts.dhall` files.
+  Only CamelCase format is supported
 
-- CODENAMES - The Debian codenames `Bullseye,Focal`. All available names are located in `buildkite/src/Constans/DebianVersions.dhall`. Only CamelCase format is supported
+- CODENAMES - The Debian codenames `Bullseye,Focal`. All available names are
+  located in `buildkite/src/Constans/DebianVersions.dhall`. Only CamelCase
+  format is supported
 
 - FROM_VERSION - The Source Docker or Debian version
 
 - NEW_VERSION - The new Debian version or new Docker tag
 
-- REMOVE_PROFILE_FROM_NAME - Should we remove profile suffix from debian name. For example from package name "mina-devnet-hardfork" it will generate name "mina-devnet"
+- REMOVE_PROFILE_FROM_NAME - Should we remove profile suffix from debian name.
+  For example from package name "mina-devnet-hardfork" it will generate name
+  "mina-devnet"
 
-- PROFILE                     The Docker and Debian profile (Standard, Lightnet)". All available profiles are located in `buildkite/src/Constants/Profiles.dhall` file. Only CamelCase format is supported
+- PROFILE The Docker and Debian profile (Standard, Lightnet)". All available
+  profiles are located in `buildkite/src/Constants/Profiles.dhall` file. Only
+  CamelCase format is supported
 
-- NETWORK                     The Docker and Debian network (Devnet, Mainnet). All available profiles are located in `buildkite/src/Constants/Network.dhall` file. Only CamelCase format is supported
+- NETWORK The Docker and Debian network (Devnet, Mainnet). All available
+  profiles are located in `buildkite/src/Constants/Network.dhall` file. Only
+  CamelCase format is supported
 
-- FROM_CHANNEL                Source debian channel. By default: Unstable. All available channels  are located in `buildkite/src/Constants/DebianChannel.dhall` file. Only CamelCase format is supported
+- FROM_CHANNEL Source debian channel. By default: Unstable. All available
+  channels are located in `buildkite/src/Constants/DebianChannel.dhall` file.
+  Only CamelCase format is supported
 
-- TO_CHANNEL                  Target debian channel. By default: Unstable. All available profiles are located in `buildkite/src/Constants/DebianChannel.dhall` file. Only CamelCase format is supported
+- TO_CHANNEL Target debian channel. By default: Unstable. All available profiles
+  are located in `buildkite/src/Constants/DebianChannel.dhall` file. Only
+  CamelCase format is supported
 
-- PUBLISH                     The Publish to docker.io flag. If defined, script will publish docker do docker.io. Otherwise it will still resides in gcr.io
+- PUBLISH The Publish to docker.io flag. If defined, script will publish docker
+  do docker.io. Otherwise it will still resides in gcr.io
 
+#### Examples
 
-#### Examples 
-
-Below examples focus only on environment variables values. We are omitting full pipeline setup.
+Below examples focus only on environment variables values. We are omitting full
+pipeline setup.
 
 ##### Promoting Hardfork packages
 
-We would like to promote all hardfork packages (archive node, daemon, rosetta) from unstable debian channel and gcr to devnet debian channel and dockerhub. We also want easy upgrade from old deamon debian to new one (we would like user experience to be smooth and only required command to update on user side should be `apt-get update mina-daemon`). That is why we want to strip `-hardfork` suffix from debian package. 
-Pipeline with create 6 jobs for each Docker and Debian component separately.
+We would like to promote all hardfork packages (archive node, daemon, rosetta)
+from unstable debian channel and gcr to devnet debian channel and dockerhub. We
+also want easy upgrade from old deamon debian to new one (we would like user
+experience to be smooth and only required command to update on user side should
+be `apt-get update mina-daemon`). That is why we want to strip `-hardfork`
+suffix from debian package. Pipeline with create 6 jobs for each Docker and
+Debian component separately.
 
 ```
   - "DOCKERS=Archive,Daemon,Rosetta"
@@ -190,12 +241,14 @@ Pipeline with create 6 jobs for each Docker and Debian component separately.
   - "CODENAMES=Focal,Bullseye"
   - "FROM_CHANNEL=Unstable"
   - "TO_CHANNEL=Devnet"
-    
+
 ```
 
 #### Promoting dockers form gcr to dockerhub
 
-We want only to move dockers from gcr to dockerhub without changing version. Current implementation of pipeline is not user friendly so we need to still define `FROM_VERSION` and `TO_VERSION`. They should be equal.
+We want only to move dockers from gcr to dockerhub without changing version.
+Current implementation of pipeline is not user friendly so we need to still
+define `FROM_VERSION` and `TO_VERSION`. They should be equal.
 
 ```
   - "DOCKERS=Archive,Daemon,Rosetta"
