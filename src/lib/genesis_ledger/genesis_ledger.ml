@@ -115,6 +115,15 @@ end
 
 include Utils
 
+open struct
+  (* HACK: When genesis stacking epoch ledger & next epoch ledgers happens to be
+     stored on a same file, we return the same root, instead of telling RocksDB
+     to attempt loading them again. This prevents double-lock acquiring. Since
+     any genesis ledgers are supposed to be constants, this should be fine. *)
+  let (duplicated_roots : (string, Ledger.Root.t) Hashtbl_intf.Hashtbl.t) =
+    Hashtbl.create (module String)
+end
+
 module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
   include Inputs
 
@@ -125,44 +134,45 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
      the users of the genesis ledger interface (through the [t] value below), so
      that is also saved here. *)
   let backing_ledger =
-    let open Lazy.Let_syntax in
-    let%map ledger, insert_accounts =
-      match directory with
-      | `Ephemeral ->
-          lazy (`Ephemeral (Ledger.create_ephemeral ~depth ()), true)
-      | `New ->
-          lazy
-            ( `Root
-                (Ledger.Root.create_temporary
-                   ~backing_type:Ledger.Root.Config.Stable_db ~depth () )
-            , true )
-      | `Path directory_name ->
-          lazy
-            ( `Root
-                (Ledger.Root.create
-                   ~config:
-                     (Ledger.Root.Config.with_directory
-                        ~backing_type:Ledger.Root.Config.Stable_db
-                        ~directory_name )
-                   ~depth () )
-            , false )
-    in
-    let masked =
-      match ledger with
-      | `Ephemeral ledger ->
-          ledger
-      | `Root ledger ->
-          Ledger.Root.as_masked ledger
-    in
-    ( if insert_accounts then
-      let addrs_and_accounts =
-        let ledger_depth = Ledger.depth masked in
-        Lazy.force accounts
-        |> List.mapi ~f:(fun i (_, acct) ->
-               (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
-      in
-      Ledger.set_batch_accounts masked addrs_and_accounts ) ;
-    (ledger, masked)
+    Lazy.from_fun (fun () ->
+        let ledger, insert_accounts =
+          match directory with
+          | `Ephemeral ->
+              (`Ephemeral (Ledger.create_ephemeral ~depth ()), true)
+          | `New ->
+              ( `Root
+                  (Ledger.Root.create_temporary
+                     ~backing_type:Ledger.Root.Config.Stable_db ~depth () )
+              , true )
+          | `Path directory_name ->
+              let root =
+                Hashtbl.find_or_add duplicated_roots directory_name
+                  ~default:(fun () ->
+                    Ledger.Root.create
+                      ~config:
+                        (Ledger.Root.Config.with_directory
+                           ~backing_type:Ledger.Root.Config.Stable_db
+                           ~directory_name )
+                      ~depth () )
+              in
+              (`Root root, false)
+        in
+        let masked =
+          match ledger with
+          | `Ephemeral ledger ->
+              ledger
+          | `Root ledger ->
+              Ledger.Root.as_masked ledger
+        in
+        ( if insert_accounts then
+          let addrs_and_accounts =
+            let ledger_depth = Ledger.depth masked in
+            Lazy.force accounts
+            |> List.mapi ~f:(fun i (_, acct) ->
+                   (Ledger.Addr.of_int_exn ~ledger_depth i, acct) )
+          in
+          Ledger.set_batch_accounts masked addrs_and_accounts ) ;
+        (ledger, masked) )
 
   let t = Lazy.map ~f:snd backing_ledger
 
