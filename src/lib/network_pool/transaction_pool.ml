@@ -942,7 +942,7 @@ struct
                           |> Deferred.don't_wait_for ;
                           Deferred.unit ) ) ;
                  Deferred.unit ) ) ;
-      t
+      Deferred.return t
 
     type pool = t
 
@@ -1952,7 +1952,7 @@ let%test_module _ =
           ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
           ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
       in
-      let pool_, _, _ =
+      let%bind pool_, _, _ =
         Test.create ~config ~logger ~constraint_constants ~consensus_constants
           ~time_controller ~frontier_broadcast_pipe:frontier_pipe_r
           ~log_gossip_heard:false ~on_remote_push:(Fn.const Deferred.unit)

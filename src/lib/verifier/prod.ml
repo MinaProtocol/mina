@@ -431,8 +431,8 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
       Deferred.any
         [ ( exit_or_signal
           >>| function
-          | Ok _ ->
-              `Unexpected_termination
+          | Ok exit_or_signal ->
+              `Unexpected_termination exit_or_signal
           | Error err ->
               `Wait_threw_an_exception err )
         ]
@@ -450,9 +450,14 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
            Ivar.fill_if_empty create_worker_trigger () ) ;
         let () =
           match e with
-          | `Unexpected_termination ->
-              [%log error] "verifier terminated unexpectedly"
-                ~metadata:[ ("verifier_pid", `Int (Pid.to_int pid)) ] ;
+          | `Unexpected_termination exit_or_signal ->
+              [%log error] "verifier terminated unexpectedly: $exit_or_signal"
+                ~metadata:
+                  [ ("verifier_pid", `Int (Pid.to_int pid))
+                  ; ( "exit_or_signal"
+                    , `String (Unix.Exit_or_signal.to_string_hum exit_or_signal)
+                    )
+                  ] ;
               Ivar.fill_if_empty create_worker_trigger ()
           | `Wait_threw_an_exception _ -> (
               ( match e with

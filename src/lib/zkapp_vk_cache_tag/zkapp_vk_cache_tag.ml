@@ -20,7 +20,7 @@ let write_key_to_disk db key =
       Identity key
 
 let create_db path ~logger =
-  Cache.initialize ~logger path
+  Cache.initialize ~logger path ()
   |> Async.Deferred.Result.map ~f:(fun cache -> Lmdb_cache cache)
 
 module For_tests = struct
