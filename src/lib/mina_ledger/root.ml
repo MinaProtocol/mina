@@ -29,7 +29,7 @@ module Make
                     and module Addr = Any_ledger.M.Addr) =
 struct
   module Config = struct
-    type t = string
+    type t = string [@@deriving compare, sexp_of, hash]
 
     type backing_type = Stable_db
 
@@ -60,8 +60,18 @@ struct
 
   let merkle_root t = match t with Stable_db db -> Stable_db.merkle_root db
 
-  let create ~config:directory_name ~depth () =
-    Stable_db (Stable_db.create ~directory_name ~depth ())
+  module CreateParam = struct
+    type t = { config : Config.t; depth : int }
+    [@@deriving compare, sexp_of, hash]
+  end
+
+  (* WARN: It's assumed that when converting ledger backed roots are introduced,
+     same primary directory must indicate same converted directory *)
+  let create =
+    let mem = Hashtbl.create (module CreateParam) in
+    fun ~config ~depth () ->
+      Hashtbl.find_or_add mem { config; depth } ~default:(fun () ->
+          Stable_db (Stable_db.create ~directory_name:config ~depth ()) )
 
   let create_temporary ~backing_type:Config.Stable_db ~depth () =
     Stable_db (Stable_db.create ~depth ())
