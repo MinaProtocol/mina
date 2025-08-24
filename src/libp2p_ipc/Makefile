@@ -11,13 +11,13 @@ GO_CAPNP_STD = $(shell $(GO) env GOPATH)/pkg/mod/capnproto.org/go/capnp/${GO_CAP
 endif
 
 get-go-capnp:
-	$(GO) get capnproto.org/go/capnp/$(GO_CAPNP_VERSION)
+	@$(GO) get capnproto.org/go/capnp/$(GO_CAPNP_VERSION) > /dev/null
 
 build/capnpc-go: get-go-capnp
-	@mkdir -p build && $(GO) build -o build/capnpc-go capnproto.org/go/capnp/v3/capnpc-go
+	@mkdir -p build && $(GO) build -o build/capnpc-go capnproto.org/go/capnp/v3/capnpc-go > /dev/null
 
 libp2p_ipc.capnp.go: libp2p_ipc.capnp build/capnpc-go
-	@PATH="build:${PATH}" capnp compile -ogo -I${GO_CAPNP_STD} libp2p_ipc.capnp
+	@PATH="build:${PATH}" capnp compile -ogo -I${GO_CAPNP_STD} libp2p_ipc.capnp > /dev/null
 
 libp2p_ipc_capnp.ml libp2p_ipc_capnp.mli: libp2p_ipc.capnp
 	@mkdir -p _codegen
