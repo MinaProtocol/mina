@@ -20,6 +20,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -v|--version) VERSION="$2"; shift;;
   -p|--package) PACKAGE="$2"; shift;;
   -m|--codename) CODENAME="$2"; shift;;
+  -a|--arch) ARCH="$2"; shift;;
   -s|--signed) SIGNED=1; ;;
   -h|--help) usage; exit 0;;
   *) echo "❌  Unknown parameter passed: $1"; usage;  exit 1;;
@@ -60,6 +61,10 @@ if [ -z $REPO ]; then
   usage; exit 1;
 fi
 
+if [ -z $ARCH ]; then
+  ARCH=amd64
+fi
+
 case $PACKAGE in
   mina-archive*) COMMAND="mina-archive --version && mina-archive --help" ;;
   mina-logproc) COMMAND="echo skipped execution for mina-logproc" ;;
@@ -93,6 +98,11 @@ case $CODENAME in
   *) echo "❌  Unknown codename passed: $CODENAME"; exit 1;;
 esac
 
+case $ARCH in
+  amd64|arm64) DOCKER_ARCH="--platform linux/$ARCH" ;;
+  *) echo "❌  Unknown architecture passed: $ARCH"; exit 1;;
+esac
+
 echo "📋  Testing $PACKAGE $DOCKER_IMAGE" \
-  && docker run --rm $DOCKER_IMAGE bash -c "$SCRIPT" \
+  && docker run $DOCKER_ARCH --rm $DOCKER_IMAGE bash -c "$SCRIPT" \
   && echo '✅  OK: ALL WORKED FINE!' || (echo '❌  KO: ERROR!!!' && exit 1)

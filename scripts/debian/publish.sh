@@ -9,6 +9,7 @@ BUCKET=packages.o1test.net
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--names) DEB_NAMES="$2"; shift;;
+  -a|--arch) ARCH="$2"; shift;;
   -r|--release) DEB_RELEASE="$2"; shift;;
   -v|--version) DEB_VERSION="$2"; shift;;
   -c|--codename) DEB_CODENAME="$2"; shift;;

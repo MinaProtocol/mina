@@ -156,6 +156,22 @@ function get_suffix() {
     esac
 }
 
+function get_arch_suffix() {
+    local __arch=$1
+
+    case $__arch in
+        amd64)
+            echo ""
+        ;;
+        arm64)
+            echo "-arm64"
+        ;;
+        *)
+            echo ""
+        ;;
+    esac
+}
+
 function get_repo() {
     local __publish_to_docker_io="$1"
 
@@ -193,15 +209,19 @@ function calculate_debian_version() {
     local __target_version=$2
     local __codename=$3
     local __network=$4
+    local __arch=$5
 
     local __network_suffix
     __network_suffix=$(get_suffix $__artifact $__network)
-    echo "$__artifact:$__target_version-$__codename$__network_suffix"
+    echo "$__artifact:$__target_version-$__codename$__network_suffix-$__arch"
 }
 
 function extract_version_from_deb() {
     local __deb_file=$1
-    echo "$__deb_file" | sed -n 's/.*_\([^_]*\)\.deb$/\1/p'
+    # Extract the version from a Debian package filename
+    # Expected format: {package_name}_{version}_{arch}.deb
+    # Uses split with between underscores and outputs only the version string
+    basename "$__deb_file" .deb | cut -d'_' -f2
 }
 
 
@@ -212,14 +232,18 @@ function calculate_docker_tag() {
     local __target_version=$3
     local __codename=$4
     local __network=$5
+    local __arch=$6
 
     local __network_suffix
     __network_suffix=$(get_suffix $__artifact $__network)
 
+    local __arch_suffix
+    __arch_suffix=$(get_arch_suffix $__arch)
+
     if [[ $__publish_to_docker_io == 1 ]]; then
-        echo "$DOCKER_IO_REPO/$__artifact:$__target_version-$__codename$__network_suffix"
+        echo "$DOCKER_IO_REPO/$__artifact:$__target_version-$__codename$__network_suffix$__arch_suffix"
     else
-        echo "$GCR_REPO/$__artifact:$__target_version-$__codename$__network_suffix"
+        echo "$GCR_REPO/$__artifact:$__target_version-$__codename$__network_suffix$__arch_suffix"
     fi
 }
 
@@ -336,12 +360,13 @@ function get_cached_debian_or_download() {
     local artifact=$2
     local codename=$3
     local network=$4
+    local arch=$5
 
     local artifact_full_name
     artifact_full_name=$(get_artifact_with_suffix "$artifact" "$network")
     local remote_path
-    remote_path="$(storage_root "$backend")/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*"
-    
+    remote_path="$(storage_root "$backend")/$BUILDKITE_BUILD_ID/debians/$codename/${artifact_full_name}_*_${arch}.deb"
+
     local check
     check=$(storage_list "$backend" "$remote_path")
 
@@ -379,8 +404,9 @@ function publish_debian() {
     local __debian_repo=${10}
     local __debian_sign_key=${11}
     local __new_artifact_name=${12:-""}
+    local __arch=${13:-DEFAULT_ARCHITECTURE}
 
-    get_cached_debian_or_download $__backend $__artifact $__codename "$__network"
+    get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch"
     local __artifact_full_name
     __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
     local __deb=$DEBIAN_CACHE_FOLDER/$__codename/"${__artifact_full_name}"
@@ -406,11 +432,12 @@ function publish_debian() {
                 --new-version ${__target_version} \
                 --suite "unstable" \
                 --new-suite ${__channel} \
-                --new-name ${__new_artifact_name}
+                --new-name ${__new_artifact_name} \
+                --arch ${__arch}
     fi
 
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
-    echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" )"
+    echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" "$__arch")"
     if [[ $__dry_run == 0 ]]; then
         # shellcheck disable=SC2068
         prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
@@ -419,6 +446,7 @@ function publish_debian() {
             --bucket $__debian_repo \
             -c $__codename \
             -r $__channel \
+            --arch $__arch \
             ${__sign_arg[@]}
 
         if [[ $__verify == 1 ]]; then
@@ -430,6 +458,7 @@ function publish_debian() {
                 --version $__target_version \
                 -m $__codename \
                 -r $__debian_repo \
+                -a $__arch \
                 -c $__channel ${__signed_arg}
         fi
     fi
@@ -445,11 +474,20 @@ function promote_and_verify_docker() {
     local __publish_to_docker_io=$6
     local __verify=$7
     local __dry_run=$8
+    local __arch=$9
+
     local __network_suffix
     __network_suffix=$(get_suffix $__artifact $__network)
 
-    local __artifact_full_source_version=$__source_version-$__codename${__network_suffix}
-    local __artifact_full_target_version=$__target_version-$__codename${__network_suffix}
+    local __arch_suffix
+    case $__arch in
+      amd64) __arch_suffix="" ;;
+      arm64) __arch_suffix="-$__arch" ;;
+      *) echo "❌  Unknown architecture passed: $__arch"; exit 1;;
+    esac
+
+    local __artifact_full_source_version=$__source_version-$__codename${__network_suffix}${__arch_suffix}
+    local __artifact_full_target_version=$__target_version-$__codename${__network_suffix}${__arch_suffix}
 
     if [[ $__publish_to_docker_io == 1 ]]; then
         local __publish_arg="-p"
@@ -459,7 +497,7 @@ function promote_and_verify_docker() {
         local __repo=$GCR_REPO
     fi
 
-    echo " 🐋 Publishing $__artifact docker for '$__network' network and '$__codename' codename with '$__target_version' version"
+    echo " 🐋 Publishing $__artifact docker for '$__network' network and '$__codename' codename with '$__target_version' version and '$__arch_suffix'"
     echo "    📦 Target version: $(calculate_docker_tag $__publish_to_docker_io $__artifact $__target_version $__codename "$__network" )"
     echo ""
     if [[ $__dry_run == 0 ]]; then
@@ -468,6 +506,7 @@ function promote_and_verify_docker() {
             -n "$__artifact" \
             -v $__artifact_full_source_version \
             -t $__artifact_full_target_version \
+            -a $__arch \
             $__publish_arg
 
             echo ""
@@ -482,7 +521,8 @@ function promote_and_verify_docker() {
                 -v "$__target_version" \
                 -c "$__codename" \
                 -s "$__network_suffix" \
-                -r "$__repo"
+                -r "$__repo" \
+                -a "$__arch"
 
             echo ""
         fi
@@ -501,6 +541,7 @@ function promote_debian() {
     local __dry_run=$9
     local __debian_repo=${10}
     local __debian_sign_key=${11}
+    local __arch=${12}
 
     if [[ $__debian_sign_key != "" ]]; then
         local __sign_arg=("--sign" "$__debian_sign_key")
@@ -510,9 +551,9 @@ function promote_debian() {
         local __signed_arg=""
     fi
 
-    echo " 🍥 Promoting $__artifact debian from $__source_channel to $__target_channel, from $__source_version to $__target_version"
-    echo "    📦 Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network")"
-   
+    echo " 🍥 Promoting $__artifact debian from $__source_channel to $__target_channel, from $__source_version to $__target_version for $__arch architecture"
+    echo "    📦 Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" $__arch)"
+
     local __artifact_full_name
     __artifact_full_name=$(get_artifact_with_suffix $__artifact $__network)
 
@@ -1554,6 +1595,7 @@ function persist(){
     local __codename
     local __new_version
     local __suite="unstable"
+    local __arch="$DEFAULT_ARCHITECTURE"
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -1587,6 +1629,10 @@ function persist(){
             ;;
             --suite )
                 __suite=${2:?$error_message}
+                shift 2;
+            ;;
+            --arch )
+                __arch=${2:?$error_message}
                 shift 2;
             ;;
             * )
@@ -1624,6 +1670,7 @@ function persist(){
     echo " - Buildkite build id: $__buildkite_build_id"
     echo " - Codename: $__codename"
     echo " - Suite: $__suite"
+    echo " - Architecture: $__arch"
     echo " - Target: $__target"
     if [[ -n ${__new_version+x} ]]; then
         echo " - New version: $__new_version"
@@ -1637,14 +1684,15 @@ function persist(){
     echo ""
 
     for __artifact in "${__artifacts_arr[@]}"; do
-        storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*" "$tmp_dir"
-      
+        storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact}_*_${__arch}.deb" "$tmp_dir"
+
         if [[ -n ${__new_version+x} ]]; then
             local __source_version
-            __source_version=$(extract_version_from_deb "$(ls $tmp_dir/${__artifact}_*.deb | head -1)")
-            
+            echo " - Extracting source version from $tmp_dir/${__artifact}_*_${__arch}.deb"
+            __source_version=$(extract_version_from_deb "$(ls $tmp_dir/${__artifact}_*_${__arch}.deb | head -1)")
+
             local __deb
-            __deb=$(ls $tmp_dir/${__artifact}_*.deb | head -1)
+            __deb=$(ls $tmp_dir/${__artifact}_*_${__arch}.deb | head -1)
 
             local __artifact_full_name
             __artifact_full_name=$(get_artifact_with_suffix $__artifact)
@@ -1656,7 +1704,8 @@ function persist(){
                 --new-version ${__new_version} \
                 --suite "unstable" \
                 --new-suite ${__suite} \
-                --new-name ${__artifact_full_name}
+                --new-name ${__artifact_full_name} \
+                --arch ${__arch}
         fi
 
       

@@ -11,6 +11,7 @@ function usage() {
   echo "Usage: $0 [-d deb-name] [-v new-version] "
   echo "  -d, --deb         The Debian name"
   echo "  --version         The Current Debian version"
+  echo "  --arch            The Debian architecture"
   echo "  --new-version     The New Debian version"
   echo "  --suite           The Current Debian suite"
   echo "  --repo            The Source Debian repo"
@@ -29,6 +30,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --new-repo) NEW_REPO="$2"; shift;;
   --suite) SUITE="$2"; shift;;
   --version) VERSION="$2"; shift;;
+  --arch) ARCH="$2"; shift;;
   --repo) REPO="$2"; shift;;
   --sign) SIGN="$2"; shift;;
   *) echo "❌ Unknown parameter passed: $1"; usage exit 1;;
@@ -38,6 +40,7 @@ if [[ ! -v SUITE ]]; then echo "❌ No suite specified"; echo ""; usage "$0" "$1
 if [[ ! -v VERSION ]]; then echo "❌ No version specified"; echo ""; usage "$0" "$1" ; exit 1; fi
 if [[ ! -v REPO ]]; then echo "❌ No repo specified"; echo ""; usage "$0" "$1" ; exit 1; fi
 if [[ ! -v NEW_NAME ]]; then NEW_NAME=$DEB; fi;
+if [[ ! -v ARCH ]]; then ARCH=amd64; fi;
 if [[ ! -v NEW_VERSION ]]; then NEW_VERSION=$VERSION; fi;
 if [[ ! -v NEW_SUITE ]]; then NEW_SUITE=$SUITE; fi;
 if [[ ! -v NEW_REPO ]]; then NEW_REPO=$REPO; fi;
@@ -58,8 +61,9 @@ function rebuild_deb() {
             --new-version ${NEW_VERSION} \
             --suite ${SUITE} \
             --new-suite ${NEW_SUITE} \
-            --new-name ${NEW_NAME}
+            --new-name ${NEW_NAME} \
+            --arch ${ARCH}
 }
 
 rebuild_deb
-source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}.deb" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG}
+source scripts/debian/publish.sh --names "${NEW_NAME}_${NEW_VERSION}_${ARCH}.deb" --arch "${ARCH}" --version "${NEW_VERSION}" --codename "${CODENAME}" --release "${NEW_SUITE}" --bucket "${NEW_REPO}" ${SIGN_ARG}
