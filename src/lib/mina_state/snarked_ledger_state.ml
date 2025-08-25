@@ -183,6 +183,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
+
+    let drop_sok (t : _ t) = { t with sok_digest = () }
   end
 
   [%%versioned

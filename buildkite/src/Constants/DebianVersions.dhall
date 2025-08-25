@@ -1,14 +1,12 @@
-let Prelude = ../External/Prelude.dhall
-
-let Optional/default = Prelude.Optional.default
-
 let Profiles = ./Profiles.dhall
+
+let Network = ./Network.dhall
 
 let BuildFlags = ./BuildFlags.dhall
 
 let S = ../Lib/SelectFiles.dhall
 
-let DebVersion = < Bookworm | Bullseye | Jammy | Focal >
+let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
 let capitalName =
           \(debVersion : DebVersion)
@@ -17,6 +15,7 @@ let capitalName =
             , Bullseye = "Bullseye"
             , Jammy = "Jammy"
             , Focal = "Focal"
+            , Noble = "Noble"
             }
             debVersion
 
@@ -27,68 +26,44 @@ let lowerName =
             , Bullseye = "bullseye"
             , Jammy = "jammy"
             , Focal = "focal"
+            , Noble = "noble"
             }
             debVersion
 
-let dependsOnStep =
-          \(prefix : Optional Text)
-      ->  \(debVersion : DebVersion)
-      ->  \(profile : Profiles.Type)
-      ->  \(buildFlag : BuildFlags.Type)
-      ->  \(step : Text)
-      ->  let profileSuffix = Profiles.toSuffixUppercase profile
-
-          let prefix = Optional/default Text "MinaArtifact" prefix
-
-          in  merge
-                { Bookworm =
-                  [ { name =
-                        "${prefix}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                      buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Bullseye =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Jammy =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                , Focal =
-                  [ { name =
-                        "${prefix}${capitalName
-                                      debVersion}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                     buildFlag}"
-                    , key = "${step}-deb-pkg"
-                    }
-                  ]
-                }
-                debVersion
+let DepsSpec =
+      { Type =
+          { deb_version : DebVersion
+          , network : Network.Type
+          , profile : Profiles.Type
+          , build_flag : BuildFlags.Type
+          , step : Text
+          , prefix : Text
+          }
+      , default =
+          { deb_version = DebVersion.Bullseye
+          , network = Network.Type.Berkeley
+          , profile = Profiles.Type.Devnet
+          , build_flag = BuildFlags.Type.None
+          , step = "build"
+          , prefix = "MinaArtifact"
+          }
+      }
 
 let dependsOn =
-          \(debVersion : DebVersion)
-      ->  \(profile : Profiles.Type)
-      ->  dependsOnStep
-            (None Text)
-            debVersion
-            profile
-            BuildFlags.Type.None
-            "build"
+          \(spec : DepsSpec.Type)
+      ->  let profileSuffix = Profiles.toSuffixUppercase spec.profile
+
+          let name =
+                "${spec.prefix}${capitalName
+                                   spec.deb_version}${Network.capitalName
+                                                        spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                                                                         spec.build_flag}"
+
+          in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 
 let minimalDirtyWhen =
       [ S.exactly "buildkite/src/Constants/DebianVersions" "dhall"
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
-      , S.exactly "buildkite/src/Command/HardforkPackageGeneration" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
       , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
       , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
@@ -97,12 +72,9 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Command/ReplayerTest" "dhall"
       , S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact")
       , S.strictlyStart (S.contains "dockerfiles/stages")
-      , S.exactly "scripts/debian/build" "sh"
-      , S.exactly "scripts/debian/builder-helpers" "sh"
-      , S.exactly "scripts/docker/release" "sh"
-      , S.exactly "scripts/docker/build" "sh"
+      , S.strictlyStart (S.contains "scripts/debian")
+      , S.strictlyStart (S.contains "scripts/docker")
       , S.exactly "buildkite/scripts/build-artifact" "sh"
-      , S.exactly "buildkite/scripts/build-hardfork-package" "sh"
       , S.exactly "buildkite/scripts/check-compatibility" "sh"
       , S.exactly "buildkite/scripts/version-linter" "sh"
       , S.exactly "scripts/version-linter" "py"
@@ -113,12 +85,12 @@ let minimalDirtyWhen =
 
 let bullseyeDirtyWhen =
         [ S.strictlyStart (S.contains "src")
-        , S.strictlyStart (S.contains "automation")
         , S.strictly (S.contains "Makefile")
         , S.exactly "buildkite/scripts/connect/connect-to-network" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests-full" "sh"
         , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
+        , S.exactly "scripts/patch-archive-test" "sh"
         , S.strictlyStart (S.contains "buildkite/src/Jobs/Test")
         ]
       # minimalDirtyWhen
@@ -130,6 +102,7 @@ let dirtyWhen =
             , Bullseye = bullseyeDirtyWhen
             , Jammy = minimalDirtyWhen
             , Focal = minimalDirtyWhen
+            , Noble = minimalDirtyWhen
             }
             debVersion
 
@@ -137,6 +110,6 @@ in  { DebVersion = DebVersion
     , capitalName = capitalName
     , lowerName = lowerName
     , dependsOn = dependsOn
-    , dependsOnStep = dependsOnStep
     , dirtyWhen = dirtyWhen
+    , DepsSpec = DepsSpec
     }

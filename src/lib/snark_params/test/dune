@@ -1,0 +1,23 @@
+(test
+ (name test_snark_params)
+ (libraries
+  ;; opam libraries
+  alcotest
+  base
+  core_kernel
+  ;; local libraries
+  bignum_bigint
+  crypto_params
+  group_map
+  kimchi_pasta
+  kimchi_pasta.basic
+  pickles.backend
+  snarky_curves
+  snarky.backendless
+  snarky_field_extensions
+  snarky_group_map
+  snark_params)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_snarky)))

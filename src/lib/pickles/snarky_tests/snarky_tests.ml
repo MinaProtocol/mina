@@ -382,7 +382,7 @@ module As_prover_circuits = struct
     (* test that accessing non existent vars fails*)
     let generate_witness_fails () =
       Alcotest.(
-        check_raises "should fail accesing non existent var"
+        check_raises "should fail accessing non existent var"
           (Failure "vector_get") generate_witness_fails)
 
     (* test that as_prover doesn't affect constraints *)
@@ -585,6 +585,8 @@ module Protocol_circuits = struct
   (* Full because we want to be sure nothing changes *)
   let proof_level = Genesis_constants.Proof_level.Full
 
+  let signature_kind = Mina_signature_kind.Testnet
+
   let constraint_constants = Genesis_constants.Compiled.constraint_constants
 
   let print_hash print expected digest : unit =
@@ -611,7 +613,8 @@ module Protocol_circuits = struct
     let expected1 = "b8879f677f622a1d86648030701f43e1" in
     let expected2 = "740db2397b0b01806a48f061a2e2b063" in
     let digest =
-      Transaction_snark.constraint_system_digests ~constraint_constants ()
+      Transaction_snark.constraint_system_digests ~signature_kind
+        ~constraint_constants ()
     in
     (* these are for the Base and Merge branches, if more branches were added to the digest this line should be updated *)
     let hash1, hash2 =

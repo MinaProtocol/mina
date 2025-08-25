@@ -38,12 +38,12 @@
 ;; rules to build the static library for kimchi
 ;;
 
-;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
+;; note: to build Mina, nix will set `KIMCHI_STUBS` and ignore this rule
 
 (rule
  (enabled_if
-  (= %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libwires_15_stubs.a)
+  (= %{env:KIMCHI_STUBS=n} n))
+ (targets libkimchi_stubs.a)
  (deps
   Cargo.toml
   rust-toolchain.toml
@@ -51,35 +51,40 @@
   (source_tree kimchi-stubs-vendors)
   (source_tree .cargo)
   (source_tree ../../proof-systems)
-  (env_var MARLIN_PLONK_STUBS))
+  (env_var KIMCHI_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
    (setenv
-    CARGO_TARGET_DIR
-    "%{read:../dune-build-root}/cargo_kimchi_stubs"
-    (setenv
-     RUSTFLAGS
-     %{read:rustflags.sexp}
-     (run cargo build --release --offline)))
+    RUSTFLAGS
+    %{read:rustflags.sexp}
+    (run
+     cargo
+     build
+     -p
+     kimchi-stubs
+     --release
+     --target-dir
+     %{read:../dune-build-root}/cargo_kimchi_stubs
+     --offline))
    (run
     cp
-    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libwires_15_stubs.a
+    %{read:../dune-build-root}/cargo_kimchi_stubs/release/libkimchi_stubs.a
     .))))
 
 ;; this is used by nix
 
 (rule
  (enabled_if
-  (<> %{env:MARLIN_PLONK_STUBS=n} n))
- (targets libwires_15_stubs.a)
+  (<> %{env:KIMCHI_STUBS_STATIC_LIB=n} n))
+ (targets libkimchi_stubs.a)
  (deps
-  (env_var MARLIN_PLONK_STUBS))
+  (env_var KIMCHI_STUBS_STATIC_LIB))
  (action
   (progn
    (copy
-    %{env:MARLIN_PLONK_STUBS=n}/lib/libwires_15_stubs.a
-    libwires_15_stubs.a))))
+    %{env:KIMCHI_STUBS_STATIC_LIB=n}/lib/libkimchi_stubs.a
+    libkimchi_stubs.a))))
 
 ;;
 ;; declare the libraries we're going to generate to match the bindings
@@ -91,7 +96,7 @@
  (modules kimchi_types)
  (instrumentation
   (backend bisect_ppx))
- (libraries bounded_types)
+ (libraries mina_stdlib)
  (inline_tests
   (flags -verbose -show-counts))
  (preprocess
@@ -101,7 +106,7 @@
  (public_name pasta_bindings)
  (name pasta_bindings)
  (modules pasta_bindings)
- (libraries kimchi_types pasta_bindings.backend bounded_types)
+ (libraries kimchi_types mina_stdlib pasta_bindings.backend)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
@@ -113,7 +118,7 @@
  (public_name kimchi_bindings)
  (name kimchi_bindings)
  (modules kimchi_bindings)
- (libraries pasta_bindings kimchi_types bounded_types)
+ (libraries pasta_bindings kimchi_types mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
@@ -125,12 +130,12 @@
  (public_name pasta_bindings.backend.native)
  (name pasta_bindings_backend_native)
  (modules pasta_bindings_backend)
- (foreign_archives wires_15_stubs)
+ (foreign_archives kimchi_stubs)
  (no_dynlink)
  ; ^ Required for compilation of this library separately
  ; from libraries that depend on it
  (c_library_flags :standard "-lpthread")
- (libraries bounded_types)
+ (libraries mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (inline_tests
@@ -143,12 +148,12 @@
 ;; generate the OCaml bindings
 ;;
 
-;; note: to build Mina, nix will set `MARLIN_PLONK_STUBS` and ignore this rule
+;; note: to build Mina, nix will set `KIMCHI_STUBS` and ignore this rule
 
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
  (enabled_if
-  (= %{env:MARLIN_PLONK_STUBS=n} n))
+  (= %{env:KIMCHI_STUBS=n} n))
  (mode promote)
  (deps
   ../../../../.ocamlformat
@@ -158,7 +163,7 @@
   (source_tree kimchi-stubs-vendors)
   (source_tree .cargo)
   (source_tree ../../proof-systems)
-  (env_var MARLIN_PLONK_STUBS))
+  (env_var KIMCHI_STUBS))
  (locks /cargo-lock) ;; lock for rustup
  (action
   (progn
@@ -175,12 +180,12 @@
 (rule
  (targets kimchi_types.ml pasta_bindings.ml kimchi_bindings.ml)
  (enabled_if
-  (<> %{env:MARLIN_PLONK_STUBS=n} n))
+  (<> %{env:KIMCHI_STUBS=n} n))
  (mode promote)
  (deps
   ../../../../.ocamlformat
-  (env_var MARLIN_PLONK_STUBS))
+  (env_var KIMCHI_STUBS))
  (action
   (progn
-   (run %{env:MARLIN_PLONK_STUBS=n}/bin/wires_15_stubs %{targets})
+   (run %{env:KIMCHI_STUBS=n}/bin/wires_15_stubs %{targets})
    (run ocamlformat -i %{targets}))))

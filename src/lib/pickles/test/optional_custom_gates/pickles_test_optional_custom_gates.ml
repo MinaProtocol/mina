@@ -235,7 +235,6 @@ let register_test name feature_flags1 feature_flags2 =
   let tag, _cache_handle, proof, Pickles.Provers.[ prove1; prove2 ] =
     Pickles.compile ~public_input:(Pickles.Inductive_rule.Input Typ.unit)
       ~auxiliary_typ:Typ.unit
-      ~branches:(module Nat.N2)
       ~max_proofs_verified:(module Nat.N0)
       ~name:"optional_custom_gates"
       ~choices:(fun ~self:_ ->

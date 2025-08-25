@@ -4,12 +4,14 @@ include T
 
 let hashes =
   lazy
-    (let constraint_constants =
+    (let signature_kind = Mina_signature_kind.t_DEPRECATED in
+     let constraint_constants =
        Genesis_constants.For_unit_tests.Constraint_constants.t
      in
      let proof_level = Genesis_constants.Proof_level.Full in
      let ts =
-       Transaction_snark.constraint_system_digests ~constraint_constants ()
+       Transaction_snark.constraint_system_digests ~signature_kind
+         ~constraint_constants ()
      in
      let bs =
        Blockchain_snark.Blockchain_snark_state.constraint_system_digests

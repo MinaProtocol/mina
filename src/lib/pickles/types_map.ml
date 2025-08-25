@@ -9,10 +9,9 @@ open Backend
 type inner_curve_var = Impls.Step.Field.t * Impls.Step.Field.t
 
 module Basic = struct
-  type ('var, 'value, 'n1, 'n2) t =
+  type ('var, 'value, 'n1) t =
     { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
     ; public_input : ('var, 'value) Impls.Step.Typ.t
-    ; branches : 'n2 Nat.t
     ; wrap_domains : Domains.t
     ; wrap_key : Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t
     ; wrap_vk : Impls.Wrap.Verification_key.t
@@ -35,29 +34,27 @@ module Side_loaded = struct
   end
 
   module Permanent = struct
-    type ('var, 'value, 'n1, 'n2) t =
+    type ('var, 'value, 'n1) t =
       { max_proofs_verified : (module Nat.Add.Intf with type n = 'n1)
       ; public_input : ('var, 'value) Impls.Step.Typ.t
       ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
-      ; branches : 'n2 Nat.t
       ; num_chunks : int
       ; zk_rows : int
       }
   end
 
-  type ('var, 'value, 'n1, 'n2) t =
+  type ('var, 'value, 'n1) t =
     { ephemeral : Ephemeral.t option
-    ; permanent : ('var, 'value, 'n1, 'n2) Permanent.t
+    ; permanent : ('var, 'value, 'n1) Permanent.t
     }
 
   type packed =
-    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
+    | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1) t -> packed
 
   let to_basic
       { permanent =
           { max_proofs_verified
           ; public_input
-          ; branches
           ; feature_flags
           ; num_chunks
           ; zk_rows
@@ -79,7 +76,6 @@ module Side_loaded = struct
     { Basic.max_proofs_verified
     ; wrap_vk
     ; public_input
-    ; branches
     ; wrap_domains = Common.wrap_domains ~proofs_verified
     ; wrap_key
     ; feature_flags
@@ -91,8 +87,6 @@ end
 module Compiled = struct
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) basic =
     { public_input : ('a_var, 'a_value) Impls.Step.Typ.t
-    ; proofs_verifieds : (int, 'branches) Vector.t
-          (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; wrap_domains : Domains.t
     ; step_domains : (Domains.t, 'branches) Vector.t
     ; feature_flags : Opt.Flag.t Plonk_types.Features.Full.t
@@ -104,11 +98,8 @@ module Compiled = struct
      ['a_var], which has ['branches] many "variants" each of which depends on at most
      ['max_proofs_verified] many previous statements. *)
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Nat.t
-    ; max_proofs_verified :
+    { max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds : (int, 'branches) Vector.t
-          (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key :
         Tick.Inner_curve.Affine.t array Plonk_verification_key_evals.t Promise.t
@@ -125,13 +116,11 @@ module Compiled = struct
     | T : ('var, 'value, 'n1, 'n2) Tag.id * ('var, 'value, 'n1, 'n2) t -> packed
 
   let to_basic
-      { branches = _
-      ; max_proofs_verified
-      ; proofs_verifieds = _
+      { max_proofs_verified
       ; public_input
       ; wrap_vk
       ; wrap_domains
-      ; step_domains
+      ; step_domains = _
       ; wrap_key
       ; feature_flags
       ; num_chunks
@@ -142,7 +131,6 @@ module Compiled = struct
     { Basic.max_proofs_verified
     ; wrap_domains
     ; public_input
-    ; branches = Vector.length step_domains
     ; wrap_key
     ; wrap_vk
     ; feature_flags
@@ -153,11 +141,8 @@ end
 
 module For_step = struct
   type ('a_var, 'a_value, 'max_proofs_verified, 'branches) t =
-    { branches : 'branches Nat.t
-    ; max_proofs_verified :
+    { max_proofs_verified :
         (module Nat.Add.Intf with type n = 'max_proofs_verified)
-    ; proofs_verifieds :
-        [ `Known of (Impls.Step.Field.t, 'branches) Vector.t | `Side_loaded ]
     ; public_input : ('a_var, 'a_value) Impls.Step.Typ.t
     ; wrap_key : inner_curve_var array Plonk_verification_key_evals.t
     ; wrap_domain :
@@ -169,18 +154,17 @@ module For_step = struct
     ; zk_rows : int
     }
 
-  let of_side_loaded (type a b c d)
+  let of_side_loaded (type a b c)
       ({ ephemeral
        ; permanent =
-           { branches
-           ; max_proofs_verified
+           { max_proofs_verified
            ; public_input
            ; feature_flags
            ; num_chunks
            ; zk_rows
            }
        } :
-        (a, b, c, d) Side_loaded.t ) : (a, b, c, d) t =
+        (a, b, c) Side_loaded.t ) : (a, b, c, _) t =
     let index =
       match ephemeral with
       | Some { index = `In_circuit i | `In_both (_, i) } ->
@@ -188,14 +172,11 @@ module For_step = struct
       | _ ->
           failwithf "For_step.side_loaded: Expected `In_circuit (%s)" __LOC__ ()
     in
-    let T = Nat.eq_exn branches Side_loaded_verification_key.Max_branches.n in
     let wrap_key =
       Plonk_verification_key_evals.map index.wrap_index ~f:(fun x -> [| x |])
     in
-    { branches
-    ; max_proofs_verified
+    { max_proofs_verified
     ; public_input
-    ; proofs_verifieds = `Side_loaded
     ; wrap_key
     ; wrap_domain = `Side_loaded index.actual_wrap_domain_size
     ; step_domains = `Side_loaded
@@ -216,9 +197,7 @@ module For_step = struct
 
   let of_compiled_with_known_wrap_key
       ({ wrap_key; step_domains } : _ Optional_wrap_key.known)
-      ({ branches
-       ; max_proofs_verified
-       ; proofs_verifieds
+      ({ max_proofs_verified
        ; public_input
        ; wrap_key = _
        ; wrap_domains
@@ -229,10 +208,7 @@ module For_step = struct
        ; zk_rows
        } :
         _ Compiled.t ) =
-    { branches
-    ; max_proofs_verified
-    ; proofs_verifieds =
-        `Known (Vector.map proofs_verifieds ~f:Impls.Step.Field.of_int)
+    { max_proofs_verified
     ; public_input
     ; wrap_key =
         Plonk_verification_key_evals.map wrap_key
@@ -282,7 +258,7 @@ let lookup_compiled :
 
 let lookup_side_loaded :
     type var value n m.
-    (var, value, n, m) Tag.id -> (var, value, n, m) Side_loaded.t =
+    (var, value, n, m) Tag.id -> (var, value, n) Side_loaded.t =
  fun t ->
   let (T (other_id, d)) = find univ.side_loaded (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
@@ -290,7 +266,7 @@ let lookup_side_loaded :
 
 let lookup_basic :
     type var value n m.
-    (var, value, n, m) Tag.t -> (var, value, n, m) Basic.t Promise.t =
+    (var, value, n, m) Tag.t -> (var, value, n) Basic.t Promise.t =
  fun t ->
   match t.kind with
   | Compiled ->
@@ -344,7 +320,7 @@ let _lookup_map (type var value c d) (t : (var, value, c, d) Tag.t) ~self
     ~default
     ~(f :
           [ `Compiled of (var, value, c, d) Compiled.t
-          | `Side_loaded of (var, value, c, d) Side_loaded.t ]
+          | `Side_loaded of (var, value, c) Side_loaded.t ]
        -> _ ) =
   match Type_equal.Id.same_witness t.id self with
   | Some _ ->

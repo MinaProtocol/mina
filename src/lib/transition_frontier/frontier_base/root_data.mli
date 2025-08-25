@@ -90,7 +90,7 @@ module Limited : sig
 end
 
 (* Minimal root data contains the smallest amount of information about a root.
- * It contains a hash pointing to the root transition, and the auxilliary data
+ * It contains a hash pointing to the root transition, and the auxiliary data
  * needed to reconstruct the staged ledger at that point (scan_state,
  * pending_coinbase).
  *)

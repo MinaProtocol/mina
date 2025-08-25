@@ -84,5 +84,9 @@ module Make_test
 struct
   include Produce_test (S) (G)
 
+  (* This should be removed when the effort of moving from inline tests to
+     alcotest is finished. The library in graphql_lib still uses Make_test and
+     relies on this method for unit testing.
+  *)
   let%test_unit "test" = test_query ()
 end

@@ -21,6 +21,8 @@ let%test_module "Zkapp payments tests" =
 
     let constraint_constants = U.constraint_constants
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let merkle_root_after_zkapp_command_exn t
         ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
         ~global_slot txn =
@@ -43,19 +45,21 @@ let%test_module "Zkapp payments tests" =
       let new_state : _ Zkapp_state.V.t =
         Pickles_types.Vector.init Zkapp_state.Max_state_size.n ~f:Field.of_int
       in
-      Zkapp_command.of_simple
+      Zkapp_command.of_simple ~signature_kind:U.signature_kind ~proof_cache_db
         { fee_payer =
-            { body =
+            Account_update.Fee_payer.make
+              ~body:
                 { public_key = acct1.account.public_key
                 ; fee = Fee.of_nanomina_int_exn full_amount
                 ; valid_until = None
                 ; nonce = acct1.account.nonce
                 }
-            ; authorization = Signature.dummy
-            }
+              ~authorization:Signature.dummy
         ; account_updates =
-            [ { body =
-                  { public_key = acct1.account.public_key
+            [ Account_update.with_no_aux
+                ~body:
+                  { Account_update.Body.Simple.public_key =
+                      acct1.account.public_key
                   ; update =
                       { app_state =
                           Pickles_types.Vector.map new_state ~f:(fun x ->
@@ -87,10 +91,11 @@ let%test_module "Zkapp payments tests" =
                   ; may_use_token = No
                   ; authorization_kind = Signature
                   }
-              ; authorization = Signature Signature.dummy
-              }
-            ; { body =
-                  { public_key = acct2.account.public_key
+                ~authorization:(Control.Poly.Signature Signature.dummy)
+            ; Account_update.with_no_aux
+                ~body:
+                  { Account_update.Body.Simple.public_key =
+                      acct2.account.public_key
                   ; update = Account_update.Update.noop
                   ; token_id = Token_id.default
                   ; balance_change = Amount.Signed.(of_unsigned receiver_amount)
@@ -110,8 +115,7 @@ let%test_module "Zkapp payments tests" =
                   ; may_use_token = No
                   ; authorization_kind = None_given
                   }
-              ; authorization = None_given
-              }
+                ~authorization:Control.Poly.None_given
             ]
         ; memo
         }

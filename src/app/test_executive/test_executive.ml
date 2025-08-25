@@ -50,24 +50,24 @@ let engines : engine list =
   [ ("local", (module Integration_test_local_engine : Intf.Engine.S)) ]
 
 let tests : test list =
-  [ ( "peers-reliability"
-    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  [ ( "block-prod-prio"
+    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
+  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
-  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
+  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ( "peers-reliability"
+    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
+  ; ( "verification-key"
+    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
   ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
   ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
-  ; ( "verification-key"
-    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
-  ; ( "block-prod-prio"
-    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
-  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
-  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
-  ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
-  ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -75,15 +75,16 @@ let report_test_errors ~log_error_set ~internal_error_set =
   let open Test_error in
   let open Test_error.Set in
   let color_eprintf color =
-    Printf.ksprintf (fun s -> Print.eprintf "%s%s%s" color s Bash_colors.none)
+    Printf.ksprintf (fun s ->
+        Print.eprintf "%s%s%s" color s Mina_stdlib.Bash_colors.none )
   in
   let color_of_severity = function
     | `None ->
-        Bash_colors.green
+        Mina_stdlib.Bash_colors.green
     | `Soft ->
-        Bash_colors.yellow
+        Mina_stdlib.Bash_colors.yellow
     | `Hard ->
-        Bash_colors.red
+        Mina_stdlib.Bash_colors.red
   in
   let category_prefix_of_severity = function
     | `None ->
@@ -127,7 +128,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       (color_of_severity log_errors_severity)
       "=== Log %ss ===\n" log_type ;
     Error_accumulator.iter_contexts log_errors ~f:(fun node_id log_errors ->
-        color_eprintf Bash_colors.light_magenta "    %s:\n" node_id ;
+        color_eprintf Mina_stdlib.Bash_colors.light_magenta "    %s:\n" node_id ;
         List.iter log_errors ~f:(fun (severity, { error_message; _ }) ->
             color_eprintf
               (color_of_severity severity)
@@ -151,7 +152,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       | `Hard ->
           report_log_errors "Error" ) ;
       (* report contextualized internal errors *)
-      color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
+      color_eprintf Mina_stdlib.Bash_colors.magenta "=== Test Results ===\n" ;
       Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
           print_category_header
             (max_severity_of_list (List.map errors ~f:fst))
@@ -182,7 +183,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       Print.eprintf "\n" ;
       let exit_code =
         if test_failed then (
-          color_eprintf Bash_colors.red
+          color_eprintf Mina_stdlib.Bash_colors.red
             "The test has failed. See the above errors for details.\n\n" ;
           match (internal_error_set.exit_code, log_error_set.exit_code) with
           | None, None ->
@@ -190,14 +191,15 @@ let report_test_errors ~log_error_set ~internal_error_set =
           | Some exit_code, _ | None, Some exit_code ->
               Some exit_code )
         else (
-          color_eprintf Bash_colors.green
+          color_eprintf Mina_stdlib.Bash_colors.green
             "The test has completed successfully.\n\n" ;
           None )
       in
       let%bind () = Writer.(flushed (Lazy.force stderr)) in
       return exit_code
 
-(* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
+(* TODO: refactor cleanup system (smells like a monad for composing linear
+   resources would help a lot) *)
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
@@ -505,7 +507,8 @@ let default_cmd =
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 
-(* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
+(* TODO: move required args to positions instead of flags, or provide reasonable
+   defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
   Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))

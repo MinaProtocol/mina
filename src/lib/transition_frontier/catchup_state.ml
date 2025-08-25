@@ -8,24 +8,14 @@
    to decide whether a long catchup job is in progress, and so we do not need a separate tree of hashes.
 *)
 
-type t = Hash of Catchup_hash_tree.t | Full of Full_catchup_tree.t
+type t = Full of Full_catchup_tree.t
 
 let max_catchup_chain_length : t -> int = function
-  | Hash t ->
-      Catchup_hash_tree.max_catchup_chain_length t
   | Full t ->
       Full_catchup_tree.max_catchup_chain_length t
 
 let apply_diffs (t : t) (ds : Frontier_base.Diff.Full.E.t list) : unit =
-  match t with
-  | Hash t ->
-      Catchup_hash_tree.apply_diffs t ds
-  | Full t ->
-      Full_catchup_tree.apply_diffs t ds
+  match t with Full t -> Full_catchup_tree.apply_diffs t ds
 
 let create t ~logger ~root =
-  match t with
-  | `Normal ->
-      Hash (Catchup_hash_tree.create ~logger ~root)
-  | `Super ->
-      Full (Full_catchup_tree.create ~logger ~root)
+  match t with `Super -> Full (Full_catchup_tree.create ~logger ~root)

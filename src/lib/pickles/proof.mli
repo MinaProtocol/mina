@@ -92,8 +92,8 @@ module Base : sig
   end
 end
 
-type ('s, 'mlmb, 'c) with_data =
-      ('s, 'mlmb, 'c) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
+type ('s, 'mlmb) with_data =
+      ('s, 'mlmb) Mina_wire_types.Pickles.Concrete_.Proof.with_data =
   | T :
       ( 'mlmb Base.Messages_for_next_proof_over_same_field.Wrap.t
       , ( 's
@@ -107,20 +107,16 @@ type ('s, 'mlmb, 'c) with_data =
           Pickles_types.Vector.t )
         Base.Messages_for_next_proof_over_same_field.Step.t )
       Base.Wrap.t
-      -> ('s, 'mlmb, _) with_data
+      -> ('s, 'mlmb) with_data
 
-type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
+type 'mlmb t = (unit, 'mlmb) with_data
 
 val dummy :
-     'w Pickles_types.Nat.t
-  -> 'h Pickles_types.Nat.t
-  -> 'r Pickles_types.Nat.t
-  -> domain_log2:int
-  -> ('w, 'h) t
+  'h Pickles_types.Nat.t -> 'r Pickles_types.Nat.t -> domain_log2:int -> 'h t
 
-module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
+module Make (MLMB : Pickles_types.Nat.Intf) : sig
   module Max_proofs_verified_at_most :
-      module type of Pickles_types.At_most.With_length (W)
+      module type of Pickles_types.At_most.With_length (MLMB)
 
   module MLMB_vec : module type of Import.Nvector (MLMB)
 
@@ -142,7 +138,7 @@ module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
-  type nonrec t = (W.n, MLMB.n) t [@@deriving compare, sexp, hash, equal]
+  type nonrec t = MLMB.n t [@@deriving compare, sexp, hash, equal]
 
   val to_base64 : t -> string
 
@@ -156,7 +152,7 @@ module Make (W : Pickles_types.Nat.Intf) (MLMB : Pickles_types.Nat.Intf) : sig
 end
 
 module Proofs_verified_2 : sig
-  module T : module type of Make (Pickles_types.Nat.N2) (Pickles_types.Nat.N2)
+  module T : module type of Make (Pickles_types.Nat.N2)
 
   [%%versioned:
   module Stable : sig
@@ -173,11 +169,7 @@ module Proofs_verified_2 : sig
 end
 
 module Proofs_verified_max : sig
-  module T :
-      module type of
-        Make
-          (Side_loaded_verification_key.Width.Max)
-          (Side_loaded_verification_key.Width.Max)
+  module T : module type of Make (Side_loaded_verification_key.Width.Max)
 
   [%%versioned:
   module Stable : sig

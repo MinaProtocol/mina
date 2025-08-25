@@ -4,12 +4,12 @@
  (libraries
   ;; opam libraries
   core_kernel
-  async
+  async_kernel
   ;; local libraries
-  mina_base
   logger
-  disk_cache)
+  disk_cache
+  pickles)
  (preprocess
-  (pps ppx_mina ppx_version))
+  (pps ppx_mina ppx_version ppx_jane))
  (instrumentation
   (backend bisect_ppx)))

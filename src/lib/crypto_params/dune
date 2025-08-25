@@ -7,21 +7,21 @@
   (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
-  core_kernel
   bin_prot.shape
+  core_kernel
   sexplib0
   ;; local libraries
-  kimchi_pasta
-  kimchi_pasta.basic
-  pickles.backend
-  snarky.backendless
   cache_dir
   group_map
+  kimchi_backend
+  kimchi_pasta
+  kimchi_pasta.basic
   pickles
-  tuple_lib
-  kimchi_backend)
+  pickles.backend
+  snarky.backendless
+  tuple_lib)
  (preprocess
-  (pps ppx_version ppx_jane h_list.ppx))
+  (pps h_list.ppx ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx))
  (synopsis "Cryptographic parameters"))

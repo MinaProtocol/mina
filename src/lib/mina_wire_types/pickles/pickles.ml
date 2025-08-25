@@ -106,7 +106,7 @@ module M = struct
       end
     end
 
-    type ('s, 'mlmb, _) with_data =
+    type ('s, 'mlmb) with_data =
       | T :
           ( 'mlmb Pickles_reduced_messages_for_next_proof_over_same_field.Wrap.t
           , ( 's
@@ -119,13 +119,13 @@ module M = struct
             Pickles_reduced_messages_for_next_proof_over_same_field.Step.V1.t
           )
           Base.Wrap.V2.t
-          -> ('s, 'mlmb, _) with_data
+          -> ('s, 'mlmb) with_data
 
-    type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) with_data
+    type 'mlmb t = (unit, 'mlmb) with_data
 
     module Proofs_verified_2 = struct
       module V2 = struct
-        type nonrec t = (Pickles_types.Nat.two, Pickles_types.Nat.two) t
+        type nonrec t = Pickles_types.Nat.two t
       end
     end
   end
@@ -159,8 +159,7 @@ module M = struct
 
     module Proof = struct
       module V2 = struct
-        type t =
-          (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
+        type t = Verification_key.Max_width.n Proof.t
       end
     end
   end
@@ -169,11 +168,11 @@ end
 module Types = struct
   module type S = sig
     module Proof : sig
-      type ('a, 'b) t
+      type 'a t
 
       module Proofs_verified_2 : sig
         module V2 : sig
-          type nonrec t = (Pickles_types.Nat.two, Pickles_types.Nat.two) t
+          type nonrec t = Pickles_types.Nat.two t
         end
       end
     end
@@ -191,8 +190,7 @@ module Types = struct
 
       module Proof : sig
         module V2 : sig
-          type t =
-            (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
+          type t = Verification_key.Max_width.n Proof.t
         end
       end
     end
@@ -216,7 +214,7 @@ module type Concrete =
     with type Side_loaded.Verification_key.V2.t =
       M.Side_loaded.Verification_key.V2.t
      and type Backend.Tick.Field.V1.t = Pasta_bindings.Fp.t
-     and type ('a, 'b) Proof.t = ('a, 'b) M.Proof.t
+     and type 'a Proof.t = 'a M.Proof.t
 
 module type Local_sig = Signature(Types).S
 

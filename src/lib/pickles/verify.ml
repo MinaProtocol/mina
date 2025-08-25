@@ -13,7 +13,7 @@ module Instance = struct
         * chunking_data option
         * Verification_key.t
         * 'a
-        * ('n, 'n) Proof.t
+        * 'n Proof.t
         -> t
 end
 
@@ -201,7 +201,6 @@ let verify_heterogenous (ts : Instance.t list) =
                   t.statement.proof_state.sponge_digest_before_evaluations
               ; messages_for_next_wrap_proof =
                   Wrap_hack.hash_messages_for_next_wrap_proof
-                    Max_proofs_verified.n
                     (Reduced_messages_for_next_proof_over_same_field.Wrap
                      .prepare
                        t.statement.proof_state.messages_for_next_wrap_proof )
@@ -244,7 +243,7 @@ let verify_heterogenous (ts : Instance.t list) =
 let verify (type a n) ?chunking_data
     (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
-    (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
+    (key : Verification_key.t) (ts : (a * n Proof.t) list) =
   verify_heterogenous
     (List.map ts ~f:(fun (x, p) ->
          Instance.T (max_proofs_verified, a_value, chunking_data, key, x, p) )
