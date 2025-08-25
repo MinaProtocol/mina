@@ -43,7 +43,7 @@ echo "[buildx] Bootstrapping current builder"
 docker buildx inspect --bootstrap >/dev/null
 
 # Install binfmt only when using docker-container (useful for cross-building)
-CURRENT_BUILDER="$(docker buildx ls | awk '/\*/{print $1}')"
+CURRENT_BUILDER="$(docker buildx ls | awk '/\*/{gsub(/\*/, "", $1); print $1}')"
 CURRENT_DRIVER="$(docker buildx inspect "$CURRENT_BUILDER" | awk -F': ' '/Driver:/ {print $2}')"
 
 if [[ "$INSTALL_BINFMT" = "1" && "$CURRENT_DRIVER" = "docker-container" ]]; then
