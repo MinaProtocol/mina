@@ -40,9 +40,9 @@ end)
      and type hash := Inputs.Hash.t
      and type account_id := Inputs.Account_id.t
      and type account_id_set := Inputs.Account_id.Set.t
-     and type primary_ledger := Primary_ledger.t
-     and type converting_ledger := Converting_ledger.t
-     and type converted_account := Inputs.converted_account = struct
+     and type converted_account := Inputs.converted_account
+     and type primary_ledger = Primary_ledger.t
+     and type converting_ledger = Converting_ledger.t = struct
   let convert = Inputs.convert
 
   module Location = Inputs.Location
@@ -52,6 +52,10 @@ end)
   type path = Primary_ledger.path
 
   type index = int
+
+  type primary_ledger = Primary_ledger.t
+
+  type converting_ledger = Converting_ledger.t
 
   type t =
     { primary_ledger : Primary_ledger.t

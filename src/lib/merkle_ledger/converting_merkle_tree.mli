@@ -49,9 +49,9 @@ end)
      and type hash := Inputs.Hash.t
      and type account_id := Inputs.Account_id.t
      and type account_id_set := Inputs.Account_id.Set.t
-     and type primary_ledger := Primary_ledger.t
-     and type converting_ledger := Converting_ledger.t
      and type converted_account := Inputs.converted_account
+     and type primary_ledger = Primary_ledger.t
+     and type converting_ledger = Converting_ledger.t
 
 module With_database_config : Intf.Ledger.Converting.Config
 
@@ -101,6 +101,6 @@ end)
      and type hash := Inputs.Hash.t
      and type account_id := Inputs.Account_id.t
      and type account_id_set := Inputs.Account_id.Set.t
-     and type primary_ledger := Primary_db.t
-     and type converting_ledger := Converting_db.t
      and type converted_account := Inputs.converted_account
+     and type primary_ledger = Primary_db.t
+     and type converting_ledger = Converting_db.t
