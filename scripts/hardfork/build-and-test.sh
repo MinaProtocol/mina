@@ -196,16 +196,8 @@ if [[ "$CONTEXT" == "ci" ]]; then
   git submodule update --init --recursive
 fi
 
-if [[ "$MODE" == "app" ]]; then
-  build_branch "$INIT_DIR" "$INIT_DIR/fork-devnet"
-else
-  echo "Docker mode is used and docker will be built after we generate fork config. For now we build only mina app"
-  cd "$INIT_DIR"
-  DUNE_PROFILE=devnet make build
-  DUNE_PROFILE=devnet make build-logproc
-  DUNE_PROFILE=devnet make build-devnet-sigs
-  DUNE_PROFILE=devnet make build-daemon-utils
-fi
+
+build_branch "$INIT_DIR" "$INIT_DIR/fork-devnet"
 
 if  [[ "$MODE" == "nix" ]] && [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws
