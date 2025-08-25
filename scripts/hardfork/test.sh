@@ -45,6 +45,24 @@ stop_nodes(){
   fi
 }
 
+print_nodes_logs() {
+  if [[ "$MODE" == "docker" ]]; then
+    echo "Block producer logs:" >&2
+    docker logs "$BP_CONTAINER_NAME" 2>&1 | tail -50
+    echo "SNARK worker logs:" >&2
+    docker logs "$SW_CONTAINER_NAME" 2>&1 | tail -50
+  else
+    echo "Node logs (if available):" >&2
+    # Print any available log files
+    for log_file in localnet/runtime_*/mina.log; do
+      if [[ -f "$log_file" ]]; then
+        echo "Log file: $log_file" >&2
+        tail -50 "$log_file" 2>&1
+      fi
+    done
+  fi
+}
+
 # Parse command line arguments
 
 MINA_DOCKER=""
@@ -123,11 +141,18 @@ sleep $((MAIN_SLOT * BEST_CHAIN_QUERY_FROM - NOW_UNIX_TS%60 + MAIN_DELAY*60))s
 
 # 2. Check that there are many blocks >50% of slots occupied from slot 0 to slot
 # $BEST_CHAIN_QUERY_FROM and that there are some user commands in blocks corresponding to slots
-blockHeight=$(get_height 10303)
+if ! blockHeight=$(get_height 10303); then
+  echo "Error: Failed to get block height from node" >&2
+  echo "Printing logs for troubleshooting:" >&2
+  print_nodes_logs
+  stop_nodes "$MAIN_MINA_EXE"
+  exit 3
+fi
 echo "Block height is $blockHeight at slot $BEST_CHAIN_QUERY_FROM."
 
 if [[ $((2*blockHeight)) -lt $BEST_CHAIN_QUERY_FROM ]]; then
   echo "Assertion failed: slot occupancy is below 50%" >&2
+  print_nodes_logs
   stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
