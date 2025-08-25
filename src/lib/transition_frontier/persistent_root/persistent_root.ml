@@ -149,9 +149,9 @@ module Instance = struct
     Ledger.Root.close t.snarked_ledger ;
     t.factory.instance <- None
 
-  let create factory =
+  let create ~logger factory =
     let snarked_ledger =
-      Ledger.Root.create ~depth:factory.ledger_depth
+      Ledger.Root.create ~logger ~depth:factory.ledger_depth
         ~config:(Config.snarked_ledger factory)
         ()
     in
@@ -172,7 +172,7 @@ module Instance = struct
       List.fold_until potential_snarked_ledgers ~init:None
         ~f:(fun _ config ->
           let potential_snarked_ledger =
-            Ledger.Root.create ~depth:factory.ledger_depth ~config ()
+            Ledger.Root.create ~logger ~depth:factory.ledger_depth ~config ()
           in
           let potential_snarked_ledger_hash =
             Frozen_ledger_hash.of_ledger_hash
@@ -189,7 +189,7 @@ module Instance = struct
               snarked_ledger_hash
           then (
             let snarked_ledger =
-              Ledger.Root.create ~depth:factory.ledger_depth
+              Ledger.Root.create ~logger ~depth:factory.ledger_depth
                 ~config:(Config.tmp_snarked_ledger factory)
                 ()
             in
@@ -232,7 +232,7 @@ module Instance = struct
     match snarked_ledger with
     | None ->
         let snarked_ledger =
-          Ledger.Root.create ~depth:factory.ledger_depth
+          Ledger.Root.create ~logger ~depth:factory.ledger_depth
             ~config:(Config.snarked_ledger factory)
             ()
         in
@@ -304,7 +304,7 @@ let create ~logger ~directory ~ledger_depth =
 
 let create_instance_exn t =
   assert (Option.is_none t.instance) ;
-  let instance = Instance.create t in
+  let instance = Instance.create ~logger:t.logger t in
   t.instance <- Some instance ;
   instance
 

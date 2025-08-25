@@ -166,13 +166,15 @@ let%test_module "Epoch ledger sync tests" =
         let directory = `New
 
         let depth = constraint_constants.ledger_depth
+
+        let logger = Context.logger
       end) in
       (module Test_genesis_ledger)
 
     (* TODO: single for now, but the tests might need to be expanded to cover
        other types of Root ledgers when they are implemented *)
     let make_empty_root_ledger (module Context : CONTEXT) =
-      Mina_ledger.Ledger.Root.create_temporary
+      Mina_ledger.Ledger.Root.create_temporary ~logger
         ~backing_type:Mina_ledger.Ledger.Root.Config.Stable_db
         ~depth:Context.precomputed_values.constraint_constants.ledger_depth ()
 

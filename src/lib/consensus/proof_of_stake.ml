@@ -470,7 +470,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ]
             "Loading epoch ledger from disk: $location" ;
           Snapshot.Ledger_snapshot.Ledger_root
-            (Mina_ledger.Ledger.Root.create ~config
+            (Mina_ledger.Ledger.Root.create ~logger ~config
                ~depth:constraint_constants.ledger_depth () ) )
         else Genesis_epoch_ledger genesis_epoch_ledger
 
@@ -2678,7 +2678,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                           Ok ledger
                       | Ledger_snapshot.Genesis_epoch_ledger packed ->
                           let fresh_root_ledger =
-                            Mina_ledger.Ledger.Root.create
+                            Mina_ledger.Ledger.Root.create ~logger
                               ~config:snapshot_config
                               ~depth:Context.constraint_constants.ledger_depth
                               ()
