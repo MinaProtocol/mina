@@ -17,8 +17,6 @@ module Type1 =
     (Shifted_value.Type1)
     (struct
       let constant_term = Plonk_checks.Scalars.Tick.constant_term
-
-      let index_terms = Plonk_checks.Scalars.Tick.index_terms
     end)
 
 let _vector_of_list (type a t)
@@ -353,9 +351,7 @@ let wrap
                      P.Base.Messages_for_next_proof_over_same_field.Wrap
                      .Prepared
                      .t ) =
-                 Wrap_hack.hash_messages_for_next_wrap_proof
-                   (Vector.length m.old_bulletproof_challenges)
-                   m
+                 Wrap_hack.hash_messages_for_next_wrap_proof m
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in
@@ -565,7 +561,7 @@ let wrap
               { next_statement.proof_state with
                 messages_for_next_wrap_proof =
                   Wrap_hack.hash_messages_for_next_wrap_proof
-                    max_proofs_verified messages_for_next_wrap_proof_prepared
+                    messages_for_next_wrap_proof_prepared
               ; deferred_values =
                   { next_statement.proof_state.deferred_values with
                     plonk =

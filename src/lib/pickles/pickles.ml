@@ -8,7 +8,7 @@ module Make_sig (A : Wire_types.Types.S) = struct
     Pickles_intf.S
       with type Side_loaded.Verification_key.Stable.V2.t =
         A.Side_loaded.Verification_key.V2.t
-       and type ('a, 'b) Proof.t = ('a, 'b) A.Proof.t
+       and type 'a Proof.t = 'a A.Proof.t
 end
 
 module Make_str (_ : Wire_types.Concrete) = struct
@@ -36,7 +36,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Util = Util
   module Tick_field_sponge = Tick_field_sponge
   module Impls = Impls
-  module Inductive_rule = Inductive_rule
+  module Inductive_rule = Inductive_rule.Kimchi
   module Tag = Tag
   module Types_map = Types_map
   module Dirty = Dirty
@@ -47,6 +47,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Cache = Cache
   module Storables = Compile.Storables
   module Ro = Ro
+  module Step_branch_data = Step_branch_data.Make (Inductive_rule)
 
   type chunking_data = Verify.Instance.chunking_data =
     { num_chunks : int; domain_size : int; zk_rows : int }
@@ -159,9 +160,9 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Proof = P
 
   module Statement_with_proof = struct
-    type ('s, 'max_width, _) t =
+    type ('s, 'max_width) t =
       (* TODO: use Max local max proofs verified instead of max_width *)
-      ('max_width, 'max_width) Proof.t
+      'max_width Proof.t
   end
 
   module Verification_key = struct
@@ -251,7 +252,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
       Types_map.add_side_loaded ~name
         { max_proofs_verified
         ; public_input = typ
-        ; branches = Verification_key.Max_branches.n
         ; feature_flags =
             Plonk_types.(Features.to_full ~or_:Opt.Flag.( ||| ) feature_flags)
         ; num_chunks = Plonk_checks.num_chunks_by_default
@@ -315,22 +315,43 @@ module Make_str (_ : Wire_types.Concrete) = struct
     Compile.compile_with_wrap_main_override_promise
 
   let compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     compile_with_wrap_main_override_promise ?self ?cache ?storables ?proof_cache
-      ?disk_keys ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ
-      ~branches ~max_proofs_verified ~name ~choices ()
+      ?disk_keys ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
+      ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
 
   let compile ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
-          type a b c d e f g h i j.
-             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule).t
-          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
-        function
+          type length a b c d e f g h i j.
+             ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule).t
+          -> ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Promise).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
@@ -345,8 +366,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ~choices ()
+        ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
+        ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -362,15 +383,36 @@ module Make_str (_ : Wire_types.Concrete) = struct
     (self, cache_handle, proof_module, adjust_provers provers)
 
   let compile_async ?self ?cache ?storables ?proof_cache ?disk_keys
-      ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
+      ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input ~auxiliary_typ
       ~max_proofs_verified ~name ~choices () =
     let choices ~self =
       let choices = choices ~self in
       let rec go :
-          type a b c d e f g h i j.
-             (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Deferred).t
-          -> (a, b, c, d, e, f, g, h, i, j) H4_6.T(Inductive_rule.Promise).t =
-        function
+          type length a b c d e f g h i j.
+             ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Deferred).t
+          -> ( length
+             , a
+             , b
+             , c
+             , d
+             , e
+             , f
+             , g
+             , h
+             , i
+             , j )
+             H4_6_with_length.T(Inductive_rule.Promise).t = function
         | [] ->
             []
         | { identifier; prevs; main; feature_flags } :: rest ->
@@ -390,8 +432,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
     in
     let self, cache_handle, proof_module, provers =
       compile_promise ?self ?cache ?storables ?proof_cache ?disk_keys
-        ?override_wrap_domain ?num_chunks ~public_input ~auxiliary_typ ~branches
-        ~max_proofs_verified ~name ~choices ()
+        ?override_wrap_domain ?num_chunks ?lazy_mode ~public_input
+        ~auxiliary_typ ~max_proofs_verified ~name ~choices ()
     in
     let rec adjust_provers :
         type a1 a2 a3 s1 s2_inner.
@@ -409,556 +451,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
   module Provers = H3_2.T (Prover)
   module Proof0 = Proof
 
-  let%test_module "test no side-loaded" =
-    ( module struct
-      let () = Tock.Keypair.set_urs_info []
-
-      let () = Tick.Keypair.set_urs_info []
-
-      let () = Backtrace.elide := false
-
-      open Impls.Step
-
-      let () = Snarky_backendless.Snark0.set_eval_constraints true
-
-      (* Currently, a circuit must have at least 1 of every type of constraint. *)
-      let dummy_constraints () =
-        Impl.(
-          let x =
-            exists Field.typ ~compute:(fun () -> Field.Constant.of_int 3)
-          in
-          let g =
-            exists Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
-                Tick.Inner_curve.(to_affine_exn one) )
-          in
-          ignore
-            ( SC.to_field_checked'
-                (module Impl)
-                ~num_bits:16
-                (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t * Field.t ) ;
-          ignore
-            ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
-              : Step_main_inputs.Inner_curve.t ) ;
-          ignore
-            ( Step_main_inputs.Ops.scale_fast g ~num_bits:5 (Shifted_value x)
-              : Step_main_inputs.Inner_curve.t ) ;
-          ignore
-            ( Step_verifier.Scalar_challenge.endo g ~num_bits:4
-                (Kimchi_backend_common.Scalar_challenge.create x)
-              : Field.t * Field.t ))
-
-      module No_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
-          Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
-                ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
-                ~max_proofs_verified:(module Nat.N0)
-                ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          dummy_constraints () ;
-                          Field.Assert.equal self Field.zero ;
-                          Promise.return
-                            { Inductive_rule.previous_proof_statements = []
-                            ; public_output = ()
-                            ; auxiliary_output = ()
-                            } )
-                    }
-                  ] ) )
-
-        module Proof = (val p)
-
-        let example =
-          let (), (), b0 =
-            Common.time "b0" (fun () ->
-                Promise.block_on_async_exn (fun () -> step Field.Constant.zero) )
-          in
-          Or_error.ok_exn
-            (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
-          (Field.Constant.zero, b0)
-
-        let _example_input, _example_proof = example
-      end
-
-      module No_recursion_return = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
-          Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Output Field.typ)
-                ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
-                ~max_proofs_verified:(module Nat.N0)
-                ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; prevs = []
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun _ ->
-                          dummy_constraints () ;
-                          Promise.return
-                            { Inductive_rule.previous_proof_statements = []
-                            ; public_output = Field.zero
-                            ; auxiliary_output = ()
-                            } )
-                    }
-                  ] ) )
-
-        module Proof = (val p)
-
-        let example =
-          let res, (), b0 =
-            Common.time "b0" (fun () ->
-                Promise.block_on_async_exn (fun () -> step ()) )
-          in
-          assert (Field.Constant.(equal zero) res) ;
-          Or_error.ok_exn
-            (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (res, b0) ] ) ) ;
-          (res, b0)
-
-        let _example_input, _example_proof = example
-      end
-
-      [@@@warning "-60"]
-
-      module Simple_chain = struct
-        type _ Snarky_backendless.Request.t +=
-          | Prev_input : Field.Constant.t Snarky_backendless.Request.t
-          | Proof : (Nat.N1.n, Nat.N1.n) Proof.t Snarky_backendless.Request.t
-
-        let handler (prev_input : Field.Constant.t) (proof : _ Proof.t)
-            (Snarky_backendless.Request.With { request; respond }) =
-          match request with
-          | Prev_input ->
-              respond (Provide prev_input)
-          | Proof ->
-              respond (Provide proof)
-          | _ ->
-              respond Unhandled
-
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
-          Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
-                ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
-                ~max_proofs_verified:(module Nat.N1)
-                ~name:"blockchain-snark"
-                ~choices:(fun ~self ->
-                  [ { identifier = "main"
-                    ; prevs = [ self ]
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; main =
-                        (fun { public_input = self } ->
-                          let prev =
-                            exists Field.typ ~request:(fun () -> Prev_input)
-                          in
-                          let proof =
-                            exists (Typ.prover_value ()) ~request:(fun () ->
-                                Proof )
-                          in
-                          let is_base_case = Field.equal Field.zero self in
-                          let proof_must_verify = Boolean.not is_base_case in
-                          let self_correct = Field.(equal (one + prev) self) in
-                          Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          Promise.return
-                            { Inductive_rule.previous_proof_statements =
-                                [ { public_input = prev
-                                  ; proof
-                                  ; proof_must_verify
-                                  }
-                                ]
-                            ; public_output = ()
-                            ; auxiliary_output = ()
-                            } )
-                    }
-                  ] ) )
-
-        module Proof = (val p)
-
-        let example =
-          let s_neg_one = Field.Constant.(negate one) in
-          let b_neg_one : (Nat.N1.n, Nat.N1.n) Proof0.t =
-            Proof0.dummy Nat.N1.n Nat.N1.n Nat.N1.n ~domain_log2:14
-          in
-          let (), (), b0 =
-            Common.time "b0" (fun () ->
-                Promise.block_on_async_exn (fun () ->
-                    step
-                      ~handler:(handler s_neg_one b_neg_one)
-                      Field.Constant.zero ) )
-          in
-          Or_error.ok_exn
-            (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
-          let (), (), b1 =
-            Common.time "b1" (fun () ->
-                Promise.block_on_async_exn (fun () ->
-                    step
-                      ~handler:(handler Field.Constant.zero b0)
-                      Field.Constant.one ) )
-          in
-          Or_error.ok_exn
-            (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.one, b1) ] ) ) ;
-          (Field.Constant.one, b1)
-
-        let _example_input, _example_proof = example
-      end
-
-      module Tree_proof = struct
-        type _ Snarky_backendless.Request.t +=
-          | No_recursion_input : Field.Constant.t Snarky_backendless.Request.t
-          | No_recursion_proof :
-              (Nat.N0.n, Nat.N0.n) Proof.t Snarky_backendless.Request.t
-          | Recursive_input : Field.Constant.t Snarky_backendless.Request.t
-          | Recursive_proof :
-              (Nat.N2.n, Nat.N2.n) Proof.t Snarky_backendless.Request.t
-
-        let handler
-            ((no_recursion_input, no_recursion_proof) :
-              Field.Constant.t * _ Proof.t )
-            ((recursion_input, recursion_proof) : Field.Constant.t * _ Proof.t)
-            (Snarky_backendless.Request.With { request; respond }) =
-          match request with
-          | No_recursion_input ->
-              respond (Provide no_recursion_input)
-          | No_recursion_proof ->
-              respond (Provide no_recursion_proof)
-          | Recursive_input ->
-              respond (Provide recursion_input)
-          | Recursive_proof ->
-              respond (Provide recursion_proof)
-          | _ ->
-              respond Unhandled
-
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
-          Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Input Field.typ)
-                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
-                ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
-                ~max_proofs_verified:(module Nat.N2)
-                ~name:"blockchain-snark"
-                ~choices:(fun ~self ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = [ No_recursion.tag; self ]
-                    ; main =
-                        (fun { public_input = self } ->
-                          let no_recursive_input =
-                            exists Field.typ ~request:(fun () ->
-                                No_recursion_input )
-                          in
-                          let no_recursive_proof =
-                            exists (Typ.prover_value ()) ~request:(fun () ->
-                                No_recursion_proof )
-                          in
-                          let prev =
-                            exists Field.typ ~request:(fun () ->
-                                Recursive_input )
-                          in
-                          let prev_proof =
-                            exists (Typ.prover_value ()) ~request:(fun () ->
-                                Recursive_proof )
-                          in
-                          let is_base_case = Field.equal Field.zero self in
-                          let proof_must_verify = Boolean.not is_base_case in
-                          let self_correct = Field.(equal (one + prev) self) in
-                          Boolean.Assert.any [ self_correct; is_base_case ] ;
-                          Promise.return
-                            { Inductive_rule.previous_proof_statements =
-                                [ { public_input = no_recursive_input
-                                  ; proof = no_recursive_proof
-                                  ; proof_must_verify = Boolean.true_
-                                  }
-                                ; { public_input = prev
-                                  ; proof = prev_proof
-                                  ; proof_must_verify
-                                  }
-                                ]
-                            ; public_output = ()
-                            ; auxiliary_output = ()
-                            } )
-                    }
-                  ] ) )
-
-        module Proof = (val p)
-
-        let example1, example2 =
-          let s_neg_one = Field.Constant.(negate one) in
-          let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
-            Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
-          in
-          let (), (), b0 =
-            Common.time "tree b0" (fun () ->
-                Promise.block_on_async_exn (fun () ->
-                    step
-                      ~handler:
-                        (handler No_recursion.example (s_neg_one, b_neg_one))
-                      Field.Constant.zero ) )
-          in
-          Or_error.ok_exn
-            (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (Field.Constant.zero, b0) ] ) ) ;
-          let (), (), b1 =
-            Common.time "tree b1" (fun () ->
-                Promise.block_on_async_exn (fun () ->
-                    step
-                      ~handler:
-                        (handler No_recursion.example (Field.Constant.zero, b0))
-                      Field.Constant.one ) )
-          in
-          ((Field.Constant.zero, b0), (Field.Constant.one, b1))
-
-        let examples = [ example1; example2 ]
-
-        let _example1_input, _example_proof = example1
-
-        let _example2_input, _example2_proof = example2
-      end
-
-      let%test_unit "verify" =
-        Or_error.ok_exn
-          (Promise.block_on_async_exn (fun () ->
-               Tree_proof.Proof.verify_promise Tree_proof.examples ) )
-
-      module Tree_proof_return = struct
-        type _ Snarky_backendless.Request.t +=
-          | Is_base_case : bool Snarky_backendless.Request.t
-          | No_recursion_input : Field.Constant.t Snarky_backendless.Request.t
-          | No_recursion_proof :
-              (Nat.N0.n, Nat.N0.n) Proof.t Snarky_backendless.Request.t
-          | Recursive_input : Field.Constant.t Snarky_backendless.Request.t
-          | Recursive_proof :
-              (Nat.N2.n, Nat.N2.n) Proof.t Snarky_backendless.Request.t
-
-        let handler (is_base_case : bool)
-            ((no_recursion_input, no_recursion_proof) :
-              Field.Constant.t * _ Proof.t )
-            ((recursion_input, recursion_proof) : Field.Constant.t * _ Proof.t)
-            (Snarky_backendless.Request.With { request; respond }) =
-          match request with
-          | Is_base_case ->
-              respond (Provide is_base_case)
-          | No_recursion_input ->
-              respond (Provide no_recursion_input)
-          | No_recursion_proof ->
-              respond (Provide no_recursion_proof)
-          | Recursive_input ->
-              respond (Provide recursion_input)
-          | Recursive_proof ->
-              respond (Provide recursion_proof)
-          | _ ->
-              respond Unhandled
-
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
-          Common.time "compile" (fun () ->
-              compile_promise () ~public_input:(Output Field.typ)
-                ~override_wrap_domain:Pickles_base.Proofs_verified.N1
-                ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
-                ~max_proofs_verified:(module Nat.N2)
-                ~name:"blockchain-snark"
-                ~choices:(fun ~self ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = [ No_recursion_return.tag; self ]
-                    ; main =
-                        (fun { public_input = () } ->
-                          let no_recursive_input =
-                            exists Field.typ ~request:(fun () ->
-                                No_recursion_input )
-                          in
-                          let no_recursive_proof =
-                            exists (Typ.prover_value ()) ~request:(fun () ->
-                                No_recursion_proof )
-                          in
-                          let prev =
-                            exists Field.typ ~request:(fun () ->
-                                Recursive_input )
-                          in
-                          let prev_proof =
-                            exists (Typ.prover_value ()) ~request:(fun () ->
-                                Recursive_proof )
-                          in
-                          let is_base_case =
-                            exists Boolean.typ ~request:(fun () -> Is_base_case)
-                          in
-                          let proof_must_verify = Boolean.not is_base_case in
-                          let self =
-                            Field.(
-                              if_ is_base_case ~then_:zero ~else_:(one + prev))
-                          in
-                          Promise.return
-                            { Inductive_rule.previous_proof_statements =
-                                [ { public_input = no_recursive_input
-                                  ; proof = no_recursive_proof
-                                  ; proof_must_verify = Boolean.true_
-                                  }
-                                ; { public_input = prev
-                                  ; proof = prev_proof
-                                  ; proof_must_verify
-                                  }
-                                ]
-                            ; public_output = self
-                            ; auxiliary_output = ()
-                            } )
-                    }
-                  ] ) )
-
-        module Proof = (val p)
-
-        let example1, example2 =
-          let s_neg_one = Field.Constant.(negate one) in
-          let b_neg_one : (Nat.N2.n, Nat.N2.n) Proof0.t =
-            Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
-          in
-          let s0, (), b0 =
-            Common.time "tree b0" (fun () ->
-                Promise.block_on_async_exn (fun () ->
-                    step
-                      ~handler:
-                        (handler true No_recursion_return.example
-                           (s_neg_one, b_neg_one) )
-                      () ) )
-          in
-          assert (Field.Constant.(equal zero) s0) ;
-          Or_error.ok_exn
-            (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ (s0, b0) ] ) ) ;
-          let s1, (), b1 =
-            Common.time "tree b1" (fun () ->
-                Promise.block_on_async_exn (fun () ->
-                    step
-                      ~handler:
-                        (handler false No_recursion_return.example (s0, b0))
-                      () ) )
-          in
-          assert (Field.Constant.(equal one) s1) ;
-          ((s0, b0), (s1, b1))
-
-        let examples = [ example1; example2 ]
-
-        let _example1_input, _example1_proof = example1
-
-        let _example2_input, _example2_proof = example2
-      end
-
-      let%test_unit "verify" =
-        Or_error.ok_exn
-          (Promise.block_on_async_exn (fun () ->
-               Tree_proof_return.Proof.verify_promise Tree_proof_return.examples )
-          )
-
-      module Add_one_return = struct
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
-          Common.time "compile" (fun () ->
-              compile_promise ()
-                ~public_input:(Input_and_output (Field.typ, Field.typ))
-                ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
-                ~max_proofs_verified:(module Nat.N0)
-                ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = []
-                    ; main =
-                        (fun { public_input = x } ->
-                          dummy_constraints () ;
-                          Promise.return
-                            { Inductive_rule.previous_proof_statements = []
-                            ; public_output = Field.(add one) x
-                            ; auxiliary_output = ()
-                            } )
-                    }
-                  ] ) )
-
-        module Proof = (val p)
-
-        let example =
-          let input = Field.Constant.of_int 42 in
-          let res, (), b0 =
-            Common.time "b0" (fun () ->
-                Promise.block_on_async_exn (fun () -> step input) )
-          in
-          assert (Field.Constant.(equal (of_int 43)) res) ;
-          Or_error.ok_exn
-            (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ ((input, res), b0) ] ) ) ;
-          ((input, res), b0)
-
-        let _example_input, _example_proof = example
-      end
-
-      module Auxiliary_return = struct
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
-          Common.time "compile" (fun () ->
-              compile_promise ()
-                ~public_input:(Input_and_output (Field.typ, Field.typ))
-                ~auxiliary_typ:Field.typ
-                ~branches:(module Nat.N1)
-                ~max_proofs_verified:(module Nat.N0)
-                ~name:"blockchain-snark"
-                ~choices:(fun ~self:_ ->
-                  [ { identifier = "main"
-                    ; feature_flags = Plonk_types.Features.none_bool
-                    ; prevs = []
-                    ; main =
-                        (fun { public_input = input } ->
-                          dummy_constraints () ;
-                          let sponge =
-                            Step_main_inputs.Sponge.create
-                              Step_main_inputs.sponge_params
-                          in
-                          let blinding_value =
-                            exists Field.typ ~compute:Field.Constant.random
-                          in
-                          Step_main_inputs.Sponge.absorb sponge (`Field input) ;
-                          Step_main_inputs.Sponge.absorb sponge
-                            (`Field blinding_value) ;
-                          let result = Step_main_inputs.Sponge.squeeze sponge in
-                          Promise.return
-                            { Inductive_rule.previous_proof_statements = []
-                            ; public_output = result
-                            ; auxiliary_output = blinding_value
-                            } )
-                    }
-                  ] ) )
-
-        module Proof = (val p)
-
-        let example =
-          let input = Field.Constant.of_int 42 in
-          let result, blinding_value, b0 =
-            Common.time "b0" (fun () ->
-                Promise.block_on_async_exn (fun () -> step input) )
-          in
-          let sponge =
-            Tick_field_sponge.Field.create Tick_field_sponge.params
-          in
-          Tick_field_sponge.Field.absorb sponge input ;
-          Tick_field_sponge.Field.absorb sponge blinding_value ;
-          let result' = Tick_field_sponge.Field.squeeze sponge in
-          assert (Field.Constant.equal result result') ;
-          Or_error.ok_exn
-            (Promise.block_on_async_exn (fun () ->
-                 Proof.verify_promise [ ((input, result), b0) ] ) ) ;
-          ((input, result), b0)
-
-        let _example_input, _example_proof = example
-      end
-    end )
-
   let%test_module "test uncorrelated bulletproof_challenges" =
     ( module struct
+      let () = Backend.Tock.Keypair.set_urs_info []
+
+      let () = Backend.Tick.Keypair.set_urs_info []
+
       let () = Backtrace.elide := false
 
       let () = Snarky_backendless.Snark0.set_eval_constraints true
@@ -1002,7 +500,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             (fun { public_input = () } ->
               let dummy_proof =
                 exists (Typ.prover_value ()) ~compute:(fun () ->
-                    Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15 )
+                    Proof0.dummy Nat.N2.n Nat.N2.n ~domain_log2:15 )
               in
               Promise.return
                 { Inductive_rule.previous_proof_statements =
@@ -1071,12 +569,8 @@ module Make_str (_ : Wire_types.Concrete) = struct
           (* TODO Think this is right.. *)
         end
 
-        let compile :
-            (   unit
-             -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t Promise.t
-            )
-            * _
-            * _ =
+        let compile : (unit -> Max_proofs_verified.n Proof.t Promise.t) * _ * _
+            =
           let self = tag in
           let snark_keys_header kind constraint_system_hash =
             { Snark_keys_header.header_version =
@@ -1128,13 +622,12 @@ module Make_str (_ : Wire_types.Concrete) = struct
               , 'm )
               Step_branch_data.t
           end in
-          let proofs_verifieds = Vector.singleton 2 in
           let (T inner_step_data as step_data) =
             Step_branch_data.create ~index:0 ~feature_flags ~num_chunks:1
               ~actual_feature_flags ~max_proofs_verified:Max_proofs_verified.n
               ~branches:Branches.n ~self ~public_input:(Input typ)
               ~auxiliary_typ:typ A.to_field_elements A_value.to_field_elements
-              rule ~wrap_domains ~proofs_verifieds ~chain_to:(Promise.return ())
+              rule ~wrap_domains ~chain_to:(Promise.return ())
             (* TODO? *)
           in
           let step_domains = Vector.singleton inner_step_data.domains in
@@ -1198,7 +691,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             Cache.Step.read_or_generate
               ~prev_challenges:
                 (Nat.to_int (fst inner_step_data.proofs_verified))
-              [] k_p k_v
+              [] ~lazy_mode:false k_p k_v
           in
           let step_vks =
             lazy
@@ -1270,13 +763,16 @@ module Make_str (_ : Wire_types.Concrete) = struct
             let r =
               Common.time "wrap read or generate " (fun () ->
                   Cache.Wrap.read_or_generate ~prev_challenges:2 []
+                    ~lazy_mode:false
                     (Lazy.map ~f:Promise.return disk_key_prover)
                     (Lazy.map ~f:Promise.return disk_key_verifier) )
             in
             (r, disk_key_verifier)
           in
           let wrap_vk = Lazy.map wrap_vk ~f:(Promise.map ~f:fst) in
-          let module S = Step.Make (A) (A_value) (Max_proofs_verified) in
+          let module S =
+            Step.Make (Inductive_rule) (A) (A_value) (Max_proofs_verified)
+          in
           let prover =
             let f :
                    ( unit * (unit * unit)
@@ -1286,8 +782,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                    Branch_data.t
                 -> Lazy_keys.t
                 -> unit
-                -> (Max_proofs_verified.n, Max_proofs_verified.n) Proof.t
-                   Promise.t =
+                -> Max_proofs_verified.n Proof.t Promise.t =
              fun (T b as branch_data) (step_pk, step_vk) () ->
               let (_ : (Max_proofs_verified.n, Maxes.ns) Requests.Wrap.t) =
                 Requests.Wrap.create ()
@@ -1402,8 +897,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                        (Vector.length
                                           m.old_bulletproof_challenges )
                                    in
-                                   Wrap_hack.hash_messages_for_next_wrap_proof
-                                     max_proofs_verified m
+                                   Wrap_hack.hash_messages_for_next_wrap_proof m
                                end)
                            in
                           let module V = H1.To_vector (Digest.Constant) in
@@ -1756,7 +1250,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
                                 { next_statement.proof_state with
                                   messages_for_next_wrap_proof =
                                     Wrap_hack.hash_messages_for_next_wrap_proof
-                                      max_proofs_verified
                                       messages_for_next_wrap_proof_prepared
                                 ; deferred_values =
                                     { next_statement.proof_state.deferred_values with
@@ -1816,9 +1309,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
             f step_data step_keypair
           in
           let data : _ Types_map.Compiled.t =
-            { branches = Branches.n
-            ; feature_flags
-            ; proofs_verifieds
+            { feature_flags
             ; max_proofs_verified = (module Max_proofs_verified)
             ; public_input = typ
             ; wrap_key =
@@ -1845,7 +1336,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
       module Proof = struct
         module Max_local_max_proofs_verified = Max_proofs_verified
-        include Proof.Make (Max_proofs_verified) (Max_local_max_proofs_verified)
+        include Proof.Make (Max_local_max_proofs_verified)
 
         let _id = wrap_disk_key
 
@@ -1874,11 +1365,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       module Recurse_on_bad_proof = struct
         open Impls.Step
 
-        let _dummy_proof =
-          Proof0.dummy Nat.N2.n Nat.N2.n Nat.N2.n ~domain_log2:15
+        let _dummy_proof = Proof0.dummy Nat.N2.n Nat.N2.n ~domain_log2:15
 
         type _ Snarky_backendless.Request.t +=
-          | Proof : (Nat.N2.n, Nat.N2.n) Proof0.t Snarky_backendless.Request.t
+          | Proof : Nat.N2.n Proof0.t Snarky_backendless.Request.t
 
         let handler (proof : _ Proof0.t)
             (Snarky_backendless.Request.With { request; respond }) =
@@ -1888,11 +1378,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
           | _ ->
               respond Unhandled
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Typ.unit)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"recurse-on-bad"
                 ~choices:(fun ~self:_ ->
@@ -2016,11 +1505,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2055,11 +1543,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_1_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2094,12 +1581,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_2_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2160,11 +1646,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:Plonk_types.Features.none ~typ:Field.typ
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2328,11 +1813,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
               : Field.t * Field.t ))
 
       module No_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N0)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2367,11 +1851,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_1_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2406,12 +1889,11 @@ module Make_str (_ : Wire_types.Concrete) = struct
       end
 
       module Fake_2_recursion = struct
-        let[@warning "-45"] tag, _, p, Provers.[ step ] =
+        let tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~override_wrap_domain:Pickles_base.Proofs_verified.N1
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N2)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->
@@ -2475,11 +1957,10 @@ module Make_str (_ : Wire_types.Concrete) = struct
             ~max_proofs_verified:(Nat.Add.create Nat.N2.n)
             ~feature_flags:maybe_features ~typ:Field.typ
 
-        let[@warning "-45"] _tag, _, p, Provers.[ step ] =
+        let _tag, _, p, Provers.[ step ] =
           Common.time "compile" (fun () ->
               compile_promise () ~public_input:(Input Field.typ)
                 ~auxiliary_typ:Typ.unit
-                ~branches:(module Nat.N1)
                 ~max_proofs_verified:(module Nat.N1)
                 ~name:"blockchain-snark"
                 ~choices:(fun ~self:_ ->

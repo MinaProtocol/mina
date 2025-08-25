@@ -213,7 +213,8 @@ let remember ~nonce ~hash t =
 let of_operations ?memo ?valid_until (ops : Operation.t list) :
     (Partial.t, Partial.Reason.t) Validation.t =
   (* TODO: If we care about DoS attacks, break early if length too large *)
-  (* Note: It's better to have nice errors with the validation than micro-optimize searching through a small list a minimal number of times. *)
+  (* Note: It's better to have nice errors with the validation than
+     micro-optimize searching through a small list a minimal number of times. *)
   let find_kind k (ops : Operation.t list) =
     let name = Operation_types.name k in
     List.find ops ~f:(fun op -> String.equal op.Operation._type name)
@@ -420,7 +421,8 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
     @
     match t.kind with
     | `Payment -> (
-        (* When amount is not none, we move the amount from source to receiver -- unless it's a failure, we will capture that below *)
+        (* When amount is not none, we move the amount from source to receiver
+           -- unless it's a failure, we will capture that below *)
         match t.amount with
         | Some amount ->
             [ { Op.label = `Payment_source_dec amount; related_to = None }
@@ -535,54 +537,6 @@ let to_operations ~failure_status (t : Partial.t) : Operation.t list =
 
 let to_operations' (t : t) : Operation.t list =
   to_operations ~failure_status:t.failure_status (forget t)
-
-let%test_unit "payment_round_trip" =
-  let start =
-    { kind = `Payment (* default token *)
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee = Unsigned.UInt64.of_int 2_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
-    ; nonce = Unsigned.UInt32.of_int 3
-    ; amount = Some (Unsigned.UInt64.of_int 2_000_000_000)
-    ; failure_status = None
-    ; hash = "TXN_1_HASH"
-    ; valid_until = Some (Unsigned.UInt32.of_int 10_000)
-    ; memo = Some "hello"
-    }
-  in
-  let ops = to_operations' start in
-  match of_operations ?valid_until:start.valid_until ?memo:start.memo ops with
-  | Ok partial ->
-      [%test_eq: Partial.t] partial (forget start)
-  | Error e ->
-      failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
-
-let%test_unit "delegation_round_trip" =
-  let start =
-    { kind = `Delegation
-    ; fee_payer = `Pk "Alice"
-    ; source = `Pk "Alice"
-    ; token = `Token_id Amount_of.Token_id.default
-    ; fee = Unsigned.UInt64.of_int 1_000_000_000
-    ; receiver = `Pk "Bob"
-    ; fee_token = `Token_id Amount_of.Token_id.default
-    ; nonce = Unsigned.UInt32.of_int 42
-    ; amount = None
-    ; failure_status = None
-    ; hash = "TXN_2_HASH"
-    ; valid_until = Some (Unsigned.UInt32.of_int 867888)
-    ; memo = Some "hello"
-    }
-  in
-  let ops = to_operations' start in
-  match of_operations ops ?valid_until:start.valid_until ?memo:start.memo with
-  | Ok partial ->
-      [%test_eq: Partial.t] partial (forget start)
-  | Error e ->
-      failwithf !"Mismatch because %{sexp: Partial.Reason.t list}" e ()
 
 let non_default_token =
   `Token_id

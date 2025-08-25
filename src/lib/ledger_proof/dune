@@ -3,11 +3,7 @@
  (public_name ledger_proof)
  (libraries
   ;; opam libraries
-  base
-  sexplib0
   core_kernel
-  bin_prot.shape
-  base.caml
   ;; local libraries
   transaction_snark
   mina_base

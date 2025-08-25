@@ -1,23 +1,20 @@
-(library
- (name snarky_taylor_tests)
- (inline_tests
-  (flags -verbose -show-counts))
+(tests
+ (names floating_point_test snarky_taylor_test)
  (libraries
   ;; opam libraries
+  alcotest
+  base
+  bignum
   bignum.bigint
   core_kernel
-  bignum
-  ppx_inline_test.config
-  base
   ;; local libraries
-  pickles
-  snarky_integer
-  snark_params
-  snarky_taylor
-  snarky
   bitstring_lib
-  snarky.backendless)
+  snark_params
+  snarky
+  snarky.backendless
+  snarky_integer
+  snarky_taylor)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_inline_test ppx_let ppx_version)))
+  (pps ppx_let ppx_version)))

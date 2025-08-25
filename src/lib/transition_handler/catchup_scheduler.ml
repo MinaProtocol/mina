@@ -29,7 +29,7 @@ type t =
             , State_hash.t )
             Cached.t
           * Mina_net2.Validation_callback.t option )
-          Rose_tree.t
+          Mina_stdlib.Rose_tree.t
           list
       , crash buffered
       , unit )
@@ -58,17 +58,17 @@ type t =
           , State_hash.t )
           Cached.t
         * Mina_net2.Validation_callback.t option )
-        Rose_tree.t
+        Mina_stdlib.Rose_tree.t
         list )
       Capped_supervisor.t
   }
 
-let create ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
-    ~frontier ~time_controller ~catchup_job_writer
+let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
+    ~time_controller ~catchup_job_writer
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , crash buffered
@@ -96,7 +96,7 @@ let create ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
     Capped_supervisor.create ~job_capacity:30
       (fun (initial_hash, transition_branches) ->
         match%map
-          Breadcrumb_builder.build_subtrees_of_breadcrumbs ~proof_cache_db
+          Breadcrumb_builder.build_subtrees_of_breadcrumbs
             ~logger:
               (Logger.extend logger
                  [ ("catchup_scheduler", `String "Called from catchup scheduler")
@@ -113,7 +113,8 @@ let create ~proof_cache_db ~logger ~precomputed_values ~verifier ~trust_system
                 $error"
               ~metadata:[ ("error", Error_json.error_to_yojson err) ] ;
             List.iter transition_branches ~f:(fun subtree ->
-                Rose_tree.iter subtree ~f:(fun (cached_transition, vc) ->
+                Mina_stdlib.Rose_tree.iter subtree
+                  ~f:(fun (cached_transition, vc) ->
                     (* TODO consider rejecting the callback in some cases,
                        see https://github.com/MinaProtocol/mina/issues/11087 *)
                     Option.value_map vc ~default:ignore
@@ -171,7 +172,7 @@ let rec extract_subtree t cached_transition =
   let successors =
     Option.value ~default:[] (Hashtbl.find t.collected_transitions hash)
   in
-  Rose_tree.T
+  Mina_stdlib.Rose_tree.T
     ( (cached_transition, Hashtbl.find t.validation_callbacks hash)
     , List.map successors ~f:(extract_subtree t) )
 
@@ -383,8 +384,6 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             ~pids () )
 
-    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
-
     (* cast a breadcrumb into a cached, enveloped, partially validated transition *)
     let downcast_breadcrumb breadcrumb =
       let transition =
@@ -412,9 +411,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
-            create ~proof_cache_db ~frontier ~precomputed_values ~verifier
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+            create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -473,9 +471,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map ~f:register_breadcrumb branch
           in
           let scheduler =
-            create ~proof_cache_db ~precomputed_values ~frontier ~verifier
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -516,7 +513,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                   failwith "pipe closed unexpectedly"
               | `Ok
                   (`Ok
-                    ( [ Rose_tree.T ((received_breadcrumb, _vc), []) ]
+                    ( [ Mina_stdlib.Rose_tree.T ((received_breadcrumb, _vc), [])
+                      ]
                     , `Catchup_scheduler ) ) ->
                   [%test_eq: State_hash.t]
                     (Transition_frontier.Breadcrumb.state_hash
@@ -550,9 +548,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               (Buffered (`Capacity 10, `Overflow Crash))
           in
           let scheduler =
-            create ~proof_cache_db ~precomputed_values ~frontier ~verifier
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
-              ~clean_up_signal:(Ivar.create ())
+            create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
+              ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch

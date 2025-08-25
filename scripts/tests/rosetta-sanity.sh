@@ -28,7 +28,11 @@ while [[ "$#" -gt 0 ]]; do
         --network) NETWORK="$2"; shift ;;
         --wait-for-sync) WAIT_FOR_SYNC=true ;;
         --timeout) TIMEOUT="$2"; shift ;;
-        --address) mainnet[address]="$2"
+        --address) 
+                   
+                   # shellcheck disable=SC2034
+                   mainnet[address]="$2"
+                   # shellcheck disable=SC2034
                    devnet[address]="$2"
                    shift
                    ;;
@@ -62,7 +66,8 @@ function wait_for_sync() {
     declare -n __test_data=$1
 
     echo "⏳  Waiting for rosetta to sync..."
-    local start_time=$(date +%s)
+    local start_time
+    start_time=$(date +%s)
     local end_time=$((start_time + TIMEOUT))
     local sync_status=""
 

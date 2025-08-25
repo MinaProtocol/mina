@@ -464,7 +464,7 @@ let check_state_hash ~logger state_hash_opt =
               [ ("state_hash", `String state_hash)
               ; ("error", Error_json.error_to_yojson err)
               ] ;
-          Core.exit 1 )
+          Stdlib.exit 1 )
 
 let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
     ~output_folder ~network ~include_block_height_in_name () =
@@ -512,7 +512,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
                 [%log error]
                   "No subchain available from an unparented block (possibly \
                    the genesis block) to block with given end state hash" ;
-                Core.exit 1 ) ;
+                Stdlib.exit 1 ) ;
               blocks
           | Some start_state_hash, Some end_state_hash ->
               [%log info]
@@ -537,7 +537,7 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks
                    available; try omitting the start state hash, to get a \
                    chain from an unparented block to the block with the end \
                    state hash" ;
-                Core.exit 1 ) ;
+                Stdlib.exit 1 ) ;
               blocks
           | _ ->
               (* unreachable *)

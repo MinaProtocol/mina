@@ -5,7 +5,7 @@
 # - Includes the entire mina codebase and submodules in "${MINA_DIR}" (must be writable by opam user)
 # - Largely mirrors/replaces ./scripts/setup-opam.sh
 #################################################################################################
-FROM build-deps AS opam-deps
+FROM build-deps-$deb_codename AS opam-deps
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
@@ -38,11 +38,15 @@ RUN git clone \
 
 WORKDIR $HOME/$MINA_DIR
 
-ENV OPAMYES 1
+# Set environment variables *before* running OPAM commands
+ENV OPAMYES=1
 
-# --- Import Opam Switch
-# TODO: handle this opam work without cloning the full repository (directly pull opam.export)
-RUN opam switch import opam.export --quiet
+# --- Use alternative ocamlfind location since download.camlcity.org is not available
+RUN opam pin add ocamlfind.1.9.3 http://download2.camlcity.org/download/findlib-1.9.3.tar.gz
+
+# Update repo and install the switch (sources must be available locally!)
+RUN opam update && \
+    opam switch import opam.export --yes
 
 # --- Pin external packages / submodules
 # TODO: Would be really nice to pull this script, the git submodules, and opam.export exclusively in this stage

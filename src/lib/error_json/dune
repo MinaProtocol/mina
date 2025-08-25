@@ -3,10 +3,10 @@
  (public_name error_json)
  (libraries
   ;; opam libraries
-  sexplib0
-  yojson
   base
-  sexplib)
+  sexplib
+  sexplib0
+  yojson)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

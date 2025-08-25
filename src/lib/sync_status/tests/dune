@@ -1,0 +1,12 @@
+(tests
+ (names test_sync_status)
+ (libraries
+  ;; opam libraries
+  alcotest
+  core_kernel
+  ;; local libraries
+  sync_status)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_jane ppx_version)))

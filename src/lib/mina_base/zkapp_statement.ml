@@ -40,9 +40,9 @@ let of_tree (type account_update)
         :> Zkapp_command.Transaction_commitment.t )
   }
 
-let zkapp_statements_of_forest' (type data)
-    (forest : data Zkapp_command.Call_forest.With_hashes_and_data.t) :
-    (data * t) Zkapp_command.Call_forest.With_hashes_and_data.t =
+let zkapp_statements_of_forest' (type proof data)
+    (forest : (proof, data) Zkapp_command.Call_forest.With_hashes_and_data.t) :
+    (proof, data * t) Zkapp_command.Call_forest.With_hashes_and_data.t =
   Zkapp_command.Call_forest.mapi_with_trees forest
     ~f:(fun _i (account_update, data) tree ->
       (account_update, (data, of_tree tree)) )

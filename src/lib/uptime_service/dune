@@ -41,7 +41,7 @@
   mina_block
   daemon_rpcs
   snark_work_lib
-  rfc3339_time
+  mina_stdlib_unix
   ledger_proof
   error_json
   pipe_lib
@@ -50,7 +50,7 @@
   transition_frontier_base
   random_oracle
   interruptible
-  truth
+  mina_stdlib
   one_or_two
   transaction_snark
   pickles.backend
