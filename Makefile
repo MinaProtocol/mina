@@ -553,6 +553,14 @@ debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
 debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 	$(call build_debian_package,rosetta_mainnet)
 
+.PHONY: debian-build-daemon-devnet-hardfork
+debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
+	$(call build_debian_package,daemon_devnet_hardfork)
+
+.PHONY: debian-download-create-legacy-hardfork
+debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
+	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
 ########################################
 # Docker images
 
@@ -648,6 +656,45 @@ docker-build-rosetta-devnet: start-local-debian-repo ## Build the Rosetta Docker
 docker-build-rosetta-mainnet: SHELL := /bin/bash
 docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docker image for mainnet
 	$(call build_docker_image,mina-rosetta,mainnet)
+
+########################################
+# Generate hardfork packages
+
+.PHONY: hardfork-debian
+hardfork-debian: SHELL := /bin/bash
+hardfork-debian: ocaml_checks ## Generate hardfork packages
+	$(info 📦 Generating hardfork packages for network $(NETWORK_NAME))
+
+	@BUILD_DIR=./_build \
+	MINA_DEB_CODENAME=$(CODENAME) \
+	BRANCH_NAME=$(BRANCH_NAME) \
+	KEEP_MY_TAGS_INTACT=true \
+	./scripts/hardfork/build-packages.sh daemon_devnet_hardfork
+
+
+.PHONY: hardfork-docker
+hardfork-docker: SHELL := /bin/bash
+hardfork-docker: ocaml_checks ## Generate hardfork packages
+	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
+
+	$(MAKE) hardfork-debian
+	$(MAKE) start-local-debian-repo
+
+	@BUILD_DIR=./_build \
+	MINA_DEB_CODENAME=$(CODENAME) \
+	KEEP_MY_TAGS_INTACT=true \
+	. ./scripts/export-git-env-vars.sh \
+	&& ./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-daemon \
+		--version "$$MINA_DEB_VERSION" \
+		--branch $(BRANCH_NAME) \
+		--network $(NETWORK_NAME) \
+		--deb-suffix hardfork \
+		--no-cache
+
+	$(info 📦 stopping local Debian repository)
+	@./scripts/debian/aptly.sh stop
 
 ########################################
 # Generate odoc documentation
