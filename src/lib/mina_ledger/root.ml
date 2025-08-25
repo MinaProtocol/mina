@@ -12,6 +12,17 @@ module type Stable_db_intf =
      and type hash := Ledger_hash.t
      and type root_hash := Ledger_hash.t
 
+module type Unstable_db_intf =
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with type account := Account.Unstable.t
+     and type key := Signature_lib.Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type hash := Ledger_hash.t
+     and type root_hash := Ledger_hash.t
+
 module type Any_ledger_intf =
   Merkle_ledger.Intf.Ledger.ANY
     with type account := Account.t
@@ -22,11 +33,31 @@ module type Any_ledger_intf =
      and type account_id_set := Account_id.Set.t
      and type hash := Ledger_hash.t
 
+module type Converting_ledger_intf =
+  Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Signature_lib.Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type converted_account := Account.Unstable.t
+
 module Make
     (Any_ledger : Any_ledger_intf)
     (Stable_db : Stable_db_intf
                    with module Location = Any_ledger.M.Location
-                    and module Addr = Any_ledger.M.Addr) =
+                    and module Addr = Any_ledger.M.Addr)
+    (Unstable_db : Unstable_db_intf
+                     with module Location = Any_ledger.M.Location
+                      and module Addr = Any_ledger.M.Addr)
+    (Converting_ledger : Converting_ledger_intf
+                           with module Location = Any_ledger.M.Location
+                            and module Addr = Any_ledger.M.Addr
+                           with type primary_ledger = Stable_db.t
+                            and type converting_ledger = Unstable_db.t) =
 struct
   module Config = struct
     type t = string
