@@ -24,6 +24,8 @@ set -exo pipefail
 MODE="nix"
 FORK_BRANCH=""
 CONTEXT="local"
+NETWORK_NAME=devnet
+DUNE_PROFILE=${NETWORK_NAME}
 DOCKER_TOOLCHAIN="${DOCKER_TOOLCHAIN:-gcr.io/o1labs-192920/mina-toolchain@sha256:cb775fd01376736f4942255b63f8e9745f3f23e15839836b0fe60c3e2dfe9e4b}"
 OVERRIDE_COMPATIBLE_TMP_DIR="${OVERRIDE_COMPATIBLE_TMP_DIR}"
 
@@ -118,7 +120,7 @@ build_branch() {
         make build-devnet-sigs
         make build-daemon-utils
         make debian-build-logproc
-        DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-devnet
+        DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-${NETWORK_NAME}
       else
          docker run --rm -v "$PWD:/workdir" -v /var/storagebox:/var/storagebox --env DUNE_PROFILE=devnet -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
           sudo chown -R opam . \
@@ -127,12 +129,12 @@ build_branch() {
           && ls -la \
           && git config --global --add safe.directory /workdir \
           && make libp2p_helper \
-          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-logproc \
-          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-devnet-sigs \
-          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-daemon-utils \
+          && make build-logproc \
+          && make build-${NETWORK_NAME}-sigs \
+          && make build-daemon-utils \
           && make debian-build-logproc \
-          && BUILDKITE_BUILD_ID=$BUILDKITE_BUILD_ID make debian-download-create-legacy-genesis-devnet \
-          && DEBIAN_SKIP_LEDGERS_COPY=y OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-daemon-devnet \
+          && BUILDKITE_BUILD_ID=$BUILDKITE_BUILD_ID make debian-download-create-legacy-genesis-${NETWORK_NAME} \
+          && DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-${NETWORK_NAME} \
         "
       fi
 
@@ -199,10 +201,10 @@ if [[ "$MODE" == "app" ]]; then
 else
   echo "Docker mode is used and docker will be built after we generate fork config. For now we build only mina app"
   cd "$INIT_DIR"
-  DUNE_PROFILE=devnet make build
-  DUNE_PROFILE=devnet make build-logproc
-  DUNE_PROFILE=devnet make build-devnet-sigs
-  DUNE_PROFILE=devnet make build-daemon-utils
+  make build
+  make build-logproc
+  make build-devnet-sigs
+  make build-daemon-utils
 fi
 
 if  [[ "$MODE" == "nix" ]] && [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
