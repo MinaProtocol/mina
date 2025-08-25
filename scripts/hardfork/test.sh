@@ -150,14 +150,14 @@ export MINA_DEB_CODENAME=focal
 export OPAMSWITCH=4.14.2
 export BYPASS_OPAM_SWITCH_UPDATE=1
 export DUNE_PROFILE=${NETWORK_NAME}
-
-
-#RUNTIME_CONFIG_JSON=localnet/fork_config.json LEDGER_TARBALLS="$(echo localnet/hf_ledgers/*.tar.gz)" ./scripts/debian/build.sh "daemon_devnet_hardfork"
+export NETWORK_NAME=devnet
 
 source ./scripts/export-git-env-vars.sh
-NETWORK=devnet make hardfork-docker
 
-MINA_FORK_DOCKER=gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-devnet
+RUNTIME_CONFIG_JSON=$PWD/localnet/fork_config.json LEDGER_TARBALLS="$(echo $PWD/localnet/prefork_hf_ledgers/*.tar.gz)" ./scripts/debian/build.sh "daemon_devnet_hardfork"
+MINA_DEB_CODENAME=focal NETWORK_NAME=devnet make hardfork-docker
+
+MINA_FORK_DOCKER=gcr.io/o1labs-192920/mina-daemon:$MINA_DEB_VERSION-$NETWORK_NAME
 
 if [[ "$MODE" == "docker" ]]; then
     docker run --rm -v "$PWD/localnet:/localnet" --entrypoint "mina-create-genesis" "$MINA_FORK_DOCKER" --config-file /localnet/fork_config.json --genesis-dir /localnet/prefork_hf_ledgers --hash-output-file /localnet/prefork_hf_ledger_hashes.json
