@@ -4,6 +4,8 @@ let Network = ./Network.dhall
 
 let BuildFlags = ./BuildFlags.dhall
 
+let Arch = ./Arch.dhall
+
 let S = ../Lib/SelectFiles.dhall
 
 let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
@@ -60,7 +62,7 @@ let dependsOn =
                                    spec.deb_version}${Network.capitalName
                                                         spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
                                                                                          spec.build_flag}${Arch.nameSuffix
-                                                                                                           spec.arch}"
+                                                                                                             spec.arch}"
 
           in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 
