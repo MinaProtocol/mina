@@ -166,9 +166,9 @@ if [[ ! -L compatible-devnet ]]; then
     if [[ -n "$OVERRIDE_COMPATIBLE_TMP_DIR" ]]; then
       compatible_build="$OVERRIDE_COMPATIBLE_TMP_DIR"
     else
-      compatible_build=/tmp/tmp.OE1ju0JZiS
+      compatible_build=$(mktemp -d /tmp/compatible-build.XXXXXX)
     fi
-    #git clone -b compatible --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
+    git clone -b compatible --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
     cd "$compatible_build"
   else
     git checkout -f $1
@@ -194,7 +194,16 @@ if [[ "$CONTEXT" == "ci" ]]; then
   git submodule update --init --recursive
 fi
 
-build_branch "$INIT_DIR" "$INIT_DIR/fork-devnet"
+if [[ "$MODE" == "app" ]]; then
+  build_branch "$INIT_DIR" "$INIT_DIR/fork-devnet"
+else
+  echo "Docker mode is used and docker will be built after we generate fork config. For now we build only mina app"
+  cd "$INIT_DIR"
+  DUNE_PROFILE=devnet make build
+  DUNE_PROFILE=devnet make build-logproc
+  DUNE_PROFILE=devnet make build-devnet-sigs
+  DUNE_PROFILE=devnet make build-daemon-utils
+fi
 
 if  [[ "$MODE" == "nix" ]] && [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws
