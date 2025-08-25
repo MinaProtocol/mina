@@ -155,6 +155,7 @@ let docker_step
                   , build_flag = spec.buildFlags
                   , step = step_dep_name
                   , prefix = spec.prefix
+                  , arch = spec.arch
                   }
 
           let docker_publish = DockerPublish.Type.Essential
