@@ -19,6 +19,19 @@ ARG ROSETTA_CLI_VERSION=v0.10.1
 
 ENV DEBIAN_FRONTEND noninteractive
 
+ARG deb_suffix
+
+# if --build-arg deb_suffix is defined, add hypen at beginning.
+ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
+# construct mina debian package name based on network and suffix.
+# possible values:
+# - mina-devnet
+# - mina-devnet-lightnet etc.
+ENV MINA_DEB=mina-${network}${SUFFIX}
+ENV MINA_ARCHIVE_DEB=mina-archive-${network}
+ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
+
+
 # We do not install the below platform-specific dependencies,
 # and instead assume that apt will install the proper deps based on the package definition.
 # The packages are noted here just for clarity/documentation.
@@ -109,7 +122,7 @@ RUN mkdir -p ${MINA_CONFIG_DIR}/wallets/store/ \
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
     && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
     && apt-get update --quiet --yes \
-    && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "mina-$network=$deb_version" "mina-rosetta-$network=$deb_version" "mina-archive-$network=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
+    && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" "${MINA_ARCHIVE_DEB}=$deb_version" "${MINA_ROSETTA_DEB}=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Set up postgres
