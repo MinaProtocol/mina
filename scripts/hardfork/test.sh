@@ -49,8 +49,12 @@ print_nodes_logs() {
   if [[ "$MODE" == "docker" ]]; then
     echo "Block producer logs:" >&2
     docker logs "$BP_CONTAINER_NAME" 2>&1 | tail -50
+    echo "Block produces oversized logs:"
+    docker exec "$BP_CONTAINER_NAME" bash -c 'head -c 100 /localnet/runtime_1/mina-oversized-logs.log'
     echo "SNARK worker logs:" >&2
     docker logs "$SW_CONTAINER_NAME" 2>&1 | tail -50
+    echo "SNARK worker oversized logs:"
+    docker exec "$SW_CONTAINER_NAME" bash -c 'head -c 100 /localnet/runtime_2/mina-oversized-logs.log'
   else
     echo "Node logs (if available):" >&2
     # Print any available log files
