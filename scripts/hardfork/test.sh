@@ -207,12 +207,10 @@ if [[ "$fork_data" != "$expected_fork_data" ]]; then
 fi
 
 if [[ "$MODE" == "docker" ]]; then
-    docker run --rm -v "$PWD:/localnet" "mina-create-legacy-genesis" --config-file /localnet/fork_config.json --genesis-dir /localnet/prefork_hf_ledgers --hash-output-file /localnet/prefork_hf_ledger_hashes.json
+    docker run --rm -v "$PWD/localnet:/localnet" --entrypoint "mina-create-genesis" "$MINA_DOCKER" --config-file /localnet/fork_config.json --genesis-dir /localnet/prefork_hf_ledgers --hash-output-file /localnet/prefork_hf_ledger_hashes.json
 else
     "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
 fi
-
-
 
 # Finds staking ledger hash corresponding to an epoch given as $1 parameter
 function find_staking_hash(){
@@ -258,7 +256,21 @@ fi
 rm -Rf localnet/hf_ledgers
 mkdir localnet/hf_ledgers
 
-"$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
+export MINA_DEB_CODENAME=focal
+
+RUNTIME_CONFIG_JSON=localnet/fork_config.json LEDGER_TARBALLS="$(echo localnet/hf_ledgers/*.tar.gz)" ./scripts/debian/build.sh "mina-daemon-devnet-hardfork"
+
+source ./scripts/export-git-env-vars.sh
+make hardfork-debian
+make hardfork-docker
+
+MINA_FORK_DOCKER=gcr.io/o1labs-192920/mina-daemon:$MINA_DOCKER_TAG-devnet
+
+if [[ "$MODE" == "docker" ]]; then
+    docker run --rm -v "$PWD/localnet:/localnet" --entrypoint "mina-create-genesis" "$MINA_FORK_DOCKER" --config-file /localnet/fork_config.json --genesis-dir /localnet/prefork_hf_ledgers --hash-output-file /localnet/prefork_hf_ledger_hashes.json
+else
+    "$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
+fi
 
 NOW_UNIX_TS=$(date +%s)
 FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
@@ -280,17 +292,10 @@ wait "$MAIN_NETWORK_PID"
 
 echo "Config for the fork is correct, starting a new network"
 
-
-RUNTIME_CONFIG_JSON=localnet/fork_config.json LEDGER_TARBALLS="$(echo localnet/hf_ledgers/*.tar.gz)" ./scripts/debian/build.sh "mina-daemon-devnet-hardfork"
-make hardfork-docker
-
-
-
-
 # 8. Node is shutdown and restarted with mina-fork and the config from previous step 
 
 if [[ "$MODE" == "docker" ]]; then
-  "$SCRIPT_DIR"/run-localnet.sh --mina-docker "$MINA_DOCKER" \
+  "$SCRIPT_DIR"/run-localnet.sh --mina-docker "$MINA_FORK_DOCKER" \
      --bp-container-name "$BP_CONTAINER_NAME" \
      --sw-container-name "$SW_CONTAINER_NAME" \
      -d "$FORK_DELAY" \
