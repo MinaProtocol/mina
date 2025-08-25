@@ -26,7 +26,7 @@ FORK_BRANCH=""
 CONTEXT="local"
 NETWORK_NAME=devnet
 DUNE_PROFILE=${NETWORK_NAME}
-DOCKER_TOOLCHAIN="${DOCKER_TOOLCHAIN:-gcr.io/o1labs-192920/mina-toolchain@sha256:cb775fd01376736f4942255b63f8e9745f3f23e15839836b0fe60c3e2dfe9e4b}"
+DOCKER_TOOLCHAIN="${DOCKER_TOOLCHAIN:-gcr.io/o1labs-192920/mina-toolchain@sha256:3b17e388d8974fdbe4bbd5f77315519763c78148a4c91434d9add62de87ab792}"
 OVERRIDE_COMPATIBLE_TMP_DIR="${OVERRIDE_COMPATIBLE_TMP_DIR}"
 
 while [[ $# -gt 0 ]]; do
@@ -129,12 +129,12 @@ build_branch() {
           && ls -la \
           && git config --global --add safe.directory /workdir \
           && make libp2p_helper \
-          && make build-logproc \
-          && make build-${NETWORK_NAME}-sigs \
-          && make build-daemon-utils \
+          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-logproc \
+          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-devnet-sigs \
+          && OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make build-daemon-utils \
           && make debian-build-logproc \
-          && BUILDKITE_BUILD_ID=$BUILDKITE_BUILD_ID make debian-download-create-legacy-genesis-${NETWORK_NAME} \
-          && DEBIAN_SKIP_LEDGERS_COPY=y make debian-build-daemon-${NETWORK_NAME} \
+          && BUILDKITE_BUILD_ID=$BUILDKITE_BUILD_ID make debian-download-create-legacy-genesis-devnet \
+          && DEBIAN_SKIP_LEDGERS_COPY=y OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 make debian-build-daemon-devnet \
         "
       fi
 
@@ -201,10 +201,10 @@ if [[ "$MODE" == "app" ]]; then
 else
   echo "Docker mode is used and docker will be built after we generate fork config. For now we build only mina app"
   cd "$INIT_DIR"
-  make build
-  make build-logproc
-  make build-devnet-sigs
-  make build-daemon-utils
+  DUNE_PROFILE=devnet make build
+  DUNE_PROFILE=devnet make build-logproc
+  DUNE_PROFILE=devnet make build-devnet-sigs
+  DUNE_PROFILE=devnet make build-daemon-utils
 fi
 
 if  [[ "$MODE" == "nix" ]] && [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
