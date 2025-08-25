@@ -96,7 +96,7 @@ let generateDockerForCodename =
                   , profile = profile
                   , network = spec.network
                   , prefix = pipelineName
-                  , suffix = "-${DebianVersions.lowerName codename}"
+                  , suffix = Some "-${DebianVersions.lowerName codename}"
                   , extraBuildEnvs =
                     [ "NETWORK_NAME=${Network.lowerName spec.network}"
                     , "CONFIG_JSON_GZ_URL=${spec.config_json_gz_url}"
@@ -143,7 +143,7 @@ let generateDockerForCodename =
                     , Cmd.runInDocker
                         Cmd.Docker::{ image = image }
                         "curl ${spec.config_json_gz_url} > config.json.gz && gunzip config.json.gz && sed 's/B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X/B62qrTP88hjyU3hq6QNvFafX8sgHrsAW6v7tt5twrcugJM4bBV2eu9k/g' -i config.json && ! (FORKING_FROM_CONFIG_JSON=config.json mina-verify-packaged-fork-config ${Network.lowerName
-                                                                                                                                                                                                                                                spec.network} config.json /workdir/verification)"
+                                                                                                                                                                                                                                                                                                                               spec.network} config.json /workdir/verification)"
                     ]
                   , label =
                       "Assert corrupted packaged artifacts are unverifiable"
