@@ -66,7 +66,8 @@ let command_run =
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than ~runtime_config_opt ~missing_blocks_width )
+         ~delete_older_than ~runtime_config_opt ~missing_blocks_width
+         ~signature_kind:Mina_signature_kind.t_DEPRECATED )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

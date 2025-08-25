@@ -3983,10 +3983,9 @@ module Block = struct
     in
     return ()
 
-  let add_from_extensional ~logger (module Conn : Mina_caqti.CONNECTION)
-      ~proof_cache_db ?(v1_transaction_hash = false)
+  let add_from_extensional ~logger ~proof_cache_db ~signature_kind
+      ?(v1_transaction_hash = false) (module Conn : Mina_caqti.CONNECTION)
       (block : Extensional.Block.t) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let open Deferred.Result.Let_syntax in
     let%bind block_id =
       match%bind find_opt (module Conn) ~state_hash:block.state_hash with
@@ -4628,12 +4627,12 @@ let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
     ~tokens_used:block.Precomputed.tokens_used block
 
 (* used by `archive_blocks` app *)
-let add_block_aux_extensional ~proof_cache_db ~logger ?retries ~pool
-    ~delete_older_than block =
+let add_block_aux_extensional ~proof_cache_db ~logger ~signature_kind ?retries
+    ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:
       (Block.add_from_extensional ~logger ~proof_cache_db
-         ~v1_transaction_hash:false )
+         ~v1_transaction_hash:false ~signature_kind )
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
     ~accounts_accessed:block.Extensional.Block.accounts_accessed
     ~accounts_created:block.Extensional.Block.accounts_created
@@ -4832,7 +4831,8 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
-    ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
+    ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
+    =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4891,7 +4891,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~f:(fun extensional_block ->
           match%map
             add_block_aux_extensional ~proof_cache_db ~genesis_constants ~logger
-              ~pool ~delete_older_than extensional_block
+              ~pool ~delete_older_than ~signature_kind extensional_block
           with
           | Error e ->
               [%log warn]
