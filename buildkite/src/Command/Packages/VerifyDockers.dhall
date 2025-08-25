@@ -93,8 +93,8 @@ let verify
                     ++  Prelude.Optional.default Text "" suffixFlag
 
           in      ". ./buildkite/scripts/export-git-env-vars.sh && "
-              ++  suffixAndArchFlag
               ++  "./buildkite/scripts/release/manager.sh verify "
+              ++  suffixAndArchFlag
               ++  "--artifacts ${joinArtifacts spec} "
               ++  "--networks ${joinNetworks spec} "
               ++  "--version ${spec.version} "
