@@ -95,12 +95,116 @@ if [[ "$MODE" == "nix" ]]; then
   fi
 fi
 
-#if [[ "$MODE" == "docker" ]]; then
-#    docker run --rm -v "$PWD/localnet:/localnet" --entrypoint "mina-create-genesis" "$MINA_DOCKER" --config-file /localnet/fork_config.json --genesis-dir /localnet/prefork_hf_ledgers --hash-output-file /localnet/prefork_hf_ledger_hashes.json
-#else
-#    "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
-#fi
+# 1. Node is started
+NOW_UNIX_TS=$(date +%s)
+MAIN_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + MAIN_DELAY*60))
+GENESIS_TIMESTAMP="$(date -u -d @$MAIN_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00')"
+export GENESIS_TIMESTAMP
 
+COMMON_ARGS=(
+  -i "$MAIN_SLOT"
+  -s "$MAIN_SLOT"
+  --slot-tx-end "$SLOT_TX_END"
+  --slot-chain-end "$SLOT_CHAIN_END"
+)
+
+if [[ "$MODE" == "docker" ]]; then
+  "$SCRIPT_DIR"/run-localnet.sh --mina-docker "$MINA_DOCKER" \
+     --bp-container-name "$BP_CONTAINER_NAME" \
+     --sw-container-name "$SW_CONTAINER_NAME" \
+     "${COMMON_ARGS[@]}" &
+else
+  "$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" "${COMMON_ARGS[@]}" &
+fi
+
+MAIN_NETWORK_PID=$!
+
+sleep $((MAIN_SLOT * BEST_CHAIN_QUERY_FROM - NOW_UNIX_TS%60 + MAIN_DELAY*60))s
+
+# 2. Check that there are many blocks >50% of slots occupied from slot 0 to slot
+# $BEST_CHAIN_QUERY_FROM and that there are some user commands in blocks corresponding to slots
+blockHeight=$(get_height 10303)
+echo "Block height is $blockHeight at slot $BEST_CHAIN_QUERY_FROM."
+
+if [[ $((2*blockHeight)) -lt $BEST_CHAIN_QUERY_FROM ]]; then
+  echo "Assertion failed: slot occupancy is below 50%" >&2
+  stop_nodes "$MAIN_MINA_EXE"
+  exit 3
+fi
+
+first_epoch_ne_str="$(blocks 10303 2>/dev/null | latest_nonempty_block)"
+IFS=, read -ra first_epoch_ne <<< "$first_epoch_ne_str"
+
+genesis_epoch_staking_hash="${first_epoch_ne[$((3+IX_CUR_EPOCH_HASH))]}"
+genesis_epoch_next_hash="${first_epoch_ne[$((3+IX_NEXT_EPOCH_HASH))]}"
+
+echo "Genesis epoch staking/next hashes: $genesis_epoch_staking_hash, $genesis_epoch_next_hash"
+
+last_ne_str="$(for i in $(seq $BEST_CHAIN_QUERY_FROM $SLOT_CHAIN_END); do
+  blocks $((10303+10*(i%2))) 2>/dev/null || true
+  sleep "${MAIN_SLOT}s"
+done | latest_nonempty_block)"
+
+IFS=, read -ra latest_ne <<< "$last_ne_str"
+
+# Maximum slot observed for a block
+max_slot=${latest_ne[0]}
+
+# List of epochs for which last snarked ledger hashes were captured
+IFS=: read -ra epochs <<< "${latest_ne[1]}"
+# List of last snarked ledger hashes captured
+IFS=: read -ra last_snarked_hash_pe <<< "${latest_ne[2]}"
+
+latest_ne=( "${latest_ne[@]:3}" )
+
+echo "Last occupied slot of pre-fork chain: $max_slot"
+if [[ $max_slot -ge $SLOT_CHAIN_END ]]; then
+  echo "Assertion failed: block with slot $max_slot created after slot chain end" >&2
+  stop_nodes "$MAIN_MINA_EXE"
+  exit 3
+fi
+
+latest_shash="${latest_ne[$IX_STATE_HASH]}"
+latest_height=${latest_ne[$IX_HEIGHT]}
+latest_ne_slot=${latest_ne[$IX_SLOT]}
+
+echo "Latest non-empty block: $latest_shash, height: $latest_height, slot: $latest_ne_slot"
+if [[ $latest_ne_slot -ge $SLOT_TX_END ]]; then
+  echo "Assertion failed: non-empty block with slot $latest_ne_slot created after slot tx end" >&2
+  stop_nodes "$MAIN_MINA_EXE"
+  exit 3
+fi
+
+expected_fork_data="{\"fork\":{\"blockchain_length\":$latest_height,\"global_slot_since_genesis\":$latest_ne_slot,\"state_hash\":\"$latest_shash\"},\"next_seed\":\"${latest_ne[$IX_NEXT_EPOCH_SEED]}\",\"staking_seed\":\"${latest_ne[$IX_CUR_EPOCH_SEED]}\"}"
+
+# 4. Check that no new blocks are created
+sleep 1m
+height1=$(get_height 10303)
+sleep 5m
+height2=$(get_height 10303)
+if [[ $(( height2 - height1 )) -gt 0 ]]; then
+  echo "Assertion failed: there should be no change in blockheight after slot chain end." >&2
+  stop_nodes "$MAIN_MINA_EXE"
+  exit 3
+fi
+
+# 6. Transition root is extracted into a new runtime config
+get_fork_config 10313 > localnet/fork_config.json
+
+while [[ "$(stat -c %s localnet/fork_config.json)" == 0 ]] || [[ "$(head -c 4 localnet/fork_config.json)" == "null" ]]; do
+  echo "Failed to fetch fork config" >&2
+  sleep 1m
+  get_fork_config 10313 > localnet/fork_config.json
+done
+
+# 7. Runtime config is converted with a script to have only ledger hashes in the config
+stop_nodes "$MAIN_MINA_EXE"
+
+fork_data="$(jq -cS '{fork:.proof.fork,next_seed:.epoch_data.next.seed,staking_seed:.epoch_data.staking.seed}' localnet/fork_config.json)"
+if [[ "$fork_data" != "$expected_fork_data" ]]; then
+  echo "Assertion failed: unexpected fork data" >&2
+  exit 3
+fi
 
 # Finds staking ledger hash corresponding to an epoch given as $1 parameter
 function find_staking_hash(){
@@ -140,7 +244,7 @@ if [[ "$prefork_hashes" != "$expected_prefork_hashes" ]]; then
   echo "Assertion failed: unexpected ledgers in fork_config" >&2
   echo "Expected: $expected_prefork_hashes" >&2
   echo "Actual: $prefork_hashes" >&2
- # exit 3
+  exit 3
 fi
 
 rm -Rf localnet/hf_ledgers
