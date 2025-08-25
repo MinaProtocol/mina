@@ -2,7 +2,8 @@
 
 set -eox pipefail
 
-# shellcheck source=./scripts/export-git-env-vars.sh
+
+# shellcheck disable=SC1091
 source ./scripts/export-git-env-vars.sh
 
 PWD=$(pwd)

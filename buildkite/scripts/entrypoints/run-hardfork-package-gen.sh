@@ -56,7 +56,7 @@ function usage() {
 function to_dhall_list() {
   local input_str="$1"
   local dhall_type="$2"
-  local arr=(${input_str//,/ })
+  local arr=("${input_str//,/ }")
   local dhall_list=""
 
   if [[ ${#arr[@]} -eq 0 || -z "${arr[0]}" ]]; then
