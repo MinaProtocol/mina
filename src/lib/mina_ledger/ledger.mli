@@ -84,12 +84,13 @@ module Converting_ledger :
      and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
-     and type primary_ledger := Db.t
-     and type converting_ledger := Unstable_db.t
      and type converted_account := Account.Unstable.t
+     and type primary_ledger = Db.t
+     and type converting_ledger = Unstable_db.t
 
 module Root : sig
-  include module type of Root.Make (Any_ledger) (Db)
+  include module type of
+      Root.Make (Any_ledger) (Db) (Unstable_db) (Converting_ledger)
 
   val as_masked : t -> Mask.Attached.t
 end
