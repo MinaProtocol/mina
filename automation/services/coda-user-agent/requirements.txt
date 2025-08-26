@@ -1,3 +1,0 @@
--e git+https://github.com/CodaProtocol/coda-python-client.git#egg=CodaClient
-schedule
-prometheus_client

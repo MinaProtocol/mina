@@ -1,3 +1,9 @@
+(**
+  Mina_lib contains the core logic of the Mina protocol, including the
+  ledger, consensus, SNARK workers, networking, and state management. It
+  provides the foundational components used by Mina_run, CLI tools, and
+  other services to operate a Mina node. *)
+
 open Async_kernel
 open Core
 open Mina_base
@@ -23,11 +29,29 @@ type Structured_log_events.t +=
 module type CONTEXT = sig
   val logger : Logger.t
 
+  val time_controller : Block_time.Controller.t
+
+  val trust_system : Trust_system.t
+
+  val consensus_local_state : Consensus.Data.Local_state.t
+
   val precomputed_values : Precomputed_values.t
 
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val commit_id : string
+
+  val vrf_poll_interval : Time.Span.t
+
+  val zkapp_cmd_limit : int option ref
+
+  val compaction_interval : Time.Span.t option
+
+  val ledger_sync_config : Syncable_ledger.daemon_config
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 exception Snark_worker_error of int
@@ -41,6 +65,8 @@ exception Bootstrap_stuck_shutdown
 val time_controller : t -> Block_time.Controller.t
 
 val subscription : t -> Mina_subscriptions.t
+
+val commit_id : t -> string
 
 val daemon_start_time : Time_ns.t
 
@@ -87,11 +113,19 @@ val snark_work_fee : t -> Currency.Fee.t
 
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
-val request_work : t -> Snark_worker.Work.Spec.t option
+val request_work : t -> Work_selector.work Snark_work_lib.Work.Spec.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_worker.Work.Result.t -> unit
+val add_work : t -> Snark_work_lib.Selector.Result.Stable.Latest.t -> unit
+
+val add_work_graphql :
+     t
+  -> Network_pool.Snark_pool.Resource_pool.Diff.t
+  -> ( [ `Broadcasted | `Not_broadcasted ]
+     * Network_pool.Snark_pool.Resource_pool.Diff.t
+     * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
+     Deferred.Or_error.t
 
 val snark_job_state : t -> Work_selector.State.t
 
@@ -110,7 +144,7 @@ val add_transactions :
 
 val add_full_transactions :
      t
-  -> User_command.t list
+  -> User_command.Stable.Latest.t list
   -> ( [ `Broadcasted | `Not_broadcasted ]
      * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
@@ -118,7 +152,7 @@ val add_full_transactions :
 
 val add_zkapp_transactions :
      t
-  -> Zkapp_command.t list
+  -> Zkapp_command.Stable.Latest.t list
   -> ( [ `Broadcasted | `Not_broadcasted ]
      * Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
@@ -171,13 +205,14 @@ val snark_pool : t -> Network_pool.Snark_pool.t
 val start : t -> unit Deferred.t
 
 val start_with_precomputed_blocks :
-  t -> Block_producer.Precomputed.t Sequence.t -> unit Deferred.t
+  t -> Mina_block.Precomputed.t Sequence.t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
+val create :
+  commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
 
-val staged_ledger_ledger_proof : t -> Ledger_proof.t option
+val staged_ledger_ledger_proof : t -> Ledger_proof.Cached.t option
 
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -195,7 +230,7 @@ val wallets : t -> Secrets.Wallets.t
 val subscriptions : t -> Mina_subscriptions.t
 
 val most_recent_valid_transition :
-  t -> Mina_block.initial_valid_block Broadcast_pipe.Reader.t
+  t -> Mina_block.initial_valid_header Broadcast_pipe.Reader.t
 
 val block_produced_bvar :
   t -> (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
@@ -208,11 +243,13 @@ val net : t -> Mina_networking.t
 
 val runtime_config : t -> Runtime_config.t
 
+val compile_config : t -> Mina_compile_config.t
+
 val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
 
-val verifier : t -> Verifier.t
+val prover : t -> Prover.t
 
 val vrf_evaluator : t -> Vrf_evaluator.t
 
@@ -221,7 +258,49 @@ val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
 val vrf_evaluation_state : t -> Block_producer.Vrf_evaluation_state.t
 
 val best_chain_block_by_height :
-  t -> Unsigned.UInt32.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+  t -> Unsigned.UInt32.t -> Transition_frontier.Breadcrumb.t Or_error.t
 
 val best_chain_block_by_state_hash :
-  t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+  t -> State_hash.t -> Transition_frontier.Breadcrumb.t Or_error.t
+
+val best_chain_block_before_stop_slot :
+  t -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
+
+module Hardfork_config : sig
+  type mina_lib = t
+
+  type breadcrumb_spec =
+    [ `Stop_slot
+    | `State_hash of State_hash.t
+    | `Block_height of Unsigned.UInt32.t ]
+
+  val breadcrumb :
+       breadcrumb_spec:breadcrumb_spec
+    -> mina_lib
+    -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
+
+  val epoch_ledgers :
+       breadcrumb:Transition_frontier.Breadcrumb.t
+    -> mina_lib
+    -> ( Mina_ledger.Ledger.Any_ledger.witness
+       * Mina_ledger.Ledger.Any_ledger.witness )
+       Deferred.Or_error.t
+
+  type inputs =
+    { staged_ledger : Mina_ledger.Ledger.t
+    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; state_hash : State_hash.t
+    ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
+    ; staking_epoch_seed : Epoch_seed.t
+    ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
+    ; next_epoch_seed : Epoch_seed.t
+    ; blockchain_length : Mina_numbers.Length.t
+    }
+
+  val prepare_inputs :
+    breadcrumb_spec:breadcrumb_spec -> mina_lib -> inputs Deferred.Or_error.t
+end
+
+val zkapp_cmd_limit : t -> int option ref
+
+val proof_cache_db : t -> Proof_cache_tag.cache_db

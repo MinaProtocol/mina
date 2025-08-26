@@ -1,15 +1,4 @@
-[%%import "/src/config.mlh"]
-
-[%%ifdef consensus_mechanism]
-
 open Pickles.Impls.Step.Internal_Basic
-
-[%%else]
-
-open Snark_params.Tick
-
-[%%endif]
-
 module Input = Random_oracle_input
 
 module State : sig
@@ -34,8 +23,6 @@ include
 
 val salt : string -> Field.t State.t
 
-[%%ifdef consensus_mechanism]
-
 module Checked :
   Intf.S
     with type field := Field.Var.t
@@ -53,8 +40,6 @@ val read_typ : Field.Var.t Input.Chunked.t -> Field.t Input.Chunked.t
 val read_typ' :
      Field.Var.t Input.Chunked.t
   -> Field.t Input.Chunked.t Pickles.Impls.Step.Internal_Basic.As_prover.t
-
-[%%endif]
 
 module Legacy : sig
   module Input = Random_oracle_input.Legacy
@@ -91,8 +76,6 @@ module Legacy : sig
 
   val salt : string -> Field.t State.t
 
-  [%%ifdef consensus_mechanism]
-
   module Checked :
     Intf.S
       with type field := Field.Var.t
@@ -100,6 +83,4 @@ module Legacy : sig
        and type bool := Boolean.var
        and module State := State
        and type input := (Field.Var.t, Boolean.var) Random_oracle_input.Legacy.t
-
-  [%%endif]
 end

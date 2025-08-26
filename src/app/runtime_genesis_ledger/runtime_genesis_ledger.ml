@@ -13,20 +13,20 @@ module Hash_json = struct
   type t = { ledger : Hashes.t; epoch_data : epoch_data } [@@deriving to_yojson]
 end
 
-let ledger_depth =
-  (Lazy.force Precomputed_values.compiled_inputs).constraint_constants
-    .ledger_depth
-
 let logger = Logger.create ()
 
-let load_ledger (accounts : Runtime_config.Accounts.t) =
+let load_ledger ~ignore_missing_fields ~pad_app_state
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    (accounts : Runtime_config.Accounts.t) =
   let accounts =
     List.map accounts ~f:(fun account ->
-        (None, Runtime_config.Accounts.Single.to_account account) )
+        ( None
+        , Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
+            ~pad_app_state account ) )
   in
   let packed =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-      ~depth:ledger_depth
+      ~depth:constraint_constants.ledger_depth
       (lazy accounts)
   in
   Lazy.force (Genesis_ledger.Packed.t packed)
@@ -120,16 +120,27 @@ let load_config_exn config_file =
   , Option.map ~f:extract_accounts_exn staking_ledger
   , Option.map ~f:extract_accounts_exn next_ledger )
 
-let main ~config_file ~genesis_dir ~hash_output_file () =
+let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
+    ~pad_app_state () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
-  let ledger = load_ledger accounts in
-  let staking_ledger =
-    Option.value_map ~default:ledger ~f:load_ledger staking_accounts_opt
+  let ledger =
+    load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
+      accounts
+  in
+  let staking_ledger : Ledger.t =
+    Option.value_map ~default:ledger
+      ~f:
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
+      staking_accounts_opt
   in
   let next_ledger =
-    Option.value_map ~default:staking_ledger ~f:load_ledger next_accounts_opt
+    Option.value_map ~default:staking_ledger
+      ~f:
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
+      next_accounts_opt
   in
   let%bind hash_json =
     generate_hash_json ~genesis_dir ledger staking_ledger next_ledger
@@ -138,6 +149,7 @@ let main ~config_file ~genesis_dir ~hash_output_file () =
     ~contents:(Yojson.Safe.to_string (Hash_json.to_yojson hash_json))
 
 let () =
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
   Command.run
     (Command.async
        ~summary:
@@ -163,5 +175,18 @@ let () =
              ~doc:
                "PATH path to the file where the hashes of the ledgers are to \
                 be saved"
+         and ignore_missing_fields =
+           flag "--ignore-missing" no_arg
+             ~doc:
+               "BOOL whether to ignore missing fields in account definition \
+                (and replace with default values)"
+         (* TODO: at later stages replace with a flag to do all
+            ledger transformations necessary for the hardfork *)
+         and pad_app_state =
+           flag "--pad-app-state" no_arg
+             ~doc:
+               "BOOL whether to pad app_state to max allowed size (default: \
+                false)"
          in
-         main ~config_file ~genesis_dir ~hash_output_file) )
+         main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
+           ~ignore_missing_fields ~pad_app_state) )

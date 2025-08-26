@@ -10,13 +10,21 @@ open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
 open Pickles.Impls.Step
 
-let add_constraint c = assert_ { basic = T c; annotation = None }
+let add_constraint c = assert_ c
 
-let add_plonk_constraint c = assert_ { basic = T c; annotation = None }
+let add_plonk_constraint c = add_constraint c
 
 let etyp_unit =
-  Composition_types.Spec.ETyp.T
-    (Snarky_backendless.Typ.unit (), Core_kernel.Fn.id, Core_kernel.Fn.id)
+  Composition_types.Spec.Step_etyp.T
+    (Pickles.Impls.Step.Typ.unit, Core_kernel.Fn.id, Core_kernel.Fn.id)
+
+let log2_size ~feature_flags main =
+  let main' () = main () ; Promise.return () in
+  let domains =
+    Promise.block_on_async_exn (fun () ->
+        Pickles__Fix_domains.domains ~feature_flags etyp_unit etyp_unit main' )
+  in
+  Pickles_base.Domain.log2_size domains.h
 
 let test_fix_domains_with_runtime_table_cfgs () =
   let table_sizes = [ [ 1 ]; [ 1; 1 ]; [ 1; 10; 42; 36 ] ] in
@@ -39,12 +47,7 @@ let test_fix_domains_with_runtime_table_cfgs () =
                 (AddRuntimeTableCfg { id = Int32.of_int i; first_column }) )
             table_sizes
         in
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       table_sizes exp_output )
 
@@ -86,12 +89,7 @@ let test_fix_domains_with_runtime_table_cfgs_and_fixed_lookup_tables () =
                 ) )
             rt_cfgs_table_sizes
         in
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       (List.combine fixed_table_sizes rt_cfgs_table_sizes)
       exp_outputs )
@@ -126,12 +124,7 @@ let test_fix_domains_with_runtime_table_cfgs_and_fixed_lookup_tables_sharing_id
           in
           add_constraint (AddRuntimeTableCfg { id; first_column })
         in
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       (List.combine fixed_lt_sizes rt_cfg_sizes)
       exp_outputs )
@@ -161,12 +154,7 @@ let test_fix_domains_with_fixed_lookup_tables () =
                    { id = Int32.of_int i; data = [| indexes; values |] } ) )
             table_sizes
         in
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       table_sizes exp_output )
 
@@ -186,12 +174,7 @@ let test_fix_domains_with_xor_table () =
   assert (
     List.for_all
       (fun feature_flags ->
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       feature_flags_s )
 
@@ -238,12 +221,7 @@ let test_fix_domains_with_range_check_table () =
   assert (
     List.for_all
       (fun feature_flags ->
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       feature_flags_s )
 
@@ -289,12 +267,7 @@ let test_fix_domains_with_range_check_and_xor_table () =
   assert (
     List.for_all
       (fun feature_flags ->
-        let domains =
-          Pickles__Fix_domains.domains ~feature_flags
-            (module Pickles.Impls.Step)
-            etyp_unit etyp_unit main
-        in
-        let log2_size = Pickles_base.Domain.log2_size domains.h in
+        let log2_size = log2_size ~feature_flags main in
         log2_size = exp_output )
       feature_flags_s )
 

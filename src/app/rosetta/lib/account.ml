@@ -30,15 +30,10 @@ end
 
 module Sql = struct
   module Balance_from_last_relevant_command = struct
-    let max_txns =
-      Int.pow 2
-        Genesis_constants.Constraint_constants.compiled
-          .transaction_capacity_log_2
-
     let query_pending =
-      Caqti_request.find_opt
-        Caqti_type.(tup3 string int64 string)
-        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
+      Mina_caqti.find_opt_req
+        Caqti_type.(t3 string int64 string)
+        Caqti_type.(t2 (t4 int64 int64 int64 int64) int)
         {sql|
   WITH RECURSIVE pending_chain AS (
 
@@ -87,9 +82,9 @@ module Sql = struct
 |sql}
 
     let query_canonical =
-      Caqti_request.find_opt
-        Caqti_type.(tup3 string int64 string)
-        Caqti_type.(tup2 (tup4 int64 int64 int64 int64) int)
+      Mina_caqti.find_opt_req
+        Caqti_type.(t3 string int64 string)
+        Caqti_type.(t2 (t4 int64 int64 int64 int64) int)
         {sql|
                 SELECT b.height,b.global_slot_since_genesis AS block_global_slot_since_genesis,balance,nonce,timing_id
 
@@ -108,7 +103,7 @@ module Sql = struct
                 LIMIT 1
 |sql}
 
-    let run (module Conn : Caqti_async.CONNECTION) ~requested_block_height
+    let run (module Conn : Mina_caqti.CONNECTION) ~requested_block_height
         ~address ~token_id =
       let open Deferred.Result.Let_syntax in
       let%bind has_canonical_height =
@@ -143,7 +138,7 @@ module Sql = struct
       ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       ~initial_minimum_balance
 
-  let find_current_balance (module Conn : Caqti_async.CONNECTION)
+  let find_current_balance (module Conn : Mina_caqti.CONNECTION)
       ~requested_block_global_slot_since_genesis ~last_relevant_command_info
       ?timing_id () =
     let open Deferred.Result.Let_syntax in
@@ -198,8 +193,8 @@ module Sql = struct
     let balance_info : Balance_info.t = { liquid_balance; total_balance } in
     Deferred.Result.return (balance_info, nonce)
 
-  let run (module Conn : Caqti_async.CONNECTION) ~block_query
-      ~address ~token_id =
+  let run (module Conn : Mina_caqti.CONNECTION) ~block_query ~address ~token_id
+      =
     let open Deferred.Result.Let_syntax in
     (* First find the block referenced by the block identifier. Then
        find the latest block no later than it that has a user or
@@ -218,7 +213,7 @@ module Sql = struct
       | None ->
           Deferred.Result.fail
             (Errors.create @@ `Block_missing (Block_query.to_string block_query))
-      | Some (_block_id, block_info, _) ->
+      | Some { raw_block = block_info; _ } ->
           Deferred.Result.return
             ( block_info.height
             , block_info.global_slot_since_genesis
@@ -268,6 +263,7 @@ module Balance = struct
                M.t
         ; validate_network_choice :
                network_identifier:Network_identifier.t
+            -> minimum_user_command_fee:Mina_currency.Fee.t
             -> graphql_uri:Uri.t
             -> (unit, Errors.t) M.t
         }
@@ -279,11 +275,15 @@ module Balance = struct
     (* But for tests, we want things to go fast *)
     module Mock = T (Result)
 
-    let real : with_db:_ -> graphql_uri:Uri.t -> 'gql Real.t =
-     fun ~with_db ~graphql_uri ->
+    let real :
+           with_db:_
+        -> graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
+        -> 'gql Real.t =
+     fun ~with_db ~graphql_uri ~minimum_user_command_fee ->
       { gql =
           (fun ?token_id ~address () ->
-            Graphql.query
+            Graphql.query ~minimum_user_command_fee
               Get_balance.(
                 make
                 @@ makeVariables ~public_key:(`String address)
@@ -298,10 +298,8 @@ module Balance = struct
       ; db_block_identifier_and_balance_info =
           (fun ~block_query ~address ~token_id ->
             with_db (fun ~db ->
-                let (module Conn : Caqti_async.CONNECTION) = db in
-                Sql.run
-                  (module Conn)
-                  ~block_query ~address ~token_id
+                let (module Conn : Mina_caqti.CONNECTION) = db in
+                Sql.run (module Conn) ~block_query ~address ~token_id
                 |> Errors.Lift.wrap )
             |> Deferred.Result.map_error ~f:(function `App e -> e) )
       ; validate_network_choice = Network.Validate_choice.Real.validate
@@ -344,16 +342,17 @@ module Balance = struct
 
     let handle :
            graphql_uri:Uri.t
+        -> minimum_user_command_fee:Mina_currency.Fee.t
         -> env:'gql E.t
         -> Account_balance_request.t
         -> (Account_balance_response.t, Errors.t) M.t =
-     fun ~graphql_uri ~env req ->
+     fun ~graphql_uri ~minimum_user_command_fee ~env req ->
       let open M.Let_syntax in
       let address = req.account_identifier.address in
       let%bind token_id = Token_id.decode req.account_identifier.metadata in
       let%bind () =
         env.validate_network_choice ~network_identifier:req.network_identifier
-          ~graphql_uri
+          ~graphql_uri ~minimum_user_command_fee
       in
       let make_balance_amount ~liquid_balance ~total_balance =
         let amount =
@@ -450,7 +449,7 @@ module Balance = struct
           ~expected:
             (Mock.handle
                ~graphql_uri:(Uri.of_string "http://minaprotocol.com")
-               ~env:Env.mock
+               ~minimum_user_command_fee:Mina_currency.Fee.one ~env:Env.mock
                (Account_balance_request.create
                   (Network_identifier.create "x" "y")
                   (Account_identifier.create "x") ) )
@@ -489,7 +488,7 @@ module Balance = struct
           ~expected:
             (Mock.handle
                ~graphql_uri:(Uri.of_string "http://minaprotocol.com")
-               ~env:Env.mock
+               ~minimum_user_command_fee:Mina_currency.Fee.one ~env:Env.mock
                Account_balance_request.
                  { block_identifier =
                      Some
@@ -530,7 +529,8 @@ module Balance = struct
     end )
 end
 
-let router ~graphql_uri ~logger ~with_db (route : string list) body =
+let router ~graphql_uri ~minimum_user_command_fee ~logger ~with_db
+    (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /account/ $route"
     ~metadata:[ ("route", `List (List.map route ~f:(fun s -> `String s))) ] ;
@@ -567,8 +567,9 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        Balance.Real.handle ~graphql_uri
-          ~env:(Balance.Env.real ~with_db ~graphql_uri)
+        Balance.Real.handle ~graphql_uri ~minimum_user_command_fee
+          ~env:
+            (Balance.Env.real ~with_db ~graphql_uri ~minimum_user_command_fee)
           req
         |> Errors.Lift.wrap
       in

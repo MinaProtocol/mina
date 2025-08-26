@@ -1,6 +1,5 @@
 (*
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
@@ -32,7 +31,7 @@ let%test_module "Root_history and Transition_frontier" =
 
     let logger = Logger.null ()
 
-    let hb_logger = Logger.create ()
+    let hb_logger = Logger.null ()
 
     let pids = Child_processes.Termination.create_pid_table ()
 

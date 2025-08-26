@@ -19,6 +19,9 @@ end)
   let apply_and_broadcast_thread_label =
     "apply_and_broadcast_" ^ Resource_pool.label ^ "_diffs"
 
+  let apply_no_broadcast_thread_label =
+    "apply_no_broadcast_" ^ Resource_pool.label ^ "_diffs"
+
   let processing_diffs_thread_label =
     "processing_" ^ Resource_pool.label ^ "_diffs"
 
@@ -105,6 +108,7 @@ end)
     ; write_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Writer.t
     ; read_broadcasts : Resource_pool.Diff.t With_nonce.t Linear_pipe.Reader.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; block_window_duration : Time.Span.t
     }
 
   let resource_pool { resource_pool; _ } = resource_pool
@@ -154,6 +158,24 @@ end)
             Resource_pool.Diff.log_internal ~logger "rejected" env ;
             Broadcast_callback.error e cb )
 
+  let apply_no_broadcast ({ logger; _ } as t)
+      (diff : Resource_pool.Diff.verified Envelope.Incoming.t) =
+    let env = Envelope.Incoming.map ~f:Resource_pool.Diff.t_of_verified diff in
+    O1trace.sync_thread apply_no_broadcast_thread_label (fun () ->
+        match Resource_pool.Diff.unsafe_apply t.resource_pool diff with
+        | Ok (`Accept, _accepted, _rejected) ->
+            Resource_pool.Diff.log_internal ~logger "accepted" env
+        | Ok (`Reject, _accepted, _rejected) ->
+            Resource_pool.Diff.log_internal ~logger "rejected"
+              ~reason:"not_applied" env
+        | Error (`Locally_generated _res) ->
+            Resource_pool.Diff.log_internal ~logger "rejected"
+              ~reason:"locally_generated" env
+        | Error (`Other e) ->
+            [%log' debug t.logger] "Pool diff apply feedback: $error"
+              ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+            Resource_pool.Diff.log_internal ~logger "rejected" env )
+
   let log_rate_limiter_occasionally t rl =
     let time = Time_ns.Span.of_min 1. in
     every time (fun () ->
@@ -167,7 +189,7 @@ end)
     | Transition_frontier_extension of Resource_pool.transition_frontier_diff
 
   let of_resource_pool_and_diffs resource_pool ~logger ~constraint_constants
-      ~tf_diffs ~log_gossip_heard ~on_remote_push =
+      ~tf_diffs ~log_gossip_heard ~on_remote_push ~block_window_duration =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool =
       { resource_pool
@@ -175,6 +197,7 @@ end)
       ; read_broadcasts
       ; write_broadcasts
       ; constraint_constants
+      ; block_window_duration
       }
     in
     let remote_r, remote_w, remote_rl =
@@ -262,7 +285,8 @@ end)
     go ()
 
   let create ~config ~constraint_constants ~consensus_constants ~time_controller
-      ~frontier_broadcast_pipe ~logger ~log_gossip_heard ~on_remote_push =
+      ~frontier_broadcast_pipe ~logger ~log_gossip_heard ~on_remote_push
+      ~block_window_duration =
     (* Diffs from transition frontier extensions *)
     let tf_diff_reader, tf_diff_writer =
       Strict_pipe.(
@@ -274,7 +298,7 @@ end)
            ~time_controller ~config ~logger ~frontier_broadcast_pipe
            ~tf_diff_writer )
         ~constraint_constants ~logger ~tf_diffs:tf_diff_reader ~log_gossip_heard
-        ~on_remote_push
+        ~on_remote_push ~block_window_duration
     in
     O1trace.background_thread rebroadcast_loop_thread_label (fun () ->
         rebroadcast_loop t logger ) ;

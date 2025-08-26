@@ -1,5 +1,4 @@
 (* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Async_kernel
 open Core_kernel
 open Mina_base
@@ -25,6 +24,12 @@ let%test_module "Full_frontier tests" =
 
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
+    let test_eq ~message b1 b2 =
+      if not @@ Breadcrumb.equal b1 b2 then failwith message
+
+    let test_not_eq ~message b1 b2 =
+      if Breadcrumb.equal b1 b2 then failwith message
+
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:4
         ~f:(fun make_breadcrumb ->
@@ -37,7 +42,8 @@ let%test_module "Full_frontier tests" =
                 Full_frontier.find_exn frontier
                   (Breadcrumb.state_hash breadcrumb)
               in
-              [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ;
+              test_eq ~message:"retrieved unexpected benchmark from frontier"
+                breadcrumb queried_breadcrumb ;
               clean_up_persistent_root ~frontier ) )
 
     let%test_unit "Constructing a better branch should change the best tip" =
@@ -78,12 +84,6 @@ let%test_module "Full_frontier tests" =
 
     let%test_unit "The root should be updated after (> max_length) nodes are \
                    added in sequence" =
-      let test_eq ?message = [%test_eq: Breadcrumb.t] ?equal:None ?message in
-      let test_not_eq ?message =
-        let message = Option.map message ~f:(fun m -> "not " ^ m) in
-        [%test_eq: Breadcrumb.t] ?message ~equal:(fun a b ->
-            not (Breadcrumb.equal a b) )
-      in
       Quickcheck.test
         (gen_breadcrumb_seq ~verifier (max_length * 2))
         ~trials:4

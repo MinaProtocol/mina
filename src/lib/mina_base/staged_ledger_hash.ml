@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Mina_base_util
 open Fold_lib
@@ -24,7 +22,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Bounded_types.String.Stable.V1.t
+        type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
 
         let to_latest = Fn.id
@@ -108,7 +106,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Bounded_types.String.Stable.V1.t
+        type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash]
 
         let to_latest = Fn.id
@@ -215,25 +213,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     let var_of_t t : var =
       List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
-    [%%if proof_level = "check"]
-
-    let warn_improper_transport () = ()
-
-    [%%else]
-
-    let warn_improper_transport () =
-      printf "WARNING: improperly transporting staged-ledger-hash\n"
-
-    [%%endif]
-
     let typ : (var, value) Typ.t =
       Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)
         ~there:(Fn.compose Fold.to_list fold) ~back:(fun _ ->
-          (* If we put a failwith here, we lose the ability to printf-inspect
-             * anything that uses staged-ledger-hashes from within Checked
-             * computations. It's useful when debugging to dump the protocol state
-             * and so we can just lie here instead. *)
-          warn_improper_transport () ; Lazy.force dummy )
+          (* TODO: We could just use a prover value. *)
+          printf "WARNING: improperly transporting staged-ledger-hash\n" ;
+          Lazy.force dummy )
   end
 
   module Poly = struct

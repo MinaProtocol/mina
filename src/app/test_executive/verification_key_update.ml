@@ -71,13 +71,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   type dsl = Dsl.t
 
-  let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp
-      ~constraint_constants:Genesis_constants.Constraint_constants.compiled ()
-
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -101,7 +97,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let logger = Logger.create ()
 
-  let run network t =
+  let run ~config:{ Test_config.signature_kind; _ } network t =
     let open Malleable_error.Let_syntax in
     let%bind () =
       section_hard "Wait for nodes to initialize"
@@ -109,9 +105,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Wait_condition.nodes_to_initialize
               (Core.String.Map.data (Network.all_mina_nodes network)) ) )
     in
-    let whale1 =
-      Core.String.Map.find_exn (Network.block_producers network) "whale1"
-    in
+    let whale1 = Network.block_producer_exn network "whale1" in
     let%bind whale1_pk = pub_key_of_node whale1 in
     let%bind whale1_sk = priv_key_of_node whale1 in
     let constraint_constants = Network.constraint_constants network in
@@ -124,27 +118,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let tag1, _, _, Pickles.Provers.[ trivial_prover1 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial1"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule1.rule ])
+    in
+    let%bind.Async.Deferred vk1 =
+      Pickles.Side_loaded.Verification_key.of_compiled tag1
     in
     let tag2, _, _, Pickles.Provers.[ trivial_prover2 ] =
       Zkapps_examples.compile () ~cache:Cache_dir.cache
         ~auxiliary_typ:Impl.Typ.unit
-        ~branches:(module Pickles_types.Nat.N1)
         ~max_proofs_verified:(module Pickles_types.Nat.N0)
         ~name:"trivial2"
-        ~constraint_constants:
-          (Genesis_constants.Constraint_constants.to_snark_keys_header
-             constraint_constants )
         ~choices:(fun ~self:_ -> [ Trivial_rule2.rule ])
     in
-    let vk1 = Pickles.Side_loaded.Verification_key.of_compiled tag1 in
-    let vk2 = Pickles.Side_loaded.Verification_key.of_compiled tag2 in
+    let%bind.Async.Deferred vk2 =
+      Pickles.Side_loaded.Verification_key.of_compiled tag2
+    in
     let%bind.Async.Deferred account_update1, _ =
       trivial_prover1 ~handler:Trivial_rule1.handler ()
     in
@@ -195,11 +185,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-
       (* TODO: This is a pain. *)
-      { body = body vk; authorization = Signature Signature.dummy }
+      Account_update.with_aux ~body:(body vk)
+        ~authorization:(Control.Poly.Signature Signature.dummy)
     in
-    let zkapp_command_create_accounts =
+    let%bind zkapp_command_create_accounts =
       let memo =
         Signed_command_memo.create_from_string_exn "Zkapp create account"
       in
@@ -216,7 +206,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-      Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
+      Malleable_error.lift
+      @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants spec
     in
     let call_forest_to_zkapp ~call_forest ~nonce : Zkapp_command.t =
       let memo = Signed_command_memo.empty in
@@ -225,14 +216,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
       in
       let fee_payer : Account_update.Fee_payer.t =
-        { body =
+        Account_update.Fee_payer.make
+          ~body:
             { Account_update.Body.Fee_payer.dummy with
               public_key = account_a_pk
             ; nonce
             ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
             }
-        ; authorization = Signature.dummy
-        }
+          ~authorization:Signature.dummy
       in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
@@ -240,6 +231,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           transaction_commitment ~memo_hash
           ~fee_payer_hash:
             (Zkapp_command.Call_forest.Digest.Account_update.create
+               ~signature_kind
                (Account_update.of_fee_payer fee_payer) )
       in
       let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
@@ -250,7 +242,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             when Public_key.Compressed.equal public_key account_a_pk ->
               { fee_payer with
                 authorization =
-                  Schnorr.Chunked.sign account_a_kp.private_key
+                  Schnorr.Chunked.sign ~signature_kind account_a_kp.private_key
                     (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
@@ -260,6 +252,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = _
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key account_a_pk ->
@@ -269,8 +262,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 in
                 { account_update with
                   authorization =
-                    Signature
-                      (Schnorr.Chunked.sign account_a_kp.private_key
+                    Control.Poly.Signature
+                      (Schnorr.Chunked.sign ~signature_kind
+                         account_a_kp.private_key
                          (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->
@@ -283,7 +277,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest1 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update1
-      |> Zkapp_command.Call_forest.cons (update_vk vk1)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk1)
     in
     let zkapp_command_update_vk1 =
       call_forest_to_zkapp ~call_forest:call_forest1
@@ -292,7 +286,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest2 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update1
-      |> Zkapp_command.Call_forest.cons (update_vk vk2)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk2)
     in
     let zkapp_command_update_vk2_refers_vk1 =
       call_forest_to_zkapp ~call_forest:call_forest2
@@ -301,7 +295,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let call_forest_update_vk2 =
       []
       |> Zkapp_command.Call_forest.cons_tree account_update2
-      |> Zkapp_command.Call_forest.cons (update_vk vk2)
+      |> Zkapp_command.Call_forest.cons ~signature_kind (update_vk vk2)
     in
     let zkapp_command_update_vk2 =
       call_forest_to_zkapp ~call_forest:call_forest_update_vk2
@@ -382,19 +376,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; snapp_update = snapp_update_impossible
         }
       in
-      let%map invalid_update_vk_perm_proof =
+
+      let%bind invalid_update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_invalid_proof
-      and invalid_update_vk_perm_impossible =
+      in
+      let%bind invalid_update_vk_perm_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_invalid_impossible
-      and update_vk_perm_proof =
+      in
+      let%bind update_vk_perm_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_proof
-      and update_vk_perm_impossible =
+      in
+      let%map update_vk_perm_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_impossible
@@ -447,15 +445,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; current_auth = Proof
         }
       in
-      let%map failed_update_vk_signature_1 =
+      let%bind failed_update_vk_signature_1 =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_failed_signature_1
-      and failed_update_vk_signature_2 =
+      in
+      let%bind failed_update_vk_signature_2 =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_failed_signature_2
-      and update_vk_proof =
+      in
+      let%map update_vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_proof

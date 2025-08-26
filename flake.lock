@@ -1,5 +1,51 @@
 {
   "nodes": {
+    "describe-dune": {
+      "inputs": {
+        "flake-utils": [
+          "utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1742933373,
+        "narHash": "sha256-sW6ZheQeXe+GULDKLcgRJN4eucP3IXWHz0bHL9KKU1w=",
+        "owner": "o1-labs",
+        "repo": "describe-dune",
+        "rev": "ba71baa26329399ca2f1d158f15e7c32bba1d072",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "describe-dune",
+        "type": "github"
+      }
+    },
+    "dune-nix": {
+      "inputs": {
+        "flake-utils": [
+          "utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1742933757,
+        "narHash": "sha256-FI8sVvIJuKscrnOUj/cqbZRVOxTzgBwYMyZSNcXq+58=",
+        "owner": "o1-labs",
+        "repo": "dune-nix",
+        "rev": "5eedc211a4cfc3bae1833c5a85542be49b4a9f6b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "dune-nix",
+        "type": "github"
+      }
+    },
     "flake-buildkite-pipeline": {
       "inputs": {
         "nixpkgs-lib": "nixpkgs-lib"
@@ -261,19 +307,51 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
+    "nixpkgs-old": {
       "locked": {
-        "lastModified": 1713180868,
-        "narHash": "sha256-5CSnPSCEWeUmrFiLuYIQIPQzPrpCB8x3VhE+oXLRO3k=",
+        "lastModified": 1705033721,
+        "narHash": "sha256-K5eJHmL1/kev6WuqyqqbS1cdNnSidIZ3jeqJ7GbrYnQ=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "140546acf30a8212a03a88ded8506413fa3b5d21",
+        "rev": "a1982c92d8980a0114372973cbdfe0a307f1bdea",
         "type": "github"
       },
       "original": {
         "owner": "nixos",
-        "ref": "nixos-23.11-small",
+        "ref": "nixos-23.05-small",
         "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1747187171,
+        "narHash": "sha256-heMv6zpxnLYhdcMtUxSn8PWaDLKlJCvQwhbarTNrXYI=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "97bd66213bef339d11520ee2e84e3907394b16c7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-24.11-small",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "o1-opam-repository": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1749055102,
+        "narHash": "sha256-JEeAGWyzlWbUoYwav7mpFY/aYuZ/qay7xirnp+2pWGs=",
+        "owner": "o1-labs",
+        "repo": "opam-repository",
+        "rev": "677657206d9da47987a4eff8087c1f3a258908f3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "o1-labs",
+        "repo": "opam-repository",
         "type": "github"
       }
     },
@@ -324,16 +402,17 @@
     "opam-repository": {
       "flake": false,
       "locked": {
-        "lastModified": 1708601497,
-        "narHash": "sha256-mDYINTjOiYLN4wT5fGlWTvHFQdWkzY46XUuZWKgmJxY=",
+        "lastModified": 1750360330,
+        "narHash": "sha256-sizv8xZ/E/OgsE/ak9Oo+iEuBpzvUs08T0S+yXXzaDs=",
         "owner": "ocaml",
         "repo": "opam-repository",
-        "rev": "90d8c520a4f0b035ac51e267a8b33739c5a78b5a",
+        "rev": "08d8c16c16dc6b23a5278b06dff0ac6c7a217356",
         "type": "github"
       },
       "original": {
         "owner": "ocaml",
         "repo": "opam-repository",
+        "rev": "08d8c16c16dc6b23a5278b06dff0ac6c7a217356",
         "type": "github"
       }
     },
@@ -360,6 +439,8 @@
     },
     "root": {
       "inputs": {
+        "describe-dune": "describe-dune",
+        "dune-nix": "dune-nix",
         "flake-buildkite-pipeline": "flake-buildkite-pipeline",
         "flake-compat": "flake-compat",
         "flockenzeit": "flockenzeit",
@@ -370,6 +451,8 @@
         "nix-utils": "nix-utils",
         "nixpkgs": "nixpkgs_2",
         "nixpkgs-mozilla": "nixpkgs-mozilla",
+        "nixpkgs-old": "nixpkgs-old",
+        "o1-opam-repository": "o1-opam-repository",
         "opam-nix": "opam-nix",
         "opam-repository": "opam-repository",
         "utils": "utils"

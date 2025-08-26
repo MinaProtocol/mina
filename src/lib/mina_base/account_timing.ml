@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 open Tick
@@ -69,7 +67,7 @@ module As_record = struct
     ; vesting_period : 'slot_span
     ; vesting_increment : 'amount
     }
-  [@@deriving equal, hlist, fields, annot]
+  [@@deriving equal, hlist, fields, annot, sexp_of]
 
   let deriver obj =
     let open Fields_derivers_zkapps.Derivers in
@@ -88,6 +86,7 @@ type as_record =
   , Balance.Stable.Latest.t
   , Amount.Stable.Latest.t )
   As_record.t
+[@@deriving sexp_of]
 
 (* convert sum type to record format, useful for to_bits and typ *)
 let to_record t =
@@ -157,8 +156,6 @@ let to_input t =
      ; Global_slot_span.to_input vesting_period
      ; Amount.to_input vesting_increment
     |]
-
-[%%ifdef consensus_mechanism]
 
 type var =
   ( Boolean.var
@@ -310,5 +307,3 @@ let if_ b ~(then_ : var) ~(else_ : var) =
 let deriver obj =
   let open Fields_derivers_zkapps in
   iso_record ~to_record ~of_record As_record.deriver obj
-
-[%%endif]

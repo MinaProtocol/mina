@@ -10,13 +10,25 @@ open Pickles_types
 module Make
     (Inputs : Intf.Step_main_inputs.S
                 with type Impl.field = Backend.Tick.Field.t
+                 and type Impl.field_var = Step_main_inputs.Impl.field_var
                  and type Impl.Bigint.t = Backend.Tick.Bigint.t
+                 and type Impl.Constraint.t = Backend.Tick.Constraint.t
+                 and type 'a Impl.Internal_Basic.Checked.t =
+                  'a Step_main_inputs.Impl.Internal_Basic.Checked.t
+                 and type ('var, 'value, 'aux) Impl.Internal_Basic.Typ.typ' =
+                  ( 'var
+                  , 'value
+                  , 'aux )
+                  Step_main_inputs.Impl.Internal_Basic.Typ.typ'
+                 and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
+                  ('var, 'value) Step_main_inputs.Impl.Internal_Basic.Typ.typ
                  and type Inner_curve.Constant.Scalar.t = Backend.Tock.Field.t) =
 struct
   open Inputs
   open Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
+  module Utils = Util.Make (Impl)
 
   (* Other_field.size > Field.size *)
   module Other_field = struct
@@ -71,7 +83,7 @@ struct
 
   let lowest_128_bits ~constrain_low_bits x =
     let assert_128_bits = assert_n_bits ~n:128 in
-    Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
+    Utils.lowest_128_bits ~constrain_low_bits ~assert_128_bits x
 
   module Scalar_challenge =
     SC.Make (Impl) (Inner_curve) (Challenge) (Endo.Step_inner_curve)
@@ -217,7 +229,7 @@ struct
     with_label __LOC__ (fun () ->
         Ops.scale_fast2 p s ~num_bits:Field.size_in_bits )
 
-  let check_bulletproof ~pcs_batch ~(sponge : Sponge.t) ~xi
+  let check_bulletproof ~(sponge : Sponge.t) ~xi
       ~(* Corresponds to y in figure 7 of WTS *)
        (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       (advice : _ Bulletproof.Advice.t)
@@ -240,7 +252,7 @@ struct
         let open Inner_curve in
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
           with_label "combined_polynomial" (fun () ->
-              Pcs_batch.combine_split_commitments pcs_batch
+              Pcs_batch.combine_split_commitments
                 ~reduce_without_degree_bound:Array.to_list
                 ~reduce_with_degree_bound:(fun { Plonk_types.Poly_comm
                                                  .With_degree_bound
@@ -354,7 +366,7 @@ struct
     | _ ->
         assert false
 
-  module O = One_hot_vector.Make (Impl)
+  module O = One_hot_vector.Step
   open Tuple_lib
 
   let public_input_commitment_dynamic (type n) ~srs (which : n O.t)
@@ -389,7 +401,7 @@ struct
                     Field.((b :> t) * x, (b :> t) * y) ) )
             |> Vector.reduce_exn
                  ~f:(Vector.map2 ~f:(Double.map2 ~f:Field.( + )))
-            |> Vector.map ~f:(Double.map ~f:(Util.seal (module Impl)))
+            |> Vector.map ~f:(Double.map ~f:Utils.seal)
     in
     let lagrange i =
       select_curve_points ~points_for_domain:(fun d ->
@@ -474,9 +486,9 @@ struct
       ~(domain :
          [ `Known of Domain.t
          | `Side_loaded of
-           _ Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ]
-         ) ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi
-      ~sponge ~sponge_after_index
+           Composition_types.Branch_data.Proofs_verified.One_hot.Checked.t ] )
+      ~srs ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
+      ~sponge_after_index
       ~(public_input :
          [ `Field of Field.t | `Packed_bits of Field.t * int ] array )
       ~(sg_old : (_, Proofs_verified.n) Vector.t) ~advice
@@ -592,13 +604,8 @@ struct
                     num_commitments_without_degree_bound ) )
           in
           with_label "check_bulletproof" (fun () ->
-              check_bulletproof
-                ~pcs_batch:
-                  (Common.dlog_pcs_batch
-                     (Wrap_hack.Padded_length.add
-                        num_commitments_without_degree_bound ) )
-                ~sponge:sponge_before_evaluations ~xi ~advice ~opening
-                ~polynomials:(without_degree_bound, []) )
+              check_bulletproof ~sponge:sponge_before_evaluations ~xi ~advice
+                ~opening ~polynomials:(without_degree_bound, []) )
         in
         let joint_combiner = None in
         assert_eq_deferred_values
@@ -624,7 +631,7 @@ struct
 
   let challenge_polynomial = Wrap_verifier.challenge_polynomial (module Field)
 
-  module Pseudo = Pseudo.Make (Impl)
+  module Pseudo = Pseudo.Step
 
   (* module Bounded = struct
        type t = { max : int; actual : Field.t }
@@ -661,7 +668,7 @@ struct
     fun ~(log2_size : Field.t) ->
       let domain ~max =
         let (T max_n) = Nat.of_int max in
-        let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
+        let mask = Utils.ones_vector max_n ~first_zero:log2_size in
         let log2_sizes =
           ( O.of_index log2_size ~length:(S max_n)
           , Vector.init (S max_n) ~f:Fn.id )
@@ -777,14 +784,12 @@ struct
         (Shifted_value.Type1)
         (struct
           let constant_term = Plonk_checks.Scalars.Tick.constant_term
-
-          let index_terms = Plonk_checks.Scalars.Tick.index_terms
         end)
   end
 
   let domain_for_compiled (type branches)
       (domains : (Domains.t, branches) Vector.t)
-      (branch_data : Impl.field Branch_data.Checked.t) :
+      (branch_data : Branch_data.Checked.Step.t) :
       Field.t Plonk_checks.plonk_domain =
     let (T unique_domains) =
       List.map (Vector.to_list domains) ~f:Domains.h
@@ -835,7 +840,7 @@ struct
         , _
         , _
         , _
-        , Field.Constant.t Branch_data.Checked.t
+        , Branch_data.Checked.Step.t
         , _ )
         Types.Wrap.Proof_state.Deferred_values.In_circuit.t )
       { Plonk_types.All_evals.In_circuit.ft_eval1; evals } =
@@ -1109,7 +1114,7 @@ struct
     let after_index = sponge_after_index index in
     ( after_index
     , (* TODO: Just get rid of the proofs verified mask and always absorb in full *)
-      stage (fun t ~widths:_ ~max_width:_ ~proofs_verified_mask ->
+      stage (fun t ~proofs_verified_mask ->
           let sponge = Sponge.copy after_index in
           let t =
             { t with
@@ -1159,19 +1164,13 @@ struct
   let verify ~proofs_verified ~is_base_case ~sg_old ~sponge_after_index
       ~lookup_parameters ~feature_flags ~(proof : Wrap_proof.Checked.t) ~srs
       ~wrap_domain ~wrap_verification_key statement
-      (unfinalized :
-        ( _
-        , _
-        , _ Shifted_value.Type2.t
-        , _
-        , _
-        , _ )
-        Types.Step.Proof_state.Per_proof.In_circuit.t ) =
+      (unfinalized : Impls.Step.unfinalized_proof_var) =
     let public_input :
         [ `Field of Field.t | `Packed_bits of Field.t * int ] array =
       with_label "pack_statement" (fun () ->
           Spec.pack
             (module Impl)
+            (module Branch_data.Checked.Step)
             (Types.Wrap.Statement.In_circuit.spec
                (module Impl)
                lookup_parameters feature_flags )

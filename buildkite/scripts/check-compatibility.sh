@@ -2,11 +2,12 @@
 
 # start mainline branch daemon as seed, see if PR branch daemon can sync to it
 
-# don't exit if docker download fails
-set +e
+set -eox pipefail
+
+CURR_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
 function get_shas {
-  SHAS=$(git log -n 10 --format="%h" --abbrev=7 --no-merges)
+  SHAS=$(git log -n 10 --format="%h" --abbrev=7 --first-parent)
 }
 
 function image_tag {
@@ -14,7 +15,7 @@ function image_tag {
     IMAGE_TAG="$SHA-bullseye-berkeley"
 }
 
-function download-docker {
+function download_docker {
    SHA=$1
    image_tag $SHA
    docker pull gcr.io/o1labs-192920/mina-daemon:$IMAGE_TAG
@@ -23,17 +24,25 @@ function download-docker {
 function try_docker_shas {
     DOCKER_SHAS=$1
     GOT_DOCKER=0
-
     for sha in $DOCKER_SHAS; do
-	download-docker $sha
-	if [ $? -eq 0 ] ; then
-	    GOT_DOCKER=1
-	    image_tag $sha
-	    break
-	else
-	    echo "No docker available for SHA=$sha"
-	fi
+
+        set +e
+        download_docker $sha
+
+        if [ $? -eq 0 ] ; then
+            GOT_DOCKER=1
+            image_tag $sha
+            break
+        else
+            echo "No docker available for SHA=$sha"
+        fi
+        set -e
     done
+
+    if [[ $GOT_DOCKER == 0 ]]; then
+        echo "docker cannot be found for given shas: $DOCKER_SHAS"
+        exit 1
+    fi
 }
 
 function image_id {
@@ -95,7 +104,7 @@ function boot_and_sync {
         # "connection refused" until GraphQL server up
         GOT_SYNC_STATUS=$(echo ${SYNC_STATUS} | grep "syncStatus")
         if [ ! -z $GOT_SYNC_STATUS ]; then
-            echo $(date +'%Y-%m-%d %H:%M:%S') ". Sync status:" $GOT_SYNC_STATUS
+            echo "$(date +'%Y-%m-%d %H:%M:%S')" ". Sync status:" $GOT_SYNC_STATUS
         fi
 
         SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
@@ -148,8 +157,6 @@ else
 fi
 
 MAIN_BRANCH_IMAGE_TAG=$IMAGE_TAG
-
-CURR_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 
 echo "Checking out PR branch"
 git checkout $CURR_BRANCH

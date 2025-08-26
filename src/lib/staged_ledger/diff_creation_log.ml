@@ -64,7 +64,7 @@ module Summary = struct
       ( Sequence.length completed_work
       , Sequence.sum
           (module Fee_Summable)
-          completed_work ~f:Transaction_snark_work.fee )
+          completed_work ~f:Transaction_snark_work.Checked.fee )
     in
     let commands =
       ( Sequence.length commands
@@ -183,7 +183,7 @@ module Detail = struct
           ; completed_work =
               ( fst x.completed_work - 1
               , Currency.Fee.sub (snd x.completed_work)
-                  (Transaction_snark_work.fee completed_work)
+                  (Transaction_snark_work.Checked.fee completed_work)
                 |> Option.value_exn )
           }
         in

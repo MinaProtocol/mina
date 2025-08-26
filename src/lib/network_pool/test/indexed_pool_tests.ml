@@ -35,8 +35,7 @@ let singleton_properties () =
           (Amount.of_nanomina_int_exn 500)
       in
       if
-        Option.value_exn (currency_consumed ~constraint_constants cmd)
-        |> Amount.to_nanomina_int > 500
+        Option.value_exn (currency_consumed cmd) |> Amount.to_nanomina_int > 500
       then
         match add_res with
         | Error (Insufficient_funds _) ->
@@ -49,14 +48,16 @@ let singleton_properties () =
             assert_pool_consistency pool' ;
             assert (Sequence.is_empty dropped) ;
             [%test_eq: int] (size pool') 1 ;
-            [%test_eq:
-              Transaction_hash.User_command_with_valid_signature.t option]
-              (get_highest_fee pool') (Some cmd) ;
+            assert (
+              [%equal:
+                Transaction_hash.User_command_with_valid_signature.t option]
+                (get_highest_fee pool') (Some cmd) ) ;
             let dropped', pool'' = remove_lowest_fee pool' in
-            [%test_eq:
-              Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-              dropped' (Sequence.singleton cmd) ;
-            [%test_eq: t] ~equal pool pool''
+            assert (
+              [%equal:
+                Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+                dropped' (Sequence.singleton cmd) ) ;
+            assert (equal pool pool'')
         | _ ->
             failwith "should've succeeded" )
 
@@ -111,9 +112,7 @@ let sequential_adds_all_valid () =
             in
             match add_res with
             | Ok (_, pool', dropped) ->
-                [%test_eq:
-                  Transaction_hash.User_command_with_valid_signature.t
-                  Sequence.t] dropped Sequence.empty ;
+                assert (Sequence.is_empty dropped) ;
                 assert_pool_consistency pool' ;
                 pool := pool' ;
                 go rest
@@ -214,9 +213,7 @@ let replacement () =
             ~common:(fun c -> { c with fee = Amount.to_fee fee })
             ~body:(fun b -> { b with amount })
         in
-        let consumed =
-          Option.value_exn (currency_consumed ~constraint_constants cmd')
-        in
+        let consumed = Option.value_exn (currency_consumed cmd') in
         let%map rest =
           go
             (Account_nonce.succ current_nonce)
@@ -260,9 +257,7 @@ let replacement () =
             match add_from_gossip_exn t cmd init_nonce init_balance with
             | Ok (_, t', removed) ->
                 assert_pool_consistency t' ;
-                [%test_eq:
-                  Transaction_hash.User_command_with_valid_signature.t
-                  Sequence.t] removed Sequence.empty ;
+                assert (Sequence.is_empty removed) ;
                 t'
             | _ ->
                 failwith
@@ -293,7 +288,7 @@ let replacement () =
           ~f:(fun consumed_so_far cmd ->
             Option.value_exn
               Option.(
-                currency_consumed ~constraint_constants cmd
+                currency_consumed cmd
                 >>= fun consumed -> Amount.(consumed + consumed_so_far)) )
       in
       assert (Amount.(currency_consumed_pre_replace <= init_balance)) ;
@@ -301,12 +296,9 @@ let replacement () =
         Option.value_exn
           (let open Option.Let_syntax in
           let%bind replaced_currency_consumed =
-            currency_consumed ~constraint_constants
-            @@ List.nth_exn setup_cmds replaced_idx
+            currency_consumed @@ List.nth_exn setup_cmds replaced_idx
           in
-          let%bind replacer_currency_consumed =
-            currency_consumed ~constraint_constants replace_cmd
-          in
+          let%bind replacer_currency_consumed = currency_consumed replace_cmd in
           let%bind a =
             Amount.(currency_consumed_pre_replace - replaced_currency_consumed)
           in
@@ -338,10 +330,11 @@ let remove_lowest_fee () =
       (User_command.fee_per_wu @@ command cmd0)
       (User_command.fee_per_wu @@ command cmd1)
   in
+  let module Set = Transaction_hash.User_command_with_valid_signature.Set in
   let cmds_sorted_by_fee_per_wu = List.sort ~compare cmds in
   let cmd_lowest_fee, commands_to_keep =
     ( List.hd_exn cmds_sorted_by_fee_per_wu
-    , List.tl_exn cmds_sorted_by_fee_per_wu )
+    , List.map ~f:Set.singleton @@ List.tl_exn cmds_sorted_by_fee_per_wu )
   in
   let insert_cmd pool cmd =
     add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
@@ -353,21 +346,19 @@ let remove_lowest_fee () =
     List.fold_left cmds ~init:empty ~f:insert_cmd |> remove_lowest_fee
   in
   (* check that the lowest fee per wu command is returned *)
-  assert (Sequence.(equal cmd_equal removed @@ return cmd_lowest_fee))
+  assert (Sequence.(equal cmd_equal removed @@ singleton cmd_lowest_fee))
   |> fun () ->
   (* check that the lowest fee per wu command is removed from
      applicable_by_fee *)
   applicable_by_fee pool |> Map.data
-  |> List.concat_map ~f:Set.to_list
   |> fun applicable_by_fee_cmds ->
-  assert (List.(equal cmd_equal applicable_by_fee_cmds commands_to_keep))
+  assert (List.equal Set.equal applicable_by_fee_cmds commands_to_keep)
   |> fun () ->
   (* check that the lowest fee per wu command is removed from
      all_by_fee *)
   applicable_by_fee pool |> Map.data
-  |> List.concat_map ~f:Set.to_list
   |> fun all_by_fee_cmds ->
-  assert (List.(equal cmd_equal all_by_fee_cmds commands_to_keep))
+  assert (List.equal Set.equal all_by_fee_cmds commands_to_keep)
 
 let insert_cmd pool cmd =
   add_from_gossip_exn pool cmd Account_nonce.zero (Amount.of_mina_int_exn 5)
@@ -393,9 +384,10 @@ let pick_highest_fee_for_application () =
           (User_command.fee_per_wu @@ command cmd1)
       in
       let pool = List.fold_left cmds ~init:empty ~f:insert_cmd in
-      [%test_eq: Transaction_hash.User_command_with_valid_signature.t option]
-        (get_highest_fee pool)
-        (List.max_elt ~compare cmds) )
+      assert (
+        [%equal: Transaction_hash.User_command_with_valid_signature.t option]
+          (get_highest_fee pool)
+          (List.max_elt ~compare cmds) ) )
 
 let command_nonce (txn : Transaction_hash.User_command_with_valid_signature.t) =
   let open Transaction_hash.User_command_with_valid_signature in
@@ -408,14 +400,14 @@ let command_nonce (txn : Transaction_hash.User_command_with_valid_signature.t) =
 let dummy_state_view =
   let state_body =
     let consensus_constants =
-      let genesis_constants = Genesis_constants.for_unit_tests in
+      let genesis_constants = Genesis_constants.For_unit_tests.t in
       Consensus.Constants.create ~constraint_constants
         ~protocol_constants:genesis_constants.protocol
     in
     let compile_time_genesis =
       (*not using Precomputed_values.for_unit_test because of dependency cycle*)
       Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+        ~genesis_ledger:Genesis_ledger.for_unit_tests
         ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
         ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         ~constraint_constants ~consensus_constants
@@ -432,8 +424,7 @@ let add_to_pool ~nonce ~balance pool cmd =
     |> Result.map_error ~f:(Fn.compose Sexp.to_string Command_error.sexp_of_t)
     |> Result.ok_or_failwith
   in
-  [%test_eq: Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-    dropped Sequence.empty ;
+  assert (Sequence.is_empty dropped) ;
   assert_pool_consistency pool' ;
   pool'
 
@@ -453,6 +444,7 @@ let init_permissionless_ledger ledger account_info =
         { account with balance; permissions = Permissions.empty } )
 
 let apply_to_ledger ledger cmd =
+  let signature_kind = Mina_signature_kind.Testnet in
   match Transaction_hash.User_command_with_valid_signature.command cmd with
   | User_command.Signed_command c ->
       let (`If_this_is_used_it_should_have_a_comment_justifying_it v) =
@@ -467,7 +459,8 @@ let apply_to_ledger ledger cmd =
           )
   | User_command.Zkapp_command p -> (
       let applied, _ =
-        Mina_ledger.Ledger.apply_zkapp_command_unchecked ~constraint_constants
+        Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
+          ~constraint_constants
           ~global_slot:dummy_state_view.global_slot_since_genesis
           ~state_view:dummy_state_view ledger p
         |> Or_error.ok_exn
@@ -500,7 +493,8 @@ let commit_to_pool ledger pool cmd expected_drops =
               (Mina_ledger.Ledger.get ledger loc) )
   in
   let lower =
-    List.map ~f:Transaction_hash.User_command_with_valid_signature.hash
+    List.map
+      ~f:Transaction_hash.User_command_with_valid_signature.transaction_hash
   in
   [%test_eq: Transaction_hash.t list]
     (lower (Sequence.to_list dropped))
@@ -508,23 +502,27 @@ let commit_to_pool ledger pool cmd expected_drops =
   assert_pool_consistency pool ;
   pool
 
+let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+let signature_kind = Mina_signature_kind.Testnet
+
 let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
     ~double_increment_sender ~increment_receiver ~amount ~fee nonce_int =
   let nonce = Account.Nonce.of_int nonce_int in
   let sender_pk = Public_key.compress sender.public_key in
   let receiver_pk = Public_key.compress receiver.public_key in
-  let zkapp_command_wire : Zkapp_command.Stable.Latest.Wire.t =
+  let zkapp_command_wire : Zkapp_command.Stable.Latest.t =
     { fee_payer =
-        { Account_update.Fee_payer.body =
-            { public_key = sender_pk; fee; nonce; valid_until = None }
-            (* Real signature added in below *)
-        ; authorization = Signature.dummy
-        }
+        (* Real signature added in below *)
+        Account_update.Fee_payer.make
+          ~body:{ public_key = sender_pk; fee; nonce; valid_until = None }
+          ~authorization:Signature.dummy
     ; account_updates =
         Zkapp_command.Call_forest.of_account_updates
           ~account_update_depth:(Fn.const 0)
-          [ { Account_update.body =
-                { public_key = sender_pk
+          [ Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.public_key = sender_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.(negate @@ of_unsigned amount)
@@ -543,12 +541,13 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; may_use_token = No
                 ; use_full_commitment = not double_increment_sender
                 ; implicit_account_creation_fee = false
-                ; authorization_kind = None_given
+                ; authorization_kind =
+                    Account_update.Authorization_kind.None_given
                 }
-            ; authorization = None_given
-            }
-          ; { Account_update.body =
-                { public_key = receiver_pk
+              ~authorization:Control.Poly.None_given
+          ; Account_update.with_no_aux
+              ~body:
+                { Account_update.Body.public_key = receiver_pk
                 ; update = Account_update.Update.noop
                 ; token_id = Token_id.default
                 ; balance_change = Amount.Signed.of_unsigned amount
@@ -567,13 +566,15 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
                 ; use_full_commitment = not increment_receiver
                 ; authorization_kind = None_given
                 }
-            ; authorization = None_given
-            }
+              ~authorization:Control.Poly.None_given
           ]
     ; memo = Signed_command_memo.empty
     }
   in
-  let zkapp_command = Zkapp_command.of_wire zkapp_command_wire in
+  let zkapp_command =
+    Zkapp_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+      zkapp_command_wire
+  in
   (* We skip signing the commitment and updating the authorization as it is not necessary to have a valid transaction for these tests. *)
   let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd) =
     User_command.to_valid_unsafe (User_command.Zkapp_command zkapp_command)
@@ -581,7 +582,7 @@ let make_zkapp_command_payment ~(sender : Keypair.t) ~(receiver : Keypair.t)
   Transaction_hash.User_command_with_valid_signature.create cmd
 
 let support_for_zkapp_command_commands () =
-  let fee = Fee.minimum_user_command_fee in
+  let fee = Genesis_constants.For_unit_tests.t.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =
@@ -614,7 +615,7 @@ let support_for_zkapp_command_commands () =
       () )
 
 let nonce_increment_side_effects () =
-  let fee = Fee.minimum_user_command_fee in
+  let fee = Genesis_constants.For_unit_tests.t.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =
@@ -647,7 +648,7 @@ let nonce_increment_side_effects () =
       () )
 
 let nonce_invariant_violation () =
-  let fee = Fee.minimum_user_command_fee in
+  let fee = Genesis_constants.For_unit_tests.t.minimum_user_command_fee in
   let amount = Amount.of_nanomina_int_exn @@ Fee.to_nanomina_int fee in
   let balance = Option.value_exn (Amount.scale amount 100) in
   let kp1 =
@@ -728,7 +729,8 @@ let gen_accounts_and_transactions =
   (accounts_map senders, shuffled)
 
 let transactions_from_many_senders_no_nonce_gaps () =
-  Quickcheck.test gen_accounts_and_transactions ~f:(fun (account_map, txns) ->
+  Quickcheck.test ~trials:1000 gen_accounts_and_transactions
+    ~f:(fun (account_map, txns) ->
       let pool =
         pool_of_transactions ~init:empty ~account_map txns |> rem_lowest_fee 5
       in
@@ -739,23 +741,23 @@ let transactions_from_many_senders_no_nonce_gaps () =
       assert_pool_consistency pool )
 
 let revalidation_drops_nothing_unless_ledger_changed () =
-  Quickcheck.test gen_accounts_and_transactions ~f:(fun (account_map, txns) ->
+  Quickcheck.test ~trials:1000 gen_accounts_and_transactions
+    ~f:(fun (account_map, txns) ->
       let pool = pool_of_transactions ~init:empty ~account_map txns in
       let pool', dropped =
         Indexed_pool.revalidate pool ~logger `Entire_pool (fun aid ->
             Public_key.Compressed.Map.find_exn account_map
               (Account_id.public_key aid) )
       in
-      [%test_eq:
-        Transaction_hash.User_command_with_valid_signature.t Sequence.t] dropped
-        Sequence.empty ;
-      [%test_eq: Indexed_pool.t] pool pool' ;
+      assert (Sequence.is_empty dropped) ;
+      assert (Indexed_pool.equal pool pool') ;
       let to_apply = Indexed_pool.transactions ~logger pool in
       let to_apply' = Indexed_pool.transactions ~logger pool' in
       assert_pool_consistency pool ;
-      [%test_eq:
-        Transaction_hash.User_command_with_valid_signature.t Sequence.t]
-        to_apply to_apply' )
+      assert (
+        [%equal:
+          Transaction_hash.User_command_with_valid_signature.t Sequence.t]
+          to_apply to_apply' ) )
 
 let apply_transactions txns accounts =
   List.fold txns ~init:accounts ~f:(fun m t ->
@@ -765,7 +767,7 @@ let apply_transactions txns accounts =
         | None ->
             failwith "sender not found"
         | Some a ->
-            let open Account.Poly in
+            let open Account in
             let nonce = Account.Nonce.succ a.nonce in
             let balance =
               let amt =
@@ -776,10 +778,11 @@ let apply_transactions txns accounts =
             in
             { a with nonce; balance } ) )
 
-let txn_hash = Transaction_hash.User_command_with_valid_signature.hash
+let txn_hash =
+  Transaction_hash.User_command_with_valid_signature.transaction_hash
 
 let application_invalidates_applied_transactions () =
-  Quickcheck.test
+  Quickcheck.test ~trials:1000
     (let open Quickcheck.Generator.Let_syntax in
     let%bind accounts, txns = gen_accounts_and_transactions in
     (* Simulate application of some transactions in order to invalidate them. *)
@@ -855,7 +858,7 @@ let transaction_replacement () =
       in
       assert_pool_consistency pool ;
       let queue, _ =
-        let open Account.Poly in
+        let open Account in
         Public_key.decompress sender.public_key
         |> Option.value_exn |> Account_id.of_public_key
         |> Account_id.Map.find_exn (Indexed_pool.For_tests.all_by_sender pool')

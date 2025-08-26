@@ -1,43 +1,98 @@
-let Prelude = ../External/Prelude.dhall
 let Profiles = ./Profiles.dhall
 
-let Docker: Type  = < Bookworm | Bullseye | Buster | Jammy | Focal >
+let Artifacts = ./Artifacts.dhall
 
-let capitalName = \(docker : Docker) ->
-  merge {
-    Bookworm = "Bookworm"
-    , Bullseye = "Bullseye"
-    , Buster = "Buster"
-    , Jammy = "Jammy"
-    , Focal = "Focal"
-  } docker
+let Network = ./Network.dhall
 
-let lowerName = \(docker : Docker) ->
-  merge {
-    Bookworm = "bookworm"
-    , Bullseye = "bullseye"
-    , Buster = "buster"
-    , Jammy = "jammy"
-    , Focal = "focal"
-  } docker
+let DebianVersions = ./DebianVersions.dhall
 
-let dependsOn = \(docker : Docker) -> \(profile : Profiles.Type) -> \(binary: Text) -> 
-  let profileSuffix = Profiles.toSuffixUppercase profile in
-  let prefix = "MinaArtifact" in 
-  let suffix = "docker-image" in
-  merge {
-    Bookworm = [{ name = "${prefix}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-    , Bullseye = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-    , Buster = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-    , Jammy = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-    , Focal = [{ name = "${prefix}${capitalName docker}${profileSuffix}", key = "${binary}-${lowerName docker}-${suffix}" }]
-  } docker
+let BuildFlags = ./BuildFlags.dhall
 
-in
+let Docker
+    : Type
+    = < Bookworm | Bullseye | Jammy | Focal | Noble >
 
-{
-  Type = Docker
-  , capitalName = capitalName
-  , lowerName = lowerName
-  , dependsOn = dependsOn
-}
+let capitalName =
+          \(docker : Docker)
+      ->  merge
+            { Bookworm = "Bookworm"
+            , Bullseye = "Bullseye"
+            , Jammy = "Jammy"
+            , Focal = "Focal"
+            , Noble = "Noble"
+            }
+            docker
+
+let lowerName =
+          \(docker : Docker)
+      ->  merge
+            { Bookworm = "bookworm"
+            , Bullseye = "bullseye"
+            , Jammy = "jammy"
+            , Focal = "focal"
+            , Noble = "noble"
+            }
+            docker
+
+let DepsSpec =
+      { Type =
+          { codename : Docker
+          , prefix : Text
+          , network : Network.Type
+          , profile : Profiles.Type
+          , artifact : Artifacts.Type
+          , buildFlags : BuildFlags.Type
+          , suffix : Text
+          }
+      , default =
+          { codename = Docker.Bullseye
+          , prefix = "MinaArtifact"
+          , network = Network.Type.Berkeley
+          , profile = Profiles.Type.Devnet
+          , artifact = Artifacts.Type.Daemon
+          , buildFlags = BuildFlags.Type.None
+          , suffix = "docker-image"
+          }
+      }
+
+let dependsOn =
+          \(spec : DepsSpec.Type)
+      ->  let network = "${Network.capitalName spec.network}"
+
+          let profileSuffix = "${Profiles.toSuffixUppercase spec.profile}"
+
+          let key = "${Artifacts.lowerName spec.artifact}-${spec.suffix}"
+
+          let buildFlagSuffix =
+                merge
+                  { None = ""
+                  , Instrumented =
+                      "${BuildFlags.toSuffixUppercase spec.buildFlags}"
+                  }
+                  spec.buildFlags
+
+          in  [ { name =
+                    "${spec.prefix}${capitalName
+                                       spec.codename}${network}${profileSuffix}${buildFlagSuffix}"
+                , key = key
+                }
+              ]
+
+let ofDebian =
+          \(debian : DebianVersions.DebVersion)
+      ->  merge
+            { Bookworm = Docker.Bookworm
+            , Bullseye = Docker.Bullseye
+            , Jammy = Docker.Jammy
+            , Focal = Docker.Focal
+            , Noble = Docker.Noble
+            }
+            debian
+
+in  { Type = Docker
+    , capitalName = capitalName
+    , lowerName = lowerName
+    , ofDebian = ofDebian
+    , dependsOn = dependsOn
+    , DepsSpec = DepsSpec
+    }

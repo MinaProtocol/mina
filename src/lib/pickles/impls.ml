@@ -2,7 +2,7 @@ open Pickles_types
 open Core_kernel
 open Import
 open Backend
-module Wrap_impl = Snarky_backendless.Snark.Run.Make (Tock)
+module Wrap_impl = Kimchi_pasta_snarky_backend.Wrap_impl
 
 (** returns [true] if the [i]th bit of [x] is set to 1 *)
 let test_bit x i = B.(shift_right x i land one = one)
@@ -31,7 +31,7 @@ let forbidden_shifted_values ~modulus:r ~size_in_bits =
   |> List.dedup_and_sort ~compare:B.compare
 
 module Step = struct
-  module Impl = Snarky_backendless.Snark.Run.Make (Tick)
+  module Impl = Kimchi_pasta_snarky_backend.Step_impl
   include Impl
   module Verification_key = Tick.Verification_key
   module Proving_key = Tick.Proving_key
@@ -41,9 +41,9 @@ module Step = struct
 
     let create = Fields.create
 
-    let generate ~prev_challenges cs =
+    let generate ?(lazy_mode = false) ~prev_challenges cs =
       let open Tick.Keypair in
-      let keypair = create ~prev_challenges cs in
+      let keypair = create ~lazy_mode ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
@@ -101,7 +101,7 @@ module Step = struct
       Checked.List.map (Lazy.force forbidden_shifted_values) ~f:(equal t)
       >>= Boolean.any >>| Boolean.not >>= Boolean.Assert.is_true
 
-    let typ : _ Snarky_backendless.Typ.t =
+    let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
@@ -112,12 +112,46 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~proofs_verified ~wrap_rounds =
+  type unfinalized_proof =
+    ( Challenge.Constant.t
+    , Challenge.Constant.t Scalar_challenge.t
+    , Tock.Field.t Shifted_value.Type2.t
+    , ( Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+      , Tock.Rounds.n )
+      Vector.t
+    , Digest.Constant.t
+    , bool )
+    Types.Step.Proof_state.Per_proof.In_circuit.t
+
+  type 'proofs_verified statement =
+    ( (unfinalized_proof, 'proofs_verified) Pickles_types.Vector.t
+    , Import.Types.Digest.Constant.t
+    , (Import.Types.Digest.Constant.t, 'proofs_verified) Pickles_types.Vector.t
+    )
+    Import.Types.Step.Statement.t
+
+  type unfinalized_proof_var =
+    ( Field.t
+    , Field.t Scalar_challenge.t
+    , Other_field.t Shifted_value.Type2.t
+    , ( Field.t Scalar_challenge.t Bulletproof_challenge.t
+      , Tock.Rounds.n )
+      Pickles_types.Vector.t
+    , Field.t
+    , Boolean.var )
+    Types.Step.Proof_state.Per_proof.In_circuit.t
+
+  type 'proofs_verified statement_var =
+    ( (unfinalized_proof_var, 'proofs_verified) Pickles_types.Vector.t
+    , Impl.Field.t
+    , (Impl.Field.t, 'proofs_verified) Pickles_types.Vector.t )
+    Import.Types.Step.Statement.t
+
+  let input ~proofs_verified =
     let open Types.Step.Statement in
-    let spec = spec proofs_verified wrap_rounds in
+    let spec = spec proofs_verified Tock.Rounds.n in
     let (T (typ, f, f_inv)) =
       Spec.packed_typ
-        (module Impl)
         (T
            ( Shifted_value.Type2.typ Other_field.typ_unchecked
            , (fun (Shifted_value.Type2.Shifted_value x as t) ->
@@ -127,11 +161,13 @@ module Step = struct
         spec
     in
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
-    Spec.ETyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+    Spec.Step_etyp.T (typ, (fun x -> of_data (f x)), fun x -> f_inv (to_data x))
+
+  module Async_promise = Async_generic (Promise)
 end
 
 module Wrap = struct
-  module Impl = Wrap_impl
+  module Impl = Kimchi_pasta_snarky_backend.Wrap_impl
   include Impl
   module Challenge = Challenge.Make (Impl)
   module Digest = Digest.Make (Impl)
@@ -145,9 +181,9 @@ module Wrap = struct
 
     let create = Fields.create
 
-    let generate ~prev_challenges cs =
+    let generate ?(lazy_mode = false) ~prev_challenges cs =
       let open Tock.Keypair in
-      let keypair = create ~prev_challenges cs in
+      let keypair = create ~lazy_mode ~prev_challenges cs in
       { pk = pk keypair; vk = vk keypair }
   end
 
@@ -188,7 +224,7 @@ module Wrap = struct
       in
       (typ_unchecked, check)
 
-    let typ : _ Snarky_backendless.Typ.t =
+    let typ : _ Impl.Typ.t =
       let (Typ typ_unchecked) = typ_unchecked in
       Typ { typ_unchecked with check }
 
@@ -219,10 +255,9 @@ module Wrap = struct
     in
     let open Types.Wrap.Statement in
     let (T (typ, f, f_inv)) =
-      Spec.packed_typ
-        (module Impl)
+      Spec.wrap_packed_typ
         (T
-           ( Shifted_value.Type1.typ fp
+           ( Shifted_value.Type1.wrap_typ fp
            , (fun (Shifted_value x as t) ->
                Impl.run_checked (Other_field.check x) ;
                t )
@@ -234,7 +269,7 @@ module Wrap = struct
         ~there:(In_circuit.to_data ~option_map:Option.map)
         ~back:(In_circuit.of_data ~option_map:Option.map)
     in
-    Spec.ETyp.T
+    Spec.Wrap_etyp.T
       ( typ
       , (fun x -> In_circuit.of_data ~option_map:Opt.map (f x))
       , fun x -> f_inv (In_circuit.to_data ~option_map:Opt.map x) )

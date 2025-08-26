@@ -110,6 +110,7 @@ module Cache = struct
     val create :
          name:string
       -> logger:Logger.t
+      -> cache_exceptions:bool
       -> on_add:('elt -> unit)
       -> on_remove:([ `Consumed | `Unconsumed | `Failure ] -> 'elt -> unit)
       -> element_to_string:('elt -> string)
@@ -171,7 +172,7 @@ module Transmuter_cache = struct
 
     type t = target Cache.t
 
-    val create : logger:Logger.t -> t
+    val create : logger:Logger.t -> cache_exceptions:bool -> t
 
     val register_exn : t -> source -> (source, target) Cached.t
 

@@ -1,15 +1,16 @@
 (library
  (name snarky_curves)
  (public_name snarky_curves)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_snarky ppx_jane ppx_compare))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_snarky ppx_jane ppx_compare))
  (libraries
-   ;; opam libraries
-   core_kernel
-   sexplib0
-   bignum.bigint
-   ;; local libraries
-   bitstring_lib
-   snarky.backendless
-   snarky_field_extensions
-))
+  ;; opam libraries
+  core_kernel
+  sexplib0
+  bignum.bigint
+  ;; local libraries
+  bitstring_lib
+  snarky.backendless
+  snarky_field_extensions))

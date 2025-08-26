@@ -164,8 +164,9 @@ let%test_module "Fee payer tests" =
                 }
               in
               let zkapp_command =
-                Transaction_snark.For_tests.deploy_snapp test_spec
-                  ~constraint_constants
+                Async.Thread_safe.block_on_async_exn (fun () ->
+                    Transaction_snark.For_tests.deploy_snapp test_spec
+                      ~constraint_constants )
               in
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view U.genesis_state_body
@@ -177,8 +178,8 @@ let%test_module "Fee payer tests" =
               ( match
                   let mask = Ledger.Mask.create ~depth:U.ledger_depth () in
                   let ledger0 = Ledger.register_mask ledger mask in
-                  Ledger.apply_transactions ledger0 ~constraint_constants
-                    ~global_slot ~txn_state_view
+                  Ledger.apply_transactions ~signature_kind ledger0
+                    ~constraint_constants ~global_slot ~txn_state_view
                     [ Transaction.Command (Zkapp_command zkapp_command) ]
                 with
               | Error _ ->

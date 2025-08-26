@@ -56,7 +56,7 @@ let sgn_cmd_to_txn cmd =
 let gen_amount : (uint64, Account.t) Stateful_gen.t =
   let open Stateful_gen in
   let open Let_syntax in
-  let open Account.Poly in
+  let open Account in
   let%bind balance = getf (fun a -> a.balance) in
   let%bind amt = lift @@ Amount.(gen_incl zero @@ Balance.to_amount balance) in
   let%map () =
@@ -66,7 +66,7 @@ let gen_amount : (uint64, Account.t) Stateful_gen.t =
   Amount.to_uint64 amt
 
 let accounts_map accounts =
-  List.map accounts ~f:Account.Poly.(fun a -> (a.public_key, a))
+  List.map accounts ~f:Account.(fun a -> (a.public_key, a))
   |> Public_key.Compressed.Map.of_alist_exn
 
 let with_accounts ~f ~account_map ~init txns =
@@ -78,7 +78,7 @@ let with_accounts ~f ~account_map ~init txns =
       let%map accum' = f accum a t in
       let accounts' =
         Public_key.Compressed.Map.set accounts ~key:pk
-          ~data:Account.Poly.{ a with nonce = Account_nonce.succ a.nonce }
+          ~data:Account.{ a with nonce = Account_nonce.succ a.nonce }
       in
       (accounts', accum') )
   |> Result.map ~f:snd
@@ -90,7 +90,7 @@ let pool_of_transactions ~init ~account_map txns =
            (Signed_command t) ) )
     ~init
     ~f:(fun p t ->
-      let open Account.Poly in
+      let open Account in
       Indexed_pool.For_tests.assert_pool_consistency p ;
       let a = Public_key.Compressed.Map.find_exn account_map (sender_pk t) in
       Indexed_pool.add_from_gossip_exn p t a.nonce (Balance.to_amount a.balance)
@@ -101,7 +101,7 @@ let pool_of_transactions ~init ~account_map txns =
 let rec gen_txns_from_single_sender_to receiver_public_key =
   let open Stateful_gen in
   let open Let_syntax in
-  let open Account.Poly in
+  let open Account in
   let%bind sender = get in
   if Balance.(sender.balance = zero) then return []
   else

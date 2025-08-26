@@ -4,13 +4,13 @@ open Mina_base
 
 type t =
   { proof_level : Genesis_constants.Proof_level.t
-  ; constraint_constants : Genesis_constants.Constraint_constants.t
   ; verify_blockchain_snarks :
          Blockchain_snark.Blockchain.t list
       -> unit Or_error.t Or_error.t Deferred.t
-  ; verification_key : Pickles.Verification_key.t Lazy.t
+  ; blockchain_verification_key : Pickles.Verification_key.t
+  ; transaction_verification_key : Pickles.Verification_key.t
   ; verify_transaction_snarks :
-         (Ledger_proof.Prod.t * Mina_base.Sok_message.t) list
+         (Ledger_proof.t * Mina_base.Sok_message.t) list
       -> unit Or_error.t Or_error.t Deferred.t
   }
 
@@ -21,39 +21,32 @@ let invalid_to_error = Common.invalid_to_error
 type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
-    ~proof_level ~constraint_constants ~pids:_ ~conf_dir:_ () =
-  let module T = Transaction_snark.Make (struct
-    let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
-  end) in
-  let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
-    let tag = T.tag
-
-    let constraint_constants = constraint_constants
-
-    let proof_level = proof_level
-  end) in
+    ~proof_level ~pids:_ ~conf_dir:_ ~commit_id:_ ~blockchain_verification_key
+    ~transaction_verification_key () =
   let verify_blockchain_snarks chains =
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
-        B.Proof.verify
+        Blockchain_snark.Blockchain_snark_state.verify
+          ~key:blockchain_verification_key
           (List.map chains ~f:(fun snark ->
                ( Blockchain_snark.Blockchain.state snark
                , Blockchain_snark.Blockchain.proof snark ) ) )
         |> Deferred.Or_error.map ~f:Or_error.return
-    | Check | None ->
+    | Check | No_check ->
         Deferred.Or_error.return (Ok ())
   in
   let verify_transaction_snarks ts =
     match proof_level with
     | Full -> (
-        match Or_error.try_with (fun () -> T.verify ts) with
+        match
+          Or_error.try_with (fun () ->
+              Transaction_snark.verify ~key:transaction_verification_key ts )
+        with
         | Ok result ->
             result |> Deferred.map ~f:Or_error.return
         | Error e ->
             failwith (Error.to_string_hum e) )
-    | Check | None ->
+    | Check | No_check ->
         (* Don't check if the proof has default sok, becasue they were probably not
            intended to be checked. If it has some value then check that against the
            message passed.
@@ -75,9 +68,9 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
 
   Deferred.return
     { proof_level
-    ; constraint_constants
     ; verify_blockchain_snarks
-    ; verification_key = B.Proof.verification_key
+    ; blockchain_verification_key
+    ; transaction_verification_key
     ; verify_transaction_snarks
     }
 
@@ -98,72 +91,55 @@ let verify_commands { proof_level; _ }
     | Common.invalid ]
     list
     Deferred.Or_error.t =
+  let valid { With_status.data = cmd; _ } =
+    (* Since we have stripped the transaction from the result, we reconstruct it here.
+       The use of [to_valid_unsafe] is justified because a [`Valid] result for this
+       command means that it has indeed been validated. *)
+    let (`If_this_is_used_it_should_have_a_comment_justifying_it cmd') =
+      User_command.(cmd |> of_verifiable |> to_valid_unsafe)
+    in
+    `Valid cmd'
+  in
   match proof_level with
-  | Check | None ->
-      List.map cs ~f:(fun c ->
-          match Common.check c with
-          | `Valid c ->
-              `Valid c
-          | `Valid_assuming (c, _) ->
-              `Valid c
-          | `Invalid_keys keys ->
-              `Invalid_keys keys
-          | `Invalid_signature keys ->
-              `Invalid_signature keys
-          | `Invalid_proof err ->
-              `Invalid_proof err
-          | `Missing_verification_key keys ->
-              `Missing_verification_key keys
-          | `Unexpected_verification_key keys ->
-              `Unexpected_verification_key keys
-          | `Mismatched_authorization_kind keys ->
-              `Mismatched_authorization_kind keys )
-      |> Deferred.Or_error.return
+  | Check | No_check ->
+      let convert_check_res cmd : _ -> [> invalid | `Valid of _ ] = function
+        | Error (#invalid as invalid) ->
+            invalid
+        | Ok (`Assuming _) ->
+            valid cmd
+      in
+      let f cmd = convert_check_res cmd (Common.check cmd) in
+      List.map cs ~f |> Deferred.Or_error.return
   | Full ->
-      let cs = List.map cs ~f:Common.check in
+      let read_proof (vk, stmt, proof) =
+        (vk, stmt, Proof_cache_tag.read_proof_from_disk proof)
+      in
+      let read_proofs (`Assuming ls) = `Assuming (List.map ~f:read_proof ls) in
+      let results =
+        List.map cs ~f:(Fn.compose (Result.map ~f:read_proofs) Common.check)
+      in
       let to_verify =
-        List.concat_map cs ~f:(function
-          | `Valid _ ->
-              []
-          | `Valid_assuming (_, xs) ->
-              xs
-          | `Invalid_keys _
-          | `Invalid_signature _
-          | `Invalid_proof _
-          | `Missing_verification_key _
-          | `Unexpected_verification_key _
-          | `Mismatched_authorization_kind _ ->
-              [] )
+        List.concat_map
+          ~f:(function Ok (`Assuming xs) -> xs | Error _ -> [])
+          results
       in
       let%map all_verified =
         Pickles.Side_loaded.verify ~typ:Zkapp_statement.typ to_verify
       in
-      Ok
-        (List.map cs ~f:(function
-          | `Valid c ->
-              `Valid c
-          | `Valid_assuming (c, xs) ->
-              if Or_error.is_ok all_verified then `Valid c
-              else `Valid_assuming xs
-          | `Invalid_keys keys ->
-              `Invalid_keys keys
-          | `Invalid_signature keys ->
-              `Invalid_signature keys
-          | `Invalid_proof err ->
-              `Invalid_proof err
-          | `Missing_verification_key keys ->
-              `Missing_verification_key keys
-          | `Unexpected_verification_key keys ->
-              `Unexpected_verification_key keys
-          | `Mismatched_authorization_kind keys ->
-              `Mismatched_authorization_kind keys ) )
+      let f cmd : _ -> [ invalid | `Valid of _ | `Valid_assuming of _ ] =
+        function
+        | Error (#invalid as invalid) ->
+            invalid
+        | Ok (`Assuming []) ->
+            valid cmd
+        | Ok (`Assuming xs) ->
+            if Or_error.is_ok all_verified then valid cmd
+            else `Valid_assuming xs
+      in
+      Ok (List.map2_exn cs results ~f)
 
 let verify_transaction_snarks { verify_transaction_snarks; _ } ts =
   verify_transaction_snarks ts
-
-let get_blockchain_verification_key { verification_key; _ } =
-  Deferred.Or_error.try_with ~here:[%here] (fun () ->
-      Deferred.return @@ Lazy.force verification_key )
 
 let toggle_internal_tracing _ _ = Deferred.Or_error.ok_unit
 

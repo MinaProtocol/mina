@@ -33,10 +33,12 @@ end
 module R1CS_constraint_system =
   Kimchi_pasta_constraint_system.Vesta_constraint_system
 
+module Constraint = R1CS_constraint_system.Constraint
+
 let lagrange srs domain_log2 : _ Kimchi_types.poly_comm array =
   let domain_size = Int.pow 2 domain_log2 in
-  Array.init domain_size ~f:(fun i ->
-      Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitment srs domain_size i )
+  Kimchi_bindings.Protocol.SRS.Fp.lagrange_commitments_whole_domain srs
+    domain_size
 
 let with_lagrange f (vk : Verification_key.t) =
   f (lagrange vk.srs vk.domain.log_size_of_group) vk
@@ -176,3 +178,7 @@ module Oracles = Plonk_dlog_oracles.Make (struct
     let create_with_public_evals = with_lagrange create_with_public_evals
   end
 end)
+
+module Cvar = Kimchi_pasta_snarky_backend.Vesta_based_plonk.Cvar
+
+module Run_state = Kimchi_pasta_snarky_backend.Vesta_based_plonk.Run_state

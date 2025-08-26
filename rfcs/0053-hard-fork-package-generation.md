@@ -68,7 +68,7 @@ The hard fork package will be generated in a buildkite pipeline. The buildkite p
 
 Here is a diagram of the various buildkite jobs required to generate the hard fork package:
 
-![](res/hard-fork-package-generation-buildkite-pipeline.dot.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/hard-fork-package-generation-buildkite-pipeline.dot.png)
 
 The `build_daemon` job will build the daemon with the correct compile time configuration for mainnet (`mainnet.mlh`). The hard fork specific configuration will be provided via a static runtime configuration that is bundled with the hard fork release.
 

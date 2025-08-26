@@ -3,20 +3,21 @@ open Core
 (* number of operations to do when performing benchmarks *)
 let bench_count = 10_000
 
+type config =
+  { constraint_constants : Genesis_constants.Constraint_constants.t
+  ; genesis_constants : Genesis_constants.t
+  }
+
 module Const = struct
-  let k = 290
-
-  let ledger_depth = 30
-
   let scan_state_depth = 7
 
   let scan_state_delay = 2
 
   (* 2*k for best tip path (including root history), k for duplicate block producers *)
-  let est_blocks_in_frontier = 3 * k
+  let est_blocks_in_frontier ~config = 3 * config.genesis_constants.protocol.k
 
   (* k for best tip boath (excluding root history), k for duplicate block producers *)
-  let est_scan_states = 2 * k
+  let est_scan_states ~config = 2 * config.genesis_constants.protocol.k
 
   let max_accounts_modified_per_signed_command = 2
 end
@@ -44,8 +45,18 @@ module Params = struct
       * max_signed_commands_per_block
 end
 
+(* Sample data used for computing RAM usage *)
+module type Sample = sig
+  val generated_zkapps : Mina_base.Zkapp_command.t list
+
+  val vk :
+    ( Mina_base.Side_loaded_verification_key.t
+    , Snark_params.Tick.Field.t )
+    With_hash.t
+end
+
 (* dummy values used for computing RAM usage benchmarking *)
-module Values = struct
+module Values (S : Sample) = struct
   let bin_copy (type a) ~(bin_class : a Bin_prot.Type_class.t) (x : a) =
     let size = bin_class.writer.size x in
     let buf = Bigstring.create size in
@@ -171,37 +182,19 @@ module Values = struct
     Signature_lib.Public_key.compress (keypair ()).public_key
 
   let verification_key : unit -> Mina_base.Verification_key_wire.t =
-    let vk =
-      let `VK vk, `Prover _ =
-        Transaction_snark.For_tests.create_trivial_snapp
-          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-          ()
-      in
-      vk
-    in
-    fun () ->
-      bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t vk
+   fun () ->
+    bin_copy ~bin_class:Mina_base.Verification_key_wire.Stable.Latest.bin_t S.vk
 
-  let side_loaded_proof : unit -> Pickles.Side_loaded.Proof.t =
-    let proof =
-      let num_updates = 1 in
-      let _ledger, zkapp_commands =
-        Snark_profiler_lib.create_ledger_and_zkapps ~min_num_updates:num_updates
-          ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
-      in
-      let cmd = List.hd_exn zkapp_commands in
-      let update =
-        List.nth_exn (Mina_base.Zkapp_command.all_account_updates_list cmd) 1
-      in
-      match update.authorization with
-      | Proof proof ->
-          proof
-      | _ ->
-          failwith "woops"
+  let side_loaded_proof : Proof_cache_tag.t =
+    let cmd = List.hd_exn S.generated_zkapps in
+    let update =
+      List.nth_exn (Mina_base.Zkapp_command.all_account_updates_list cmd) 1
     in
-    fun () ->
-      bin_copy ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
-        (Pickles.Side_loaded.Proof.of_proof proof)
+    match update.authorization with
+    | Proof proof ->
+        proof
+    | _ ->
+        failwith "woops"
 
   let ledger_proof () : Ledger_proof.t =
     bin_copy ~bin_class:Ledger_proof.Stable.Latest.bin_t
@@ -261,28 +254,29 @@ module Values = struct
           }
     }
 
-  let ledger_mask ?(n = Params.max_accounts_modified_per_block) () :
+  let ledger_mask ?(n = Params.max_accounts_modified_per_block) ~config () :
       Mina_ledger.Ledger.t =
     let ledger =
-      Mina_ledger.Ledger.create_ephemeral ~depth:Const.ledger_depth ()
+      Mina_ledger.Ledger.create_ephemeral
+        ~depth:config.constraint_constants.ledger_depth ()
     in
     List.init n ~f:Fn.id
     |> List.iter ~f:(fun i ->
            Mina_ledger.Ledger.set_at_index_exn ledger i (account ()) ) ;
     ledger
 
-  let ledger_witness n : Mina_ledger.Sparse_ledger.t =
+  let ledger_witness ~config n : Mina_ledger.Sparse_ledger.t =
     let ledger_mask = ledger_mask ~n () in
     let ids = ref [] in
-    Mina_ledger.Ledger.iteri ledger_mask ~f:(fun _ acc ->
+    Mina_ledger.Ledger.iteri (ledger_mask ~config) ~f:(fun _ acc ->
         ids := Mina_base.Account.identifier acc :: !ids ) ;
-    Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger_mask !ids
+    Mina_ledger.Sparse_ledger.of_ledger_subset_exn (ledger_mask ~config) !ids
 
-  let zkapp_command_witness () : Mina_ledger.Sparse_ledger.t =
-    ledger_witness Params.max_accounts_modified_per_zkapp_command
+  let zkapp_command_witness ~config () : Mina_ledger.Sparse_ledger.t =
+    ledger_witness ~config Params.max_accounts_modified_per_zkapp_command
 
-  let signed_command_witness () : Mina_ledger.Sparse_ledger.t =
-    ledger_witness Const.max_accounts_modified_per_signed_command
+  let signed_command_witness ~config () : Mina_ledger.Sparse_ledger.t =
+    ledger_witness ~config Const.max_accounts_modified_per_signed_command
 
   let signed_command' () : Mina_base.Signed_command.t =
     { payload =
@@ -303,8 +297,9 @@ module Values = struct
     Mina_base.User_command.Signed_command (signed_command' ())
 
   let zkapp_account_update () : Mina_base.Account_update.t =
-    { body =
-        { public_key = public_key ()
+    Mina_base.Account_update.with_aux
+      ~body:
+        { Mina_base.Account_update.Body.public_key = public_key ()
         ; token_id = token_id ()
         ; update =
             { app_state =
@@ -331,23 +326,23 @@ module Values = struct
         ; may_use_token = No
         ; authorization_kind = Proof (field ())
         }
-    ; authorization = Proof (side_loaded_proof ())
-    }
+      ~authorization:(Mina_base.Control.Poly.Proof side_loaded_proof)
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer =
-        { body =
+        Mina_base.Account_update.Fee_payer.make
+          ~body:
             { public_key = public_key ()
             ; fee = fee ()
             ; valid_until = Some (global_slot_since_genesis ())
             ; nonce = account_nonce ()
             }
-        ; authorization = (field (), private_key ())
-        }
+          ~authorization:(field (), private_key ())
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())
         |> List.fold_left ~init:[] ~f:(fun acc () ->
-               Mina_base.Zkapp_command.Call_forest.cons
+               Mina_base.Zkapp_command.Call_forest.cons ~signature_kind
                  (zkapp_account_update ()) acc )
     ; memo = signed_command_memo ()
     }
@@ -399,7 +394,7 @@ module Values = struct
     ; block_global_slot = global_slot_since_genesis ()
     }
 
-  let zkapp_command_base_work () :
+  let zkapp_command_base_work ~config () :
       Transaction_snark_scan_state.Transaction_with_witness.t =
     base_work
       (fun () ->
@@ -415,9 +410,9 @@ module Values = struct
                  (* the worst case is that no new accounts are created and they are all cached, so we leave this empty *)
              ; new_accounts = []
              } ) )
-      zkapp_command_witness
+      (zkapp_command_witness ~config)
 
-  let signed_command_base_work () :
+  let signed_command_base_work ~config () :
       Transaction_snark_scan_state.Transaction_with_witness.t =
     base_work
       (fun () ->
@@ -433,23 +428,38 @@ module Values = struct
                        [ Mina_base.Account.identifier (account ()) ]
                    }
              } ) )
-      signed_command_witness
+      (signed_command_witness ~config)
 
   let sok_message () : Mina_base.Sok_message.t =
     Mina_base.Sok_message.create ~fee:(fee ()) ~prover:(public_key ())
 
-  let merge_work () :
-      Transaction_snark_scan_state.Ledger_proof_with_sok_message.t =
-    (ledger_proof (), sok_message ())
+  let merge_work () = (ledger_proof (), sok_message ())
 end
 
-module Sizes = struct
+type size_params =
+  { side_loaded_proof : int
+  ; ledger_proof : int
+  ; one_priced_proof : int
+  ; two_priced_proof : int
+  ; signed_command : int
+  ; zkapp_command : int
+  ; ledger_mask : int
+  ; zkapp_command_base_work : int
+  ; signed_command_base_work : int
+  ; merge_work : int
+  }
+[@@deriving sexp]
+
+module Sizes (S : Sample) = struct
+  module Values = Values (S)
+
   let count (type a) (x : a) =
     Obj.(reachable_words @@ repr x) * (Sys.word_size / 8)
 
   let verification_key = count @@ Values.verification_key ()
 
-  let side_loaded_proof = count @@ Values.side_loaded_proof ()
+  let side_loaded_proof =
+    count @@ Proof_cache_tag.read_proof_from_disk Values.side_loaded_proof
 
   let ledger_proof = count @@ Values.ledger_proof ()
 
@@ -468,20 +478,6 @@ module Sizes = struct
   let signed_command_base_work = count @@ Values.signed_command_base_work ()
 
   let merge_work = count @@ Values.merge_work ()
-
-  type size_params =
-    { side_loaded_proof : int
-    ; ledger_proof : int
-    ; one_priced_proof : int
-    ; two_priced_proof : int
-    ; signed_command : int
-    ; zkapp_command : int
-    ; ledger_mask : int
-    ; zkapp_command_base_work : int
-    ; signed_command_base_work : int
-    ; merge_work : int
-    }
-  [@@deriving sexp]
 
   let pre_fix =
     { side_loaded_proof
@@ -616,17 +612,9 @@ let serial_bench (type a) ~(name : string)
   ; hash = Timer.average hash_timer
   }
 
-let compute_ram_usage (sizes : Sizes.size_params) =
+let compute_ram_usage ~config (sizes : size_params) =
   let format_gb size = Int.to_float size /. (1024.0 **. 3.0) in
-  (*
-  let format_kb size = (Int.to_float size /. 1024.0) in
-  Printf.printf "verification key = %fKB, side_loaded_proof = %fKB, account update = %fKB\n, command = %fKB, %d\n"
-    (format_kb Sizes.verification_key)
-    (format_kb Sizes.side_loaded_proof)
-    (format_kb Sizes.zkapp_account_update)
-    (format_kb Sizes.zkapp_command)
-    Params.max_zkapp_txn_account_updates ;
-  *)
+
   (* this baseline measurement was taken from a fresh daemon, and serves to show the general overhead a daemon has before bootstrapping *)
   let baseline =
     let prover = Int.of_float (1.04 *. 1024.0 *. 1024.0 *. 1024.0) in
@@ -653,7 +641,7 @@ let compute_ram_usage (sizes : Sizes.size_params) =
         * (sizes.merge_work - sizes.ledger_proof)
       in
       (* the deltas apply for all but the root scan state *)
-      (Const.est_scan_states - 1) * (base + merge)
+      (Const.est_scan_states ~config - 1) * (base + merge)
     in
     (* for the root, we cannot subtract out shared references, since the data in the root can be from bootstrap *)
     (* after k blocks, some references can be shared from root history, but not necessarily all *)
@@ -670,7 +658,7 @@ let compute_ram_usage (sizes : Sizes.size_params) =
     in
     root + deltas
   in
-  let ledger_masks = Const.k * sizes.ledger_mask in
+  let ledger_masks = config.genesis_constants.protocol.k * sizes.ledger_mask in
   let staged_ledger_diffs =
     (* TODO: coinbases, fee transfers *)
     let zkapp_commands_size_per_block =
@@ -679,13 +667,13 @@ let compute_ram_usage (sizes : Sizes.size_params) =
     let signed_commands_size_per_block =
       Params.max_signed_commands_per_block * sizes.signed_command
     in
-    Const.est_blocks_in_frontier
+    Const.est_blocks_in_frontier ~config
     * (zkapp_commands_size_per_block + signed_commands_size_per_block)
   in
   let snark_pool =
     Printf.printf "snark pool references = %d\n"
       ( (128 * (Const.scan_state_delay + 1))
-      + (128 * (Const.est_scan_states - 1)) ) ;
+      + (128 * (Const.est_scan_states ~config - 1)) ) ;
     (* NB: the scan state is split up into (depth+1)+(delay+1) trees, but with different layers
        being built across each tree, they squash down into (delay+1) full trees of work referenced *)
     (* the size of works referenced per a squashed tree; 127 bundles of 2 proofs, 1 bundle of 1
@@ -699,7 +687,8 @@ let compute_ram_usage (sizes : Sizes.size_params) =
     in
     (* the size of delta references added by each full block in the frontier after the root *)
     let delta_referenced_size = referenced_size_per_squashed_tree in
-    root_referenced_size + ((Const.est_scan_states - 1) * delta_referenced_size)
+    root_referenced_size
+    + ((Const.est_scan_states ~config - 1) * delta_referenced_size)
   in
   (* TODO: measure the actuall network pool memory footprint instead of estimating *)
   let transaction_pool = Params.max_txn_pool_size * sizes.zkapp_command in
@@ -720,18 +709,53 @@ let compute_ram_usage (sizes : Sizes.size_params) =
   Printf.printf "TOTAL: %fGB\n" (format_gb total_size)
 
 let () =
+  Async.Thread_safe.block_on_async_exn
+  @@ fun () ->
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let config = { constraint_constants; genesis_constants } in
+  let%bind.Async_kernel.Deferred _, generated_zkapps =
+    let num_updates = 1 in
+    Snark_profiler_lib.create_ledger_and_zkapps
+      ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
+      ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
+      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+  in
+  let%map.Async_kernel.Deferred vk =
+    let `VK vk, `Prover _ =
+      Transaction_snark.For_tests.create_trivial_snapp ()
+    in
+    vk
+  in
+  let module Sizes = Sizes (struct
+    let generated_zkapps = generated_zkapps
+
+    let vk = vk
+  end) in
+  let format_kb size = Int.to_float size /. 1024.0 in
+
+  Printf.printf
+    "verification key = %fKB, side_loaded_proof = %fKB, command = %fKB, %d\n"
+    (format_kb Sizes.verification_key)
+    (format_kb Sizes.side_loaded_proof)
+    (format_kb Sizes.zkapp_command)
+    Params.max_zkapp_txn_account_updates ;
+
+  let module Values = Sizes.Values in
   print_header "PRE FIX SIZES" ;
-  Printf.printf !"%{sexp: Sizes.size_params}\n" Sizes.pre_fix ;
-  compute_ram_usage Sizes.pre_fix ;
+  Printf.printf !"%{sexp: size_params}\n" Sizes.pre_fix ;
+  compute_ram_usage ~config Sizes.pre_fix ;
   Printf.printf "\n" ;
   print_header "POST FIX SIZES" ;
-  Printf.printf !"%{sexp: Sizes.size_params}\n" Sizes.post_fix ;
-  compute_ram_usage Sizes.post_fix ;
+  Printf.printf !"%{sexp: size_params}\n" Sizes.post_fix ;
+  compute_ram_usage ~config Sizes.post_fix ;
   Printf.printf "\n" ;
   let side_loaded_proof_serial_times =
     serial_bench ~name:"Pickles.Side_loaded.Proof.t"
       ~bin_class:Pickles.Side_loaded.Proof.Stable.Latest.bin_t
-      ~gen:(Quickcheck.Generator.return (Values.side_loaded_proof ()))
+      ~gen:
+        ( Quickcheck.Generator.return
+        @@ Proof_cache_tag.read_proof_from_disk Values.side_loaded_proof )
       ~equal:Pickles.Side_loaded.Proof.equal ()
   in
   Printf.printf "\n" ;

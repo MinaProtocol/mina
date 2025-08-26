@@ -1,3 +1,9 @@
+(*
+  Mina_run provides the runtime layer for the Mina daemon, building on 
+  Mina_lib’s core protocol logic. It manages GraphQL APIs, node status 
+  reporting, crash/shutdown handling, and configuration setup, acting as the 
+  control panel connecting Mina_lib to CLI tools and external services. *)
+
 open Core
 open Async
 module Graphql_cohttp_async =
@@ -69,7 +75,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
           validate_cli_protocol_version protocol_version ;
           write_protocol_version protocol_version ;
           [%log info]
-            "Overwriting Coda config proposed protocol version \
+            "Overwriting Mina config proposed protocol version \
              $config_proposed_protocol_version with proposed protocol version \
              $protocol_version from the command line"
             ~metadata:
@@ -101,7 +107,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   match !coda_ref with
   | None ->
       [%log warn]
-        "Shutdown before Coda instance was created, not saving a visualization"
+        "Shutdown before Mina instance was created, not saving a visualization"
   | Some t -> (
       (*Transition frontier visualization*)
       match Mina_lib.visualize_frontier ~filename:frontier_file t with
@@ -133,7 +139,7 @@ let summary exn_json =
 let coda_status coda_ref =
   Option.value_map coda_ref
     ~default:
-      (Deferred.return (`String "Shutdown before Coda instance was created"))
+      (Deferred.return (`String "Shutdown before Mina instance was created"))
     ~f:(fun t ->
       Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
@@ -212,6 +218,8 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
+  let compile_config = (Mina_lib.config mina).compile_config in
+  let itn_features = (Mina_lib.config mina).itn_features in
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -304,10 +312,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           | Ok ledger -> (
               match ledger with
               | Genesis_epoch_ledger l ->
-                  let%map accts = Mina_ledger.Ledger.to_list l in
+                  let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+                  let%map accts = Mina_ledger.Ledger.to_list l_inner in
                   Ok accts
-              | Ledger_db db ->
-                  let%map accts = Mina_ledger.Ledger.Db.to_list db in
+              | Ledger_root l ->
+                  let casted = Mina_ledger.Ledger.Root.as_unmasked l in
+                  let%map accts =
+                    Mina_ledger.Ledger.Any_ledger.M.to_list casted
+                  in
                   Ok accts )
           | Error err ->
               return (Error err) )
@@ -324,9 +336,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
           Mina_tracing.stop () ; Deferred.unit )
     ; implement Daemon_rpcs.Start_internal_tracing.rpc (fun () () ->
-          Internal_tracing.toggle ~logger `Enabled )
+          Internal_tracing.toggle ~commit_id:Mina_version.commit_id ~logger
+            `Enabled )
     ; implement Daemon_rpcs.Stop_internal_tracing.rpc (fun () () ->
-          Internal_tracing.toggle ~logger `Disabled )
+          Internal_tracing.toggle ~commit_id:Mina_version.commit_id ~logger
+            `Disabled )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
           return (Mina_lib.visualize_frontier ~filename mina) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
@@ -351,7 +365,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
     ; implement Daemon_rpcs.Get_node_status.rpc (fun () peers ->
-          Node_status.get_node_status_from_peers (Mina_lib.net mina) peers )
+          Mina_networking.get_node_status_from_peers (Mina_lib.net mina) peers )
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
@@ -364,11 +378,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics (work : Snark_worker.Work.Result.t) =
+  let log_snark_work_metrics
+      (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
     Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
     One_or_two.iter
       (One_or_two.zip_exn work.metrics
-         (Snark_worker.Work.Result.transactions work) )
+         (Snark_work_lib.Selector.Result.Stable.Latest.transactions work) )
       ~f:(fun ((total, tag), transaction_opt) ->
         ( match tag with
         | `Merge ->
@@ -400,7 +415,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                           Mina_base.Control.(
                             Tag.equal Proof
                               (tag
-                                 (Mina_base.Account_update.authorization party) ))
+                                 (Mina_base.Account_update.Poly.authorization
+                                    party ) ))
                         then proof_parties_count + 1
                         else proof_parties_count ) )
                 in
@@ -431,17 +447,30 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 (Mina_lib.snark_coordinator_key mina)
                 ~f:Fn.const
             in
-            let%map r = Mina_lib.request_work mina in
+            let%map work = Mina_lib.request_work mina in
+            let work =
+              Snark_work_lib.Work.Spec.map work
+                ~f:
+                  (Snark_work_lib.Work.Single.Spec.map
+                     ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                     ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+            in
             [%log trace]
-              ~metadata:[ ("work_spec", Snark_worker.Work.Spec.to_yojson r) ]
+              ~metadata:
+                [ ( "work_spec"
+                  , Snark_work_lib.Selector.Spec.Stable.Latest.to_yojson work )
+                ]
               "responding to a Get_work request with some new work" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-            (r, key)) )
+            (work, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
-        (fun () (work : Snark_worker.Work.Result.t) ->
+        (fun () (work : Snark_work_lib.Selector.Result.Stable.Latest.t) ->
           [%log trace] "received completed work from a snark worker"
             ~metadata:
-              [ ("work_spec", Snark_worker.Work.Spec.to_yojson work.spec) ] ;
+              [ ( "work_spec"
+                , Snark_work_lib.Selector.Spec.Stable.Latest.to_yojson work.spec
+                )
+              ] ;
           log_snark_work_metrics work ;
           Deferred.return @@ Mina_lib.add_work mina work )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
@@ -449,11 +478,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           ()
           ((error, _work_spec, _prover_public_key) :
             Error.t
-            * Snark_worker.Work.Spec.t
+            * Snark_work_lib.Selector.Spec.Stable.Latest.t
             * Signature_lib.Public_key.Compressed.t )
         ->
           [%str_log error]
-            (Snark_worker.Generating_snark_work_failed
+            (Snark_worker.Events.Generating_snark_work_failed
                { error = Error_json.error_to_yojson error } ) ;
           Mina_metrics.(Counter.inc_one Snark_work.snark_work_failed_rpc) ;
           Deferred.unit )
@@ -549,7 +578,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             ~require_auth:false rest_server_port ) ) ;
-  if Mina_compile_config.itn_features then
+  if itn_features then
     (* Third graphql server with ITN-particular queries exposed *)
     Option.iter itn_graphql_port ~f:(fun rest_server_port ->
         O1trace.background_thread "serve_itn_graphql" (fun () ->
@@ -594,17 +623,17 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Deferred.unit )
              else
                Rpc.Connection.server_with_close
-                 ~handshake_timeout:
-                   (Time.Span.of_sec
-                      Mina_compile_config.rpc_handshake_timeout_sec )
+                 ~handshake_timeout:compile_config.rpc_handshake_timeout
                  ~heartbeat_config:
                    (Rpc.Connection.Heartbeat_config.create
                       ~timeout:
                         (Time_ns.Span.of_sec
-                           Mina_compile_config.rpc_heartbeat_timeout_sec )
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_timeout ) )
                       ~send_every:
                         (Time_ns.Span.of_sec
-                           Mina_compile_config.rpc_heartbeat_send_every_sec )
+                           (Time.Span.to_sec
+                              compile_config.rpc_heartbeat_send_every ) )
                       () )
                  reader writer
                  ~implementations:
@@ -729,7 +758,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
-           | Mina_user_error.Mina_user_error { message; where } ->
+           | Mina_stdlib.Mina_user_error.Mina_user_error { message; where } ->
                Core.print_string "\nFATAL ERROR" ;
                let error =
                  match where with
@@ -761,7 +790,8 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
            | _exn ->
                let error = Error.of_exn ~backtrace:`Get exn in
                let%bind () =
-                 Node_error_service.send_report ~logger:top_logger ~error
+                 Node_error_service.send_report
+                   ~commit_id:Mina_version.commit_id ~logger:top_logger ~error
                in
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref

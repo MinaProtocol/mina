@@ -84,7 +84,7 @@ let max_catchup_chain_length t =
   Hash_set.fold t.tips ~init:0 ~f:(fun acc tip ->
       Int.max acc (missing_length 0 (Hashtbl.find_exn t.nodes tip)) )
 
-let create ~root =
+let create ~logger ~root =
   let root_hash = Breadcrumb.state_hash root in
   let parent = Breadcrumb.parent_hash root in
   let nodes =
@@ -97,7 +97,7 @@ let create ~root =
       State_hash.Table.of_alist_exn
         [ (parent, State_hash.Set.singleton root_hash) ]
   ; nodes
-  ; logger = Logger.create ()
+  ; logger
   }
 
 let check_for_parent t h ~parent:p ~check_has_breadcrumb =
@@ -213,7 +213,7 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
         breadcrumb_added t b
     | E (Root_transitioned { new_root; garbage = Full hs; _ }) ->
         List.iter (Diff.Node_list.to_lite hs) ~f:(remove_node t) ;
-        let h = (Root_data.Limited.hashes new_root).state_hash in
+        let h = (Root_data.Limited.Stable.Latest.hashes new_root).state_hash in
         Hashtbl.change t.nodes h ~f:(function
           | None ->
               [%log' debug t.logger]

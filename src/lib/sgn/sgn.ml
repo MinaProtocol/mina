@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 
@@ -27,8 +25,6 @@ let of_field_exn x =
   if Field.equal x Field.one then Pos
   else if Field.equal x neg_one then Neg
   else failwith "Sgn.of_field: Expected positive or negative 1"
-
-[%%ifdef consensus_mechanism]
 
 type var = Field.Var.t
 
@@ -81,5 +77,3 @@ module Checked = struct
 
   let if_ = Field.Checked.if_
 end
-
-[%%endif]

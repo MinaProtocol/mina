@@ -10,11 +10,12 @@ module T = struct
 
   type t =
     { validated_transition : Mina_block.Validated.t
-    ; staged_ledger : (Staged_ledger.t[@sexp.opaque])
+    ; staged_ledger : Staged_ledger.t
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
+    ; staged_ledger_hash : Staged_ledger_hash.t
     }
-  [@@deriving sexp, fields]
+  [@@deriving fields]
 
   type 'a creator =
        validated_transition:Mina_block.Validated.t
@@ -31,10 +32,22 @@ module T = struct
 
   let create ~validated_transition ~staged_ledger ~just_emitted_a_proof
       ~transition_receipt_time =
+    (* TODO This looks terrible, consider removing this in the hardfork by either
+       removing staged_ledger_hash from the header or computing it consistently
+       for the genesis block *)
+    let staged_ledger_hash =
+      if Mina_block.Validated.is_genesis validated_transition then
+        Staged_ledger.hash staged_ledger
+      else
+        Mina_block.Validated.header validated_transition
+        |> Mina_block.Header.protocol_state |> Protocol_state.blockchain_state
+        |> Blockchain_state.staged_ledger_hash
+    in
     { validated_transition
     ; staged_ledger
     ; just_emitted_a_proof
     ; transition_receipt_time
+    ; staged_ledger_hash
     }
 
   let to_yojson
@@ -42,6 +55,7 @@ module T = struct
       ; staged_ledger = _
       ; just_emitted_a_proof
       ; transition_receipt_time
+      ; staged_ledger_hash = _
       } =
     `Assoc
       [ ( "validated_transition"
@@ -61,9 +75,10 @@ T.
   , staged_ledger
   , just_emitted_a_proof
   , transition_receipt_time
-  , to_yojson )]
+  , to_yojson
+  , staged_ledger_hash )]
 
-include Allocation_functor.Make.Sexp (T)
+include Allocation_functor.Make.Basic (T)
 
 let compute_block_trace_metadata transition_with_validation =
   (* No need to compute anything if internal tracing is disabled, will be dropped anyway *)
@@ -88,8 +103,8 @@ let compute_block_trace_metadata transition_with_validation =
     ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
     ]
 
-let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
-    ~trust_system ~parent
+let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
+    ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~get_completed_work ~sender ~transition_receipt_time () =
   let state_hash =
@@ -111,7 +126,7 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values ~verifier
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header
             |> Mina_block.Header.protocol_state )
-          transition_with_validation
+          ?transaction_pool_proxy transition_with_validation
       with
       | Ok
           ( `Just_emitted_a_proof just_emitted_a_proof
@@ -314,7 +329,7 @@ module For_tests = struct
         in
         let send_amount = Currency.Amount.of_nanomina_int_exn 1_000_000_001 in
         let sender_account_amount =
-          sender_account.Account.Poly.balance |> Currency.Balance.to_amount
+          sender_account.Account.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let sender_pk = Account.public_key sender_account in
@@ -323,7 +338,8 @@ module For_tests = struct
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:(Payment { receiver_pk; amount = send_amount })
         in
-        Signed_command.sign sender_keypair payload )
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
+        Signed_command.sign ~signature_kind sender_keypair payload )
 
   let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier
@@ -357,15 +373,15 @@ module For_tests = struct
         let { Keypair.public_key; _ } = Keypair.create () in
         let prover = Public_key.compress public_key in
         Some
-          Transaction_snark_work.Checked.
-            { fee = Fee.of_nanomina_int_exn 1
-            ; proofs =
-                One_or_two.map stmts ~f:(fun statement ->
-                    Ledger_proof.create ~statement
-                      ~sok_digest:Sok_message.Digest.default
-                      ~proof:(Lazy.force Proof.transaction_dummy) )
-            ; prover
-            }
+          (Transaction_snark_work.Checked.create_unsafe
+             { fee = Fee.of_nanomina_int_exn 1
+             ; proofs =
+                 One_or_two.map stmts ~f:(fun statement ->
+                     Ledger_proof.Cached.create ~statement
+                       ~sok_digest:Sok_message.Digest.default
+                       ~proof:(Lazy.force Proof.For_tests.transaction_dummy_tag) )
+             ; prover
+             } )
       in
       let current_state_view, state_and_body_hash =
         let prev_state =
@@ -398,7 +414,7 @@ module For_tests = struct
       let body =
         Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
       in
-      let%bind ( `Hash_after_applying next_staged_ledger_hash
+      let%bind ( `Hash_after_applying staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
                , `Pending_coinbase_update _ ) =
@@ -426,7 +442,7 @@ module For_tests = struct
       in
       let ledger_proof_statement =
         Option.value_map ledger_proof_opt
-          ~f:(fun (proof, _) -> Ledger_proof.statement proof)
+          ~f:(fun (proof, _) -> Ledger_proof.Cached.statement proof)
           ~default:previous_ledger_proof_stmt
       in
       let genesis_ledger_hash =
@@ -436,8 +452,10 @@ module For_tests = struct
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
-          ~staged_ledger_hash:next_staged_ledger_hash ~genesis_ledger_hash
-          ~body_reference:(Body.compute_reference body)
+          ~staged_ledger_hash ~genesis_ledger_hash
+          ~body_reference:
+            ( Body.compute_reference ~tag:Mina_net2.Bitswap_tag.(to_enum Body)
+            @@ Body.read_all_proofs_from_disk body )
           ~ledger_proof_statement
       in
       let previous_state_hashes =

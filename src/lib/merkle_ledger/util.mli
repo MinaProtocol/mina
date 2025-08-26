@@ -1,3 +1,5 @@
+open Core_kernel
+
 module type Inputs_intf = sig
   module Location : Location_intf.S
 
@@ -57,7 +59,10 @@ module Make (Inputs : Inputs_intf) : sig
     Inputs.Base.t -> (Inputs.Location.t * Inputs.Hash.t) list -> unit
 
   val set_batch :
-    Inputs.Base.t -> (Inputs.Location.t * Inputs.Account.t) list -> unit
+       ?hash_cache:Inputs.Hash.t Inputs.Location.Addr.Map.t
+    -> Inputs.Base.t
+    -> (Inputs.Location.t * Inputs.Account.t) list
+    -> unit
 
   val set_batch_accounts :
     Inputs.Base.t -> (Inputs.Location.Addr.t * Inputs.Account.t) list -> unit

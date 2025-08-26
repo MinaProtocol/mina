@@ -8,17 +8,16 @@ val pad_accumulator :
      list
 
 val hash_messages_for_next_wrap_proof :
-     'n Pickles_types.Nat.t
-  -> ( Backend.Tick.Curve.Affine.t
+     ( Backend.Tick.Curve.Affine.t
      , ( ( Backend.Tock.Field.t
          , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
          Pickles_types.Vector.t
        , 'n )
        Pickles_types.Vector.t )
      Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
-  -> (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.t
+  -> Import.Types.Digest.Constant.t
 
-val pad_proof : ('mlmb, 'a) Proof.t -> Proof.Proofs_verified_max.t
+val pad_proof : 'mlmb Proof.t -> Proof.Proofs_verified_max.t
 
 val pad_challenges :
      ( ( Backend.Tock.Field.t
@@ -58,15 +57,14 @@ module Checked : sig
     lazy_t
 
   val hash_constant_messages_for_next_wrap_proof :
-       'a Pickles_types.Nat.t
-    -> ( Backend.Tick.Curve.Affine.t
+       ( Backend.Tick.Curve.Affine.t
        , ( ( Backend.Tock.Field.t
            , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
            Pickles_types.Vector.t
          , 'a )
          Pickles_types.Vector.t )
        Composition_types.Wrap.Proof_state.Messages_for_next_wrap_proof.t
-    -> (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.t
+    -> Import.Types.Digest.Constant.t
 
   val hash_messages_for_next_wrap_proof :
        'n Pickles_types.Nat.t

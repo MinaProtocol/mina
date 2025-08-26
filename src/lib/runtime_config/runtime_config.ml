@@ -245,7 +245,7 @@ module Json_layout = struct
             ]
 
         let of_permissions (perm : Mina_base.Permissions.t) =
-          { edit_state = Auth_required.of_account_perm perm.edit_action_state
+          { edit_state = Auth_required.of_account_perm perm.edit_state
           ; send = Auth_required.of_account_perm perm.send
           ; receive = Auth_required.of_account_perm perm.receive
           ; set_delegate = Auth_required.of_account_perm perm.set_delegate
@@ -473,6 +473,10 @@ module Json_layout = struct
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
+      ; minimum_user_command_fee : Currency.Fee.t option [@default None]
+      ; network_id : string option [@default None]
+      ; sync_ledger_max_subtree_depth : int option [@default None]
+      ; sync_ledger_default_subtree_depth : int option [@default None]
       }
     [@@deriving yojson, fields]
 
@@ -602,7 +606,7 @@ module Accounts = struct
 
     let default = Json_layout.Accounts.Single.default
 
-    let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
+    let of_account (a : Mina_base.Account.t) : t Or_error.t =
       let open Result.Let_syntax in
       let open Signature_lib in
       return
@@ -636,9 +640,9 @@ module Accounts = struct
         ; permissions = Some (Permissions.of_permissions a.permissions)
         }
 
-    let to_account (a : t) : Mina_base.Account.t =
+    let to_account ?(ignore_missing_fields = false) ?(pad_app_state = false)
+        (a : t) : Mina_base.Account.t =
       let open Signature_lib in
-      let open Mina_base.Account.Poly in
       let timing =
         let open Mina_base.Account_timing.Poly in
         match a.timing with
@@ -659,8 +663,7 @@ module Accounts = struct
               ; vesting_increment
               }
       in
-      let permissions =
-        let perms = Option.value_exn a.permissions in
+      let to_permissions (perms : Permissions.t) =
         Mina_base.Permissions.Poly.
           { edit_state =
               Json_layout.Accounts.Single.Permissions.Auth_required
@@ -704,6 +707,29 @@ module Accounts = struct
               .to_account_perm perms.set_timing
           }
       in
+      let permissions =
+        match (ignore_missing_fields, a.permissions) with
+        | _, Some perms ->
+            to_permissions perms
+        | false, None ->
+            failwithf "no permissions set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.Permissions.user_default
+      in
+      let pad_app_state_do app_state =
+        if pad_app_state then
+          let max = Mina_base.Zkapp_state.max_size_int in
+          let len = List.length app_state in
+          if len > max then
+            failwithf "zkapp app_state length (%d) exceeds max allowed (%d)" len
+              max ()
+          else
+            let zeros =
+              List.init (max - len) ~f:(const Snark_params.Tick.Field.zero)
+            in
+            app_state @ zeros
+        else app_state
+      in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
           , Mina_base.Verification_key_wire.t option
@@ -715,7 +741,9 @@ module Accounts = struct
           Mina_base.Zkapp_account.Poly.t =
         let hash_data = Mina_base.Verification_key_wire.digest_vk in
         Zkapp_account.
-          { app_state = Mina_base.Zkapp_state.V.of_list_exn app.app_state
+          { app_state =
+              Mina_base.Zkapp_state.V.of_list_exn
+              @@ pad_app_state_do app.app_state
           ; verification_key =
               Option.map ~f:With_hash.(of_data ~hash_data) app.verification_key
           ; zkapp_version = app.zkapp_version
@@ -728,20 +756,34 @@ module Accounts = struct
           ; zkapp_uri = app.zkapp_uri
           }
       in
+      let receipt_chain_hash =
+        match (ignore_missing_fields, a.receipt_chain_hash) with
+        | _, Some rch ->
+            Mina_base.Receipt.Chain_hash.of_base58_check_exn rch
+        | false, None ->
+            failwithf "no receipt_chain_hash set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.Receipt.Chain_hash.empty
+      in
+      let voting_for =
+        match (ignore_missing_fields, a.voting_for) with
+        | _, Some voting_for ->
+            Mina_base.State_hash.of_base58_check_exn voting_for
+        | false, None ->
+            failwithf "no voting_for set for account %s" a.pk ()
+        | true, _ ->
+            Mina_base.State_hash.dummy
+      in
       { public_key = Public_key.Compressed.of_base58_check_exn a.pk
       ; token_id =
           Mina_base.Token_id.(Option.value_map ~default ~f:of_string a.token)
       ; token_symbol = Option.value ~default:"" a.token_symbol
       ; balance = a.balance
       ; nonce = a.nonce
-      ; receipt_chain_hash =
-          Mina_base.Receipt.Chain_hash.of_base58_check_exn
-            (Option.value_exn a.receipt_chain_hash)
+      ; receipt_chain_hash
       ; delegate =
           Option.map ~f:Public_key.Compressed.of_base58_check_exn a.delegate
-      ; voting_for =
-          Mina_base.State_hash.of_base58_check_exn
-            (Option.value_exn a.voting_for)
+      ; voting_for
       ; timing
       ; permissions
       ; zkapp = Option.map ~f:mk_zkapp a.zkapp
@@ -750,7 +792,7 @@ module Accounts = struct
     let gen =
       Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
           (* This will never fail with a proper account generator. *)
-          of_account a |> Result.ok_or_failwith )
+          of_account a |> Or_error.ok_exn )
   end
 
   type single = Single.t =
@@ -915,14 +957,14 @@ end
 
 module Proof_keys = struct
   module Level = struct
-    type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
+    type t = Full | Check | No_check [@@deriving bin_io_unversioned, equal]
 
     let to_string = function
       | Full ->
           "full"
       | Check ->
           "check"
-      | None ->
+      | No_check ->
           "none"
 
     let of_string str =
@@ -932,7 +974,7 @@ module Proof_keys = struct
       | "check" ->
           Ok Check
       | "none" ->
-          Ok None
+          Ok No_check
       | _ ->
           Error "Expected one of 'full', 'check', or 'none'"
 
@@ -953,7 +995,7 @@ module Proof_keys = struct
             "Runtime_config.Proof_keys.Level.of_json_layout: Expected the \
              field 'level' to contain a string"
 
-    let gen = Quickcheck.Generator.of_list [ Full; Check; None ]
+    let gen = Quickcheck.Generator.of_list [ Full; Check; No_check ]
   end
 
   module Transaction_capacity = struct
@@ -1220,6 +1262,11 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
+          [@default None]
+    ; network_id : string option [@default None]
+    ; sync_ledger_max_subtree_depth : int option [@default None]
+    ; sync_ledger_default_subtree_depth : int option [@default None]
     }
   [@@deriving bin_io_unversioned]
 
@@ -1259,6 +1306,16 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; minimum_user_command_fee =
+        opt_fallthrough ~default:t1.minimum_user_command_fee
+          t2.minimum_user_command_fee
+    ; network_id = opt_fallthrough ~default:t1.network_id t2.network_id
+    ; sync_ledger_max_subtree_depth =
+        opt_fallthrough ~default:t1.sync_ledger_max_subtree_depth
+          t2.sync_ledger_max_subtree_depth
+    ; sync_ledger_default_subtree_depth =
+        opt_fallthrough ~default:t1.sync_ledger_default_subtree_depth
+          t2.sync_ledger_default_subtree_depth
     }
 
   let gen =
@@ -1270,6 +1327,9 @@ module Daemon = struct
     let%bind zkapp_transaction_cost_limit = Float.gen_incl 0.0 100.0 in
     let%bind max_event_elements = Int.gen_incl 0 100 in
     let%bind zkapp_cmd_limit_hardcap = Int.gen_incl 0 1000 in
+    let%bind minimum_user_command_fee =
+      Currency.Fee.(gen_incl one (of_mina_int_exn 10))
+    in
     let%map max_action_elements = Int.gen_incl 0 1000 in
     { txpool_max_size = Some txpool_max_size
     ; peer_list_url = None
@@ -1282,6 +1342,10 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; minimum_user_command_fee = Some minimum_user_command_fee
+    ; network_id = None
+    ; sync_ledger_max_subtree_depth = None
+    ; sync_ledger_default_subtree_depth = None
     }
 end
 
@@ -1481,7 +1545,7 @@ let gen =
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
-  let open Async.Deferred.Result.Let_syntax in
+  let open Async.Deferred.Or_error.Let_syntax in
   let yield = Async_unix.Scheduler.yield_every ~n:100 |> Staged.unstage in
   let%bind accounts =
     Mina_ledger.Ledger.Any_ledger.M.to_list ledger
@@ -1509,11 +1573,12 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
-let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
-    ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger ~next_epoch_seed =
-  let open Async.Deferred.Result.Let_syntax in
+let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
+    ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
+    ~next_epoch_seed =
+  let open Async.Deferred.Or_error.Let_syntax in
   let global_slot_since_genesis =
-    Mina_numbers.Global_slot_since_hard_fork.to_int global_slot
+    Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in
   let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
   let yield () =
@@ -1578,116 +1643,9 @@ let make_fork_config ~staged_ledger ~global_slot ~state_hash ~blockchain_length
       }
     ~proof:(Proof_keys.make ~fork ()) ()
 
-let slot_tx_end_or_default, slot_chain_end_or_default =
-  let f compile get_runtime t =
-    Option.map ~f:Mina_numbers.Global_slot_since_hard_fork.of_int
-    @@ Option.value_map t.daemon ~default:compile ~f:(fun daemon ->
-           Option.merge compile ~f:(fun _c r -> r) @@ get_runtime daemon )
+let slot_tx_end, slot_chain_end =
+  let f get_runtime t =
+    let open Option.Let_syntax in
+    t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
-  ( f Mina_compile_config.slot_tx_end (fun d -> d.slot_tx_end)
-  , f Mina_compile_config.slot_chain_end (fun d -> d.slot_chain_end) )
-
-module Test_configs = struct
-  let bootstrap =
-    lazy
-      ( (* test_postake_bootstrap *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 6
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "none"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 6
-      , "work_delay": 2
-      , "block_window_duration_ms": 1500
-      , "transaction_capacity": {"2_to_the": 3}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger": { "name": "test", "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-
-  let transactions =
-    lazy
-      ( (* test_postake_txns *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 6
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 6
-      , "work_delay": 2
-      , "block_window_duration_ms": 15000
-      , "transaction_capacity": {"2_to_the": 3}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_split_two_stakers"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-
-  let split_snarkless =
-    lazy
-      ( (* test_postake_split_snarkless *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 24
-      , "delta": 0
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 8
-      , "ledger_depth": 30
-      , "work_delay": 1
-      , "block_window_duration_ms": 10000
-      , "transaction_capacity": {"2_to_the": 2}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_split_two_stakers"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-
-  let delegation =
-    lazy
-      ( (* test_postake_delegation *)
-        {json|
-  { "daemon":
-      { "txpool_max_size": 3000 }
-  , "genesis":
-      { "k": 4
-      , "delta": 0
-      , "slots_per_epoch": 72
-      , "genesis_state_timestamp": "2019-01-30 12:00:00-08:00" }
-  , "proof":
-      { "level": "check"
-      , "sub_windows_per_window": 4
-      , "ledger_depth": 6
-      , "work_delay": 1
-      , "block_window_duration_ms": 5000
-      , "transaction_capacity": {"2_to_the": 2}
-      , "coinbase_amount": "20"
-      , "supercharged_coinbase_factor": 2
-      , "account_creation_fee": "1" }
-  , "ledger":
-      { "name": "test_delegation"
-      , "add_genesis_winner": false } }
-      |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
-end
+  (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))

@@ -15,6 +15,11 @@ let%test_module "account timing check" =
   ( module struct
     open Mina_ledger.Ledger.For_tests
 
+    let signature_kind = Mina_signature_kind.Testnet
+
+    let constraint_constants =
+      Genesis_constants.For_unit_tests.Constraint_constants.t
+
     let account_with_default_vesting_schedule ?(token = Token_id.default)
         ?(initial_minimum_balance = Balance.of_mina_int_exn 10_000)
         ?(cliff_amount = Amount.zero)
@@ -64,8 +69,7 @@ let%test_module "account timing check" =
           Balance.Checked.equal checked_min_balance
             (Balance.var_of_t unchecked_min_balance)
         in
-        Snarky_backendless.As_prover0.read Tick.Boolean.typ
-          equal_balances_checked
+        As_prover.read Tick.Boolean.typ equal_balances_checked
       in
       Or_error.ok_exn @@ Tick.run_and_check equal_balances_computation
 
@@ -295,8 +299,6 @@ let%test_module "account timing check" =
 
     (* user commands with timings *)
 
-    let constraint_constants = Genesis_constants.Constraint_constants.compiled
-
     let keypairss, keypairs =
       (* these tests are based on relative balance/payment amounts, don't need to
          run on multiple keypairs
@@ -324,7 +326,7 @@ let%test_module "account timing check" =
     let check_transaction_snark
         ~(txn_global_slot : Mina_numbers.Global_slot_since_genesis.t)
         (sparse_ledger_before : Mina_ledger.Sparse_ledger.t)
-        (transaction : Mina_transaction.Transaction.t) =
+        (transaction : Mina_transaction.Transaction.t) ~constraint_constants =
       let sok_message =
         Sok_message.create ~fee:Currency.Fee.zero
           ~prover:
@@ -361,7 +363,8 @@ let%test_module "account timing check" =
             stack_with_state
       in
       let supply_increase =
-        Mina_ledger.Ledger.Transaction_applied.supply_increase txn_applied
+        Mina_transaction_logic.Transaction_applied.supply_increase
+          ~constraint_constants txn_applied
         |> Or_error.ok_exn
       in
       Transaction_snark.check_transaction ~constraint_constants ~sok_message
@@ -382,7 +385,7 @@ let%test_module "account timing check" =
         (unstage (Mina_ledger.Sparse_ledger.handler sparse_ledger_before))
 
     let apply_user_commands_at_slot ledger slot ?expected_failure_status
-        ?(expected_rejection = false)
+        ?(expected_rejection = false) ~constraint_constants
         (txns : Mina_transaction.Transaction.t list) =
       ignore
         ( List.map txns ~f:(fun txn ->
@@ -443,13 +446,14 @@ let%test_module "account timing check" =
                             "Transaction expected to be applied successfully \
                              but failed with %s"
                             failures_str () ) ) ;
-                  check_transaction_snark ~txn_global_slot:slot
-                    sparse_ledger_before txn
+                  check_transaction_snark ~signature_kind ~txn_global_slot:slot
+                    sparse_ledger_before txn ~constraint_constants
               | Error err -> (
                   (*transaction snark should fail as well*)
                   try
-                    check_transaction_snark ~txn_global_slot:slot
-                      sparse_ledger_before txn ;
+                    check_transaction_snark ~signature_kind
+                      ~txn_global_slot:slot sparse_ledger_before txn
+                      ~constraint_constants ;
                     failwith
                       "transaction snark successful for a failing transaction"
                   with _exn ->
@@ -495,7 +499,7 @@ let%test_module "account timing check" =
           Quickcheck.Generator.all
           @@ List.map keypairss ~f:(fun (kp1, kp2) ->
                  let%map payment =
-                   Signed_command.Gen.payment ~sign_type:`Real
+                   Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
                      ~key_gen:(return (kp1, kp2))
                      ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
                  in
@@ -514,7 +518,7 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              apply_user_commands_at_slot ledger
+              apply_user_commands_at_slot ledger ~constraint_constants
                 Mina_numbers.Global_slot_since_genesis.(succ zero)
                 user_commands ) )
 
@@ -553,7 +557,7 @@ let%test_module "account timing check" =
         let amount = 100_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -575,7 +579,7 @@ let%test_module "account timing check" =
                 | _ ->
                     failwith "Expected signed user command"
               in
-              apply_user_commands_at_slot ledger
+              apply_user_commands_at_slot ledger ~constraint_constants
                 Mina_numbers.Global_slot_since_genesis.(succ zero)
                 ~expected_rejection:true
                 [ Mina_transaction.Transaction.Command (Signed_command uc) ] ) )
@@ -611,7 +615,7 @@ let%test_module "account timing check" =
         in
         let amount = 100_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -625,7 +629,7 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              apply_user_commands_at_slot ledger
+              apply_user_commands_at_slot ledger ~constraint_constants
                 (Mina_numbers.Global_slot_since_genesis.of_int 9999)
                 ~expected_rejection:true
                 [ Mina_transaction.Transaction.Command
@@ -663,7 +667,7 @@ let%test_module "account timing check" =
         let amount = 100_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -681,7 +685,7 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              apply_user_commands_at_slot ledger
+              apply_user_commands_at_slot ledger ~constraint_constants
                 (Mina_numbers.Global_slot_since_genesis.of_int 10000)
                 [ user_command ] ) )
 
@@ -717,11 +721,12 @@ let%test_module "account timing check" =
         *)
         let amount =
           liquid_bal_100_slots
-          - Fee.to_nanomina_int Currency.Fee.minimum_user_command_fee
+          - Fee.to_nanomina_int
+              Genesis_constants.For_unit_tests.t.minimum_user_command_fee
         in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -741,7 +746,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               (* 100 vesting periods after cliff *)
-              apply_user_commands_at_slot ledger
+              apply_user_commands_at_slot ledger ~constraint_constants
                 (Mina_numbers.Global_slot_since_genesis.of_int 10100)
                 [ user_command ] ) )
 
@@ -770,7 +775,7 @@ let%test_module "account timing check" =
         let amount = 9_000_000_000_000 in
         let%map user_command =
           let%map payment =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
           in
@@ -789,7 +794,7 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              apply_user_commands_at_slot ledger
+              apply_user_commands_at_slot ledger ~constraint_constants
                 Mina_numbers.Global_slot_since_genesis.(of_int 20_000)
                 [ user_command ] ) )
 
@@ -817,7 +822,7 @@ let%test_module "account timing check" =
         in
         let amount = 100_000_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -832,7 +837,7 @@ let%test_module "account timing check" =
               (* slot well past cliff *)
               apply_user_commands_at_slot ledger
                 (Mina_numbers.Global_slot_since_genesis.of_int 200_000)
-                ~expected_rejection:true
+                ~expected_rejection:true ~constraint_constants
                 [ Mina_transaction.Transaction.Command
                     (Signed_command user_command)
                 ] ) )
@@ -861,7 +866,7 @@ let%test_module "account timing check" =
         in
         let amount = 20 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:5 ()
         in
@@ -877,7 +882,7 @@ let%test_module "account timing check" =
               (* slot before cliff, insufficient fund to pay fee *)
               apply_user_commands_at_slot ledger
                 (Mina_numbers.Global_slot_since_genesis.of_int 9_000)
-                ~expected_rejection:true
+                ~expected_rejection:true ~constraint_constants
                 [ Mina_transaction.Transaction.Command
                     (Signed_command user_command)
                 ] ) )
@@ -906,7 +911,7 @@ let%test_module "account timing check" =
         in
         let amount = 10_000_000_000_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -921,7 +926,7 @@ let%test_module "account timing check" =
                 ledger_init_state ;
               apply_user_commands_at_slot ledger
                 (Mina_numbers.Global_slot_since_genesis.of_int 10_000)
-                ~expected_rejection:true
+                ~constraint_constants ~expected_rejection:true
                 [ Mina_transaction.Transaction.Command
                     (Signed_command user_command)
                 ] ) )
@@ -954,7 +959,7 @@ let%test_module "account timing check" =
         in
         let amount = 1_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -970,7 +975,7 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              apply_user_commands_at_slot ledger
+              apply_user_commands_at_slot ledger ~constraint_constants
                 (Mina_numbers.Global_slot_since_genesis.of_int 11_000)
                 [ Mina_transaction.Transaction.Command
                     (Signed_command user_command)
@@ -1004,7 +1009,7 @@ let%test_module "account timing check" =
         in
         let amount = 1_000 in
         let%map user_command =
-          Signed_command.Gen.payment ~sign_type:`Real
+          Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
             ~key_gen:(return @@ List.hd_exn keypairss)
             ~min_amount:amount ~max_amount:amount ~fee_range:0 ()
         in
@@ -1020,7 +1025,7 @@ let%test_module "account timing check" =
             ~depth:constraint_constants.ledger_depth ~f:(fun ledger ->
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
-              apply_user_commands_at_slot ledger
+              apply_user_commands_at_slot ledger ~constraint_constants
                 (Mina_numbers.Global_slot_since_genesis.of_int 11_000)
                 [ Mina_transaction.Transaction.Command
                     (Signed_command user_command)
@@ -1149,7 +1154,7 @@ let%test_module "account timing check" =
                 (i, i)
           in
           let%bind cmd =
-            Signed_command.Gen.payment ~sign_type:`Real
+            Signed_command.Gen.payment ~sign_type:(`Real signature_kind)
               ~key_gen:(return @@ List.hd_exn keypairss)
               ~min_amount ~max_amount ~fee_range:0 ()
           in
@@ -1231,7 +1236,8 @@ let%test_module "account timing check" =
             Option.value ~default:zero @@ Signed_command.amount cmd
           in
           let fee =
-            Currency.Fee.to_uint64 Currency.Fee.minimum_user_command_fee
+            Currency.Fee.to_uint64
+              Genesis_constants.For_unit_tests.t.minimum_user_command_fee
             |> of_uint64
           in
           let total = Option.value ~default:max_int (amount + fee) in
@@ -1425,7 +1431,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1495,7 +1502,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1508,7 +1516,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1576,7 +1584,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1589,7 +1598,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               match
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1670,7 +1679,10 @@ let%test_module "account timing check" =
         , create_timed_account_spec.snapp_update
         , zkapp_keypair )
       in
-      return (ledger_init_state, zkapp_command)
+
+      return
+        ( ledger_init_state
+        , Async.Thread_safe.block_on_async_exn (fun () -> zkapp_command) )
 
     let%test_unit "zkApp command, timed account creation, min_balance > balance"
         =
@@ -1688,7 +1700,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(succ zero)
@@ -1790,7 +1802,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1802,7 +1815,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               match
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 9999)
@@ -1876,7 +1889,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -1952,7 +1966,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2029,7 +2044,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2041,7 +2057,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 10_100)
@@ -2109,7 +2125,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2184,7 +2201,8 @@ let%test_module "account timing check" =
             ; preconditions = None
             }
           in
-          Transaction_snark.For_tests.multiple_transfers zkapp_command_spec
+          Transaction_snark.For_tests.multiple_transfers ~constraint_constants
+            zkapp_command_spec
         in
         return (ledger_init_state, zkapp_command)
       in
@@ -2196,7 +2214,7 @@ let%test_module "account timing check" =
               Mina_ledger.Ledger.apply_initial_ledger_state ledger
                 ledger_init_state ;
               let result =
-                Mina_ledger.Ledger.apply_zkapp_command_unchecked
+                Mina_ledger.Ledger.apply_zkapp_command_unchecked ~signature_kind
                   ~constraint_constants
                   ~global_slot:
                     Mina_numbers.Global_slot_since_genesis.(of_int 110_000)
@@ -2258,7 +2276,9 @@ let%test_module "account timing check" =
       in
       let gen =
         Quickcheck.Generator.return
-          (ledger_init_state, create_timed_account_zkapp_command)
+          ( ledger_init_state
+          , Async.Thread_safe.block_on_async_exn (fun () ->
+                create_timed_account_zkapp_command ) )
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Async.Quickcheck.async_test

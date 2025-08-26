@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Make (Inputs : Intf.Inputs.Intf) : sig
   include
     Intf.Ledger.NULL
@@ -16,8 +18,6 @@ end = struct
 
   type t = { uuid : Uuid.t; depth : int } [@@deriving sexp_of]
 
-  let t_of_sexp _ = failwith "t_of_sexp unimplemented"
-
   type index = int
 
   module Location = Location
@@ -30,7 +30,9 @@ end = struct
   let create ~depth () = { uuid = Uuid_unix.create (); depth }
 
   let empty_hash_at_height =
-    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+    Mina_stdlib.Empty_hashes.extensible_cache
+      (module Hash)
+      ~init_hash:Hash.empty_account
 
   let merkle_path t location =
     let location =
@@ -45,7 +47,7 @@ end = struct
       else
         let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
+        Mina_stdlib.Direction.map dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)
     in
     loop location
@@ -65,7 +67,9 @@ end = struct
       else
         let dir = Location.last_direction (Location.to_path_exn k) in
         let hash = empty_hash_at_height h in
-        Direction.map dir ~left:(`Left (hash, hash)) ~right:(`Right (hash, hash))
+        Mina_stdlib.Direction.map dir
+          ~left:(`Left (hash, hash))
+          ~right:(`Right (hash, hash))
         :: loop (Location.parent k)
     in
     loop location
@@ -93,7 +97,8 @@ end = struct
 
   let get_at_index_exn _t = failwith "get_at_index_exn: null ledgers are empty"
 
-  let set_batch _t = failwith "set_batch: null ledgers cannot be mutated"
+  let set_batch ?hash_cache:_ _t =
+    failwith "set_batch: null ledgers cannot be mutated"
 
   let set _t = failwith "set: null ledgers cannot be mutated"
 
@@ -157,9 +162,6 @@ end = struct
 
   let set_batch_accounts _t =
     failwith "set_batch_accounts: null ledgers cannot be mutated"
-
-  let set_inner_hash_at_addr_exn _t =
-    failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"
 
   let get_inner_hash_at_addr_exn t addr =
     empty_hash_at_height (Addr.height ~ledger_depth:t.depth addr)

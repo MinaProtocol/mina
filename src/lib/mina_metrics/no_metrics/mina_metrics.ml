@@ -264,6 +264,14 @@ module Network = struct
 
   let get_ancestry_rpc_responses_failed : Counter.t = ()
 
+  let get_completed_snarks_rpcs_sent : Counter.t * Gauge.t = ((), ())
+
+  let get_completed_snarks_rpcs_received : Counter.t * Gauge.t = ((), ())
+
+  let get_completed_snarks_rpc_requests_failed : Counter.t = ()
+
+  let get_completed_snarks_rpc_responses_failed : Counter.t = ()
+
   let ban_notify_rpcs_sent : Counter.t * Gauge.t = ((), ())
 
   let ban_notify_rpcs_received : Counter.t * Gauge.t = ((), ())
@@ -323,17 +331,11 @@ end
 
 module Pipe = struct
   module Drop_on_overflow = struct
-    let bootstrap_sync_ledger : Counter.t = ()
-
     let verified_network_pool_diffs : Counter.t = ()
 
     let transition_frontier_valid_transitions : Counter.t = ()
 
     let transition_frontier_primary_transitions : Counter.t = ()
-
-    let router_transition_frontier_controller : Counter.t = ()
-
-    let router_bootstrap_controller : Counter.t = ()
 
     let router_verified_transitions : Counter.t = ()
 
@@ -436,6 +438,8 @@ module Transition_frontier = struct
     let update : float -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   let recently_finalized_staged_txns : Gauge.t = ()
@@ -498,6 +502,8 @@ module Block_latency = struct
     let update : float -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   module Gossip_time = struct
@@ -506,6 +512,8 @@ module Block_latency = struct
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   module Inclusion_time = struct
@@ -514,6 +522,8 @@ module Block_latency = struct
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 
   module Validation_acceptance_time = struct
@@ -522,6 +532,8 @@ module Block_latency = struct
     let update : Time.Span.t -> unit = fun _ -> ()
 
     let clear : unit -> unit = fun _ -> ()
+
+    let initialize = Fn.ignore
   end
 end
 
@@ -571,3 +583,5 @@ module Archive = struct
    fun ?forward_uri:_ ~port:_ ~logger:_ _ ->
     failwith "No metrics server available"
 end
+
+let initialize_all = Fn.ignore

@@ -46,31 +46,6 @@ module Tick0 = struct
   module Snarkable = Make_snarkable (Crypto_params.Tick)
 end
 
-let%test_unit "group-map test" =
-  let params = Crypto_params.Tock.group_map_params () in
-  let module M = Crypto_params.Tick.Run in
-  Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
-      let checked_output =
-        M.run_and_check (fun () ->
-            let x, y =
-              Snarky_group_map.Checked.to_group
-                (module M)
-                ~params (M.Field.constant t)
-            in
-            fun () -> M.As_prover.(read_var x, read_var y) )
-        |> Or_error.ok_exn
-      in
-      let ((x, y) as actual) =
-        Group_map.to_group (module Tick0.Field) ~params t
-      in
-      [%test_eq: Tick0.Field.t]
-        Tick0.Field.(
-          (x * x * x)
-          + (Tick0.Inner_curve.Params.a * x)
-          + Tick0.Inner_curve.Params.b)
-        Tick0.Field.(y * y) ;
-      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output actual )
-
 module Make_inner_curve_scalar (Impl : Snark_intf.S) (Other_impl : Snark_intf.S) =
 struct
   module T = Other_impl.Field
@@ -183,6 +158,10 @@ module Tick = struct
     include Tick0.Field
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
+    let to_yojson = Kimchi_pasta_basic.Fp.to_yojson
+
+    let of_yojson = Kimchi_pasta_basic.Fp.of_yojson
+
     let size_in_triples = Int.((size_in_bits + 2) / 3)
   end
 
@@ -227,7 +206,7 @@ module Tick = struct
 
   module Util = Snark_util.Make (Tick0)
 
-  let m : Run.field Snarky_backendless.Snark.m = (module Run)
+  let m : _ Snarky_backendless.Snark.m = (module Run)
 
   let make_checked c = Run.make_checked c
 end

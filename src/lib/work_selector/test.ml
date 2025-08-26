@@ -10,7 +10,7 @@ struct
   let reassignment_wait = 2000
 
   module Lib = Work_lib.Make (T)
-  module Selection_method = Make_selection_method (T) (Lib)
+  module Selection_method = Make_selection_method (Lib)
 
   let gen_staged_ledger =
     (*Staged_ledger for tests is a list of work specs*)

@@ -2,9 +2,9 @@ open Core_kernel
 open Async
 open Rosetta_lib
 
-let router ~graphql_uri
+let router ~graphql_uri ~minimum_user_command_fee ~account_creation_fee
     ~(pool :
-       ( (Caqti_async.connection, [> Caqti_error.connect ]) Caqti_async.Pool.t
+       ( (Caqti_async.connection, [> Caqti_error.connect ]) Mina_caqti.Pool.t
        , [ `App of Errors.t ] )
        Deferred.Result.t
        lazy_t ) ~logger route body =
@@ -18,7 +18,7 @@ let router ~graphql_uri
   in
   let with_db f =
     let%bind pool = Lazy.force pool in
-    Caqti_async.Pool.use (fun db -> f ~db) pool
+    Mina_caqti.Pool.use (fun db -> f ~db) pool
     |> Deferred.Result.map_error ~f:(function
          | `App e ->
              `App e
@@ -41,19 +41,25 @@ let router ~graphql_uri
     match route with
     | "network" :: tl ->
         Network.router tl body ~get_graphql_uri_or_error ~logger
-          ~with_db:with_db'
+          ~with_db:with_db' ~minimum_user_command_fee
     | "account" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Account.router tl body ~graphql_uri ~logger ~with_db
+          ~minimum_user_command_fee
     | "mempool" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
-        Mempool.router tl body ~graphql_uri ~logger
+        Mempool.router tl body ~graphql_uri ~logger ~minimum_user_command_fee
     | "block" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Block.router tl body ~graphql_uri ~logger ~with_db:with_db'
+          ~minimum_user_command_fee
     | "construction" :: tl ->
         Construction.router tl body ~get_graphql_uri_or_error ~logger
-          ~with_db:with_db'
+          ~with_db:with_db' ~minimum_user_command_fee ~account_creation_fee
+    | "search" :: tl ->
+        let%bind graphql_uri = get_graphql_uri_or_error () in
+        Search.router tl body ~graphql_uri ~logger ~with_db:with_db'
+          ~minimum_user_command_fee
     | _ ->
         Deferred.return (Error `Page_not_found)
   with exn -> Deferred.return (Error (`Exception exn))
@@ -62,7 +68,7 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
   match%bind Lazy.force pool with
   | Ok pool ->
       let get_logs () : (unit, _) Deferred.Result.t =
-        Caqti_async.Pool.use
+        Mina_caqti.Pool.use
           (fun db ->
             let open Deferred.Result.Let_syntax in
             let%bind num_conns = Pg_data.run_connection_count db () in
@@ -99,16 +105,19 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
         ~metadata:[ ("error", `String (Errors.show err)) ] ;
       Deferred.unit
 
-let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
+let server_handler ~pool ~graphql_uri ~logger ~minimum_user_command_fee
+    ~account_creation_fee ~body _sock req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
   let%bind result =
     match Yojson.Safe.from_string body with
     | body ->
-        router route body ~pool ~graphql_uri ~logger
+        router route body ~pool ~graphql_uri ~logger ~minimum_user_command_fee
+          ~account_creation_fee
     | exception Yojson.Json_error "Blank input data" ->
-        router route `Null ~pool ~graphql_uri ~logger
+        router route `Null ~pool ~graphql_uri ~logger ~minimum_user_command_fee
+          ~account_creation_fee
     | exception Yojson.Json_error err ->
         Errors.create ~context:"JSON in request malformed"
           (`Json_parse (Some err))
@@ -144,7 +153,7 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
       [%log warn] ~metadata "Error response: $error" ;
       respond_500 error
 
-let command =
+let command ~minimum_user_command_fee ~account_creation_fee =
   let open Command.Let_syntax in
   let%map_open archive_uri =
     flag "--archive-uri" ~aliases:[ "archive-uri" ]
@@ -187,7 +196,7 @@ let command =
               "MINA_ROSETTA_MAX_DB_POOL_SIZE not set or invalid. Please set \
                this to a number (try 64 or 128)"
         in
-        match Caqti_async.connect_pool ~max_size:max_pool_size archive_uri with
+        match Mina_caqti.connect_pool ~max_size:max_pool_size archive_uri with
         | Error e ->
             [%log error]
               ~metadata:[ ("error", `String (Caqti_error.show e)) ]
@@ -220,7 +229,8 @@ let command =
                     env_var ~metadata ;
                   ignore (exit 1) ) )
         (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
-        (server_handler ~pool ~graphql_uri ~logger)
+        (server_handler ~pool ~graphql_uri ~logger ~minimum_user_command_fee
+           ~account_creation_fee )
     in
     [%log info]
       ~metadata:[ ("port", `Int port) ]

@@ -1,0 +1,22 @@
+(library
+ (name signature_lib_graphql)
+ (public_name graphql_lib.signature_lib)
+ (inline_tests
+  (flags -verbose -show-counts))
+ (libraries
+  ;; opam libraries
+  graphql-async
+  graphql
+  yojson
+  core_kernel
+  core
+  sexplib0
+  ppx_inline_test.config
+  ;; local libraries
+  graphql_basic_scalars
+  signature_lib)
+ (preprocess
+  (pps ppx_jane ppx_version))
+ (instrumentation
+  (backend bisect_ppx))
+ (synopsis "Definitions required for graphql implementation"))

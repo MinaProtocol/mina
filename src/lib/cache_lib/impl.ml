@@ -3,7 +3,7 @@ open Core_kernel
 
 module type Inputs_intf = sig
   val handle_unconsumed_cache_item :
-    logger:Logger.t -> cache_name:string -> unit
+    logger:Logger.t -> cache_exceptions:bool -> cache_name:string -> unit
 end
 
 module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
@@ -12,6 +12,8 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       Intf.Cache.S with type ('t, 'cache_t) cached := ('t, 'cache_t) Cached.t
 
     val logger : _ t -> Logger.t
+
+    val cache_exceptions : _ t -> bool
 
     val remove :
       'elt t -> [ `Consumed | `Unconsumed | `Failure ] -> 'elt -> unit
@@ -23,17 +25,28 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       ; element_to_string : 'a -> string
       ; set : ('a, 'a Intf.final_state) Hashtbl.t
       ; logger : Logger.t
+      ; cache_exceptions : bool
       }
 
     let name { name; _ } = name
 
     let logger { logger; _ } = logger
 
-    let create (type elt) ~name ~logger ~on_add ~on_remove ~element_to_string
-        (module Elt : Hashtbl.Key_plain with type t = elt) : elt t =
+    let cache_exceptions { cache_exceptions; _ } = cache_exceptions
+
+    let create (type elt) ~name ~logger ~cache_exceptions ~on_add ~on_remove
+        ~element_to_string (module Elt : Hashtbl.Key_plain with type t = elt) :
+        elt t =
       let set = Hashtbl.create ~growth_allowed:true ?size:None (module Elt) in
       let logger = Logger.extend logger [ ("cache", `String name) ] in
-      { name; on_add; on_remove; element_to_string; set; logger }
+      { name
+      ; on_add
+      ; on_remove
+      ; element_to_string
+      ; set
+      ; logger
+      ; cache_exceptions
+      }
 
     let final_state t x = Hashtbl.find t.set x
 
@@ -164,6 +177,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
             let cache = cache t in
             Cache.remove cache `Unconsumed (original t) ;
             Inputs.handle_unconsumed_cache_item ~logger:(Cache.logger cache)
+              ~cache_exceptions:(Cache.cache_exceptions cache)
               ~cache_name:(Cache.name cache) ) ) ;
       t
 
@@ -279,7 +293,8 @@ let%test_module "cache_lib test instance" =
     let dropped_cache_items = ref 0
 
     include Make (struct
-      let handle_unconsumed_cache_item ~logger:_ ~cache_name:_ =
+      let handle_unconsumed_cache_item ~logger:_ ~cache_exceptions:_
+          ~cache_name:_ =
         incr dropped_cache_items
     end)
 
@@ -290,8 +305,8 @@ let%test_module "cache_lib test instance" =
       |> String.map ~f:(fun _ -> Char.of_int_exn (Random.bits () land 0xff))
       |> f
 
-    let with_cache ~logger ~f =
-      Cache.create ~name:"test" ~logger ~on_add:ignore
+    let with_cache ~logger ~cache_exceptions ~f =
+      Cache.create ~name:"test" ~logger ~cache_exceptions ~on_add:ignore
         ~on_remove:(fun _ _ -> ())
         ~element_to_string:Fn.id
         (module String)
@@ -301,7 +316,7 @@ let%test_module "cache_lib test instance" =
                    invalidated" =
       setup () ;
       let logger = Logger.null () in
-      with_cache ~logger ~f:(fun cache ->
+      with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
           with_item ~f:(fun data ->
               let x = Cache.register_exn cache data in
               ignore (Cached.invalidate_with_success x : string) ) ;
@@ -312,7 +327,7 @@ let%test_module "cache_lib test instance" =
         =
       setup () ;
       let logger = Logger.null () in
-      with_cache ~logger ~f:(fun cache ->
+      with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
           with_item ~f:(fun data ->
               ignore (Cache.register_exn cache data : (string, string) Cached.t) ) ;
           Gc.full_major () ;
@@ -322,7 +337,7 @@ let%test_module "cache_lib test instance" =
       setup () ;
       let logger = Logger.null () in
       with_item ~f:(fun data ->
-          with_cache ~logger ~f:(fun cache ->
+          with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
               ignore (Cache.register_exn cache data : (string, string) Cached.t) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
@@ -330,7 +345,7 @@ let%test_module "cache_lib test instance" =
     let%test_unit "cached objects are not unexpectedly garbage collected" =
       setup () ;
       let logger = Logger.null () in
-      with_cache ~logger ~f:(fun cache ->
+      with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
           with_item ~f:(fun data ->
               let cached = Cache.register_exn cache data in
               Gc.full_major () ;
@@ -343,7 +358,7 @@ let%test_module "cache_lib test instance" =
                    unconsumption handler for parents" =
       setup () ;
       let logger = Logger.null () in
-      with_cache ~logger ~f:(fun cache ->
+      with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
           with_item ~f:(fun data ->
               ignore
                 ( Cache.register_exn cache data
@@ -357,7 +372,7 @@ let%test_module "cache_lib test instance" =
                    any unconsumption handler calls" =
       setup () ;
       let logger = Logger.null () in
-      with_cache ~logger ~f:(fun cache ->
+      with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
           with_item ~f:(fun data ->
               Cache.register_exn cache data
               |> Cached.transform ~f:(Fn.const 5)
@@ -370,7 +385,7 @@ let%test_module "cache_lib test instance" =
                    derived cached object" =
       setup () ;
       let logger = Logger.null () in
-      with_cache ~logger ~f:(fun cache ->
+      with_cache ~logger ~cache_exceptions:false ~f:(fun cache ->
           with_item ~f:(fun data ->
               let src = Cache.register_exn cache data in
               let _der =
@@ -384,7 +399,8 @@ let%test_module "cache_lib test instance" =
 
     let%test_unit "deriving a cached object inhabits its parent's final_state" =
       setup () ;
-      with_cache ~logger:(Logger.null ()) ~f:(fun cache ->
+      with_cache ~logger:(Logger.null ()) ~cache_exceptions:false
+        ~f:(fun cache ->
           with_item ~f:(fun data ->
               let src = Cache.register_exn cache data in
               let der = Cached.transform src ~f:(Fn.const 5) in

@@ -6,13 +6,24 @@ module Stable : sig
   [@@@no_toplevel_latest_type]
 
   module V2 : sig
-    type t [@@deriving sexp, to_yojson, equal]
+    type t [@@deriving sexp, equal]
+
+    val header : t -> Header.Stable.V2.t
+
+    val body : t -> Staged_ledger_diff.Body.Stable.V1.t
+
+    val transactions :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> t
+      -> Transaction.Stable.V2.t With_status.t list
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, to_yojson, equal]
+type t
 
-type with_hash = t State_hash.With_state_hashes.t [@@deriving sexp]
+val to_logging_yojson : Header.t -> Yojson.Safe.t
+
+type with_hash = t State_hash.With_state_hashes.t
 
 (* TODO: interface for both unchecked and checked construction of blocks *)
 (* check version needs to run following checks:
@@ -35,7 +46,12 @@ val transactions :
   -> t
   -> Transaction.t With_status.t list
 
-val payments : t -> Signed_command.t With_status.t list
-
 val account_ids_accessed :
-  t -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> t
+  -> (Account_id.t * [ `Accessed | `Not_accessed ]) list
+
+val write_all_proofs_to_disk :
+  proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+
+val read_all_proofs_from_disk : t -> Stable.Latest.t

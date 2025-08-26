@@ -2,7 +2,7 @@
 
 ## Typing Conventions
 
-In the context of this document, we will describe query and response types using a psuedo type-system. Tuples of data are in the form `(a, ..., b)`, lists are in the form `[a]`, and polymorphic types are represented as functions returning types. For example, we use the standard polymorphic types `optional :: type -> type` and `result :: type -> type -> type` throughout this document. The `optional` type constructor means that a value can be null, and a `result` type constructor means that there is 1 of 2 possible return types (typically a success type and an error type). For example, `optional int` might be an int or null, where as `result int error` is either an int or an error.
+In the context of this document, we will describe query and response types using a pseudo type-system. Tuples of data are in the form `(a, ..., b)`, lists are in the form `[a]`, and polymorphic types are represented as functions returning types. For example, we use the standard polymorphic types `optional :: type -> type` and `result :: type -> type -> type` throughout this document. The `optional` type constructor means that a value can be null, and a `result` type constructor means that there is 1 of 2 possible return types (typically a success type and an error type). For example, `optional int` might be an int or null, where as `result int error` is either an int or an error.
 
 ### Relevant types
 
@@ -15,7 +15,7 @@ In the context of this document, we will describe query and response types using
 - `protocol_state` == the proven contents of a block (contains `consensus_state`)
 - `block` == an entire block (contains `protocol_state` and the staged ledger diff for that block)
 - `staged_ledger` == the data structure which represents the intermediate (unsnarked) ledger state of the network (large)
-- `pending_coinbase` == a auxilliary hash which identifies some state related to the staged ledger
+- `pending_coinbase` == an auxilliary hash which identifies some state related to the staged ledger
 - `sync_ledger_query` == queries for performing sync ledger protocol (requests for hashes or batches of subtrees of a merkle tree)
 - `sync_ledger_response` == responses for handling sync ledger protocol (responses of hashes or batches of subtrees of a merkle tree)
 - `transaction_pool_diff` == a bundle of multiple transactions to be included into the blockchain
@@ -34,13 +34,13 @@ Broadcasts newly produced blocks throughout the network.
 
 **Data**: `transaction_pool_diff`
 
-Broadcasts transactions from mempools throughout the network. Nodes broadcast locally submitted transactions on an interval for a period of time after creation, as well as rebroadcast externally submitted transactions if they were relevant and could be added to the their mempool.
+Broadcasts transactions from mempools throughout the network. Nodes broadcast locally submitted transactions on an interval for a period of time after creation, as well as rebroadcast externally submitted transactions if they were relevant and could be added to their mempool.
 
 ### snark\_pool\_diffs
 
 **Data**: `snark_pool_diff`
 
-Broadcasts snark work from mempools throughout the network. Snark coordinator's broadcast locally produced snarks on an interval for a period of time after creation, and all nodes rebroadcast externally produced snarks if they were relevant and could be added to the their mempool.
+Broadcasts snark work from mempools throughout the network. Snark coordinator's broadcast locally produced snarks on an interval for a period of time after creation, and all nodes rebroadcast externally produced snarks if they were relevant and could be added to their mempool.
 
 ## RPC Messages
 
@@ -82,7 +82,7 @@ Serves merkle ledger information over a "sync ledger" protocol. The sync ledger 
 
 **Response**: `optional [block]`
 
-Returns a bulk bulk set of blocks associated with a provided set of state hashes. This is used by the catchup routine when it is downloading old blocks to re synchronize with the network over short distances of missing information. At the current moment, the maximum number of blocks that can be requested in a single batch is 20 (requesting more than 20 will result in no response).
+Returns a bulk set of blocks associated with a provided set of state hashes. This is used by the catchup routine when it is downloading old blocks to re synchronize with the network over short distances of missing information. At the current moment, the maximum number of blocks that can be requested in a single batch is 20 (requesting more than 20 will result in no response).
 
 ### get\_transition\_chain\_proof
 
@@ -100,7 +100,7 @@ Returns a transition chain proof for a specified block on the blockchain. A tran
 
 **Response**: `[state_hash]`
 
-Returns the a list of `k` state hashes of blocks from the root of the frontier (point of finality) up to the current best tip (most recent block on the canonical chain).
+Returns the list of `k` state hashes of blocks from the root of the frontier (point of finality) up to the current best tip (most recent block on the canonical chain).
 
 ### get\_ancestry
 
@@ -136,4 +136,4 @@ Returns the best tip block along with the root block of the frontier, and a merk
 
 **Response**: `result node_status error`
 
-This acts as a telemetry RPC which asks a peer to provide invformation about their node status. Daemons do not have to respond to this request, and node operators may pass a command line flag to opt-out of responding to these node status requests.
+This acts as a telemetry RPC which asks a peer to provide information about their node status. Daemons do not have to respond to this request, and node operators may pass a command line flag to opt-out of responding to these node status requests.

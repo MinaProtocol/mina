@@ -18,11 +18,12 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-export MINA_NETWORK=${MINA_NETWORK:=sandbox}
+export MINA_NETWORK=${MINA_NETWORK:=testnet}
 export LOG_LEVEL="${LOG_LEVEL:=Info}"
 
 # Postgres database connection string and related variables
-export POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
+POSTGRES_VERSION=$(psql -V | cut -d " " -f 3 | sed 's/.[[:digit:]]*$//g')
+export POSTGRES_VERSION
 export POSTGRES_USERNAME=${POSTGRES_USERNAME:=pguser}
 export POSTGRES_DBNAME=${POSTGRES_DBNAME:=archive}
 export POSTGRES_DATA_DIR=${POSTGRES_DATA_DIR:=/data/postgresql}
@@ -30,7 +31,7 @@ export PG_CONN=postgres://${POSTGRES_USERNAME}:${POSTGRES_USERNAME}@127.0.0.1:54
 
 # Mina Archive variables
 export MINA_ARCHIVE_PORT=${MINA_ARCHIVE_PORT:=3086}
-export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/etc/mina/rosetta/archive/create_schema.sql}
+export MINA_ARCHIVE_SQL_SCHEMA_PATH=${MINA_ARCHIVE_SQL_SCHEMA_PATH:=/etc/mina/archive/create_schema.sql}
 
 # Mina Rosetta variables
 export MINA_ROSETTA_ONLINE_PORT=${MINA_ROSETTA_ONLINE_PORT:=3087}
@@ -73,8 +74,8 @@ ZKAPP_SENDER_KEY=$MINA_KEYS_PATH/zkapp-sender.key
 ZKAPP_ACCOUNT_KEY=$MINA_KEYS_PATH/zkapp-account.key
 TIME_VESTING_ACCOUNT_1_KEY=$MINA_KEYS_PATH/time-vesting-account-1.key
 TIME_VESTING_ACCOUNT_2_KEY=$MINA_KEYS_PATH/time-vesting-account-2.key
-keys=($BLOCK_PRODUCER_KEY $SNARK_PRODUCER_KEY $ZKAPP_FEE_PAYER_KEY $ZKAPP_SENDER_KEY $ZKAPP_ACCOUNT_KEY $TIME_VESTING_ACCOUNT_1_KEY $TIME_VESTING_ACCOUNT_2_KEY)
-for key in ${keys[*]}; do
+keys=("$BLOCK_PRODUCER_KEY" "$SNARK_PRODUCER_KEY" "$ZKAPP_FEE_PAYER_KEY" "$ZKAPP_SENDER_KEY" "$ZKAPP_ACCOUNT_KEY" "$TIME_VESTING_ACCOUNT_1_KEY" "$TIME_VESTING_ACCOUNT_2_KEY")
+for key in "${keys[@]}"; do
   mina advanced generate-keypair --privkey-path $key
 done
 chmod -R 0700 $MINA_KEYS_PATH
@@ -93,10 +94,10 @@ cat <<EOF >"$MINA_CONFIG_FILE"
 {
   "genesis": { "genesis_state_timestamp": "$CURRENT_TIME" },
   "proof": { "block_window_duration_ms": 20000 },
+  "daemon": { "network_id": "${MINA_NETWORK}" },
   "ledger": {
-    "name": "${MINA_NETWORK}",
     "accounts": [
-      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
+      { "pk": "${BLOCK_PRODUCER_PUB_KEY}", "balance": "600000000", "delegate": null, "sk": null },
       { "pk": "${SNARK_PRODUCER_PK}", "balance": "2000000", "delegate": "${BLOCK_PRODUCER_PUB_KEY}", "sk": null },
       { "pk": "${ZKAPP_FEE_PAYER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
       { "pk": "${ZKAPP_SENDER_PUB_KEY}", "balance": "1000000", "delegate": null, "sk": null },
@@ -145,15 +146,15 @@ mina accounts import --privkey-path ${SNARK_PRODUCER_KEY} --config-directory $MI
 echo "========================= INITIALIZING POSTGRESQL ==========================="
 pg_ctlcluster ${POSTGRES_VERSION} main start
 pg_dropcluster --stop ${POSTGRES_VERSION} main
-pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/postgresql.conf ${POSTGRES_VERSION} main
+pg_createcluster --start -d ${POSTGRES_DATA_DIR} --createclusterconf /etc/mina/rosetta/scripts/postgresql.conf ${POSTGRES_VERSION} main
 sudo -u postgres psql --command "CREATE USER ${POSTGRES_USERNAME} WITH SUPERUSER PASSWORD '${POSTGRES_USERNAME}';"
 sudo -u postgres createdb -O ${POSTGRES_USERNAME} ${POSTGRES_DBNAME}
 psql -f "${MINA_ARCHIVE_SQL_SCHEMA_PATH}" "${PG_CONN}"
 
 # Mina Rosetta
 echo "=========================== STARTING ROSETTA API ONLINE AND OFFLINE INSTANCES ==========================="
-ports=($MINA_ROSETTA_ONLINE_PORT $MINA_ROSETTA_OFFLINE_PORT)
-for port in ${ports[*]}; do
+ports=("$MINA_ROSETTA_ONLINE_PORT" "$MINA_ROSETTA_OFFLINE_PORT")
+for port in "${ports[@]}"; do
   mina-rosetta \
     --archive-uri "${PG_CONN}" \
     --graphql-uri http://127.0.0.1:${MINA_GRAPHQL_PORT}/graphql \

@@ -10,7 +10,7 @@ open Network_peer
  *  can only be initialized, and any interaction with it must go through
  *  its [Resource_pool_diff_intf] *)
 module type Resource_pool_base_intf = sig
-  type t [@@deriving sexp_of]
+  type t
 
   val label : string
 
@@ -19,7 +19,7 @@ module type Resource_pool_base_intf = sig
   type transition_frontier
 
   module Config : sig
-    type t [@@deriving sexp_of]
+    type t
   end
 
   (** Diff from a transition frontier extension that would update the resource pool*)
@@ -42,12 +42,7 @@ module type Resource_pool_base_intf = sig
 end
 
 module Verification_error = struct
-  type t =
-    | Fee_higher
-    | Fee_equal
-    | Recently_seen
-    | Invalid of Error.t
-    | Failure of Error.t
+  type t = Fee_higher | Fee_equal | Invalid of Error.t | Failure of Error.t
 
   let to_error = function
     | Fee_equal ->
@@ -58,12 +53,8 @@ module Verification_error = struct
         Error.tag err ~tag:"invalid"
     | Failure err ->
         Error.tag err ~tag:"failure"
-    | Recently_seen ->
-        Error.of_string "recently seen"
 
   let to_short_string = function
-    | Recently_seen ->
-        "recently_seen"
     | Fee_equal ->
         "fee_equal"
     | Fee_higher ->
@@ -83,12 +74,12 @@ module type Resource_pool_diff_intf = sig
 
   val label : string
 
-  type t [@@deriving sexp, to_yojson]
+  type t
 
-  type verified [@@deriving sexp, to_yojson]
+  type verified
 
   (** Part of the diff that was not added to the resource pool*)
-  type rejected [@@deriving sexp, to_yojson]
+  type rejected
 
   val empty : t
 
@@ -233,6 +224,7 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
+    -> block_window_duration:Time.Span.t
     -> t * Remote_sink.t * Local_sink.t
 
   val of_resource_pool_and_diffs :
@@ -242,6 +234,7 @@ module type Network_pool_base_intf = sig
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> log_gossip_heard:bool
     -> on_remote_push:(unit -> unit Deferred.t)
+    -> block_window_duration:Time.Span.t
     -> t * Remote_sink.t * Local_sink.t
 
   val resource_pool : t -> resource_pool
@@ -255,6 +248,9 @@ module type Network_pool_base_intf = sig
     -> resource_pool_diff_verified Envelope.Incoming.t
     -> Broadcast_callback.t
     -> unit
+
+  val apply_no_broadcast :
+    t -> resource_pool_diff_verified Envelope.Incoming.t -> unit
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a
@@ -262,24 +258,27 @@ end
 module type Snark_resource_pool_intf = sig
   include Resource_pool_base_intf
 
+  val proof_cache_db : t -> Proof_cache_tag.cache_db
+
   val make_config :
        trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> disk_location:string
+    -> proof_cache_db:Proof_cache_tag.cache_db
     -> Config.t
 
   val add_snark :
        ?is_local:bool
     -> t
     -> work:Transaction_snark_work.Statement.t
-    -> proof:Ledger_proof.t One_or_two.t
+    -> proof:Ledger_proof.Cached.t One_or_two.t
     -> fee:Fee_with_prover.t
     -> [ `Added | `Statement_not_referenced ]
 
   val request_proof :
        t
     -> Transaction_snark_work.Statement.t
-    -> Ledger_proof.t One_or_two.t Priced_proof.t option
+    -> Ledger_proof.Cached.t One_or_two.t Priced_proof.t option
 
   val verify_and_act :
        t
@@ -306,9 +305,24 @@ module type Snark_pool_diff_intf = sig
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp]
 
-  type verified = t [@@deriving compare, sexp]
+  module Cached : sig
+    type t =
+      | Add_solved_work of
+          Transaction_snark_work.Statement.t
+          * Ledger_proof.Cached.t One_or_two.t Priced_proof.t
+      | Empty
+
+    val read_all_proofs_from_disk :
+      t -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+
+    val write_all_proofs_to_disk :
+         proof_cache_db:Proof_cache_tag.cache_db
+      -> Mina_wire_types.Network_pool.Snark_pool.Diff_versioned.V2.t
+      -> t
+  end
+
+  type verified = Cached.t
 
   type compact =
     { work_ids : int One_or_two.t
@@ -324,7 +338,7 @@ module type Snark_pool_diff_intf = sig
   include
     Resource_pool_diff_intf
       with type t := t
-       and type verified := t
+       and type verified := Cached.t
        and type pool := resource_pool
 
   val to_compact : t -> compact option
@@ -341,7 +355,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.t list [@@deriving sexp, of_yojson]
+  type t = User_command.Stable.Latest.t list
 
   module Diff_error : sig
     type t =
@@ -357,13 +371,13 @@ module type Transaction_pool_diff_intf = sig
       | Fee_payer_account_not_found
       | Fee_payer_not_permitted_to_send
       | After_slot_tx_end
-    [@@deriving sexp, yojson]
+    [@@deriving yojson]
 
     val to_string_hum : t -> string
   end
 
   module Rejected : sig
-    type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
+    type t = (User_command.Stable.Latest.t * Diff_error.t) list
   end
 
   type Structured_log_events.t +=
@@ -391,9 +405,11 @@ module type Transaction_resource_pool_intf = sig
     -> verifier:Verifier.t
     -> genesis_constants:Genesis_constants.t
     -> slot_tx_end:Mina_numbers.Global_slot_since_hard_fork.t option
+    -> vk_cache_db:Zkapp_vk_cache_tag.cache_db
+    -> proof_cache_db:Proof_cache_tag.cache_db
     -> Config.t
 
-  val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
+  val member : t -> Transaction_hash.t -> bool
 
   val transactions :
     t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t

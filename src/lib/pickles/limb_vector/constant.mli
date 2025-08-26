@@ -1,7 +1,3 @@
-type 'n t = (int64, 'n) Pickles_types.Vector.t [@@deriving sexp_of]
-
-val to_bits : 'a t -> bool list
-
 module Hex64 : sig
   include module type of Core_kernel.Int64
 
@@ -28,7 +24,7 @@ module Hex64 : sig
       type nonrec t = t
       [@@deriving compare, sexp, yojson, hash, equal, bin_shape, bin_io]
 
-      include Pickles_types.Sigs.VERSIONED
+      include Plonkish_prelude.Sigs.VERSIONED
     end
   end
 end

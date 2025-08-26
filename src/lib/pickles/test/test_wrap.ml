@@ -1,12 +1,13 @@
-(* Testing
-   -------
+(** Testing
+    -------
 
-   Component: Pickles
-   Subject: Test Wrap
-   Invocation: \
-    dune exec src/lib/pickles/test/main.exe -- test "Gate:"
+    Component: Pickles
+    Subject: Test Wrap
+    Invocation: \
+     dune exec src/lib/pickles/test/test_wrap.exe
 *)
 open Pickles_types
+
 module Wrap = Pickles__Wrap
 module Import = Pickles__Import
 
@@ -69,7 +70,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
   (* Constants helper - takes an OCaml value and converts it to a snarky value, where
                         all values here are constant literals.  N.b. this should be
                         encapsulated as Snarky internals, but it never got merged. *)
-  let constant (Typ typ : _ Snarky_backendless.Typ.t) x =
+  let constant (Typ typ : _ Impls.Step.Typ.t) x =
     let xs, aux = typ.value_to_fields x in
     typ.var_of_fields (Array.map xs ~f:Impls.Step.Field.constant, aux)
   in
@@ -100,7 +101,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
            - The next step proof also computes the deferred values inside the circuit and verifies
              that they match those used by the previous wrap proof.
 
-      The code below generates the deferred values so that we can verifiy that we can actually
+      The code below generates the deferred values so that we can verify that we can actually
       compute those values correctly inside the circuit.  Special thanks to Matthew Ryan for
       explaining this in detail. *)
   let { Wrap.For_tests_only.deferred_values
@@ -123,10 +124,8 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
      once for the wrap circuit.  It was decided not to use a functor for this. *)
   let deferred_values_typ =
     let open Impls.Step in
-    let open Step_main_inputs in
     let open Step_verifier in
     Import.Types.Wrap.Proof_state.Deferred_values.In_circuit.typ
-      (module Impls.Step)
       ~feature_flags:full_features ~challenge:Challenge.typ
       ~scalar_challenge:Challenge.typ
       ~dummy_scalar_challenge:
@@ -134,7 +133,6 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
            Limb_vector.Challenge.Constant.zero )
       (Shifted_value.Type1.typ Field.typ)
       (Import.Branch_data.typ
-         (module Impl)
          ~assert_16_bits:(Step_verifier.assert_n_bits ~n:16) )
   in
 
@@ -154,9 +152,7 @@ let run_recursive_proof_test (actual_feature_flags : Plonk_types.Features.flags)
      for use in the circuit *)
   and evals =
     constant
-      (Plonk_types.All_evals.typ ~num_chunks:1
-         (module Impls.Step)
-         full_features )
+      (Plonk_types.All_evals.typ ~num_chunks:1 full_features)
       { evals =
           { public_input = x_hat_evals; evals = proof.proof.openings.evals }
       ; ft_eval1 = proof.proof.openings.ft_eval1
@@ -258,18 +254,18 @@ end
 (* Small combinators to lift gate example signatures to the expected
    signatures for the tests. This amounts to generating the list of public
    inputs from either no public inputs, a single one or a pair of inputs
-   returned by the gate example. *)
+   returned by the gate example. In all cases, it uses lazy_mode = false. *)
 
 let without_public_input gate_example srs =
-  let index, proof = gate_example srs in
+  let index, proof = gate_example srs false in
   (index, [], proof)
 
 let with_one_public_input gate_example srs =
-  let index, public_input, proof = gate_example srs in
+  let index, public_input, proof = gate_example srs false in
   (index, [ public_input ], proof)
 
 let with_two_public_inputs gate_example srs =
-  let index, (public_input1, public_input2), proof = gate_example srs in
+  let index, (public_input1, public_input2), proof = gate_example srs false in
   (index, [ public_input1; public_input2 ], proof)
 
 module Lookup = Make (struct
@@ -328,11 +324,13 @@ module FFAdd = Make (struct
     }
 end)
 
-let tests =
-  [ ("Gate:Lookup", Lookup.tests)
-  ; ("Gate:Foreign field addition", FFAdd.tests)
-  ; ("Gate:Rot", Rot.tests)
-  ; ("Gate:Xor", Xor.tests)
-  ; ("Gate:Range check", Range_check.tests)
-  ; ("Gate:Range_check 64 bits", Range_check_64.tests)
-  ]
+let () =
+  let open Alcotest in
+  run "Gate tests"
+    [ ("Gate:Lookup", Lookup.tests)
+    ; ("Gate:Foreign field addition", FFAdd.tests)
+    ; ("Gate:Rot", Rot.tests)
+    ; ("Gate:Xor", Xor.tests)
+    ; ("Gate:Range check", Range_check.tests)
+    ; ("Gate:Range_check 64 bits", Range_check_64.tests)
+    ]

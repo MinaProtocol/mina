@@ -10,7 +10,7 @@
   pasta_bindings
   js_of_ocaml
   bindings_js
-  node_backend
+  bindings_js.node_backend
   logger.fake
   pasta_bindings.backend.none)
  (link_deps ../../node_js/plonk_wasm.js ../../node_js/plonk_wasm_bg.wasm)

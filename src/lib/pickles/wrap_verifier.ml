@@ -48,7 +48,18 @@ end
 module Make
     (Inputs : Intf.Wrap_main_inputs.S
                 with type Impl.field = Backend.Tock.Field.t
+                 and type Impl.field_var = Wrap_main_inputs.Impl.field_var
                  and type Impl.Bigint.t = Backend.Tock.Bigint.t
+                 and type Impl.Constraint.t = Backend.Tock.Constraint.t
+                 and type 'a Impl.Internal_Basic.Checked.t =
+                  'a Wrap_main_inputs.Impl.Internal_Basic.Checked.t
+                 and type ('var, 'value, 'aux) Impl.Internal_Basic.Typ.typ' =
+                  ( 'var
+                  , 'value
+                  , 'aux )
+                  Wrap_main_inputs.Impl.Internal_Basic.Typ.typ'
+                 and type ('var, 'value) Impl.Internal_Basic.Typ.typ =
+                  ('var, 'value) Wrap_main_inputs.Impl.Internal_Basic.Typ.typ
                  and type Inner_curve.Constant.Scalar.t = Backend.Tick.Field.t) =
 struct
   open Inputs
@@ -149,7 +160,7 @@ struct
 
   let lowest_128_bits ~constrain_low_bits x =
     let assert_128_bits = assert_n_bits ~n:128 in
-    Util.lowest_128_bits ~constrain_low_bits ~assert_128_bits (module Impl) x
+    Util.Wrap.lowest_128_bits ~constrain_low_bits ~assert_128_bits x
 
   let squeeze_challenge sponge : Field.t =
     lowest_128_bits (* I think you may not have to constrain these actually *)
@@ -254,7 +265,9 @@ struct
                      Boolean.Unsafe.of_cvar Field.(add (b1 :> t) (b2 :> t)) )
                in
                let none_sum =
-                 let num_chunks = (* TODO *) 1 in
+                 let num_chunks =
+                   (* TODO *) Plonk_checks.num_chunks_by_default
+                 in
                  Option.map is_none ~f:(fun (b : Boolean.var) ->
                      Array.init num_chunks ~f:(fun _ ->
                          Double.map Inner_curve.one ~f:(( * ) (b :> t)) ) )
@@ -298,17 +311,16 @@ struct
                in
                Opt.Maybe (is_yes, sum) )
       |> Plonk_verification_key_evals.Step.map
-           ~f:(fun g -> Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) g)
+           ~f:(fun g -> Array.map ~f:(Double.map ~f:Util.Wrap.seal) g)
            ~f_opt:(function
              | Opt.Nothing ->
                  Opt.Nothing
              | Opt.Maybe (b, x) ->
                  Opt.Maybe
-                   ( Boolean.Unsafe.of_cvar (Util.seal (module Impl) (b :> t))
-                   , Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) x )
+                   ( Boolean.Unsafe.of_cvar (Util.Wrap.seal (b :> t))
+                   , Array.map ~f:(Double.map ~f:Util.Wrap.seal) x )
              | Opt.Just x ->
-                 Opt.Just
-                   (Array.map ~f:(Double.map ~f:(Util.seal (module Impl))) x) )
+                 Opt.Just (Array.map ~f:(Double.map ~f:Util.Wrap.seal) x) )
 
   (* TODO: Unify with the code in step_verifier *)
   let lagrange (type n)
@@ -369,8 +381,20 @@ struct
           (* TODO: num_bits should maybe be input_length - 1. *)
           Ops.bits_per_chunk * Ops.chunks_needed ~num_bits:input_length
         in
-        let rec pow2pow x i =
-          if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
+        (* computes 2^i *)
+        let rec field2pow f i =
+          if i = 1 then f
+          else
+            let j = i - 1 in
+            Inner_curve.Constant.Scalar.(f * field2pow f j)
+        in
+        (* computes 2^actual_shift *)
+        let two_to_actual_shift =
+          field2pow (Inner_curve.Constant.Scalar.of_int 2) actual_shift
+        in
+        (* computes [2^actual_shift] G *)
+        let field_to_two_to_shift g =
+          Inner_curve.Constant.scale g two_to_actual_shift
         in
         let base_and_correction (h : Domain.t) =
           let d = Int.pow 2 (Domain.log2_size h) in
@@ -383,7 +407,7 @@ struct
                 let open Inner_curve.Constant in
                 let g = of_affine g in
                 ( Inner_curve.constant g
-                , Inner_curve.constant (negate (pow2pow g actual_shift)) )
+                , Inner_curve.constant (negate (field_to_two_to_shift g)) )
             | Infinity ->
                 (* Point at infinity should be impossible in the SRS *)
                 assert false )
@@ -408,8 +432,7 @@ struct
                    ~f:
                      (Array.map2_exn
                         ~f:(Double.map2 ~f:(Double.map2 ~f:Field.( + ))) )
-              |> Array.map
-                   ~f:(Double.map ~f:(Double.map ~f:(Util.seal (module Impl)))) )
+              |> Array.map ~f:(Double.map ~f:(Double.map ~f:Util.Wrap.seal)) )
 
   let _h_precomp =
     Lazy.map ~f:Inner_curve.Scaling_precomputation.create Generators.h
@@ -445,12 +468,6 @@ struct
         [ `Finite of Inner_curve.t
         | `Maybe_finite of Boolean.var * Inner_curve.t ]
 
-      let _finite : t -> Boolean.var = function
-        | `Finite _ ->
-            Boolean.true_
-        | `Maybe_finite (b, _) ->
-            b
-
       let assert_finite : t -> unit = function
         | `Finite _ ->
             ()
@@ -471,7 +488,7 @@ struct
       type t = { point : Inner_curve.t; non_zero : Boolean.var }
     end
 
-    let combine batch ~xi without_bound with_bound =
+    let combine ~xi without_bound with_bound =
       let reduce_point p =
         let point = ref (Point.underlying p.(Array.length p - 1)) in
         for i = Array.length p - 2 downto 0 do
@@ -480,7 +497,7 @@ struct
         !point
       in
       let { Curve_opt.non_zero; point } =
-        Pcs_batch.combine_split_commitments batch
+        Pcs_batch.combine_split_commitments
           ~reduce_with_degree_bound:(fun _ -> assert false)
           ~reduce_without_degree_bound:(fun x -> [ x ])
           ~scale_and_add:(fun ~(acc : Curve_opt.t) ~xi
@@ -544,8 +561,7 @@ struct
 
   let scale_fast = Ops.scale_fast
 
-  let check_bulletproof ~pcs_batch ~(sponge : Sponge.t)
-      ~(xi : Scalar_challenge.t)
+  let check_bulletproof ~(sponge : Sponge.t) ~(xi : Scalar_challenge.t)
       ~(advice :
          Other_field.Packed.t Shifted_value.Type1.t
          Types.Step.Bulletproof.Advice.t )
@@ -569,8 +585,7 @@ struct
         in
         let open Inner_curve in
         let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-          Split_commitments.combine pcs_batch ~xi without_degree_bound
-            with_degree_bound
+          Split_commitments.combine ~xi without_degree_bound with_degree_bound
         in
         let scale_fast =
           scale_fast ~num_bits:Other_field.Packed.Constant.size_in_bits
@@ -631,7 +646,7 @@ struct
     in
     let length = Pseudo.choose (choice, lengths) ~f:Field.of_int in
     let (T max) = Nat.of_int max in
-    Vector.to_array (ones_vector (module Impl) ~first_zero:length max)
+    Vector.to_array (Util.Wrap.ones_vector ~first_zero:length max)
 
   module Plonk = Types.Wrap.Proof_state.Deferred_values.Plonk
 
@@ -1210,7 +1225,7 @@ struct
         let alpha = sample_scalar () in
         let t_comm :
             (Inputs.Impl.Field.t * Inputs.Impl.Field.t)
-            Pickles_types__Plonk_types.Poly_comm.Without_degree_bound.t =
+            Kimchi_backend_common.Plonk_types.Poly_comm.Without_degree_bound.t =
           messages.t_comm
         in
         absorb_g t_comm ;
@@ -1274,7 +1289,6 @@ struct
             Nat.N11.add Nat.N8.n
           in
           let len_6, len_6_add = Nat.N45.add len_5 in
-          let num_commitments_without_degree_bound = len_6 in
           let without_degree_bound =
             let append_chain len second first =
               Vector.append first second len
@@ -1329,11 +1343,8 @@ struct
                            ; m.lookup_selector_ffmul
                            ] ) )
           in
-          check_bulletproof
-            ~pcs_batch:
-              (Common.dlog_pcs_batch
-                 (Max_proofs_verified.add num_commitments_without_degree_bound) )
-            ~sponge:sponge_before_evaluations ~xi ~advice ~openings_proof
+          check_bulletproof ~sponge:sponge_before_evaluations ~xi ~advice
+            ~openings_proof
             ~polynomials:
               ( Vector.map without_degree_bound
                   ~f:
@@ -1373,6 +1384,7 @@ struct
 
   let challenge_polynomial = G.challenge_polynomial (module Field)
 
+  (* computes pt^{2^n} *)
   let pow2pow (pt : Field.t) (n : int) : Field.t =
     with_label __LOC__ (fun () ->
         let rec go acc i =
@@ -1396,17 +1408,13 @@ struct
                 (* 0 = - acc' + y + pt_n_acc *)
                 let open Field.Constant in
                 assert_
-                  { annotation = None
-                  ; basic =
-                      T
-                        (Basic
-                           { l = (one, y)
-                           ; r = (one, pt_n_acc)
-                           ; o = (negate one, acc')
-                           ; m = zero
-                           ; c = zero
-                           } )
-                  } ;
+                  (Basic
+                     { l = (one, y)
+                     ; r = (one, pt_n_acc)
+                     ; o = (negate one, acc')
+                     ; m = zero
+                     ; c = zero
+                     } ) ;
                 acc' )
         | [] ->
             failwith "empty list" )
@@ -1421,10 +1429,9 @@ struct
 
   let map_plonk_to_field plonk =
     Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_challenges
-      ~f:(Util.seal (module Impl))
-      ~scalar:scalar_to_field plonk
+      ~f:Util.Wrap.seal ~scalar:scalar_to_field plonk
     |> Types.Step.Proof_state.Deferred_values.Plonk.In_circuit.map_fields
-         ~f:(Shifted_value.Type2.map ~f:(Util.seal (module Impl)))
+         ~f:(Shifted_value.Type2.map ~f:Util.Wrap.seal)
 
   module Plonk_checks = struct
     include Plonk_checks
@@ -1563,7 +1570,8 @@ struct
       Plonk_checks.scalars_env
         (module Env_bool)
         (module Env_field)
-        ~srs_length_log2:Common.Max_degree.wrap_log2 ~zk_rows:3
+        ~srs_length_log2:Common.Max_degree.wrap_log2
+        ~zk_rows:Plonk_checks.zk_rows_by_default
         ~endo:(Impl.Field.constant Endo.Wrap_inner_curve.base)
         ~mds:sponge_params.mds
         ~field_of_hex:(fun s ->

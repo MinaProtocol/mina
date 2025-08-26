@@ -2,66 +2,61 @@ open Core_kernel
 
 open Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint
 
-let seal i = Tuple_lib.Double.map ~f:(Util.seal i)
+module Make_add (Impl : Kimchi_pasta_snarky_backend.Snark_intf) = struct
+  module Utils = Util.Make (Impl)
 
-let add_fast (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(check_finite = true) ((x1, y1) as p1) ((x2, y2) as p2) :
-    Impl.Field.t * Impl.Field.t =
-  let p1 = seal (module Impl) p1 in
-  let p2 = seal (module Impl) p2 in
-  let open Impl in
-  let open Field.Constant in
-  let bool b = if b then one else zero in
-  let eq a b = As_prover.(equal (read_var a) (read_var b)) in
-  let same_x_bool = lazy (eq x1 x2) in
-  let ( ! ) = Lazy.force in
-  let ( !! ) = As_prover.read_var in
-  let mk f = exists Field.typ ~compute:f in
-  let same_x = mk (fun () -> bool !same_x_bool) in
-  let inf =
-    if check_finite then Field.zero
-    else mk (fun () -> bool (!same_x_bool && not (eq y1 y2)))
-  in
-  let inf_z =
-    mk (fun () ->
-        if eq y1 y2 then zero
-        else if !same_x_bool then inv (!!y2 - !!y1)
-        else zero )
-  in
-  let x21_inv =
-    mk (fun () -> if !same_x_bool then zero else inv (!!x2 - !!x1))
-  in
-  let s =
-    mk (fun () ->
-        if !same_x_bool then
-          let x1_squared = square !!x1 in
-          let y1 = !!y1 in
-          (x1_squared + x1_squared + x1_squared) / (y1 + y1)
-        else (!!y2 - !!y1) / (!!x2 - !!x1) )
-  in
-  let x3 = mk (fun () -> square !!s - (!!x1 + !!x2)) in
-  let y3 = mk (fun () -> (!!s * (!!x1 - !!x3)) - !!y1) in
-  let p3 = (x3, y3) in
-  with_label "add_fast" (fun () ->
-      assert_
-        { Snarky_backendless.Constraint.annotation = Some __LOC__
-        ; basic =
-            Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-              (EC_add_complete
-                 { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv } )
-        } ;
-      p3 )
+  let seal = Tuple_lib.Double.map ~f:Utils.seal
+
+  let add_fast ?(check_finite = true) ((x1, y1) as p1) ((x2, y2) as p2) :
+      Impl.Field.t * Impl.Field.t =
+    let p1 = seal p1 in
+    let p2 = seal p2 in
+    let open Impl in
+    let open Field.Constant in
+    let bool b = if b then one else zero in
+    let eq a b = As_prover.(equal (read_var a) (read_var b)) in
+    let same_x_bool = lazy (eq x1 x2) in
+    let ( ! ) = Lazy.force in
+    let ( !! ) = As_prover.read_var in
+    let mk f = exists Field.typ ~compute:f in
+    let same_x = mk (fun () -> bool !same_x_bool) in
+    let inf =
+      if check_finite then Field.zero
+      else mk (fun () -> bool (!same_x_bool && not (eq y1 y2)))
+    in
+    let inf_z =
+      mk (fun () ->
+          if eq y1 y2 then zero
+          else if !same_x_bool then inv (!!y2 - !!y1)
+          else zero )
+    in
+    let x21_inv =
+      mk (fun () -> if !same_x_bool then zero else inv (!!x2 - !!x1))
+    in
+    let s =
+      mk (fun () ->
+          if !same_x_bool then
+            let x1_squared = square !!x1 in
+            let y1 = !!y1 in
+            (x1_squared + x1_squared + x1_squared) / (y1 + y1)
+          else (!!y2 - !!y1) / (!!x2 - !!x1) )
+    in
+    let x3 = mk (fun () -> square !!s - (!!x1 + !!x2)) in
+    let y3 = mk (fun () -> (!!s * (!!x1 - !!x3)) - !!y1) in
+    let p3 = (x3, y3) in
+    with_label "add_fast" (fun () ->
+        assert_
+          (EC_add_complete
+             { p1; p2; p3; inf; same_x; slope = s; inf_z; x21_inv } ) ;
+        p3 )
+end
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run)
+    (Impl : Kimchi_pasta_snarky_backend.Snark_intf)
     (G : Intf.Group(Impl).S with type t = Impl.Field.t * Impl.Field.t) =
 struct
   open Impl
-
-  let seal = seal (module Impl)
-
-  let add_fast = add_fast (module Impl)
+  include Make_add (Impl)
 
   let bits_per_chunk = 5
 
@@ -124,12 +119,7 @@ struct
         }
         :: !rounds_rev
     done ;
-    assert_
-      { Snarky_backendless.Constraint.annotation = Some __LOC__
-      ; basic =
-          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-            (EC_scale { state = Array.of_list_rev !rounds_rev })
-      } ;
+    assert_ (EC_scale { state = Array.of_list_rev !rounds_rev }) ;
     (* TODO: Return n_acc ? *)
     !acc
 
@@ -199,12 +189,7 @@ struct
         }
         :: !rounds_rev
     done ;
-    assert_
-      { Snarky_backendless.Constraint.annotation = Some __LOC__
-      ; basic =
-          Kimchi_backend_common.Plonk_constraint_system.Plonk_constraint.T
-            (EC_scale { state = Array.of_list_rev !rounds_rev })
-      } ;
+    assert_ (EC_scale { state = Array.of_list_rev !rounds_rev }) ;
     Field.Assert.equal !n_acc scalar ;
     let bits_lsb =
       let bs = Array.map bits_msb ~f:Boolean.Unsafe.of_cvar in

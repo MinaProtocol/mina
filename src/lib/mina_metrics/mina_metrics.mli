@@ -250,6 +250,14 @@ module Network : sig
 
   val get_ancestry_rpc_responses_failed : Counter.t
 
+  val get_completed_snarks_rpcs_sent : Counter.t * Gauge.t
+
+  val get_completed_snarks_rpcs_received : Counter.t * Gauge.t
+
+  val get_completed_snarks_rpc_requests_failed : Counter.t
+
+  val get_completed_snarks_rpc_responses_failed : Counter.t
+
   val ban_notify_rpcs_sent : Counter.t * Gauge.t
 
   val ban_notify_rpcs_received : Counter.t * Gauge.t
@@ -311,17 +319,11 @@ end
 
 module Pipe : sig
   module Drop_on_overflow : sig
-    val bootstrap_sync_ledger : Counter.t
-
     val verified_network_pool_diffs : Counter.t
 
     val transition_frontier_valid_transitions : Counter.t
 
     val transition_frontier_primary_transitions : Counter.t
-
-    val router_transition_frontier_controller : Counter.t
-
-    val router_bootstrap_controller : Counter.t
 
     val router_verified_transitions : Counter.t
 
@@ -424,6 +426,8 @@ module Transition_frontier : sig
     val update : float -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   val recently_finalized_staged_txns : Gauge.t
@@ -486,6 +490,8 @@ module Block_latency : sig
     val update : float -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Gossip_time : sig
@@ -494,6 +500,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Inclusion_time : sig
@@ -502,6 +510,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 
   module Validation_acceptance_time : sig
@@ -510,6 +520,8 @@ module Block_latency : sig
     val update : Time.Span.t -> unit
 
     val clear : unit -> unit
+
+    val initialize : Core_kernel.Time.Span.t -> unit
   end
 end
 
@@ -553,3 +565,5 @@ module Archive : sig
   val create_archive_server :
     ?forward_uri:Uri.t -> port:int -> logger:Logger.t -> unit -> t Deferred.t
 end
+
+val initialize_all : Time.Span.t -> unit

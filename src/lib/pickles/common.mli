@@ -51,20 +51,13 @@ val ft_comm :
   -> t_comm:'comm array
   -> 'comm
 
-val dlog_pcs_batch :
-     'total Pickles_types.Nat.t
-     * ('proofs_verified, 'n, 'total) Pickles_types.Nat.Adds.t
-  -> ('a, 'total, Pickles_types.Nat.z) Pickles_types.Pcs_batch.t
-
 val combined_evaluation :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> xi:'f Snarky_backendless.Cvar.t
-  -> ( 'f Snarky_backendless.Cvar.t
-     , 'f Snarky_backendless.Cvar.t Snarky_backendless.Snark_intf.Boolean0.t )
-     Pickles_types.Opt.t
-     array
-     list
-  -> 'f Snarky_backendless.Cvar.t
+     (module Snarky_backendless.Snark_intf.Run
+        with type field = 'f
+         and type field_var = 'v )
+  -> xi:'v
+  -> ('v, 'v Snarky_backendless.Boolean.t) Pickles_types.Opt.t array list
+  -> 'v
 
 module Max_degree : sig
   val wrap_log2 : int
@@ -160,37 +153,11 @@ val hash_messages_for_next_step_proof :
        Pickles_types.Vector.t
      (* bulletproof challenges *) )
      Import.Types.Step.Proof_state.Messages_for_next_step_proof.t
-  -> (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.t
+  -> Import.Types.Digest.Constant.t
 
 val tick_public_input_of_statement :
-     max_proofs_verified:'a Pickles_types.Nat.t
-  -> ( ( ( Impls.Step.Challenge.Constant.t
-         , Impls.Step.Challenge.Constant.t Composition_types.Scalar_challenge.t
-         , Impls.Step.Other_field.Constant.t Pickles_types.Shifted_value.Type2.t
-         , ( Limb_vector.Challenge.Constant.t
-             Kimchi_backend_common.Scalar_challenge.t
-             Composition_types.Bulletproof_challenge.t
-           , Pickles_types.Nat.z Backend.Tock.Rounds.plus_n )
-           Pickles_types.Vector.t
-           Pickles_types.Hlist0.Id.t
-         , ( Limb_vector.Constant.Hex64.t
-           , Composition_types.Digest.Limbs.n )
-           Pickles_types.Vector.vec
-         , bool )
-         Composition_types.Step.Proof_state.Per_proof.In_circuit.t
-       , 'a )
-       Pickles_types.Vector.t
-     , ( Limb_vector.Constant.Hex64.t
-       , Composition_types.Digest.Limbs.n )
-       Pickles_types.Vector.vec
-       Pickles_types.Hlist0.Id.t
-     , ( ( Limb_vector.Constant.Hex64.t
-         , Composition_types.Digest.Limbs.n )
-         Pickles_types.Vector.vec
-       , 'a )
-       Pickles_types.Vector.t
-       Pickles_types.Hlist0.Id.t )
-     Import.Types.Step.Statement.t
+     max_proofs_verified:'max_proofs_verified Pickles_types.Nat.t
+  -> 'max_proofs_verified Impls.Step.statement
   -> Backend.Tick.Field.Vector.elt list
 
 val tock_public_input_of_statement :
@@ -204,21 +171,14 @@ val tock_public_input_of_statement :
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        option
      , bool
-     , ( Limb_vector.Constant.Hex64.t
-       , Composition_types.Digest.Limbs.n )
-       Pickles_types.Vector.vec
-     , ( Limb_vector.Constant.Hex64.t
-       , Composition_types.Digest.Limbs.n )
-       Pickles_types.Vector.vec
-     , ( Limb_vector.Constant.Hex64.t
-       , Composition_types.Digest.Limbs.n )
-       Pickles_types.Vector.vec
+     , Import.Types.Digest.Constant.t
+     , Import.Types.Digest.Constant.t
+     , Import.Types.Digest.Constant.t
      , ( Limb_vector.Challenge.Constant.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
-       Pickles_types.Hlist0.Id.t
      , Composition_types.Branch_data.t )
      Import.Types.Wrap.Statement.In_circuit.t
   -> Backend.Tock.Field.Vector.elt list
@@ -234,21 +194,14 @@ val tock_unpadded_public_input_of_statement :
      , Limb_vector.Challenge.Constant.t Composition_types.Scalar_challenge.t
        option
      , bool
-     , ( Limb_vector.Constant.Hex64.t
-       , Composition_types.Digest.Limbs.n )
-       Pickles_types.Vector.vec
-     , ( Limb_vector.Constant.Hex64.t
-       , Composition_types.Digest.Limbs.n )
-       Pickles_types.Vector.vec
-     , ( Limb_vector.Constant.Hex64.t
-       , Composition_types.Digest.Limbs.n )
-       Pickles_types.Vector.vec
+     , Import.Types.Digest.Constant.t
+     , Import.Types.Digest.Constant.t
+     , Import.Types.Digest.Constant.t
      , ( Limb_vector.Challenge.Constant.t
          Kimchi_backend_common.Scalar_challenge.t
          Composition_types.Bulletproof_challenge.t
        , Pickles_types.Nat.z Backend.Tick.Rounds.plus_n )
        Pickles_types.Vector.t
-       Pickles_types.Hlist0.Id.t
      , Composition_types.Branch_data.t )
      Import.Types.Wrap.Statement.In_circuit.t
   -> Backend.Tock.Field.Vector.elt list

@@ -1,0 +1,11 @@
+(library
+ (name node_config_for_unit_tests)
+ (public_name mina_node_config.for_unit_tests)
+ (libraries
+  node_config_intf
+  node_config_version
+  node_config_unconfigurable_constants)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_base ppx_optcomp)))

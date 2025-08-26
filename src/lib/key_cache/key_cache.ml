@@ -1,21 +1,11 @@
 open Core_kernel
 open Async_kernel
 
-[%%import "/src/config.mlh"]
-
 module Spec = struct
   type t =
     | On_disk of { directory : string; should_write : bool }
     | S3 of { bucket_prefix : string; install_path : string }
 end
-
-[%%inject "may_download", download_snark_keys]
-
-let may_download = ref may_download
-
-let set_downloads_enabled b = may_download := b
-
-let may_download () = !may_download
 
 module T (M : sig
   type _ t

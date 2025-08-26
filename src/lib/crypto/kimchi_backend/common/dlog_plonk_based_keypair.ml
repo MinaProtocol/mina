@@ -14,11 +14,11 @@ module type Stable_v1 = sig
 end
 
 module type Inputs_intf = sig
-  open Intf
+  open Kimchi_pasta_snarky_backend.Intf
 
   val name : string
 
-  module Rounds : Pickles_types.Nat.Intf
+  module Rounds : Plonkish_prelude.Nat.Intf
 
   module Gate_vector : sig
     open Unsigned
@@ -68,7 +68,8 @@ module type Inputs_intf = sig
           nb_public
           runtime_tables_cfg
           nb_prev_challanges
-          srs] *)
+          srs
+          lazy_mode] *)
     val create :
          Gate_vector.t
       -> int
@@ -76,6 +77,7 @@ module type Inputs_intf = sig
       -> Scalar_field.t Kimchi_types.runtime_table_cfg array
       -> int
       -> Urs.t
+      -> bool
       -> t
   end
 
@@ -116,12 +118,12 @@ module Make (Inputs : Inputs_intf) = struct
   type t = { index : Inputs.Index.t; cs : Inputs.Constraint_system.t }
 
   let name =
-    sprintf "%s_%d_v4" Inputs.name (Pickles_types.Nat.to_int Inputs.Rounds.n)
+    sprintf "%s_%d_v4" Inputs.name (Plonkish_prelude.Nat.to_int Inputs.Rounds.n)
 
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in
     let urs = ref None in
-    let degree = 1 lsl Pickles_types.Nat.to_int Inputs.Rounds.n in
+    let degree = 1 lsl Plonkish_prelude.Nat.to_int Inputs.Rounds.n in
     let set_urs_info specs = Set_once.set_exn urs_info Lexing.dummy_pos specs in
     let load () =
       match !urs with
@@ -172,7 +174,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (set_urs_info, load)
 
-  let create ~prev_challenges cs =
+  let create ?(lazy_mode = false) ~prev_challenges cs =
     let gates, fixed_lookup_tables, runtime_table_cfgs =
       Inputs.Constraint_system.finalize_and_get_gates cs
     in
@@ -190,7 +192,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let index =
       Inputs.Index.create gates public_input_size fixed_lookup_tables
-        runtime_table_cfgs prev_challenges (load_urs ())
+        runtime_table_cfgs prev_challenges (load_urs ()) lazy_mode
     in
     { index; cs }
 
@@ -198,11 +200,11 @@ module Make (Inputs : Inputs_intf) = struct
 
   let pk t = t
 
-  let array_to_vector a = Pickles_types.Vector.of_list (Array.to_list a)
+  let array_to_vector a = Plonkish_prelude.Vector.of_list (Array.to_list a)
 
   (** does this convert a backend.verifier_index to a pickles_types.verifier_index? *)
   let vk_commitments (t : Inputs.Verifier_index.t) :
-      Inputs.Curve.Affine.t Pickles_types.Plonk_verification_key_evals.t =
+      Inputs.Curve.Affine.t Plonk_verification_key_evals.t =
     let g c : Inputs.Curve.Affine.t =
       match Inputs.Poly_comm.of_backend_without_degree_bound c with
       | `Without_degree_bound x ->
@@ -211,11 +213,11 @@ module Make (Inputs : Inputs_intf) = struct
           assert false
     in
     { sigma_comm =
-        Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
-          ~f:(fun i -> g t.evals.sigma_comm.(i))
+        Plonkish_prelude.Vector.init Plonk_types.Permuts.n ~f:(fun i ->
+            g t.evals.sigma_comm.(i) )
     ; coefficients_comm =
-        Pickles_types.Vector.init Pickles_types.Plonk_types.Columns.n
-          ~f:(fun i -> g t.evals.coefficients_comm.(i))
+        Plonkish_prelude.Vector.init Plonk_types.Columns.n ~f:(fun i ->
+            g t.evals.coefficients_comm.(i) )
     ; generic_comm = g t.evals.generic_comm
     ; psm_comm = g t.evals.psm_comm
     ; complete_add_comm = g t.evals.complete_add_comm
@@ -227,7 +229,7 @@ module Make (Inputs : Inputs_intf) = struct
   let full_vk_commitments (t : Inputs.Verifier_index.t) :
       ( Inputs.Curve.Affine.t array
       , Inputs.Curve.Affine.t array option )
-      Pickles_types.Plonk_verification_key_evals.Step.t =
+      Plonk_verification_key_evals.Step.t =
     let g c : Inputs.Curve.Affine.t array =
       match Inputs.Poly_comm.of_backend_without_degree_bound c with
       | `Without_degree_bound x ->
@@ -241,11 +243,11 @@ module Make (Inputs : Inputs_intf) = struct
       f l >>| g
     in
     { sigma_comm =
-        Pickles_types.Vector.init Pickles_types.Plonk_types.Permuts.n
-          ~f:(fun i -> g t.evals.sigma_comm.(i))
+        Plonkish_prelude.Vector.init Plonk_types.Permuts.n ~f:(fun i ->
+            g t.evals.sigma_comm.(i) )
     ; coefficients_comm =
-        Pickles_types.Vector.init Pickles_types.Plonk_types.Columns.n
-          ~f:(fun i -> g t.evals.coefficients_comm.(i))
+        Plonkish_prelude.Vector.init Plonk_types.Columns.n ~f:(fun i ->
+            g t.evals.coefficients_comm.(i) )
     ; generic_comm = g t.evals.generic_comm
     ; psm_comm = g t.evals.psm_comm
     ; complete_add_comm = g t.evals.complete_add_comm
@@ -259,8 +261,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; foreign_field_mul_comm = Option.map ~f:g t.evals.foreign_field_mul_comm
     ; rot_comm = Option.map ~f:g t.evals.rot_comm
     ; lookup_table_comm =
-        Pickles_types.Vector.init
-          Pickles_types.Plonk_types.Lookup_sorted_minus_1.n ~f:(fun i ->
+        Plonkish_prelude.Vector.init Plonk_types.Lookup_sorted_minus_1.n
+          ~f:(fun i ->
             lookup (fun l -> Option.try_with (fun () -> l.lookup_table.(i))) )
     ; lookup_table_ids = lookup (fun l -> l.table_ids)
     ; runtime_tables_selector = lookup (fun l -> l.runtime_tables_selector)

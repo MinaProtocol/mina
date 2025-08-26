@@ -8,10 +8,7 @@ open Frontier_base
 type input = Diff.Lite.E.t list
 
 type create_args =
-  { db : Database.t
-  ; logger : Logger.t
-  ; persistent_root_instance : Persistent_root.Instance.t
-  }
+  { db : Database.t; logger : Logger.t; dequeue_snarked_ledger : unit -> unit }
 
 module Worker = struct
   (* when this is transitioned to an RPC worker, the db argument
@@ -23,7 +20,7 @@ module Worker = struct
   type t =
     { db : Database.t
     ; logger : Logger.t
-    ; persistent_root_instance : Persistent_root.Instance.t
+    ; dequeue_snarked_ledger : unit -> unit
     }
 
   type nonrec create_args = create_args
@@ -31,19 +28,19 @@ module Worker = struct
   type output = unit
 
   (* worker assumes database has already been checked and initialized *)
-  let create ({ db; logger; persistent_root_instance } : create_args) : t =
-    { db; logger; persistent_root_instance }
+  let create ({ db; logger; dequeue_snarked_ledger } : create_args) : t =
+    { db; logger; dequeue_snarked_ledger }
 
   (* nothing to close *)
   let close _ = Deferred.unit
 
-  let apply_diff (type mutant) ~old_root ~arcs_cache (diff : mutant Diff.Lite.t)
-      : Database.batch_t -> unit =
+  let apply_diff (type mutant) ~old_root_hash ~arcs_cache
+      (diff : mutant Diff.Lite.t) : Database.batch_t -> unit =
     match diff with
     | New_node (Lite transition) ->
         Database.add ~arcs_cache ~transition
     | Root_transitioned { new_root; garbage = Lite garbage; _ } ->
-        Database.move_root ~old_root ~new_root ~garbage
+        Database.move_root ~old_root_hash ~new_root ~garbage
     | Best_tip_changed best_tip_hash ->
         Database.set_best_tip best_tip_hash
 
@@ -59,7 +56,7 @@ module Worker = struct
                 `Fst diff
             | E (Root_transitioned diff) ->
                 `Snd diff
-            | diff ->
+            | E (New_node _) as diff ->
                 `Trd diff )
         in
         (* We only care about the final best tip diff in the sequence, as all other best tip diffs get overwritten *)
@@ -70,7 +67,8 @@ module Worker = struct
           List.drop_last root_transition_diffs
           |> Option.value ~default:[]
           |> List.bind ~f:(fun { new_root; garbage = Lite garbage; _ } ->
-                 (Root_data.Limited.hashes new_root).state_hash :: garbage )
+                 (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+                 :: garbage )
         in
         let total_root_transition_diff =
           Option.map final_root_transition_diff
@@ -109,17 +107,16 @@ module Worker = struct
               | _ ->
                   None )
           in
-          let%map.Result old_root =
+          let%map.Result old_root_hash =
             Database.find_arcs_and_root t.db ~arcs_cache ~parent_hashes
           in
           List.map diffs_to_apply ~f:(fun (Diff.Lite.E.E diff) ->
-              apply_diff ~old_root ~arcs_cache diff )
+              apply_diff ~old_root_hash ~arcs_cache diff )
         in
         let handle_emitted_proof = function
           | { Diff.Root_transition.just_emitted_a_proof = true; _ } ->
               [%log' info t.logger] "Dequeued a snarked ledger" ;
-              Persistent_root.Instance.dequeue_snarked_ledger
-                t.persistent_root_instance
+              t.dequeue_snarked_ledger ()
           | _ ->
               ()
         in

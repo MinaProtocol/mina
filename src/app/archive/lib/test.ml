@@ -9,18 +9,18 @@ let%test_module "Archive node unit tests" =
   ( module struct
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.None
+    let proof_level = Genesis_constants.Proof_level.No_check
 
     let precomputed_values =
       { (Lazy.force Precomputed_values.for_unit_tests) with proof_level }
 
     let constraint_constants = precomputed_values.constraint_constants
 
+    let genesis_constants = precomputed_values.genesis_constants
+
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
-            ~pids:(Child_processes.Termination.create_pid_table ())
+          Verifier.For_tests.default ~constraint_constants ~logger ~proof_level
             () )
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
@@ -35,15 +35,15 @@ let%test_module "Archive node unit tests" =
       lazy
         ( Thread_safe.block_on_async_exn
         @@ fun () ->
-        match%map Caqti_async.connect archive_uri with
+        match%bind Mina_caqti.connect archive_uri with
         | Ok conn ->
-            conn
+            return conn
         | Error e ->
             failwith @@ Caqti_error.show e )
 
     let conn_pool_lazy =
       lazy
-        ( match Caqti_async.connect_pool archive_uri with
+        ( match Mina_caqti.connect_pool archive_uri with
         | Ok pool ->
             pool
         | Error e ->
@@ -112,7 +112,8 @@ let%test_module "Archive node unit tests" =
       let%map (zkapp_command : Zkapp_command.t) =
         Mina_generators.Zkapp_command_generators.gen_zkapp_command_from
           ~fee_payer_keypair ~keymap ~ledger
-          ~protocol_state_view:genesis_state_view ()
+          ~protocol_state_view:genesis_state_view ~constraint_constants
+          ~genesis_constants ()
       in
       User_command.Zkapp_command zkapp_command
 
@@ -127,17 +128,21 @@ let%test_module "Archive node unit tests" =
           Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
             ~min_fee:Currency.Fee.zero coinbase_amount )
 
+    let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
     let%test_unit "User_command: read and write signed command" =
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
       Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
         user_command_signed_gen ~f:(fun user_command ->
-          let transaction_hash = Transaction_hash.hash_command user_command in
+          let transaction_hash =
+            Transaction_hash.hash_command_with_hashes user_command
+          in
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn
+              Processor.User_command.add_if_doesn't_exist conn ~logger
                 ~v1_transaction_hash:false user_command
             in
             let%map result =
@@ -163,7 +168,9 @@ let%test_module "Archive node unit tests" =
       @@ fun () ->
       Async.Quickcheck.async_test ~trials:20 ~sexp_of:[%sexp_of: User_command.t]
         user_command_zkapp_gen ~f:(fun user_command ->
-          let transaction_hash = Transaction_hash.hash_command user_command in
+          let transaction_hash =
+            Transaction_hash.hash_command_with_hashes user_command
+          in
           match user_command with
           | Signed_command _ ->
               failwith "zkapp_gen failed"
@@ -197,7 +204,7 @@ let%test_module "Archive node unit tests" =
               match%map
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
-                  Processor.User_command.add_if_doesn't_exist conn
+                  Processor.User_command.add_if_doesn't_exist conn ~logger
                     ~v1_transaction_hash:false user_command
                 in
                 let%map result =
@@ -305,14 +312,15 @@ let%test_module "Archive node unit tests" =
           List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
           Strict_pipe.Writer.close writer ;
           let%bind () =
-            Processor.run
+            Processor.run ~proof_cache_db
+              ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_constants:precomputed_values.constraint_constants pool
               reader ~logger ~delete_older_than:None
           in
           match%map
             Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
-                Caqti_async.Pool.use
+                Mina_caqti.Pool.use
                   (fun conn ->
                     let open Deferred.Result.Let_syntax in
                     match%bind

@@ -258,7 +258,7 @@ flow of the full system in an attempt to make it very easy to trace data flow.
 
 Consult the following diagram:
 
-![](../docs/res/transition_frontier_controller.dot.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/transition_frontier_controller.dot.png)
 
 Blue arrows represent pipes and asynchronous boundaries of the system. Each
 arrow is annotated with the behavior when overflow of the pipe occurs.

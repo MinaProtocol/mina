@@ -27,21 +27,6 @@ module Timing = struct
         }
 end
 
-module Public_accounts = struct
-  type account_data =
-    { pk : Public_key.Compressed.t
-    ; balance : int
-    ; delegate : Public_key.Compressed.t option
-    ; timing : Timing.t
-    }
-
-  module type S = sig
-    val name : string
-
-    val accounts : account_data list Lazy.t
-  end
-end
-
 module Private_accounts = struct
   type account_data =
     { pk : Public_key.Compressed.t
@@ -83,6 +68,12 @@ end
 
 module type S = sig
   val t : Mina_ledger.Ledger.t Lazy.t
+
+  (** Populate a root ledger with the unmasked ledger backing a genesis ledger.
+      Prefer using this to a transfer using [t], for the efficiency reasons
+      described in [Mina_ledger.Ledger.Root.transfer_accounts_with]. *)
+  val populate_root :
+    Mina_ledger.Ledger.Root.t -> Mina_ledger.Ledger.Root.t Or_error.t
 
   val depth : int
 

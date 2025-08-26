@@ -21,10 +21,6 @@
   snarky.backendless
   test_util)
  (preprocess
-  (pps
-   ppx_base
-   ppx_let
-   ppx_assert))
+  (pps ppx_base ppx_let ppx_assert))
  (instrumentation
   (backend bisect_ppx)))
-

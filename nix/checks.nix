@@ -1,5 +1,4 @@
 inputs: pkgs: {
-
   # todo: Fast
   lint-codeowners = pkgs.stdenv.mkDerivation {
     # todo: filter source
@@ -20,13 +19,6 @@ inputs: pkgs: {
     touch $out
   '';
   # todo: ./scripts/check-snarky-submodule.sh # submodule issue
-  lint-preprocessor-deps = pkgs.runCommand "lint-preprocessor-deps" {
-    meta.checkDescription = "preprocessor deps";
-  } ''
-    ln -s ${../src} ./src
-    bash ${../scripts/lint_preprocessor_deps.sh}
-    touch $out
-  '';
   # - compare ci diff_types
   # - compare_ci_diff_binables
 

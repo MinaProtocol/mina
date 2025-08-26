@@ -47,29 +47,27 @@ let validate_inputs ~logger inputs (test_config : Test_config.t) :
   else Deferred.return ()
 
 let engines : engine list =
-  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))
-  ; ("local", (module Integration_test_local_engine : Intf.Engine.S))
-  ]
+  [ ("local", (module Integration_test_local_engine : Intf.Engine.S)) ]
 
 let tests : test list =
-  [ ( "peers-reliability"
-    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  [ ( "block-prod-prio"
+    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
+  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
   ; ( "chain-reliability"
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
-  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
+  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
+  ; ( "peers-reliability"
+    , (module Peers_reliability_test.Make : Intf.Test.Functor_intf) )
+  ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
+  ; ( "verification-key"
+    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
   ; ("zkapps", (module Zkapps.Make : Intf.Test.Functor_intf))
   ; ("zkapps-timing", (module Zkapps_timing.Make : Intf.Test.Functor_intf))
   ; ("zkapps-nonce", (module Zkapps_nonce_test.Make : Intf.Test.Functor_intf))
-  ; ( "verification-key"
-    , (module Verification_key_update.Make : Intf.Test.Functor_intf) )
-  ; ( "block-prod-prio"
-    , (module Block_production_priority.Make : Intf.Test.Functor_intf) )
-  ; ("block-reward", (module Block_reward_test.Make : Intf.Test.Functor_intf))
-  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
-  ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
-  ; ("slot-end", (module Slot_end_test.Make : Intf.Test.Functor_intf))
   ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
@@ -77,15 +75,16 @@ let report_test_errors ~log_error_set ~internal_error_set =
   let open Test_error in
   let open Test_error.Set in
   let color_eprintf color =
-    Printf.ksprintf (fun s -> Print.eprintf "%s%s%s" color s Bash_colors.none)
+    Printf.ksprintf (fun s ->
+        Print.eprintf "%s%s%s" color s Mina_stdlib.Bash_colors.none )
   in
   let color_of_severity = function
     | `None ->
-        Bash_colors.green
+        Mina_stdlib.Bash_colors.green
     | `Soft ->
-        Bash_colors.yellow
+        Mina_stdlib.Bash_colors.yellow
     | `Hard ->
-        Bash_colors.red
+        Mina_stdlib.Bash_colors.red
   in
   let category_prefix_of_severity = function
     | `None ->
@@ -129,7 +128,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       (color_of_severity log_errors_severity)
       "=== Log %ss ===\n" log_type ;
     Error_accumulator.iter_contexts log_errors ~f:(fun node_id log_errors ->
-        color_eprintf Bash_colors.light_magenta "    %s:\n" node_id ;
+        color_eprintf Mina_stdlib.Bash_colors.light_magenta "    %s:\n" node_id ;
         List.iter log_errors ~f:(fun (severity, { error_message; _ }) ->
             color_eprintf
               (color_of_severity severity)
@@ -153,7 +152,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       | `Hard ->
           report_log_errors "Error" ) ;
       (* report contextualized internal errors *)
-      color_eprintf Bash_colors.magenta "=== Test Results ===\n" ;
+      color_eprintf Mina_stdlib.Bash_colors.magenta "=== Test Results ===\n" ;
       Error_accumulator.iter_contexts internal_errors ~f:(fun context errors ->
           print_category_header
             (max_severity_of_list (List.map errors ~f:fst))
@@ -184,7 +183,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
       Print.eprintf "\n" ;
       let exit_code =
         if test_failed then (
-          color_eprintf Bash_colors.red
+          color_eprintf Mina_stdlib.Bash_colors.red
             "The test has failed. See the above errors for details.\n\n" ;
           match (internal_error_set.exit_code, log_error_set.exit_code) with
           | None, None ->
@@ -192,14 +191,15 @@ let report_test_errors ~log_error_set ~internal_error_set =
           | Some exit_code, _ | None, Some exit_code ->
               Some exit_code )
         else (
-          color_eprintf Bash_colors.green
+          color_eprintf Mina_stdlib.Bash_colors.green
             "The test has completed successfully.\n\n" ;
           None )
       in
       let%bind () = Writer.(flushed (Lazy.force stderr)) in
       return exit_code
 
-(* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
+(* TODO: refactor cleanup system (smells like a monad for composing linear
+   resources would help a lot) *)
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
@@ -267,20 +267,39 @@ let main inputs =
    *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
    *)
   let logger = Logger.create () in
+  let constants : Test_config.constants =
+    let protocol =
+      { Genesis_constants.Compiled.genesis_constants.protocol with
+        k = 20
+      ; delta = 0
+      ; slots_per_epoch = 3 * 8 * 20
+      ; slots_per_sub_window = 2
+      ; grace_period_slots = 140
+      }
+    in
+    { genesis_constants =
+        { Genesis_constants.Compiled.genesis_constants with
+          protocol
+        ; txpool_max_size = 3000
+        }
+    ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+    ; compile_config = Mina_compile_config.Compiled.t
+    }
+  in
   let images =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node =
         Option.value inputs.archive_image ~default:"archive_image_unused"
     ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; bots = "minaprotocol/mina-bots:latest"
     ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
-  let%bind () = validate_inputs ~logger inputs T.config in
+  let test_config = T.config ~constants in
+  let%bind () = validate_inputs ~logger inputs test_config in
   [%log trace] "expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~debug:inputs.debug ~test_config:T.config ~images
+      ~debug:inputs.debug ~constants ~images ~test_config
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
@@ -401,7 +420,7 @@ let main inputs =
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
-        T.run network dsl )
+        T.run ~config:test_config network dsl )
   in
   let exit_reason, test_result =
     match monitor_test_result with
@@ -457,7 +476,7 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
-    let doc = "Run mina integration test(s) on remote cloud provider." in
+    let doc = "Run mina integration test(s) on engine." in
     Term.info engine_name ~doc ~exits:Term.default_exits
   in
   let test_inputs_with_cli_inputs_arg =
@@ -488,7 +507,8 @@ let default_cmd =
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 
-(* TODO: move required args to positions instead of flags, or provide reasonable defaults to make them optional *)
+(* TODO: move required args to positions instead of flags, or provide reasonable
+   defaults to make them optional *)
 let () =
   let engine_cmds = List.map engines ~f:engine_cmd in
   Term.(exit @@ eval_choice default_cmd (engine_cmds @ [ help_cmd ]))

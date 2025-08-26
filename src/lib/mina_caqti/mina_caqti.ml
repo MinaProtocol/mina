@@ -2,18 +2,68 @@
 
 open Async
 open Core_kernel
-open Caqti_async
 open Mina_base
 
 (* custom Caqti types for generating type annotations on queries *)
-type _ Caqti_type.field +=
-  | Array_nullable_int : int option array Caqti_type.field
+let find_req t u s = Caqti_request.Infix.(t ->! u) s
 
-type _ Caqti_type.field +=
-  | Array_nullable_int64 : int64 option array Caqti_type.field
+let find_opt_req t u s = Caqti_request.Infix.(t ->? u) s
 
-type _ Caqti_type.field +=
-  | Array_nullable_string : string option array Caqti_type.field
+let collect_req t u s = Caqti_request.Infix.(t ->* u) s
+
+let exec_req t s = Caqti_request.Infix.(t ->. Caqti_type.unit) s
+
+module type CONNECTION = sig
+  include Caqti_async.CONNECTION
+
+  (** Code expects any queries to differing sources to never interfere. *)
+  val source : Uri.t
+end
+
+module Wrap
+    (Conn : Caqti_async.CONNECTION) (Arg : sig
+      val source : Uri.t
+    end) : CONNECTION = struct
+  include Conn
+  include Arg
+end
+
+let wrap_conn (module Conn : Caqti_async.CONNECTION) ~source =
+  let module Conn =
+    Wrap
+      (Conn)
+      (struct
+        let source = source
+      end)
+  in
+  (module Conn : CONNECTION)
+
+module Pool = struct
+  type ('a, 'e) t = { source : Uri.t; pool : ('a, 'e) Caqti_async.Pool.t }
+
+  let wrap ~source pool = { source; pool }
+
+  let use (f : (module CONNECTION) -> 'a) pool =
+    Caqti_async.Pool.use
+      (fun (module Conn : Caqti_async.CONNECTION) ->
+        f (wrap_conn (module Conn) ~source:pool.source) )
+      pool.pool
+end
+
+let connect_pool ?max_size uri =
+  let size = max_size in
+  let%map.Result pool =
+    Caqti_async.connect_pool
+      ~pool_config:
+        Caqti_pool_config.(
+          merge_left (default_from_env ()) (create ?max_size:size ()))
+      uri
+  in
+  Pool.wrap ~source:uri pool
+
+let connect uri =
+  let%map.Deferred.Result conn = Caqti_async.connect uri in
+  wrap_conn ~source:uri conn
 
 module Type_spec = struct
   type (_, _) t =
@@ -26,7 +76,7 @@ module Type_spec = struct
      | [] ->
          (Caqti_type.unit : tuple Caqti_type.t)
      | rep :: spec ->
-         Caqti_type.tup2 rep (to_rep spec)
+         Caqti_type.t2 rep (to_rep spec)
 
   let rec hlist_to_tuple :
             'hlist 'tuple.
@@ -53,6 +103,101 @@ module Type_spec = struct
     let encode t = Ok (hlist_to_tuple tys (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist tys t)) in
     Caqti_type.custom ~encode ~decode (to_rep tys)
+end
+
+module Vector = struct
+  type (_, _, _, _) t =
+    | [] : ('elem, unit, unit, Pickles_types.Nat.z) t
+    | ( :: ) :
+        'elem Caqti_type.t * ('elem, 'fun_t, 'tup_t, 'n) t
+        -> ('elem, 'elem -> 'fun_t, 'elem * 'tup_t, 'n Pickles_types.Nat.s) t
+
+  let rec vec_to_hlist :
+            'elem 'hlist 'tup 'n.
+               ('elem, 'hlist, 'tup, 'n) t
+            -> ('elem, 'n) Pickles_types.Vector.t
+            -> (unit, 'hlist) H_list.t =
+    fun (type elem hlist tup n) (spec : (elem, hlist, tup, n) t)
+        (v : (elem, n) Pickles_types.Vector.t) ->
+     match (spec, v) with
+     | [], [] ->
+         ([] : (unit, hlist) H_list.t)
+     | _ :: spec, x :: v ->
+         x :: vec_to_hlist spec v
+
+  let rec hlist_to_vec :
+            'elem 'hlist 'tup 'n.
+               ('elem, 'hlist, 'tup, 'n) t
+            -> (unit, 'hlist) H_list.t
+            -> ('elem, 'n) Pickles_types.Vector.t =
+    fun (type elem hlist tup n) (spec : (elem, hlist, tup, n) t)
+        (l : (unit, hlist) H_list.t) ->
+     match (spec, l) with
+     | _ :: spec, x :: l ->
+         (x :: hlist_to_vec spec l : (elem, n) Pickles_types.Vector.t)
+     | [], [] ->
+         []
+
+  module type Intf = sig
+    (** defines a function type, like ['elem -> 'elem -> ... -> 'elem -> unit] *)
+    type 'elem fun_t
+
+    (** defines a tuple type, like ['elem * 'elem * ... * 'elem * unit] *)
+    type 'elem tup_t
+
+    type n
+
+    val spec : 'elem Caqti_type.t -> ('elem, 'elem fun_t, 'elem tup_t, n) t
+
+    val type_spec : 'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t
+  end
+
+  let rec spec_of_nat :
+      type n. n Plonkish_prelude.Nat.nat -> (module Intf with type n = n) =
+    function
+    | Z ->
+        let module N = struct
+          type 'elem fun_t = unit
+
+          type 'elem tup_t = unit
+
+          type n = Pickles_types.Nat.z
+
+          let spec _ = []
+
+          let type_spec _ = Type_spec.[]
+        end in
+        (module N : Intf with type n = n)
+    | S p ->
+        let (module Prev) = spec_of_nat p in
+        let module N = struct
+          type 'elem fun_t = 'elem -> 'elem Prev.fun_t
+
+          type 'elem tup_t = 'elem * 'elem Prev.tup_t
+
+          type n = Prev.n Pickles_types.Nat.s
+
+          let spec :
+              type elem.
+              elem Caqti_type.t -> (elem, elem fun_t, elem tup_t, n) t =
+           fun t -> t :: Prev.spec t
+
+          let type_spec :
+              'elem Caqti_type.t -> ('elem fun_t, 'elem tup_t) Type_spec.t =
+           fun t -> t :: Prev.type_spec t
+        end in
+        (module N : Intf with type n = n)
+
+  let typ :
+      type elem n.
+         elem Caqti_type.t * n Plonkish_prelude.Nat.nat
+      -> (elem, n) Pickles_types.Vector.vec Caqti_type.t =
+   fun (elem, n) ->
+    let (module M) = spec_of_nat n in
+    Type_spec.custom_type
+      ~to_hlist:(vec_to_hlist (M.spec elem))
+      ~of_hlist:(hlist_to_vec (M.spec elem))
+      (M.type_spec elem)
 end
 
 (* build coding for array type that can be interpreted as a string
@@ -94,59 +239,14 @@ let make_coding (type a) ~(elem_to_string : a -> string)
   in
   (encode, decode)
 
-(* register coding for nullable int arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
+(** this type may require type annotations in queries, eg.
+   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
+*)
+let array_nullable_int_typ =
   let encode, decode =
     make_coding ~elem_to_string:Int.to_string ~elem_of_string:Int.of_string
   in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_int ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_int { get_coding }
-
-(* register coding for nullable int64 arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
-  let encode, decode =
-    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
-  in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_int64 ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_int64 { get_coding }
-
-(* register coding for nullable string arrays *)
-let () =
-  let open Caqti_type.Field in
-  let rep = Caqti_type.String in
-  let encode, decode =
-    make_coding ~elem_to_string:Fn.id ~elem_of_string:Fn.id
-  in
-  let get_coding : type a. _ -> a t -> a coding =
-   fun _ -> function
-    | Array_nullable_string ->
-        Coding { rep; encode; decode }
-    | _ ->
-        assert false
-  in
-  define_coding Array_nullable_string { get_coding }
-
-(* this type may require type annotations in queries, eg.
-   `SELECT id FROM zkapp_states WHERE element_ids = ?::int[]`
-*)
-let array_nullable_int_typ : int option array Caqti_type.t =
-  Caqti_type.field Array_nullable_int
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_int_typ : int array Caqti_type.t =
   let open Result.Let_syntax in
@@ -159,11 +259,14 @@ let array_int_typ : int array Caqti_type.t =
   in
   Caqti_type.custom array_nullable_int_typ ~encode ~decode
 
-(* this type may require type annotations in queries, eg.
+(** this type may require type annotations in queries, eg.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::bigint[]`
 *)
-let array_nullable_int64_typ : int64 option array Caqti_type.t =
-  Caqti_type.field Array_nullable_int64
+let array_nullable_int64_typ =
+  let encode, decode =
+    make_coding ~elem_to_string:Int64.to_string ~elem_of_string:Int64.of_string
+  in
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_int64_typ : int64 array Caqti_type.t =
   let open Result.Let_syntax in
@@ -176,11 +279,14 @@ let array_int64_typ : int64 array Caqti_type.t =
   in
   Caqti_type.custom array_nullable_int64_typ ~encode ~decode
 
-(* this type may require type annotations in queries, e.g.
+(*** this type may require type annotations in queries, e.g.
    `SELECT id FROM zkapp_states WHERE element_ids = ?::string[]`
 *)
-let array_nullable_string_typ : string option array Caqti_type.t =
-  Caqti_type.field Array_nullable_string
+let array_nullable_string_typ =
+  let encode, decode =
+    make_coding ~elem_to_string:Fn.id ~elem_of_string:Fn.id
+  in
+  Caqti_type.custom ~encode ~decode Caqti_type.string
 
 let array_string_typ : string array Caqti_type.t =
   let open Result.Let_syntax in
@@ -289,7 +395,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
     (module Conn : CONNECTION) (value : 'cols) =
   let open Deferred.Result.Let_syntax in
   Conn.find_opt
-    ( Caqti_request.find_opt (snd cols) (snd select)
+    ( Caqti_request.Infix.(snd cols ->? snd select)
     @@ select_cols ~select:(fst select) ~table_name ?tannot ~cols:(fst cols) ()
     )
     value
@@ -298,7 +404,7 @@ let select_insert_into_cols ~(select : string * 'select Caqti_type.t)
       return id
   | None ->
       Conn.find
-        ( Caqti_request.find (snd cols) (snd select)
+        ( Caqti_request.Infix.(snd cols ->! snd select)
         @@ insert_into_cols ~returning:(fst select) ~table_name ?tannot
              ~cols:(fst cols) () )
         value
@@ -320,7 +426,11 @@ let insert_multi_into_col ~(table_name : string)
       (sep_by_comma ~parenthesis:true values)
       (fst col)
   in
-  let%bind () = Conn.exec (Caqti_request.exec Caqti_type.unit insert) () in
+  let%bind () =
+    Conn.exec
+      (Caqti_request.Infix.(Caqti_type.unit ->. Caqti_type.unit) insert)
+      ()
+  in
   let search =
     sprintf
       {sql| SELECT %s, id FROM %s
@@ -328,13 +438,12 @@ let insert_multi_into_col ~(table_name : string)
       (fst col) table_name (fst col) (sep_by_comma values)
   in
   Conn.collect_list
-    (Caqti_request.collect Caqti_type.unit
-       Caqti_type.(tup2 (snd col) int)
-       search )
+    Caqti_request.Infix.(
+      (Caqti_type.unit ->* Caqti_type.(t2 (snd col) int)) search)
     ()
 
 let query ~f pool =
-  match%bind Caqti_async.Pool.use f pool with
+  match%bind Pool.use f pool with
   | Ok v ->
       return v
   | Error msg ->

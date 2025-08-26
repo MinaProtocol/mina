@@ -1,10 +1,8 @@
 (library
  (name backend)
  (public_name pickles.backend)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson ))
- (libraries
-   kimchi_backend
-   kimchi_backend.pasta
-   kimchi_backend.pasta.basic
-))
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_mina ppx_jane ppx_deriving.std ppx_deriving_yojson))
+ (libraries kimchi_backend kimchi_pasta kimchi_pasta.basic))

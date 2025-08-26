@@ -118,9 +118,7 @@ module type S = sig
       element of the array [elmts] followed by a call to squeeze with a sponge
       construction instantiated with the parameters [sponge_params] *)
   val digest :
-       field Sponge.Params.t
-    -> field array
-    -> (int64, Composition_types.Digest.Limbs.n) Pickles_types.Vector.t
+    field Sponge.Params.t -> field array -> Import.Types.Digest.Constant.t
 end
 
 (** {2 Functors} *)

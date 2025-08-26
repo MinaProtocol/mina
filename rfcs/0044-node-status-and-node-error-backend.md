@@ -18,7 +18,7 @@ We need a backend for node staus/error systems. Candidates for the backend inclu
 
 Google Cloud Loggind provides storage and data searching/visualization of logs. It provides a handy command line sdk tool. But unfortunately there's no official support for ocaml binding. The architecture of the Google Cloud Logging is depicted as following: 
 
-![](res/gcloud_logging.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/gcloud_logging.png)
 
 For the frontend, each nodes would have 2 command line options to allow them to sed node status/error reports to any specific url: `--node-status-url URL` and `--node-error-url URL`. By default users would send their reports to our backend. They could change the destination by providing their own destination `URL` to the command options. Those setting could also be changed in the daemon.json file for the corresponding field.
 
@@ -56,7 +56,7 @@ In summary, we need to setup a micro-service for each corresponding system and w
 
 The AWS stack provides the log storage and data searching/visualization.
 
-![](res/aws_stack.png)
+![](https://github.com/MinaProtocol/mina-resources/blob/main/docs/res/aws_stack.png)
 
 Like the diagram shown above, we would setup a public Kenesis firehose data stream where the mina client can push to. And this Kenesis data stream would be connected to the S3 bucket, the OpenSearch and Kibana. (Splunk and Redshift are potential  tools that we could utilize but we would not use them in this project.)
 

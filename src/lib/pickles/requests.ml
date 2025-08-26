@@ -98,7 +98,7 @@ module Wrap = struct
     (module R)
 end
 
-module Step = struct
+module Step (Inductive_rule : Inductive_rule.Intf) = struct
   module type S = sig
     type statement
 
@@ -122,7 +122,7 @@ module Step = struct
           ( prev_values
           , local_signature )
           H2.T(Inductive_rule.Previous_proof_statement.Constant).t
-          -> unit t
+          -> unit Promise.t t
       | Proof_with_datas :
           ( prev_values
           , local_signature
@@ -176,7 +176,7 @@ module Step = struct
             ( prev_values
             , local_signature )
             H2.T(Inductive_rule.Previous_proof_statement.Constant).t
-            -> unit t
+            -> unit Promise.t t
         | Proof_with_datas :
             ( prev_values
             , local_signature

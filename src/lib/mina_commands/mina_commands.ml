@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core
 open Async
 open Signature_lib
@@ -8,6 +6,8 @@ open Mina_base
 
 (** For status *)
 let txn_count = ref 0
+
+let sync_lag = 5
 
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
@@ -37,18 +37,18 @@ let get_keys_with_details t =
   let%map.Participating_state accounts = accounts_pstate in
   List.map accounts ~f:(fun account ->
       ( string_of_public_key account
-      , account.Account.Poly.balance |> Currency.Balance.to_nanomina_int
-      , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
+      , account.Account.balance |> Currency.Balance.to_nanomina_int
+      , account.Account.nonce |> Account.Nonce.to_int ) )
 
 let get_nonce t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
-  account.Account.Poly.nonce
+  account.Account.nonce
 
 let get_balance t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
-  account.Account.Poly.balance
+  account.Account.balance
 
 let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let config = Mina_lib.config t in
@@ -97,7 +97,9 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                 | `Not_broadcasted ->
                     "not_broadcasted" ) )
           ; ( "valid_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+            , `List
+                (List.map ~f:User_command.Stable.Latest.to_yojson valid_commands)
+            )
           ; ( "invalid_commands"
             , `List
                 (List.map invalid_commands ~f:(fun (_cmd, diff_err) ->
@@ -118,7 +120,8 @@ let setup_and_submit_user_commands t user_command_list =
       [ ("mina_command", `String "scheduling a batch of user transactions") ] ;
   Mina_lib.add_transactions t user_command_list
 
-let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
+let setup_and_submit_zkapp_commands t
+    (zkapp_commands : Zkapp_command.Stable.Latest.t list) =
   let open Participating_state.Let_syntax in
   (* hack to get types to work out *)
   let%map () = return () in
@@ -167,7 +170,8 @@ let setup_and_submit_zkapp_commands t (zkapp_commands : Zkapp_command.t list) =
   | Error e ->
       Error e
 
-let setup_and_submit_zkapp_command t (zkapp_command : Zkapp_command.t) =
+let setup_and_submit_zkapp_command t
+    (zkapp_command : Zkapp_command.Stable.Latest.t) =
   let res = setup_and_submit_zkapp_commands t [ zkapp_command ] in
   let%map.Participating_state res' = res in
   match%map.Deferred res' with
@@ -179,11 +183,11 @@ let setup_and_submit_zkapp_command t (zkapp_command : Zkapp_command.t) =
       Error err
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
-  type proof_elem = User_command.t
+  type proof_elem = User_command.Stable.Latest.t
 
   type hash = Receipt.Chain_hash.t [@@deriving equal]
 
-  let hash parent_hash (proof_elem : User_command.t) =
+  let hash parent_hash (proof_elem : User_command.Stable.Latest.t) =
     match proof_elem with
     | Signed_command cmd ->
         let elt =
@@ -226,23 +230,26 @@ let chain_id_inputs (t : Mina_lib.t) =
   , protocol_transaction_version
   , protocol_network_version )
 
-let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
-    (init_receipt, proof) =
+let verify_payment t (addr : Account_id.t)
+    (verifying_txn : User_command.Stable.Latest.t) (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
-  let resulting_receipt = account.Account.Poly.receipt_chain_hash in
+  let resulting_receipt = account.Account.receipt_chain_hash in
   let open Or_error.Let_syntax in
   let%bind (_ : Receipt.Chain_hash.t Mina_stdlib.Nonempty_list.t) =
     Result.of_option
       (Receipt_chain_verifier.verify ~init:init_receipt proof resulting_receipt)
       ~error:(Error.createf "Merkle list proof of payment is invalid")
   in
-  if List.exists proof ~f:(fun txn -> User_command.equal verifying_txn txn) then
-    Ok ()
+  if
+    List.exists proof ~f:(fun txn ->
+        User_command.Stable.Latest.equal verifying_txn txn )
+  then Ok ()
   else
     Or_error.errorf
-      !"Merkle list proof does not contain payment %{sexp:User_command.t}"
+      !"Merkle list proof does not contain payment \
+        %{sexp:User_command.Stable.Latest.t}"
       verifying_txn
 
 type active_state_fields =
@@ -259,6 +266,7 @@ let max_block_height = ref 1
 let get_status ~flag t =
   let open Mina_lib.Config in
   let config = Mina_lib.config t in
+  let commit_id = Mina_lib.commit_id t in
   let precomputed_values = config.precomputed_values in
   let protocol_constants = precomputed_values.genesis_constants.protocol in
   let constraint_constants = precomputed_values.constraint_constants in
@@ -267,7 +275,6 @@ let get_status ~flag t =
     Time_ns.diff (Time_ns.now ()) Mina_lib.daemon_start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
-  let commit_id = Mina_version.commit_id in
   let conf_dir = config.conf_dir in
   let%map peers =
     let%map undisplay_peers = Mina_lib.peers t in
@@ -349,7 +356,7 @@ let get_status ~flag t =
   in
   let new_block_length_received =
     let open Mina_block in
-    Length.to_int @@ Mina_block.blockchain_length @@ Validation.block
+    Length.to_int @@ Mina_block.Header.blockchain_length @@ Validation.header
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Mina_lib.most_recent_valid_transition t)
   in
@@ -393,7 +400,7 @@ let get_status ~flag t =
       | `Synced | `Catchup ->
           if
             (Mina_lib.config t).demo_mode
-            || abs (!max_block_height - blockchain_length) < 5
+            || abs (!max_block_height - blockchain_length) < sync_lag
           then `Active `Synced
           else `Active `Catchup
     in
@@ -444,13 +451,11 @@ let get_status ~flag t =
     let%bind frontier =
       Mina_lib.transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
     in
-    match Transition_frontier.catchup_tree frontier with
+    match Transition_frontier.catchup_state frontier with
     | Full full ->
         Some
           (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
                (state, State_hash.Set.length hashes) ) )
-    | _ ->
-        None
   in
   let metrics =
     let open Mina_metrics.Block_producer in

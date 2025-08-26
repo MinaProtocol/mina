@@ -380,7 +380,7 @@ module Mutations = struct
                   in
                   Types.Zkapp_command.With_status.map cmd ~f:(fun cmd ->
                       { With_hash.data = cmd
-                      ; hash = Transaction_hash.hash_command (Zkapp_command cmd)
+                      ; hash = Transaction_hash.hash_zkapp_command cmd
                       } ) )
             in
             Ok cmds_with_hash
@@ -391,12 +391,13 @@ module Mutations = struct
     | `Bootstrapping ->
         return (Error "Daemon is bootstrapping")
 
-  let mock_zkapp_command mina zkapp_command :
-      ( (Zkapp_command.t, Transaction_hash.t) With_hash.t
+  let mock_zkapp_command mina (zkapp_command : Zkapp_command.Stable.Latest.t) :
+      ( (Zkapp_command.Stable.Latest.t, Transaction_hash.t) With_hash.t
         Types.Zkapp_command.With_status.t
       , string )
       result
       Io.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     (* instead of adding the zkapp_command to the transaction pool, as we would for an actual zkapp,
        apply the zkapp using an ephemeral ledger
     *)
@@ -407,8 +408,8 @@ module Mutations = struct
           |> Staged_ledger.ledger
         in
         let%bind accounts = Ledger.to_list best_tip_ledger in
-        let constraint_constants =
-          Genesis_constants.Constraint_constants.compiled
+        let { Precomputed_values.constraint_constants; _ } =
+          (Mina_lib.config mina).precomputed_values
         in
         let depth = constraint_constants.ledger_depth in
         let ledger = Ledger.create_ephemeral ~depth () in
@@ -417,7 +418,7 @@ module Mutations = struct
         *)
         List.iter accounts ~f:(fun account ->
             let pk = Account.public_key account in
-            let token = Account.token account in
+            let token = Account.token_id account in
             let account_id = Account_id.create pk token in
             match Ledger.get_or_create_account ledger account_id account with
             | Ok (`Added, _loc) ->
@@ -460,24 +461,24 @@ module Mutations = struct
                   |> Mina_state.Protocol_state.Body.view
                 in
                 let applied =
-                  Ledger.apply_zkapp_command_unchecked ~constraint_constants
+                  Ledger.apply_zkapp_command_unchecked ~signature_kind
+                    ~constraint_constants
                     ~global_slot:
                       ( Transition_frontier.Breadcrumb.consensus_state breadcrumb
                       |> Consensus.Data.Consensus_state
                          .global_slot_since_genesis )
-                    ~state_view ledger zkapp_command
+                    ~state_view ledger
+                    (Zkapp_command.write_all_proofs_to_disk ~signature_kind
+                       ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+                       zkapp_command )
                 in
                 (* rearrange data to match result type of `send_zkapp_command` *)
                 let applied_ok =
                   Result.map applied
                     ~f:(fun (zkapp_command_applied, _local_state_and_amount) ->
-                      let ({ data = zkapp_command; status }
-                            : Zkapp_command.t With_status.t ) =
-                        zkapp_command_applied.command
-                      in
+                      let status = zkapp_command_applied.command.status in
                       let hash =
-                        Transaction_hash.hash_command
-                          (Zkapp_command zkapp_command)
+                        Transaction_hash.hash_zkapp_command zkapp_command
                       in
                       let (with_hash : _ With_hash.t) =
                         { data = zkapp_command; hash }
@@ -503,8 +504,9 @@ module Mutations = struct
         "Couldn't find an unlocked key for specified `sender`. Did you unlock \
          the account you're making a transaction from?"
 
-  let create_user_command_input ~fee ~fee_payer_pk ~nonce_opt ~valid_until ~memo
-      ~signer ~body ~sign_choice : (User_command_input.t, string) result =
+  let create_user_command_input ~(genesis_constants : Genesis_constants.t) ~fee
+      ~fee_payer_pk ~nonce_opt ~valid_until ~memo ~signer ~body ~sign_choice :
+      (User_command_input.t, string) result =
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
@@ -515,15 +517,16 @@ module Mutations = struct
         ~error:(sprintf "Invalid `fee` provided.")
     in
     let%bind () =
+      let minimum_fee = genesis_constants.minimum_user_command_fee in
       Result.ok_if_true
-        Currency.Fee.(fee >= Signed_command.minimum_fee)
+        Currency.Fee.(fee >= minimum_fee)
         ~error:
           (* IMPORTANT! Do not change the content of this error without
            * updating Rosetta's construction API to handle the changes *)
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_mina_string fee)
-             (Currency.Fee.to_mina_string Signed_command.minimum_fee) )
+             (Currency.Fee.to_mina_string minimum_fee) )
     in
     let%map memo =
       Option.value_map memo ~default:(Ok Signed_command_memo.empty)
@@ -534,24 +537,24 @@ module Mutations = struct
     User_command_input.create ~signer ~fee ~fee_payer_pk ?nonce:nonce_opt
       ~valid_until ~memo ~body ~sign_choice ()
 
-  let make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
-      ~fee_payer_pk ~valid_until ~body =
+  let make_signed_user_command ~genesis_constants ~signature ~nonce_opt ~signer
+      ~memo ~fee ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind signature = signature |> Deferred.return in
     let%map user_command_input =
-      create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
-        ~valid_until ~body
+      create_user_command_input ~genesis_constants ~nonce_opt ~signer ~memo ~fee
+        ~fee_payer_pk ~valid_until ~body
         ~sign_choice:(User_command_input.Sign_choice.Signature signature)
       |> Deferred.return
     in
     user_command_input
 
-  let send_signed_user_command ~signature ~mina ~nonce_opt ~signer ~memo ~fee
-      ~fee_payer_pk ~valid_until ~body =
+  let send_signed_user_command ~genesis_constants ~signature ~mina ~nonce_opt
+      ~signer ~memo ~fee ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind user_command_input =
-      make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
-        ~fee_payer_pk ~valid_until ~body
+      make_signed_user_command ~genesis_constants ~signature ~nonce_opt ~signer
+        ~memo ~fee ~fee_payer_pk ~valid_until ~body
     in
     let%map cmd = send_user_command mina user_command_input in
     Types.User_command.With_status.map cmd ~f:(fun cmd ->
@@ -559,7 +562,8 @@ module Mutations = struct
         ; hash = Transaction_hash.hash_command (Signed_command cmd)
         } )
 
-  let send_unsigned_user_command ~mina ~nonce_opt ~signer ~memo ~fee
+  let send_unsigned_user_command ~mina
+      ~(genesis_constants : Genesis_constants.t) ~nonce_opt ~signer ~memo ~fee
       ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind user_command_input =
@@ -571,8 +575,8 @@ module Mutations = struct
         | `Hd_index hd_index ->
             Hd_index hd_index
       in
-      create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_payer_pk
-        ~valid_until ~body ~sign_choice)
+      create_user_command_input ~genesis_constants ~nonce_opt ~signer ~memo ~fee
+        ~fee_payer_pk ~valid_until ~body ~sign_choice)
       |> Deferred.return
     in
     let%map cmd = send_user_command mina user_command_input in
@@ -597,19 +601,23 @@ module Mutations = struct
           ]
       ~resolve:(fun { ctx = mina; _ } ()
                     (from, to_, fee, valid_until, memo, nonce_opt) signature ->
+        let { Precomputed_values.genesis_constants; _ } =
+          (Mina_lib.config mina).precomputed_values
+        in
         let body =
           Signed_command_payload.Body.Stake_delegation
             (Set_delegate { new_delegate = to_ })
         in
         match signature with
         | None ->
-            send_unsigned_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_payer_pk:from ~valid_until ~body
+            send_unsigned_user_command ~mina ~genesis_constants ~nonce_opt
+              ~signer:from ~memo ~fee ~fee_payer_pk:from ~valid_until ~body
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command
         | Some signature ->
             let%bind signature = signature |> Deferred.return in
-            send_signed_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_payer_pk:from ~valid_until ~body ~signature
+            send_signed_user_command ~mina ~genesis_constants ~nonce_opt
+              ~signer:from ~memo ~fee ~fee_payer_pk:from ~valid_until ~body
+              ~signature
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command )
 
   let send_payment =
@@ -623,18 +631,22 @@ module Mutations = struct
       ~resolve:(fun { ctx = mina; _ } ()
                     (from, to_, amount, fee, valid_until, memo, nonce_opt)
                     signature ->
+        let { Precomputed_values.genesis_constants; _ } =
+          (Mina_lib.config mina).precomputed_values
+        in
         let body =
           Signed_command_payload.Body.Payment
             { receiver_pk = to_; amount = Amount.of_uint64 amount }
         in
         match signature with
         | None ->
-            send_unsigned_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_payer_pk:from ~valid_until ~body
+            send_unsigned_user_command ~mina ~genesis_constants ~nonce_opt
+              ~signer:from ~memo ~fee ~fee_payer_pk:from ~valid_until ~body
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command
         | Some signature ->
-            send_signed_user_command ~mina ~nonce_opt ~signer:from ~memo ~fee
-              ~fee_payer_pk:from ~valid_until ~body ~signature
+            send_signed_user_command ~mina ~genesis_constants ~nonce_opt
+              ~signer:from ~memo ~fee ~fee_payer_pk:from ~valid_until ~body
+              ~signature
             |> Deferred.Result.map ~f:Types.User_command.mk_user_command )
 
   let make_zkapp_endpoint ~name ~doc ~f =
@@ -682,6 +694,9 @@ module Mutations = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () senders_list receiver_pk amount fee
                     repeat_count repeat_delay_ms ->
+        let { Precomputed_values.genesis_constants; _ } =
+          (Mina_lib.config mina).precomputed_values
+        in
         let dumb_password = lazy (return (Bytes.of_string "dumb")) in
         let senders = Array.of_list senders_list in
         let repeat_delay =
@@ -712,9 +727,9 @@ module Mutations = struct
             Secrets.Wallets.import_keypair (Mina_lib.wallets mina) kp
               ~password:dumb_password
           in
-          send_unsigned_user_command ~mina ~nonce_opt:None ~signer:source_pk
-            ~memo:(Some memo) ~fee ~fee_payer_pk:source_pk ~valid_until:None
-            ~body
+          send_unsigned_user_command ~mina ~genesis_constants ~nonce_opt:None
+            ~signer:source_pk ~memo:(Some memo) ~fee ~fee_payer_pk:source_pk
+            ~valid_until:None ~body
           |> Deferred.Result.map ~f:(const 0)
         in
 
@@ -770,6 +785,41 @@ module Mutations = struct
         | Ok _ ->
             Error "Internal error: response from transaction pool was malformed"
         )
+
+  let add_snark_work =
+    io_field "sendProofBundle" ~doc:"Transaction SNARKs for a given spec"
+      ~args:
+        Arg.
+          [ arg "input"
+              ~doc:
+                "Proof bundle for a given spec in json format including fees \
+                 and prover public key"
+              ~typ:(non_null Types.Input.ProofBundleInput.arg_typ)
+          ]
+      ~typ:(non_null string)
+      ~resolve:(fun { ctx = mina; _ } ()
+                    (proof_bundle :
+                      Ledger_proof.t
+                      Snark_work_lib.Work.Result_without_metrics.t ) ->
+        let solved_work =
+          Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work
+            ( proof_bundle.statements
+            , { proof = proof_bundle.proofs
+              ; fee = { fee = proof_bundle.fee; prover = proof_bundle.prover }
+              } )
+        in
+        match%map Mina_lib.add_work_graphql mina solved_work with
+        | Ok
+            ( `Broadcasted
+            , Network_pool.Snark_pool.Resource_pool.Diff.Add_solved_work _
+            , _ ) ->
+            Ok "Accepted"
+        | Error err ->
+            Error (Error.to_string_hum err)
+        | Ok _ ->
+            Error
+              "Internal error: Transaction proofs could not be added to the \
+               pool" )
 
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
@@ -988,6 +1038,7 @@ module Mutations = struct
     ; archive_precomputed_block
     ; archive_extensional_block
     ; send_rosetta_transaction
+    ; add_snark_work
     ]
 
   module Itn = struct
@@ -1008,6 +1059,9 @@ module Mutations = struct
           return
           @@ O1trace.sync_thread "itn_schedule_payments"
           @@ fun () ->
+          let { Precomputed_values.genesis_constants; _ } =
+            (Mina_lib.config mina).precomputed_values
+          in
           let%bind.Result () =
             Result.ok_if_true with_seq_no ~error:"Missing sequence information"
           in
@@ -1031,7 +1085,7 @@ module Mutations = struct
           in
           let%bind.Result () =
             let open Currency.Fee in
-            Result.ok_if_true ~error:"Maximum fee less than mininum fee"
+            Result.ok_if_true ~error:"Maximum fee less than minimum fee"
               (payment_details.max_fee >= payment_details.min_fee)
           in
           let logger = Mina_lib.top_level_logger mina in
@@ -1118,7 +1172,10 @@ module Mutations = struct
                 ~memo:(Signed_command_memo.create_from_string_exn memo)
                 ~body
             in
-            let signature = Ok (Signed_command.sign_payload sender payload) in
+            let signature_kind = Mina_signature_kind.t_DEPRECATED in
+            let signature =
+              Ok (Signed_command.sign_payload ~signature_kind sender payload)
+            in
             [%log info]
               "Payment scheduler with handle %s is sending a payment from \
                sender %s"
@@ -1135,9 +1192,9 @@ module Mutations = struct
                 ] ;
             let fee = Currency.Fee.to_uint64 fee in
             match%map
-              send_signed_user_command ~mina ~nonce_opt:(Some nonce)
-                ~signer:source_pk ~memo:(Some memo) ~fee ~fee_payer_pk:source_pk
-                ~valid_until ~body ~signature
+              send_signed_user_command ~mina ~genesis_constants
+                ~nonce_opt:(Some nonce) ~signer:source_pk ~memo:(Some memo) ~fee
+                ~fee_payer_pk:source_pk ~valid_until ~body ~signature
             with
             | Ok _cmd_with_status ->
                 (* next nonce for this sender *)
@@ -1248,7 +1305,10 @@ module Mutations = struct
             let tm_end = Time.add tm_start duration_span in
             [%log info] "Starting zkApp scheduler with handle %s"
               (Uuid.to_string uuid) ;
-            let { Precomputed_values.constraint_constants; _ } =
+            let { Precomputed_values.constraint_constants
+                ; genesis_constants
+                ; _
+                } =
               (Mina_lib.config mina).precomputed_values
             in
             let zkapp_account_keypairs =
@@ -1314,10 +1374,11 @@ module Mutations = struct
                   in
                   let tm_next = Time.add (Time.now ()) wait_span in
                   don't_wait_for
-                  @@ Itn_zkapps.send_zkapps ~fee_payer_array
-                       ~constraint_constants ~scheduler_tbl ~uuid ~keymap
-                       ~unused_pks ~stop_signal ~mina ~zkapp_command_details
-                       ~wait_span ~logger ~tm_end ~account_state_tbl tm_next
+                  @@ Itn_zkapps.send_zkapps ~genesis_constants
+                       ~constraint_constants ~fee_payer_array ~scheduler_tbl
+                       ~uuid ~keymap ~unused_pks ~stop_signal ~mina
+                       ~zkapp_command_details ~wait_span ~logger ~tm_end
+                       ~account_state_tbl tm_next
                        (List.length zkapp_account_keypairs) ) ;
             Ok (Uuid.to_string uuid) )
 
@@ -1484,7 +1545,7 @@ module Mutations = struct
               let clean_config = Option.value ~default:false clean_config in
               let conf_dir = (Mina_lib.config mina).conf_dir in
               if clean_config then
-                Exit_handlers.register_async_shutdown_handler
+                Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler
                   ~logger:(Mina_lib.config mina).logger
                   ~description:"Remove configuration data" (fun () ->
                     let epoch_ledger_json_file =
@@ -1521,7 +1582,7 @@ module Mutations = struct
                                 in
                                 match%bind Sys.file_exists path with
                                 | `Yes ->
-                                    File_system.remove_dir path
+                                    Mina_stdlib_unix.File_system.remove_dir path
                                 | `No | `Unknown ->
                                     Deferred.unit
                               in
@@ -1551,7 +1612,7 @@ module Mutations = struct
                         let path = conf_dir ^/ dir in
                         match%bind Sys.file_exists path with
                         | `Yes ->
-                            File_system.remove_dir path
+                            Mina_stdlib_unix.File_system.remove_dir path
                         | `No | `Unknown ->
                             Deferred.unit ) ) ;
               let s =
@@ -1575,8 +1636,8 @@ module Mutations = struct
           Arg.[ arg "limit" ~doc:"ZkApp commands per block limit." ~typ:int ]
         ~typ:int
         ~doc:"Set zkApp commands per block limit for the block producer."
-        ~resolve:(fun { ctx = _; _ } () limit ->
-          Block_producer.zkapp_cmd_limit := limit ;
+        ~resolve:(fun { ctx = _, mina; _ } () limit ->
+          Mina_lib.zkapp_cmd_limit mina := limit ;
           limit )
 
     let commands =
@@ -1595,7 +1656,9 @@ module Queries = struct
   open Schema
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
-  let get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt =
+  let get_commands ~proof_cache_db ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+      =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
         Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
@@ -1647,7 +1710,9 @@ module Queries = struct
                       match Zkapp_command.of_base64 serialized_txn with
                       | Ok zkapp_command ->
                           let user_cmd =
-                            User_command.Zkapp_command zkapp_command
+                            User_command.Zkapp_command
+                              (Zkapp_command.write_all_proofs_to_disk
+                                 ~signature_kind ~proof_cache_db zkapp_command )
                           in
                           (* The command gets piped through [forget_check]
                              below; this is just to make the types work
@@ -1699,7 +1764,11 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        let cmds =
+          get_commands
+            ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+            ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
         List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
@@ -1735,11 +1804,16 @@ module Queries = struct
         let resource_pool =
           Network_pool.Transaction_pool.resource_pool transaction_pool
         in
-        let cmds = get_commands ~resource_pool ~pk_opt ~hashes_opt ~txns_opt in
+        let cmds =
+          get_commands
+            ~proof_cache_db:(Mina_lib.proof_cache_db mina)
+            ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
+        in
         List.filter_map cmds ~f:(fun txn ->
             let cmd_with_hash =
               Transaction_hash.User_command_with_valid_signature.forget_check
                 txn
+              |> With_hash.map ~f:User_command.read_all_proofs_from_disk
             in
             match cmd_with_hash.data with
             | Signed_command _ ->
@@ -1791,7 +1865,7 @@ module Queries = struct
     field "version" ~typ:string
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
-      ~resolve:(fun _ _ -> Some Mina_version.commit_id)
+      ~resolve:(fun { ctx; _ } _ -> Some (Mina_lib.commit_id ctx))
 
   let get_filtered_log_entries =
     field "getFilteredLogEntries"
@@ -1993,6 +2067,7 @@ module Queries = struct
         in
         let frontier_broadcast_pipe = Mina_lib.transition_frontier mina in
         let transaction_pool = Mina_lib.transaction_pool mina in
+        (* TODO: do not compute hashes to just get the status *)
         Transaction_inclusion_status.get_status ~frontier_broadcast_pipe
           ~transaction_pool txn.data )
 
@@ -2021,10 +2096,8 @@ module Queries = struct
             ; hash = { State_hash.State_hashes.state_hash = hash; _ }
             } =
           let open Staged_ledger_diff in
-          Genesis_protocol_state.t
-            ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
-            ~genesis_epoch_data ~constraint_constants ~consensus_constants
-            ~genesis_body_reference
+          Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
         in
         let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data =
@@ -2086,8 +2159,8 @@ module Queries = struct
           [ arg "maxLength"
               ~doc:
                 "The maximum number of blocks to return. If there are more \
-                 blocks in the transition frontier from root to tip, the n \
-                 blocks closest to the best tip will be returned"
+                 blocks in the transition frontier from root to tip, the \
+                 maxLength blocks closest to the best tip will be returned"
               ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () max_length ->
@@ -2101,6 +2174,103 @@ module Queries = struct
         | None ->
             return
             @@ Error "Could not obtain best chain from transition frontier" )
+
+  let account_actions =
+    field "accountActions"
+      ~doc:
+        "Find all the actions associated to an account from the current best \
+         tip."
+      ~typ:(non_null @@ list @@ non_null Types.Action_state.spec)
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of account being retrieved"
+              ~typ:(non_null Types.Input.PublicKey.arg_typ)
+          ; arg' "token"
+              ~doc:"Token of account being retrieved (defaults to MINA)"
+              ~typ:Types.Input.TokenId.arg_typ ~default:Token_id.default
+          ; arg "maxLength"
+              ~doc:
+                "The maximum number of blocks to search for actions. If there \
+                 are more blocks in the transition frontier from root to tip, \
+                 the maxLength blocks closest to the best tip will be returned"
+              ~typ:int
+          ]
+      ~resolve:(fun { ctx = mina; _ } () pk token max_length ->
+        let best_chain = Mina_lib.best_chain ?max_length mina in
+        match best_chain with
+        | Some best_chain ->
+            let actions =
+              List.concat_map
+                ~f:(fun bc ->
+                  let user_cmds =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.body
+                    |> Staged_ledger_diff.Body.staged_ledger_diff
+                    |> Staged_ledger_diff.commands
+                  in
+                  let block_number =
+                    bc |> Transition_frontier.Breadcrumb.block
+                    |> Mina_block.header |> Mina_block.Header.blockchain_length
+                  in
+                  let transaction_seq = ref 0 in
+                  let action_list_list =
+                    List.filter_map user_cmds ~f:(fun user_cmd ->
+                        transaction_seq := !transaction_seq + 1 ;
+                        match user_cmd.data with
+                        | Zkapp_command c
+                          when Transaction_status.Stable.V2.(
+                                 equal user_cmd.status Applied) -> (
+                            let actions =
+                              c.Zkapp_command.Poly.account_updates
+                              |> Zkapp_command.Call_forest.fold ~init:(0, [])
+                                   ~f:(fun acc au ->
+                                     let action_seq, acc = acc in
+                                     let account_id =
+                                       Account_id.create au.body.public_key
+                                         token
+                                     in
+                                     if
+                                       Account_id.equal account_id
+                                         (Account_id.create pk token)
+                                     then
+                                       let action_body = au.body.actions in
+                                       let field_elems =
+                                         List.map
+                                           ~f:(fun e -> Array.to_list e)
+                                           action_body
+                                       in
+                                       let action_seq = action_seq + 1 in
+                                       match field_elems with
+                                       | [] ->
+                                           (action_seq, acc)
+                                       | field_elems ->
+                                           let action_state =
+                                             { Types.Action_state.action =
+                                                 field_elems
+                                             ; action_sequence_no = action_seq
+                                             ; transaction_sequence_no =
+                                                 !transaction_seq
+                                             ; block_number
+                                             }
+                                           in
+                                           (action_seq, action_state :: acc)
+                                     else (action_seq, acc) )
+                            in
+                            let _, actions = actions in
+                            match actions with
+                            | [] ->
+                                None
+                            | actions ->
+                                Some actions )
+                        | Signed_command _ | Zkapp_command _ ->
+                            None )
+                  in
+                  action_list_list |> List.concat )
+                best_chain
+            in
+            actions
+        | None ->
+            [] )
 
   let block =
     result_field2 "block"
@@ -2117,12 +2287,9 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () (state_hash_base58_opt : string option)
                     (height_opt : int option) ->
-        let open Result.Let_syntax in
+        (let open Or_error.Let_syntax in
         let block_from_state_hash state_hash_base58 =
-          let%bind state_hash =
-            State_hash.of_base58_check state_hash_base58
-            |> Result.map_error ~f:Error.to_string_hum
-          in
+          let%bind state_hash = State_hash.of_base58_check state_hash_base58 in
           let%map breadcrumb =
             Mina_lib.best_chain_block_by_state_hash mina state_hash
           in
@@ -2148,7 +2315,9 @@ module Queries = struct
         | None, Some height ->
             block_from_height height
         | None, None | Some _, Some _ ->
-            Error "Must provide exactly one of state hash, height" )
+            Or_error.error_string
+              "Must provide exactly one of state hash, height")
+        |> result_of_or_error )
 
   let initial_peers =
     field "initialPeers"
@@ -2188,8 +2357,141 @@ module Queries = struct
           Mina_lib.(
             Option.map (snark_worker_key mina) ~f:(fun _ -> snark_work_fee mina))
         in
-        let (module S) = Mina_lib.work_selection_method mina in
-        S.pending_work_statements ~snark_pool ~fee_opt snark_job_state )
+        Work_selector.pending_work_statements ~snark_pool ~fee_opt
+          snark_job_state )
+
+  let snark_work_range =
+    field "snarkWorkRange"
+      ~doc:
+        "Find any sequence of snark work between two indexes in all available \
+         snark work. Returns both completed and uncompleted work."
+      ~args:
+        Arg.
+          [ arg "startingIndex"
+              ~doc:"The first index to be taken from all available snark work"
+              ~typ:(non_null Types.Input.UInt32.arg_typ)
+          ; arg "endingIndex"
+              ~doc:
+                "The last index to be taken from all available snark work \
+                 (exclusive). If not specified or greater than the available \
+                 snark work list,all elements from index [startingIndex] will \
+                 be returned. An empty list will be returned if startingIndex \
+                 is not a valid index or if startingIndex >= endingIndex."
+              ~typ:Types.Input.UInt32.arg_typ
+          ]
+      ~typ:(non_null @@ list @@ non_null Types.pending_work_spec)
+      ~resolve:(fun { ctx = mina; _ } () start_idx end_idx ->
+        let snark_job_state = Mina_lib.snark_job_state mina in
+        let snark_pool = Mina_lib.snark_pool mina in
+        let all_work = Work_selector.all_work ~snark_pool snark_job_state in
+        let work_size = all_work |> List.length |> Unsigned.UInt32.of_int in
+        let less_than uint1 uint2 = Unsigned.UInt32.compare uint1 uint2 < 0 in
+        let to_bundle_specs =
+          List.map ~f:(fun (spec, fee_prover) ->
+              let spec =
+                One_or_two.map spec
+                  ~f:
+                    (Snark_work_lib.Work.Single.Spec.map
+                       ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+                       ~f_witness:Transaction_witness.read_all_proofs_from_disk )
+              in
+              { Types.Snark_work_bundle.spec; fee_prover } )
+        in
+        match end_idx with
+        | None when less_than start_idx work_size ->
+            (* drop handles case when start_idx is greater than pending work and is O(start_idx)*)
+            let start = Unsigned.UInt32.to_int start_idx in
+            List.drop all_work start |> to_bundle_specs
+        | Some end_idx
+          when less_than start_idx end_idx && less_than start_idx work_size ->
+            let pos = Unsigned.UInt32.to_int start_idx in
+            let len =
+              Unsigned.UInt32.(
+                min (sub end_idx start_idx) (sub work_size start_idx) |> to_int)
+            in
+            List.sub ~pos ~len all_work |> to_bundle_specs
+        | _ ->
+            [] )
+
+  module SnarkedLedgerMembership = struct
+    let resolve_membership :
+           mapper:(Ledger.path -> Account.t -> 'a)
+        -> Mina_lib.t resolve_info
+        -> unit
+        -> (Account.key * Token_id.t option) list
+        -> string
+        -> ('a list, string) result Io.t =
+     fun ~mapper { ctx = mina; _ } () account_infos state_hash ->
+      let open Deferred.Let_syntax in
+      let state_hash = State_hash.of_base58_check_exn state_hash in
+      let%bind ledger =
+        Mina_lib.get_snarked_ledger_full mina (Some state_hash)
+      in
+      let ledger =
+        match ledger with
+        | Ok ledger ->
+            ledger
+        | Error err ->
+            raise
+              (Failure
+                 ("Failed to get snarked ledger: " ^ Error.to_string_hum err) )
+      in
+      let%map memberships =
+        Deferred.List.map account_infos ~f:(fun (pk, token) ->
+            let token = Option.value ~default:Token_id.default token in
+            let account_id = Account_id.create pk token in
+            let location = Ledger.location_of_account ledger account_id in
+            match location with
+            | None ->
+                raise (Failure "Account not found in snarked ledger")
+            | Some location -> (
+                let account = Ledger.get ledger location in
+                match account with
+                | None ->
+                    raise (Failure "Account not found in snarked ledger")
+                | Some account ->
+                    let proof = Ledger.merkle_path ledger location in
+                    mapper proof account |> Deferred.return ) )
+      in
+      Ok memberships
+
+    let snarked_ledger_account_membership =
+      io_field "snarkedLedgerAccountMembership"
+        ~doc:
+          "obtain a membership proof for an account in the snarked ledger \
+           along with the account's balance, timing information, and nonce"
+        ~args:
+          Arg.
+            [ arg "accountInfos" ~doc:"Token id of the account to check"
+                ~typ:
+                  (non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
+            ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
+                ~typ:(non_null string)
+            ]
+        ~typ:(non_null (list (non_null Types.SnarkedLedgerMembership.obj)))
+        ~resolve:
+          (resolve_membership ~mapper:Types.SnarkedLedgerMembership.of_account)
+
+    let encoded_snarked_ledger_account_membership =
+      io_field "encodedSnarkedLedgerAccountMembership"
+        ~doc:
+          "obtain a membership proof for an account in the snarked ledger \
+           along with the accounts full information encoded as base64 binable \
+           type"
+        ~args:
+          Arg.
+            [ arg "accountInfos" ~doc:"Token id of the account to check"
+                ~typ:
+                  (non_null (list (non_null Types.Input.AccountInfo.arg_typ)))
+            ; arg "stateHash" ~doc:"Hash of the snarked ledger to check"
+                ~typ:(non_null string)
+            ]
+        ~typ:
+          (non_null (list (non_null Types.SnarkedLedgerMembership.encoded_obj)))
+        ~resolve:
+          (resolve_membership
+             ~mapper:Types.SnarkedLedgerMembership.of_encoded_account )
+  end
 
   let genesis_constants =
     field "genesisConstants"
@@ -2236,6 +2538,9 @@ module Queries = struct
                     (from, to_, amount, fee, valid_until, memo, nonce_opt)
                     signature ->
         let open Deferred.Result.Let_syntax in
+        let genesis_constants =
+          (Mina_lib.config mina).precomputed_values.genesis_constants
+        in
         let body =
           Signed_command_payload.Body.Payment
             { receiver_pk = to_; amount = Amount.of_uint64 amount }
@@ -2248,8 +2553,9 @@ module Queries = struct
               Deferred.Result.fail "Signature field is missing"
         in
         let%bind user_command_input =
-          Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
-            ~fee_payer_pk:from ~valid_until ~body ~signature
+          Mutations.make_signed_user_command ~genesis_constants ~nonce_opt
+            ~signer:from ~memo ~fee ~fee_payer_pk:from ~valid_until ~body
+            ~signature
         in
         let%map user_command, _ =
           User_command_input.to_user_command
@@ -2258,10 +2564,11 @@ module Queries = struct
             ~constraint_constants:
               (Mina_lib.config mina).precomputed_values.constraint_constants
             ~logger:(Mina_lib.top_level_logger mina)
-            user_command_input
+            ~signature_kind:Mina_signature_kind.t_DEPRECATED user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        Signed_command.check_signature user_command )
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
+        Signed_command.check_signature ~signature_kind user_command )
 
   let runtime_config =
     field "runtimeConfig"
@@ -2271,90 +2578,6 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () ->
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
-
-  let get_epoch_ledgers ~mina breadcrumb =
-    let open Deferred.Result.Let_syntax in
-    let mina_config = Mina_lib.config mina in
-    let frontier_consensus_local_state = mina_config.consensus_local_state in
-    let consensus_state =
-      breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
-      |> Mina_state.Protocol_state.consensus_state
-    in
-    let staking_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
-        consensus_state
-    in
-    let next_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-        consensus_state
-    in
-    let cast_ledger = function
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
-          l ->
-          Ledger.Any_ledger.cast (module Ledger) l
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_db l ->
-          Ledger.Any_ledger.cast (module Ledger.Db) l
-    in
-    let root_consensus_state =
-      let frontier =
-        Option.value_exn @@ Pipe_lib.Broadcast_pipe.Reader.peek
-        @@ Mina_lib.transition_frontier mina
-      in
-      let frontier_root = Transition_frontier.root frontier in
-      frontier_root |> Transition_frontier.Breadcrumb.protocol_state
-      |> Mina_state.Protocol_state.consensus_state
-    in
-    let%map staking_ledger, next_epoch_ledger =
-      match
-        (* We pretend that the block is finalized, so that we can query it in
-           advance, for redundancy.
-        *)
-        Consensus.Hooks.get_epoch_ledgers_for_finalized_frontier_block
-          ~root_consensus_state ~target_consensus_state:consensus_state
-          ~local_state:frontier_consensus_local_state
-      with
-      | `Both (staking_ledger, next_epoch_ledger) ->
-          return (cast_ledger staking_ledger, cast_ledger next_epoch_ledger)
-      | `Snarked_ledger (staking_ledger, num_parents) ->
-          (* The epoch transition was at a block between the given block and
-             the root. We find it by walking back by `num_parents` blocks.
-          *)
-          let%bind epoch_transition_state_hash =
-            let open Result.Let_syntax in
-            let rec ancestor breadcrumb i =
-              if i = 0 then return breadcrumb
-              else
-                let parent_hash =
-                  Transition_frontier.Breadcrumb.parent_hash breadcrumb
-                in
-                let%bind breadcrumb =
-                  Mina_lib.best_chain_block_by_state_hash mina parent_hash
-                in
-                ancestor breadcrumb (i - 1)
-            in
-            ancestor breadcrumb num_parents
-            >>| Transition_frontier.Breadcrumb.state_hash |> Deferred.return
-          in
-          (* When this block reaches the root of the frontier, its snarked
-             ledger will become the next epoch ledger; we simulate that here.
-          *)
-          let%map next_epoch_ledger =
-            Mina_lib.get_snarked_ledger_full mina
-              (Some epoch_transition_state_hash)
-            |> Deferred.Result.map_error ~f:Error.to_string_hum
-          in
-          ( cast_ledger staking_ledger
-          , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
-    in
-    assert (
-      Mina_base.Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root staking_ledger)
-        staking_epoch.ledger.hash ) ;
-    assert (
-      Mina_base.Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
-        next_epoch.ledger.hash ) ;
-    (staking_ledger, next_epoch_ledger)
 
   let fork_config =
     io_field "fork_config"
@@ -2372,109 +2595,47 @@ module Queries = struct
               ~doc:"The height of the desired block in the best chain" ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
-        let open Deferred.Result.Let_syntax in
-        let runtime_config = Mina_lib.runtime_config mina in
-        let%bind breadcrumb =
+        (let open Deferred.Or_error.Let_syntax in
+        let%bind breadcrumb_spec =
           match (state_hash_opt, block_height_opt) with
-          | None, None -> (
-              match Mina_lib.best_tip mina with
-              | `Bootstrapping ->
-                  Deferred.Result.fail "Daemon is bootstrapping"
-              | `Active breadcrumb -> (
-                  let txn_stop_slot_opt =
-                    Runtime_config.slot_tx_end_or_default runtime_config
-                  in
-                  match txn_stop_slot_opt with
-                  | None ->
-                      return breadcrumb
-                  | Some stop_slot ->
-                      let rec find_block_older_than_stop_slot breadcrumb =
-                        let protocol_state =
-                          Transition_frontier.Breadcrumb.protocol_state
-                            breadcrumb
-                        in
-                        let global_slot =
-                          Mina_state.Protocol_state.consensus_state
-                            protocol_state
-                          |> Consensus.Data.Consensus_state.curr_global_slot
-                        in
-                        if
-                          Mina_numbers.Global_slot_since_hard_fork.( < )
-                            global_slot stop_slot
-                        then return breadcrumb
-                        else
-                          let parent_hash =
-                            Transition_frontier.Breadcrumb.parent_hash
-                              breadcrumb
-                          in
-                          let%bind breadcrumb =
-                            Deferred.return
-                            @@ Mina_lib.best_chain_block_by_state_hash mina
-                                 parent_hash
-                          in
-                          find_block_older_than_stop_slot breadcrumb
-                      in
-                      find_block_older_than_stop_slot breadcrumb ) )
+          | None, None ->
+              return `Stop_slot
           | Some state_hash_base58, None ->
-              let open Result.Monad_infix in
-              State_hash.of_base58_check state_hash_base58
-              |> Result.map_error ~f:Error.to_string_hum
-              >>= Mina_lib.best_chain_block_by_state_hash mina
-              |> Deferred.return
+              let%map state_hash =
+                State_hash.of_base58_check state_hash_base58 |> Deferred.return
+              in
+              `State_hash state_hash
           | None, Some block_height ->
-              Mina_lib.best_chain_block_by_height mina
-                (Unsigned.UInt32.of_int block_height)
-              |> Deferred.return
+              return (`Block_height (Unsigned.UInt32.of_int block_height))
           | Some _, Some _ ->
-              Deferred.Result.fail "Cannot specify both state hash and height"
+              Deferred.Or_error.error_string
+                "Cannot specify both state hash and height"
         in
-        let block = Transition_frontier.Breadcrumb.block breadcrumb in
-        let blockchain_length = Mina_block.blockchain_length block in
-        let global_slot =
-          Mina_block.consensus_state block
-          |> Consensus.Data.Consensus_state.curr_global_slot
-        in
-        let staged_ledger =
-          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-          |> Staged_ledger.ledger
-        in
-        let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-        let protocol_state =
-          Transition_frontier.Breadcrumb.protocol_state breadcrumb
-        in
-        let consensus =
-          Mina_state.Protocol_state.consensus_state protocol_state
-        in
-        let staking_epoch =
-          Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
-            consensus
-        in
-        let next_epoch =
-          Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-            consensus
-        in
-        let staking_epoch_seed =
-          Mina_base.Epoch_seed.to_base58_check
-            staking_epoch.Mina_base.Epoch_data.Poly.seed
-        in
-        let next_epoch_seed =
-          Mina_base.Epoch_seed.to_base58_check
-            next_epoch.Mina_base.Epoch_data.Poly.seed
-        in
-        let%bind staking_ledger, next_epoch_ledger =
-          get_epoch_ledgers ~mina breadcrumb
+        let%bind { staged_ledger
+                 ; global_slot_since_genesis
+                 ; state_hash
+                 ; staking_ledger
+                 ; staking_epoch_seed
+                 ; next_epoch_ledger
+                 ; next_epoch_seed
+                 ; blockchain_length
+                 } =
+          Mina_lib.Hardfork_config.prepare_inputs ~breadcrumb_spec mina
         in
         let%bind new_config =
-          Runtime_config.make_fork_config ~staged_ledger ~global_slot
-            ~state_hash ~staking_ledger ~staking_epoch_seed
-            ~next_epoch_ledger:(Some next_epoch_ledger) ~next_epoch_seed
+          Runtime_config.make_fork_config ~staged_ledger
+            ~global_slot_since_genesis ~state_hash ~staking_ledger
+            ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
+            ~next_epoch_ledger:(Some next_epoch_ledger)
+            ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
             ~blockchain_length
         in
         let%map () =
           let open Async.Deferred.Infix in
           Async_unix.Scheduler.yield () >>| Result.return
         in
-        Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
+        Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic)
+        |> Deferred.Result.map_error ~f:Error.to_string_hum )
 
   let thread_graph =
     field "threadGraph"
@@ -2554,7 +2715,7 @@ module Queries = struct
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
         let open Deferred.Result.Let_syntax in
-        Mina_lib.verifier mina |> Verifier.get_blockchain_verification_key
+        Mina_lib.prover mina |> Prover.get_blockchain_verification_key
         |> Deferred.Result.map_error ~f:Error.to_string_hum
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
@@ -2566,15 +2727,14 @@ module Queries = struct
       ~typ:(non_null string)
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
-        let configured_name =
-          let open Option.Let_syntax in
-          let cfg = Mina_lib.runtime_config mina in
-          let%bind ledger = cfg.ledger in
-          ledger.name
+        let cfg = Mina_lib.config mina in
+        let runtime_cfg = Mina_lib.runtime_config mina in
+        let network_id =
+          Option.value ~default:cfg.compile_config.network_id
+          @@ let%bind.Option daemon = runtime_cfg.daemon in
+             daemon.network_id
         in
-        "mina:"
-        ^ Option.value ~default:Mina_compile_config.network_id configured_name
-        )
+        "mina:" ^ network_id )
 
   let signature_kind =
     field "signatureKind"
@@ -2582,7 +2742,7 @@ module Queries = struct
       ~typ:(non_null string)
       ~args:Arg.[]
       ~resolve:(fun _ () ->
-        match Mina_signature_kind.t with
+        match Mina_signature_kind.t_DEPRECATED with
         | Mainnet ->
             "mainnet"
         | Testnet ->
@@ -2590,6 +2750,65 @@ module Queries = struct
         | Other_network s ->
             (* Prefix string to disambiguate *)
             "other network: " ^ s )
+
+  let protocol_state =
+    io_field "protocolState"
+      ~doc:
+        "Get the protocol state for a given block, optionally encoded in Base64"
+      ~typ:(non_null string)
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"The state hash of the desired block"
+              ~typ:string
+          ; arg "height"
+              ~doc:"The height of the desired block in the best chain" ~typ:int
+          ; arg "encoding" ~doc:"Encoding format (JSON or BASE64)"
+              ~typ:
+                (enum "Encoding"
+                   ~values:
+                     [ enum_value "JSON" ~value:`JSON
+                     ; enum_value "BASE64" ~value:`BASE64
+                     ] )
+          ]
+      ~resolve:(fun { ctx = mina; _ } () state_hash_base58_opt height_opt
+                    encoding_opt ->
+        (let open Deferred.Result.Let_syntax in
+        let%map breadcrumb =
+          match (state_hash_base58_opt, height_opt) with
+          | None, None -> (
+              match Mina_lib.best_tip mina with
+              | `Active best_tip ->
+                  Deferred.Result.return best_tip
+              | `Bootstrapping ->
+                  Deferred.Or_error.error_string "Node is bootstrapping" )
+          | Some state_hash_base58, None ->
+              let%bind state_hash =
+                Deferred.return (State_hash.of_base58_check state_hash_base58)
+              in
+              Deferred.return
+                (Mina_lib.best_chain_block_by_state_hash mina state_hash)
+          | None, Some height ->
+              let height_uint32 = Unsigned.UInt32.of_int height in
+              Deferred.return
+                (Mina_lib.best_chain_block_by_height mina height_uint32)
+          | Some _, Some _ ->
+              Deferred.Or_error.error_string
+                "Must provide exactly one of state hash, height"
+        in
+        let protocol_state =
+          Transition_frontier.Breadcrumb.protocol_state breadcrumb
+        in
+        match encoding_opt with
+        | Some `BASE64 ->
+            Bin_prot.Writer.to_string
+              Mina_state.Protocol_state.Value.Stable.V2.bin_t.writer
+              protocol_state
+            |> Base64.encode_exn
+        | Some `JSON | None ->
+            (* Default to JSON if no encoding is specified *)
+            Mina_state.Protocol_state.value_to_yojson protocol_state
+            |> Yojson.Safe.to_string)
+        |> Deferred.Result.map_error ~f:Error.to_string_hum )
 
   let commands =
     [ sync_status
@@ -2617,6 +2836,9 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; pending_snark_work
+    ; snark_work_range
+    ; SnarkedLedgerMembership.snarked_ledger_account_membership
+    ; SnarkedLedgerMembership.encoded_snarked_ledger_account_membership
     ; genesis_constants
     ; time_offset
     ; validate_payment
@@ -2628,6 +2850,8 @@ module Queries = struct
     ; blockchain_verification_key
     ; network_id
     ; signature_kind
+    ; protocol_state
+    ; account_actions
     ]
 
   module Itn = struct
@@ -2701,8 +2925,6 @@ let schema_limited =
       ~mutations:[] ~subscriptions:[])
 
 let schema_itn : (bool * Mina_lib.t) Schema.schema =
-  if Mina_compile_config.itn_features then
-    Graphql_async.Schema.(
-      schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
-        ~subscriptions:[])
-  else Graphql_async.Schema.(schema [] ~mutations:[] ~subscriptions:[])
+  Graphql_async.Schema.(
+    schema Queries.Itn.commands ~mutations:Mutations.Itn.commands
+      ~subscriptions:[])

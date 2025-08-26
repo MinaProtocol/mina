@@ -1,4 +1,4 @@
-open Intf
+open Kimchi_pasta_snarky_backend.Intf
 open Core_kernel
 
 module type Input_intf = sig
@@ -159,15 +159,16 @@ struct
     include Stable.Latest
 
     let to_backend :
-        (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t -> Backend.t =
-      function
+           (Base_field.t * Base_field.t) Plonkish_prelude.Or_infinity.t
+        -> Backend.t = function
       | Infinity ->
           Infinity
       | Finite (x, y) ->
           Finite (x, y)
 
     let of_backend :
-        Backend.t -> (Base_field.t * Base_field.t) Pickles_types.Or_infinity.t =
+           Backend.t
+        -> (Base_field.t * Base_field.t) Plonkish_prelude.Or_infinity.t =
       function
       | Infinity ->
           Infinity

@@ -95,7 +95,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; global_slot_since_genesis = 500000
     }
 
-  let config =
+  let config ~constants =
     let open Test_config in
     let staking_accounts : Test_account.t list =
       let open Test_account in
@@ -112,7 +112,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = staking_accounts in
       { epoch_ledger; epoch_seed }
     in
-    (* next accounts contains staking accounts, with balances changed, one new account *)
+    (* next accounts contains staking accounts, with balances changed, one new
+       account *)
     let next_accounts : Test_account.t list =
       let open Test_account in
       [ create ~account_name:"node-a-key" ~balance:"200000" ()
@@ -129,12 +130,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = next_accounts in
       { epoch_ledger; epoch_seed }
     in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; epoch_data = Some { staking; next = Some next }
     ; genesis_ledger =
         (let open Test_account in
-        (* the genesis ledger contains the staking ledger plus some other accounts *)
+        (* the genesis ledger contains the staking ledger plus some other
+           accounts *)
         staking_accounts
         @ [ create ~account_name:"fish1" ~balance:"100" ()
           ; create ~account_name:"fish2" ~balance:"100" ()
@@ -210,11 +212,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
     }
 
-  let run network t =
+  let run ~config:({ Test_config.signature_kind; _ } as config) network t =
     let open Malleable_error.Let_syntax in
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.compiled
-    in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -222,36 +221,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (Wait_condition.nodes_to_initialize
            (Core.String.Map.data all_mina_nodes) )
     in
-    let node_a =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
-    let node_b =
-      Core.String.Map.find_exn (Network.block_producers network) "node-b"
-    in
-    let fish1 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish1"
-    in
-    let fish2 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "fish2"
-    in
-    let timed1 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed1"
-    in
-    let timed2 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed2"
-    in
-    let timed3 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed3"
-    in
-    let timed4 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed4"
-    in
-    let timed5 =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "timed5"
-    in
-    let vk_proof =
-      Core.String.Map.find_exn (Network.genesis_keypairs network) "vk-proof"
-    in
+    let node_a = Network.block_producer_exn network "node-a" in
+    let node_b = Network.block_producer_exn network "node-b" in
+    let fish1 = Network.genesis_keypair_exn network "fish1" in
+    let fish2 = Network.genesis_keypair_exn network "fish2" in
+    let timed1 = Network.genesis_keypair_exn network "timed1" in
+    let timed2 = Network.genesis_keypair_exn network "timed2" in
+    let timed3 = Network.genesis_keypair_exn network "timed3" in
+    let timed4 = Network.genesis_keypair_exn network "timed4" in
+    let timed5 = Network.genesis_keypair_exn network "timed5" in
+    let vk_proof = Network.genesis_keypair_exn network "vk-proof" in
     let vk_impossible =
       Core.String.Map.find_exn
         (Network.genesis_keypairs network)
@@ -296,7 +275,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       { Signed_command_payload.Poly.common; body }
     in
     let raw_signature =
-      Signed_command.sign_payload sender.private_key payload
+      Signed_command.sign_payload ~signature_kind sender.private_key payload
       |> Signature.Raw.encode
     in
     let zkapp_account_keypair = Signature_lib.Keypair.create () in
@@ -362,11 +341,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; sender = (fish1.keypair, Account.Nonce.(succ one))
         }
       in
-      let%map vk_proof =
+      let constraint_constants = Network.constraint_constants network in
+      let%bind vk_proof =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_proof
-      and vk_impossible =
+      in
+      let%map vk_impossible =
         Malleable_error.lift
         @@ Transaction_snark.For_tests.update_states ~constraint_constants
              spec_impossible
@@ -727,8 +708,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                let bad_height =
                  Unsigned.UInt32.to_int height <= fork_config.blockchain_length
                in
-               (* for now, we accept the "link block" with a global slot since genesis equal to the previous global slot
-                  see issue #13897
+               (* for now, we accept the "link block" with a global slot since
+                  genesis equal to the previous global slot - see issue #13897
                *)
                let bad_slot =
                  Mina_numbers.Global_slot_since_genesis.to_int

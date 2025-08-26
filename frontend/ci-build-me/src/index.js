@@ -74,11 +74,12 @@ const handler = async (event, req) => {
       // and the comment contents is exactly the slug we are looking for
       req.body.comment.body == "!approved-for-mainnet"
     ) {
-      // TODO #7711: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
+      // TODO: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
       if (
-        req.body.sender.login == "aneesharaines" ||
         req.body.sender.login == "bkase" ||
+        req.body.sender.login == "dannywillems" ||
         req.body.sender.login == "deepthiskumar" ||
+        req.body.sender.login == "georgeee" ||
         req.body.sender.login == "mrmr1993" ||
         req.body.sender.login == "nholland94"
       ) {
@@ -100,6 +101,40 @@ const handler = async (event, req) => {
       }
     }
 
+    // Mina CI Build section (nix-based)
+    else if (
+      // we are creating the comment
+      req.body.action == "created" &&
+      // and this is actually a pull request
+      req.body.issue.pull_request &&
+      req.body.issue.pull_request.url &&
+      // and the comment contents is exactly the slug we are looking for
+      req.body.comment.body == "!ci-nix-me"
+    ) {
+      const orgData = await getRequest(req.body.sender.organizations_url);
+      // and the comment author is part of the core team
+      if (
+          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
+      ) {
+        const prData = await getRequest(req.body.issue.pull_request.url);
+        const buildkite = await runBuild(
+          {
+            sender: req.body.sender,
+            pull_request: prData.data,
+          },
+          "mina-nix-experimental",
+          {}
+        );
+        return [buildkite];
+      } else {
+        // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
+        return [
+          "comment author is not (publically) a member of the core team",
+          "comment author is not (publically) a member of the core team",
+        ];
+      }
+    }
+
     // Mina CI Build section
     else if (
       // we are creating the comment
@@ -113,10 +148,7 @@ const handler = async (event, req) => {
       const orgData = await getRequest(req.body.sender.organizations_url);
       // and the comment author is part of the core team
       if (
-          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0 ||
-          req.body.sender.login == "ylecornec" ||
-          req.body.sender.login == "balsoft" ||
-          req.body.sender.login == "bryanhonof"
+          orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
         const buildkite = await runBuild(

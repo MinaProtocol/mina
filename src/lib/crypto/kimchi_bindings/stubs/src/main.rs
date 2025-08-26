@@ -7,10 +7,7 @@ use kimchi::circuits::{
     },
 };
 use kimchi::proof::{caml::CamlRecursionChallenge, PointEvaluations};
-use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
-use std::fs::File;
-use std::io::Write;
-use wires_15_stubs::{
+use kimchi_stubs::{
     // we must import all here, to have access to the derived functions
     arkworks::{bigint_256::*, group_affine::*, group_projective::*, pasta_fp::*, pasta_fq::*},
     field_vector::{fp::*, fq::*},
@@ -42,6 +39,9 @@ use wires_15_stubs::{
     CurrOrNext,
     GateType,
 };
+use ocaml_gen::{decl_fake_generic, decl_func, decl_module, decl_type, decl_type_alias, Env};
+use std::fs::File;
+use std::io::Write;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -363,6 +363,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fp_srs_write => "write");
                 decl_func!(w, env, caml_fp_srs_read => "read");
                 decl_func!(w, env, caml_fp_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_fp_srs_lagrange_commitments_whole_domain => "lagrange_commitments_whole_domain");
                 decl_func!(w, env, caml_fp_srs_add_lagrange_basis=> "add_lagrange_basis");
                 decl_func!(w, env, caml_fp_srs_commit_evaluations => "commit_evaluations");
                 decl_func!(w, env, caml_fp_srs_b_poly_commitment => "b_poly_commitment");
@@ -378,6 +379,7 @@ fn generate_kimchi_bindings(mut w: impl std::io::Write, env: &mut Env) {
                 decl_func!(w, env, caml_fq_srs_write => "write");
                 decl_func!(w, env, caml_fq_srs_read => "read");
                 decl_func!(w, env, caml_fq_srs_lagrange_commitment => "lagrange_commitment");
+                decl_func!(w, env, caml_fq_srs_lagrange_commitments_whole_domain => "lagrange_commitments_whole_domain");
                 decl_func!(w, env, caml_fq_srs_add_lagrange_basis=> "add_lagrange_basis");
                 decl_func!(w, env, caml_fq_srs_commit_evaluations => "commit_evaluations");
                 decl_func!(w, env, caml_fq_srs_b_poly_commitment => "b_poly_commitment");

@@ -14,12 +14,15 @@ EXTRA_KEY_BALANCE=${EXTRA_KEY_BALANCE:-10000000}
 # Do not use "next" ledgers
 NO_NEXT=${NO_NEXT:-}
 
+# Replace top
+REPLACE_TOP=${REPLACE_TOP:-}
+
 echo "Script downloads ledgers for the three latest consequetive epochs of mainnet and converts them into ledgers suitable for HF dryrun" >&2
 echo "Script creates three files in current directory: genesis.json staking.json and next.json" >&2
 echo "Script assumes mainnet's start was at epoch 0 on 17th March 2021, if it's not the case, update the script please" >&2
 echo "Usage: $0 [-e|--extra-keys $EXTRA_KEYS] [-b|--extra-key-balance $EXTRA_KEY_BALANCE] <BP key 1> <BP key 2> ... <BP key n>" >&2
 
-MAINNET_START='2021-03-17 00:00:00'
+MAINNET_START='2024-06-05T00:00:00Z'
 now=$(date +%s)
 mainnet_start=$(date --date="$MAINNET_START" -u +%s)
 
@@ -37,6 +40,8 @@ while [[ $# -gt 0 ]]; do
       EXTRA_KEYS="$2"; shift; shift ;;
     -b|--extra-key-balance)
       KEY_BALANCE="$2"; shift; shift ;;
+    -r|--repalce-top)
+      REPLACE_TOP=1; shift ;;
     --no-next)
       NO_NEXT=1; shift ;;
     -*|--*)
@@ -58,11 +63,16 @@ function update_extra_balances(){
 
 ledger_script="$SCRIPT_DIR/prepare-test-ledger.sh"
 
+args=""
+if [[ "$REPLACE_TOP" != "" ]]; then
+  args="-r"
+fi
+
 if [[ "$NO_NEXT" == "" ]]; then
-  "$ledger_script" -r -p next-staking-$EPOCH "${KEYS[@]}" | update_extra_balances > genesis.json
+  "$ledger_script" $args -p next-staking-$EPOCH "${KEYS[@]}" | update_extra_balances > genesis.json
 else
-  "$ledger_script" -r -p staking-$EPOCH "${KEYS[@]}" | update_extra_balances > genesis.json
+  "$ledger_script" $args -p staking-$EPOCH "${KEYS[@]}" | update_extra_balances > genesis.json
   EPOCH=$((EPOCH-1))
 fi
-"$ledger_script" -r -p staking-$EPOCH "${KEYS[@]}" | update_extra_balances > next.json
-"$ledger_script" -r -p staking-$((EPOCH-1)) "${KEYS[@]}" | update_extra_balances > staking.json
+"$ledger_script" $args -p staking-$EPOCH "${KEYS[@]}" | update_extra_balances > next.json
+"$ledger_script" $args -p staking-$((EPOCH-1)) "${KEYS[@]}" | update_extra_balances > staking.json

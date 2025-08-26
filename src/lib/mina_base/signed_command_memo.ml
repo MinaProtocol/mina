@@ -1,7 +1,5 @@
 (* signed_command_memo.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params
 
@@ -18,7 +16,7 @@ module Make_str (_ : Wire_types.Concrete) = struct
     module V1 = struct
       [@@@with_all_version_tags]
 
-      type t = Bounded_types.String.Tagged.Stable.V1.t
+      type t = Mina_stdlib.Bounded_types.String.Tagged.Stable.V1.t
       [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id
@@ -79,21 +77,27 @@ module Make_str (_ : Wire_types.Concrete) = struct
 
   let max_input_length = digest_length
 
-  let tag (memo : t) = memo.[tag_index]
+  let tag (memo : t) =
+    if tag_index < String.length memo then Some memo.[tag_index] else None
 
-  let length memo = Char.to_int memo.[length_index]
+  let length memo =
+    if length_index < String.length memo then
+      Some (Char.to_int memo.[length_index])
+    else None
 
-  let is_bytes memo = Char.equal (tag memo) bytes_tag
+  let is_bytes memo = Option.equal Char.equal (tag memo) (Some bytes_tag)
 
-  let is_digest memo = Char.equal (tag memo) digest_tag
+  let is_digest memo = Option.equal Char.equal (tag memo) (Some digest_tag)
 
   let is_valid memo =
     Int.(String.length memo = memo_length)
     &&
-    let length = length memo in
+    let length =
+      Option.value_exn ~message:"memo_length > length_index" @@ length memo
+    in
     if is_digest memo then Int.(length = digest_length)
     else
-      Char.equal (tag memo) bytes_tag
+      is_bytes memo
       && Int.(length <= digest_length)
       &&
       let padded =
@@ -156,12 +160,19 @@ module Make_str (_ : Wire_types.Concrete) = struct
   type raw = Digest of string | Bytes of string
 
   let to_raw_exn memo =
-    let tag = tag memo in
-    if Char.equal tag digest_tag then Digest (to_base58_check memo)
-    else if Char.equal tag bytes_tag then
-      let len = length memo in
-      Bytes (String.init len ~f:(fun idx -> memo.[idx - 2]))
-    else failwithf "Unknown memo tag %c" tag ()
+    if is_digest memo then Digest (to_base58_check memo)
+    else if is_bytes memo then
+      match length memo with
+      | Some len ->
+          Bytes (String.init len ~f:(fun idx -> memo.[idx - 2]))
+      | None ->
+          failwith "Invalid memo"
+    else
+      match tag memo with
+      | Some tag ->
+          failwithf "Unknown memo tag %c" tag ()
+      | None ->
+          failwith "Missing memo tag"
 
   let to_raw_bytes_exn memo =
     match to_raw_exn memo with
@@ -201,11 +212,21 @@ module Make_str (_ : Wire_types.Concrete) = struct
          (Random_oracle_input.Legacy.bitstring (to_bits memo)) )
 
   let to_plaintext (memo : t) : string Or_error.t =
-    if is_bytes memo then Ok (String.sub memo ~pos:2 ~len:(length memo))
+    if is_bytes memo then
+      match length memo with
+      | Some len ->
+          Ok (String.sub memo ~pos:2 ~len)
+      | None ->
+          Error (Error.of_string "Invalid memo")
     else Error (Error.of_string "Memo does not contain text bytes")
 
   let to_digest (memo : t) : string Or_error.t =
-    if is_digest memo then Ok (String.sub memo ~pos:2 ~len:digest_length)
+    if is_digest memo then
+      match length memo with
+      | Some len when len = digest_length ->
+          Ok (String.sub memo ~pos:2 ~len)
+      | Some _ | None ->
+          Error (Error.of_string "Invalid memo")
     else Error (Error.of_string "Memo does not contain a digest")
 
   let to_string_hum (memo : t) =
@@ -218,8 +239,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
             sprintf "0x%s" (Hex.encode digest)
         | Error _ ->
             "(Invalid memo, neither text nor a digest)" )
-
-  [%%ifdef consensus_mechanism]
 
   module Boolean = Tick.Boolean
   module Typ = Tick.Typ
@@ -248,15 +267,15 @@ module Make_str (_ : Wire_types.Concrete) = struct
       ~there:(fun (t : t) -> Blake2.string_to_bits (t :> string))
       ~back:(fun bs -> (Blake2.bits_to_string bs :> t))
 
-  [%%endif]
-
   let deriver obj =
     Fields_derivers_zkapps.iso_string obj ~name:"Memo" ~js_type:String
       ~to_string:to_base58_check ~of_string:of_base58_check_exn
 
   let%test_module "user_command_memo" =
     ( module struct
-      let data memo = String.sub memo ~pos:(length_index + 1) ~len:(length memo)
+      let data memo =
+        String.sub memo ~pos:(length_index + 1)
+          ~len:(Option.value_exn @@ length memo)
 
       let%test "digest string" =
         let s = "this is a string" in
@@ -284,8 +303,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           false
         with Too_long_user_memo_input -> true
 
-      [%%ifdef consensus_mechanism]
-
       let%test_unit "typ is identity" =
         let s = "this is a string" in
         let memo = create_by_digesting_string_exn s in
@@ -310,8 +327,6 @@ module Make_str (_ : Wire_types.Concrete) = struct
           |> typ.value_of_fields
         in
         [%test_eq: string] memo memo_read
-
-      [%%endif]
     end )
 end
 

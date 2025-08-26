@@ -8,7 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -19,9 +20,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   (* let num_sender_nodes = 4 *)
 
-  let config =
+  let config ~(constants : Test_config.constants) =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -68,15 +69,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let min_resulting_blocks = 12
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let receiver =
-      Core.String.Map.find_exn (Network.block_producers network) "receiver"
-    in
-    let observer =
-      Core.String.Map.find_exn (Network.block_producers network) "observer"
-    in
+    let receiver = Network.block_producer_exn network "receiver" in
+    let observer = Network.block_producer_exn network "observer" in
     let%bind receiver_pub_key = pub_key_of_node receiver in
     let empty_bps =
       Core.String.Map.remove
@@ -218,14 +215,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            List.fold ~init:0 ~f:( + )
            @@ List.drop block_production_delay_histogram_buckets_60s_min 1
          in
-         (* First two slots might be delayed because of test's bootstrap, so we have 2 as a threshold *)
+         (* First two slots might be delayed because of test's bootstrap, so we
+            have 2 as a threshold *)
          ok_if_true "block production was delayed" (blocks_delayed_over_60s <= 2)
         )
     in
     let%bind () =
       section "retrieve metrics of tx sender nodes"
-        (* We omit the result because we just want to query senders to see some useful
-            output in test logs *)
+        (* We omit the result because we just want to query senders to see some
+           useful output in test logs *)
         (Malleable_error.List.iter empty_bps
            ~f:
              (Fn.compose Malleable_error.soften_error

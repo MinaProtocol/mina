@@ -82,6 +82,7 @@ end) : sig
   val create :
        max_batch_size:int
     -> stop:unit Deferred.t
+    -> logger:Logger.t
     -> trust_system:Trust_system.t
     -> get:(Peer.t -> Key.t list -> Result.t list Deferred.Or_error.t)
     -> knowledge_context:Knowledge_context.t Broadcast_pipe.Reader.t
@@ -104,6 +105,8 @@ end) : sig
   val check_invariant : t -> unit
 
   val set_check_invariant : (t -> unit) -> unit
+
+  val logger : t -> Logger.t
 end = struct
   let max_wait = Time.Span.of_ms 100.
 
@@ -626,6 +629,8 @@ end = struct
     ; stop : unit Deferred.t
     }
 
+  let logger t = t.logger
+
   let jobs_added t = Bvar.broadcast t.jobs_added_bvar ()
 
   let total_jobs (t : t) = Q.length t.pending + Hashtbl.length t.downloading
@@ -951,7 +956,7 @@ end = struct
   let mark_preferred t peer ~now =
     Useful_peers.Preferred_heap.add t.useful_peers.all_preferred (peer, now)
 
-  let create ~max_batch_size ~stop ~trust_system ~get ~knowledge_context
+  let create ~max_batch_size ~stop ~logger ~trust_system ~get ~knowledge_context
       ~knowledge ~peers ~preferred =
     let%map all_peers = peers () in
     let pipe ~name c =
@@ -972,7 +977,7 @@ end = struct
       ; useful_peers = Useful_peers.create ~all_peers ~preferred
       ; get
       ; max_batch_size
-      ; logger = Logger.create ()
+      ; logger
       ; trust_system
       ; downloading = Key.Table.create ()
       ; stop

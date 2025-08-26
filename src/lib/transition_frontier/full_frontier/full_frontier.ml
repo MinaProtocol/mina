@@ -20,7 +20,7 @@ module Node = struct
     ; successor_hashes : State_hash.t list
     ; length : int
     }
-  [@@deriving sexp, fields]
+  [@@deriving fields]
 
   type display =
     { length : int
@@ -306,7 +306,6 @@ let visualize_to_string t =
 let calculate_root_transition_diff t heir =
   let root = root t in
   let heir_hash = Breadcrumb.state_hash heir in
-  let heir_transition = Breadcrumb.validated_transition heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->
@@ -326,15 +325,22 @@ let calculate_root_transition_diff t heir =
         in
         { transition; scan_state } )
   in
+  let new_scan_state = Staged_ledger.scan_state heir_staged_ledger in
   let protocol_states =
     Protocol_states_for_root_scan_state.protocol_states_for_next_root_scan_state
-      t.protocol_states_for_root_scan_state
-      ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+      t.protocol_states_for_root_scan_state ~new_scan_state
       ~old_root_state:(Breadcrumb.protocol_state_with_hashes root)
   in
+  let heir_transition =
+    Breadcrumb.validated_transition heir
+    |> Mina_block.Validated.read_all_proofs_from_disk
+  in
+  let new_scan_state_unwrapped =
+    Staged_ledger.Scan_state.read_all_proofs_from_disk new_scan_state
+  in
   let new_root_data =
-    Root_data.Limited.create ~transition:heir_transition
-      ~scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+    Root_data.Limited.Stable.Latest.create ~transition:heir_transition
+      ~scan_state:new_scan_state_unwrapped
       ~pending_coinbase:
         (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
       ~protocol_states
@@ -380,7 +386,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
    * the following operations on masks in order:
    *
    *     0) notify consensus that root transitioned
-   *     1) unattach and destroy all the garbage (to avoid unecessary trickling of
+   *     1) unattach and destroy all the garbage (to avoid unnecessary trickling of
    *        invalidations from `m0` during the next step)
    *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
    *        making `m1` into an identity mask (an empty mask on top of `m1'`).
@@ -451,23 +457,23 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-      let location =
-        Persistent_root.Locations.potential_snarked_ledger
-          t.persistent_root_instance.factory.directory
+      let config =
+        Persistent_root.Instance.Config.make_potential_snarked_ledger
+          t.persistent_root_instance.factory
       in
       let () =
-        Ledger.Db.make_checkpoint t.persistent_root_instance.snarked_ledger
-          ~directory_name:location
+        Ledger.Root.make_checkpoint t.persistent_root_instance.snarked_ledger
+          ~config
       in
       [%log' info t.logger]
         ~metadata:
           [ ( "potential_snarked_ledger_hash"
             , Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash
-              @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger
-            )
+              @@ Ledger.Root.merkle_root
+                   t.persistent_root_instance.snarked_ledger )
           ]
         "Enqueued a snarked ledger" ;
-      Persistent_root.Instance.enqueue_snarked_ledger ~location
+      Persistent_root.Instance.enqueue_snarked_ledger ~config
         t.persistent_root_instance ;
       let s = t.root_ledger in
       (* STEP 4 *)
@@ -475,10 +481,11 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         Ledger.Maskable.register_mask s
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       (* STEP 5 *)
       (*Validate transactions against the protocol state associated with the transaction*)
       let apply_first_pass =
-        Ledger.apply_transaction_first_pass
+        Ledger.apply_transaction_first_pass ~signature_kind
           ~constraint_constants:Context.constraint_constants
       in
       let apply_second_pass = Ledger.apply_transaction_second_pass in
@@ -628,10 +635,12 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
   | Root_transitioned { new_root; garbage = Full garbage; _ } ->
-      let new_root_hash = (Root_data.Limited.hashes new_root).state_hash in
+      let new_root_hash =
+        (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+      in
       let old_root_hash = t.root in
       let new_root_protocol_states =
-        Root_data.Limited.protocol_states new_root
+        Root_data.Limited.Stable.Latest.protocol_states new_root
       in
       [%log' internal t.logger] "Move_frontier_root" ;
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
@@ -962,10 +971,7 @@ module For_tests = struct
 
   let verifier () =
     Async.Thread_safe.block_on_async_exn (fun () ->
-        Verifier.create ~logger ~proof_level ~constraint_constants
-          ~conf_dir:None
-          ~pids:(Child_processes.Termination.create_pid_table ())
-          () )
+        Verifier.For_tests.default ~constraint_constants ~logger ~proof_level () )
 
   module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
@@ -993,7 +999,8 @@ module For_tests = struct
     let consensus_local_state =
       Consensus.Data.Local_state.create
         ~context:(module Context)
-        Public_key.Compressed.Set.empty ~genesis_ledger:Genesis_ledger.t
+        Public_key.Compressed.Set.empty
+        ~genesis_ledger:(module Genesis_ledger)
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:
@@ -1006,12 +1013,14 @@ module For_tests = struct
            ~src:(Lazy.force Genesis_ledger.t)
            ~dest:(Mina_ledger.Ledger.create ~depth:ledger_depth ()) )
     in
+    let staged_ledger =
+      Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+    in
     let root_data =
       let open Root_data in
       { transition =
           Mina_block.Validated.lift @@ Mina_block.genesis ~precomputed_values
-      ; staged_ledger =
-          Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
+      ; staged_ledger
       ; protocol_states = []
       }
     in

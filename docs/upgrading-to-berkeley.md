@@ -63,6 +63,7 @@ done
 
 ## Verifying packaged configuration
 
+
 A script is installed (from `./scripts/mina-verify-packaged-fork-config`) that automates this process. If you want to verify that an installed Mina package was generated from the same configuration as the one exported earlier, it is as easy as:
 
 ```
@@ -70,3 +71,65 @@ mina-verify-packaged-fork-config (mainnet|devnet) fork_config.json /tmp/mina-ver
 ```
 
 Many of the script inputs are environment variables that default to the locations used by the debs. If you are building from source, inspect the script, determine what you need to change, and then run it.
+
+Here are some general instructions that should help you get most of the way there.
+
+### Package Verification
+
+#### Environment Setup
+1. **Use a Debian Environment:** 
+    - It is recommended to perform package verification in a Debian environment because macOS Intel emulation doesn’t support the required AVX instructions for libp2p.
+
+2. **Environment Preparation:**
+    - **Install mina-create-legacy-genesis**
+      ```bash
+      echo "deb [trusted=yes] http://packages.o1test.net bullseye stable" > /etc/apt/sources.list.d/o1.list
+      apt-get update
+      apt-get install mina-create-legacy-genesis=1.4.1-97f7d8c
+
+    - **Direct Installation Script:**
+    - ***NOTE this currently needs to be run as root***
+        ``` bash
+        #!/bin/bash
+        export CONFIG_JSON_GZ_URL="https://storage.googleapis.com/tmp-hardfork-testing/fork-config-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json.gz"
+        export GENESIS_TIMESTAMP="2024-06-05T00:00:00Z"
+        export NETWORK_NAME="mainnet"
+        mkdir -p genesis_ledgers
+        cp /var/lib/coda/config_93e02797.json genesis_ledgers/mainnet.json
+        curl https://storage.googleapis.com/tmp-hardfork-testing/fork-config-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json.gz > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config mainnet config.json /workdir/verification 
+        ```
+
+- **Prepare Environment Variables:** Set up the necessary environment variables manually to match the expected configuration for verification.
+- **Create `genesis_ledgers` Directory:** Temporarily, create a new directory named `genesis_ledgers` in the working directory and place the daemon config for the required chain, typically `mainnet.json` there. Alternatively, make sure that `genesis_ledgers/mainnet.json` is present. The script assumes that it is running in a directory where this is present.
+
+
+3. **Set Environment Variables:**
+    - **GSUTIL Path:**
+        ```bash
+        export GSUTIL=/usr/bin/gsutil
+        ```
+    - **Download Block Data:**
+        - Example command to download the block data:
+            ```bash
+            gsutil cp gs://mina_network_block_data/mainnet-<some-version>.json ./block_data.json
+            export PRECOMPUTED_FORK_BLOCK=./block_data.json
+            ```
+    - **Verify Additional Variables:**
+        - Confirm the following variables are properly set:
+            ```bash
+            CONFIG_JSON_GZ_URL=<url to fork config zip> ex: "https://storage.googleapis.com/fork-config-dryrun.json.gz"
+            GENESIS_TIMESTAMP=<same ts as your genesis config> ex: "2024-05-03T00:00:00Z"
+            NETWORK_NAME=<this should match the intended network> ex: mainnet
+            PRECOMPUTED_BLOCK_GS_PREFIX=<url to the network block data> ex: "gs://mina_network_block_data/mainnet"
+            ```
+
+#### Verification Process
+1. **Run the Verification Command:**
+    - If the fork config is not already on your machine, you can download it with a command similiar to:
+        ```bash
+        curl https://storage.googleapis.com/fork-config-dryrun.json.gz > config.json.gz && gunzip config.json.gz && mina-verify-packaged-fork-config mainnet config.json /workdir/verification gs://mina_network_block_data/mainnet-pre-hf-dry-run-2
+        ```
+    - If the fork config is already available locally, use:
+        ```bash
+        mina-verify-packaged-fork-config mainnet fork-config-dryrun.json /tmp/mina-verification
+        ```

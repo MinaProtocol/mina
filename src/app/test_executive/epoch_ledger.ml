@@ -8,7 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -21,7 +22,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; global_slot_since_genesis = 500000
     }
 
-  let config =
+  let config ~constants =
     let open Test_config in
     let staking_accounts : Test_account.t list =
       let open Test_account in
@@ -49,7 +50,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let epoch_ledger = next_accounts in
       { epoch_ledger; epoch_seed }
     in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; epoch_data = Some { staking; next = Some next }
     ; genesis_ledger = next_accounts
@@ -60,7 +61,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; proof_config = { proof_config_default with fork = Some fork_config }
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let all_mina_nodes = Network.all_mina_nodes network in
     let%bind () =
@@ -69,8 +70,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Core.String.Map.data all_mina_nodes) )
     in
     (* Since I made the balances of block producers in genesis ledger and next
-       epoch ledgers to be 0, then blocks would only be produced, if the consensus
-       selects the staking epoch *)
+       epoch ledgers to be 0, then blocks would only be produced, if the
+       consensus selects the staking epoch *)
     section "wait for 3 block to be produced"
       (wait_for t (Wait_condition.blocks_to_be_produced 3))
 end

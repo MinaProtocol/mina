@@ -32,6 +32,12 @@ module Make_str (A : Wire_types.Concrete) = struct
     val consensus_constants : Constants.t
   end
 
+  module type CONTEXT_WITH_LEDGER_SYNC = sig
+    include CONTEXT
+
+    val ledger_sync_config : Syncable_ledger.daemon_config
+  end
+
   let make_checked t = Snark_params.Tick.Run.make_checked t
 
   let name = "proof_of_stake"
@@ -81,10 +87,18 @@ module Make_str (A : Wire_types.Concrete) = struct
       (Float.of_int num_delegators) ;
     outer_table
 
-  let compute_delegatee_table_ledger_db keys ledger =
-    O1trace.sync_thread "compute_delegatee_table_ledger_db" (fun () ->
+  let compute_delegatee_table_ledger_root keys ledger =
+    O1trace.sync_thread "compute_delegatee_table_ledger_root" (fun () ->
         compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct) ) )
+            Mina_ledger.Ledger.Any_ledger.M.iteri
+              (Mina_ledger.Ledger.Root.as_unmasked ledger) ~f:(fun i acct ->
+                f i acct ) ) )
+
+  let compute_delegatee_table_ledger_any keys ledger =
+    O1trace.sync_thread "compute_delegatee_table_ledger_any" (fun () ->
+        compute_delegatee_table keys ~iter_accounts:(fun f ->
+            Mina_ledger.Ledger.Any_ledger.M.iteri ledger ~f:(fun i acct ->
+                f i acct ) ) )
 
   let compute_delegatee_table_genesis_ledger keys ledger =
     O1trace.sync_thread "compute_delegatee_table_genesis_ledger" (fun () ->
@@ -262,42 +276,46 @@ module Make_str (A : Wire_types.Concrete) = struct
       module Snapshot = struct
         module Ledger_snapshot = struct
           type t =
-            | Genesis_epoch_ledger of Mina_ledger.Ledger.t
-            | Ledger_db of Mina_ledger.Ledger.Db.t
+            | Genesis_epoch_ledger of Genesis_ledger.Packed.t
+            | Ledger_root of Mina_ledger.Ledger.Root.t
 
           let merkle_root = function
-            | Genesis_epoch_ledger ledger ->
-                Mina_ledger.Ledger.merkle_root ledger
-            | Ledger_db ledger ->
-                Mina_ledger.Ledger.Db.merkle_root ledger
+            | Genesis_epoch_ledger packed ->
+                Genesis_ledger.Packed.t packed
+                |> Lazy.force |> Mina_ledger.Ledger.merkle_root
+            | Ledger_root ledger ->
+                Mina_ledger.Ledger.Root.merkle_root ledger
 
           let compute_delegatee_table keys ledger =
             match ledger with
             | Genesis_epoch_ledger ledger ->
-                compute_delegatee_table_genesis_ledger keys ledger
-            | Ledger_db ledger ->
-                compute_delegatee_table_ledger_db keys ledger
+                Genesis_ledger.Packed.t ledger
+                |> Lazy.force
+                |> compute_delegatee_table_genesis_ledger keys
+            | Ledger_root ledger ->
+                compute_delegatee_table_ledger_root keys ledger
 
           let close = function
             | Genesis_epoch_ledger _ ->
                 ()
-            | Ledger_db ledger ->
-                Mina_ledger.Ledger.Db.close ledger
+            | Ledger_root ledger ->
+                Mina_ledger.Ledger.Root.close ledger
 
-          let remove ~location = function
+          let remove ~config = function
             | Genesis_epoch_ledger _ ->
                 ()
-            | Ledger_db ledger ->
-                Mina_ledger.Ledger.Db.close ledger ;
-                File_system.rmrf location
+            | Ledger_root ledger ->
+                Mina_ledger.Ledger.Root.close ledger ;
+                Mina_ledger.Ledger.Root.Config.delete_any_backing config
 
           let ledger_subset keys ledger =
             let open Mina_ledger in
             match ledger with
-            | Genesis_epoch_ledger ledger ->
+            | Genesis_epoch_ledger packed ->
+                let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed in
                 Sparse_ledger.of_ledger_subset_exn ledger keys
-            | Ledger_db db_ledger ->
-                let ledger = Ledger.of_database db_ledger in
+            | Ledger_root db_ledger ->
+                let ledger = Ledger.Root.as_masked db_ledger in
                 let subset_ledger =
                   Sparse_ledger.of_ledger_subset_exn ledger keys
                 in
@@ -357,6 +375,8 @@ module Make_str (A : Wire_types.Concrete) = struct
               Option.t
           ; mutable epoch_ledger_uuids : epoch_ledger_uuids
           ; epoch_ledger_location : string
+          ; epoch_ledger_backing_type :
+              Mina_ledger.Ledger.Root.Config.backing_type
           }
 
         let to_yojson t =
@@ -379,11 +399,19 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
       type t = Data.t ref [@@deriving to_yojson]
 
-      let staking_epoch_ledger_location (t : t) =
-        !t.epoch_ledger_location ^ Uuid.to_string !t.epoch_ledger_uuids.staking
+      let staking_epoch_ledger_config (t : t) =
+        Mina_ledger.Ledger.Root.Config.with_directory
+          ~backing_type:!t.epoch_ledger_backing_type
+          ~directory_name:
+            ( !t.epoch_ledger_location
+            ^ Uuid.to_string !t.epoch_ledger_uuids.staking )
 
-      let next_epoch_ledger_location (t : t) =
-        !t.epoch_ledger_location ^ Uuid.to_string !t.epoch_ledger_uuids.next
+      let next_epoch_ledger_config (t : t) =
+        Mina_ledger.Ledger.Root.Config.with_directory
+          ~backing_type:!t.epoch_ledger_backing_type
+          ~directory_name:
+            ( !t.epoch_ledger_location
+            ^ Uuid.to_string !t.epoch_ledger_uuids.next )
 
       let current_epoch_delegatee_table ~(local_state : t) =
         !local_state.staking_epoch_snapshot.delegatee_table
@@ -430,21 +458,30 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         Data.{ staking; next; genesis_state_hash }
 
-      let create_epoch_ledger ~location ~context:(module Context : CONTEXT)
+      let create_epoch_ledger ~config ~context:(module Context : CONTEXT)
           ~genesis_epoch_ledger =
         let open Context in
-        if Sys.file_exists location then (
+        if Mina_ledger.Ledger.Root.Config.exists_backing config then (
           [%log info]
-            ~metadata:[ ("location", `String location) ]
+            ~metadata:
+              [ ( "location"
+                , `String
+                    (Mina_ledger.Ledger.Root.Config.primary_directory config) )
+              ]
             "Loading epoch ledger from disk: $location" ;
-          Snapshot.Ledger_snapshot.Ledger_db
-            (Mina_ledger.Ledger.Db.create ~directory_name:location
+          Snapshot.Ledger_snapshot.Ledger_root
+            (Mina_ledger.Ledger.Root.create ~config
                ~depth:constraint_constants.ledger_depth () ) )
-        else Genesis_epoch_ledger (Lazy.force genesis_epoch_ledger)
+        else Genesis_epoch_ledger genesis_epoch_ledger
 
       let create block_producer_pubkeys ~context:(module Context : CONTEXT)
           ~genesis_ledger ~genesis_epoch_data ~epoch_ledger_location
           ~genesis_state_hash =
+        (* TODO: Pass in from above. The backing type should ultimately be based
+           on the value of the HF automation flag. *)
+        let epoch_ledger_backing_type =
+          Mina_ledger.Ledger.Root.Config.Stable_db
+        in
         let open Context in
         (* TODO: remove this duplicate of the genesis ledger *)
         let genesis_epoch_ledger_staking, genesis_epoch_ledger_next =
@@ -468,8 +505,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             (epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
           epoch_ledger_uuids
         in
-        let ledger_location uuid =
-          epoch_ledger_location ^ Uuid.to_string uuid
+        let ledger_config uuid =
+          Mina_ledger.Ledger.Root.Config.(
+            with_directory ~backing_type:epoch_ledger_backing_type
+              ~directory_name:(epoch_ledger_location ^ Uuid.to_string uuid))
         in
         let epoch_ledger_uuids =
           if Sys.file_exists epoch_ledger_uuids_location then (
@@ -496,12 +535,10 @@ module Make_str (A : Wire_types.Concrete) = struct
             then epoch_ledger_uuids
             else
               (*Clean-up outdated epoch ledgers*)
-              let staking_ledger_location =
-                ledger_location epoch_ledger_uuids.staking
+              let staking_ledger_config =
+                ledger_config epoch_ledger_uuids.staking
               in
-              let next_ledger_location =
-                ledger_location epoch_ledger_uuids.next
-              in
+              let next_ledger_config = ledger_config epoch_ledger_uuids.next in
               [%log info]
                 "Cleaning up old epoch ledgers with genesis state $state_hash \
                  at locations $staking and $next"
@@ -509,27 +546,33 @@ module Make_str (A : Wire_types.Concrete) = struct
                   [ ( "state_hash"
                     , Mina_base.State_hash.to_yojson
                         epoch_ledger_uuids.genesis_state_hash )
-                  ; ("staking", `String staking_ledger_location)
-                  ; ("next", `String next_ledger_location)
+                  ; ( "staking"
+                    , `String
+                        ( Mina_ledger.Ledger.Root.Config.primary_directory
+                        @@ staking_ledger_config ) )
+                  ; ( "next"
+                    , `String
+                        ( Mina_ledger.Ledger.Root.Config.primary_directory
+                        @@ next_ledger_config ) )
                   ] ;
-              File_system.rmrf staking_ledger_location ;
-              File_system.rmrf next_ledger_location ;
+              Mina_ledger.Ledger.Root.Config.delete_any_backing
+                staking_ledger_config ;
+              Mina_ledger.Ledger.Root.Config.delete_any_backing
+                next_ledger_config ;
               create_new_uuids () )
           else create_new_uuids ()
         in
-        let staking_epoch_ledger_location =
-          ledger_location epoch_ledger_uuids.staking
+        let staking_epoch_ledger_config =
+          ledger_config epoch_ledger_uuids.staking
         in
         let staking_epoch_ledger =
-          create_epoch_ledger ~location:staking_epoch_ledger_location
+          create_epoch_ledger ~config:staking_epoch_ledger_config
             ~context:(module Context)
             ~genesis_epoch_ledger:genesis_epoch_ledger_staking
         in
-        let next_epoch_ledger_location =
-          ledger_location epoch_ledger_uuids.next
-        in
+        let next_epoch_ledger_config = ledger_config epoch_ledger_uuids.next in
         let next_epoch_ledger =
-          create_epoch_ledger ~location:next_epoch_ledger_location
+          create_epoch_ledger ~config:next_epoch_ledger_config
             ~context:(module Context)
             ~genesis_epoch_ledger:genesis_epoch_ledger_next
         in
@@ -553,6 +596,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; last_epoch_delegatee_table = None
           ; epoch_ledger_uuids
           ; epoch_ledger_location
+          ; epoch_ledger_backing_type
           }
 
       let block_production_keys_swap ~(constants : Constants.t) t
@@ -586,6 +630,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; last_epoch_delegatee_table = None
           ; epoch_ledger_uuids = old.epoch_ledger_uuids
           ; epoch_ledger_location = old.epoch_ledger_location
+          ; epoch_ledger_backing_type = old.epoch_ledger_backing_type
           }
 
       type snapshot_identifier = Staking_epoch_snapshot | Next_epoch_snapshot
@@ -607,7 +652,7 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let reset_snapshot (t : t) id ledger =
         let delegatee_table =
-          compute_delegatee_table_ledger_db
+          compute_delegatee_table_ledger_root
             (current_block_production_keys t)
             ledger
         in
@@ -615,12 +660,12 @@ module Make_str (A : Wire_types.Concrete) = struct
         | Staking_epoch_snapshot ->
             !t.staking_epoch_snapshot <-
               { delegatee_table
-              ; ledger = Snapshot.Ledger_snapshot.Ledger_db ledger
+              ; ledger = Snapshot.Ledger_snapshot.Ledger_root ledger
               }
         | Next_epoch_snapshot ->
             !t.next_epoch_snapshot <-
               { delegatee_table
-              ; ledger = Snapshot.Ledger_snapshot.Ledger_db ledger
+              ; ledger = Snapshot.Ledger_snapshot.Ledger_root ledger
               }
 
       let next_epoch_ledger (t : t) =
@@ -628,30 +673,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
       let staking_epoch_ledger (t : t) =
         Snapshot.ledger @@ get_snapshot t Staking_epoch_snapshot
-
-      let _seen_slot (t : t) epoch slot =
-        let module Table = Public_key.Compressed.Table in
-        let unseens =
-          Table.to_alist !t.last_checked_slot_and_epoch
-          |> List.filter_map ~f:(fun (pk, last_checked_epoch_and_slot) ->
-                 let i =
-                   Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
-                     last_checked_epoch_and_slot (epoch, slot)
-                 in
-                 if i > 0 then None
-                 else if i = 0 then
-                   (*vrf evaluation was stopped at this point because it was either the end of the epoch or the key won this slot; re-check this slot when staking keys are reset so that we don't skip producing block. This will not occur in the normal flow because [slot] will be greater than the last-checked-slot*)
-                   Some pk
-                 else (
-                   Table.set !t.last_checked_slot_and_epoch ~key:pk
-                     ~data:(epoch, slot) ;
-                   Some pk ) )
-        in
-        match unseens with
-        | [] ->
-            `All_seen
-        | nel ->
-            `Unseen (Public_key.Compressed.Set.of_list nel)
 
       module For_tests = struct
         type nonrec snapshot_identifier = snapshot_identifier =
@@ -674,21 +695,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         { Poly.hash = genesis_ledger_hash ~ledger
         ; total_currency = genesis_ledger_total_currency ~ledger
         }
-
-      let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
-        let open Graphql_async in
-        let open Schema in
-        obj "epochLedger" ~fields:(fun _ ->
-            [ field "hash"
-                ~typ:
-                  (non_null @@ Mina_base_unix.Graphql_scalars.LedgerHash.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.hash; _ } -> hash)
-            ; field "totalCurrency"
-                ~typ:(non_null @@ Currency_unix.Graphql_scalars.Amount.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.total_currency; _ } -> total_currency)
-            ] )
     end
 
     module Vrf = struct
@@ -775,9 +781,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let eval = T.eval
 
       module Precomputed = struct
-        let keypairs = Lazy.force Key_gen.Sample_keypairs.keypairs
-
-        let genesis_winner = keypairs.(0)
+        let genesis_winner = Key_gen.Sample_keypairs.genesis_winner
 
         let genesis_stake_proof :
             genesis_epoch_ledger:Mina_ledger.Ledger.t Lazy.t -> Stake_proof.t =
@@ -937,12 +941,6 @@ module Make_str (A : Wire_types.Concrete) = struct
 
         val typ : (Mina_base.State_hash.var, t) Typ.t
 
-        type graphql_type
-
-        val graphql_type : unit -> ('ctx, graphql_type) Graphql_async.Schema.typ
-
-        val resolve : t -> graphql_type
-
         val to_input :
           t -> Snark_params.Tick.Field.t Random_oracle.Input.Chunked.t
 
@@ -973,37 +971,6 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
             ~value_to_hlist:Poly.to_hlist ~value_of_hlist:Poly.of_hlist
 
-        let graphql_type name =
-          let open Graphql_async in
-          let open Schema in
-          obj name ~fields:(fun _ ->
-              [ field "ledger"
-                  ~typ:(non_null @@ Epoch_ledger.graphql_type ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.ledger; _ } -> ledger)
-              ; field "seed"
-                  ~typ:
-                    (non_null @@ Mina_base_unix.Graphql_scalars.EpochSeed.typ ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.seed; _ } -> seed)
-              ; field "startCheckpoint"
-                  ~typ:
-                    (non_null @@ Mina_base_unix.Graphql_scalars.StateHash.typ ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.start_checkpoint; _ } ->
-                    start_checkpoint )
-              ; field "lockCheckpoint"
-                  ~typ:(Lock_checkpoint.graphql_type ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.lock_checkpoint; _ } ->
-                    Lock_checkpoint.resolve lock_checkpoint )
-              ; field "epochLength"
-                  ~typ:
-                    (non_null @@ Mina_numbers_unix.Graphql_scalars.Length.typ ())
-                  ~args:Arg.[]
-                  ~resolve:(fun _ { Poly.epoch_length; _ } -> epoch_length)
-              ] )
-
         let to_input
             ({ ledger; seed; start_checkpoint; lock_checkpoint; epoch_length } :
               Value.t ) =
@@ -1029,7 +996,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             ]
 
         let genesis ~(genesis_epoch_data : Genesis_epoch_data.Data.t) =
-          { Poly.ledger = Epoch_ledger.genesis ~ledger:genesis_epoch_data.ledger
+          let ledger = Genesis_ledger.Packed.t genesis_epoch_data.ledger in
+          { Poly.ledger = Epoch_ledger.genesis ~ledger
           ; seed = genesis_epoch_data.seed
           ; start_checkpoint = Mina_base.State_hash.(of_hash zero)
           ; lock_checkpoint = Lock_checkpoint.null
@@ -1044,15 +1012,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           Random_oracle.Input.Chunked.field (t :> Tick.Field.t)
 
         let null = Mina_base.State_hash.(of_hash zero)
-
-        open Graphql_async
-        open Schema
-
-        type graphql_type = string
-
-        let graphql_type () = non_null string
-
-        let resolve = to_base58_check
       end
 
       module Staking = Make (T)
@@ -1207,8 +1166,6 @@ module Make_str (A : Wire_types.Concrete) = struct
       let of_global_slot ~(constants : Constants.t) slot =
         of_slot_number ~constants slot
     end
-
-    [%%if true]
 
     module Min_window_density = struct
       (* Three cases for updating the densities of sub-windows
@@ -1682,25 +1639,6 @@ module Make_str (A : Wire_types.Concrete) = struct
         end )
     end
 
-    [%%else]
-
-    module Min_window_density = struct
-      let update_min_window_density ~constants:_ ~prev_global_slot:_
-          ~next_global_slot:_ ~prev_sub_window_densities
-          ~prev_min_window_density =
-        (prev_min_window_density, prev_sub_window_densities)
-
-      module Checked = struct
-        let update_min_window_density ~constants:_ ~prev_global_slot:_
-            ~next_global_slot:_ ~prev_sub_window_densities
-            ~prev_min_window_density =
-          Tick.Checked.return
-            (prev_min_window_density, prev_sub_window_densities)
-      end
-    end
-
-    [%%endif]
-
     (* We have a list of state hashes. When we extend the blockchain,
        we see if the **previous** state should be saved as a checkpoint.
        This is because we have convenient access to the entire previous
@@ -2089,7 +2027,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                  (Length.to_int constants.sub_windows_per_window - 1)
                  ~f:(Fn.const max_sub_window_density)
         ; last_vrf_output = Vrf.Output.Truncated.dummy
-        ; total_currency = genesis_ledger_total_currency ~ledger:genesis_ledger
+        ; total_currency =
+            genesis_ledger_total_currency
+              ~ledger:(Genesis_ledger.Packed.t genesis_ledger)
         ; curr_global_slot_since_hard_fork = Global_slot.zero ~constants
         ; global_slot_since_genesis
         ; staking_epoch_data =
@@ -2121,7 +2061,8 @@ module Make_str (A : Wire_types.Concrete) = struct
             }
         in
         let snarked_ledger_hash =
-          Lazy.force genesis_ledger |> Mina_ledger.Ledger.merkle_root
+          Genesis_ledger.Packed.t genesis_ledger
+          |> Lazy.force |> Mina_ledger.Ledger.merkle_root
           |> Mina_base.Frozen_ledger_hash.of_ledger_hash
         in
         let genesis_winner_pk = fst Vrf.Precomputed.genesis_winner in
@@ -2195,7 +2136,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Global_slot.Checked.of_slot_number ~constants transition_data
         in
         let%bind slot_diff =
-          [%with_label_ "Next global slot is less than previous global slot"]
+          [%with_label_ "Next global slot is larger than previous global slot"]
             (fun () ->
               Global_slot.Checked.diff_slots next_global_slot prev_global_slot )
         in
@@ -2415,7 +2356,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         , block_stake_winner
         , last_vrf_output
         , block_creator
-        , coinbase_receiver )]
+        , coinbase_receiver
+        , has_ancestor_in_same_checkpoint_window )]
 
       module Unsafe = struct
         (* TODO: very unsafe, do not use unless you know what you are doing *)
@@ -2437,103 +2379,6 @@ module Make_str (A : Wire_types.Concrete) = struct
           ; global_slot_since_genesis = new_global_slot_since_genesis
           }
       end
-
-      let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
-        let open Graphql_async in
-        let open Signature_lib_unix.Graphql_scalars in
-        let public_key = PublicKey.typ () in
-        let open Schema in
-        let length = Mina_numbers_unix.Graphql_scalars.Length.typ () in
-        let amount = Currency_unix.Graphql_scalars.Amount.typ () in
-        obj "ConsensusState" ~fields:(fun _ ->
-            [ field "blockchainLength" ~typ:(non_null length)
-                ~doc:"Length of the blockchain at this block"
-                ~deprecated:(Deprecated (Some "use blockHeight instead"))
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.blockchain_length; _ } ->
-                  blockchain_length )
-            ; field "blockHeight" ~typ:(non_null length)
-                ~doc:"Height of the blockchain at this block"
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.blockchain_length; _ } ->
-                  blockchain_length )
-            ; field "epochCount" ~typ:(non_null length)
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.epoch_count; _ } -> epoch_count)
-            ; field "minWindowDensity" ~typ:(non_null length)
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.min_window_density; _ } ->
-                  min_window_density )
-            ; field "lastVrfOutput" ~typ:(non_null string)
-                ~args:Arg.[]
-                ~resolve:(fun (_ : 'ctx resolve_info)
-                              { Poly.last_vrf_output; _ } ->
-                  Vrf.Output.Truncated.to_base58_check last_vrf_output )
-            ; field "totalCurrency"
-                ~doc:"Total currency in circulation at this block"
-                ~typ:(non_null amount)
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.total_currency; _ } -> total_currency)
-            ; field "stakingEpochData"
-                ~typ:
-                  ( non_null
-                  @@ Epoch_data.Staking.graphql_type "StakingEpochData" )
-                ~args:Arg.[]
-                ~resolve:(fun (_ : 'ctx resolve_info)
-                              { Poly.staking_epoch_data; _ } ->
-                  staking_epoch_data )
-            ; field "nextEpochData"
-                ~typ:(non_null @@ Epoch_data.Next.graphql_type "NextEpochData")
-                ~args:Arg.[]
-                ~resolve:(fun (_ : 'ctx resolve_info)
-                              { Poly.next_epoch_data; _ } -> next_epoch_data )
-            ; field "hasAncestorInSameCheckpointWindow" ~typ:(non_null bool)
-                ~args:Arg.[]
-                ~resolve:(fun _
-                              { Poly.has_ancestor_in_same_checkpoint_window; _ } ->
-                  has_ancestor_in_same_checkpoint_window )
-            ; field "slot" ~doc:"Slot in which this block was created"
-                ~typ:(non_null @@ Graphql_scalars.Slot.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.curr_global_slot_since_hard_fork; _ } ->
-                  Global_slot.slot curr_global_slot_since_hard_fork )
-            ; field "slotSinceGenesis"
-                ~doc:"Slot since genesis (across all hard-forks)"
-                ~typ:
-                  ( non_null
-                  @@ Mina_numbers_unix.Graphql_scalars.GlobalSlotSinceGenesis
-                     .typ () )
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.global_slot_since_genesis; _ } ->
-                  global_slot_since_genesis )
-            ; field "epoch" ~doc:"Epoch in which this block was created"
-                ~typ:(non_null @@ Graphql_scalars.Epoch.typ ())
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.curr_global_slot_since_hard_fork; _ } ->
-                  Global_slot.epoch curr_global_slot_since_hard_fork )
-            ; field "superchargedCoinbase" ~typ:(non_null bool)
-                ~doc:
-                  "Whether or not this coinbase was \"supercharged\", ie. \
-                   created by an account that has no locked tokens"
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.supercharge_coinbase; _ } ->
-                  supercharge_coinbase )
-            ; field "blockStakeWinner" ~typ:(non_null public_key)
-                ~doc:
-                  "The public key that is responsible for winning this block \
-                   (including delegations)"
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.block_stake_winner; _ } ->
-                  block_stake_winner )
-            ; field "blockCreator" ~typ:(non_null public_key)
-                ~doc:"The block producer public key that created this block"
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.block_creator; _ } -> block_creator)
-            ; field "coinbaseReceiever" ~typ:(non_null public_key)
-                ~args:Arg.[]
-                ~resolve:(fun _ { Poly.coinbase_receiver; _ } ->
-                  coinbase_receiver )
-            ] )
     end
 
     module Prover_state = struct
@@ -2769,8 +2614,8 @@ module Make_str (A : Wire_types.Concrete) = struct
                    ; staking = staking.expected_root
                    } ) )
 
-    let sync_local_state ~context:(module Context : CONTEXT) ~trust_system
-        ~local_state ~glue_sync_ledger requested_syncs =
+    let sync_local_state ~context:(module Context : CONTEXT_WITH_LEDGER_SYNC)
+        ~trust_system ~local_state ~glue_sync_ledger requested_syncs =
       let open Context in
       let open Local_state in
       let open Snapshot in
@@ -2797,21 +2642,20 @@ module Make_str (A : Wire_types.Concrete) = struct
             then (
               Local_state.Snapshot.Ledger_snapshot.remove
                 !local_state.staking_epoch_snapshot.ledger
-                ~location:(staking_epoch_ledger_location local_state) ;
+                ~config:(staking_epoch_ledger_config local_state) ;
               match !local_state.next_epoch_snapshot.ledger with
               | Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger _ ->
                   set_snapshot local_state Staking_epoch_snapshot
                     !local_state.next_epoch_snapshot ;
                   Deferred.Or_error.ok_unit
-              | Ledger_db next_epoch_ledger ->
+              | Ledger_root next_epoch_ledger ->
                   let ledger =
-                    Mina_ledger.Ledger.Db.create_checkpoint next_epoch_ledger
-                      ~directory_name:
-                        (staking_epoch_ledger_location local_state)
+                    Mina_ledger.Ledger.Root.create_checkpoint next_epoch_ledger
+                      ~config:(staking_epoch_ledger_config local_state)
                       ()
                   in
                   set_snapshot local_state Staking_epoch_snapshot
-                    { ledger = Ledger_snapshot.Ledger_db ledger
+                    { ledger = Ledger_snapshot.Ledger_root ledger
                     ; delegatee_table =
                         !local_state.next_epoch_snapshot.delegatee_table
                     } ;
@@ -2826,51 +2670,48 @@ module Make_str (A : Wire_types.Concrete) = struct
                  than syncing with an empty ledger, since ledgers accumulate
                  new leaves in increasing index order
               *)
-              let%bind.Deferred.Or_error db_ledger =
-                let db_ledger_of_snapshot snapshot snapshot_location =
-                  O1trace.sync_thread "db_ledger_of_snapshot" (fun () ->
+              let%bind.Deferred.Or_error root_ledger =
+                let root_ledger_of_snapshot snapshot snapshot_config =
+                  O1trace.sync_thread "root_ledger_of_snapshot" (fun () ->
                       match snapshot.ledger with
-                      | Ledger_snapshot.Ledger_db ledger ->
+                      | Ledger_snapshot.Ledger_root ledger ->
                           Ok ledger
-                      | Ledger_snapshot.Genesis_epoch_ledger ledger ->
-                          let module Ledger_transfer =
-                            Mina_ledger.Ledger_transfer.Make
-                              (Mina_ledger.Ledger)
-                              (Mina_ledger.Ledger.Db)
-                          in
-                          let fresh_db_ledger =
-                            Mina_ledger.Ledger.Db.create
-                              ~directory_name:snapshot_location
+                      | Ledger_snapshot.Genesis_epoch_ledger packed ->
+                          let fresh_root_ledger =
+                            Mina_ledger.Ledger.Root.create
+                              ~config:snapshot_config
                               ~depth:Context.constraint_constants.ledger_depth
                               ()
                           in
-                          Ledger_transfer.transfer_accounts ~src:ledger
-                            ~dest:fresh_db_ledger )
+                          Genesis_ledger.Packed.populate_root packed
+                            fresh_root_ledger )
                 in
                 match snapshot_id with
                 | Staking_epoch_snapshot ->
                     return
-                    @@ db_ledger_of_snapshot !local_state.staking_epoch_snapshot
-                         (staking_epoch_ledger_location local_state)
+                    @@ root_ledger_of_snapshot
+                         !local_state.staking_epoch_snapshot
+                         (staking_epoch_ledger_config local_state)
                 | Next_epoch_snapshot ->
                     return
-                    @@ db_ledger_of_snapshot !local_state.next_epoch_snapshot
-                         (next_epoch_ledger_location local_state)
+                    @@ root_ledger_of_snapshot !local_state.next_epoch_snapshot
+                         (next_epoch_ledger_config local_state)
               in
               let sync_ledger =
-                Mina_ledger.Sync_ledger.Db.create ~logger ~trust_system
-                  db_ledger
+                Mina_ledger.Sync_ledger.Root.create
+                  ~context:(module Context)
+                  ~trust_system root_ledger
               in
               let query_reader =
-                Mina_ledger.Sync_ledger.Db.query_reader sync_ledger
+                Mina_ledger.Sync_ledger.Root.query_reader sync_ledger
               in
               let response_writer =
-                Mina_ledger.Sync_ledger.Db.answer_writer sync_ledger
+                Mina_ledger.Sync_ledger.Root.answer_writer sync_ledger
               in
               glue_sync_ledger ~preferred:[] query_reader response_writer ;
               match%bind
-                Mina_ledger.Sync_ledger.Db.fetch sync_ledger target_ledger_hash
-                  ~data:() ~equal:(fun () () -> true)
+                Mina_ledger.Sync_ledger.Root.fetch sync_ledger
+                  target_ledger_hash ~data:() ~equal:(fun () () -> true)
               with
               | `Ok ledger ->
                   [%log info]
@@ -2879,7 +2720,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                     ~metadata:[ ("target_ledger_hash", ledger_hash_json) ] ;
                   assert (
                     Mina_base.Ledger_hash.equal target_ledger_hash
-                      (Mina_ledger.Ledger.Db.merkle_root ledger) ) ;
+                      (Mina_ledger.Ledger.Root.merkle_root ledger) ) ;
                   reset_snapshot local_state snapshot_id ledger ;
                   Deferred.Or_error.ok_unit
               | `Target_changed _ ->
@@ -2930,7 +2771,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let time_received =
         Time.(
           of_span_since_epoch
-            (Span.of_ms (Unix_timestamp.to_int64 time_received)))
+            (Span.of_ms (Mina_stdlib.Unix_timestamp.to_int64 time_received)))
       in
       let slot_diff =
         Epoch.diff_in_slots ~constants
@@ -3211,7 +3052,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         (next : Consensus_state.Value.t) ~(local_state : Local_state.t)
         ~snarked_ledger ~genesis_ledger_hash =
       let snarked_ledger_hash =
-        Mina_ledger.Ledger.Db.merkle_root snarked_ledger
+        Mina_ledger.Ledger.Root.merkle_root snarked_ledger
       in
       if
         not
@@ -3223,7 +3064,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           Some !local_state.staking_epoch_snapshot.delegatee_table ;
         Local_state.Snapshot.Ledger_snapshot.remove
           !local_state.staking_epoch_snapshot.ledger
-          ~location:(Local_state.staking_epoch_ledger_location local_state) ;
+          ~config:(Local_state.staking_epoch_ledger_config local_state) ;
         !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;
         (*If snarked ledger hash is still the genesis ledger hash then the epoch ledger should continue to be `next_data.ledger`. This is because the epoch ledgers at genesis can be different from the genesis ledger*)
         if
@@ -3245,16 +3086,20 @@ module Make_str (A : Wire_types.Concrete) = struct
             (Local_state.epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
           !local_state.next_epoch_snapshot <-
             { ledger =
-                Local_state.Snapshot.Ledger_snapshot.Ledger_db
-                  (Mina_ledger.Ledger.Db.create_checkpoint snarked_ledger
+                (let config =
+                   Mina_ledger.Ledger.Root.Config.with_directory
+                     ~backing_type:!local_state.epoch_ledger_backing_type
                      ~directory_name:
                        ( !local_state.epoch_ledger_location
                        ^ Uuid.to_string epoch_ledger_uuids.next )
-                     () )
+                 in
+                 Local_state.Snapshot.Ledger_snapshot.Ledger_root
+                   (Mina_ledger.Ledger.Root.create_checkpoint snarked_ledger
+                      ~config () ) )
             ; delegatee_table =
-                compute_delegatee_table_ledger_db
+                compute_delegatee_table_ledger_any
                   (Local_state.current_block_production_keys local_state)
-                  snarked_ledger
+                  (Mina_ledger.Ledger.Root.as_unmasked snarked_ledger)
             } ) )
 
     let should_bootstrap_len ~context:(module Context : CONTEXT) ~existing
@@ -3279,34 +3124,19 @@ module Make_str (A : Wire_types.Concrete) = struct
             ~candidate:
               (Consensus_state.blockchain_length (With_hash.data candidate))
 
-    let%test "should_bootstrap is sane" =
-      let module Context = struct
-        let logger = Logger.create ()
-
-        let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
-
-        let consensus_constants = Lazy.force Constants.for_unit_tests
-      end in
-      (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
-      should_bootstrap_len
-        ~context:(module Context)
-        ~existing:Length.zero
-        ~candidate:(Length.of_int 100_000_000)
-
     let to_unix_timestamp recieved_time =
       recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
-      |> Unix_timestamp.of_int64
+      |> Mina_stdlib.Unix_timestamp.of_int64
 
     let%test "Receive a valid consensus_state with a bit of delay" =
       let constants = Lazy.force Constants.for_unit_tests in
-      let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
+      let genesis_ledger = Genesis_ledger.for_unit_tests in
       let genesis_epoch_data = Genesis_epoch_data.for_unit_tests in
       let negative_one =
         Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
           ~constants
           ~constraint_constants:
-            Genesis_constants.Constraint_constants.for_unit_tests
+            Genesis_constants.For_unit_tests.Constraint_constants.t
       in
       let curr_epoch, curr_slot =
         Consensus_state.curr_epoch_and_slot negative_one
@@ -3323,13 +3153,13 @@ module Make_str (A : Wire_types.Concrete) = struct
     let%test "Receive an invalid consensus_state" =
       let epoch = Epoch.of_int 5 in
       let constants = Lazy.force Constants.for_unit_tests in
-      let genesis_ledger = Genesis_ledger.(Packed.t for_unit_tests) in
+      let genesis_ledger = Genesis_ledger.for_unit_tests in
       let genesis_epoch_data = Genesis_epoch_data.for_unit_tests in
       let negative_one =
         Consensus_state.negative_one ~genesis_ledger ~genesis_epoch_data
           ~constants
           ~constraint_constants:
-            Genesis_constants.Constraint_constants.for_unit_tests
+            Genesis_constants.For_unit_tests.Constraint_constants.t
       in
       let start_time = Epoch.start_time ~constants epoch in
       let ((curr_epoch, curr_slot) as curr) =
@@ -3599,7 +3429,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       open Consensus_state
 
       let constraint_constants =
-        Genesis_constants.Constraint_constants.for_unit_tests
+        Genesis_constants.For_unit_tests.Constraint_constants.t
 
       let constants = Lazy.force Constants.for_unit_tests
 
@@ -3625,8 +3455,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let previous_consensus_state =
           Consensus_state.create_genesis
             ~negative_one_protocol_state_hash:previous_protocol_state_hash
-            ~genesis_ledger:Genesis_ledger.t ~genesis_epoch_data
-            ~constraint_constants ~constants
+            ~genesis_ledger:(module Genesis_ledger)
+            ~genesis_epoch_data ~constraint_constants ~constants
         in
         (*If this is a fork then check blockchain length and global_slot_since_genesis have been set correctly*)
         ( match constraint_constants.fork with
@@ -3753,7 +3583,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ~compute:
                 (As_prover.return
                    (Mina_base.Protocol_constants_checked.value_of_t
-                      Genesis_constants.for_unit_tests.protocol ) )
+                      Genesis_constants.For_unit_tests.t.protocol ) )
           in
           let result =
             update_var previous_state transition_data
@@ -3835,7 +3665,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let%test_unit "vrf win rate" =
         let constants = Lazy.force Constants.for_unit_tests in
         let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
+          Genesis_constants.For_unit_tests.Constraint_constants.t
         in
         let previous_protocol_state_hash =
           Mina_base.State_hash.(of_hash zero)
@@ -3843,8 +3673,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let previous_consensus_state =
           Consensus_state.create_genesis
             ~negative_one_protocol_state_hash:previous_protocol_state_hash
-            ~genesis_ledger:Genesis_ledger.t ~genesis_epoch_data
-            ~constraint_constants ~constants
+            ~genesis_ledger:(module Genesis_ledger)
+            ~genesis_epoch_data ~constraint_constants ~constants
         in
         let seed = previous_consensus_state.staking_epoch_data.seed in
         let maybe_sk, account = Genesis_ledger.largest_account_exn () in
@@ -3862,7 +3692,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         in
         let epoch_snapshot =
           { Local_state.Snapshot.delegatee_table
-          ; ledger = Genesis_epoch_ledger ledger
+          ; ledger = Genesis_epoch_ledger (module Genesis_ledger)
           }
         in
         let balance = Balance.to_nanomina_int account.balance in
@@ -3961,7 +3791,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         let open Quickcheck.Generator.Let_syntax in
         let constants = Lazy.force Constants.for_unit_tests in
         let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
+          Genesis_constants.For_unit_tests.Constraint_constants.t
         in
         let gen_sub_window_density =
           gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta
@@ -3981,7 +3811,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       (* Computes currency at height, assuming every block contains coinbase (ignoring inflation scheduling). *)
       let currency_at_height ~genesis_currency height =
         let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
+          Genesis_constants.For_unit_tests.Constraint_constants.t
         in
         Option.value_exn
           Amount.(

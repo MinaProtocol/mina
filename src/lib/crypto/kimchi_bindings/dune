@@ -1,0 +1,9 @@
+;; create a `dune-build-root` file that contains the dune workspace root
+
+(rule
+ (target dune-build-root)
+ (deps
+  ; no sandbox, we want the path to the _build directory
+  (sandbox none))
+ (action
+  (system "printf \"%s\" $(realpath %{workspace_root}/..) > %{target}")))

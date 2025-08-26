@@ -66,12 +66,17 @@ let deploy_zkapps ~scheduler_tbl ~mina ~ledger ~deployment_fee ~max_cost
               else Permissions.user_default )
             spec
         in
+        let%bind zkapp_command = zkapp_command in
         let%bind () = after wait_span in
         Deferred.repeat_until_finished ()
         @@ fun () ->
         if finished () then Deferred.return (`Finished ())
         else
-          match%bind Zkapps.send_zkapp_command mina zkapp_command with
+          (* TODO create without hash accumulation and remove read_all_proofs_from_disk call *)
+          match%bind
+            Zkapps.send_zkapp_command mina
+              (Zkapp_command.read_all_proofs_from_disk zkapp_command)
+          with
           | Ok _ ->
               fee_payer_nonces.(ndx) :=
                 Account.Nonce.succ !(fee_payer_nonces.(ndx)) ;
@@ -152,9 +157,11 @@ let insert_account_queue ~account_queue ~account_queue_size ~account_state_tbl
       ~data:(a, role)
   else ()
 
-let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
-    ~uuid ~keymap ~unused_pks ~stop_signal ~mina ~zkapp_command_details
-    ~wait_span ~logger ~account_state_tbl init_tm_next init_counter =
+let send_zkapps ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~fee_payer_array ~tm_end ~scheduler_tbl ~uuid ~keymap ~unused_pks
+    ~stop_signal ~mina ~zkapp_command_details ~wait_span ~logger
+    ~account_state_tbl init_tm_next init_counter =
   let wait_span_ms = Time.Span.to_ms wait_span |> int_of_float in
   let repeat tm_next counter =
     let%map () = Async_unix.at tm_next in
@@ -176,8 +183,9 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
     `Repeat (next_tm_next, counter + 1)
   in
   let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+    Transaction_snark.For_tests.create_trivial_snapp ()
   in
+  let%bind.Deferred vk = vk in
   let account_queue = Queue.create () in
   let num_fee_payers = Array.length fee_payer_array in
   Deferred.repeat_until_finished (init_tm_next, init_counter)
@@ -249,7 +257,8 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
                    ~ignore_sequence_events_precond:true ~no_token_accounts:true
                    ~limited:true ~fee_payer_keypair:fee_payer ~keymap
                    ~account_state_tbl ~generate_new_accounts ~ledger ~vk
-                   ~available_public_keys:unused_pks () )
+                   ~available_public_keys:unused_pks ~genesis_constants
+                   ~constraint_constants () )
                ~size:1
                ~random:(Splittable_random.State.create Random.State.default)
     in
@@ -278,7 +287,11 @@ let send_zkapps ~fee_payer_array ~constraint_constants ~tm_end ~scheduler_tbl
         let%bind () =
           O1trace.thread "itn_send_zkapp"
           @@ fun () ->
-          match%map Zkapps.send_zkapp_command mina zkapp_command with
+          (* TODO create without hash accumulation and remove read_all_proofs_from_disk call *)
+          match%map
+            Zkapps.send_zkapp_command mina
+              (Zkapp_command.read_all_proofs_from_disk zkapp_command)
+          with
           | Ok _ ->
               [%log info] "Sent out zkApp with fee payer's summary $summary"
                 ~metadata:

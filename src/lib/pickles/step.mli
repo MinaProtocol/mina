@@ -1,10 +1,13 @@
 open Pickles_types
 
 module Make
+    (Inductive_rule : Inductive_rule.Intf with type 'a proof = 'a Proof.t)
     (A : Pickles_types.Poly_types.T0) (A_value : sig
       type t
     end)
     (Max_proofs_verified : Pickles_types.Nat.Add.Intf_transparent) : sig
+  module Step_branch_data : module type of Step_branch_data.Make (Inductive_rule)
+
   val f :
        ?handler:
          (   Snarky_backendless.Request.request
@@ -30,7 +33,8 @@ module Make
              and type ns = 'max_local_max_proof_verifieds )
     -> prevs_length:('prev_vars, 'prevs_length) Pickles_types.Hlist.Length.t
     -> self:('a, 'b, 'c, 'd) Tag.t
-    -> step_domains:(Import.Domains.t, 'self_branches) Pickles_types.Vector.t
+    -> step_domains:
+         (Import.Domains.t, 'self_branches) Pickles_types.Vector.t Promise.t
     -> feature_flags:Opt.Flag.t Plonk_types.Features.Full.t
     -> self_dlog_plonk_index:
          Backend.Tick.Inner_curve.Affine.t array

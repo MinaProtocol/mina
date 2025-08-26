@@ -1,3 +1,4 @@
+module Common = Common
 module Failure = Verification_failure
 module Prod = Prod
 module Dummy = Dummy
@@ -17,3 +18,38 @@ let m =
   else (module Prod)
 
 include (val m)
+
+module For_tests = struct
+  let get_verification_keys_eagerly ~constraint_constants ~proof_level =
+    let module T = Transaction_snark.Make (struct
+      let signature_kind = Mina_signature_kind.t_DEPRECATED
+
+      let constraint_constants = constraint_constants
+
+      let proof_level = proof_level
+    end) in
+    let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
+      let tag = T.tag
+
+      let constraint_constants = constraint_constants
+
+      let proof_level = proof_level
+    end) in
+    let open Async.Deferred.Let_syntax in
+    let%bind blockchain_vk = Lazy.force B.Proof.verification_key in
+    let%bind transaction_vk = Lazy.force T.verification_key in
+    return (`Blockchain blockchain_vk, `Transaction transaction_vk)
+
+  let default ~logger ~constraint_constants ?enable_internal_tracing
+      ?internal_trace_filename ~proof_level
+      ?(pids = Child_processes.Termination.create_pid_table ())
+      ?(conf_dir = None) ?(commit_id = "not specified for unit tests") () =
+    let open Async.Deferred.Let_syntax in
+    let%bind ( `Blockchain blockchain_verification_key
+             , `Transaction transaction_verification_key ) =
+      get_verification_keys_eagerly ~constraint_constants ~proof_level
+    in
+    create ~logger ?enable_internal_tracing ?internal_trace_filename
+      ~proof_level ~pids ~conf_dir ~commit_id ~blockchain_verification_key
+      ~transaction_verification_key ()
+end

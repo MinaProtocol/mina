@@ -22,7 +22,6 @@ type node_error_report =
   ; peer_id : string
   ; ip_address : string
   ; public_key : Public_key.Compressed.t option
-  ; git_branch : string
   ; commit_hash : string
   ; chain_id : string
   ; contact_info : string option
@@ -58,7 +57,7 @@ let serialize_report report =
 let send_node_error_report ~logger ~url report =
   let json = serialize_report report in
   let json_string = Yojson.Safe.to_string json in
-  (* TODO: move length check to to send_node_error_data *)
+  (* TODO: move length check to send_node_error_data *)
   if String.length json_string > max_report_bytes then (
     [%log error]
       "Could not send error report because generated error exceeded max report \
@@ -115,10 +114,8 @@ let with_deps ~logger ~f =
       | Some node_state ->
           f ~node_state ~node_error_url ~contact_info )
 
-let generate_report ~node_state ~contact_info error =
-  let commit_hash = Mina_version.commit_id in
-  let git_branch = Mina_version.branch in
-  let timestamp = Rfc3339_time.get_rfc3339_time () in
+let generate_report ~commit_id ~node_state ~contact_info error =
+  let timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time () in
   let id = Uuid_unix.create () |> Uuid.to_string in
   let ({ peer_id
        ; ip_address
@@ -138,8 +135,7 @@ let generate_report ~node_state ~contact_info error =
     ; peer_id
     ; ip_address
     ; public_key
-    ; git_branch
-    ; commit_hash
+    ; commit_hash = commit_id
     ; chain_id
     ; contact_info
     ; hardware_info
@@ -156,9 +152,11 @@ let generate_report ~node_state ~contact_info error =
     ; uptime_of_node
     }
 
-let send_dynamic_report ~logger ~generate_error =
+let send_dynamic_report ~commit_id ~logger ~generate_error =
   with_deps ~logger ~f:(fun ~node_state ~node_error_url ~contact_info ->
-      match generate_report ~node_state ~contact_info (`String "") with
+      match
+        generate_report ~commit_id ~node_state ~contact_info (`String "")
+      with
       | None ->
           Deferred.unit
       | Some base_report ->
@@ -173,10 +171,10 @@ let send_dynamic_report ~logger ~generate_error =
           in
           send_node_error_report ~logger ~url:node_error_url report )
 
-let send_report ~logger ~error =
+let send_report ~commit_id ~logger ~error =
   with_deps ~logger ~f:(fun ~node_state ~node_error_url ~contact_info ->
       match
-        generate_report ~node_state ~contact_info
+        generate_report ~commit_id ~node_state ~contact_info
           (Error_json.error_to_yojson error)
       with
       | None ->

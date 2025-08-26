@@ -39,11 +39,12 @@ let valid_as_peer t =
 
 let of_file_contents contents : t list =
   String.split ~on:'\n' contents
-  |> List.filter ~f:(fun s ->
-         if valid_as_peer s then true
-         else if String.is_empty s then false
+  |> List.filter_map ~f:(fun full_line ->
+         let s = String.strip full_line in
+         if valid_as_peer s then Some s
+         else if String.is_empty s then None
          else (
            [%log' error (Logger.create ())]
              "Invalid peer $peer found in peers list"
              ~metadata:[ ("peer", `String s) ] ;
-           false ) )
+           None ) )

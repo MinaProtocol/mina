@@ -8,6 +8,8 @@ open Mina_base
 
 let state_body = U.genesis_state_body
 
+let signature_kind = U.signature_kind
+
 let constraint_constants = U.constraint_constants
 
 let consensus_constants = U.consensus_constants
@@ -143,11 +145,11 @@ let%test_module "Transaction union tests" =
             |> Or_error.ok_exn
           in
           let supply_increase =
-            Mina_ledger.Ledger.Transaction_applied.supply_increase
-              applied_transaction
+            Mina_transaction_logic.Transaction_applied.supply_increase
+              ~constraint_constants applied_transaction
             |> Or_error.ok_exn
           in
-          Transaction_snark.check_transaction txn_in_block
+          Transaction_snark.check_transaction ~signature_kind txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
             ~constraint_constants:U.constraint_constants
             ~sok_message:
@@ -226,8 +228,8 @@ let%test_module "Transaction union tests" =
                 in
                 Currency.Amount.Signed.create ~magnitude ~sgn:Sgn.Neg
               in
-              Transaction_snark.check_user_command ~constraint_constants
-                ~sok_message
+              Transaction_snark.check_user_command ~signature_kind
+                ~constraint_constants ~sok_message
                 ~source_first_pass_ledger:(Ledger.merkle_root ledger)
                 ~target_first_pass_ledger ~init_stack:pending_coinbase_stack
                 ~pending_coinbase_stack_state
@@ -518,7 +520,9 @@ let%test_module "Transaction union tests" =
                 ( Ledger.apply_user_command ~constraint_constants ledger
                     ~txn_global_slot:current_global_slot t1
                   |> Or_error.ok_exn
-                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
+                  : Mina_transaction_logic.Transaction_applied
+                    .Signed_command_applied
+                    .t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -581,7 +585,7 @@ let%test_module "Transaction union tests" =
         let open Staged_ledger_diff in
         let state_body0 =
           Mina_state.Protocol_state.negative_one
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_ledger:Genesis_ledger.for_unit_tests
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
@@ -604,7 +608,7 @@ let%test_module "Transaction union tests" =
         let state_body0 =
           let open Staged_ledger_diff in
           Mina_state.Protocol_state.negative_one
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_ledger:Genesis_ledger.for_unit_tests
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
@@ -662,7 +666,9 @@ let%test_module "Transaction union tests" =
           ~memo ~body
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
-      let user_command = Signed_command.sign signer payload in
+      let user_command =
+        Signed_command.sign ~signature_kind:U.signature_kind signer payload
+      in
       U.test_transaction_union ?expected_failure ledger
         (Command (Signed_command user_command)) ;
       let fee_payer = Signed_command.Payload.fee_payer payload in
@@ -2041,6 +2047,8 @@ let%test_module "legacy transactions using zkApp accounts" =
     let memo = Signed_command_memo.create_from_string_exn "zkApp-legacy-txns"
 
     let `VK vk, `Prover _zkapp_prover = Lazy.force U.trivial_zkapp
+
+    let vk = Async.Thread_safe.block_on_async_exn (fun () -> vk)
 
     let account ledger pk =
       let location =

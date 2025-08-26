@@ -1,10 +1,10 @@
-(* Testing
-   -------
+(** Testing
+    -------
 
-   Component: Pickles
-   Subject: Test scaling functions
-   Invocation: \
-    dune exec src/lib/pickles/test/main.exe -- test "Step curve operations"
+    Component: Pickles
+    Subject: Test scaling functions
+    Invocation: \
+     dune exec src/lib/pickles/test/test_step.exe
 *)
 
 module Impl = Pickles__Impls.Step
@@ -88,10 +88,11 @@ let test_scale_fast_2_small () =
           G.Constant.scale g x )
         (G.Constant.random (), s) )
 
-let tests =
+let () =
   let open Alcotest in
-  [ ( "Step curve operations"
-    , [ test_case "scale fast prime" `Quick test_scale_fast_2
-      ; test_case "scale fast small" `Quick test_scale_fast_2_small
-      ] )
-  ]
+  run "Pickles Step Curve Operations"
+    [ ( "scale"
+      , [ test_case "scale fast prime" `Quick test_scale_fast_2
+        ; test_case "scale fast small" `Quick test_scale_fast_2_small
+        ] )
+    ]

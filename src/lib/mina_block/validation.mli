@@ -24,83 +24,114 @@ end
 val validation :
   ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_block -> ('a, 'b, 'c, 'd, 'e, 'f, 'g) t
 
+val header_with_hash : _ with_header -> Header.with_hash
+
 val block_with_hash : _ with_block -> Block.with_hash
 
 val block : _ with_block -> Block.t
 
+val header : _ with_header -> Header.t
+
+val to_header :
+     ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_block
+  -> ('a, 'b, 'c, 'd, 'e, 'f, 'g) with_header
+
 val wrap : Block.with_hash -> fully_invalid_with_block
+
+val wrap_header : Header.with_hash -> fully_invalid_with_header
 
 val validate_time_received :
      precomputed_values:Precomputed_values.t
   -> time_received:Block_time.t
-  -> ( [ `Time_received ] * unit Truth.false_t
+  -> ( [ `Time_received ] * unit Mina_stdlib.Truth.false_t
      , 'a
      , 'b
      , 'c
      , 'd
      , 'e
      , 'f )
-     with_block
-  -> ( ( [ `Time_received ] * unit Truth.true_t
+     with_header
+  -> ( ( [ `Time_received ] * unit Mina_stdlib.Truth.true_t
        , 'a
        , 'b
        , 'c
        , 'd
        , 'e
        , 'f )
-       with_block
+       with_header
      , [> `Invalid_time_received of [ `Too_early | `Too_late of int64 ] ] )
      Result.t
 
 val skip_time_received_validation :
      [ `This_block_was_not_received_via_gossip ]
-  -> ( [ `Time_received ] * unit Truth.false_t
+  -> ( [ `Time_received ] * unit Mina_stdlib.Truth.false_t
      , 'a
      , 'b
      , 'c
      , 'd
      , 'e
      , 'f )
-     with_block
-  -> ([ `Time_received ] * unit Truth.true_t, 'a, 'b, 'c, 'd, 'e, 'f) with_block
-
-val validate_genesis_protocol_state :
-     genesis_state_hash:State_hash.t
-  -> ( 'a
-     , [ `Genesis_state ] * unit Truth.false_t
+     with_header
+  -> ( [ `Time_received ] * unit Mina_stdlib.Truth.true_t
+     , 'a
      , 'b
      , 'c
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
+
+val validate_genesis_protocol_state :
+     genesis_state_hash:State_hash.t
+  -> ( 'a
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.false_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
   -> ( ( 'a
-       , [ `Genesis_state ] * unit Truth.true_t
+       , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
        , 'b
        , 'c
        , 'd
        , 'e
        , 'f )
-       with_block
+       with_header
      , [> `Invalid_genesis_protocol_state ] )
      Result.t
 
 val skip_genesis_protocol_state_validation :
      [ `This_block_was_generated_internally ]
   -> ( 'a
-     , [ `Genesis_state ] * unit Truth.false_t
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.false_t
      , 'b
      , 'c
      , 'd
      , 'e
      , 'f )
      with_block
-  -> ('a, [ `Genesis_state ] * unit Truth.true_t, 'b, 'c, 'd, 'e, 'f) with_block
+  -> ( 'a
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
 
 val reset_genesis_protocol_state_validation :
-     ('a, [ `Genesis_state ] * unit Truth.true_t, 'b, 'c, 'd, 'e, 'f) with_block
+     ( 'a
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.true_t
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
   -> ( 'a
-     , [ `Genesis_state ] * unit Truth.false_t
+     , [ `Genesis_state ] * unit Mina_stdlib.Truth.false_t
      , 'b
      , 'c
      , 'd
@@ -111,30 +142,74 @@ val reset_genesis_protocol_state_validation :
 val validate_proofs :
      verifier:Verifier.t
   -> genesis_state_hash:State_hash.t
-  -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block list
-  -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block list
+  -> ( 'a
+     , 'b
+     , [ `Proof ] * unit Mina_stdlib.Truth.false_t
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+     list
+  -> ( ( 'a
+       , 'b
+       , [ `Proof ] * unit Mina_stdlib.Truth.true_t
+       , 'c
+       , 'd
+       , 'e
+       , 'f )
+       with_header
+       list
      , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val validate_single_proof :
      verifier:Verifier.t
   -> genesis_state_hash:State_hash.t
-  -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block
-  -> ( ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block
+  -> ( 'a
+     , 'b
+     , [ `Proof ] * unit Mina_stdlib.Truth.false_t
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_header
+  -> ( ( 'a
+       , 'b
+       , [ `Proof ] * unit Mina_stdlib.Truth.true_t
+       , 'c
+       , 'd
+       , 'e
+       , 'f )
+       with_header
      , [> `Invalid_proof of Error.t | `Verifier_error of Error.t ] )
      Deferred.Result.t
 
 val skip_proof_validation :
      [ `This_block_was_generated_internally ]
-  -> ('a, 'b, [ `Proof ] * unit Truth.false_t, 'c, 'd, 'e, 'f) with_block
-  -> ('a, 'b, [ `Proof ] * unit Truth.true_t, 'c, 'd, 'e, 'f) with_block
+  -> ( 'a
+     , 'b
+     , [ `Proof ] * unit Mina_stdlib.Truth.false_t
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
+  -> ( 'a
+     , 'b
+     , [ `Proof ] * unit Mina_stdlib.Truth.true_t
+     , 'c
+     , 'd
+     , 'e
+     , 'f )
+     with_block
 
 val extract_delta_block_chain_witness :
      ( 'a
      , 'b
      , 'c
      , [ `Delta_block_chain ]
-       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
+       * State_hash.t Mina_stdlib.Nonempty_list.t Mina_stdlib.Truth.true_t
      , 'd
      , 'e
      , 'f )
@@ -146,20 +221,20 @@ val validate_delta_block_chain :
      , 'b
      , 'c
      , [ `Delta_block_chain ]
-       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
+       * State_hash.t Mina_stdlib.Nonempty_list.t Mina_stdlib.Truth.false_t
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
   -> ( ( 'a
        , 'b
        , 'c
        , [ `Delta_block_chain ]
-         * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
+         * State_hash.t Mina_stdlib.Nonempty_list.t Mina_stdlib.Truth.true_t
        , 'd
        , 'e
        , 'f )
-       with_block
+       with_header
      , [> `Invalid_delta_block_chain_proof ] )
      Result.t
 
@@ -169,41 +244,44 @@ val skip_delta_block_chain_validation :
      , 'b
      , 'c
      , [ `Delta_block_chain ]
-       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.false_t
+       * State_hash.t Mina_stdlib.Nonempty_list.t Mina_stdlib.Truth.false_t
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
   -> ( 'a
      , 'b
      , 'c
      , [ `Delta_block_chain ]
-       * State_hash.t Mina_stdlib.Nonempty_list.t Truth.true_t
+       * State_hash.t Mina_stdlib.Nonempty_list.t Mina_stdlib.Truth.true_t
      , 'd
      , 'e
      , 'f )
-     with_block
+     with_header
 
 val validate_frontier_dependencies :
-     context:(module CONTEXT)
+     to_header:('a -> Header.t)
+  -> context:(module CONTEXT)
   -> root_block:Block.with_hash
-  -> get_block_by_hash:(State_hash.t -> Block.with_hash option)
-  -> ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , [ `Frontier_dependencies ] * unit Truth.false_t
-     , 'e
-     , 'f )
-     with_block
-  -> ( ( 'a
-       , 'b
+  -> is_block_in_frontier:(Frozen_ledger_hash.t -> bool)
+  -> ('a, State_hash.State_hashes.t) With_hash.t
+     * ( 'b
        , 'c
        , 'd
-       , [ `Frontier_dependencies ] * unit Truth.true_t
        , 'e
-       , 'f )
-       with_block
+       , [ `Frontier_dependencies ] * unit Mina_stdlib.Truth.false_t
+       , 'f
+       , 'g )
+       t
+  -> ( ('a, State_hash.State_hashes.t) With_hash.t
+       * ( 'b
+         , 'c
+         , 'd
+         , 'e
+         , [ `Frontier_dependencies ] * unit Mina_stdlib.Truth.true_t
+         , 'f
+         , 'g )
+         t
      , [> `Already_in_frontier
        | `Not_selected_over_frontier_root
        | `Parent_missing_from_frontier ] )
@@ -216,7 +294,7 @@ val skip_frontier_dependencies_validation :
      , 'b
      , 'c
      , 'd
-     , [ `Frontier_dependencies ] * unit Truth.false_t
+     , [ `Frontier_dependencies ] * unit Mina_stdlib.Truth.false_t
      , 'e
      , 'f )
      with_block
@@ -224,28 +302,30 @@ val skip_frontier_dependencies_validation :
      , 'b
      , 'c
      , 'd
-     , [ `Frontier_dependencies ] * unit Truth.true_t
+     , [ `Frontier_dependencies ] * unit Mina_stdlib.Truth.true_t
      , 'e
      , 'f )
      with_block
 
 val reset_frontier_dependencies_validation :
-     ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , [ `Frontier_dependencies ] * unit Truth.true_t
-     , 'e
-     , 'f )
-     with_block
-  -> ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , [ `Frontier_dependencies ] * unit Truth.false_t
-     , 'e
-     , 'f )
-     with_block
+     'g
+     * ( 'a
+       , 'b
+       , 'c
+       , 'd
+       , [ `Frontier_dependencies ] * unit Mina_stdlib.Truth.true_t
+       , 'e
+       , 'f )
+       t
+  -> 'g
+     * ( 'a
+       , 'b
+       , 'c
+       , 'd
+       , [ `Frontier_dependencies ] * unit Mina_stdlib.Truth.false_t
+       , 'e
+       , 'f )
+       t
 
 val validate_staged_ledger_diff :
      ?skip_staged_ledger_verification:[ `All | `Proofs ]
@@ -257,12 +337,13 @@ val validate_staged_ledger_diff :
   -> verifier:Verifier.t
   -> parent_staged_ledger:Staged_ledger.t
   -> parent_protocol_state:Protocol_state.Value.t
+  -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
   -> ( 'a
      , 'b
      , 'c
      , 'd
      , 'e
-     , [ `Staged_ledger_diff ] * unit Truth.false_t
+     , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t
      , 'f )
      with_block
   -> ( [ `Just_emitted_a_proof of bool ]
@@ -272,7 +353,7 @@ val validate_staged_ledger_diff :
            , 'c
            , 'd
            , 'e
-           , [ `Staged_ledger_diff ] * unit Truth.true_t
+           , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.true_t
            , 'f )
            with_block ]
        * [ `Staged_ledger of Staged_ledger.t ]
@@ -292,7 +373,7 @@ val validate_staged_ledger_hash :
      , 'c
      , 'd
      , 'e
-     , [ `Staged_ledger_diff ] * unit Truth.false_t
+     , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t
      , 'f )
      with_block
   -> ( ( 'a
@@ -300,7 +381,7 @@ val validate_staged_ledger_hash :
        , 'c
        , 'd
        , 'e
-       , [ `Staged_ledger_diff ] * unit Truth.true_t
+       , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.true_t
        , 'f )
        with_block
      , [> `Staged_ledger_hash_mismatch ] )
@@ -313,7 +394,7 @@ val skip_staged_ledger_diff_validation :
      , 'c
      , 'd
      , 'e
-     , [ `Staged_ledger_diff ] * unit Truth.false_t
+     , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t
      , 'f )
      with_block
   -> ( 'a
@@ -321,27 +402,29 @@ val skip_staged_ledger_diff_validation :
      , 'c
      , 'd
      , 'e
-     , [ `Staged_ledger_diff ] * unit Truth.true_t
+     , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.true_t
      , 'f )
      with_block
 
 val reset_staged_ledger_diff_validation :
-     ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , 'e
-     , [ `Staged_ledger_diff ] * unit Truth.true_t
-     , 'f )
-     with_block
-  -> ( 'a
-     , 'b
-     , 'c
-     , 'd
-     , 'e
-     , [ `Staged_ledger_diff ] * unit Truth.false_t
-     , 'f )
-     with_block
+     'g
+     * ( 'a
+       , 'b
+       , 'c
+       , 'd
+       , 'e
+       , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.true_t
+       , 'f )
+       t
+  -> 'g
+     * ( 'a
+       , 'b
+       , 'c
+       , 'd
+       , 'e
+       , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t
+       , 'f )
+       t
 
 val validate_protocol_versions :
      ( 'a
@@ -350,16 +433,16 @@ val validate_protocol_versions :
      , 'd
      , 'e
      , 'f
-     , [ `Protocol_versions ] * unit Truth.false_t )
-     with_block
+     , [ `Protocol_versions ] * unit Mina_stdlib.Truth.false_t )
+     with_header
   -> ( ( 'a
        , 'b
        , 'c
        , 'd
        , 'e
        , 'f
-       , [ `Protocol_versions ] * unit Truth.true_t )
-       with_block
+       , [ `Protocol_versions ] * unit Mina_stdlib.Truth.true_t )
+       with_header
      , [> `Invalid_protocol_version | `Mismatched_protocol_version ] )
      Result.t
 
@@ -371,7 +454,7 @@ val skip_protocol_versions_validation :
      , 'd
      , 'e
      , 'f
-     , [ `Protocol_versions ] * unit Truth.false_t )
+     , [ `Protocol_versions ] * unit Mina_stdlib.Truth.false_t )
      with_block
   -> ( 'a
      , 'b
@@ -379,5 +462,24 @@ val skip_protocol_versions_validation :
      , 'd
      , 'e
      , 'f
-     , [ `Protocol_versions ] * unit Truth.true_t )
+     , [ `Protocol_versions ] * unit Mina_stdlib.Truth.true_t )
+     with_block
+
+val with_body :
+     ( 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t
+     , 'f )
+     with_header
+  -> Staged_ledger_diff.Body.t
+  -> ( 'a
+     , 'b
+     , 'c
+     , 'd
+     , 'e
+     , [ `Staged_ledger_diff ] * unit Mina_stdlib.Truth.false_t
+     , 'f )
      with_block

@@ -18,17 +18,15 @@ let account_id = Account_id.create pk_compressed Token_id.default
 
 let tag, _, p_module, Pickles.Provers.[ prover ] =
   Zkapps_examples.compile () ~cache:Cache_dir.cache ~auxiliary_typ:Impl.Typ.unit
-    ~branches:(module Nat.N1)
     ~max_proofs_verified:(module Nat.N0)
     ~name:"empty_update"
-    ~constraint_constants:
-      (Genesis_constants.Constraint_constants.to_snark_keys_header
-         constraint_constants )
     ~choices:(fun ~self:_ -> [ Zkapps_empty_update.rule pk_compressed ])
 
 module P = (val p_module)
 
-let vk = Pickles.Side_loaded.Verification_key.of_compiled tag
+let vk =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      Pickles.Side_loaded.Verification_key.of_compiled tag )
 
 let account_update, () = Async.Thread_safe.block_on_async_exn prover
 
@@ -61,14 +59,13 @@ let deploy_account_update_body : Account_update.Body.t =
 
 let deploy_account_update : Account_update.t =
   (* TODO: This is a pain. *)
-  { body = deploy_account_update_body
-  ; authorization = Signature Signature.dummy
-  }
+  Account_update.with_aux ~body:deploy_account_update_body
+    ~authorization:(Control.Poly.Signature Signature.dummy)
 
 let account_updates =
   []
   |> Zkapp_command.Call_forest.cons_tree account_update
-  |> Zkapp_command.Call_forest.cons deploy_account_update
+  |> Zkapp_command.Call_forest.cons ~signature_kind deploy_account_update
 
 let memo = Signed_command_memo.empty
 
@@ -79,20 +76,20 @@ let transaction_commitment : Zkapp_command.Transaction_commitment.t =
 
 let fee_payer =
   (* TODO: This is a pain. *)
-  { Account_update.Fee_payer.body =
+  Account_update.Fee_payer.make
+    ~body:
       { Account_update.Body.Fee_payer.dummy with
         public_key = pk_compressed
       ; fee = Currency.Fee.(of_nanomina_int_exn 100)
       }
-  ; authorization = Signature.dummy
-  }
+    ~authorization:Signature.dummy
 
 let full_commitment =
   (* TODO: This is a pain. *)
   Zkapp_command.Transaction_commitment.create_complete transaction_commitment
     ~memo_hash:(Signed_command_memo.hash memo)
     ~fee_payer_hash:
-      (Zkapp_command.Digest.Account_update.create
+      (Zkapp_command.Digest.Account_update.create ~signature_kind
          (Account_update.of_fee_payer fee_payer) )
 
 (* TODO: Make this better. *)
@@ -104,7 +101,7 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
       when Public_key.Compressed.equal public_key pk_compressed ->
         { fee_payer with
           authorization =
-            Schnorr.Chunked.sign sk
+            Schnorr.Chunked.sign ~signature_kind sk
               (Random_oracle.Input.Chunked.field full_commitment)
         }
     | fee_payer ->
@@ -114,6 +111,7 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
     Zkapp_command.Call_forest.map account_updates ~f:(function
       | ({ body = { public_key; use_full_commitment; _ }
          ; authorization = Signature _
+         ; aux = _
          } as account_update :
           Account_update.t )
         when Public_key.Compressed.equal public_key pk_compressed ->
@@ -123,8 +121,8 @@ let sign_all ({ fee_payer; account_updates; memo } : Zkapp_command.t) :
           in
           { account_update with
             authorization =
-              Control.Signature
-                (Schnorr.Chunked.sign sk
+              Control.Poly.Signature
+                (Schnorr.Chunked.sign ~signature_kind sk
                    (Random_oracle.Input.Chunked.field commitment) )
           }
       | account_update ->

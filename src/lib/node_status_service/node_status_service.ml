@@ -71,7 +71,6 @@ type node_status_data =
   ; libp2p_output_bandwidth : float
   ; libp2p_cpu_usage : float
   ; commit_hash : string
-  ; git_branch : string
   ; chain_id : string
   ; peer_id : string
   ; ip_address : string
@@ -91,7 +90,6 @@ module Simplified = struct
   type t =
     { max_observed_block_height : int
     ; commit_hash : string
-    ; git_branch : string
     ; chain_id : string
     ; peer_id : string
     ; peer_count : int
@@ -180,8 +178,8 @@ let reset_gauges () =
   Queue.clear Transition_frontier.validated_blocks ;
   Queue.clear Transition_frontier.rejected_blocks
 
-let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
-    ~network ~addrs_and_ports ~start_time ~slot_duration =
+let start ~commit_id ~logger ~node_status_url ~transition_frontier ~sync_status
+    ~chain_id ~network ~addrs_and_ports ~start_time ~slot_duration =
   [%log info] "Starting node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
   let five_slots = Time.Span.scale slot_duration 5. in
@@ -197,13 +195,11 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
       Deferred.unit
   | Some tf -> (
       let catchup_job_states =
-        match Transition_frontier.catchup_tree tf with
-        | Full catchup_tree ->
+        match Transition_frontier.catchup_state tf with
+        | Full catchup_state ->
             Some
               (Transition_frontier.Full_catchup_tree.to_node_status_report
-                 catchup_tree )
-        | _ ->
-            None
+                 catchup_state )
       in
       let sync_status =
         sync_status |> Mina_incremental.Status.Observer.value_exn
@@ -258,15 +254,14 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
             ; libp2p_input_bandwidth
             ; libp2p_output_bandwidth
             ; libp2p_cpu_usage
-            ; commit_hash = Mina_version.commit_id
-            ; git_branch = Mina_version.branch
+            ; commit_hash = commit_id
             ; chain_id
             ; peer_id =
                 (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
             ; ip_address =
                 Node_addrs_and_ports.external_ip addrs_and_ports
                 |> Core.Unix.Inet_addr.to_string
-            ; timestamp = Rfc3339_time.get_rfc3339_time ()
+            ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
             ; uptime_of_node =
                 Time.Span.to_sec @@ Time.diff (Time.now ()) start_time
             ; peer_count = List.length peers
@@ -420,7 +415,7 @@ let start ~logger ~node_status_url ~transition_frontier ~sync_status ~chain_id
             "Failed to get bandwidth info from libp2p" ;
           Deferred.unit )
 
-let start_simplified ~logger ~node_status_url ~chain_id ~network
+let start_simplified ~commit_id ~logger ~node_status_url ~chain_id ~network
     ~addrs_and_ports ~slot_duration ~block_producer_public_key_base58 =
   [%log info] "Starting simplified node status service using URL $url"
     ~metadata:[ ("url", `String node_status_url) ] ;
@@ -432,12 +427,11 @@ let start_simplified ~logger ~node_status_url ~chain_id ~network
      let node_status_data =
        { Simplified.max_observed_block_height =
            !Mina_metrics.Transition_frontier.max_blocklength_observed
-       ; commit_hash = Mina_version.commit_id
-       ; git_branch = Mina_version.branch
+       ; commit_hash = commit_id
        ; chain_id
        ; peer_id = (Node_addrs_and_ports.to_peer_exn addrs_and_ports).peer_id
        ; peer_count = List.length peers
-       ; timestamp = Rfc3339_time.get_rfc3339_time ()
+       ; timestamp = Mina_stdlib_unix.Rfc3339_time.get_rfc3339_time ()
        ; block_producer_public_key = block_producer_public_key_base58
        }
      in

@@ -53,11 +53,6 @@ let hash_messages_for_next_step_proof ~app_state
          Array.concat_map x ~f:(fun x -> Array.of_list (g x)) )
        ~app_state )
 
-let dlog_pcs_batch (type nat proofs_verified total)
-    ((without_degree_bound, _pi) :
-      total Nat.t * (proofs_verified, nat, total) Nat.Adds.t ) =
-  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[]
-
 let when_profiling profiling default =
   match Option.map (Sys.getenv_opt "PICKLES_PROFILING") ~f:String.lowercase with
   | None | Some ("0" | "false") ->
@@ -218,11 +213,10 @@ let tock_public_input_of_statement ~feature_flags s =
   tock_unpadded_public_input_of_statement ~feature_flags s
 
 let tick_public_input_of_statement ~max_proofs_verified
-    (prev_statement : _ Types.Step.Statement.t) =
+    (prev_statement : _ Impls.Step.statement) =
   let input =
     let (T (input, _conv, _conv_inv)) =
       Impls.Step.input ~proofs_verified:max_proofs_verified
-        ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input input prev_statement
   in
@@ -251,9 +245,11 @@ let ft_comm ~add:( + ) ~scale ~negate
   f_comm + chunked_t_comm
   + negate (scale chunked_t_comm plonk.zeta_to_domain_size)
 
-let combined_evaluation (type f)
-    (module Impl : Snarky_backendless.Snark_intf.Run with type field = f)
-    ~(xi : Impl.Field.t) (without_degree_bound : _ list) =
+let combined_evaluation (type f v)
+    (module Impl : Snarky_backendless.Snark_intf.Run
+      with type field = f
+       and type field_var = v ) ~(xi : Impl.Field.t)
+    (without_degree_bound : _ list) =
   let open Impl in
   let open Field in
   let mul_and_add ~(acc : Field.t) ~(xi : Field.t)

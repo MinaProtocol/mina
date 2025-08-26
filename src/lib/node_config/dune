@@ -1,0 +1,12 @@
+(library
+ (name node_config)
+ (public_name mina_node_config)
+ (libraries
+  node_config_intf
+  node_config_version
+  node_config_unconfigurable_constants)
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_base ppx_optcomp)))

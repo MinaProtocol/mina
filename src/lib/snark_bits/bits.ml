@@ -1,7 +1,5 @@
 (* bits.ml *)
 
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Fold_lib
 open Bitstring_lib
@@ -94,8 +92,6 @@ module UInt64 : Bits_intf.Convertible_bits with type t := Unsigned.UInt64.t =
 
 module UInt32 : Bits_intf.Convertible_bits with type t := Unsigned.UInt32.t =
   Vector.Make (Vector.UInt32)
-
-[%%ifdef consensus_mechanism]
 
 module type Big_int_intf = sig
   include Snarky_backendless.Bigint_intf.S
@@ -390,7 +386,7 @@ module Snarkable = struct
     include Field_backed (Impl) (M)
 
     let pack_var bs =
-      assert (Mina_stdlib.List.Length.Compare.(bs = M.bit_length)) ;
+      assert (List.length bs = M.bit_length) ;
       project_var bs
 
     let pack_value = Fn.id
@@ -416,5 +412,3 @@ struct
 
   let typ : (var, value) Typ.t = Typ.list ~length:M.bit_length Boolean.typ
 end
-
-[%%endif]

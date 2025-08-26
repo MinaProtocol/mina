@@ -1,0 +1,26 @@
+(test
+ (name test_pickles)
+ (flags
+  (:standard -warn-error +a)
+  -open
+  Core_kernel
+  -open
+  Pickles_graphql)
+ (package graphql_lib)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  ; opam libraries
+  alcotest
+  core_kernel
+  sexplib0
+  ; local libraries
+  kimchi_pasta
+  kimchi_pasta.basic
+  graphql_basic_scalars
+  pasta_bindings
+  pickles
+  pickles.backend
+  graphql_lib.pickles)
+ (action
+  (run %{test})))

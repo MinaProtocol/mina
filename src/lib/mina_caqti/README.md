@@ -64,9 +64,7 @@ returning its result (if it succeeds), and if the data is `Ignore`,
 returns `None`.  The functions `get_zkapp_set_or_keep` and
 `get_zkapp_or_ignore` operate symmetrically, by converting a queried value to
 a value construct with `Set` or `Check`, if not NULL, and converting a
-NULL to `Keep` or `Ignore`. The use of NULL to encode these
-zkApp-related values is mentioned as the `NULL convention` in the part
-of the database schema in `zkapp_tables.sql`.
+NULL to `Keep` or `Ignore`.
 
 The functions `add_if_some` and `get_opt_item` are similar to these
 zkApps-related functions, except that the constructors involved are

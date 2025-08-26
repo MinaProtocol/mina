@@ -8,16 +8,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
 
   type dsl = Dsl.t
 
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -30,7 +31,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     [%log info] "gossip_consistency test: starting..." ;
@@ -40,13 +41,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
            (Core.String.Map.data (Network.all_mina_nodes network)) )
     in
     [%log info] "gossip_consistency test: done waiting for initializations" ;
-    let receiver_bp =
-      Core.String.Map.find_exn (Network.block_producers network) "node-a"
-    in
+    let receiver_bp = Network.block_producer_exn network "node-a" in
     let%bind receiver_pub_key = pub_key_of_node receiver_bp in
-    let sender_bp =
-      Core.String.Map.find_exn (Network.block_producers network) "node-b"
-    in
+    let sender_bp = Network.block_producer_exn network "node-b" in
     let%bind sender_pub_key = pub_key_of_node sender_bp in
     let num_payments = 3 in
     let fee = Currency.Fee.of_nanomina_int_exn 10_000_000 in

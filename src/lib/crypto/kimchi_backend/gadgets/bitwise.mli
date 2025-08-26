@@ -1,3 +1,5 @@
+module Circuit := Kimchi_pasta_snarky_backend.Step_impl
+
 (* Side of rotation *)
 type rot_mode = Left | Right
 
@@ -9,12 +11,11 @@ type rot_mode = Left | Right
  * Returns rotated word
  *)
 val rot64 :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?check64:bool (* false *)
-  -> 'f Snarky_backendless.Cvar.t
+     ?check64:bool (* false *)
+  -> Circuit.Field.t
   -> int
   -> rot_mode
-  -> 'f Snarky_backendless.Cvar.t
+  -> Circuit.Field.t
 
 (** 64-bit bitwise logical shift left of bits to the `mode` side
  * Inputs
@@ -24,11 +25,7 @@ val rot64 :
  * Output: left shifted word (with bits 0s at the least significant positions)
  *)
 val lsl64 :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?check64:bool (* false *)
-  -> 'f Snarky_backendless.Cvar.t
-  -> int
-  -> 'f Snarky_backendless.Cvar.t
+  ?check64:bool (* false *) -> Circuit.Field.t -> int -> Circuit.Field.t
 
 (** 64-bit bitwise logical shift of bits to the right side
  * Inputs
@@ -38,11 +35,7 @@ val lsl64 :
  * Output: right shifted word (with bits 0s at the most significant positions)
  *)
 val lsr64 :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?check64:bool (* false *)
-  -> 'f Snarky_backendless.Cvar.t
-  -> int
-  -> 'f Snarky_backendless.Cvar.t
+  ?check64:bool (* false *) -> Circuit.Field.t -> int -> Circuit.Field.t
 
 (** Boolean Xor of length bits 
  * input1 and input2 are the inputs to the Xor gate
@@ -50,33 +43,20 @@ val lsr64 :
  * len_xor is the number of bits of the lookup table (default is 4)
  *)
 val bxor :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?len_xor:int
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
-  -> int
-  -> 'f Snarky_backendless.Cvar.t
+  ?len_xor:int -> Circuit.Field.t -> Circuit.Field.t -> int -> Circuit.Field.t
 
 (** Boolean Xor of 16 bits
    * This is a special case of Xor for 16 bits for Xor lookup table of 4 bits of inputs.
    * Receives two input words to Xor together, of maximum 16 bits each.
    * Returns the Xor of the two words.
 *)
-val bxor16 :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+val bxor16 : Circuit.Field.t -> Circuit.Field.t -> Circuit.Field.t
 
 (** Boolean Xor of 64 bits
  * This is a special case of Xor for 64 bits for Xor lookup table of 4 bits of inputs.   * Receives two input words to Xor together, of maximum 64 bits each.
  * Returns the Xor of the two words.
 *)
-val bxor64 :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+val bxor64 : Circuit.Field.t -> Circuit.Field.t -> Circuit.Field.t
 
 (** Boolean And of length bits
    *  input1 and input2 are the two inputs to AND
@@ -84,23 +64,14 @@ val bxor64 :
    *  len_xor is the number of bits of the inputs of the Xor lookup table (default is 4)
 *)
 val band :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?len_xor:int
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
-  -> int
-  -> 'f Snarky_backendless.Cvar.t
+  ?len_xor:int -> Circuit.Field.t -> Circuit.Field.t -> int -> Circuit.Field.t
 
 (** Boolean And of 64 bits 
  * This is a special case of And for 64 bits for Xor lookup table of 4 bits of inputs.
  * Receives two input words to And together, of maximum 64 bits each.
  * Returns the And of the two words.   
  *)
-val band64 :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+val band64 : Circuit.Field.t -> Circuit.Field.t -> Circuit.Field.t
 
 (** Boolean Not of length bits for checked length (uses Xor gadgets inside to constrain the length)
     *   - input of word to negate
@@ -108,19 +79,11 @@ val band64 :
     *   - len_xor is the length of the Xor lookup table to use beneath (default 4)
     * Note that the length needs to be less than the bit length of the field.
     *)
-val bnot_checked :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> ?len_xor:int
-  -> 'f Snarky_backendless.Cvar.t
-  -> int
-  -> 'f Snarky_backendless.Cvar.t
+val bnot_checked : ?len_xor:int -> Circuit.Field.t -> int -> Circuit.Field.t
 
 (** Negates a word of 64 bits with checked length of 64 bits.
    * This means that the bound in lenght is constrained in the circuit. *)
-val bnot64_checked :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+val bnot64_checked : Circuit.Field.t -> Circuit.Field.t
 
 (** Boolean Not of length bits for unchecked length (uses Generic subtractions inside) 
  *  - input of word to negate
@@ -129,15 +92,8 @@ val bnot64_checked :
  variable with a correct length in order to make sure that the length is correct )   
  * Note that the length needs to be less than the bit length of the field.
  *)
-val bnot_unchecked :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> int
-  -> 'f Snarky_backendless.Cvar.t
+val bnot_unchecked : Circuit.Field.t -> int -> Circuit.Field.t
 
 (** Negates a word of 64 bits, but its length goes unconstrained in the circuit
    (unless it is copied from a checked length value) *)
-val bnot64_unchecked :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+val bnot64_unchecked : Circuit.Field.t -> Circuit.Field.t

@@ -1,10 +1,9 @@
-{ lib, buildGoModule, fetchFromGitHub }:
-
+{ lib, buildGoModule, fetchFromGitHub, }:
 buildGoModule {
   pname = "vend";
   version = "unstable-2020-06-04";
 
-  patches = [./remove_tidy.patch];
+  patches = [ ./remove_tidy.patch ];
 
   # A permanent fork from master is maintained to avoid non deterministic go tidy
   src = fetchFromGitHub {

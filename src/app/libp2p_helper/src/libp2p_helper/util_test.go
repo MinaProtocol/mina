@@ -82,7 +82,7 @@ func newTestAppWithMaxConnsAndCtxAndGrace(t *testing.T, privkey crypto.PrivKey, 
 		panicOnErr(helper.Host.Close())
 	})
 	outChan := make(chan *capnp.Message, 64)
-	bitswapCtx := NewBitswapCtx(ctx, outChan)
+	bitswapCtx := NewBitswapCtxWithMaxBlockSize(1<<9, ctx, outChan)
 	bitswapCtx.engine = helper.Bitswap
 	bitswapCtx.storage = helper.BitswapStorage
 

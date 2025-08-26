@@ -13,13 +13,13 @@ module Instance = struct
         * chunking_data option
         * Verification_key.t
         * 'a
-        * ('n, 'n) Proof.t
+        * 'n Proof.t
         -> t
 end
 
 let verify_heterogenous (ts : Instance.t list) =
   let module Tick_field = Backend.Tick.Field in
-  let logger = Internal_tracing_context_logger.get () in
+  let logger = Context_logger.get () in
   [%log internal] "Verify_heterogenous"
     ~metadata:[ ("count", `Int (List.length ts)) ] ;
   let tick_field : _ Plonk_checks.field = (module Tick_field) in
@@ -60,8 +60,8 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.start __LOC__ ;
         let non_chunking, expected_num_chunks =
           let expected_num_chunks =
-            Option.value_map ~default:1 chunking_data ~f:(fun x ->
-                x.Instance.num_chunks )
+            Option.value_map ~default:Plonk_checks.num_chunks_by_default
+              chunking_data ~f:(fun x -> x.Instance.num_chunks)
           in
           let exception Is_chunked in
           match
@@ -117,8 +117,8 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.clock __LOC__ ;
         let deferred_values =
           let zk_rows =
-            Option.value_map ~default:3 chunking_data ~f:(fun x ->
-                x.Instance.zk_rows )
+            Option.value_map ~default:Plonk_checks.zk_rows_by_default
+              chunking_data ~f:(fun x -> x.Instance.zk_rows)
           in
           Wrap_deferred_values.expand_deferred ~evals ~zk_rows
             ~old_bulletproof_challenges ~proof_state
@@ -201,7 +201,6 @@ let verify_heterogenous (ts : Instance.t list) =
                   t.statement.proof_state.sponge_digest_before_evaluations
               ; messages_for_next_wrap_proof =
                   Wrap_hack.hash_messages_for_next_wrap_proof
-                    Max_proofs_verified.n
                     (Reduced_messages_for_next_proof_over_same_field.Wrap
                      .prepare
                        t.statement.proof_state.messages_for_next_wrap_proof )
@@ -244,7 +243,7 @@ let verify_heterogenous (ts : Instance.t list) =
 let verify (type a n) ?chunking_data
     (max_proofs_verified : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
-    (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
+    (key : Verification_key.t) (ts : (a * n Proof.t) list) =
   verify_heterogenous
     (List.map ts ~f:(fun (x, p) ->
          Instance.T (max_proofs_verified, a_value, chunking_data, key, x, p) )

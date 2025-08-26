@@ -5,12 +5,6 @@ open Signature_lib
 open Mina_base
 open Mina_transaction
 
-let constraint_constants = Genesis_constants.Constraint_constants.compiled
-
-let genesis_constants = Genesis_constants.compiled
-
-let proof_level = Genesis_constants.Proof_level.compiled
-
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct
   include Mina_ledger.Sparse_ledger
@@ -18,7 +12,9 @@ module Sparse_ledger = struct
   let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 end
 
-let create_ledger_and_transactions num_transactions :
+let create_ledger_and_transactions
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    num_transactions :
     Mina_ledger.Ledger.t * _ User_command.t_ Transaction.t_ list =
   let num_accounts = 4 in
   let ledger =
@@ -43,7 +39,8 @@ let create_ledger_and_transactions num_transactions :
         ~memo:Signed_command_memo.dummy ~valid_until:None
         ~body:(Payment { receiver_pk = to_pk; amount })
     in
-    Signed_command.sign from_kp payload
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    Signed_command.sign ~signature_kind from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
@@ -118,7 +115,10 @@ module Transaction_key = struct
   include Comparable.Make (T)
   include Hashable.Make (T)
 
-  let of_zkapp_command ~ledger (p : Zkapp_command.t) =
+  let of_zkapp_command
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~ledger
+      (p : Zkapp_command.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let second_pass_ledger =
       let new_mask =
         Mina_ledger.Ledger.Mask.create
@@ -128,7 +128,8 @@ module Transaction_key = struct
       Mina_ledger.Ledger.register_mask ledger new_mask
     in
     let _partial_stmt =
-      Mina_ledger.Ledger.apply_transaction_first_pass ~constraint_constants
+      Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
+        ~constraint_constants
         ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~txn_state_view:Transaction_snark_tests.Util.genesis_state_view
         second_pass_ledger
@@ -136,7 +137,8 @@ module Transaction_key = struct
       |> Or_error.ok_exn
     in
     let segments =
-      Transaction_snark.zkapp_command_witnesses_exn ~constraint_constants
+      Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
+        ~constraint_constants
         ~global_slot:Mina_numbers.Global_slot_since_genesis.zero
         ~state_body:Transaction_snark_tests.Util.genesis_state_body
         ~fee_excess:Currency.Amount.Signed.zero
@@ -187,10 +189,17 @@ end
 let transaction_combinations = Transaction_key.Table.create ()
 
 let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
-    ~max_num_updates () : Mina_ledger.Ledger.t * Zkapp_command.t list =
+    ~(proof_cache_db : Proof_cache_tag.cache_db)
+    ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~max_num_updates () :
+    (Mina_ledger.Ledger.t * Zkapp_command.t list) Async.Deferred.t =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let `VK verification_key, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
+    Transaction_snark.For_tests.create_trivial_snapp ()
   in
+  let zkapp_prover_and_vk = (prover, verification_key) in
+  let%bind.Async.Deferred verification_key = verification_key in
   let num_keypairs = max_num_updates + 10 in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let num_keypairs_in_ledger = max_num_updates + 1 in
@@ -207,7 +216,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
           ~data:kp.private_key )
   in
   let balances =
-    let min_cmd_fee = Currency.Fee.minimum_user_command_fee in
+    let min_cmd_fee = genesis_constants.minimum_user_command_fee in
     let min_balance =
       Currency.Fee.to_nanomina_int min_cmd_fee
       |> Int.( + ) 1_000_000_000_000_000
@@ -341,7 +350,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
         perm1 @ perm2
   in
   let rec generate_zkapp ~num_proof_updates ~num_updates acc nonce =
-    if num_updates > max_num_updates then List.rev acc
+    if num_updates > max_num_updates then Async.Deferred.return @@ List.rev acc
     else if num_proof_updates > num_updates then
       (* start a new iteration for transactions with one more update *)
       generate_zkapp ~num_proof_updates:0 ~num_updates:(num_updates + 1) acc
@@ -351,12 +360,10 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       let empty_sender, spec =
         test_spec nonce ~num_proof_updates ~num_updates
       in
-      let parties =
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            Transaction_snark.For_tests.update_states
-              ~zkapp_prover_and_vk:(prover, verification_key)
-              ~constraint_constants ~empty_sender spec
-              ~receiver_auth:Control.Tag.Signature )
+      let%bind.Async.Deferred parties =
+        Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
+          ~constraint_constants ~empty_sender spec
+          ~receiver_auth:Control.Tag.Signature
       in
       let simple_parties = Zkapp_command.to_simple parties in
       let other_parties = simple_parties.account_updates in
@@ -386,14 +393,18 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
         (List.length other_parties + 1)
         (List.length proof_parties)
         Time.(Span.to_sec (diff (now ()) start)) ;
-      let permutations =
+      let%bind.Async.Deferred permutations =
         permute proof_parties (signature_parties @ no_auths) [] []
-        |> List.filter_mapi
+        |> Async.Deferred.List.filter_mapi ~how:`Sequential
              ~f:(fun i (account_updates : Account_update.Simple.t list) ->
                let p =
-                 Zkapp_command.of_simple { simple_parties with account_updates }
+                 Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+                   { simple_parties with account_updates }
                in
-               let combination = Transaction_key.of_zkapp_command ~ledger p in
+               let combination =
+                 Transaction_key.of_zkapp_command ~constraint_constants ~ledger
+                   p
+               in
                let perm_string =
                  List.fold ~init:"S" account_updates
                    ~f:(fun acc (p : Account_update.Simple.t) ->
@@ -408,7 +419,7 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
                if Transaction_key.Table.mem transaction_combinations combination
                then (
                  printf "Skipping %s\n%!" perm_string ;
-                 None )
+                 Async.Deferred.return None )
                else (
                  printf
                    !"Generated updates permutation %d: %s\n\
@@ -416,10 +427,9 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
                      %!"
                    i perm_string ;
                  (*Update the authorizations*)
-                 let p =
-                   Async.Thread_safe.block_on_async_exn (fun () ->
-                       Zkapp_command_builder.replace_authorizations ~prover
-                         ~keymap p )
+                 let%map.Async.Deferred p =
+                   Zkapp_command_builder.replace_authorizations ~prover ~keymap
+                     p
                  in
                  Transaction_key.Table.add_exn transaction_combinations
                    ~key:combination
@@ -429,68 +439,11 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       generate_zkapp ~num_proof_updates:(num_proof_updates + 1) ~num_updates
         (permutations @ acc) nonce
   in
-  ( ledger
-  , generate_zkapp ~num_proof_updates ~num_updates:min_num_updates []
-      Mina_base.Account.Nonce.zero )
-
-let _create_ledger_and_zkapps_from_generator num_transactions :
-    Mina_ledger.Ledger.t * Zkapp_command.t list =
-  let length =
-    match num_transactions with
-    | `Count length ->
-        length
-    | `Two_from_same ->
-        failwith "Must provide a count when profiling with snapps"
+  let%map.Async.Deferred zkapp =
+    generate_zkapp ~num_proof_updates ~num_updates:min_num_updates []
+      Mina_base.Account.Nonce.zero
   in
-  let max_account_updates = 6 in
-  printf
-    !"Generating zkApp transactions with %d updates\n%!"
-    max_account_updates ;
-  let start = Time.now () in
-  let `VK vk, `Prover prover =
-    Transaction_snark.For_tests.create_trivial_snapp ~constraint_constants ()
-  in
-  let cmd_infos, ledger =
-    Quickcheck.random_value
-      (Mina_generators.User_command_generators
-       .sequence_zkapp_command_with_ledger ~max_account_updates ~length ~vk () )
-  in
-  let zkapps =
-    List.map cmd_infos ~f:(fun (user_cmd, _keypair, keymap) ->
-        match user_cmd with
-        | User_command.Zkapp_command parties_valid ->
-            let parties = Zkapp_command.Valid.forget parties_valid in
-            let other_parties = Zkapp_command.account_updates_list parties in
-            let proof_count, signature_count, no_auths =
-              List.fold ~init:(0, 0, 0)
-                (Account_update.of_fee_payer parties.fee_payer :: other_parties)
-                ~f:(fun (pc, sc, na) (p : Account_update.t) ->
-                  match p.authorization with
-                  | Proof _ ->
-                      (pc + 1, sc, na)
-                  | Signature _ ->
-                      (pc, sc + 1, na)
-                  | _ ->
-                      (pc, sc, na + 1) )
-            in
-            printf
-              !"Generated zkapp with %d parties of which %d signatures, %d \
-                proofs and %d none\n\
-                %!"
-              (List.length other_parties + 1)
-              signature_count proof_count no_auths ;
-            Async.Thread_safe.block_on_async_exn (fun () ->
-                Zkapp_command_builder.replace_authorizations
-                  ~prover (*~dummy_proof:proof*)
-                  ~keymap
-                  (Zkapp_command.Valid.forget parties_valid) )
-        | User_command.Signed_command _ ->
-            failwith "Expected Zkapp_command user command" )
-  in
-  printf
-    !"Time to generate zkapps: %f secs\n%!"
-    Time.(Span.to_sec (diff (now ()) start)) ;
-  (ledger, zkapps)
+  (ledger, zkapp)
 
 let time thunk =
   let start = Time.now () in
@@ -506,23 +459,47 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
-let precomputed_values = Precomputed_values.compiled_inputs
+let state_body ~(genesis_constants : Genesis_constants.t)
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+  lazy
+    (let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
+     let consensus_constants =
+       Consensus.Constants.create ~constraint_constants
+         ~protocol_constants:genesis_constants.protocol
+     in
+     (* TODO: Do we really need to create a whole ledger just to compute this?
+        Probably not..
+     *)
+     let module Test_genesis_ledger = Genesis_ledger.Make (struct
+       include Test_genesis_ledger
 
-let state_body =
-  Mina_state.(
-    Lazy.map precomputed_values ~f:(fun values ->
-        values.protocol_state_with_hashes.data |> Protocol_state.body ))
+       let directory = `Ephemeral
 
-let curr_state_view = Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
+       let depth = constraint_constants.ledger_depth
+     end) in
+     Mina_state.Genesis_protocol_state.t
+       ~genesis_ledger:(module Test_genesis_ledger)
+       ~genesis_epoch_data ~constraint_constants ~consensus_constants
+       ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
+     |> With_hash.data |> Mina_state.Protocol_state.body )
 
-let state_body_hash = Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
+let curr_state_view ~genesis_constants ~constraint_constants =
+  Lazy.map
+    (state_body ~genesis_constants ~constraint_constants)
+    ~f:Mina_state.Protocol_state.Body.view
 
-let pending_coinbase_stack_target (t : Transaction.t) stack =
+let state_body_hash ~genesis_constants ~constraint_constants =
+  Lazy.map ~f:Mina_state.Protocol_state.Body.hash
+    (state_body ~genesis_constants ~constraint_constants)
+
+let pending_coinbase_stack_target ~genesis_constants ~constraint_constants
+    (t : Transaction.t) stack =
   let stack_with_state =
     Pending_coinbase.Stack.(
       push_state
-        (Lazy.force state_body_hash)
-        (Lazy.force curr_state_view).global_slot_since_genesis stack)
+        (Lazy.force @@ state_body_hash ~genesis_constants ~constraint_constants)
+        (Lazy.force @@ curr_state_view ~genesis_constants ~constraint_constants)
+          .global_slot_since_genesis stack)
   in
   let target =
     match t with
@@ -537,6 +514,7 @@ let format_time_span ts =
   sprintf !"Total time was: %{Time.Span.to_string_hum}" ts
 
 let apply_transactions_and_keep_intermediate_ledgers
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~(txn_state_view : Zkapp_precondition.Protocol_state.View.t)
     first_pass_ledger txns =
   let first_pass_target_ledgers, partially_applied_txns =
@@ -565,13 +543,16 @@ let apply_transactions_and_keep_intermediate_ledgers
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
-let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
+let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
+    ~constraint_constants sparse_ledger0
     (transitions : Transaction.Valid.t list) _ : string Async.Deferred.t =
-  let txn_state_view = Lazy.force curr_state_view in
+  let txn_state_view =
+    Lazy.force @@ curr_state_view ~genesis_constants ~constraint_constants
+  in
   let open Async.Deferred.Let_syntax in
   let first_pass_target_ledgers, second_pass_target_ledgers, applied_txns =
-    apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
-      sparse_ledger0 transitions
+    apply_transactions_and_keep_intermediate_ledgers ~constraint_constants
+      ~txn_state_view sparse_ledger0 transitions
   in
   let final_first_pass_ledger =
     Sparse_ledger.merkle_root (List.last_exn first_pass_target_ledgers)
@@ -588,7 +569,7 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
                  (target_ledger, applied) ->
            let txn =
              With_status.data
-             @@ Mina_ledger.Ledger.Transaction_applied.transaction applied
+             @@ Mina_ledger.Ledger.transaction_of_applied applied
            in
            (* the txn was already valid before apply, we are just recasting it here after application *)
            let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -614,7 +595,9 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
                  ; target =
                      { first_pass_ledger = target_hash
                      ; second_pass_ledger = target_hash
-                     ; pending_coinbase_stack = coinbase_stack_target
+                     ; pending_coinbase_stack =
+                         coinbase_stack_target ~genesis_constants
+                           ~constraint_constants
                      ; local_state = Mina_state.Local_state.empty ()
                      }
                  ; connecting_ledger_left = target_hash
@@ -630,14 +613,18 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
                  }
                ~init_stack:coinbase_stack_source
                { Transaction_protocol_state.Poly.transaction = valid_txn
-               ; block_data = Lazy.force state_body
+               ; block_data =
+                   Lazy.force
+                   @@ state_body ~genesis_constants ~constraint_constants
                ; global_slot = txn_state_view.global_slot_since_genesis
                }
                (unstage (Sparse_ledger.handler source_ledger))
            in
            let tm1 = Core.Unix.gettimeofday () in
            let span = Time.Span.of_sec (tm1 -. tm0) in
-           ( (Time.Span.max span max_span, target_ledger, coinbase_stack_target)
+           ( ( Time.Span.max span max_span
+             , target_ledger
+             , coinbase_stack_target ~genesis_constants ~constraint_constants )
            , proof :: proofs ) )
   in
   let rec merge_all serial_time proofs =
@@ -669,7 +656,9 @@ let profile_user_command (module T : Transaction_snark.S) sparse_ledger0
   let%map total_time = merge_all base_proof_time (List.rev base_proofs_rev) in
   format_time_span total_time
 
-let profile_zkapps ~verifier ledger zkapp_commands =
+let profile_zkapps
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~verifier
+    ledger zkapp_commands =
   let open Async.Deferred.Let_syntax in
   let tm0 = Core.Unix.gettimeofday () in
   let%map () =
@@ -727,10 +716,9 @@ let profile_zkapps ~verifier ledger zkapp_commands =
           | Ok () ->
               ()
           | Error exn ->
-              (* workaround for SNARK failures *)
               printf !"Error: %s\n%!" (Exn.to_string exn) ;
-              printf "zkApp failed, continuing ...\n" ;
-              ()
+              printf "zkApp failed, exiting ...\n" ;
+              exit 1
         in
         let tm_zkapp1 = Core.Unix.gettimeofday () in
         let zkapp_span = Time.Span.of_sec (tm_zkapp1 -. tm_zkapp0) in
@@ -740,8 +728,8 @@ let profile_zkapps ~verifier ledger zkapp_commands =
         let combination =
           Transaction_key.of_zkapp_command ~ledger zkapp_command
         in
-        Transaction_key.Table.change transaction_combinations combination
-          ~f:(fun data_opt ->
+        Transaction_key.Table.change transaction_combinations
+          (combination ~constraint_constants) ~f:(fun data_opt ->
             let txn, _, perm_string = Option.value_exn data_opt in
             Some (txn, time_values, perm_string) ) ;
         printf
@@ -780,25 +768,28 @@ let profile_zkapps ~verifier ledger zkapp_commands =
   let total_time = Time.Span.of_sec (tm1 -. tm0) in
   format_time_span total_time
 
-let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
-    preeval =
+let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
+    (transitions : Transaction.Valid.t list) preeval =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   ignore
     ( let sok_message =
         Sok_message.create ~fee:Currency.Fee.zero
           ~prover:
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
-      let txn_state_view = Lazy.force curr_state_view in
+      let txn_state_view =
+        Lazy.force @@ curr_state_view ~genesis_constants ~constraint_constants
+      in
       let first_pass_target_ledgers, _, applied_txns =
-        apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
-          sparse_ledger0 transitions
+        apply_transactions_and_keep_intermediate_ledgers ~constraint_constants
+          ~txn_state_view sparse_ledger0 transitions
       in
       List.zip_exn first_pass_target_ledgers applied_txns
       |> List.fold ~init:sparse_ledger0
            ~f:(fun source_ledger (target_ledger, applied_txn) ->
              let txn =
                With_status.data
-               @@ Mina_ledger.Ledger.Transaction_applied.transaction applied_txn
+               @@ Mina_ledger.Ledger.transaction_of_applied applied_txn
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -809,12 +800,12 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
                pending_coinbase_stack_target txn Pending_coinbase.Stack.empty
              in
              let supply_increase =
-               Mina_ledger.Ledger.Transaction_applied.supply_increase
-                 applied_txn
+               Mina_transaction_logic.Transaction_applied.supply_increase
+                 ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
              let () =
-               Transaction_snark.check_transaction ?preeval
+               Transaction_snark.check_transaction ~signature_kind ?preeval
                  ~constraint_constants ~sok_message
                  ~source_first_pass_ledger:
                    (Sparse_ledger.merkle_root source_ledger)
@@ -823,11 +814,14 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
                  ~init_stack:Pending_coinbase.Stack.empty
                  ~pending_coinbase_stack_state:
                    { source = Pending_coinbase.Stack.empty
-                   ; target = coinbase_stack_target
+                   ; target =
+                       coinbase_stack_target ~genesis_constants
+                         ~constraint_constants
                    }
                  ~supply_increase
                  { Transaction_protocol_state.Poly.block_data =
-                     Lazy.force state_body
+                     Lazy.force
+                     @@ state_body ~genesis_constants ~constraint_constants
                  ; transaction = valid_txn
                  ; global_slot = txn_state_view.global_slot_since_genesis
                  }
@@ -837,25 +831,28 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
       : Sparse_ledger.t ) ;
   Async.Deferred.return "Base constraint system satisfied"
 
-let generate_base_snarks_witness sparse_ledger0
-    (transitions : Transaction.Valid.t list) preeval =
+let generate_base_snarks_witness ~genesis_constants ~constraint_constants
+    sparse_ledger0 (transitions : Transaction.Valid.t list) preeval =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   ignore
     ( let sok_message =
         Sok_message.create ~fee:Currency.Fee.zero
           ~prover:
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
-      let txn_state_view = Lazy.force curr_state_view in
+      let txn_state_view =
+        Lazy.force @@ curr_state_view ~genesis_constants ~constraint_constants
+      in
       let first_pass_target_ledgers, _, applied_txns =
-        apply_transactions_and_keep_intermediate_ledgers ~txn_state_view
-          sparse_ledger0 transitions
+        apply_transactions_and_keep_intermediate_ledgers ~constraint_constants
+          ~txn_state_view sparse_ledger0 transitions
       in
       List.zip_exn first_pass_target_ledgers applied_txns
       |> List.fold ~init:sparse_ledger0
            ~f:(fun source_ledger (target_ledger, applied_txn) ->
              let txn =
                With_status.data
-               @@ Mina_ledger.Ledger.Transaction_applied.transaction applied_txn
+               @@ Mina_ledger.Ledger.transaction_of_applied applied_txn
              in
              (* the txn was already valid before apply, we are just recasting it here after application *)
              let (`If_this_is_used_it_should_have_a_comment_justifying_it
@@ -866,13 +863,13 @@ let generate_base_snarks_witness sparse_ledger0
                pending_coinbase_stack_target txn Pending_coinbase.Stack.empty
              in
              let supply_increase =
-               Mina_ledger.Ledger.Transaction_applied.supply_increase
-                 applied_txn
+               Mina_transaction_logic.Transaction_applied.supply_increase
+                 ~constraint_constants applied_txn
                |> Or_error.ok_exn
              in
              let () =
-               Transaction_snark.generate_transaction_witness ?preeval
-                 ~constraint_constants ~sok_message
+               Transaction_snark.generate_transaction_witness ~signature_kind
+                 ?preeval ~constraint_constants ~sok_message
                  ~source_first_pass_ledger:
                    (Sparse_ledger.merkle_root source_ledger)
                  ~target_first_pass_ledger:
@@ -881,11 +878,15 @@ let generate_base_snarks_witness sparse_ledger0
                  ~pending_coinbase_stack_state:
                    { Transaction_snark.Pending_coinbase_stack_state.source =
                        Pending_coinbase.Stack.empty
-                   ; target = coinbase_stack_target
+                   ; target =
+                       coinbase_stack_target ~genesis_constants
+                         ~constraint_constants
                    }
                  ~supply_increase
                  { Transaction_protocol_state.Poly.transaction = valid_txn
-                 ; block_data = Lazy.force state_body
+                 ; block_data =
+                     Lazy.force
+                     @@ state_body ~genesis_constants ~constraint_constants
                  ; global_slot = txn_state_view.global_slot_since_genesis
                  }
                  (unstage (Sparse_ledger.handler source_ledger))

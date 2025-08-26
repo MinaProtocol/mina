@@ -1,0 +1,8 @@
+(library
+ (name node_config_intf)
+ (public_name mina_node_config.intf)
+ (modules_without_implementation node_config_intf)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_base ppx_optcomp)))

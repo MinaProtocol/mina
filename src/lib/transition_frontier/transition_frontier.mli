@@ -14,7 +14,7 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Root_data = Root_data
-module Catchup_tree = Catchup_tree
+module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
 
@@ -26,6 +26,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val proof_cache_db : Proof_cache_tag.cache_db
 end
 
 include Frontier_intf.S
@@ -52,7 +54,7 @@ type Structured_log_events.t += Persisted_frontier_dropped
 
 val max_catchup_chunk_length : int
 
-val catchup_tree : t -> Catchup_tree.t
+val catchup_state : t -> Catchup_state.t
 
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
@@ -66,7 +68,7 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
-  -> catchup_mode:[ `Normal | `Super ]
+  -> catchup_mode:[ `Super ]
   -> unit
   -> ( t
      , [ `Failure of string
@@ -85,7 +87,7 @@ val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
 
-val root_snarked_ledger : t -> Mina_ledger.Ledger.Db.t
+val root_snarked_ledger : t -> Mina_ledger.Ledger.Root.t
 
 val extensions : t -> Extensions.t
 
@@ -121,7 +123,7 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Normal | `Super ]
+    -> catchup_mode:[ `Super ]
     -> unit
     -> ( t
        , [ `Failure of string
@@ -150,8 +152,10 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:
-         Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
+    -> ?populate_root_and_accounts:
+         (   Mina_ledger.Ledger.Root.t
+          -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
+         * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
          * Mina_state.Protocol_state.value
@@ -160,7 +164,6 @@ module For_tests : sig
          Quickcheck.Generator.t
     -> max_length:int
     -> size:int
-    -> ?use_super_catchup:bool
     -> unit
     -> t Quickcheck.Generator.t
 
@@ -170,8 +173,10 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:
-         Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
+    -> ?populate_root_and_accounts:
+         (   Mina_ledger.Ledger.Root.t
+          -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
+         * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
          * Mina_state.Protocol_state.value
@@ -182,7 +187,6 @@ module For_tests : sig
     -> max_length:int
     -> frontier_size:int
     -> branch_size:int
-    -> ?use_super_catchup:bool
     -> unit
     -> (t * Breadcrumb.t list) Quickcheck.Generator.t
 end

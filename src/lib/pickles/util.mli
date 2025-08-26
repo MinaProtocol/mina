@@ -10,23 +10,23 @@ val absorb :
   -> 'a
   -> unit
 
-val ones_vector :
-  'f 'n.
-     first_zero:'f Snarky_backendless.Cvar.t
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'n Pickles_types.Nat.t
-  -> ( 'f Snarky_backendless.Cvar.t Snarky_backendless.Boolean.t
-     , 'n )
-     Pickles_types.Vector.t
+module Make (Impl : Kimchi_pasta_snarky_backend.Snark_intf) : sig
+  open Impl
 
-val seal :
-     (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+  val ones_vector :
+       first_zero:Field.t
+    -> 'n Pickles_types.Nat.t
+    -> (Boolean.var, 'n) Pickles_types.Vector.t
 
-val lowest_128_bits :
-     constrain_low_bits:bool
-  -> assert_128_bits:('f Snarky_backendless.Cvar.t -> unit)
-  -> (module Snarky_backendless.Snark_intf.Run with type field = 'f)
-  -> 'f Snarky_backendless.Cvar.t
-  -> 'f Snarky_backendless.Cvar.t
+  val seal : Field.t -> Field.t
+
+  val lowest_128_bits :
+       constrain_low_bits:bool
+    -> assert_128_bits:(Field.t -> unit)
+    -> Field.t
+    -> Field.t
+end
+
+module Step : module type of Make (Kimchi_pasta_snarky_backend.Step_impl)
+
+module Wrap : module type of Make (Kimchi_pasta_snarky_backend.Wrap_impl)

@@ -9,16 +9,17 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
 
   type dsl = Dsl.t
 
-  let config =
+  let config ~constants =
     let open Test_config in
-    { default with
+    { (default ~constants) with
       requires_graphql = true
     ; genesis_ledger =
         (let open Test_account in
@@ -33,7 +34,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ]
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -86,7 +87,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (assert_peers_cant_be_partitioned ~max_disconnections:2
            initial_connectivity_data )
     in
-    (* a couple of transactions, so the persisted transition frontier is not trivial *)
+    (* a couple of transactions, so the persisted transition frontier is not
+       trivial *)
     let%bind () =
       section_hard "send a payment"
         (let%bind sender_pub_key = pub_key_of_node node_c in
@@ -138,7 +140,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
              ; authorization_kind = Signature
              }
            in
-           return
+           Malleable_error.lift
            @@ Transaction_snark.For_tests.deploy_snapp
                 ~constraint_constants:(Network.constraint_constants network)
                 parties_spec

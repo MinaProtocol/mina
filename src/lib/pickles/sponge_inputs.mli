@@ -10,7 +10,7 @@
 *)
 
 module Make
-    (Impl : Snarky_backendless.Snark_intf.Run) (_ : sig
+    (Impl : Kimchi_pasta_snarky_backend.Snark_intf) (_ : sig
       (** The parameters of the permutation *)
       val params : Impl.field Sponge.Params.t
 

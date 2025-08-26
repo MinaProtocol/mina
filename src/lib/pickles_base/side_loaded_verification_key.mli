@@ -16,9 +16,10 @@ module Poly : sig
       [@@deriving hash]
 
       include
-        Pickles_types.Sigs.Binable.S3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
+        Plonkish_prelude.Sigs.Binable.S3
+          with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
 
-      include Pickles_types.Sigs.VERSIONED
+      include Plonkish_prelude.Sigs.VERSIONED
     end
 
     module Latest = V2
@@ -63,7 +64,7 @@ module Repr : sig
         }
       [@@deriving sexp, equal, compare, yojson]
 
-      include Pickles_types.Sigs.Binable.S1 with type 'a t := 'a t
+      include Plonkish_prelude.Sigs.Binable.S1 with type 'a t := 'a t
 
       val __versioned__ : unit
     end
@@ -83,7 +84,7 @@ module Width : sig
     module V1 : sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
 
-      include Pickles_types.Sigs.Binable.S with type t := t
+      include Plonkish_prelude.Sigs.Binable.S with type t := t
 
       val __versioned__ : unit
     end
@@ -111,7 +112,7 @@ module Width : sig
         type 'a t = ('a, Max.n) Pickles_types.At_most.t
         [@@deriving sexp, equal, compare, hash, yojson]
 
-        include Pickles_types.Sigs.Binable.S1 with type 'a t := 'a t
+        include Plonkish_prelude.Sigs.Binable.S1 with type 'a t := 'a t
 
         val __versioned__ : unit
       end
@@ -136,22 +137,4 @@ module Domains : sig
 
   type 'a t = { h : 'a }
   [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
-end
-
-(** [Max_branches] is mostly an alias for {!Pickles_types.Nat.N8} *)
-module Max_branches : sig
-  type 'a plus_n = 'a Pickles_types.Nat.N7.plus_n Pickles_types.Nat.s
-
-  type n = Pickles_types.Nat.z plus_n
-
-  val eq : (n, n) Base.Type_equal.t
-
-  val n : Pickles_types.Nat.z plus_n Pickles_types.Nat.nat
-
-  val add :
-       'm Pickles_types.Nat.nat
-    -> 'm plus_n Pickles_types.Nat.nat
-       * (Pickles_types.Nat.z plus_n, 'm, 'm plus_n) Pickles_types.Nat.Adds.t
-
-  module Log2 = Pickles_types.Nat.N3
 end

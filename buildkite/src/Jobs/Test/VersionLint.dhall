@@ -1,66 +1,83 @@
-let Prelude = ../../External/Prelude.dhall
-
-let Cmd = ../../Lib/Cmds.dhall
 let S = ../../Lib/SelectFiles.dhall
-let D = S.PathPattern
+
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let Pipeline = ../../Pipeline/Dsl.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
+
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
+
 let RunInToolchain = ../../Command/RunInToolchain.dhall
+
 let Docker = ../../Command/Docker/Type.dhall
+
 let Size = ../../Command/Size.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
 
-let dependsOn = [
-    { name = "MinaArtifactBullseye", key = "build-deb-pkg" }
-]
+let dependsOn = DebianVersions.dependsOn DebianVersions.DepsSpec::{=}
 
-in 
+let buildTestCmd
+    : Text -> Size -> List Command.TaggedKey.Type -> B/SoftFail -> Command.Type
+    =     \(release_branch : Text)
+      ->  \(cmd_target : Size)
+      ->  \(dependsOn : List Command.TaggedKey.Type)
+      ->  \(soft_fail : B/SoftFail)
+      ->  Command.build
+            Command.Config::{
+            , commands =
+                  RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/dump-mina-type-shapes.sh"
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/version-linter-patch-missing-type-shapes.sh ${release_branch}"
+                # RunInToolchain.runInToolchain
+                    ([] : List Text)
+                    "buildkite/scripts/version-linter.sh ${release_branch}"
+            , label = "Versioned type linter for ${release_branch}"
+            , key = "version-linter-${release_branch}"
+            , soft_fail = Some soft_fail
+            , target = cmd_target
+            , docker = None Docker.Type
+            , depends_on = dependsOn
+            , artifact_paths = [ S.contains "core_dumps/*" ]
+            }
 
-let buildTestCmd : Text -> Size -> List Command.TaggedKey.Type -> Command.Type = \(release_branch : Text) -> \(cmd_target : Size) -> \(dependsOn : List Command.TaggedKey.Type) ->
-  Command.build
-    Command.Config::{
-      commands =  [
-        Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../../Constants/ContainerImages.dhall).ubuntu2004
-            } "buildkite/scripts/dump-mina-type-shapes.sh",
-        Cmd.run "gsutil cp $(git log -n 1 --format=%h --abbrev=7 --no-merges)-type_shape.txt $MINA_TYPE_SHAPE gs://mina-type-shapes",
-        Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../../Constants/ContainerImages.dhall).ubuntu2004
-            } "buildkite/scripts/version-linter.sh ${release_branch}"
-      ],
-      label = "Versioned type linter",
-      key = "version-linter",
-      target = cmd_target,
-      docker = None Docker.Type,
-      depends_on = dependsOn,
-      artifact_paths = [ S.contains "core_dumps/*" ]
-    }
-in
+in  Pipeline.build
+      Pipeline.Config::{
+      , spec =
+          let lintDirtyWhen =
+                [ S.strictlyStart (S.contains "src")
+                , S.exactly "buildkite/src/Jobs/Test/VersionLint" "dhall"
+                , S.exactly "buildkite/scripts/version-linter" "sh"
+                , S.exactly
+                    "buildkite/scripts/version-linter-patch-missing-type-shapes"
+                    "sh"
+                ]
 
-Pipeline.build
-  Pipeline.Config::{
-    spec =
-      let lintDirtyWhen = [
-        S.strictlyStart (S.contains "src"),
-        S.exactly "buildkite/src/Jobs/Test/VersionLint" "dhall",
-        S.exactly "buildkite/scripts/version-linter" "sh"
-      ]
-
-      in
-
-      JobSpec::{
-        dirtyWhen = lintDirtyWhen,
-        path = "Test",
-        name = "VersionLint",
-        tags = [ PipelineTag.Type.Long, PipelineTag.Type.Test ]
-      },
-    steps = [
-      buildTestCmd "develop" Size.Small dependsOn
-    ]
-  }
+          in  JobSpec::{
+              , dirtyWhen = lintDirtyWhen
+              , path = "Test"
+              , name = "VersionLint"
+              , tags =
+                [ PipelineTag.Type.Long
+                , PipelineTag.Type.Test
+                , PipelineTag.Type.Stable
+                ]
+              }
+      , steps =
+        [ buildTestCmd
+            "compatible"
+            Size.Small
+            dependsOn
+            (B/SoftFail.Boolean True)
+        , buildTestCmd "develop" Size.Small dependsOn (B/SoftFail.Boolean True)
+        , buildTestCmd "master" Size.Small dependsOn (B/SoftFail.Boolean True)
+        ]
+      }

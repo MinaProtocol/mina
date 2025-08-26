@@ -39,8 +39,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -77,8 +78,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -109,8 +111,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -142,8 +145,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
@@ -175,8 +179,9 @@ let%test_module "zkApp deploy tests" =
                     }
                   in
                   let zkapp_command =
-                    Transaction_snark.For_tests.deploy_snapp test_spec
-                      ~constraint_constants
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        Transaction_snark.For_tests.deploy_snapp test_spec
+                          ~constraint_constants )
                   in
                   Init_ledger.init
                     (module Ledger.Ledger_inner)

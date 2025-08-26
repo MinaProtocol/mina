@@ -44,12 +44,13 @@ let timestamp =
   let open Command.Param in
   anon ("timestamp" %: string)
 
-let instantiate_verify_functions ~logger = function
+let instantiate_verify_functions ~logger ~genesis_constants
+    ~constraint_constants ~proof_level ~cli_proof_level ~signature_kind =
+  function
   | None ->
       Deferred.return
-        (Verifier.verify_functions
-           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
-           ~proof_level:Genesis_constants.Proof_level.compiled () )
+        (Verifier.verify_functions ~constraint_constants ~proof_level
+           ~signature_kind () )
   | Some config_file ->
       let%bind.Deferred precomputed_values =
         let%bind.Deferred.Or_error config_json =
@@ -60,8 +61,8 @@ let instantiate_verify_functions ~logger = function
           @@ Result.map_error ~f:Error.of_string
           @@ Runtime_config.of_yojson config_json
         in
-        Genesis_ledger_helper.init_from_config_file ~logger ~proof_level:None
-          config
+        Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
+          ~constraint_constants ~genesis_constants config ~cli_proof_level
       in
       let%map.Deferred precomputed_values =
         match precomputed_values with
@@ -74,7 +75,8 @@ let instantiate_verify_functions ~logger = function
       let constraint_constants =
         Precomputed_values.constraint_constants precomputed_values
       in
-      Verifier.verify_functions ~constraint_constants ~proof_level:Full ()
+      Verifier.verify_functions ~constraint_constants ~proof_level:Full
+        ~signature_kind ()
 
 module Make_verifier (Source : Submission.Data_source) = struct
   let verify_transaction_snarks = Source.verify_transaction_snarks
@@ -109,7 +111,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
             verify_snark_work ~verify_transaction_snarks ~proof ~message
       else return ()
     in
-    let header = Mina_block.header block in
+    let header = Mina_block.Stable.Latest.header block in
     let protocol_state = Mina_block.Header.protocol_state header in
     let consensus_state =
       Mina_state.Protocol_state.consensus_state protocol_state
@@ -154,8 +156,16 @@ let filesystem_command =
       and config_file = config_flag in
       fun () ->
         let logger = Logger.create () in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+        let constraint_constants =
+          Genesis_constants.Compiled.constraint_constants
+        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+          instantiate_verify_functions ~logger config_file ~genesis_constants
+            ~constraint_constants ~proof_level ~cli_proof_level:None
+            ~signature_kind
         in
         let submission_paths = get_filenames inputs in
         let module V = Make_verifier (struct
@@ -187,8 +197,17 @@ let cassandra_command =
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+        let constraint_constants =
+          Genesis_constants.Compiled.constraint_constants
+        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
+
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+          instantiate_verify_functions ~logger config_file ~genesis_constants
+            ~constraint_constants ~proof_level ~cli_proof_level:None
+            ~signature_kind
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -219,8 +238,16 @@ let stdin_command =
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
+        let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+        let constraint_constants =
+          Genesis_constants.Compiled.constraint_constants
+        in
+        let proof_level = Genesis_constants.Compiled.proof_level in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
-          instantiate_verify_functions ~logger config_file
+          instantiate_verify_functions ~logger config_file ~genesis_constants
+            ~constraint_constants ~proof_level ~cli_proof_level:None
+            ~signature_kind
         in
         let module V = Make_verifier (struct
           include Submission.Stdin

@@ -2,6 +2,7 @@
 
 open Core_kernel
 module Bignum_bigint = Snarky_backendless.Backend_extended.Bignum_bigint
+module Circuit = Kimchi_pasta_snarky_backend.Step_impl
 
 let tests_enabled = true
 
@@ -49,32 +50,22 @@ let bignum_bigint_bit_length (bigint : Bignum_bigint.t) : int =
  *)
 
 (* Convert cvar field element (i.e. Field.t) to field *)
-let cvar_field_to_field_as_prover (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : Circuit.Field.t) : f =
+let cvar_field_to_field_as_prover (field_element : Circuit.Field.t) =
   Circuit.As_prover.read Circuit.Field.typ field_element
 
 (* Convert cvar bool element (i.e. Boolean.t) to field *)
-let cvar_bool_to_bool_as_prover (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (b : Circuit.Boolean.var) : bool =
+let cvar_bool_to_bool_as_prover (b : Circuit.Boolean.var) : bool =
   Circuit.As_prover.read Circuit.Boolean.typ b
 
 (* Combines bits of two cvars with a given boolean function and returns the resulting field element *)
-let cvar_field_bits_combine_as_prover (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (input1 : Circuit.Field.t) (input2 : Circuit.Field.t)
-    (bfun : bool -> bool -> bool) : f =
+let cvar_field_bits_combine_as_prover (input1 : Circuit.Field.t)
+    (input2 : Circuit.Field.t) (bfun : bool -> bool -> bool) =
   let open Circuit in
   let list1 =
-    Field.Constant.unpack
-    @@ cvar_field_to_field_as_prover (module Circuit)
-    @@ input1
+    Field.Constant.unpack @@ cvar_field_to_field_as_prover @@ input1
   in
   let list2 =
-    Field.Constant.unpack
-    @@ cvar_field_to_field_as_prover (module Circuit)
-    @@ input2
+    Field.Constant.unpack @@ cvar_field_to_field_as_prover @@ input2
   in
   Field.Constant.project @@ List.map2_exn list1 list2 ~f:bfun
 
@@ -94,9 +85,7 @@ let cvar_field_bits_combine_as_prover (type f)
  *       [......xxx.....] field_element
  *       [xxx...........] output
  *       lsb          msb *)
-let field_bits_le_to_field (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : f) (start : int) (stop : int) : f =
+let field_bits_le_to_field field_element (start : int) (stop : int) =
   let open Circuit in
   (* Check range is valid *)
   if stop <> -1 && stop <= start then
@@ -113,10 +102,8 @@ let field_bits_le_to_field (type f)
 
 (* Create cvar field element from contiguous bits of another
      See field_bits_le_to_field for more information *)
-let as_prover_cvar_field_bits_le_to_cvar_field (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : Circuit.Field.t) (start : int) (stop : int) :
-    Circuit.Field.t =
+let as_prover_cvar_field_bits_le_to_cvar_field (field_element : Circuit.Field.t)
+    (start : int) (stop : int) : Circuit.Field.t =
   let open Circuit in
   (* Check range is valid - for exception handling we need to repeat this check
    *                        so it happens outside exists *)
@@ -124,35 +111,26 @@ let as_prover_cvar_field_bits_le_to_cvar_field (type f)
     invalid_arg "stop offset must be greater than start offset" ;
   exists Field.typ ~compute:(fun () ->
       field_bits_le_to_field
-        (module Circuit)
-        (cvar_field_to_field_as_prover (module Circuit) field_element)
+        (cvar_field_to_field_as_prover field_element)
         start stop )
 
 (* Create field element from base10 string *)
-let field_of_base10 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (base10 : string) =
+let field_of_base10 (base10 : string) =
   let open Circuit in
   Field.Constant.of_string base10
 
 (* Create cvar field element from base10 string *)
-let as_prover_cvar_field_of_base10 (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (base10 : string) =
+let as_prover_cvar_field_of_base10 (base10 : string) =
   let open Circuit in
-  exists Field.typ ~compute:(fun () -> field_of_base10 (module Circuit) base10)
+  exists Field.typ ~compute:(fun () -> field_of_base10 base10)
 
 (* Convert field element to bigint *)
-let field_to_bignum_bigint (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : f) : Bignum_bigint.t =
+let field_to_bignum_bigint field_element : Bignum_bigint.t =
   (* Bigint doesn't have bigint operators defined for it, so we must use Bignum_bigint *)
   Circuit.Bigint.(to_bignum_bigint (of_field field_element))
 
 (* Convert bigint to field element *)
-let bignum_bigint_to_field (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (bigint : Bignum_bigint.t) : f =
+let bignum_bigint_to_field (bigint : Bignum_bigint.t) =
   Circuit.Bigint.(to_field (of_bignum_bigint bigint))
 
 (* Returns (quotient, remainder) such that numerator = quotient * denominator + remainder
@@ -196,37 +174,25 @@ let bignum_bigint_unpack ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
   in
   if remove_trailing then remove_trailing_false_values bits else bits
 
-let bignum_bigint_unpack_as (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(remove_trailing = false) (bignum : Bignum_bigint.t)
-    (typ : (Circuit.Boolean.var, bool) Circuit.Typ.t) : Circuit.Boolean.var list
-    =
+let bignum_bigint_unpack_as ?(remove_trailing = false)
+    (bignum : Bignum_bigint.t) (typ : (Circuit.Boolean.var, bool) Circuit.Typ.t)
+    : Circuit.Boolean.var list =
   let open Circuit in
   exists
     (Typ.list ~length:(bignum_bigint_bit_length bignum) typ)
     ~compute:(fun () -> bignum_bigint_unpack ~remove_trailing bignum)
 
-let bignum_bigint_unpack_as_vars (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
-    Circuit.Boolean.var list =
-  bignum_bigint_unpack_as
-    (module Circuit)
-    ~remove_trailing bignum Circuit.Boolean.typ
+let bignum_bigint_unpack_as_vars ?(remove_trailing = false)
+    (bignum : Bignum_bigint.t) : Circuit.Boolean.var list =
+  bignum_bigint_unpack_as ~remove_trailing bignum Circuit.Boolean.typ
 
-let bignum_bigint_unpack_as_unchecked_vars (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
-    Circuit.Boolean.var list =
-  bignum_bigint_unpack_as
-    (module Circuit)
-    ~remove_trailing bignum Circuit.Boolean.typ_unchecked
+let bignum_bigint_unpack_as_unchecked_vars ?(remove_trailing = false)
+    (bignum : Bignum_bigint.t) : Circuit.Boolean.var list =
+  bignum_bigint_unpack_as ~remove_trailing bignum Circuit.Boolean.typ_unchecked
 
 (* Bignum_bigint to constants Boolean.var list (without creating boolean constraints) *)
-let bignum_bigint_unpack_as_unchecked_consts (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    ?(remove_trailing = false) (bignum : Bignum_bigint.t) :
-    Circuit.Boolean.var list =
+let bignum_bigint_unpack_as_unchecked_consts ?(remove_trailing = false)
+    (bignum : Bignum_bigint.t) : Circuit.Boolean.var list =
   let open Circuit in
   List.map
     (bignum_bigint_unpack ~remove_trailing bignum)
@@ -245,12 +211,10 @@ let bignum_bigint_of_hex (hex : string) : Bignum_bigint.t =
   Bignum_bigint.of_zarith_bigint @@ Z.of_string_base 16 hex
 
 (* Convert cvar field element (i.e. Field.t) to Bignum_bigint.t *)
-let cvar_field_to_bignum_bigint_as_prover (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : Circuit.Field.t) : Bignum_bigint.t =
+let cvar_field_to_bignum_bigint_as_prover (field_element : Circuit.Field.t) :
+    Bignum_bigint.t =
   let open Circuit in
-  field_to_bignum_bigint (module Circuit)
-  @@ As_prover.read Field.typ field_element
+  field_to_bignum_bigint @@ As_prover.read Field.typ field_element
 
 (* Compute modular square root using Tonelli-Shanks algorithm
  *   See https://en.wikipedia.org/wiki/Tonelli%E2%80%93Shanks_algorithm
@@ -346,49 +310,36 @@ let bignum_bigint_inverse (x : Bignum_bigint.t) (modulus : Bignum_bigint.t) :
   Bignum_bigint.of_zarith_bigint @@ Z.invert x modulus
 
 (* Field to hex *)
-let field_to_hex (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (field_element : f) : string =
-  bignum_bigint_to_hex @@ field_to_bignum_bigint (module Circuit) field_element
+let field_to_hex field_element : string =
+  bignum_bigint_to_hex @@ field_to_bignum_bigint field_element
 
 (* Field of hex *)
-let field_of_hex (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (hex : string) : f =
-  bignum_bigint_to_field (module Circuit) @@ bignum_bigint_of_hex hex
+let field_of_hex (hex : string) =
+  bignum_bigint_to_field @@ bignum_bigint_of_hex hex
 
 (* List of field elements for each byte of hexadecimal input*)
-let field_bytes_of_hex (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (hex : string) : f list =
+let field_bytes_of_hex (hex : string) : Circuit.Field.Constant.t list =
   let chars = String.to_list hex in
   let list_pairs = List.groupi chars ~break:(fun i _ _ -> i mod 2 = 0) in
   let list_bytes =
     List.map list_pairs ~f:(fun byte ->
         let hex_i = String.of_char_list byte in
-        field_of_hex (module Circuit) hex_i )
+        field_of_hex hex_i )
   in
   list_bytes
 
 (* List of field elements of at most 1 byte to a Bignum_bigint *)
-let cvar_field_bytes_to_bignum_bigint_as_prover (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
+let cvar_field_bytes_to_bignum_bigint_as_prover
     (bytestring : Circuit.Field.t list) : Bignum_bigint.t =
   List.fold bytestring ~init:Bignum_bigint.zero ~f:(fun acc x ->
-      Bignum_bigint.(
-        (acc * of_int 2)
-        + cvar_field_to_bignum_bigint_as_prover (module Circuit) x) )
+      Bignum_bigint.((acc * of_int 2) + cvar_field_to_bignum_bigint_as_prover x) )
 
 (* Negative test helper *)
 let is_error (func : unit -> _) = Result.is_error (Or_error.try_with func)
 
 (* Two to the power of n as a field element *)
-let two_pow (type f)
-    (module Circuit : Snarky_backendless.Snark_intf.Run with type field = f)
-    (n : int) =
-  bignum_bigint_to_field
-    (module Circuit)
-    Bignum_bigint.(pow (of_int 2) (of_int n))
+let two_pow (n : int) =
+  bignum_bigint_to_field Bignum_bigint.(pow (of_int 2) (of_int n))
 
 (*********)
 (* Tests *)
@@ -406,10 +357,8 @@ let%test_unit "helper field_bits_le_to_field" =
     let _cs, _proof_keypair, _proof =
       Runner.generate_and_verify_proof (fun () ->
           let open Runner.Impl in
-          let of_bits =
-            as_prover_cvar_field_bits_le_to_cvar_field (module Runner.Impl)
-          in
-          let of_base10 = as_prover_cvar_field_of_base10 (module Runner.Impl) in
+          let of_bits = as_prover_cvar_field_bits_le_to_cvar_field in
+          let of_base10 = as_prover_cvar_field_of_base10 in
 
           (* Test value *)
           let field_element =

@@ -1,5 +1,3 @@
-[%%import "/src/config.mlh"]
-
 open Core_kernel
 open Snark_params.Tick
 open Zkapp_basic
@@ -10,14 +8,10 @@ module Event = struct
 
   let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.zkapp_event x
 
-  [%%ifdef consensus_mechanism]
-
   type var = Field.Var.t array
 
   let hash_var (x : Field.Var.t array) =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_event x
-
-  [%%endif]
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck in
@@ -45,8 +39,6 @@ struct
   let hash (x : t) =
     (* fold_right so the empty hash is used at the end of the events *)
     List.fold_right ~init:empty_hash ~f:(Fn.flip push_event) x
-
-  [%%ifdef consensus_mechanism]
 
   type var = t Data_as_hash.t
 
@@ -92,8 +84,6 @@ struct
       (Data_as_hash.hash events) ;
     (hd, tl)
 
-  [%%endif]
-
   let deriver obj =
     let open Fields_derivers_zkapps in
     let events = list @@ array field (o ()) in
@@ -112,33 +102,47 @@ module Events = struct
   end)
 end
 
+module Actions_impl = Make_events (struct
+  let salt_phrase = "MinaZkappActionsEmpty"
+
+  let hash_prefix = Hash_prefix_states.zkapp_actions
+
+  let deriver_name = "Actions"
+end)
+
 module Actions = struct
-  include Make_events (struct
-    let salt_phrase = "MinaZkappActionsEmpty"
+  type var = Actions_impl.var
 
-    let hash_prefix = Hash_prefix_states.zkapp_actions
+  type t = { actions : Actions_impl.t; hash : Field.t }
 
-    let deriver_name = "Actions"
-  end)
+  let is_empty ({ actions; _ } : t) = List.is_empty actions
 
   let is_empty_var (e : var) =
     Snark_params.Tick.Field.(
-      Checked.equal (Data_as_hash.hash e) (Var.constant empty_hash))
+      Checked.equal (Data_as_hash.hash e) (Var.constant Actions_impl.empty_hash))
 
-  let empty_state_element =
+  let empty_state_element : Field.t =
     let salt_phrase = "MinaZkappActionStateEmptyElt" in
     Hash_prefix_create.salt salt_phrase |> Random_oracle.digest
 
-  let push_events (acc : Field.t) (events : t) : Field.t =
-    push_hash acc (hash events)
-
-  [%%ifdef consensus_mechanism]
+  let push_events (acc : Field.t) ({ hash; _ } : t) : Field.t =
+    Actions_impl.push_hash acc hash
 
   let push_events_checked (x : Field.Var.t) (e : var) : Field.Var.t =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_actions
       [| x; Data_as_hash.hash e |]
 
-  [%%endif]
+  let of_event_list lst = { actions = lst; hash = Actions_impl.hash lst }
+
+  [%%define_locally
+  Actions_impl.
+    ( deriver
+    , var_to_input
+    , typ
+    , to_input
+    , push_to_data_as_hash
+    , pop_from_data_as_hash
+    , empty_stack_msg )]
 end
 
 module Zkapp_uri = struct
@@ -146,7 +150,7 @@ module Zkapp_uri = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Bounded_types.String.Stable.V1.t
+        type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_latest = Fn.id
@@ -172,9 +176,9 @@ module Zkapp_uri = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Bounded_types.String.Stable.V1)
+          (Mina_stdlib.Bounded_types.String.Stable.V1)
           (struct
-            type t = Bounded_types.String.Stable.V1.t
+            type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
 
             let to_binable = Fn.id
 
@@ -250,8 +254,6 @@ type t =
 
 let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
-[%%ifdef consensus_mechanism]
-
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Zkapp_state.V.t
@@ -313,32 +315,35 @@ end
 (* This preimage cannot be attained by any string, due to the trailing [true]
    added below.
 *)
-let zkapp_uri_non_preimage =
-  lazy (Random_oracle_input.Chunked.field_elements [| Field.zero; Field.zero |])
+let zkapp_uri_non_preimage_hash =
+  lazy
+    ( Random_oracle.pack_input
+        (Random_oracle_input.Chunked.field_elements
+           [| Field.zero; Field.zero |] )
+    |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri )
 
-let hash_zkapp_uri_opt (zkapp_uri_opt : string option) =
-  let input =
-    match zkapp_uri_opt with
-    | Some zkapp_uri ->
-        (* We use [length*8 + 1] to pass a final [true] after the end of the
-           string, to ensure that trailing null bytes don't alias in the hash
-           preimage.
-        *)
-        let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
-        String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
-            let c = Char.to_int c in
-            (* Insert the bits into [bits], LSB order. *)
-            for j = 0 to 7 do
-              (* [Int.test_bit c j] *)
-              bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
-            done ) ;
+let hash_zkapp_uri_opt = function
+  | None ->
+      Lazy.force zkapp_uri_non_preimage_hash
+  | Some zkapp_uri ->
+      (* We use [length*8 + 1] to pass a final [true] after the end of the
+         string, to ensure that trailing null bytes don't alias in the hash
+         preimage.
+      *)
+      let bits = Array.create ~len:((String.length zkapp_uri * 8) + 1) true in
+      String.foldi zkapp_uri ~init:() ~f:(fun i () c ->
+          let c = Char.to_int c in
+          (* Insert the bits into [bits], LSB order. *)
+          for j = 0 to 7 do
+            (* [Int.test_bit c j] *)
+            bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
+          done ) ;
+      let input =
         Random_oracle_input.Chunked.packeds
           (Array.map ~f:(fun b -> (field_of_bool b, 1)) bits)
-    | None ->
-        Lazy.force zkapp_uri_non_preimage
-  in
-  Random_oracle.pack_input input
-  |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri
+      in
+      Random_oracle.pack_input input
+      |> Random_oracle.hash ~init:Hash_prefix_states.zkapp_uri
 
 let hash_zkapp_uri (zkapp_uri : string) = hash_zkapp_uri_opt (Some zkapp_uri)
 
@@ -361,8 +366,6 @@ let typ : (Checked.t, t) Typ.t =
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
-
-[%%endif]
 
 let zkapp_uri_to_input zkapp_uri =
   Random_oracle.Input.Chunked.field @@ hash_zkapp_uri zkapp_uri
@@ -406,12 +409,6 @@ let digest (t : t) =
     hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
 
 let default_digest = lazy (digest default)
-
-let hash_zkapp_account_opt' = function
-  | None ->
-      Lazy.force default_digest
-  | Some (a : t) ->
-      digest a
 
 let action_state_deriver obj =
   let open Fields_derivers_zkapps.Derivers in
@@ -459,3 +456,54 @@ let gen : t Quickcheck.Generator.t =
   ; proved_state = false
   ; zkapp_uri
   }
+
+module Hardfork = struct
+  type t =
+    ( Zkapp_state.Hardfork.Value.t
+    , Verification_key_wire.Stable.Latest.t option
+    , Mina_numbers.Zkapp_version.Stable.Latest.t
+    , F.Stable.Latest.t
+    , Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
+    , bool
+    , Zkapp_uri.Stable.Latest.t )
+    Poly.Stable.Latest.t
+  [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
+
+  let of_stable (account : Stable.Latest.t) : t =
+    { app_state = Zkapp_state.Hardfork.Value.of_stable account.app_state
+    ; verification_key = account.verification_key
+    ; zkapp_version = account.zkapp_version
+    ; action_state = account.action_state
+    ; last_action_slot = account.last_action_slot
+    ; proved_state = account.proved_state
+    ; zkapp_uri = account.zkapp_uri
+    }
+
+  let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
+    let open Random_oracle.Input.Chunked in
+    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    let app_state v =
+      Random_oracle.Input.Chunked.field_elements
+        (Pickles_types.Vector.to_array v)
+    in
+    Poly.Fields.fold ~init:[] ~app_state:(f app_state)
+      ~verification_key:
+        (f
+           (Fn.compose field
+              (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+      ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
+      ~action_state:(f app_state)
+      ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
+      ~proved_state:
+        (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
+      ~zkapp_uri:(f zkapp_uri_to_input)
+    |> List.reduce_exn ~f:append
+
+  let digest (t : t) =
+    Random_oracle.(
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+
+  let default = of_stable default
+
+  let default_digest = lazy (digest default)
+end
