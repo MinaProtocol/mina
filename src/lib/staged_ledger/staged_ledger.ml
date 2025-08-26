@@ -2290,6 +2290,15 @@ module T = struct
       | Coinbase { new_accounts; _ } ->
           new_accounts )
     |> List.concat
+
+  let convert_and_apply_all_masks_to_ledger ~hardfork_db ({ ledger; _ } : t) =
+    let accounts =
+      Ledger.all_accounts_on_masks ledger
+      |> Map.to_alist
+      |> List.map ~f:(fun (loc, account) ->
+             (loc, Account.Hardfork.of_stable account) )
+    in
+    Ledger.Hardfork_db.set_batch hardfork_db accounts
 end
 
 include T
