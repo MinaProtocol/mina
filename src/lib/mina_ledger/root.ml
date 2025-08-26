@@ -33,10 +33,6 @@ module type Any_ledger_intf =
      and type account_id_set := Account_id.Set.t
      and type hash := Ledger_hash.t
 
-let primary_suffix = "PRIMARY"
-
-let converting_suffix = "CONVERTED"
-
 module type Converting_ledger_intf =
   Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
     with type root_hash := Ledger_hash.t
@@ -66,45 +62,70 @@ struct
   module Config = struct
     type backing_type = Stable_db | Converting_db [@@deriving equal]
 
-    type t = { top_directory : string; backing_type : backing_type }
+    type t =
+      | Stable_db_config of string
+      | Converting_db_config of Converting_ledger.Config.t
 
-    let exists_backing { top_directory; backing_type } =
-      let file_exists path =
-        Sys.file_exists path |> [%equal: [ `No | `Unknown | `Yes ]] `Yes
-      in
-      match backing_type with
-      | Stable_db ->
-          file_exists top_directory
-      | Converting_db ->
-          file_exists (top_directory ^/ primary_suffix)
-          && file_exists (top_directory ^/ converting_suffix)
+    let backing_of_config = function
+      | Stable_db_config _ ->
+          Stable_db
+      | Converting_db_config _ ->
+          Converting_db
+
+    let file_exists path =
+      Sys.file_exists path |> [%equal: [ `No | `Unknown | `Yes ]] `Yes
+
+    let exists_backing = function
+      | Stable_db_config path ->
+          file_exists path
+      | Converting_db_config { primary_directory; converting_directory } ->
+          file_exists primary_directory && file_exists converting_directory
 
     (* TODO: we should be able to tell backing type of a root just by looking at
        the dir structure, maybe it can be utilized to simplify our code *)
     let with_directory ~backing_type ~directory_name =
-      { top_directory = directory_name; backing_type }
+      match backing_type with
+      | Stable_db ->
+          Stable_db_config directory_name
+      | Converting_db ->
+          Converting_db_config
+            (Converting_ledger.Config.with_primary ~directory_name)
 
-    let delete_any_backing { top_directory; _ } =
-      Mina_stdlib_unix.File_system.rmrf top_directory
+    let delete_any_backing = function
+      | Stable_db_config path ->
+          Mina_stdlib_unix.File_system.rmrf path
+      | Converting_db_config { primary_directory; converting_directory } ->
+          Mina_stdlib_unix.File_system.rmrf primary_directory ;
+          Mina_stdlib_unix.File_system.rmrf converting_directory
 
     exception
       Backing_mismatch of { backing_1 : backing_type; backing_2 : backing_type }
 
-    let move_backing_exn
-        ~src:{ top_directory = top_src; backing_type = backing_src }
-        ~dst:{ top_directory = top_dst; backing_type = backing_dst } =
-      if equal_backing_type backing_src backing_dst then
-        Sys.rename top_src top_dst
-      else
-        raise
-          (Backing_mismatch { backing_1 = backing_src; backing_2 = backing_dst })
+    let move_backing_exn ~src ~dst =
+      match (src, dst) with
+      | Stable_db_config src, Stable_db_config dst ->
+          Sys.rename src dst
+      | ( Converting_db_config
+            { primary_directory = src_primary
+            ; converting_directory = src_converted
+            }
+        , Converting_db_config
+            { primary_directory = dst_primary
+            ; converting_directory = dst_converted
+            } ) ->
+          Sys.rename src_primary dst_primary ;
+          Sys.rename src_converted dst_converted
+      | cfg1, cfg2 ->
+          raise
+            (Backing_mismatch
+               { backing_1 = backing_of_config cfg1
+               ; backing_2 = backing_of_config cfg2
+               } )
 
-    let primary_directory { top_directory; backing_type } =
-      match backing_type with
-      | Stable_db ->
-          top_directory
-      | Converting_db ->
-          top_directory ^/ primary_suffix
+    let primary_directory = function
+      | Stable_db_config primary_directory
+      | Converting_db_config { primary_directory; _ } ->
+          primary_directory
   end
 
   type root_hash = Ledger_hash.t
@@ -118,6 +139,12 @@ struct
   type path = Stable_db.path
 
   type t = Stable_db of Stable_db.t | Converting_db of Converting_ledger.t
+
+  let backing_of_t = function
+    | Stable_db _ ->
+        Config.Stable_db
+    | Converting_db _ ->
+        Converting_db
 
   let close t =
     match t with
@@ -133,19 +160,11 @@ struct
     | Converting_db db ->
         Converting_ledger.merkle_root db
 
-  let prepare_converting_dirs top_directory =
-    let primary_directory = top_directory ^/ primary_suffix in
-    let converting_directory = top_directory ^/ converting_suffix in
-    let () = Unix.mkdir primary_directory in
-    let () = Unix.mkdir converting_directory in
-    Converting_ledger.Config.{ primary_directory; converting_directory }
-
-  let create ~logger ~config:Config.{ top_directory; backing_type } ~depth () =
-    match backing_type with
-    | Stable_db ->
-        Stable_db (Stable_db.create ~directory_name:top_directory ~depth ())
-    | Converting_db ->
-        let config = prepare_converting_dirs top_directory in
+  let create ~logger ~config ~depth () =
+    match config with
+    | Config.Stable_db_config directory_name ->
+        Stable_db (Stable_db.create ~directory_name ~depth ())
+    | Converting_db_config config ->
         Converting_db
           (Converting_ledger.create ~config:(In_directories config) ~logger
              ~depth () )
@@ -158,41 +177,31 @@ struct
         Converting_db
           (Converting_ledger.create ~config:Temporary ~logger ~depth ())
 
-  let create_checkpoint t ~config:Config.{ top_directory; backing_type } () =
-    match t with
-    | Stable_db db ->
-        if not Config.(equal_backing_type backing_type Stable_db) then
-          raise
-            (Config.Backing_mismatch
-               { backing_1 = Stable_db; backing_2 = backing_type } )
-        else
-          Stable_db
-            (Stable_db.create_checkpoint db ~directory_name:top_directory ())
-    | Converting_db db ->
-        if not Config.(equal_backing_type backing_type Converting_db) then
-          raise
-            (Config.Backing_mismatch
-               { backing_1 = Converting_db; backing_2 = backing_type } )
-        else
-          let config = prepare_converting_dirs top_directory in
-          Converting_db (Converting_ledger.create_checkpoint db ~config ())
+  let create_checkpoint t ~config () =
+    match (t, config) with
+    | Stable_db db, Config.Stable_db_config directory_name ->
+        Stable_db (Stable_db.create_checkpoint db ~directory_name ())
+    | Converting_db db, Converting_db_config config ->
+        Converting_db (Converting_ledger.create_checkpoint db ~config ())
+    | t, config ->
+        raise
+          (Config.Backing_mismatch
+             { backing_1 = backing_of_t t
+             ; backing_2 = Config.backing_of_config config
+             } )
 
-  let make_checkpoint t ~config:Config.{ top_directory; backing_type } =
-    match t with
-    | Stable_db db ->
-        if not Config.(equal_backing_type backing_type Stable_db) then
-          raise
-            (Config.Backing_mismatch
-               { backing_1 = Stable_db; backing_2 = backing_type } )
-        else Stable_db.make_checkpoint db ~directory_name:top_directory
-    | Converting_db db ->
-        if not Config.(equal_backing_type backing_type Converting_db) then
-          raise
-            (Config.Backing_mismatch
-               { backing_1 = Converting_db; backing_2 = backing_type } )
-        else
-          let config = prepare_converting_dirs top_directory in
-          Converting_ledger.make_checkpoint db ~config
+  let make_checkpoint t ~config =
+    match (t, config) with
+    | Stable_db db, Config.Stable_db_config directory_name ->
+        Stable_db.make_checkpoint db ~directory_name
+    | Converting_db db, Converting_db_config config ->
+        Converting_ledger.make_checkpoint db ~config
+    | t, config ->
+        raise
+          (Config.Backing_mismatch
+             { backing_1 = backing_of_t t
+             ; backing_2 = Config.backing_of_config config
+             } )
 
   let as_unmasked t =
     match t with
