@@ -202,6 +202,8 @@ end)
     Primary_ledger.get_hash_batch_exn t.primary_ledger locations
 
   let detached_signal t = Primary_ledger.detached_signal t.primary_ledger
+
+  let all_accounts_on_masks _ = Location.Map.empty
 end
 
 module With_database_config = struct

@@ -419,6 +419,11 @@ module Ledger = struct
       accessed.
   *)
     val detached_signal : t -> unit Async_kernel.Deferred.t
+
+    (** Get all accounts on all masks of current ledger until reaching a 
+        non-mask. Used to migrate root to an potential staged ledger for fork 
+        config generation *)
+    val all_accounts_on_masks : t -> account Location.Map.t
   end
 
   module type NULL = sig

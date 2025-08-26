@@ -1012,6 +1012,15 @@ module Make (Inputs : Inputs_intf.S) = struct
                 add_location () )
       | Some location ->
           Ok (`Existed, location)
+
+    let all_accounts_on_masks { parent; maps; _ } =
+      let base =
+        Result.ok parent
+        |> Option.value_map ~default:Location.Map.empty
+             ~f:Base.all_accounts_on_masks
+      in
+      let combine ~key:_ _ v = v in
+      Map.merge_skewed ~combine base maps.accounts
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =

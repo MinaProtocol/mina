@@ -153,5 +153,7 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
     let depth (T ((module Base), t)) = Base.depth t
 
     let detached_signal (T ((module Base), t)) = Base.detached_signal t
+
+    let all_accounts_on_masks _ = Location.Map.empty
   end
 end
