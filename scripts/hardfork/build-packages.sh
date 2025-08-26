@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eox pipefail
+set -eo pipefail
 
 # shellcheck source=./scripts/export-git-env-vars.sh
 source ./scripts/export-git-env-vars.sh
@@ -21,7 +21,17 @@ if [ "${NETWORK_NAME}" = "mainnet" ]; then
   export MINA_BUILD_MAINNET=1
 fi
 
-export OPAMSWITCH=4.14.2
+echo "--- Checking for AWS CLI installation"
+if ! command -v aws &> /dev/null; then
+  echo "❌ Error: AWS CLI is not installed. Please install it first."
+  echo "You can install it using:"
+  echo "  - curl \"https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip\" -o \"awscliv2.zip\""
+  echo "  - unzip awscliv2.zip"
+  echo "  - sudo ./aws/install"
+  exit 1
+fi
+echo "✅ AWS CLI is available"
+
 export BYPASS_OPAM_SWITCH_UPDATE=1
 export DUNE_PROFILE=${NETWORK_NAME}
 
@@ -50,6 +60,14 @@ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --confi
 
 echo "--- Create hardfork config"
 FORK_CONFIG_JSON=config.json LEDGER_HASHES_JSON=hardfork_ledger_hashes.json scripts/hardfork/create_runtime_config.sh > new_config.json
+
+echo "--- Checking AWS S3 permissions for bucket access"
+if ! aws s3 ls s3://snark-keys.o1test.net/ > /dev/null 2>&1; then
+  echo "❌ Error: Unable to access S3 bucket 's3://snark-keys.o1test.net/'"
+  echo "Please check your AWS credentials and permissions."
+  exit 1
+fi
+echo "✅ S3 bucket access verified"
 
 existing_files=$(aws s3 ls s3://snark-keys.o1test.net/ | awk '{print $4}')
 for file in hardfork_ledgers/*; do
