@@ -149,7 +149,5 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       kill processed_transition_writer ;
       kill catchup_job_writer ;
       kill catchup_breadcrumbs_writer ;
-      if Ivar.is_full clean_up_catchup_scheduler then
-        [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill clean_up_catchup_scheduler () ) ;
+      ignore (Ivar.fill_if_empty clean_up_catchup_scheduler () : bool) ) ;
   processed_transition_reader
