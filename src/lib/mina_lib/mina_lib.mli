@@ -1,3 +1,9 @@
+(**
+  Mina_lib contains the core logic of the Mina protocol, including the
+  ledger, consensus, SNARK workers, networking, and state management. It
+  provides the foundational components used by Mina_run, CLI tools, and
+  other services to operate a Mina node. *)
+
 open Async_kernel
 open Core
 open Mina_base
