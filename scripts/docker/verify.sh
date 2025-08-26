@@ -32,14 +32,20 @@ case $PACKAGE in
 esac
 
 case $ARCH in
-  amd64) DOCKER_ARCH_SUFFIX="" ;;
-  arm64) DOCKER_ARCH_SUFFIX="-arm64" ;;
+  amd64)
+    DOCKER_ARCH_SUFFIX=""
+    ;;
+  arm64)
+    DOCKER_ARCH_SUFFIX="-arm64"
+    ;;
   *) echo "❌  Unknown architecture passed: $ARCH"; exit 1 ;;
 esac
 
+DOCKER_PLATFORM="--platform linux/$ARCH"
+
 DOCKER_IMAGE="$REPO/$PACKAGE:$VERSION-${CODENAME}${SUFFIX}${DOCKER_ARCH_SUFFIX}"
 
-if ! docker pull "$DOCKER_IMAGE" ; then
+if ! docker  pull "$DOCKER_IMAGE" ; then
   echo "❌ Docker verification for $CODENAME $PACKAGE $ARCH failed"
   echo "❌ Please check if the image $DOCKER_IMAGE exists."
   exit 1
@@ -50,7 +56,7 @@ for APP in "${APPS[@]}"; do
     echo "📋  Testing $APP $COMMAND in $DOCKER_IMAGE"
     # Do not quote $COMMAND, because it may contain spaces or other special characters
     # shellcheck disable=SC2086
-    if ! docker run --entrypoint "$APP" --rm "$DOCKER_IMAGE" $COMMAND; then
+    if ! docker run $DOCKER_PLATFORM --entrypoint "$APP" --rm "$DOCKER_IMAGE" $COMMAND; then
       echo "❌  KO: ERROR running $APP $COMMAND"
       exit 1
     fi

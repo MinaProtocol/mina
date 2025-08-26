@@ -480,11 +480,7 @@ function promote_and_verify_docker() {
     __network_suffix=$(get_suffix $__artifact $__network)
 
     local __arch_suffix
-    case $__arch in
-      amd64) __arch_suffix="" ;;
-      arm64) __arch_suffix="-$__arch" ;;
-      *) echo "❌  Unknown architecture passed: $__arch"; exit 1;;
-    esac
+    __arch_suffix=$(get_arch_suffix $__arch)
 
     local __artifact_full_source_version=$__source_version-$__codename${__network_suffix}${__arch_suffix}
     local __artifact_full_target_version=$__target_version-$__codename${__network_suffix}${__arch_suffix}
@@ -497,8 +493,8 @@ function promote_and_verify_docker() {
         local __repo=$GCR_REPO
     fi
 
-    echo " 🐋 Publishing $__artifact docker for '$__network' network and '$__codename' codename with '$__target_version' version and '$__arch_suffix'"
-    echo "    📦 Target version: $(calculate_docker_tag $__publish_to_docker_io $__artifact $__target_version $__codename "$__network" )"
+    echo " 🐋 Publishing $__artifact docker for '$__network' network and '$__codename' codename with '$__target_version' version and '$__arch'"
+    echo "    📦 Target version: $(calculate_docker_tag $__publish_to_docker_io $__artifact $__target_version $__codename "$__network" "$__arch")"
     echo ""
     if [[ $__dry_run == 0 ]]; then
         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/promote.sh \
@@ -1207,6 +1203,8 @@ function verify_help(){
     printf "  %-25s %s\n" "--docker-io" "[bool] publish to docker.io instead of gcr.io";
     printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images";
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
+    printf "  %-25s %s\n" "--docker-suffix" "[string] suffix to append to docker image tags";
+    printf "  %-25s %s\n" "--arch" "[string] architecture (amd64 or arm64)";
     echo ""
     echo "Example:"
     echo ""
@@ -1219,12 +1217,16 @@ function verify_help(){
 
 function combine_docker_suffixes() {
     local network=$1
-    local __docker_suffix=$2
+    local __arch=$2
+    local __docker_suffix=$3
+
+    local __arch_suffix
+    __arch_suffix=$(get_arch_suffix "$__arch")
 
     if [[ -n "$__docker_suffix" ]]; then
-        echo "-$network-$__docker_suffix"
+        echo "-$network-$__docker_suffix$__arch_suffix"
     else
-        echo "-$network"
+        echo "-$network$__arch_suffix"
     fi
 }
 
@@ -1244,6 +1246,7 @@ function verify(){
     local __debian_repo=$DEBIAN_REPO
     local __debian_repo_signed=0
     local __docker_suffix=""
+    local __arch="$DEFAULT_ARCHITECTURE"
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -1295,6 +1298,10 @@ function verify(){
                 __docker_suffix=${2:?$error_message}
                 shift 2;
             ;;
+            --arch )
+                __arch=${2:?$error_message}
+                shift 2;
+            ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -1316,10 +1323,13 @@ function verify(){
     echo " - Only debians: $__only_debians"
     echo " - Only dockers: $__only_dockers"
     echo " - Docker suffix: $__docker_suffix"
+    echo " - Architecture: $__arch"
     echo ""
 
     #check environment setup
-    check_docker
+    if [[ $__only_debians == 0 ]]; then
+        check_docker
+    fi
 
     IFS=', '
     read -r -a __artifacts_arr <<< "$__artifacts"
@@ -1343,6 +1353,7 @@ function verify(){
                                         -m $__codename \
                                         -r $__debian_repo \
                                         -c $__channel \
+                                        -a $__arch \
                                         ${__signed_debian_repo:+--signed}
                             fi
 
@@ -1357,7 +1368,7 @@ function verify(){
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                local __docker_suffix_combined
-                               __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+                               __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__arch" "$__docker_suffix")
 
                                if [[ $__only_dockers == 0 ]]; then
                                     echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
@@ -1368,6 +1379,7 @@ function verify(){
                                         -m $__codename \
                                         -r $__debian_repo \
                                         -c $__channel \
+                                        -a $__arch \
                                         ${__signed_debian_repo:+--signed}
 
                                     echo ""
@@ -1375,7 +1387,7 @@ function verify(){
 
                                 if [[ $__only_debians == 0 ]]; then
 
-                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $artifact $__version $__codename "$network")"
+                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $artifact $__version $__codename "$network" "$__arch")"
 
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                         -p "$artifact" \
@@ -1383,6 +1395,7 @@ function verify(){
                                         -c "$__codename" \
                                         -s "$__docker_suffix_combined" \
                                         -r "$__repo"
+
 
                                     echo ""
                                 fi
@@ -1394,7 +1407,7 @@ function verify(){
                                __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                local __docker_suffix_combined
-                               __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+                               __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__arch" "$__docker_suffix")
 
                                if [[ $__only_dockers == 0 ]]; then
 
@@ -1414,7 +1427,7 @@ function verify(){
 
                                 if [[ $__only_debians == 0 ]]; then
 
-                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
+                                    echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename $network "$__arch" )"
                                     echo ""
 
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
@@ -1434,7 +1447,7 @@ function verify(){
                                 __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                 local __docker_suffix_combined
-                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__docker_suffix")
+                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__arch" "$__docker_suffix")
 
 
                               if [[ $__only_dockers == 0 ]]; then
@@ -1451,7 +1464,7 @@ function verify(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                      echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "")"
+                                      echo "      📋  Verifying: $artifact docker on $(calculate_docker_tag "$__docker_io" $__artifact_full_name $__version $__codename "$network" "$__arch" )"
                                 echo ""
                                     prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/verify.sh \
                                         -p "$artifact" \
@@ -1820,7 +1833,6 @@ function pull(){
     if [[ -n ${__buildkite_build_id+x} ]]; then
         echo " - Buildkite build id: $__buildkite_build_id"
     fi
-
 
     IFS=', '
     read -r -a __artifacts_arr <<< "$__artifacts"
