@@ -13,8 +13,6 @@ end
 
 module Executor = Executor.Make (Paths)
 
-type t = Executor.t
-
 let logger = Logger.create ()
 
 (** 
@@ -30,10 +28,11 @@ module Client = struct
     @param t The daemon instance containing the executor and port information.
     @return Unit. Executes the command to stop the daemon using the executor.
   *)
-  let stop_daemon t =
-    Executor.run t.executor
+  let stop_daemon t: unit Deferred.t =
+    let%map _ = Executor.run t.executor
       ~args:[ "client"; "stop-daemon"; "-daemon-port"; sprintf "%d" t.port ]
-      ()
+      () in
+    ()
 
   (** [daemon_status t] retrieves the status of the daemon running on the specified port.
     It executes the command `client status -daemon-port <port>` using the provided executor.
@@ -53,8 +52,8 @@ module Client = struct
     @param retry_attempts The number of retries.
     @return A deferred result indicating the success or failure of the operation. 
   *)
-  let wait_for_bootstrap t ?(client_delay = 40.) ?(retry_delay = 60.)
-      ?(retry_attempts = 10) () =
+  let wait_for_bootstrap t ?(client_delay = 60.) ?(retry_delay = 60.)
+      ?(retry_attempts = 40) () =
     Async.printf "Waiting initial %d s. before connecting\n"
       (int_of_float client_delay) ;
     let%bind _ =
@@ -74,6 +73,36 @@ module Client = struct
       else Deferred.Or_error.error_string output
     in
     go retry_attempts
+
+  let ledger_hash t ~ledger_file =
+     Executor.run t.executor
+      ~args:[ "ledger"; "hash"; "--ledger-file"; ledger_file ]
+      ()
+
+  let ledger_currency t ~ledger_file =
+    Executor.run t.executor
+      ~args:[ "ledger"; "currency"; "--ledger-file"; ledger_file ]
+      ()
+
+  let test_ledger t ~(n : int) =
+    Executor.run t.executor
+      ~args:[ "ledger"; "test"; "generate-accounts"; "-n"; string_of_int n ]
+      ()
+
+  let advanced_print_signature_kind t =
+    Executor.run t.executor ~args:[ "advanced"; "print-signature-kind" ] ()
+
+  let advanced_compile_time_constants t ~config_file =
+    Executor.run t.executor
+      ~env:(`Extend [ ("MINA_CONFIG_FILE", config_file) ])
+      ~args:[ "advanced"; "compile-time-constants" ]
+      ()
+
+  let advanced_constraint_system_digests t =
+    Executor.run t.executor
+      ~args:[ "advanced"; "constraint-system-digests" ]
+      ()
+
 end
 
 module Config = struct
@@ -90,6 +119,9 @@ module Config = struct
     let create ?(root_path = "/tmp") ?(config_dir = "mina_spun_test")
         ?(genesis_dir = "mina_genesis_state")
         ?(p2p_dir = "mina_test_libp2p_keypair") () =
+
+      Unix.putenv ~key:"MINA_LIBP2P_PASS" ~data:"naughty blue worm";
+      Unix.putenv ~key:"MINA_PRIVKEY_PASS" ~data:"naughty blue worm";
       (* create empty config dir to avoid any issues with the default config dir *)
       let conf = Filename.temp_dir ~in_dir:root_path config_dir "" in
       let genesis = Filename.temp_dir ~in_dir:root_path genesis_dir "" in
@@ -103,7 +135,7 @@ module Config = struct
 
   type t = { port : int; dirs : ConfigDirs.t }
 
-  let default ?dirs =
+  let default ?dirs () =
     let root_path = Filename.temp_dir ~in_dir:"/tmp" "mina_automation" "" in
     { port = 3085
     ; dirs =
@@ -154,11 +186,16 @@ let archive_blocks_from_files t ~archive_address
       let%bind _ = archive_blocks t ~archive_address ~format [ block ] () in
       after (Time.Span.of_sec (Float.of_int sleep)) )
 
-let default = Executor.default
+type t = { config : Config.t; executor : Executor.t }
 
-let client t ~(config : Config.t) = Client.create ~port:config.port t
+let of_config config = { config; executor = Executor.AutoDetect }
 
-let start t (config : Config.t) =
+let default () = { config = Config.default (); executor = Executor.AutoDetect }
+
+let client t = Client.create ~port:t.config.port ~executor:t.executor ()
+
+let start t =
+  let open Deferred.Let_syntax in
   let args =
     [ "daemon"
     ; "--seed"
@@ -167,23 +204,23 @@ let start t (config : Config.t) =
     ; "--working-dir"
     ; "."
     ; "--client-port"
-    ; sprintf "%d" config.port
+    ; sprintf "%d" t.config.port
     ; "--config-directory"
-    ; config.dirs.conf
+    ; t.config.dirs.conf
     ; "--genesis-ledger-dir"
-    ; config.dirs.genesis
+    ; t.config.dirs.genesis
     ; "--external-ip"
     ; "0.0.0.0"
     ; "--libp2p-keypair"
-    ; Config.libp2p_keypair_folder config
+    ; Config.libp2p_keypair_folder t.config
     ]
   in
 
   [%log debug] "Starting daemon" ;
 
-  let%bind _, process = Executor.run_in_background t ~args () in
+  let%bind _, process = Executor.run_in_background t.executor ~args () in
 
   let mina_process : Process.t =
-    { config; process; client = Client.create ~port:config.port ~executor:t () }
+    { config = t.config; process; client = Client.create ~port:t.config.port ~executor:t.executor () }
   in
   Deferred.return mina_process

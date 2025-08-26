@@ -126,6 +126,8 @@ function main_help(){
     echo " networks: devnet,mainnet"
     echo " codenames: bullseye,focal"
     echo " channels: unstable,alpha,beta,stable"
+    echo " backends: gs,hetzner,local"
+    echo " arch: amd64,arm64"
     echo ""
 
     exit "${1:-0}";
