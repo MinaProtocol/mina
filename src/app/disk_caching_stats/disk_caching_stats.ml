@@ -719,7 +719,7 @@ let () =
     Snark_profiler_lib.create_ledger_and_zkapps
       ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
       ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
-      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+      ~min_num_proof_updates:num_updates ~max_num_updates:num_updates ()
   in
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =
