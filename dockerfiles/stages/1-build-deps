@@ -10,24 +10,13 @@ ARG image=ubuntu:focal
 # any other stages.
 ARG deb_codename
 
-ARG TARGETPLATFORM
-
-FROM --platform=$TARGETPLATFORM ${image} AS build-deps
+FROM ${image} AS build-deps
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG RUSTARCH
 ARG OPAMARCH
 ARG TARGETARCH
-
-RUN echo $TARGETPLATFORM
-
-RUN echo $TARGETARCH
-
-RUN echo $BUILDPLATFORM
-
-RUN echo "$(uname -m)"
-
 
 # OCaml Version
 # The version must be the same as the version used in:
