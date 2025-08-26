@@ -23,7 +23,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   end
 
   type maps_t =
-    { accounts : Account.t Location_binable.Map.t
+    { accounts : Account.t Location.Map.t
     ; token_owners : Account_id.t Token_id.Map.t
     ; hashes : Hash.t Addr.Map.t
     ; locations : Location.t Account_id.Map.t
@@ -92,7 +92,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type unattached = t
 
   let empty_maps =
-    { accounts = Location_binable.Map.empty
+    { accounts = Location.Map.empty
     ; token_owners = Token_id.Map.empty
     ; hashes = Addr.Map.empty
     ; locations = Account_id.Map.empty
