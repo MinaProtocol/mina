@@ -1,4 +1,11 @@
+(** The following MIP can be relevant to understand some part of this codebase:
+    https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0004-zkapps.md
+
+    zkApps have been introduced in the first Mina protocol upgrade called
+    Berkeley, which was release in June 2024.
+*)
 open Core_kernel
+
 open Snark_params.Tick
 open Zkapp_basic
 
@@ -210,6 +217,28 @@ module Poly = struct
   end]
 end
 
+(** A zkApp account is a special type of account that can hold a zkApp, which is
+    formed by the following fields:
+   - app_state: an array of field elements, the current state of a zkApp
+     associated with the account. In the first protocol upgrade Berkeley, the
+     size of the state has been set to eight.
+   - verification_key: an optional key to use when verifying transaction SNARKs
+     for zkApps using this account; when not provided, the account is a typical
+     Mina account that supports payments.
+   - zkapp_version: a nonnegative integer that determines the protocol and
+     proof system version deployed zkApps are compatible with. Set for new
+     accounts and zkApp upgrades due to protocol and/or proof-system upgrades.
+   - 'action_state: an array of field elements, each representing an "action"
+     contained in a zkApp. For details, see
+     {{:https://github.com/MinaProtocol/MIPs/blob/main/MIPS/mip-0004-zkapps.md}the
+     zkApp MIP}. In the protocol upgrade Berkeley, it is set to five field
+     elements.
+  - last_action_slot: the global slot when the action_state was last updated
+  - proved_state: a boolean, whether the application state was set from a
+    proof-driven zkapp transaction.
+  - zkapp_uri: a string, of max size=255, either empty, or denoting a URI that
+    contains information about the zkApp.
+*)
 type ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) t_ =
       ('app_state, 'vk, 'zkapp_version, 'field, 'slot, 'bool, 'zkapp_uri) Poly.t =
   { app_state : 'app_state
@@ -254,6 +283,11 @@ type t =
 
 let (_ : (t, Stable.Latest.t) Type_equal.t) = Type_equal.T
 
+(** As zkApp accounts are part of the protocol, we need to "snarkify" it. The
+    following submodule contains the snarky version of the zkApp account.
+    An instantiation using the [Step] backend is used; no backend using [Wrap]
+    is provided. As a reminder, the [Step] backend uses the [Tick] curve.
+*)
 module Checked = struct
   type t =
     ( Pickles.Impls.Step.Field.t Zkapp_state.V.t
