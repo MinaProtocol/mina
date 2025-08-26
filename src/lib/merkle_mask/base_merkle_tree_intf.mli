@@ -16,6 +16,4 @@ module type S = sig
     ; fold_locations : (account_id * Location.t) list
     ; fold_non_existent_accounts : account_id_set
     }
-
-  val accumulate_maps_dup : init:maps_fold_mask -> t -> maps_fold_mask
 end
