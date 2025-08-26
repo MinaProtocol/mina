@@ -30,6 +30,19 @@ module Unstable_db :
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
 
+module Hardfork_db :
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.Hardfork.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+
 module Any_ledger :
   Merkle_ledger.Intf.Ledger.ANY
     with module Location = Location

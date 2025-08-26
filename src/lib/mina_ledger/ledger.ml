@@ -96,6 +96,23 @@ module Ledger_inner = struct
       let empty_account =
         Ledger_hash.of_digest (Lazy.force Account.Unstable.empty_digest)
     end
+
+    module Hardfork = struct
+      type t = Ledger_hash.Stable.V1.t
+      [@@deriving sexp, compare, hash, equal, yojson, bin_io_unversioned]
+
+      include Hashable.Make_binable (Arg)
+
+      let to_base58_check = Ledger_hash.to_base58_check
+
+      let merge = Ledger_hash.merge
+
+      let hash_account =
+        Fn.compose Ledger_hash.of_digest Mina_base.Account.Hardfork.digest
+
+      let empty_account =
+        Ledger_hash.of_digest (Lazy.force Account.Hardfork.empty_digest)
+    end
   end
 
   module Account = struct
@@ -139,6 +156,12 @@ module Ledger_inner = struct
 
       let token = token_id
     end
+
+    module Hardfork = struct
+      include Mina_base.Account.Hardfork
+
+      let token = token_id
+    end
   end
 
   module Make_inputs
@@ -177,11 +200,15 @@ module Ledger_inner = struct
 
   module Inputs = Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
   module Unstable_inputs = Make_inputs (Account.Unstable) (Hash.Unstable)
+  module Hardfork_inputs = Make_inputs (Account.Hardfork) (Hash.Hardfork)
 
   module Db : Account_Db with type account := Account.t = Database.Make (Inputs)
 
   module Unstable_db : Account_Db with type account := Account.Unstable.t =
     Database.Make (Unstable_inputs)
+
+  module Hardfork_db : Account_Db with type account := Account.Hardfork.t =
+    Database.Make (Hardfork_inputs)
 
   module Null = Null_ledger.Make (Inputs)
 
