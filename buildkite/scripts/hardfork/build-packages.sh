@@ -2,6 +2,7 @@
 
 set -eo pipefail
 
+# shellcheck disable=SC1090
 source ~/.profile
 
 export BRANCH_NAME=$BUILDKITE_BRANCH
