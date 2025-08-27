@@ -61,7 +61,7 @@ end
 module type Ledger_input_intf = sig
   include Accounts_intf
 
-  val directory : [ `Ephemeral | `New | `Path of string ]
+  val directory : [ `Ephemeral | `Path of string ]
 
   val depth : int
 end

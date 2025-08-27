@@ -163,7 +163,7 @@ let%test_module "Epoch ledger sync tests" =
       let module Test_genesis_ledger = Genesis_ledger.Make (struct
         include Test_genesis_ledger
 
-        let directory = `New
+        let directory = `Ephemeral
 
         let depth = constraint_constants.ledger_depth
       end) in
