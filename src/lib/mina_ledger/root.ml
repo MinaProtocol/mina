@@ -81,8 +81,6 @@ struct
       | Converting_db_config { primary_directory; converting_directory } ->
           file_exists primary_directory && file_exists converting_directory
 
-    (* TODO: we should be able to tell backing type of a root just by looking at
-       the dir structure, maybe it can be utilized to simplify our code *)
     let with_directory ~backing_type ~directory_name =
       match backing_type with
       | Stable_db ->
