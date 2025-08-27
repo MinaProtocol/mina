@@ -255,6 +255,4 @@ module Make (Inputs : Inputs_intf) = struct
   let set_all_accounts_rooted_at_exn t address accounts =
     Base.set_all_accounts_rooted_at_exn t address accounts ;
     batch_notify_mask_children t accounts
-
-  let accumulate_maps_dup ~(init : maps_fold_mask) _ = init
 end

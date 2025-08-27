@@ -303,7 +303,11 @@ module Ledger = struct
 
     module Path : Merkle_path.S with type hash := hash
 
-    module Location : LOCATION
+    module Location : sig
+      type t [@@deriving sexp, compare, hash]
+
+      include Comparable.S with type t := t
+    end
 
     include
       SYNCABLE
