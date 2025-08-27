@@ -28,10 +28,12 @@ module Client = struct
     @param t The daemon instance containing the executor and port information.
     @return Unit. Executes the command to stop the daemon using the executor.
   *)
-  let stop_daemon t: unit Deferred.t =
-    let%map _ = Executor.run t.executor
-      ~args:[ "client"; "stop-daemon"; "-daemon-port"; sprintf "%d" t.port ]
-      () in
+  let stop_daemon t : unit Deferred.t =
+    let%map _ =
+      Executor.run t.executor
+        ~args:[ "client"; "stop-daemon"; "-daemon-port"; sprintf "%d" t.port ]
+        ()
+    in
     ()
 
   (** [daemon_status t] retrieves the status of the daemon running on the specified port.
@@ -75,7 +77,7 @@ module Client = struct
     go retry_attempts
 
   let ledger_hash t ~ledger_file =
-     Executor.run t.executor
+    Executor.run t.executor
       ~args:[ "ledger"; "hash"; "--ledger-file"; ledger_file ]
       ()
 
@@ -99,10 +101,7 @@ module Client = struct
       ()
 
   let advanced_constraint_system_digests t =
-    Executor.run t.executor
-      ~args:[ "advanced"; "constraint-system-digests" ]
-      ()
-
+    Executor.run t.executor ~args:[ "advanced"; "constraint-system-digests" ] ()
 end
 
 module Config = struct
@@ -119,9 +118,8 @@ module Config = struct
     let create ?(root_path = "/tmp") ?(config_dir = "mina_spun_test")
         ?(genesis_dir = "mina_genesis_state")
         ?(p2p_dir = "mina_test_libp2p_keypair") () =
-
-      Unix.putenv ~key:"MINA_LIBP2P_PASS" ~data:"naughty blue worm";
-      Unix.putenv ~key:"MINA_PRIVKEY_PASS" ~data:"naughty blue worm";
+      Unix.putenv ~key:"MINA_LIBP2P_PASS" ~data:"naughty blue worm" ;
+      Unix.putenv ~key:"MINA_PRIVKEY_PASS" ~data:"naughty blue worm" ;
       (* create empty config dir to avoid any issues with the default config dir *)
       let conf = Filename.temp_dir ~in_dir:root_path config_dir "" in
       let genesis = Filename.temp_dir ~in_dir:root_path genesis_dir "" in
@@ -221,6 +219,9 @@ let start t =
   let%bind _, process = Executor.run_in_background t.executor ~args () in
 
   let mina_process : Process.t =
-    { config = t.config; process; client = Client.create ~port:t.config.port ~executor:t.executor () }
+    { config = t.config
+    ; process
+    ; client = Client.create ~port:t.config.port ~executor:t.executor ()
+    }
   in
   Deferred.return mina_process
