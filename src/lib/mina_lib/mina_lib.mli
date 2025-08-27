@@ -261,38 +261,26 @@ val best_chain_block_before_stop_slot :
   t -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
 
 module Hardfork_config : sig
-  type mina_lib = t
-
   type breadcrumb_spec =
     [ `Stop_slot
     | `State_hash of State_hash.t
     | `Block_height of Unsigned.UInt32.t ]
 
-  val breadcrumb :
-       breadcrumb_spec:breadcrumb_spec
-    -> mina_lib
-    -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
+  module Berkeley : sig
+    type inputs =
+      { staged_ledger : Mina_ledger.Ledger.t
+      ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+      ; state_hash : State_hash.t
+      ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
+      ; staking_epoch_seed : Epoch_seed.t
+      ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
+      ; next_epoch_seed : Epoch_seed.t
+      ; blockchain_length : Mina_numbers.Length.t
+      }
 
-  val epoch_ledgers :
-       breadcrumb:Transition_frontier.Breadcrumb.t
-    -> mina_lib
-    -> ( Mina_ledger.Ledger.Any_ledger.witness
-       * Mina_ledger.Ledger.Any_ledger.witness )
-       Deferred.Or_error.t
-
-  type inputs =
-    { staged_ledger : Mina_ledger.Ledger.t
-    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
-    ; state_hash : State_hash.t
-    ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
-    ; staking_epoch_seed : Epoch_seed.t
-    ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
-    ; next_epoch_seed : Epoch_seed.t
-    ; blockchain_length : Mina_numbers.Length.t
-    }
-
-  val prepare_inputs :
-    breadcrumb_spec:breadcrumb_spec -> mina_lib -> inputs Deferred.Or_error.t
+    val prepare_inputs :
+      breadcrumb_spec:breadcrumb_spec -> t -> inputs Deferred.Or_error.t
+  end
 end
 
 val zkapp_cmd_limit : t -> int option ref

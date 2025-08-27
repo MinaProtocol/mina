@@ -15864,7 +15864,7 @@
             {
               "name": "fork_config",
               "description":
-                "The runtime configuration for a blockchain fork intended to be a continuation of the current one. By default, this returns the newest block that appeared before the transaction stop slot provided in the configuration, or the best tip if no such block exists.",
+                "The runtime configuration for a blockchain fork intended to be a continuation of the current one. By default, this returns the newest block that appeared before the transaction stop slot provided in the configuration, or the best tip if no such block exists. This is query is used to support Berkeley hardfork. ",
               "args": [
                 {
                   "name": "height",
