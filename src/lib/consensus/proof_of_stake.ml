@@ -464,11 +464,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         if Mina_ledger.Ledger.Root.Config.exists_backing config then (
           [%log info]
             ~metadata:
-              [ ( "location"
-                , `String
-                    (Mina_ledger.Ledger.Root.Config.primary_directory config) )
-              ]
-            "Loading epoch ledger from disk: $location" ;
+              [ ("config", Mina_ledger.Ledger.Root.Config.to_yojson config) ]
+            "Loading epoch ledger from disk: $config" ;
           Snapshot.Ledger_snapshot.Ledger_root
             (Mina_ledger.Ledger.Root.create ~logger ~config
                ~depth:constraint_constants.ledger_depth () ) )
@@ -541,19 +538,17 @@ module Make_str (A : Wire_types.Concrete) = struct
               let next_ledger_config = ledger_config epoch_ledger_uuids.next in
               [%log info]
                 "Cleaning up old epoch ledgers with genesis state $state_hash \
-                 at locations $staking and $next"
+                 with configs $staking and $next"
                 ~metadata:
                   [ ( "state_hash"
                     , Mina_base.State_hash.to_yojson
                         epoch_ledger_uuids.genesis_state_hash )
                   ; ( "staking"
-                    , `String
-                        ( Mina_ledger.Ledger.Root.Config.primary_directory
-                        @@ staking_ledger_config ) )
+                    , Mina_ledger.Ledger.Root.Config.to_yojson
+                        staking_ledger_config )
                   ; ( "next"
-                    , `String
-                        ( Mina_ledger.Ledger.Root.Config.primary_directory
-                        @@ next_ledger_config ) )
+                    , Mina_ledger.Ledger.Root.Config.to_yojson
+                        next_ledger_config )
                   ] ;
               Mina_ledger.Ledger.Root.Config.delete_backing
                 staking_ledger_config ;
