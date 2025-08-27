@@ -91,12 +91,12 @@ struct
           Converting_db_config
             (Converting_ledger.Config.with_primary ~directory_name)
 
-    let delete_any_backing = function
-      | Stable_db_config path ->
-          Mina_stdlib_unix.File_system.rmrf path
-      | Converting_db_config { primary_directory; converting_directory } ->
-          Mina_stdlib_unix.File_system.rmrf primary_directory ;
-          Mina_stdlib_unix.File_system.rmrf converting_directory
+    let delete_any_backing primary =
+      let converting =
+        Converting_ledger.Config.default_converting_directory_name primary
+      in
+      Mina_stdlib_unix.File_system.rmrf primary ;
+      Mina_stdlib_unix.File_system.rmrf converting
 
     exception
       Backing_mismatch of { backing_1 : backing_type; backing_2 : backing_type }

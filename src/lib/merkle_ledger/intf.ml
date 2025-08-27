@@ -532,6 +532,9 @@ module Ledger = struct
       (** Create a [checkpoint] config with the default converting directory
         name *)
       val with_primary : directory_name:string -> t
+
+      (** Given a primary dir, returns the default converting_directory path associated with that primary dir *)
+      val default_converting_directory_name : string -> string
     end
 
     module type WITH_DATABASE = sig

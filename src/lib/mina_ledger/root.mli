@@ -91,8 +91,8 @@ module Make
     (** Test if a root ledger backing already exists with this config *)
     val exists_backing : t -> bool
 
-    (** Delete a backing of any type that might exist with this config, if present *)
-    val delete_any_backing : t -> unit
+    (** Delete a backing of any type that might exist with this config, if present. this function will try any backing type *)
+    val delete_any_backing : string -> unit
 
     (** Move the root backing at [src] to [dst]. Assumptions: the [src] and
         [dst] configs must have the same configured backing, there must be a
