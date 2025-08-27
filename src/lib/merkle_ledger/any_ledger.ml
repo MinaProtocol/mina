@@ -154,6 +154,7 @@ module Make_base (Inputs : Intf.Inputs.Intf) :
 
     let detached_signal (T ((module Base), t)) = Base.detached_signal t
 
-    let all_accounts_on_masks _ = Location.Map.empty
+    let all_accounts_on_masks (T ((module Base), t)) =
+      Base.all_accounts_on_masks t
   end
 end
