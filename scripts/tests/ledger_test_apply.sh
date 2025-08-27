@@ -28,7 +28,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -m|--mina-app) MINA_APP="$2"; shift; shift;;
   -r|--runtime-ledger-app) RUNTIME_LEDGER_APP="$2"; shift; shift;;
   "$ACTIONS_EVENTS_OPT") 
-    # shellcheck disable=SC2034
     FULL_ACTIONS_EVENTS="$ACTIONS_EVENTS_OPT"; shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; done
@@ -60,4 +59,4 @@ mkdir $TEMP_FOLDER/genesis/ledger
 tar -zxf  $TEMP_FOLDER/genesis/genesis_ledger_*.tar.gz -C $TEMP_FOLDER/genesis/ledger
 
 echo "running test:"
-time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200 --dump-benchmark $BENCHMARK_FILE $ACTIONS_EVENTS_OPT
+time $MINA_APP ledger test apply --ledger-path $TEMP_FOLDER/genesis/ledger  --privkey-path $SENDER --num-txs 200 --dump-benchmark $BENCHMARK_FILE $FULL_ACTIONS_EVENTS
