@@ -94,6 +94,9 @@ module Make
     (** Delete a backing of any type that might exist with this config, if present. this function will try any backing type *)
     val delete_any_backing : string -> unit
 
+    (** Delete backing of a specific config *)
+    val delete_backing : t -> unit
+
     (** Move the root backing at [src] to [dst]. Assumptions: the [src] and
         [dst] configs must have the same configured backing, there must be a
         root backing of the appropriate type at [src], there must not be a root

@@ -98,6 +98,13 @@ struct
       Mina_stdlib_unix.File_system.rmrf primary ;
       Mina_stdlib_unix.File_system.rmrf converting
 
+    let delete_backing = function
+      | Stable_db_config primary ->
+          Mina_stdlib_unix.File_system.rmrf primary
+      | Converting_db_config { primary_directory; converting_directory } ->
+          Mina_stdlib_unix.File_system.rmrf primary_directory ;
+          Mina_stdlib_unix.File_system.rmrf converting_directory
+
     exception
       Backing_mismatch of { backing_1 : backing_type; backing_2 : backing_type }
 

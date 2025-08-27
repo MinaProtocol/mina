@@ -306,7 +306,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ()
             | Ledger_root ledger ->
                 Mina_ledger.Ledger.Root.close ledger ;
-                Mina_ledger.Ledger.Root.Config.delete_any_backing config
+                Mina_ledger.Ledger.Root.Config.delete_backing config
 
           let ledger_subset keys ledger =
             let open Mina_ledger in
@@ -555,10 +555,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                         ( Mina_ledger.Ledger.Root.Config.primary_directory
                         @@ next_ledger_config ) )
                   ] ;
-              Mina_ledger.Ledger.Root.Config.delete_any_backing
+              Mina_ledger.Ledger.Root.Config.delete_backing
                 staking_ledger_config ;
-              Mina_ledger.Ledger.Root.Config.delete_any_backing
-                next_ledger_config ;
+              Mina_ledger.Ledger.Root.Config.delete_backing next_ledger_config ;
               create_new_uuids () )
           else create_new_uuids ()
         in
