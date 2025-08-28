@@ -1,0 +1,8 @@
+(test
+ (name test_random_oracle_input)
+ (libraries
+  ;; opam libraries
+  alcotest
+  base_quickcheck
+  ;; local libraries
+  random_oracle_input))
