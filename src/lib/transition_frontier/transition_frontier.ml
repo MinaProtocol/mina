@@ -651,7 +651,8 @@ module For_tests = struct
         Unix.mkdir root_dir ;
         Unix.mkdir frontier_dir ;
         let persistent_root =
-          Persistent_root.create ~logger ~directory:root_dir
+          Persistent_root.create ~logger ~backing_type:Stable_db
+            ~directory:root_dir
             ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
         in
         let persistent_frontier =
