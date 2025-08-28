@@ -88,7 +88,12 @@ end
 
 type t = Factory_type.t
 
-val create : logger:Logger.t -> directory:string -> ledger_depth:int -> t
+val create :
+     logger:Logger.t
+  -> directory:string
+  -> backing_type:Root.Config.backing_type
+  -> ledger_depth:int
+  -> t
 
 val create_instance_exn : t -> Instance_type.t
 
