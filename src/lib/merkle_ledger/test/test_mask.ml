@@ -633,6 +633,52 @@ module Make (Test : Test_intf) = struct
               ~message:"account in mask should be unchanged" ~expect:acct1
               (Mask.Attached.get attached_mask loc |> Option.value_exn) ) )
 
+  let () =
+    add_test "all_accounts_on_masks works on a chain" (fun () ->
+        Test.with_chain (fun base ~mask:m1_lazy ~mask2:m2_lazy ->
+            let num_accounts = 1 lsl min Test.depth 5 in
+            let num_layer_accounts = num_accounts / 3 in
+            let account_ids = Account_id.gen_accounts num_accounts in
+            let balances =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+            in
+            let T = Account_id.eq in
+            let accounts =
+              List.map2_exn account_ids balances ~f:Account.create
+            in
+            let root_accounts, accounts =
+              List.split_n accounts num_layer_accounts
+            in
+            let middle_accounts, top_accounts =
+              List.split_n accounts num_layer_accounts
+            in
+            let create_accounts_map ~create ledger accounts =
+              List.map accounts ~f:(fun account ->
+                  let location = create ledger account in
+                  (location, account) )
+              |> Test.Location.Map.of_alist_reduce ~f:(fun x _ -> x)
+            in
+            let _root_map =
+              create_accounts_map ~create:parent_create_new_account_exn base
+                root_accounts
+            in
+            let middle_ledger, _root = Lazy.force m1_lazy in
+            let middle_map =
+              create_accounts_map ~create:create_new_account_exn middle_ledger
+                middle_accounts
+            in
+            let top_ledger = Lazy.force m2_lazy in
+            let top_map =
+              create_accounts_map ~create:create_new_account_exn top_ledger
+                top_accounts
+            in
+            let harvested = Mask.Attached.all_accounts_on_masks top_ledger in
+            let expected =
+              Map.merge_skewed middle_map top_map ~combine:(fun ~key:_ x _ -> x)
+            in
+            [%test_eq: Account.t Test.Location.Map.t] harvested expected ) )
+
   let tests =
     let actual_tests = Stack.fold test_stack ~init:[] ~f:(fun l e -> e :: l) in
     (test_section_name, actual_tests)
