@@ -2,13 +2,8 @@ open Core
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 open Frontier_base
-module Ledger_transfer = Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Db)
-module Ledger_transfer_stable =
-  Mina_ledger.Ledger_transfer.Make (Ledger.Db) (Ledger.Db)
-
-let transfer_snarked_root =
-  Ledger.Root.transfer_accounts_with
-    ~stable:Ledger_transfer_stable.transfer_accounts
+module Ledger_transfer_any =
+  Mina_ledger.Ledger_transfer.Make (Ledger.Any_ledger.M) (Ledger.Any_ledger.M)
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in
@@ -190,8 +185,9 @@ module Instance = struct
                 ()
             in
             match
-              transfer_snarked_root ~src:potential_snarked_ledger
-                ~dest:snarked_ledger
+              Ledger_transfer_any.transfer_accounts
+                ~src:(Ledger.Root.as_unmasked potential_snarked_ledger)
+                ~dest:(Ledger.Root.as_unmasked snarked_ledger)
             with
             | Ok _ ->
                 Ledger.Root.close potential_snarked_ledger ;

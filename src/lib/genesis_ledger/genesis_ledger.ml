@@ -4,10 +4,10 @@ open Signature_lib
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Intf = Intf
-module Ledger_transfer_stable =
-  Mina_ledger.Ledger_transfer.Make (Ledger.Db) (Ledger.Db)
-module Ledger_transfer_any =
+module Ledger_transfer_mask =
   Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Any_ledger.M)
+module Ledger_transfer_any =
+  Mina_ledger.Ledger_transfer.Make (Ledger.Any_ledger.M) (Ledger.Any_ledger.M)
 
 let account_with_timing account_id balance (timing : Intf.Timing.t) =
   match timing with
@@ -66,19 +66,18 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
 end
 
 module Utils = struct
-  (* Populate a [Ledger.Root.t] ledger with the components of a root
-     backing_ledger for a genesis ledger. These components are the underlying
-     root ledger and the stored mask on top of that root that is presented to
-     users of the genesis root. The mask is passed in to this function so we can
-     assert that there are no uncommitted changes to it, allowing us to use the
-     potentially much faster Ledger.Root.transfer_accounts_with function. *)
   let populate_root_with_backing_root genesis_mask ~src ~dest =
+    let open Or_error.Let_syntax in
     assert (
       Ledger_hash.equal
         (Ledger.merkle_root genesis_mask)
         (Ledger.Root.merkle_root src) ) ;
-    Ledger.Root.transfer_accounts_with
-      ~stable:Ledger_transfer_stable.transfer_accounts ~src ~dest
+    let%map _root =
+      Ledger_transfer_any.transfer_accounts
+        ~src:(Ledger.Root.as_unmasked src)
+        ~dest:(Ledger.Root.as_unmasked dest)
+    in
+    dest
 
   let keypair_of_account_record_exn (private_key, account) =
     let open Account in
@@ -174,7 +173,7 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
         (* We are transferring to an unmasked view of the root, so this is
            used solely for the transfer side effect *)
         let%map _dest =
-          Ledger_transfer_any.transfer_accounts ~src:ledger
+          Ledger_transfer_mask.transfer_accounts ~src:ledger
             ~dest:(Ledger.Root.as_unmasked root)
         in
         root
