@@ -50,7 +50,8 @@ let plugin_flag =
   else Command.Param.return []
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
-    ~genesis_dir ~cli_proof_level ~proof_level config_files =
+    ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
+    config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -101,7 +102,8 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
-        ~logger ~genesis_constants ~constraint_constants ~proof_level config
+        ~logger ~genesis_constants ~constraint_constants ~proof_level
+        ~genesis_backing_type config
     with
     | Ok (precomputed_values, _) ->
         precomputed_values
@@ -566,6 +568,25 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
+  and hardfork_mode =
+    (*
+      There's 2 hardfork mode, namely Legacy and Auto:
+        In Legacy Mode:
+          - Behavior matching Berkeley hardfork;
+          - No automatic shutdown at network transition;
+          - No automatic data extraction;
+        In Auto Mode:
+          - New behavior for seamless transitions;
+          - Default behavior for Fall2025 hardfork;
+          - Automatic shutdown after last slot of previous network;
+          - Automatic data dump to specified directory;
+          - Integration with Docker script logic;
+      For more, see: https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e *)
+    flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
+      ~doc:
+        "MODE of Hardfork (auto|legacy, not applying any hardfork-mode when \
+         this flag is not set)"
+      (optional Hardfork_mode.arg)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -774,10 +795,20 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Genesis_constants.Compiled.constraint_constants
           in
           let compile_config = Mina_compile_config.Compiled.t in
+          (* HACK: unfortunately due to how our code is structured, below
+             definition is defined again in Mina_lib *)
+          let ledger_backing_type =
+            match hardfork_mode with
+            | Some Auto ->
+                Mina_ledger.Ledger.Root.Config.Converting_db
+            | _ ->
+                Stable_db
+          in
           let%bind precomputed_values, config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
+              ~genesis_backing_type:ledger_backing_type
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
@@ -1151,6 +1182,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
+              ~epoch_ledger_backing_type:ledger_backing_type
           in
           trace_database_initialization "epoch ledger" __LOC__
             epoch_ledger_location ;
@@ -1402,7 +1434,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~uptime_send_node_commit ~stop_time ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config () )
+                 ~itn_features ~compile_config ~hardfork_mode () )
           in
           { mina
           ; client_trustlist
@@ -1955,8 +1987,8 @@ let internal_commands logger ~itn_features =
           in
           let%bind precomputed_values, _config_jsons, _config =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
-              ~constraint_constants ~proof_level config_files
-              ~cli_proof_level:None
+              ~constraint_constants ~proof_level ~cli_proof_level:None
+              ~genesis_backing_type:Stable_db config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =

@@ -62,7 +62,8 @@ let instantiate_verify_functions ~logger ~genesis_constants
           @@ Runtime_config.of_yojson config_json
         in
         Genesis_ledger_helper.init_from_config_file ~logger ~proof_level
-          ~constraint_constants ~genesis_constants config ~cli_proof_level
+          ~constraint_constants ~genesis_constants ~cli_proof_level
+          ~genesis_backing_type:Stable_db config
       in
       let%map.Deferred precomputed_values =
         match precomputed_values with
