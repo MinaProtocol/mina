@@ -1,8 +1,7 @@
 open Core
 open Mina_base
-module Ledger = Mina_ledger.Ledger
 open Frontier_base
-module Ledger_transfer = Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Db)
+module Ledger = Mina_ledger.Ledger
 module Ledger_transfer_stable =
   Mina_ledger.Ledger_transfer.Make (Ledger.Db) (Ledger.Db)
 
