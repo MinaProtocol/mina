@@ -67,6 +67,13 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
+# --- Release Toolkit
+
+RUN echo "deb https://stable.apt.packages.minaprotocol.com focal stable" > /etc/apt/sources.list.d/mina_release_toolkit.list \
+   && wget -q https://stable.apt.packages.minaprotocol.com/repo-signing-key.gpg -O /etc/apt/trusted.gpg.d/minaprotocol.gpg \
+   && apt-get update --yes && apt-get install --no-install-recommends -y mina-release-manager=1.0.0 mina-deb-builder=1.0.0 \
+   && rm -rf /var/lib/apt/lists/*
+
 # --- Helm tools
 RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
     && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
