@@ -1025,7 +1025,7 @@ module For_tests = struct
       }
     in
     let persistent_root =
-      Persistent_root.create ~logger
+      Persistent_root.create ~logger ~backing_type:Stable_db
         ~directory:(Filename.temp_file "snarked_ledger" "")
         ~ledger_depth
     in
