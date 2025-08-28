@@ -211,13 +211,6 @@ struct
     | Converting_db db ->
         Any_ledger.cast (module Converting_ledger) db
 
-  let transfer_accounts_with ~stable ~src ~dest =
-    match (src, dest) with
-    | Stable_db db1, Stable_db db2 ->
-        stable ~src:db1 ~dest:db2 |> Or_error.map ~f:(fun x -> Stable_db x)
-    | _ ->
-        failwith "TODO: this function should be removed"
-
   let depth t =
     match t with
     | Stable_db db ->
