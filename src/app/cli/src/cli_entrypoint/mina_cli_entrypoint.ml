@@ -797,7 +797,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let compile_config = Mina_compile_config.Compiled.t in
           (* HACK: unfortunately due to how our code is structured, below
              definition is defined again in Mina_lib *)
-          let genesis_backing_type =
+          let ledger_backing_type =
             match hardfork_mode with
             | Some Auto ->
                 Mina_ledger.Ledger.Root.Config.Converting_db
@@ -808,7 +808,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
-              ~genesis_backing_type
+              ~genesis_backing_type:ledger_backing_type
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
@@ -1182,6 +1182,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
+              ~epoch_ledger_backing_type:ledger_backing_type
           in
           trace_database_initialization "epoch ledger" __LOC__
             epoch_ledger_location ;

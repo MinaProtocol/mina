@@ -990,7 +990,7 @@ module For_tests = struct
   module Transfer =
     Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)
 
-  let create_frontier () =
+  let create_frontier ~epoch_ledger_backing_type () =
     let open Core in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
@@ -1006,6 +1006,7 @@ module For_tests = struct
         ~genesis_state_hash:
           (State_hash.With_state_hashes.state_hash
              precomputed_values.protocol_state_with_hashes )
+        ~epoch_ledger_backing_type
     in
     let root_ledger =
       Or_error.ok_exn

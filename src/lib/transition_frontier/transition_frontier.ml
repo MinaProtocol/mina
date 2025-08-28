@@ -720,7 +720,8 @@ module For_tests = struct
              ~epoch_ledger_location Public_key.Compressed.Set.empty
              ~genesis_state_hash:
                (State_hash.With_state_hashes.state_hash
-                  precomputed_values.protocol_state_with_hashes ) )
+                  precomputed_values.protocol_state_with_hashes )
+             ~epoch_ledger_backing_type:Stable_db )
     in
     let populate_root, root_ledger_accounts = populate_root_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
