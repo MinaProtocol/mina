@@ -18,5 +18,5 @@
   ppx_inline_test.config
   sexplib0
   ;; local libraries
-  bounded_types
+  mina_stdlib
   ppx_version.runtime))

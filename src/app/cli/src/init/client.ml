@@ -950,12 +950,14 @@ let currency_in_ledger =
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
+         let signature_kind = Mina_signature_kind.t_DEPRECATED in
          let constraint_constants =
            Genesis_constants.Compiled.constraint_constants
          in
          let proof_level = Genesis_constants.Compiled.proof_level in
          let all =
-           Transaction_snark.constraint_system_digests ~constraint_constants ()
+           Transaction_snark.constraint_system_digests ~signature_kind
+             ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
                ~proof_level ~constraint_constants ()
          in
@@ -1641,7 +1643,8 @@ let generate_libp2p_keypair_do privkey_path =
     (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
     let logger = Logger.null () in
     (* Using the helper only for keypair generation requires no state. *)
-    File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
+    Mina_stdlib_unix.File_system.with_temp_dir "mina-generate-libp2p-keypair"
+      ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
@@ -1673,7 +1676,8 @@ let dump_libp2p_keypair_do privkey_path =
     (let open Deferred.Let_syntax in
     let logger = Logger.null () in
     (* Using the helper only for keypair generation requires no state. *)
-    File_system.with_temp_dir "mina-dump-libp2p-keypair" ~f:(fun tmpd ->
+    Mina_stdlib_unix.File_system.with_temp_dir "mina-dump-libp2p-keypair"
+      ~f:(fun tmpd ->
         match%bind
           Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
             ~pids:(Child_processes.Termination.create_pid_table ())
@@ -2141,6 +2145,7 @@ let receipt_chain_hash =
            "NN For a zkApp, 0 for fee payer or 1-based index of account update"
          (optional string)
      in
+     let signature_kind = Mina_signature_kind.t_DEPRECATED in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
@@ -2159,9 +2164,9 @@ let receipt_chain_hash =
              in
              let receipt_elt =
                let _txn_commitment, full_txn_commitment =
-                 Zkapp_command.get_transaction_commitments
-                   (Zkapp_command.write_all_proofs_to_disk ~proof_cache_db
-                      zkapp_cmd )
+                 Zkapp_command.get_transaction_commitments ~signature_kind
+                   (Zkapp_command.write_all_proofs_to_disk ~signature_kind
+                      ~proof_cache_db zkapp_cmd )
                in
                Receipt.Zkapp_command_elt.Zkapp_command_commitment
                  full_txn_commitment

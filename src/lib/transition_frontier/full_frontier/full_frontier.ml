@@ -457,23 +457,23 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-      let location =
-        Persistent_root.Locations.potential_snarked_ledger
-          t.persistent_root_instance.factory.directory
+      let config =
+        Persistent_root.Instance.Config.make_potential_snarked_ledger
+          t.persistent_root_instance.factory
       in
       let () =
-        Ledger.Db.make_checkpoint t.persistent_root_instance.snarked_ledger
-          ~directory_name:location
+        Ledger.Root.make_checkpoint t.persistent_root_instance.snarked_ledger
+          ~config
       in
       [%log' info t.logger]
         ~metadata:
           [ ( "potential_snarked_ledger_hash"
             , Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash
-              @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger
-            )
+              @@ Ledger.Root.merkle_root
+                   t.persistent_root_instance.snarked_ledger )
           ]
         "Enqueued a snarked ledger" ;
-      Persistent_root.Instance.enqueue_snarked_ledger ~location
+      Persistent_root.Instance.enqueue_snarked_ledger ~config
         t.persistent_root_instance ;
       let s = t.root_ledger in
       (* STEP 4 *)
@@ -481,10 +481,11 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         Ledger.Maskable.register_mask s
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       (* STEP 5 *)
       (*Validate transactions against the protocol state associated with the transaction*)
       let apply_first_pass =
-        Ledger.apply_transaction_first_pass
+        Ledger.apply_transaction_first_pass ~signature_kind
           ~constraint_constants:Context.constraint_constants
       in
       let apply_second_pass = Ledger.apply_transaction_second_pass in
@@ -998,7 +999,8 @@ module For_tests = struct
     let consensus_local_state =
       Consensus.Data.Local_state.create
         ~context:(module Context)
-        Public_key.Compressed.Set.empty ~genesis_ledger:Genesis_ledger.t
+        Public_key.Compressed.Set.empty
+        ~genesis_ledger:(module Genesis_ledger)
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:

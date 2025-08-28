@@ -1126,6 +1126,7 @@ struct
           ( verified Envelope.Incoming.t
           , Intf.Verification_error.t )
           Deferred.Result.t =
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let open Deferred.Result.Let_syntax in
         let open Intf.Verification_error in
         let%bind () =
@@ -1185,7 +1186,7 @@ struct
           O1trace.sync_thread "convert_transactions_to_verifiable" (fun () ->
               List.map
                 ~f:
-                  (User_command.write_all_proofs_to_disk
+                  (User_command.write_all_proofs_to_disk ~signature_kind
                      ~proof_cache_db:t.config.proof_cache_db )
                 diff
               |> User_command.Unapplied_sequence.to_all_verifiable
@@ -1674,6 +1675,8 @@ let%test_module _ =
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let constraint_constants = precomputed_values.constraint_constants
 
     let consensus_constants = precomputed_values.consensus_constants
@@ -1708,7 +1711,7 @@ let%test_module _ =
         let compile_time_genesis =
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
           Mina_state.Genesis_protocol_state.t
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_ledger:Genesis_ledger.for_unit_tests
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
             ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
@@ -1868,7 +1871,8 @@ let%test_module _ =
             |> Map.map ~f:(fun vk ->
                    Zkapp_basic.F_map.Map.singleton vk.hash vk ) )
         |> Or_error.bind ~f:(fun xs ->
-               List.map xs ~f:User_command.For_tests.check_verifiable
+               List.map xs
+                 ~f:(User_command.For_tests.check_verifiable ~signature_kind)
                |> Or_error.combine_errors )
       with
       | Ok cmds ->
@@ -1992,8 +1996,8 @@ let%test_module _ =
                 ; amount = Currency.Amount.of_nanomina_int_exn amount
                 } ) )
 
-    let mk_single_account_update ~signature_kind ~fee_payer_idx
-        ~zkapp_account_idx ~fee ~nonce ~ledger =
+    let mk_single_account_update ~fee_payer_idx ~zkapp_account_idx ~fee ~nonce
+        ~ledger =
       let fee = Currency.Fee.of_nanomina_int_exn fee in
       let fee_payer_kp = test_keys.(fee_payer_idx) in
       let nonce = Account.Nonce.of_int nonce in
@@ -2010,8 +2014,8 @@ let%test_module _ =
           }
       in
       let%map zkapp_command =
-        Transaction_snark.For_tests.single_account_update ~signature_kind
-          ~constraint_constants spec
+        Transaction_snark.For_tests.single_account_update ~constraint_constants
+          spec
       in
       Or_error.ok_exn
         (Zkapp_command.Verifiable.create ~failed:false
@@ -2291,7 +2295,7 @@ let%test_module _ =
               let applied, _ =
                 Or_error.ok_exn
                 @@ Mina_ledger.Ledger.apply_zkapp_command_unchecked
-                     ~constraint_constants
+                     ~signature_kind ~constraint_constants
                      ~global_slot:dummy_state_view.global_slot_since_genesis
                      ~state_view:dummy_state_view ledger p
               in
@@ -3125,9 +3129,8 @@ let%test_module _ =
               ()
           in
           let%bind zkapp_command =
-            mk_single_account_update
-              ~signature_kind:Mina_signature_kind.(Other_network "invalid")
-              ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0 ~zkapp_account_idx:1
+            mk_single_account_update ~fee_payer_idx:0 ~fee:minimum_fee ~nonce:0
+              ~zkapp_account_idx:1
               ~ledger:(Option.value_exn test.txn_pool.best_tip_ledger)
           in
           let tx =

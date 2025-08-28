@@ -245,7 +245,7 @@ module Json_layout = struct
             ]
 
         let of_permissions (perm : Mina_base.Permissions.t) =
-          { edit_state = Auth_required.of_account_perm perm.edit_action_state
+          { edit_state = Auth_required.of_account_perm perm.edit_state
           ; send = Auth_required.of_account_perm perm.send
           ; receive = Auth_required.of_account_perm perm.receive
           ; set_delegate = Auth_required.of_account_perm perm.set_delegate
@@ -606,7 +606,7 @@ module Accounts = struct
 
     let default = Json_layout.Accounts.Single.default
 
-    let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
+    let of_account (a : Mina_base.Account.t) : t Or_error.t =
       let open Result.Let_syntax in
       let open Signature_lib in
       return
@@ -640,8 +640,8 @@ module Accounts = struct
         ; permissions = Some (Permissions.of_permissions a.permissions)
         }
 
-    let to_account ?(ignore_missing_fields = false) (a : t) :
-        Mina_base.Account.t =
+    let to_account ?(ignore_missing_fields = false) ?(pad_app_state = false)
+        (a : t) : Mina_base.Account.t =
       let open Signature_lib in
       let timing =
         let open Mina_base.Account_timing.Poly in
@@ -716,6 +716,20 @@ module Accounts = struct
         | true, _ ->
             Mina_base.Permissions.user_default
       in
+      let pad_app_state_do app_state =
+        if pad_app_state then
+          let max = Mina_base.Zkapp_state.max_size_int in
+          let len = List.length app_state in
+          if len > max then
+            failwithf "zkapp app_state length (%d) exceeds max allowed (%d)" len
+              max ()
+          else
+            let zeros =
+              List.init (max - len) ~f:(const Snark_params.Tick.Field.zero)
+            in
+            app_state @ zeros
+        else app_state
+      in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
           , Mina_base.Verification_key_wire.t option
@@ -727,7 +741,9 @@ module Accounts = struct
           Mina_base.Zkapp_account.Poly.t =
         let hash_data = Mina_base.Verification_key_wire.digest_vk in
         Zkapp_account.
-          { app_state = Mina_base.Zkapp_state.V.of_list_exn app.app_state
+          { app_state =
+              Mina_base.Zkapp_state.V.of_list_exn
+              @@ pad_app_state_do app.app_state
           ; verification_key =
               Option.map ~f:With_hash.(of_data ~hash_data) app.verification_key
           ; zkapp_version = app.zkapp_version
@@ -776,7 +792,7 @@ module Accounts = struct
     let gen =
       Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
           (* This will never fail with a proper account generator. *)
-          of_account a |> Result.ok_or_failwith )
+          of_account a |> Or_error.ok_exn )
   end
 
   type single = Single.t =
@@ -1529,7 +1545,7 @@ let gen =
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
-  let open Async.Deferred.Result.Let_syntax in
+  let open Async.Deferred.Or_error.Let_syntax in
   let yield = Async_unix.Scheduler.yield_every ~n:100 |> Staged.unstage in
   let%bind accounts =
     Mina_ledger.Ledger.Any_ledger.M.to_list ledger
@@ -1560,7 +1576,7 @@ let ledger_of_accounts accounts =
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed =
-  let open Async.Deferred.Result.Let_syntax in
+  let open Async.Deferred.Or_error.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in

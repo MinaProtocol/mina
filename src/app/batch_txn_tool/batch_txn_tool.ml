@@ -118,8 +118,7 @@ let get_nonce ~logger ~(ingress_uri : Uri.t) ~(pub_key : Account.key) =
   let account_id = Account_id.create pub_key Mina_base.Token_id.default in
   let%bind nonce =
     let%bind querry_result =
-      Integration_test_lib.Graphql_requests.get_account_data ingress_uri ~logger
-        ~account_id
+      Graphql_requests.get_account_data ingress_uri ~logger ~account_id
     in
     match querry_result with
     | Ok res ->
@@ -154,7 +153,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
     ~origin_sender_secret_key_path
     ~(origin_sender_secret_key_pw_option : string option)
     ~returner_secret_key_path ~(returner_secret_key_pw_option : string option)
-    ~graphql_target_node_option ~minimum_user_command_fee () =
+    ~graphql_target_node_option ~minimum_user_command_fee ~signature_kind () =
   let open Deferred.Let_syntax in
   (* define the rate limiting function *)
   let open Logger in
@@ -262,6 +261,7 @@ let there_and_back_again ~num_txn_per_acct ~txns_per_block ~slot_time ~fill_rate
         ~sender_keypair:sender_kp ~receiver_pub_key ~amount:base_send_amount
         ~fee:fee_amount ~nonce ~memo:""
         ~valid_until:Mina_numbers.Global_slot_since_genesis.max_value
+        ~signature_kind
     in
     let%bind () =
       match res with
@@ -406,7 +406,8 @@ let output_there_and_back_cmds =
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
        ~returner_secret_key_path ~returner_secret_key_pw_option
-       ~graphql_target_node_option ~minimum_user_command_fee )
+       ~graphql_target_node_option ~minimum_user_command_fee
+       ~signature_kind:Mina_signature_kind.t_DEPRECATED )
 
 let () =
   Command.run

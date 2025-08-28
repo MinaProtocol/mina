@@ -3,7 +3,7 @@
 open Core_kernel
 open Async
 open Mina_base
-module Prod = Snark_worker__Prod.Inputs
+module Prod = Snark_worker.Inputs
 
 module Worker_state = struct
   module type S = sig
@@ -19,11 +19,13 @@ module Worker_state = struct
   type t = (module S)
 
   let create ~constraint_constants () : t Deferred.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     Deferred.return
       (let module M = struct
          let perform_single (message, single_spec) =
            let%bind (worker_state : Prod.Worker_state.t) =
-             Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
+             Prod.Worker_state.create ~constraint_constants ~proof_level:Full
+               ~signature_kind ()
            in
            Prod.perform_single worker_state ~message single_spec
        end in

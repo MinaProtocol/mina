@@ -33,7 +33,12 @@
   inputs.o1-opam-repository.url = "github:o1-labs/opam-repository";
   inputs.o1-opam-repository.flake = false;
 
-  inputs.opam-repository.url = "github:ocaml/opam-repository";
+  # The version must be the same as the version used in:
+  # - dockerfiles/1-build-deps
+  # - flake.nix (and flake.lock after running
+  #   `nix flake update opam-repository`).
+  # - scripts/update_opam_switch.sh
+  inputs.opam-repository.url = "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
   inputs.opam-repository.flake = false;
 
   inputs.nixpkgs-mozilla.url = "github:mozilla/nixpkgs-mozilla";
@@ -94,6 +99,13 @@
         ocaml = pkgs: prev: {
           ocamlPackages_mina =
             requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
+        };
+        # Skip tests on nodejs dep due to known issue with nixpkgs 24.11 https://github.com/NixOS/nixpkgs/issues/402079
+        # this can be removed after upgrading
+        skipNodeTests = final: prev: {
+          nodejs = prev.nodejs.overrideAttrs(old: {
+            doCheck = false;
+          });
         };
       };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;

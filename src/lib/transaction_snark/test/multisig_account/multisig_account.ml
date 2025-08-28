@@ -319,19 +319,20 @@ let%test_module "multisig_account" =
               in
               let sender_pk = sender.public_key |> Public_key.compress in
               let fee_payer : Account_update.Fee_payer.t =
-                { body =
+                Account_update.Fee_payer.make
+                  ~body:
                     { public_key = sender_pk
                     ; fee
                     ; valid_until = None
                     ; nonce = sender_nonce
                     }
                     (* Real signature added in below *)
-                ; authorization = Signature.dummy
-                }
+                  ~authorization:Signature.dummy
               in
               let sender_account_update_data : Account_update.Simple.t =
-                { body =
-                    { public_key = sender_pk
+                Account_update.with_no_aux
+                  ~body:
+                    { Account_update.Body.Simple.public_key = sender_pk
                     ; update = Account_update.Update.noop
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -354,12 +355,13 @@ let%test_module "multisig_account" =
                     ; may_use_token = No
                     ; authorization_kind = Signature
                     }
-                ; authorization = Signature Signature.dummy
-                }
+                  ~authorization:(Control.Poly.Signature Signature.dummy)
               in
               let snapp_account_update_data : Account_update.Simple.t =
-                { body =
-                    { public_key = multisig_account_pk
+                Account_update.with_no_aux
+                  ~body:
+                    { Account_update.Body.Simple.public_key =
+                        multisig_account_pk
                     ; update = update_empty_permissions
                     ; token_id = Token_id.default
                     ; balance_change =
@@ -380,9 +382,9 @@ let%test_module "multisig_account" =
                     ; may_use_token = No
                     ; authorization_kind = Proof (With_hash.hash vk)
                     }
-                ; authorization =
-                    Proof (Lazy.force Mina_base.Proof.transaction_dummy)
-                }
+                  ~authorization:
+                    (Control.Poly.Proof
+                       (Lazy.force Mina_base.Proof.transaction_dummy) )
               in
               let memo = Signed_command_memo.empty in
               let ps =
@@ -460,15 +462,17 @@ let%test_module "multisig_account" =
                       (Signature_lib.Schnorr.Chunked.sign ~signature_kind
                          sender.private_key
                          (Random_oracle.Input.Chunked.field transaction) )
+                ; aux = sender_account_update_data.aux
                 }
               in
               let zkapp_command : Zkapp_command.t =
-                Zkapp_command.of_simple ~proof_cache_db
+                Zkapp_command.of_simple ~signature_kind ~proof_cache_db
                   { fee_payer
                   ; account_updates =
                       [ sender
                       ; { body = snapp_account_update_data.body
                         ; authorization = Proof pi
+                        ; aux = snapp_account_update_data.aux
                         }
                       ]
                   ; memo

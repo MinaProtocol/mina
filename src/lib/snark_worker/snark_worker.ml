@@ -1,10 +1,16 @@
 module Prod = Prod
-module Intf = Intf
-module Inputs = Prod.Inputs
+
+module Intf = struct
+  include Intf
+
+  let command_name = Entry.command_name
+end
+
+module Inputs = Prod.Impl
 module Events = Events
 
 module Worker = struct
-  include Functor.Make
+  include Entry
 
   module Rpcs_versioned = struct
     module Get_work = Rpc_get_work.Stable

@@ -4,15 +4,26 @@ module Helper = struct
   open Mina_base
 
   let to_yojson ~proof_to_yojson tx =
+    let update_to_yojson =
+      Account_update.Poly.to_yojson Account_update.Body.to_yojson
+        (Control.Poly.to_yojson proof_to_yojson Signature.to_yojson)
+    in
     User_command.Poly.to_yojson Signed_command.to_yojson
-      (Zkapp_command.with_forest_to_yojson proof_to_yojson
+      (Zkapp_command.with_forest_to_yojson update_to_yojson
          Zkapp_command.Digest.Account_update.to_yojson
          Zkapp_command.Digest.Forest.to_yojson )
       tx
 
-  let of_yojson ~proof_of_yojson =
+  let of_yojson ~proof_of_yojson ~reset_aux =
+    let update_of_yojson t =
+      Ppx_deriving_yojson_runtime.(
+        Account_update.Poly.of_yojson Account_update.Body.of_yojson
+          (Control.Poly.of_yojson proof_of_yojson Signature.of_yojson)
+          t
+        >|= reset_aux)
+    in
     User_command.Poly.of_yojson Signed_command.of_yojson
-    @@ Zkapp_command.with_forest_of_yojson proof_of_yojson
+    @@ Zkapp_command.with_forest_of_yojson update_of_yojson
          Zkapp_command.Digest.Account_update.of_yojson
          Zkapp_command.Digest.Forest.of_yojson
 end
@@ -30,8 +41,12 @@ module User_command = struct
       let to_yojson : t -> Yojson.Safe.t =
         let signature_kind = Mina_signature_kind.t_DEPRECATED in
         function
-        | User_command.Poly.Signed_command tx ->
-            Helper.to_yojson ~proof_to_yojson:Proof.to_yojson (Signed_command tx)
+        | User_command.Poly.Signed_command _ as tx ->
+            (* ~proof_to_yojson is unused when Helper.to_yojson is applied to a
+               Signed_command; the unreachable_code function (which takes a
+               value of the uninhabited Nothing.t type) is a compile-time proof
+               of this fact through the type system. *)
+            Helper.to_yojson ~proof_to_yojson:Nothing.unreachable_code tx
         | User_command.Poly.Zkapp_command { fee_payer; memo; account_updates }
           ->
             Helper.to_yojson ~proof_to_yojson:Proof.to_yojson
@@ -47,7 +62,10 @@ module User_command = struct
                  } )
 
       let of_yojson json =
-        match Helper.of_yojson ~proof_of_yojson:Proof.of_yojson json with
+        match
+          Helper.of_yojson ~proof_of_yojson:Proof.of_yojson ~reset_aux:Fn.id
+            json
+        with
         | Ok (Signed_command tx) ->
             Ppx_deriving_yojson_runtime.Result.Ok
               (User_command.Poly.Signed_command tx)
@@ -83,7 +101,8 @@ module User_command = struct
 
   let to_yojson = Helper.to_yojson ~proof_to_yojson
 
-  let of_yojson = Helper.of_yojson ~proof_of_yojson
+  let of_yojson =
+    Helper.of_yojson ~proof_of_yojson ~reset_aux:Account_update.reset_aux
 end
 
 module Staged_ledger_diff = struct

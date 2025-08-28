@@ -8,7 +8,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   open Test_common.Make (Inputs)
 
-  (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
+  (* TODO: find a way to avoid this type alias (first class module signatures
+     restrictions make this tricky) *)
   type network = Network.t
 
   type node = Network.Node.t
@@ -70,7 +71,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let tx_delay_ms = 5000
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let num_slots = slot_chain_end + 2 in

@@ -97,8 +97,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let logger = Logger.create ()
 
-  let run network t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let run ~config:{ Test_config.signature_kind; _ } network t =
     let open Malleable_error.Let_syntax in
     let%bind () =
       section_hard "Wait for nodes to initialize"
@@ -186,9 +185,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; authorization_kind = Signature
         }
       in
-
       (* TODO: This is a pain. *)
-      { body = body vk; authorization = Signature Signature.dummy }
+      Account_update.with_aux ~body:(body vk)
+        ~authorization:(Control.Poly.Signature Signature.dummy)
     in
     let%bind zkapp_command_create_accounts =
       let memo =
@@ -217,14 +216,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Zkapp_command.Transaction_commitment.create ~account_updates_hash
       in
       let fee_payer : Account_update.Fee_payer.t =
-        { body =
+        Account_update.Fee_payer.make
+          ~body:
             { Account_update.Body.Fee_payer.dummy with
               public_key = account_a_pk
             ; nonce
             ; fee = Currency.Fee.(of_nanomina_int_exn 20_000_000)
             }
-        ; authorization = Signature.dummy
-        }
+          ~authorization:Signature.dummy
       in
       let memo_hash = Signed_command_memo.hash memo in
       let full_commitment =
@@ -243,9 +242,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             when Public_key.Compressed.equal public_key account_a_pk ->
               { fee_payer with
                 authorization =
-                  (let signature_kind = Mina_signature_kind.t_DEPRECATED in
-                   Schnorr.Chunked.sign ~signature_kind account_a_kp.private_key
-                     (Random_oracle.Input.Chunked.field full_commitment) )
+                  Schnorr.Chunked.sign ~signature_kind account_a_kp.private_key
+                    (Random_oracle.Input.Chunked.field full_commitment)
               }
           | fee_payer ->
               fee_payer
@@ -254,6 +252,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           Zkapp_command.Call_forest.map account_updates ~f:(function
             | ({ body = { public_key; use_full_commitment; _ }
                ; authorization = Signature _
+               ; aux = _
                } as account_update :
                 Account_update.t )
               when Public_key.Compressed.equal public_key account_a_pk ->
@@ -263,11 +262,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 in
                 { account_update with
                   authorization =
-                    (let signature_kind = Mina_signature_kind.t_DEPRECATED in
-                     Control.Poly.Signature
-                       (Schnorr.Chunked.sign ~signature_kind
-                          account_a_kp.private_key
-                          (Random_oracle.Input.Chunked.field commitment) ) )
+                    Control.Poly.Signature
+                      (Schnorr.Chunked.sign ~signature_kind
+                         account_a_kp.private_key
+                         (Random_oracle.Input.Chunked.field commitment) )
                 }
             | account_update ->
                 account_update )

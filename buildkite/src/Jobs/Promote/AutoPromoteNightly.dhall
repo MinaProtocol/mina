@@ -10,8 +10,6 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Artifacts = ../../Constants/Artifacts.dhall
 
-let DebianPackage = ../../Constants/DebianPackage.dhall
-
 let DebianChannel = ../../Constants/DebianChannel.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
@@ -22,23 +20,20 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let PipelineTag = ../../Pipeline/Tag.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let PromotePackages = ../../Command/Promotion/PromotePackages.dhall
-
-let VerifyPackages = ../../Command/Promotion/VerifyPackages.dhall
-
-let Command = ../../Command/Base.dhall
-
-let TaggedKey = Command.TaggedKey
+let PublishPackages = ../../Command/Packages/Publish.dhall
 
 let new_tags =
           \(codename : DebianVersions.DebVersion)
       ->  \(channel : DebianChannel.Type)
       ->  \(branch : Text)
-      ->  \(repo : DebianRepo.Type)
+      ->  \(profile : Profiles.Type)
+      ->  \(commit : Text)
       ->  \(latestGitTag : Text)
       ->  \(todayDate : Text)
       ->  [ "latest-${branch}"
@@ -46,67 +41,51 @@ let new_tags =
           , "${latestGitTag}.${todayDate}-${branch}"
           ]
 
-let promotePackages =
-      PromotePackages.PromotePackagesSpec::{
-      , debians = [] : List DebianPackage.Type
-      , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      , version = "\\\${FROM_VERSION_MANUAL:-\\\${MINA_DEB_VERSION}}"
-      , architecture = "amd64"
-      , new_debian_version = "\\\$(date \"+%Y%m%d\")"
-      , profile = Profiles.Type.Standard
-      , network = Network.Type.Devnet
-      , codenames =
-        [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
-      , from_channel = DebianChannel.Type.Unstable
-      , to_channel = DebianChannel.Type.Compatible
-      , new_tags = new_tags
-      , remove_profile_from_name = False
-      , publish = False
-      }
-
-let verifyPackages =
-      VerifyPackages.VerifyPackagesSpec::{
-      , promote_step_name = Some "AutoPromoteNightly"
-      , debians = [] : List DebianPackage.Type
-      , dockers = [ Artifacts.Type.Daemon, Artifacts.Type.Archive ]
-      , new_debian_version = "\\\$(date \"+%Y%m%d\")"
-      , profile = Profiles.Type.Standard
-      , network = Network.Type.Devnet
-      , codenames =
-        [ DebianVersions.DebVersion.Bullseye, DebianVersions.DebVersion.Focal ]
-      , channel = DebianChannel.Type.Compatible
-      , tags = new_tags
-      , remove_profile_from_name = False
-      , published = False
-      }
-
-let promoteDebiansSpecs =
-      PromotePackages.promotePackagesToDebianSpecs promotePackages
-
-let promoteDockersSpecs =
-      PromotePackages.promotePackagesToDockerSpecs promotePackages
-
-let verifyDebiansSpecs =
-      VerifyPackages.verifyPackagesToDebianSpecs verifyPackages
-
-let verifyDockersSpecs =
-      VerifyPackages.verifyPackagesToDockerSpecs verifyPackages
+let targetVersion =
+          \(codename : DebianVersions.DebVersion)
+      ->  \(channel : DebianChannel.Type)
+      ->  \(branch : Text)
+      ->  \(profile : Profiles.Type)
+      ->  \(commit : Text)
+      ->  \(latestGitTag : Text)
+      ->  \(todayDate : Text)
+      ->  "${latestGitTag}-${todayDate}"
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen = [ S.everything ]
         , path = "Promote"
-        , tags = [ PipelineTag.Type.Promote ]
+        , tags = [ PipelineTag.Type.Promote, PipelineTag.Type.TearDown ]
         , name = "AutoPromoteNightly"
+        , scope = [ PipelineScope.Type.MainlineNightly ]
         }
       , steps =
-            PromotePackages.promoteSteps
-              promoteDebiansSpecs
-              promoteDockersSpecs
-              "AutoPromoteNightly"
-              ([] : List TaggedKey.Type)
-          # VerifyPackages.verificationSteps
-              verifyDebiansSpecs
-              verifyDockersSpecs
+          PublishPackages.publish
+            PublishPackages.Spec::{
+            , artifacts =
+              [ Artifacts.Type.LogProc
+              , Artifacts.Type.Daemon
+              , Artifacts.Type.Archive
+              , Artifacts.Type.Rosetta
+              ]
+            , profile = Profiles.Type.Devnet
+            , networks = [ Network.Type.Devnet ]
+            , codenames =
+              [ DebianVersions.DebVersion.Bullseye
+              , DebianVersions.DebVersion.Focal
+              , DebianVersions.DebVersion.Bookworm
+              , DebianVersions.DebVersion.Noble
+              ]
+            , debian_repo = DebianRepo.Type.Nightly
+            , channel = DebianChannel.Type.Compatible
+            , new_docker_tags = new_tags
+            , target_version = targetVersion
+            , publish_to_docker_io = False
+            , backend = "local"
+            , verify = True
+            , branch = "\\\${BUILDKITE_BRANCH}"
+            , source_version = "\\\${MINA_DEB_VERSION}"
+            , build_id = "\\\${BUILDKITE_BUILD_ID}"
+            }
       }

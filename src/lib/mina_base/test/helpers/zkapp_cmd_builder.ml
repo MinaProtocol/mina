@@ -16,6 +16,8 @@ type transaction = < updates : (account_update list, nonces) Monad_lib.State.t >
 
 let dummy_auth = Control.Poly.Signature Signature.dummy
 
+let signature_kind = Mina_signature_kind.Testnet
+
 let get_nonce_exn (pk : Public_key.Compressed.t) :
     ( Account_nonce.t
     , Account_nonce.t Public_key.Compressed.Map.t )
@@ -63,7 +65,6 @@ let update_body ?preconditions ?(update = Account_update.Update.noop) ~account
     }
 
 let update ?(calls = []) body =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open With_stack_hash in
   let open Zkapp_command.Call_forest.Tree in
   { elt =
@@ -111,13 +112,11 @@ module Simple_txn = struct
             Amount.Signed.(of_unsigned amount)
         in
         [ update
-            { Account_update.Poly.body = sender_decrease_body
-            ; authorization = dummy_auth
-            }
+          @@ Account_update.with_aux ~body:sender_decrease_body
+               ~authorization:dummy_auth
         ; update
-            { Account_update.Poly.body = receiver_increase_body
-            ; authorization = dummy_auth
-            }
+          @@ Account_update.with_aux ~body:receiver_increase_body
+               ~authorization:dummy_auth
         ]
     end
 
@@ -175,7 +174,7 @@ module Single = struct
       method updates =
         let open Monad_lib.State.Let_syntax in
         let%map body = update_body ?preconditions ~account amount in
-        [ update { Account_update.Poly.body; authorization = dummy_auth } ]
+        [ update @@ Account_update.with_aux ~body ~authorization:dummy_auth ]
     end
 end
 
@@ -193,7 +192,7 @@ module Alter_account = struct
         let%map body =
           update_body ?preconditions ~update:state_update ~account amount
         in
-        [ update { Account_update.Poly.body; authorization = dummy_auth } ]
+        [ update @@ Account_update.with_aux ~body ~authorization:dummy_auth ]
     end
 end
 
@@ -216,7 +215,8 @@ module Txn_tree = struct
         let%map calls =
           State_ext.concat_map_m children ~f:(fun c -> c#updates)
         in
-        [ update ~calls { Account_update.Poly.body; authorization = dummy_auth }
+        [ update ~calls
+          @@ Account_update.with_aux ~body ~authorization:dummy_auth
         ]
     end
 end
@@ -239,7 +239,8 @@ let build_zkapp_cmd ?valid_until ~fee transactions :
   let open State.Let_syntax in
   let%bind body = fee_payer_body ?valid_until fee in
   let%map updates = State.concat_map_m ~f:mk_updates transactions in
-  { Zkapp_command.Poly.fee_payer = { body; authorization = Signature.dummy }
+  { Zkapp_command.Poly.fee_payer =
+      Account_update.Fee_payer.make ~body ~authorization:Signature.dummy
   ; account_updates = updates
   ; memo = Signed_command_memo.dummy
   }

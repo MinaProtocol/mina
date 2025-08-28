@@ -1,5 +1,3 @@
-let B = ../../External/Buildkite.dhall
-
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -16,7 +14,7 @@ let Size = ../../Command/Size.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
+let shellcheckVersion = "v0.10.0"
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -38,16 +36,17 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchainBullseye
+                RunInToolchain.runInToolchain
                   ([] : List Text)
                   (     "sudo apt-get update"
-                    ++  " && sudo apt-get install shellcheck"
-                    ++  " && make check-bash "
+                    ++  " && wget https://github.com/koalaman/shellcheck/releases/download/${shellcheckVersion}/shellcheck-${shellcheckVersion}.linux.x86_64.tar.xz"
+                    ++  " && tar xvf shellcheck-${shellcheckVersion}.linux.x86_64.tar.xz"
+                    ++  " && sudo cp shellcheck-${shellcheckVersion}/shellcheck /usr/local/bin/"
+                    ++  " && make check-bash"
                   )
             , label = "Bash: shellcheck"
             , key = "check-bash"
             , target = Size.Multi
-            , soft_fail = Some (B/SoftFail.Boolean True)
             , docker = None Docker.Type
             }
         ]

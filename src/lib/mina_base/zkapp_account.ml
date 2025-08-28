@@ -113,9 +113,9 @@ end)
 module Actions = struct
   type var = Actions_impl.var
 
-  type t = Actions_impl.t
+  type t = { actions : Actions_impl.t; hash : Field.t }
 
-  let is_empty (lst : t) = List.is_empty lst
+  let is_empty ({ actions; _ } : t) = List.is_empty actions
 
   let is_empty_var (e : var) =
     Snark_params.Tick.Field.(
@@ -125,14 +125,14 @@ module Actions = struct
     let salt_phrase = "MinaZkappActionStateEmptyElt" in
     Hash_prefix_create.salt salt_phrase |> Random_oracle.digest
 
-  let push_events (acc : Field.t) (events : t) : Field.t =
-    Actions_impl.push_hash acc (Actions_impl.hash events)
+  let push_events (acc : Field.t) ({ hash; _ } : t) : Field.t =
+    Actions_impl.push_hash acc hash
 
   let push_events_checked (x : Field.Var.t) (e : var) : Field.Var.t =
     Random_oracle.Checked.hash ~init:Hash_prefix_states.zkapp_actions
       [| x; Data_as_hash.hash e |]
 
-  let of_event_list lst = lst
+  let of_event_list lst = { actions = lst; hash = Actions_impl.hash lst }
 
   [%%define_locally
   Actions_impl.
@@ -150,7 +150,7 @@ module Zkapp_uri = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Bounded_types.String.Stable.V1.t
+        type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
         [@@deriving sexp, equal, compare, hash, yojson]
 
         let to_latest = Fn.id
@@ -176,9 +176,9 @@ module Zkapp_uri = struct
 
       include
         Binable.Of_binable_without_uuid
-          (Bounded_types.String.Stable.V1)
+          (Mina_stdlib.Bounded_types.String.Stable.V1)
           (struct
-            type t = Bounded_types.String.Stable.V1.t
+            type t = Mina_stdlib.Bounded_types.String.Stable.V1.t
 
             let to_binable = Fn.id
 
@@ -456,3 +456,54 @@ let gen : t Quickcheck.Generator.t =
   ; proved_state = false
   ; zkapp_uri
   }
+
+module Hardfork = struct
+  type t =
+    ( Zkapp_state.Hardfork.Value.t
+    , Verification_key_wire.Stable.Latest.t option
+    , Mina_numbers.Zkapp_version.Stable.Latest.t
+    , F.Stable.Latest.t
+    , Mina_numbers.Global_slot_since_genesis.Stable.Latest.t
+    , bool
+    , Zkapp_uri.Stable.Latest.t )
+    Poly.Stable.Latest.t
+  [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
+
+  let of_stable (account : Stable.Latest.t) : t =
+    { app_state = Zkapp_state.Hardfork.Value.of_stable account.app_state
+    ; verification_key = account.verification_key
+    ; zkapp_version = account.zkapp_version
+    ; action_state = account.action_state
+    ; last_action_slot = account.last_action_slot
+    ; proved_state = account.proved_state
+    ; zkapp_uri = account.zkapp_uri
+    }
+
+  let to_input (t : t) : _ Random_oracle.Input.Chunked.t =
+    let open Random_oracle.Input.Chunked in
+    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    let app_state v =
+      Random_oracle.Input.Chunked.field_elements
+        (Pickles_types.Vector.to_array v)
+    in
+    Poly.Fields.fold ~init:[] ~app_state:(f app_state)
+      ~verification_key:
+        (f
+           (Fn.compose field
+              (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash) ) )
+      ~zkapp_version:(f Mina_numbers.Zkapp_version.to_input)
+      ~action_state:(f app_state)
+      ~last_action_slot:(f Mina_numbers.Global_slot_since_genesis.to_input)
+      ~proved_state:
+        (f (fun b -> Random_oracle.Input.Chunked.packed (field_of_bool b, 1)))
+      ~zkapp_uri:(f zkapp_uri_to_input)
+    |> List.reduce_exn ~f:append
+
+  let digest (t : t) =
+    Random_oracle.(
+      hash ~init:Hash_prefix_states.zkapp_account (pack_input (to_input t)))
+
+  let default = of_stable default
+
+  let default_digest = lazy (digest default)
+end

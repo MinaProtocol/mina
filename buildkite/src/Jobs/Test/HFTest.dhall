@@ -8,7 +8,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
-let PipelineMode = ../../Pipeline/Mode.dhall
+let PipelineScope = ../../Pipeline/Scope.dhall
 
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
@@ -36,7 +36,7 @@ in  Pipeline.build
           ]
         , path = "Test"
         , name = "HFTest"
-        , mode = PipelineMode.Type.Stable
+        , scope = PipelineScope.AllButPullRequest
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
@@ -51,13 +51,14 @@ in  Pipeline.build
                   Cmd.Docker::{
                   , image = ContainerImages.nixos
                   , privileged = True
+                  , useBash = False
                   }
                   "./scripts/hardfork/build-and-test.sh \$BUILDKITE_BRANCH"
               ]
             , label = "hard fork test"
             , key = "hard-fork-test"
-            , target = Size.Small
-            , soft_fail = Some (B/SoftFail.Boolean True)
+            , target = Size.Integration
+            , soft_fail = Some (B/SoftFail.Boolean False)
             , docker = None Docker.Type
             , timeout_in_minutes = Some +420
             }

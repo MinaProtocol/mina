@@ -1,14 +1,7 @@
 (library
  (name snark_keys_header)
  (public_name snark_keys_header)
- (libraries
-  base
-  base.caml
-  core_kernel
-  integers
-  result
-  sexplib0
-  stdio)
+ (libraries base base.caml core_kernel integers result sexplib0 stdio)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

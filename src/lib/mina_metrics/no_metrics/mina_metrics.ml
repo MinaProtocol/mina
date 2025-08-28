@@ -337,10 +337,6 @@ module Pipe = struct
 
     let transition_frontier_primary_transitions : Counter.t = ()
 
-    let router_transition_frontier_controller : Counter.t = ()
-
-    let router_bootstrap_controller : Counter.t = ()
-
     let router_verified_transitions : Counter.t = ()
 
     let router_transitions : Counter.t = ()

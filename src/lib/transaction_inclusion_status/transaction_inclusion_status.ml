@@ -38,7 +38,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
         |> Mina_block.Validated.valid_commands
         |> List.exists ~f:(fun { data = found; _ } ->
                let found' = User_command.forget_check found in
-               User_command.equal_ignoring_proofs_and_hashes cmd found' )
+               User_command.equal_ignoring_proofs_and_hashes_and_aux cmd found' )
       in
       if List.exists ~f:in_breadcrumb best_tip_path then State.Included
       else if

@@ -16,6 +16,8 @@ let isEssential =
             , ZkappTestTransaction = False
             , FunctionalTestSuite = True
             , Toolchain = True
+            , DaemonHardfork = True
+            , CreateLegacyGenesis = False
             }
             service
 

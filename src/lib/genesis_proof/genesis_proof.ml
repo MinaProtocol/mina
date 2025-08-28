@@ -22,6 +22,7 @@ module Inputs = struct
            [None] here.
         *)
         Pickles.Verification_key.Id.t option
+    ; signature_kind : Mina_signature_kind.t
     }
 
   let runtime_config { runtime_config; _ } = runtime_config
@@ -93,6 +94,7 @@ module T = struct
         Protocol_state.value State_hash.With_state_hashes.t
     ; constraint_system_digests : (string * Md5_lib.t) list Lazy.t
     ; proof_data : Proof_data.t option
+    ; signature_kind : Mina_signature_kind.t
     }
 
   let runtime_config { runtime_config; _ } = runtime_config
@@ -112,6 +114,9 @@ module T = struct
 
   let genesis_ledger { genesis_ledger; _ } =
     Genesis_ledger.Packed.t genesis_ledger
+
+  let populate_root { genesis_ledger; _ } =
+    Genesis_ledger.Packed.populate_root genesis_ledger
 
   let genesis_epoch_data { genesis_epoch_data; _ } = genesis_epoch_data
 
@@ -159,6 +164,8 @@ let blockchain_snark_state (inputs : Inputs.t) :
     (module Transaction_snark.S)
     * (module Blockchain_snark.Blockchain_snark_state.S) =
   let module T = Transaction_snark.Make (struct
+    let signature_kind = inputs.signature_kind
+
     let constraint_constants = inputs.constraint_constants
 
     let proof_level = inputs.proof_level
@@ -187,6 +194,7 @@ let create_values_no_proof (t : Inputs.t) =
         (let txn, b = blockchain_snark_state t in
          Lazy.force (digests txn b) )
   ; proof_data = None
+  ; signature_kind = t.signature_kind
   }
 
 let to_inputs (t : t) : Inputs.t =
@@ -209,4 +217,5 @@ let to_inputs (t : t) : Inputs.t =
           Some blockchain_proof_system_id
       | None ->
           None )
+  ; signature_kind = t.signature_kind
   }

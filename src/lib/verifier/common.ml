@@ -46,7 +46,7 @@ let check_signed_command c =
         Result.Error (`Invalid_signature (Signed_command.public_keys c))
 
 let collect_vk_assumption
-    ( (p : (Account_update.Body.t, _ Control.Poly.t) Account_update.Poly.t)
+    ( (p : (Account_update.Body.t, _ Control.Poly.t, _) Account_update.Poly.t)
     , ( (vk_opt :
           (Side_loaded_verification_key.t, Pasta_bindings.Fp.t) With_hash.t
           option )

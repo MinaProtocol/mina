@@ -301,7 +301,9 @@ module Make (Inputs : Inputs_intf.S) = struct
       self_find_or_batch_lookup self_find Base.get_batch t
 
     let empty_hash =
-      Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
+      Mina_stdlib.Empty_hashes.extensible_cache
+        (module Hash)
+        ~init_hash:Hash.empty_account
 
     let self_path_get_hash ~hashes ~current_location height address =
       match Map.find hashes address with
