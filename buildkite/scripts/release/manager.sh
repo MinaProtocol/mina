@@ -895,6 +895,7 @@ function promote(){
     local __source_version
     local __target_version
     local __codenames="$DEFAULT_CODENAMES"
+    local __strip_network_from_archive=0
     local __source_channel
     local __target_channel
     local __publish_to_docker_io=0
