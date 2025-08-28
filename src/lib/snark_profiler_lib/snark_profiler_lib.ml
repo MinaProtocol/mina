@@ -459,7 +459,7 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
-let state_body ~(genesis_constants : Genesis_constants.t)
+let state_body ~logger ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
   lazy
     (let genesis_epoch_data = Consensus.Genesis_epoch_data.compiled in
@@ -476,6 +476,8 @@ let state_body ~(genesis_constants : Genesis_constants.t)
        let directory = `Ephemeral
 
        let depth = constraint_constants.ledger_depth
+
+       let logger = logger
      end) in
      Mina_state.Genesis_protocol_state.t
        ~genesis_ledger:(module Test_genesis_ledger)
@@ -483,22 +485,24 @@ let state_body ~(genesis_constants : Genesis_constants.t)
        ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
      |> With_hash.data |> Mina_state.Protocol_state.body )
 
-let curr_state_view ~genesis_constants ~constraint_constants =
+let curr_state_view ~genesis_constants ~constraint_constants ~logger =
   Lazy.map
-    (state_body ~genesis_constants ~constraint_constants)
+    (state_body ~genesis_constants ~constraint_constants ~logger)
     ~f:Mina_state.Protocol_state.Body.view
 
-let state_body_hash ~genesis_constants ~constraint_constants =
+let state_body_hash ~genesis_constants ~constraint_constants ~logger =
   Lazy.map ~f:Mina_state.Protocol_state.Body.hash
-    (state_body ~genesis_constants ~constraint_constants)
+    (state_body ~genesis_constants ~constraint_constants ~logger)
 
 let pending_coinbase_stack_target ~genesis_constants ~constraint_constants
-    (t : Transaction.t) stack =
+    ~logger (t : Transaction.t) stack =
   let stack_with_state =
     Pending_coinbase.Stack.(
       push_state
-        (Lazy.force @@ state_body_hash ~genesis_constants ~constraint_constants)
-        (Lazy.force @@ curr_state_view ~genesis_constants ~constraint_constants)
+        ( Lazy.force
+        @@ state_body_hash ~genesis_constants ~constraint_constants ~logger )
+        ( Lazy.force
+        @@ curr_state_view ~genesis_constants ~constraint_constants ~logger )
           .global_slot_since_genesis stack)
   in
   let target =
@@ -544,10 +548,11 @@ let apply_transactions_and_keep_intermediate_ledgers
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
-    ~constraint_constants sparse_ledger0
+    ~constraint_constants ~logger sparse_ledger0
     (transitions : Transaction.Valid.t list) _ : string Async.Deferred.t =
   let txn_state_view =
-    Lazy.force @@ curr_state_view ~genesis_constants ~constraint_constants
+    Lazy.force
+    @@ curr_state_view ~genesis_constants ~constraint_constants ~logger
   in
   let open Async.Deferred.Let_syntax in
   let first_pass_target_ledgers, second_pass_target_ledgers, applied_txns =
@@ -577,7 +582,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
              Transaction.to_valid_unsafe txn
            in
            let coinbase_stack_target =
-             pending_coinbase_stack_target txn coinbase_stack_source
+             pending_coinbase_stack_target txn coinbase_stack_source ~logger
            in
            let tm0 = Core.Unix.gettimeofday () in
            let target_hash = Sparse_ledger.merkle_root target_ledger in
@@ -616,6 +621,7 @@ let profile_user_command (module T : Transaction_snark.S) ~genesis_constants
                ; block_data =
                    Lazy.force
                    @@ state_body ~genesis_constants ~constraint_constants
+                        ~logger
                ; global_slot = txn_state_view.global_slot_since_genesis
                }
                (unstage (Sparse_ledger.handler source_ledger))
@@ -768,8 +774,8 @@ let profile_zkapps
   let total_time = Time.Span.of_sec (tm1 -. tm0) in
   format_time_span total_time
 
-let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
-    (transitions : Transaction.Valid.t list) preeval =
+let check_base_snarks ~genesis_constants ~constraint_constants ~logger
+    sparse_ledger0 (transitions : Transaction.Valid.t list) preeval =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   ignore
     ( let sok_message =
@@ -778,7 +784,8 @@ let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let txn_state_view =
-        Lazy.force @@ curr_state_view ~genesis_constants ~constraint_constants
+        Lazy.force
+        @@ curr_state_view ~genesis_constants ~constraint_constants ~logger
       in
       let first_pass_target_ledgers, _, applied_txns =
         apply_transactions_and_keep_intermediate_ledgers ~constraint_constants
@@ -816,12 +823,13 @@ let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
                    { source = Pending_coinbase.Stack.empty
                    ; target =
                        coinbase_stack_target ~genesis_constants
-                         ~constraint_constants
+                         ~constraint_constants ~logger
                    }
                  ~supply_increase
                  { Transaction_protocol_state.Poly.block_data =
                      Lazy.force
                      @@ state_body ~genesis_constants ~constraint_constants
+                          ~logger
                  ; transaction = valid_txn
                  ; global_slot = txn_state_view.global_slot_since_genesis
                  }
@@ -832,7 +840,7 @@ let check_base_snarks ~genesis_constants ~constraint_constants sparse_ledger0
   Async.Deferred.return "Base constraint system satisfied"
 
 let generate_base_snarks_witness ~genesis_constants ~constraint_constants
-    sparse_ledger0 (transitions : Transaction.Valid.t list) preeval =
+    ~logger sparse_ledger0 (transitions : Transaction.Valid.t list) preeval =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   ignore
     ( let sok_message =
@@ -841,7 +849,8 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let txn_state_view =
-        Lazy.force @@ curr_state_view ~genesis_constants ~constraint_constants
+        Lazy.force
+        @@ curr_state_view ~genesis_constants ~constraint_constants ~logger
       in
       let first_pass_target_ledgers, _, applied_txns =
         apply_transactions_and_keep_intermediate_ledgers ~constraint_constants
@@ -880,13 +889,14 @@ let generate_base_snarks_witness ~genesis_constants ~constraint_constants
                        Pending_coinbase.Stack.empty
                    ; target =
                        coinbase_stack_target ~genesis_constants
-                         ~constraint_constants
+                         ~constraint_constants ~logger
                    }
                  ~supply_increase
                  { Transaction_protocol_state.Poly.transaction = valid_txn
                  ; block_data =
                      Lazy.force
                      @@ state_body ~genesis_constants ~constraint_constants
+                          ~logger
                  ; global_slot = txn_state_view.global_slot_since_genesis
                  }
                  (unstage (Sparse_ledger.handler source_ledger))

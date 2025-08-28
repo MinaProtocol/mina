@@ -133,13 +133,13 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       | `New ->
           lazy
             ( `Root
-                (Ledger.Root.create_temporary
+                (Ledger.Root.create_temporary ~logger
                    ~backing_type:Ledger.Root.Config.Stable_db ~depth () )
             , true )
       | `Path directory_name ->
           lazy
             ( `Root
-                (Ledger.Root.create
+                (Ledger.Root.create ~logger
                    ~config:
                      (Ledger.Root.Config.with_directory
                         ~backing_type:Ledger.Root.Config.Stable_db
@@ -332,6 +332,8 @@ module Unit_test_ledger = Make (struct
 
   let depth =
     Genesis_constants.For_unit_tests.Constraint_constants.t.ledger_depth
+
+  let logger = Logger.create ()
 end)
 
 let for_unit_tests : Packed.t = (module Unit_test_ledger)

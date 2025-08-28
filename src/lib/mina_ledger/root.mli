@@ -82,7 +82,7 @@ module Make
     (** The kind of database that should be used for this root. Only a single
         database of [Account.Stable.Latest.t] accounts is supported. A future
         update will add a converting merkle tree backing. *)
-    type backing_type = Stable_db
+    type backing_type = Stable_db | Converting_db
 
     (** Create a root ledger configuration with the given backing type, using
         the [directory_name] as a template for its location *)
@@ -91,8 +91,11 @@ module Make
     (** Test if a root ledger backing already exists with this config *)
     val exists_backing : t -> bool
 
-    (** Delete a backing of any type that might exist with this config, if present *)
-    val delete_any_backing : t -> unit
+    (** Delete a backing of any type that might exist with this config, if present. this function will try any backing type *)
+    val delete_any_backing : string -> unit
+
+    (** Delete backing of a specific config *)
+    val delete_backing : t -> unit
 
     (** Move the root backing at [src] to [dst]. Assumptions: the [src] and
         [dst] configs must have the same configured backing, there must be a
@@ -113,10 +116,14 @@ module Make
 
   (** Create a root ledger backed by a single database in the given
       directory. *)
-  val create : config:Config.t -> depth:int -> unit -> t
+  val create : logger:Logger.t -> config:Config.t -> depth:int -> unit -> t
 
   val create_temporary :
-    backing_type:Config.backing_type -> depth:int -> unit -> t
+       logger:Logger.t
+    -> backing_type:Config.backing_type
+    -> depth:int
+    -> unit
+    -> t
 
   (** Make a checkpoint of the root ledger and return a new root ledger backed
       by that checkpoint *)

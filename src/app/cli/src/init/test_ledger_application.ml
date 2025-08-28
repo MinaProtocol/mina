@@ -191,6 +191,8 @@ let test ~privkey_path ~ledger_path ?prev_block_path ~first_partition_slots
     let directory = `Path ledger_path
 
     let depth = constraint_constants.ledger_depth
+
+    let logger = logger
   end) in
   let init_ledger =
     Lazy.force @@ Genesis_ledger.Packed.t (module Test_genesis_ledger)

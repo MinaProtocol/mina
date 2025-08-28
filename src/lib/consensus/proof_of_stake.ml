@@ -306,7 +306,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                 ()
             | Ledger_root ledger ->
                 Mina_ledger.Ledger.Root.close ledger ;
-                Mina_ledger.Ledger.Root.Config.delete_any_backing config
+                Mina_ledger.Ledger.Root.Config.delete_backing config
 
           let ledger_subset keys ledger =
             let open Mina_ledger in
@@ -470,7 +470,7 @@ module Make_str (A : Wire_types.Concrete) = struct
               ]
             "Loading epoch ledger from disk: $location" ;
           Snapshot.Ledger_snapshot.Ledger_root
-            (Mina_ledger.Ledger.Root.create ~config
+            (Mina_ledger.Ledger.Root.create ~logger ~config
                ~depth:constraint_constants.ledger_depth () ) )
         else Genesis_epoch_ledger genesis_epoch_ledger
 
@@ -555,10 +555,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                         ( Mina_ledger.Ledger.Root.Config.primary_directory
                         @@ next_ledger_config ) )
                   ] ;
-              Mina_ledger.Ledger.Root.Config.delete_any_backing
+              Mina_ledger.Ledger.Root.Config.delete_backing
                 staking_ledger_config ;
-              Mina_ledger.Ledger.Root.Config.delete_any_backing
-                next_ledger_config ;
+              Mina_ledger.Ledger.Root.Config.delete_backing next_ledger_config ;
               create_new_uuids () )
           else create_new_uuids ()
         in
@@ -2678,7 +2677,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                           Ok ledger
                       | Ledger_snapshot.Genesis_epoch_ledger packed ->
                           let fresh_root_ledger =
-                            Mina_ledger.Ledger.Root.create
+                            Mina_ledger.Ledger.Root.create ~logger
                               ~config:snapshot_config
                               ~depth:Context.constraint_constants.ledger_depth
                               ()

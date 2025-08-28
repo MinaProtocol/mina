@@ -64,6 +64,8 @@ module type Ledger_input_intf = sig
   val directory : [ `Ephemeral | `New | `Path of string ]
 
   val depth : int
+
+  val logger : Logger.t
 end
 
 module type S = sig

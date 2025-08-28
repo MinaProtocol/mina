@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Mina_base
 
 module type Stable_db_intf =
@@ -60,19 +60,77 @@ module Make
                             and type converting_ledger = Unstable_db.t) =
 struct
   module Config = struct
-    type t = string
+    type backing_type = Stable_db | Converting_db [@@deriving equal]
 
-    type backing_type = Stable_db
+    type t =
+      | Stable_db_config of string
+      | Converting_db_config of Converting_ledger.Config.t
 
-    let exists_backing = Sys.file_exists
+    let backing_of_config = function
+      | Stable_db_config _ ->
+          Stable_db
+      | Converting_db_config _ ->
+          Converting_db
 
-    let with_directory ~backing_type:Stable_db ~directory_name = directory_name
+    let file_exists path =
+      Sys.file_exists path |> [%equal: [ `No | `Unknown | `Yes ]] `Yes
 
-    let delete_any_backing = Mina_stdlib_unix.File_system.rmrf
+    let exists_backing = function
+      | Stable_db_config path ->
+          file_exists path
+      | Converting_db_config { primary_directory; converting_directory } ->
+          file_exists primary_directory && file_exists converting_directory
 
-    let move_backing_exn ~src ~dst = Sys.rename src dst
+    let with_directory ~backing_type ~directory_name =
+      match backing_type with
+      | Stable_db ->
+          Stable_db_config directory_name
+      | Converting_db ->
+          Converting_db_config
+            (Converting_ledger.Config.with_primary ~directory_name)
 
-    let primary_directory = Fn.id
+    let delete_any_backing primary =
+      let converting =
+        Converting_ledger.Config.default_converting_directory_name primary
+      in
+      Mina_stdlib_unix.File_system.rmrf primary ;
+      Mina_stdlib_unix.File_system.rmrf converting
+
+    let delete_backing = function
+      | Stable_db_config primary ->
+          Mina_stdlib_unix.File_system.rmrf primary
+      | Converting_db_config { primary_directory; converting_directory } ->
+          Mina_stdlib_unix.File_system.rmrf primary_directory ;
+          Mina_stdlib_unix.File_system.rmrf converting_directory
+
+    exception
+      Backing_mismatch of { backing_1 : backing_type; backing_2 : backing_type }
+
+    let move_backing_exn ~src ~dst =
+      match (src, dst) with
+      | Stable_db_config src, Stable_db_config dst ->
+          Sys.rename src dst
+      | ( Converting_db_config
+            { primary_directory = src_primary
+            ; converting_directory = src_converted
+            }
+        , Converting_db_config
+            { primary_directory = dst_primary
+            ; converting_directory = dst_converted
+            } ) ->
+          Sys.rename src_primary dst_primary ;
+          Sys.rename src_converted dst_converted
+      | cfg1, cfg2 ->
+          raise
+            (Backing_mismatch
+               { backing_1 = backing_of_config cfg1
+               ; backing_2 = backing_of_config cfg2
+               } )
+
+    let primary_directory = function
+      | Stable_db_config primary_directory
+      | Converting_db_config { primary_directory; _ } ->
+          primary_directory
   end
 
   type root_hash = Ledger_hash.t
@@ -85,50 +143,131 @@ struct
 
   type path = Stable_db.path
 
-  type t = Stable_db of Stable_db.t
+  type t = Stable_db of Stable_db.t | Converting_db of Converting_ledger.t
 
-  let close t = match t with Stable_db db -> Stable_db.close db
+  let backing_of_t = function
+    | Stable_db _ ->
+        Config.Stable_db
+    | Converting_db _ ->
+        Converting_db
 
-  let merkle_root t = match t with Stable_db db -> Stable_db.merkle_root db
-
-  let create ~config:directory_name ~depth () =
-    Stable_db (Stable_db.create ~directory_name ~depth ())
-
-  let create_temporary ~backing_type:Config.Stable_db ~depth () =
-    Stable_db (Stable_db.create ~depth ())
-
-  let create_checkpoint t ~config:directory_name () =
+  let close t =
     match t with
     | Stable_db db ->
-        Stable_db (Stable_db.create_checkpoint db ~directory_name ())
+        Stable_db.close db
+    | Converting_db db ->
+        Converting_ledger.close db
 
-  let make_checkpoint t ~config:directory_name =
-    match t with Stable_db db -> Stable_db.make_checkpoint db ~directory_name
+  let merkle_root t =
+    match t with
+    | Stable_db db ->
+        Stable_db.merkle_root db
+    | Converting_db db ->
+        Converting_ledger.merkle_root db
+
+  let create ~logger ~config ~depth () =
+    match config with
+    | Config.Stable_db_config directory_name ->
+        Stable_db (Stable_db.create ~directory_name ~depth ())
+    | Converting_db_config config ->
+        Converting_db
+          (Converting_ledger.create ~config:(In_directories config) ~logger
+             ~depth () )
+
+  let create_temporary ~logger ~backing_type ~depth () =
+    match backing_type with
+    | Config.Stable_db ->
+        Stable_db (Stable_db.create ~depth ())
+    | Converting_db ->
+        Converting_db
+          (Converting_ledger.create ~config:Temporary ~logger ~depth ())
+
+  let create_checkpoint t ~config () =
+    match (t, config) with
+    | Stable_db db, Config.Stable_db_config directory_name ->
+        Stable_db (Stable_db.create_checkpoint db ~directory_name ())
+    | Converting_db db, Converting_db_config config ->
+        Converting_db (Converting_ledger.create_checkpoint db ~config ())
+    | t, config ->
+        raise
+          (Config.Backing_mismatch
+             { backing_1 = backing_of_t t
+             ; backing_2 = Config.backing_of_config config
+             } )
+
+  let make_checkpoint t ~config =
+    match (t, config) with
+    | Stable_db db, Config.Stable_db_config directory_name ->
+        Stable_db.make_checkpoint db ~directory_name
+    | Converting_db db, Converting_db_config config ->
+        Converting_ledger.make_checkpoint db ~config
+    | t, config ->
+        raise
+          (Config.Backing_mismatch
+             { backing_1 = backing_of_t t
+             ; backing_2 = Config.backing_of_config config
+             } )
 
   let as_unmasked t =
-    match t with Stable_db db -> Any_ledger.cast (module Stable_db) db
+    match t with
+    | Stable_db db ->
+        Any_ledger.cast (module Stable_db) db
+    | Converting_db db ->
+        Any_ledger.cast (module Converting_ledger) db
 
   let transfer_accounts_with ~stable ~src ~dest =
     match (src, dest) with
     | Stable_db db1, Stable_db db2 ->
         stable ~src:db1 ~dest:db2 |> Or_error.map ~f:(fun x -> Stable_db x)
+    | _ ->
+        failwith "TODO: this function should be removed"
 
-  let depth t = match t with Stable_db db -> Stable_db.depth db
+  let depth t =
+    match t with
+    | Stable_db db ->
+        Stable_db.depth db
+    | Converting_db db ->
+        Converting_ledger.depth db
 
-  let num_accounts t = match t with Stable_db db -> Stable_db.num_accounts db
+  let num_accounts t =
+    match t with
+    | Stable_db db ->
+        Stable_db.num_accounts db
+    | Converting_db db ->
+        Converting_ledger.depth db
 
   let merkle_path_at_addr_exn t =
-    match t with Stable_db db -> Stable_db.merkle_path_at_addr_exn db
+    match t with
+    | Stable_db db ->
+        Stable_db.merkle_path_at_addr_exn db
+    | Converting_db db ->
+        Converting_ledger.merkle_path_at_addr_exn db
 
   let get_inner_hash_at_addr_exn t =
-    match t with Stable_db db -> Stable_db.get_inner_hash_at_addr_exn db
+    match t with
+    | Stable_db db ->
+        Stable_db.get_inner_hash_at_addr_exn db
+    | Converting_db db ->
+        Converting_ledger.get_inner_hash_at_addr_exn db
 
   let set_all_accounts_rooted_at_exn t =
-    match t with Stable_db db -> Stable_db.set_all_accounts_rooted_at_exn db
+    match t with
+    | Stable_db db ->
+        Stable_db.set_all_accounts_rooted_at_exn db
+    | Converting_db db ->
+        Converting_ledger.set_all_accounts_rooted_at_exn db
 
   let set_batch_accounts t =
-    match t with Stable_db db -> Stable_db.set_batch_accounts db
+    match t with
+    | Stable_db db ->
+        Stable_db.set_batch_accounts db
+    | Converting_db db ->
+        Converting_ledger.set_batch_accounts db
 
   let get_all_accounts_rooted_at_exn t =
-    match t with Stable_db db -> Stable_db.get_all_accounts_rooted_at_exn db
+    match t with
+    | Stable_db db ->
+        Stable_db.get_all_accounts_rooted_at_exn db
+    | Converting_db db ->
+        Converting_ledger.get_all_accounts_rooted_at_exn db
 end
