@@ -30,17 +30,7 @@ let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t)
         ~metadata:[ ("elapsed", `Float (Time.Span.to_sec elapsed)) ]
   | Transition (_, ({ transaction; _ } : Transaction_witness.Stable.Latest.t))
     ->
-      let transaction_type =
-        match transaction with
-        | Mina_transaction.Transaction.Command (Zkapp_command _) ->
-            `Zkapp_command
-        | Command (Signed_command _) ->
-            `Signed_command
-        | Coinbase _ ->
-            `Coinbase
-        | Fee_transfer _ ->
-            `Fee_transfer
-      in
+      let transaction_type = Transaction_type.of_transaction transaction in
       ( match transaction_type with
       | `Zkapp_command ->
           Perf_histograms.add_span ~name:"snark_worker_zkapp_transition_time"
