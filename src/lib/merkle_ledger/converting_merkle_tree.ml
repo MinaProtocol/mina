@@ -210,6 +210,7 @@ end
 
 module With_database_config = struct
   type t = { primary_directory : string; converting_directory : string }
+  [@@deriving yojson]
 
   type create = Temporary | In_directories of t
 

@@ -60,11 +60,12 @@ module Make
                             and type converting_ledger = Unstable_db.t) =
 struct
   module Config = struct
-    type backing_type = Stable_db | Converting_db [@@deriving equal]
+    type backing_type = Stable_db | Converting_db [@@deriving equal, yojson]
 
     type t =
       | Stable_db_config of string
       | Converting_db_config of Converting_ledger.Config.t
+    [@@deriving yojson]
 
     let backing_of_config = function
       | Stable_db_config _ ->
@@ -126,11 +127,6 @@ struct
                { backing_1 = backing_of_config cfg1
                ; backing_2 = backing_of_config cfg2
                } )
-
-    let primary_directory = function
-      | Stable_db_config primary_directory
-      | Converting_db_config { primary_directory; _ } ->
-          primary_directory
   end
 
   type root_hash = Ledger_hash.t

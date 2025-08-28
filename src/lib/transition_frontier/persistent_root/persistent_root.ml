@@ -105,21 +105,17 @@ module Instance = struct
   end
 
   let potential_snarked_ledgers_to_yojson queue =
-    `List
-      (List.map (Queue.to_list queue) ~f:(fun config ->
-           `String (Ledger.Root.Config.primary_directory config) ) )
+    `List (List.map (Queue.to_list queue) ~f:Ledger.Root.Config.to_yojson)
 
-  let potential_snarked_ledgers_of_yojson factory json =
+  let potential_snarked_ledgers_of_yojson json =
     Yojson.Safe.Util.to_list json
-    |> List.map ~f:(fun x ->
-           let directory_name = Yojson.Safe.Util.to_string x in
-           Config.make_instance_config directory_name factory )
+    |> List.map ~f:(fun json ->
+           Ledger.Root.Config.of_yojson json |> Result.ok_or_failwith )
 
   let load_potential_snarked_ledgers_from_disk factory =
     let location = Config.potential_snarked_ledgers factory in
     if phys_equal (Sys.file_exists location) `Yes then
-      Yojson.Safe.from_file location
-      |> potential_snarked_ledgers_of_yojson factory
+      Yojson.Safe.from_file location |> potential_snarked_ledgers_of_yojson
     else []
 
   let write_potential_snarked_ledgers_to_disk t =

@@ -77,7 +77,7 @@ module Make
   type path = Stable_db.path
 
   module Config : sig
-    type t
+    type t [@@deriving yojson]
 
     (** The kind of database that should be used for this root. Only a single
         database of [Account.Stable.Latest.t] accounts is supported. A future
@@ -103,9 +103,6 @@ module Make
         backing at [dst], and there must be no database connections open for
         [src]. *)
     val move_backing_exn : src:t -> dst:t -> unit
-
-    (** The primary directory of this ledger *)
-    val primary_directory : t -> string
   end
 
   (** Close the root ledger instance *)

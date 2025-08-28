@@ -526,6 +526,7 @@ module Ledger = struct
 
     module type Config = sig
       type t = { primary_directory : string; converting_directory : string }
+      [@@deriving yojson]
 
       type create =
         | Temporary
