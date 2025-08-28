@@ -23,7 +23,7 @@ let path =
   Deferred.map Executor.PathFinder.standalone_path ~f:(fun opt ->
       Option.value_exn opt
         ~message:
-          "Could not find standalone path. App is not executable outside the \
+          "Could not find standalone path for archive blocks. App is not executable outside the \
            dune" )
 
 let format_to_string format =
