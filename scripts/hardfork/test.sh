@@ -268,6 +268,9 @@ expected_prefork_hashes="{\"epoch_data\":{\"next\":{\"hash\":\"$expected_next_ha
 # checking that correct ledgers are used
 prefork_hashes_select='{epoch_data:{staking:{hash:.epoch_data.staking.hash},next:{hash:.epoch_data.next.hash}},ledger:{hash:.ledger.hash}}'
 
+
+ls -al localnet
+
 prefork_hashes="$(jq -cS "$prefork_hashes_select" localnet/prefork_hf_ledger_hashes.json)"
 if [[ "$prefork_hashes" != "$expected_prefork_hashes" ]]; then
   echo "Assertion failed: unexpected ledgers in fork_config" >&2
@@ -294,6 +297,7 @@ MINA_FORK_DOCKER=gcr.io/o1labs-192920/mina-daemon:$MINA_DEB_VERSION-$NETWORK_NAM
 
 if [[ "$MODE" == "docker" ]]; then
     docker run --rm -v "$PWD/localnet:/localnet" --entrypoint "mina-create-genesis" "$MINA_FORK_DOCKER" --config-file /localnet/fork_config.json --genesis-dir /localnet/prefork_hf_ledgers --hash-output-file /localnet/prefork_hf_ledger_hashes.json
+    docker run --rm -v "$PWD/localnet:/localnet" --entrypoint "bash" "$MINA_FORK_DOCKER" -c  "chmod 755 -R /localnet/prefork_hf_ledgers && chmod 755 /localnet/prefork_hf_ledger_hashes.json"
 else
     "$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
 fi
