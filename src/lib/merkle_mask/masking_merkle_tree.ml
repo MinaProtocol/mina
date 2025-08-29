@@ -623,15 +623,14 @@ module Make (Inputs : Inputs_intf.S) = struct
       let hash_cache = t.maps.hashes in
       t.maps <- empty_maps ;
       Base.set_batch ~hash_cache parent account_data ;
-      Debug_assert.debug_assert (fun () ->
-          [%test_result: Hash.t]
-            ~message:
-              "Parent merkle root after committing should be the same as the \
-               old one in the mask"
-            ~expect:old_root_hash (Base.merkle_root parent) ;
-          [%test_result: Hash.t]
-            ~message:"Merkle root of the mask should delegate to the parent now"
-            ~expect:(merkle_root t) (Base.merkle_root parent) ) ;
+      assert (
+        Hash.equal old_root_hash (Base.merkle_root parent)
+        || failwith
+             "Parent merkle root after committing should be the same as the \
+              old one in the mask" ) ;
+      assert (
+        Hash.equal (merkle_root t) (Base.merkle_root parent)
+        || failwith "Merkle root of the mask should delegate to the parent now" ) ;
       t.is_committing <- false
 
     (* copy tables in t; use same parent *)
