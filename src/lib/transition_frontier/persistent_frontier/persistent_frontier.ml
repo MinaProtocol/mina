@@ -390,17 +390,19 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
   with_instance_exn t ~f:(fun instance ->
       Database.initialize instance.db ~root_data ;
       (* sanity check database after initialization on debug builds *)
-      Debug_assert.debug_assert (fun () ->
-          ignore
-            ( Database.check instance.db ~genesis_state_hash
-              |> Result.map_error ~f:(function
-                   | `Invalid_version ->
-                       "invalid version"
-                   | `Not_initialized ->
-                       "not initialized"
-                   | `Genesis_state_mismatch _ ->
-                       "genesis state mismatch"
-                   | `Corrupt err ->
-                       Database.Error.message err )
-              |> Result.ok_or_failwith
-              : Frozen_ledger_hash.t ) ) )
+      assert (
+        match Database.check instance.db ~genesis_state_hash with
+        | Ok _ ->
+            true
+        | Error reason ->
+            let string_of_reason = function
+              | `Invalid_version ->
+                  "invalid version"
+              | `Not_initialized ->
+                  "not initialized"
+              | `Genesis_state_mismatch _ ->
+                  "genesis state mismatch"
+              | `Corrupt err ->
+                  Database.Error.message err
+            in
+            failwith (string_of_reason reason) ) )
