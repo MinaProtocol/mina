@@ -15,13 +15,12 @@ module Executor = Executor.Make (Paths)
 
 let logger = Logger.create ()
 
-let path =
+let path () =
   Deferred.map Executor.PathFinder.standalone_path ~f:(fun opt ->
       Option.value_exn opt
         ~message:
-          "Could not find released mina daemon environment. App is not executable outside the \
-           dune" )
-
+          "Could not find released mina daemon environment. App is not \
+           executable outside the dune" )
 
 (** 
   Module [Client] provides functions to interact with a Mina daemon.
