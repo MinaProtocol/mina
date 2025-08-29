@@ -72,7 +72,7 @@ let joinCodenames
 let verify
     : Spec.Type -> Text
     =     \(spec : Spec.Type)
-      ->  let arch = Arch.toOptionalSuffixLowercase spec.arch
+      ->  let arch = Arch.toOptional spec.arch
 
           let suffixAndArchFlag =
                 let archFlag =
@@ -100,22 +100,8 @@ let verify
               ++  "--version ${spec.version} "
               ++  "--codenames ${joinCodenames spec} "
               ++  merge
-                    { None =
-                        merge
-                          { Some =
-                              \(suffix : Text) -> "--docker-suffix ${suffix} "
-                          , None = ""
-                          }
-                          arch
-                    , Some =
-                            \(suffix : Text)
-                        ->  merge
-                              { Some =
-                                      \(arch_suffix : Text)
-                                  ->  "--docker-suffix ${suffix}${arch_suffix} "
-                              , None = "--docker-suffix ${suffix} "
-                              }
-                              arch
+                    { None = ""
+                    , Some = \(suffix : Text) -> "--docker-suffix ${suffix}"
                     }
                     spec.suffix
               ++  "--only-dockers "

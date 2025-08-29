@@ -34,6 +34,12 @@ let toOptionalSuffixLowercase =
             { Amd64 = None Text, Arm64 = Some (toSuffixLowercase artifact) }
             artifact
 
+let toOptional =
+          \(artifact : Arch)
+      ->  merge
+            { Amd64 = None Text, Arm64 = Some (lowerName artifact) }
+            artifact
+
 in  { Type = Arch
     , capitalName = capitalName
     , lowerName = lowerName
@@ -44,4 +50,5 @@ in  { Type = Arch
     , toSuffixUppercase = toSuffixUppercase
     , toSuffixLowercase = toSuffixLowercase
     , toOptionalSuffixLowercase = toOptionalSuffixLowercase
+    , toOptional = toOptional
     }
