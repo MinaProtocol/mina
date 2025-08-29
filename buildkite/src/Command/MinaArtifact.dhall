@@ -176,7 +176,7 @@ let docker_step
                     , if = spec.if
                     }
                   ]
-                , DaemonHardfork =
+                , DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
                           deps
@@ -187,7 +187,28 @@ let docker_step
                             , profile = spec.profile
                             , artifact = Artifacts.Type.Daemon
                             }
-                    , service = Artifacts.Type.DaemonHardfork
+                    , service = Artifacts.Type.DaemonAutoHardfork
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    }
+                  ]
+                , DaemonLegacyHardfork =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.DaemonLegacyHardfork
+                            }
+                    , service = Artifacts.Type.DaemonLegacyHardfork
                     , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
