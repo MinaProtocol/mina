@@ -20,7 +20,7 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # The executable that is called by this script to perform and submit work. run_snark_worker.ml needs to be built before running this script
-executable = "_build/default/src/lib/snark_worker/standalone/run_snark_worker.exe"
+executable = "_build/default/src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe"
 
 # TODO: we will probably want to generalize this with giving a public key / endpoint to some node that does not necessarily run locally
 url = "http://localhost:3085/graphql"
@@ -93,7 +93,7 @@ def fetch_pending_work(start_index, end_index):
     return format_response(response)
 
 
-# call [_build/default/src/lib/snark_worker/standalone/run_snark_worker.exe]
+# call [_build/default/src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe]
 # perform the work given by [work_spec] and send it to the graphql [endpoint]
 def spawn_worker(work_spec, bid, public_key):
     try:
