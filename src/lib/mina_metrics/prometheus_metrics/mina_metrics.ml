@@ -273,11 +273,11 @@ module Cryptography = struct
     let help = "time elapsed while doing base proof for a zkapp transaction" in
     Counter.v "snark_work_zkapp_base_time_sec" ~help ~namespace ~subsystem
 
-  let snark_work_base_time_sec =
+  let snark_work_nonzkapp_base_time_sec =
     let help =
       "time elapsed while doing base proof for a non-zkapp transaction"
     in
-    Counter.v "snark_work_base_time_sec" ~help ~namespace ~subsystem
+    Counter.v "snark_work_nonzkapp_base_time_sec" ~help ~namespace ~subsystem
 
   let snark_work_zkapp_base_submissions =
     let help =
