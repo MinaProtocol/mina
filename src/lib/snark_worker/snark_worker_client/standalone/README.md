@@ -8,7 +8,7 @@ outside of the main daemon process.
 To build the standalone worker:
 
 ```bash
-dune build src/lib/snark_worker/standalone/run_snark_worker.exe
+dune build src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe
 ```
 
 ## Running
@@ -16,7 +16,7 @@ dune build src/lib/snark_worker/standalone/run_snark_worker.exe
 Always use `dune exec` to run the binary:
 
 ```bash
-dune exec src/lib/snark_worker/standalone/run_snark_worker.exe -- \
+dune exec src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe -- \
   --spec-json <JSON_STRING> [OPTIONS]
 ```
 
@@ -25,7 +25,7 @@ executable.
 
 A help option is always available using:
 ```
-dune exec src/lib/snark_worker/standalone/run_snark_worker.exe -- --help
+dune exec src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe -- --help
 ```
 
 The documentation below might be outdated. If it is the case, update it
@@ -57,14 +57,14 @@ preference):
 Generate a proof with default settings, reading the specification from a file:
 
 ```bash
-dune exec src/lib/snark_worker/standalone/run_snark_worker.exe -- \
+dune exec src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe -- \
   --spec-json-file /path/to/spec.json
 ```
 
 Generate a proof and submit it to a local Mina daemon:
 
 ```bash
-dune exec src/lib/snark_worker/standalone/run_snark_worker.exe -- \
+dune exec src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe -- \
   --spec-json-file /path/to/spec.json \
   --graphql-uri http://localhost:3085/graphql
 ```
@@ -72,7 +72,7 @@ dune exec src/lib/snark_worker/standalone/run_snark_worker.exe -- \
 Use a specific key and fee:
 
 ```bash
-dune exec src/lib/snark_worker/standalone/run_snark_worker.exe -- \
+dune exec src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe -- \
   --spec-json-file /path/to/spec.json \
   --snark-worker-fee 20 \
   --snark-worker-public-key B62qkaG5fMGRkcYKGgbyQmhZXJBUhhDfyWcHQQ7Qy7tqHKdUe1wmaK4

@@ -165,7 +165,7 @@ copy_common_daemon_configs() {
     "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
   cp ./default/src/app/validate_keypair/validate_keypair.exe \
     "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-  cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
+  cp ./default/src/lib/snark_worker/snark_worker_client/standalone/run_snark_worker.exe \
     "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
   # Copy signature-based Binaries (based on signature type $2 passed into the \
   # function)

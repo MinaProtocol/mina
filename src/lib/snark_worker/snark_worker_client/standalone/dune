@@ -28,8 +28,8 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocessor_deps
-  ../../../graphql-ppx-config.inc
-  ../../../../graphql_schema.json)
+  ../../../../graphql-ppx-config.inc
+  ../../../../../graphql_schema.json)
  (preprocess
   (pps
    ppx_let
@@ -37,4 +37,4 @@
    ppx_version
    graphql_ppx
    --
-   %{read-lines:../../../graphql-ppx-config.inc})))
+   %{read-lines:../../../../graphql-ppx-config.inc})))
