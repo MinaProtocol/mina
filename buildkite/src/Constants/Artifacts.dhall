@@ -13,7 +13,8 @@ let Repo = ./DockerRepo.dhall
 let Artifact
     : Type
     = < Daemon
-      | DaemonHardfork
+      | DaemonLegacyHardfork
+      | DaemonAutoHardfork
       | LogProc
       | Archive
       | TestExecutive
@@ -27,7 +28,8 @@ let Artifact
 
 let AllButTests =
       [ Artifact.Daemon
-      , Artifact.DaemonHardfork
+      , Artifact.DaemonLegacyHardfork
+      , Artifact.DaemonAutoHardfork
       , Artifact.LogProc
       , Artifact.Archive
       , Artifact.BatchTxn
@@ -41,18 +43,14 @@ let AllButTests =
 let Main =
       [ Artifact.Daemon, Artifact.LogProc, Artifact.Archive, Artifact.Rosetta ]
 
-let All =
-        AllButTests
-      # [ Artifact.FunctionalTestSuite
-        , Artifact.Toolchain
-        , Artifact.DaemonHardfork
-        ]
+let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 
 let capitalName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "Daemon"
-            , DaemonHardfork = "DaemonHardfork"
+            , DaemonLegacyHardfork = "DaemonLegacyHardfork"
+            , DaemonAutoHardfork = "DaemonAutoHardfork"
             , LogProc = "LogProc"
             , Archive = "Archive"
             , TestExecutive = "TestExecutive"
@@ -69,7 +67,8 @@ let lowerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "daemon"
-            , DaemonHardfork = "daemon_hardfork"
+            , DaemonLegacyHardfork = "daemon_hardfork"
+            , DaemonAutoHardfork = "daemon_auto_hardfork"
             , LogProc = "logproc"
             , Archive = "archive"
             , TestExecutive = "test_executive"
@@ -86,7 +85,8 @@ let dockerName =
           \(artifact : Artifact)
       ->  merge
             { Daemon = "mina-daemon"
-            , DaemonHardfork = "mina-daemon-hardfork"
+            , DaemonLegacyHardfork = "mina-daemon-hardfork"
+            , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"
             , LogProc = "mina-logproc"
@@ -112,7 +112,9 @@ let toDebianName =
       ->  \(network : Network.Type)
       ->  merge
             { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonHardfork = "daemon_${Network.lowerName network}_hardfork"
+            , DaemonLegacyHardfork =
+                "daemon_${Network.lowerName network}_hardfork"
+            , DaemonAutoHardfork = ""
             , LogProc = "logproc"
             , Archive = "archive_${Network.lowerName network}"
             , TestExecutive = "test_executive"
@@ -135,7 +137,8 @@ let toDebianNames =
                   (     \(a : Artifact)
                     ->  merge
                           { Daemon = [ toDebianName a network ]
-                          , DaemonHardfork = [ toDebianName a network ]
+                          , DaemonLegacyHardfork = [ toDebianName a network ]
+                          , DaemonAutoHardfork = [ toDebianName a network ]
                           , Archive = [ toDebianName a network ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
@@ -200,7 +203,10 @@ let dockerTag =
                 { Daemon =
                     "${spec.version}-${Network.lowerName
                                          spec.network}${profile_part}${build_flags_part}"
-                , DaemonHardfork =
+                , DaemonLegacyHardfork =
+                    "${spec.version}-${Network.lowerName
+                                         spec.network}${profile_part}"
+                , DaemonAutoHardfork =
                     "${spec.version}-${Network.lowerName
                                          spec.network}${profile_part}"
                 , Archive = "${spec.version}${build_flags_part}"
