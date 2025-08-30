@@ -2579,13 +2579,15 @@ module Queries = struct
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
 
+  (* TODO: remove this fork config generation as Berkeley HF already happened *)
   let fork_config =
     io_field "fork_config"
       ~doc:
         "The runtime configuration for a blockchain fork intended to be a \
          continuation of the current one. By default, this returns the newest \
          block that appeared before the transaction stop slot provided in the \
-         configuration, or the best tip if no such block exists."
+         configuration, or the best tip if no such block exists. This is query \
+         is used to support Berkeley hardfork. "
       ~typ:(non_null Types.json)
       ~args:
         Arg.
@@ -2620,7 +2622,7 @@ module Queries = struct
                  ; next_epoch_seed
                  ; blockchain_length
                  } =
-          Mina_lib.Hardfork_config.prepare_inputs ~breadcrumb_spec mina
+          Mina_lib.Hardfork_config.Berkeley.prepare_inputs ~breadcrumb_spec mina
         in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger
