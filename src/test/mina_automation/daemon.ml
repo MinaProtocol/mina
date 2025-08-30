@@ -174,19 +174,21 @@ module Process = struct
   let force_kill t = Utils.force_kill t.process
 end
 
-let archive_blocks t ~archive_address ~(format : Archive_blocks.format) blocks =
+let archive_blocks t ~archive_address ~format blocks =
+  let format_string = match format with
+    | `Precomputed -> "precomputed"
+    | `Extensional -> "extensional" in
   Executor.run t
     ~args:
       ( [ "advanced"
         ; "archive-blocks"
         ; "--archive-addres"
         ; string_of_int archive_address
-        ; "-" ^ Archive_blocks.format_to_string format
+        ; "-" ^ format_string
         ]
       @ blocks )
 
-let archive_blocks_from_files t ~archive_address
-    ~(format : Archive_blocks.format) ?(sleep = 5) blocks =
+let archive_blocks_from_files t ~archive_address ~format ?(sleep = 5) blocks =
   Deferred.List.iter blocks ~f:(fun block ->
       let%bind _ = archive_blocks t ~archive_address ~format [ block ] () in
       after (Time.Span.of_sec (Float.of_int sleep)) )
