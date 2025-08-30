@@ -492,8 +492,7 @@ module Ledger_inner = struct
     | `Existed, _ ->
         failwith "create_empty for a key already present"
     | `Added, new_loc ->
-        Debug_assert.debug_assert (fun () ->
-            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
+        assert (Ledger_hash.equal start_hash (merkle_root ledger)) ;
         (merkle_path ledger new_loc, Account.empty)
 end
 

@@ -52,7 +52,6 @@
   bignum_bigint
   codable
   crypto_params
-  debug_assert
   fold_lib
   fields_derivers.zkapps
   fields_derivers.json
