@@ -17,4 +17,4 @@ source buildkite/scripts/debian/install.sh "mina-test-suite,mina-berkeley-lightn
 export MINA_LIBP2P_PASS="naughty blue worm"
 export MINA_PRIVKEY_PASS="naughty blue worm"
 
-mina-command-line-tests test --mina-path mina -v
+mina-command-line-tests test -v

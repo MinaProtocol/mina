@@ -114,7 +114,7 @@ type t = Mina_automation_fixture.Archive.after_bootstrap
 
 let test_case (test_data : t) =
   let open Deferred.Let_syntax in
-  let daemon = Daemon.default in
+  let daemon = Daemon.default () in
   let archive_uri = test_data.archive.config.postgres_uri in
   let output = test_data.temp_dir in
   let%bind precomputed_blocks =
@@ -127,7 +127,7 @@ let test_case (test_data : t) =
   let log_file = output ^ "/precomputed_blocks_test.log" in
   Archive.Process.start_logging test_data.archive ~log_file ;
   let%bind () =
-    Daemon.archive_blocks_from_files daemon
+    Daemon.archive_blocks_from_files daemon.executor
       ~archive_address:test_data.archive.config.server_port
       ~format:Archive_blocks.Precomputed precomputed_blocks
   in
