@@ -87,7 +87,7 @@ let generateDockerForCodename =
                   MinaArtifact.MinaBuildSpec::{
                   , artifacts =
                     [ Artifacts.Type.LogProc
-                    , Artifacts.Type.DaemonHardfork
+                    , Artifacts.Type.DaemonLegacyHardfork
                     , Artifacts.Type.Archive
                     , Artifacts.Type.Rosetta
                     , Artifacts.Type.ZkappTestTransaction

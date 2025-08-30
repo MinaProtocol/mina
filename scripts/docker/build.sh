@@ -141,9 +141,13 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
-    mina-daemon-hardfork)
+    mina-daemon-legacy-hardfork)
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        DOCKER_CONTEXT="dockerfiles/"
+        ;;
+    mina-daemon-auto-hardfork)
         if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
-          echo "Legacy version is not set for mina-daemon-hardfork."
+          echo "Legacy version is not set for mina-daemon-auto-hardfork."
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi
