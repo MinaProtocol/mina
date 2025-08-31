@@ -124,7 +124,7 @@ let main ~db_uri ~network_data_folder () =
     ; run_mode = Run
     ; missing_blocks_auditor = missing_blocks_auditor_path
     ; archive_blocks = archive_blocks_path
-    ; block_format = Extensional
+    ; block_format = `Extensional
     }
   in
 
