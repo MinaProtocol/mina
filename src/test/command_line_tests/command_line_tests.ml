@@ -14,8 +14,19 @@ module BackgroundMode = struct
       Mina_automation_fixture.Daemon.generate_random_ledger daemon ledger_file
     in
     let%bind process = Daemon.start daemon in
-    let%bind.Deferred.Result () =
+    let%bind result =
       Daemon.Client.wait_for_bootstrap process.client ()
+    in
+    let%bind () =
+      match result with
+      | Ok () -> Deferred.return ()
+      | Error _ ->
+      let%bind logs =
+        let log_file = Daemon.Config.ConfigDirs.mina_log test.config.dirs in
+        Reader.file_contents log_file
+      in
+      let () = Printf.printf "Daemon logs:\n%s\n" logs in
+      Deferred.return ()
     in
     let%bind () = Daemon.Client.stop_daemon process.client in
     Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
