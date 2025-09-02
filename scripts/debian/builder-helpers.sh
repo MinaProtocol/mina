@@ -9,7 +9,6 @@ BUILD_URL=${BUILD_URL:-${BUILDKITE_BUILD_URL:-"local build from '$(hostname)' \
 MINA_DEB_CODENAME=${MINA_DEB_CODENAME:-"bullseye"}
 MINA_DEB_VERSION=${MINA_DEB_VERSION:-"0.0.0-experimental"}
 MINA_DEB_RELEASE=${MINA_DEB_RELEASE:-"unstable"}
-ARCHITECTURE=${ARCHITECTURE:-"amd64"}
 
 # Helper script to include when building deb archives.
 
@@ -102,7 +101,7 @@ Label: MinaProtocol
 Vendor: O(1)Labs
 Codename: ${MINA_DEB_CODENAME}
 Suite: ${MINA_DEB_RELEASE}
-Architecture: ${ARCHITECTURE}
+Architecture: amd64
 Maintainer: O(1)Labs <build@o1labs.org>
 Installed-Size:
 Depends: ${2}
@@ -139,13 +138,13 @@ build_deb() {
   # Docker image, we're examining those packages in buildkite's agent, where
   # `zstd` might not be available.
   fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" \
-    "${1}"_"${MINA_DEB_VERSION}"_"${ARCHITECTURE}".deb
+    "${1}"_"${MINA_DEB_VERSION}".deb
   echo "build_deb outputs:"
   ls -lh "${1}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
 
-  echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
+  echo "--- Built ${1}_${MINA_DEB_VERSION}.deb"
 }
 
 # Function to DRY copying config files into daemon packages
