@@ -100,6 +100,13 @@
           ocamlPackages_mina =
             requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
         };
+        # Skip tests on nodejs dep due to known issue with nixpkgs 24.11 https://github.com/NixOS/nixpkgs/issues/402079
+        # this can be removed after upgrading
+        skipNodeTests = final: prev: {
+          nodejs = prev.nodejs.overrideAttrs(old: {
+            doCheck = false;
+          });
+        };
       };
       nixosModules.mina = import ./nix/modules/mina.nix inputs;
       # Mina Demo container

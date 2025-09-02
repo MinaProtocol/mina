@@ -1,7 +1,7 @@
 #!/bin/bash
 
-MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=unstable}
-MINA_DEB_RELEASE=${MINA_DEB_RELEASE:=main}
+MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=bullseye}
+MINA_DEB_RELEASE=${MINA_DEB_RELEASE:=unstable}
 MINA_DEB_BUCKET=${MINA_DEB_BUCKET:=packages.o1test.net}
 
 S3_LOCKFILE_DATE="$(aws s3 ls s3://${MINA_DEB_BUCKET}/dists/${MINA_DEB_CODENAME}/${MINA_DEB_RELEASE}/binary-/lockfile | awk '{print $1 " " $2}')"

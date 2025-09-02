@@ -2,7 +2,7 @@
 
 # Enable debug output only in CI environments
 if [[ -n "$CI" || -n "$BUILDKITE" || -n "$GITHUB_ACTIONS" ]]; then
-    set -x
+  set -x
 fi
 
 # Author's Note: Because the structure of this repo is inconsistent (Dockerfiles and build contexts placed willy-nilly)
@@ -31,6 +31,7 @@ function usage() {
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
+  echo "      --deb-suffix          The debian suffix to use for the docker image"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -52,6 +53,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
+  --deb-suffix) 
+      # shellcheck disable=SC2034
+      DOCKER_DEB_SUFFIX="--build-arg deb_suffix=$2"; shift;;
   --deb-repo-key) 
       # shellcheck disable=SC2034
       DEB_REPO_KEY="$2"; shift;;
@@ -105,8 +109,8 @@ if [[ -z "$INPUT_VERSION" ]]; then
 fi
 
 if [[ -z "$DEB_PROFILE" ]]; then
-  echo "Debian profile is not set. Using the default (standard)"
-  DEB_PROFILE="standard"
+  echo "Debian profile is not set. Using the default (devnet)"
+  DEB_PROFILE="devnet"
 fi
 
 if [[ -z "$DEB_BUILD_FLAGS" ]]; then
@@ -137,9 +141,13 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
-    mina-daemon-hardfork)
+    mina-daemon-legacy-hardfork)
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        DOCKER_CONTEXT="dockerfiles/"
+        ;;
+    mina-daemon-auto-hardfork)
         if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
-          echo "Legacy version is not set for mina-daemon-hardfork."
+          echo "Legacy version is not set for mina-daemon-auto-hardfork."
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi
@@ -205,14 +213,12 @@ export_docker_tag
 
 BUILD_NETWORK="--network=host"
 
-# Prune old docker images (24 hours) from the cache
-# This is a temporary solution to keep the cache from growing too large.
-# We will also need to evaluate the impact of this on the build process and adjust as necessary.
-docker system prune --all --force --filter until=24h
-
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
   cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
   docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
+
+echo "✅ Docker image for service ${SERVICE} built successfully."
+echo "🐳 Full image name: ${HASHTAG}"

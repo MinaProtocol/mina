@@ -2096,10 +2096,8 @@ module Queries = struct
             ; hash = { State_hash.State_hashes.state_hash = hash; _ }
             } =
           let open Staged_ledger_diff in
-          Genesis_protocol_state.t
-            ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
-            ~genesis_epoch_data ~constraint_constants ~consensus_constants
-            ~genesis_body_reference
+          Genesis_protocol_state.t ~genesis_ledger ~genesis_epoch_data
+            ~constraint_constants ~consensus_constants ~genesis_body_reference
         in
         let winner = fst Consensus_state_hooks.genesis_winner in
         { With_hash.data =
@@ -2289,12 +2287,9 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () (state_hash_base58_opt : string option)
                     (height_opt : int option) ->
-        let open Result.Let_syntax in
+        (let open Or_error.Let_syntax in
         let block_from_state_hash state_hash_base58 =
-          let%bind state_hash =
-            State_hash.of_base58_check state_hash_base58
-            |> Result.map_error ~f:Error.to_string_hum
-          in
+          let%bind state_hash = State_hash.of_base58_check state_hash_base58 in
           let%map breadcrumb =
             Mina_lib.best_chain_block_by_state_hash mina state_hash
           in
@@ -2320,7 +2315,9 @@ module Queries = struct
         | None, Some height ->
             block_from_height height
         | None, None | Some _, Some _ ->
-            Error "Must provide exactly one of state hash, height" )
+            Or_error.error_string
+              "Must provide exactly one of state hash, height")
+        |> result_of_or_error )
 
   let initial_peers =
     field "initialPeers"
@@ -2567,7 +2564,7 @@ module Queries = struct
             ~constraint_constants:
               (Mina_lib.config mina).precomputed_values.constraint_constants
             ~logger:(Mina_lib.top_level_logger mina)
-            user_command_input
+            ~signature_kind:Mina_signature_kind.t_DEPRECATED user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
         let signature_kind = Mina_signature_kind.t_DEPRECATED in
@@ -2581,90 +2578,6 @@ module Queries = struct
       ~resolve:(fun { ctx = mina; _ } () ->
         Mina_lib.runtime_config mina
         |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
-
-  let get_epoch_ledgers ~mina breadcrumb =
-    let open Deferred.Result.Let_syntax in
-    let mina_config = Mina_lib.config mina in
-    let frontier_consensus_local_state = mina_config.consensus_local_state in
-    let consensus_state =
-      breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
-      |> Mina_state.Protocol_state.consensus_state
-    in
-    let staking_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
-        consensus_state
-    in
-    let next_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-        consensus_state
-    in
-    let cast_ledger = function
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
-          l ->
-          Ledger.Any_ledger.cast (module Ledger) l
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
-          Ledger.Root.as_unmasked l
-    in
-    let root_consensus_state =
-      let frontier =
-        Option.value_exn @@ Pipe_lib.Broadcast_pipe.Reader.peek
-        @@ Mina_lib.transition_frontier mina
-      in
-      let frontier_root = Transition_frontier.root frontier in
-      frontier_root |> Transition_frontier.Breadcrumb.protocol_state
-      |> Mina_state.Protocol_state.consensus_state
-    in
-    let%map staking_ledger, next_epoch_ledger =
-      match
-        (* We pretend that the block is finalized, so that we can query it in
-           advance, for redundancy.
-        *)
-        Consensus.Hooks.get_epoch_ledgers_for_finalized_frontier_block
-          ~root_consensus_state ~target_consensus_state:consensus_state
-          ~local_state:frontier_consensus_local_state
-      with
-      | `Both (staking_ledger, next_epoch_ledger) ->
-          return (cast_ledger staking_ledger, cast_ledger next_epoch_ledger)
-      | `Snarked_ledger (staking_ledger, num_parents) ->
-          (* The epoch transition was at a block between the given block and
-             the root. We find it by walking back by `num_parents` blocks.
-          *)
-          let%bind epoch_transition_state_hash =
-            let open Result.Let_syntax in
-            let rec ancestor breadcrumb i =
-              if i = 0 then return breadcrumb
-              else
-                let parent_hash =
-                  Transition_frontier.Breadcrumb.parent_hash breadcrumb
-                in
-                let%bind breadcrumb =
-                  Mina_lib.best_chain_block_by_state_hash mina parent_hash
-                in
-                ancestor breadcrumb (i - 1)
-            in
-            ancestor breadcrumb num_parents
-            >>| Transition_frontier.Breadcrumb.state_hash |> Deferred.return
-          in
-          (* When this block reaches the root of the frontier, its snarked
-             ledger will become the next epoch ledger; we simulate that here.
-          *)
-          let%map next_epoch_ledger =
-            Mina_lib.get_snarked_ledger_full mina
-              (Some epoch_transition_state_hash)
-            |> Deferred.Result.map_error ~f:Error.to_string_hum
-          in
-          ( cast_ledger staking_ledger
-          , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
-    in
-    assert (
-      Mina_base.Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root staking_ledger)
-        staking_epoch.ledger.hash ) ;
-    assert (
-      Mina_base.Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
-        next_epoch.ledger.hash ) ;
-    (staking_ledger, next_epoch_ledger)
 
   let fork_config =
     io_field "fork_config"
@@ -2682,109 +2595,47 @@ module Queries = struct
               ~doc:"The height of the desired block in the best chain" ~typ:int
           ]
       ~resolve:(fun { ctx = mina; _ } () state_hash_opt block_height_opt ->
-        let open Deferred.Result.Let_syntax in
-        let runtime_config = Mina_lib.runtime_config mina in
-        let%bind breadcrumb =
+        (let open Deferred.Or_error.Let_syntax in
+        let%bind breadcrumb_spec =
           match (state_hash_opt, block_height_opt) with
-          | None, None -> (
-              match Mina_lib.best_tip mina with
-              | `Bootstrapping ->
-                  Deferred.Result.fail "Daemon is bootstrapping"
-              | `Active breadcrumb -> (
-                  let txn_stop_slot_opt =
-                    Runtime_config.slot_tx_end runtime_config
-                  in
-                  match txn_stop_slot_opt with
-                  | None ->
-                      return breadcrumb
-                  | Some stop_slot ->
-                      let rec find_block_older_than_stop_slot breadcrumb =
-                        let protocol_state =
-                          Transition_frontier.Breadcrumb.protocol_state
-                            breadcrumb
-                        in
-                        let global_slot =
-                          Mina_state.Protocol_state.consensus_state
-                            protocol_state
-                          |> Consensus.Data.Consensus_state.curr_global_slot
-                        in
-                        if
-                          Mina_numbers.Global_slot_since_hard_fork.( < )
-                            global_slot stop_slot
-                        then return breadcrumb
-                        else
-                          let parent_hash =
-                            Transition_frontier.Breadcrumb.parent_hash
-                              breadcrumb
-                          in
-                          let%bind breadcrumb =
-                            Deferred.return
-                            @@ Mina_lib.best_chain_block_by_state_hash mina
-                                 parent_hash
-                          in
-                          find_block_older_than_stop_slot breadcrumb
-                      in
-                      find_block_older_than_stop_slot breadcrumb ) )
+          | None, None ->
+              return `Stop_slot
           | Some state_hash_base58, None ->
-              let open Result.Monad_infix in
-              State_hash.of_base58_check state_hash_base58
-              |> Result.map_error ~f:Error.to_string_hum
-              >>= Mina_lib.best_chain_block_by_state_hash mina
-              |> Deferred.return
+              let%map state_hash =
+                State_hash.of_base58_check state_hash_base58 |> Deferred.return
+              in
+              `State_hash state_hash
           | None, Some block_height ->
-              Mina_lib.best_chain_block_by_height mina
-                (Unsigned.UInt32.of_int block_height)
-              |> Deferred.return
+              return (`Block_height (Unsigned.UInt32.of_int block_height))
           | Some _, Some _ ->
-              Deferred.Result.fail "Cannot specify both state hash and height"
+              Deferred.Or_error.error_string
+                "Cannot specify both state hash and height"
         in
-        let block = Transition_frontier.Breadcrumb.block breadcrumb in
-        let blockchain_length = Mina_block.blockchain_length block in
-        let global_slot_since_genesis =
-          Mina_block.consensus_state block
-          |> Consensus.Data.Consensus_state.global_slot_since_genesis
-        in
-        let staged_ledger =
-          Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-          |> Staged_ledger.ledger
-        in
-        let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-        let protocol_state =
-          Transition_frontier.Breadcrumb.protocol_state breadcrumb
-        in
-        let consensus =
-          Mina_state.Protocol_state.consensus_state protocol_state
-        in
-        let staking_epoch =
-          Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
-            consensus
-        in
-        let next_epoch =
-          Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-            consensus
-        in
-        let staking_epoch_seed =
-          Mina_base.Epoch_seed.to_base58_check
-            staking_epoch.Mina_base.Epoch_data.Poly.seed
-        in
-        let next_epoch_seed =
-          Mina_base.Epoch_seed.to_base58_check
-            next_epoch.Mina_base.Epoch_data.Poly.seed
-        in
-        let%bind staking_ledger, next_epoch_ledger =
-          get_epoch_ledgers ~mina breadcrumb
+        let%bind { staged_ledger
+                 ; global_slot_since_genesis
+                 ; state_hash
+                 ; staking_ledger
+                 ; staking_epoch_seed
+                 ; next_epoch_ledger
+                 ; next_epoch_seed
+                 ; blockchain_length
+                 } =
+          Mina_lib.Hardfork_config.prepare_inputs ~breadcrumb_spec mina
         in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger
             ~global_slot_since_genesis ~state_hash ~staking_ledger
-            ~staking_epoch_seed ~next_epoch_ledger:(Some next_epoch_ledger)
-            ~next_epoch_seed ~blockchain_length
+            ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
+            ~next_epoch_ledger:(Some next_epoch_ledger)
+            ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
+            ~blockchain_length
         in
         let%map () =
           let open Async.Deferred.Infix in
           Async_unix.Scheduler.yield () >>| Result.return
         in
-        Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic )
+        Runtime_config.to_yojson new_config |> Yojson.Safe.to_basic)
+        |> Deferred.Result.map_error ~f:Error.to_string_hum )
 
   let thread_graph =
     field "threadGraph"
@@ -2921,7 +2772,7 @@ module Queries = struct
           ]
       ~resolve:(fun { ctx = mina; _ } () state_hash_base58_opt height_opt
                     encoding_opt ->
-        let open Deferred.Result.Let_syntax in
+        (let open Deferred.Result.Let_syntax in
         let%map breadcrumb =
           match (state_hash_base58_opt, height_opt) with
           | None, None -> (
@@ -2929,11 +2780,10 @@ module Queries = struct
               | `Active best_tip ->
                   Deferred.Result.return best_tip
               | `Bootstrapping ->
-                  Deferred.Result.fail "Node is bootstrapping" )
+                  Deferred.Or_error.error_string "Node is bootstrapping" )
           | Some state_hash_base58, None ->
               let%bind state_hash =
                 Deferred.return (State_hash.of_base58_check state_hash_base58)
-                |> Deferred.Result.map_error ~f:Error.to_string_hum
               in
               Deferred.return
                 (Mina_lib.best_chain_block_by_state_hash mina state_hash)
@@ -2942,7 +2792,7 @@ module Queries = struct
               Deferred.return
                 (Mina_lib.best_chain_block_by_height mina height_uint32)
           | Some _, Some _ ->
-              Deferred.Result.fail
+              Deferred.Or_error.error_string
                 "Must provide exactly one of state hash, height"
         in
         let protocol_state =
@@ -2957,7 +2807,8 @@ module Queries = struct
         | Some `JSON | None ->
             (* Default to JSON if no encoding is specified *)
             Mina_state.Protocol_state.value_to_yojson protocol_state
-            |> Yojson.Safe.to_string )
+            |> Yojson.Safe.to_string)
+        |> Deferred.Result.map_error ~f:Error.to_string_hum )
 
   let commands =
     [ sync_status

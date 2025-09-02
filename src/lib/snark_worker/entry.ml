@@ -109,9 +109,9 @@ let emit_proof_metrics metrics instances logger =
                ; proof_zkapp_command_count
                } ) )
 
-let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
-    ~constraint_constants daemon_address shutdown_on_disconnect =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let main ~logger ~proof_level ~constraint_constants ~signature_kind
+    (module Rpcs_versioned : Intf.Rpcs_versioned_S) daemon_address
+    shutdown_on_disconnect =
   let%bind state =
     Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
       ~signature_kind ()
@@ -225,7 +225,8 @@ let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
   go ()
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
+    ~constraint_constants ~signature_kind
+    (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -266,9 +267,9 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
           [%log info]
             !"Received signal to terminate. Aborting snark worker process" ;
           Core.exit 0 ) ;
-      main
+      main ~logger ~proof_level ~constraint_constants ~signature_kind
         (module Rpcs_versioned)
-        ~logger ~proof_level ~constraint_constants daemon_port
+        daemon_port
         (Option.value ~default:true shutdown_on_disconnect))
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir

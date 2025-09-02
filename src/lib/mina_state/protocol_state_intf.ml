@@ -148,7 +148,7 @@ module type Full = sig
   val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
   val negative_one :
-       genesis_ledger:Mina_ledger.Ledger.t Lazy.t
+       genesis_ledger:Genesis_ledger.Packed.t
     -> genesis_epoch_data:Consensus.Genesis_epoch_data.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t

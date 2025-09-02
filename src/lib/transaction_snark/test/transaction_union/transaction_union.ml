@@ -585,7 +585,7 @@ let%test_module "Transaction union tests" =
         let open Staged_ledger_diff in
         let state_body0 =
           Mina_state.Protocol_state.negative_one
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_ledger:Genesis_ledger.for_unit_tests
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body
@@ -608,7 +608,7 @@ let%test_module "Transaction union tests" =
         let state_body0 =
           let open Staged_ledger_diff in
           Mina_state.Protocol_state.negative_one
-            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_ledger:Genesis_ledger.for_unit_tests
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants ~genesis_body_reference
           |> Mina_state.Protocol_state.body

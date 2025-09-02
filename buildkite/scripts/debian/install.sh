@@ -1,12 +1,13 @@
 #!/bin/bash
 
+set -u
 
 if [[ $# -gt 2 ]] || [[ $# -lt 1 ]]; then
     echo "Usage: $0 '<debians>' '[use-sudo]'"
     exit 1
 fi
 
-if [ -z $MINA_DEB_CODENAME ]; then 
+if [ -z "${MINA_DEB_CODENAME:-}" ]; then 
     echo "MINA_DEB_CODENAME env var is not defined"
     exit 1
 fi
@@ -14,6 +15,8 @@ fi
 DEBS=$1
 USE_SUDO=${2:-0}
 
+# Source git environment variables first to get MINA_DEB_CODENAME
+source ./buildkite/scripts/export-git-env-vars.sh
 
 if [ "$USE_SUDO" == "1" ]; then
    SUDO="sudo"
@@ -24,7 +27,6 @@ fi
 
 LOCAL_DEB_FOLDER=debs
 mkdir -p $LOCAL_DEB_FOLDER
-source ./buildkite/scripts/export-git-env-vars.sh
 
 # Download required debians from bucket locally
 if [ -z "$DEBS" ]; then 

@@ -2,8 +2,11 @@ open Core_kernel
 
 let t ~genesis_ledger ~genesis_epoch_data ~constraint_constants
     ~consensus_constants ~genesis_body_reference =
+  let genesis_ledger_forced =
+    Lazy.force @@ Genesis_ledger.Packed.t genesis_ledger
+  in
   let genesis_ledger_hash =
-    Mina_ledger.Ledger.merkle_root (Lazy.force genesis_ledger)
+    Mina_ledger.Ledger.merkle_root genesis_ledger_forced
   in
   let protocol_constants =
     Consensus.Constants.to_protocol_constants consensus_constants

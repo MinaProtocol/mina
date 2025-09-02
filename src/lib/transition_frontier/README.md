@@ -102,7 +102,48 @@ The persistent root stores and maintains the root snarked ledger of a frontier.
 This is the oldest ledger maintained by a frontier, and is persisted on-disk in
 the form of a RocksDB ledger. This ledger is loaded into the full frontier upon
 initialization and serves as the basis for ledger information for all ledgers
-maintained by the full frontier.
+maintained by the full frontier. The persistent root data (including the root
+snarked ledger) is stored in `$MINA_CONFIG/root/`.
+
+The root snarked ledger is intialized from a few possible sources. There is
+always a target ledger hash for the root snarked ledger, which is either the
+value recorded in the persistent frontier database (if that exists) or the
+genesis ledger hash. The daemon will attempt to load the root snarked ledger
+from:
+
+1. One of the "potential snarked ledgers" in the persistent root directory
+2. The actual root snarked ledger (the one that was used by a previous daemon
+   instance) in the persistent root directory
+
+If this fails, because none of these sources existed or matched the target
+ledger hash, then the root snarked ledger is initialized from the genesis
+ledger. The daemon will then have to bootstrap from there to the consensus root
+snarked ledger.
+
+After initialization, the root snarked ledger is only ever updated by
+`move_root` in the full frontier. This is a bulk procedure that uses a single
+`Ledger.commit` operation on a mask over the root snarked ledger to update the
+root snarked ledger all at once.
+
+#### Potential snarked ledgers
+
+When the daemon decides to commit to a new root snarked ledger, it first saves
+the existing root snarked ledger by checkpointing it into a fresh directory in
+the persistent root directory. The saved ledger is a "potential snarked ledger".
+The locations of these ledgers are saved in a queue; that queue is also saved to
+disk as `potential_snarked_ledgers.json`. Potential snarked ledger locations are
+removed from the queue once the persistent frontier is fully updated.
+
+The potential snarked ledger locations are saved like this as a recovery
+mechanism; if a daemon does not finish committing to a new root and updating the
+persistent frontier, then on next startup it might be able to use
+`potential_snarked_ledgers.json` and the old root snarked ledger hash in the
+persistent frontier database to initialize the root snarked ledger. Otherwise,
+the daemon would be forced to bootstrap from genesis.
+
+Since the potential snarked ledgers are just a recovery mechanism, they are
+always deleted at startup after the actual root snarked ledger has been
+initialized.
 
 ### Root Data
 

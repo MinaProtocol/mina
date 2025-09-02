@@ -31,42 +31,32 @@ let finalize_one ~submitted_result ~spec ~fee ~prover =
       ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
   in
   let Snark_work_lib.Result.Single.Poly.{ proof; _ } = submitted_result in
-  let statements =
-    `One (Snark_work_lib.Selector.Single.Spec.Poly.statement spec)
-  in
-  Done
-    ( statements
-    , Mina_wire_types.Network_pool_priced_proof.V1.
-        { proof = `One proof; fee = { fee; prover } } )
+  Done { spec_with_proof = `One (spec, proof); fee; prover }
 
 let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
     ~fee ~prover =
   let submitted_result =
-    Snark_work_lib.Result.Single.Poly.map ~f_spec:(const other_spec)
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
+    let Snark_work_lib.Result.Single.Poly.{ spec; proof; _ } =
+      Snark_work_lib.Result.Single.Poly.map ~f_spec:(const other_spec)
+        ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
+    in
+    (spec, proof)
   in
   let in_pool_result =
-    Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk in_pool_result
+    let Snark_work_lib.Result.Single.Poly.{ spec; proof; _ } =
+      Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
+        ~f_proof:Ledger_proof.Cached.read_proof_from_disk in_pool_result
+    in
+    (spec, proof)
   in
-  let results =
+  let spec_with_proof =
     match submitted_half with
     | `First ->
         `Two (submitted_result, in_pool_result)
     | `Second ->
         `Two (in_pool_result, submitted_result)
   in
-  let statements =
-    One_or_two.map
-      ~f:(fun result ->
-        Snark_work_lib.Selector.Single.Spec.Poly.statement result.spec )
-      results
-  in
-  let proof = One_or_two.map ~f:(fun result -> result.proof) results in
-  Done
-    ( statements
-    , Mina_wire_types.Network_pool_priced_proof.V1.
-        { proof; fee = { fee; prover } } )
+  Done { spec_with_proof; fee; prover }
 
 let merge_single_result (current : t)
     ~(submitted_result :

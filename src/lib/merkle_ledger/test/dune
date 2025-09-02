@@ -1,6 +1,6 @@
 (library
  (name merkle_ledger_tests)
- (public_name merkle_ledger.tests)
+ (public_name merkle_ledger_tests)
  (modules (:standard \ test))
  (flags (:standard -warn-error +a))
  (preprocess
@@ -43,7 +43,7 @@
 
 (test
  (name test)
- (package merkle_ledger)
+ (package merkle_ledger_tests)
  (modules test)
  (flags (:standard -warn-error +a))
  (preprocess

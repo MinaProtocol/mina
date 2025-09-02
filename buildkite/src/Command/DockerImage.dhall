@@ -44,6 +44,7 @@ let ReleaseSpec =
           , deb_release : Text
           , deb_version : Text
           , deb_legacy_version : Text
+          , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
@@ -60,7 +61,7 @@ let ReleaseSpec =
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
           , deb_codename = DebianVersions.DebVersion.Bullseye
-          , deb_release = "\\\${MINA_DEB_RELEASE}"
+          , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , deb_profile = Profiles.Type.Devnet
@@ -71,6 +72,7 @@ let ReleaseSpec =
           , no_debian = False
           , step_key_suffix = "-docker-image"
           , verify = False
+          , deb_suffix = None Text
           , if = None B/If
           }
       }
@@ -128,7 +130,13 @@ let generateStep =
                           "${BuildFlags.toSuffixLowercase spec.build_flags}"
                       }
                       spec.build_flags
+                  , spec.deb_suffix
                   ]
+
+          let debSuffix =
+                merge
+                  { None = "", Some = \(s : Text) -> " --deb-suffix " ++ s }
+                  spec.deb_suffix
 
           let maybeVerify =
                       if     spec.verify
@@ -148,6 +156,9 @@ let generateStep =
 
                 else  ""
 
+          let pruneDockerImages =
+                "docker system prune --all --force --filter until=24h"
+
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${Artifacts.dockerName spec.service}"
@@ -164,6 +175,7 @@ let generateStep =
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
+                ++  debSuffix
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =
@@ -206,6 +218,8 @@ let generateStep =
                   , Local =
                     [ Cmd.run
                         (     exportMinaDebCmd
+                          ++  " && "
+                          ++  pruneDockerImages
                           ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "

@@ -714,8 +714,7 @@ module For_tests = struct
         ~default:
           (Consensus.Data.Local_state.create
              ~context:(module Context)
-             ~genesis_ledger:
-               (Precomputed_values.genesis_ledger precomputed_values)
+             ~genesis_ledger:precomputed_values.genesis_ledger
              ~genesis_epoch_data:precomputed_values.genesis_epoch_data
              ~epoch_ledger_location Public_key.Compressed.Set.empty
              ~genesis_state_hash:

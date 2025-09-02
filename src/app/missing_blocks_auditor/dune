@@ -17,7 +17,8 @@
   async.async_command
   ;; local libraries
   logger
-  mina_stdlib)
+  mina_stdlib
+  mina_caqti)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
