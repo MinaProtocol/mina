@@ -137,7 +137,7 @@ let%test_module "Epoch ledger sync tests" =
           ~context:(module Context)
           ~genesis_ledger ~genesis_epoch_data
           ~epoch_ledger_location:(make_dirname "epoch_ledger")
-          ~genesis_state_hash
+          ~genesis_state_hash ~epoch_ledger_backing_type:Stable_db
           (Signature_lib.Public_key.Compressed.Set.of_list [])
       in
       let module Context = struct
