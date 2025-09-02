@@ -68,7 +68,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
       ~constraint_constants:precomputed_values.constraint_constants ~logger
       ~pending_coinbases
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
-      ~get_state
+      ~get_state ~signature_kind:Mina_signature_kind.t_DEPRECATED
   in
   let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
   if
