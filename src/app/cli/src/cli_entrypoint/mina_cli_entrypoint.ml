@@ -1686,7 +1686,8 @@ let internal_commands logger ~itn_features =
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-        ~commit_id:Mina_version.commit_id )
+        ~commit_id:Mina_version.commit_id
+        ~signature_kind:Mina_signature_kind.t_DEPRECATED )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
