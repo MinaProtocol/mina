@@ -2018,6 +2018,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
               ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db ~proof_cache_db
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
