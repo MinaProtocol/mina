@@ -8,7 +8,9 @@
 , minaToolchainBullseye =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:cb775fd01376736f4942255b63f8e9745f3f23e15839836b0fe60c3e2dfe9e4b"
 , minaToolchainNoble =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:4648556d434bf8c908eb2fc6336a7644d2efb0608b698c0cdbbd51c23b409135"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:4a2483e94a4bcf03b82e511a4f1ef926659b3c6c42e31e03c0b9765a12225ac1"
+, minaToolchainJammy =
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:4a2483e94a4bcf03b82e511a4f1ef926659b3c6c42e31e03c0b9765a12225ac1"
 , minaToolchain =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:cb775fd01376736f4942255b63f8e9745f3f23e15839836b0fe60c3e2dfe9e4b"
 , postgres = "postgres:12.4-alpine"
