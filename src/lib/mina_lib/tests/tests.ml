@@ -217,6 +217,7 @@ let%test_module "Epoch ledger sync tests" =
             ~slot_tx_end:None
             ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
             ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
+            ~signature_kind:Mina_signature_kind.t_DEPRECATED
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
           ~consensus_constants ~time_controller ~logger
