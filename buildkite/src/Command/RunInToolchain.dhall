@@ -22,14 +22,14 @@ let runInToolchainNoble
     =     \(arch : Arch.Type)
       ->  \(environment : List Text)
       ->  \(innerScript : Text)
-      ->
-        let image =
+      ->  let image =
                 merge
                   { Amd64 = ContainerImages.minaToolchainNoble.amd64
                   , Arm64 = ContainerImages.minaToolchainNoble.arm64
                   }
                   arch
-        in  runInToolchainImage image environment innerScript
+
+          in  runInToolchainImage image environment innerScript
 
 let runInToolchainJammy
     : List Text -> Text -> List Cmd.Type
