@@ -23,10 +23,10 @@ let read_privkey privkey_path =
 let generate_event =
   Snark_params.Tick.Field.gen |> Quickcheck.Generator.map ~f:(fun x -> [| x |])
 
-let mk_tx ~transfer_parties_get_actions_events ~event_elements ~action_elements
+let mk_tx ?(num_acc_updates = 8) ~transfer_parties_get_actions_events
+    ~event_elements ~action_elements
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) keypair
     nonce =
-  let num_acc_updates = 8 in
   let signaturespec : Transaction_snark.For_tests.Signature_transfers_spec.t =
     let fee_payer = None in
     let generated_values =
@@ -81,6 +81,57 @@ let mk_tx ~transfer_parties_get_actions_events ~event_elements ~action_elements
   in
   Transaction_snark.For_tests.signature_transfers ?receiver_auth
     ~constraint_constants signaturespec
+
+let%test_unit "mk_tx serialization byte size" =
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let keypair = Signature_lib.Keypair.create () in
+  let nonce = Unsigned.UInt32.zero in
+
+  (* Create a transaction using mk_tx *)
+  let num_acc_updates = 8 in
+  let ea_limit = 1024 / (num_acc_updates + 1) in
+  let tx =
+    mk_tx ~num_acc_updates ~transfer_parties_get_actions_events:true
+      ~event_elements:ea_limit ~action_elements:ea_limit ~constraint_constants
+      keypair nonce
+    |> Zkapp_command.read_all_proofs_from_disk
+  in
+
+  (* Count total action fields across all account updates *)
+  let total_action_fields =
+    Zkapp_command.Call_forest.fold tx.account_updates ~init:0
+      ~f:(fun acc account_update ->
+        acc
+        + List.fold ~init:0
+            ~f:(fun acc action -> acc + Array.length action)
+            account_update.body.actions )
+  in
+
+  (* Count total event fields across all account updates *)
+  let total_event_fields =
+    Zkapp_command.Call_forest.fold tx.account_updates ~init:0
+      ~f:(fun acc account_update ->
+        acc
+        + List.fold ~init:0
+            ~f:(fun acc event -> acc + Array.length event)
+            account_update.body.events )
+  in
+
+  (* Total account updates *)
+  let total_account_updates =
+    Zkapp_command.Call_forest.to_list tx.account_updates |> List.length
+  in
+
+  (* Get the byte size of the transaction serialization *)
+  let byte_size = Zkapp_command.Stable.Latest.bin_size_t tx in
+
+  (* Print byte size and event count to stderr *)
+  eprintf "Transaction serialization byte size: %d\n%!" byte_size ;
+  eprintf "Total number of action fields across all account updates: %d\n%!"
+    total_action_fields ;
+  eprintf "Total number of event fields across all account updates: %d\n%!"
+    total_event_fields ;
+  eprintf "Total number of account updates: %d\n%!" total_account_updates
 
 let generate_protocol_state_stub ~consensus_constants ~constraint_constants
     ledger =

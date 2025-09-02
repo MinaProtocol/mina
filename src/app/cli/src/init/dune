@@ -125,6 +125,7 @@
   transaction_snark_scan_state)
  (instrumentation
   (backend bisect_ppx))
+ (inline_tests)
  (preprocessor_deps
   ../../../../../graphql_schema.json
   ../../../../graphql-ppx-config.inc)
