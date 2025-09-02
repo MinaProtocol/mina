@@ -585,8 +585,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
     flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
       ~doc:
         "MODE of Hardfork (auto|legacy, not applying any hardfork-mode when \
-         this flag is not set)"
-      (optional Hardfork_mode.arg)
+         this flag is not set). THIS FLAG IS INTERNAL USE ONLY AND WOULD BE \
+         REMOVED WITHOUT NOTICE"
+      (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -795,14 +796,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Genesis_constants.Compiled.constraint_constants
           in
           let compile_config = Mina_compile_config.Compiled.t in
-          (* HACK: unfortunately due to how our code is structured, below
-             definition is defined again in Mina_lib *)
           let ledger_backing_type =
-            match hardfork_mode with
-            | Some Auto ->
-                Mina_ledger.Ledger.Root.Config.Converting_db
-            | _ ->
-                Stable_db
+            Mina_lib.Config.ledger_backing ~hardfork_mode
           in
           let%bind precomputed_values, config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir

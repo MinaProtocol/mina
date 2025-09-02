@@ -2158,13 +2158,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
 
           let ledger_backing =
-            match config.hardfork_mode with
-            | Some Auto ->
-                Mina_ledger.Ledger.Root.Config.Converting_db
-            | _ ->
-                Stable_db
+            Config.ledger_backing ~hardfork_mode:config.hardfork_mode
           in
-
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
