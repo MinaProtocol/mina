@@ -10,7 +10,7 @@
 , minaToolchainNoble =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:4a2483e94a4bcf03b82e511a4f1ef926659b3c6c42e31e03c0b9765a12225ac1"
 , minaToolchainJammy =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:4a2483e94a4bcf03b82e511a4f1ef926659b3c6c42e31e03c0b9765a12225ac1"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:78486314cf93bafb7e5f8f8be92ade269ad94c311cb9a92fb4b0bcaf0348c385"
 , minaToolchain =
     "gcr.io/o1labs-192920/mina-toolchain@sha256:cb775fd01376736f4942255b63f8e9745f3f23e15839836b0fe60c3e2dfe9e4b"
 , postgres = "postgres:12.4-alpine"
