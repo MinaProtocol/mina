@@ -71,7 +71,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
                   [ dump_pipelines_cmd ]
-                # RunInToolchain.runInToolchainBullseye
+                # RunInToolchain.runInToolchain
                     ([] : List Text)
                     "python3 ./buildkite/scripts/dhall/checker.py --root _pipelines deps"
             , label = "Dhall: deps"
