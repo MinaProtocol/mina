@@ -25,35 +25,35 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "❌  Unknown parameter passed: $1"; usage;  exit 1;;
 esac; shift; done
 
-if [ -z $PACKAGE ]; then
+if [ -z "$PACKAGE" ]; then
   echo "❌  No package defined. "
   echo "❌  Did you forget to pass --package?"
   echo "" 
   usage; exit 1;
 fi
 
-if [ -z $VERSION ]; then
+if [ -z "$VERSION" ]; then
   echo "❌  No version defined."; 
   echo "❌  Did you forget to pass --version?";
   echo ""
   usage; exit 1;
 fi
 
-if [ -z $CODENAME ]; then
+if [ -z "$CODENAME" ]; then
   echo "❌  No codename defined.";
   echo "❌  Did you forget to pass --codename?";
   echo ""
   usage; exit 1;
 fi
 
-if [ -z $CHANNEL ]; then
+if [ -z "$CHANNEL" ]; then
   echo "❌  No channel defined.";
   echo "❌  Did you forget to pass --channel?";
   echo ""
   usage; exit 1;
 fi
 
-if [ -z $REPO ]; then
+if [ -z "$REPO" ]; then
   echo "❌  No repository defined."; 
   echo "❌  Did you forget to pass --repo?";
   echo ""
@@ -69,7 +69,7 @@ case $PACKAGE in
 esac
 
 if [[ "$SIGNED" == 1 ]]; then
-  SIGNED=" (wget -q https://'$REPO'/repo-signing-key.gpg -O /etc/apt/trusted.gpg.d/minaprotocol.gpg ) && apt-get update > /dev/null && "
+  SIGNED="wget -q https://$REPO/repo-signing-key.gpg -O /etc/apt/trusted.gpg.d/minaprotocol.gpg && apt-get update > /dev/null && "
   TRUSTED=""
 else 
   SIGNED=""
@@ -77,17 +77,17 @@ else
 fi
 
 
-SCRIPT=' set -x \
+SCRIPT="set -x \
     && export DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
-    && echo installing '$PACKAGE' \
+    && echo installing $PACKAGE \
     && apt-get update > /dev/null \
     && apt-get install -y lsb-release ca-certificates wget gnupg > /dev/null \
-    && '$SIGNED' echo "deb '$TRUSTED' https://'$REPO' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
+    && $SIGNED echo \"deb $TRUSTED https://$REPO $CODENAME $CHANNEL\" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
-    && apt list -a '$PACKAGE' \
-    && apt-get install -y --allow-downgrades '$PACKAGE'='$VERSION' \
-    && '$COMMAND' 
-    '
+    && apt list -a $PACKAGE \
+    && apt-get install -y --allow-downgrades $PACKAGE=$VERSION \
+    && $COMMAND
+    "
 
 case $CODENAME in
   bullseye|bookworm) DOCKER_IMAGE="debian:$CODENAME" ;;
