@@ -6,24 +6,24 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineTag = ../../Pipeline/Tag.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let Network = ../../Constants/Network.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 in  Pipeline.build
-      ( ArtifactPipelines.pipeline
+      ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
-          , artifacts =
-            [ Artifacts.Type.Daemon
-            , Artifacts.Type.LogProc
-            , Artifacts.Type.Archive
-            , Artifacts.Type.Rosetta
-            , Artifacts.Type.ZkappTestTransaction
-            , Artifacts.Type.CreateLegacyGenesis
-            ]
-          , network = Network.Type.Devnet
+          , artifacts = [ Artifacts.Type.Daemon ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             ]
+          , network = Network.Type.DevnetLegacy
+          , debVersion = DebianVersions.DebVersion.Jammy
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )

@@ -303,11 +303,7 @@ module Ledger = struct
 
     module Path : Merkle_path.S with type hash := hash
 
-    module Location : sig
-      type t [@@deriving sexp, compare, hash]
-
-      include Comparable.S with type t := t
-    end
+    module Location : LOCATION
 
     include
       SYNCABLE
@@ -423,6 +419,11 @@ module Ledger = struct
       accessed.
   *)
     val detached_signal : t -> unit Async_kernel.Deferred.t
+
+    (** Get all accounts on all masks of current ledger until reaching a 
+        non-mask. Used to migrate root to an potential staged ledger for fork 
+        config generation *)
+    val all_accounts_on_masks : t -> account Location.Map.t
   end
 
   module type NULL = sig
@@ -526,6 +527,7 @@ module Ledger = struct
 
     module type Config = sig
       type t = { primary_directory : string; converting_directory : string }
+      [@@deriving yojson]
 
       type create =
         | Temporary
@@ -536,6 +538,9 @@ module Ledger = struct
       (** Create a [checkpoint] config with the default converting directory
         name *)
       val with_primary : directory_name:string -> t
+
+      (** Given a primary dir, returns the default converting_directory path associated with that primary dir *)
+      val default_converting_directory_name : string -> string
     end
 
     module type WITH_DATABASE = sig

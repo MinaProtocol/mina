@@ -2,13 +2,8 @@ open Core
 open Mina_base
 module Ledger = Mina_ledger.Ledger
 open Frontier_base
-module Ledger_transfer = Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Db)
-module Ledger_transfer_stable =
-  Mina_ledger.Ledger_transfer.Make (Ledger.Db) (Ledger.Db)
-
-let transfer_snarked_root =
-  Ledger.Root.transfer_accounts_with
-    ~stable:Ledger_transfer_stable.transfer_accounts
+module Ledger_transfer_any =
+  Mina_ledger.Ledger_transfer.Make (Ledger.Any_ledger.M) (Ledger.Any_ledger.M)
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in
@@ -105,21 +100,17 @@ module Instance = struct
   end
 
   let potential_snarked_ledgers_to_yojson queue =
-    `List
-      (List.map (Queue.to_list queue) ~f:(fun config ->
-           `String (Ledger.Root.Config.primary_directory config) ) )
+    `List (List.map (Queue.to_list queue) ~f:Ledger.Root.Config.to_yojson)
 
-  let potential_snarked_ledgers_of_yojson factory json =
+  let potential_snarked_ledgers_of_yojson json =
     Yojson.Safe.Util.to_list json
-    |> List.map ~f:(fun x ->
-           let directory_name = Yojson.Safe.Util.to_string x in
-           Config.make_instance_config directory_name factory )
+    |> List.map ~f:(fun json ->
+           Ledger.Root.Config.of_yojson json |> Result.ok_or_failwith )
 
   let load_potential_snarked_ledgers_from_disk factory =
     let location = Config.potential_snarked_ledgers factory in
     if phys_equal (Sys.file_exists location) `Yes then
-      Yojson.Safe.from_file location
-      |> potential_snarked_ledgers_of_yojson factory
+      Yojson.Safe.from_file location |> potential_snarked_ledgers_of_yojson
     else []
 
   let write_potential_snarked_ledgers_to_disk t =
@@ -133,13 +124,13 @@ module Instance = struct
 
   let dequeue_snarked_ledger t =
     let config = Queue.dequeue_exn t.potential_snarked_ledgers in
-    Ledger.Root.Config.delete_any_backing config ;
+    Ledger.Root.Config.delete_backing config ;
     write_potential_snarked_ledgers_to_disk t
 
   let destroy t =
     List.iter
       (Queue.to_list t.potential_snarked_ledgers)
-      ~f:Ledger.Root.Config.delete_any_backing ;
+      ~f:Ledger.Root.Config.delete_backing ;
     Mina_stdlib_unix.File_system.rmrf
       (Config.potential_snarked_ledgers t.factory) ;
     Ledger.Root.close t.snarked_ledger ;
@@ -149,9 +140,9 @@ module Instance = struct
     Ledger.Root.close t.snarked_ledger ;
     t.factory.instance <- None
 
-  let create factory =
+  let create ~logger factory =
     let snarked_ledger =
-      Ledger.Root.create ~depth:factory.ledger_depth
+      Ledger.Root.create ~logger ~depth:factory.ledger_depth
         ~config:(Config.snarked_ledger factory)
         ()
     in
@@ -172,7 +163,7 @@ module Instance = struct
       List.fold_until potential_snarked_ledgers ~init:None
         ~f:(fun _ config ->
           let potential_snarked_ledger =
-            Ledger.Root.create ~depth:factory.ledger_depth ~config ()
+            Ledger.Root.create ~logger ~depth:factory.ledger_depth ~config ()
           in
           let potential_snarked_ledger_hash =
             Frozen_ledger_hash.of_ledger_hash
@@ -189,30 +180,31 @@ module Instance = struct
               snarked_ledger_hash
           then (
             let snarked_ledger =
-              Ledger.Root.create ~depth:factory.ledger_depth
+              Ledger.Root.create ~logger ~depth:factory.ledger_depth
                 ~config:(Config.tmp_snarked_ledger factory)
                 ()
             in
             match
-              transfer_snarked_root ~src:potential_snarked_ledger
-                ~dest:snarked_ledger
+              Ledger_transfer_any.transfer_accounts
+                ~src:(Ledger.Root.as_unmasked potential_snarked_ledger)
+                ~dest:(Ledger.Root.as_unmasked snarked_ledger)
             with
             | Ok _ ->
                 Ledger.Root.close potential_snarked_ledger ;
-                Ledger.Root.Config.delete_any_backing
+                Ledger.Root.Config.delete_backing
                 @@ Config.snarked_ledger factory ;
                 Ledger.Root.Config.move_backing_exn
                   ~src:(Config.tmp_snarked_ledger factory)
                   ~dst:(Config.snarked_ledger factory) ;
                 List.iter potential_snarked_ledgers
-                  ~f:Ledger.Root.Config.delete_any_backing ;
+                  ~f:Ledger.Root.Config.delete_backing ;
                 Mina_stdlib_unix.File_system.rmrf
                   (Config.potential_snarked_ledgers factory) ;
                 Stop (Some snarked_ledger)
             | Error e ->
                 Ledger.Root.close potential_snarked_ledger ;
                 List.iter potential_snarked_ledgers
-                  ~f:Ledger.Root.Config.delete_any_backing ;
+                  ~f:Ledger.Root.Config.delete_backing ;
                 Mina_stdlib_unix.File_system.rmrf
                   (Config.potential_snarked_ledgers factory) ;
                 [%log' error factory.logger]
@@ -224,7 +216,7 @@ module Instance = struct
             Continue None ) )
         ~finish:(fun _ ->
           List.iter potential_snarked_ledgers
-            ~f:Ledger.Root.Config.delete_any_backing ;
+            ~f:Ledger.Root.Config.delete_backing ;
           Mina_stdlib_unix.File_system.rmrf
             (Config.potential_snarked_ledgers factory) ;
           None )
@@ -232,7 +224,7 @@ module Instance = struct
     match snarked_ledger with
     | None ->
         let snarked_ledger =
-          Ledger.Root.create ~depth:factory.ledger_depth
+          Ledger.Root.create ~logger ~depth:factory.ledger_depth
             ~config:(Config.snarked_ledger factory)
             ()
         in
@@ -304,7 +296,7 @@ let create ~logger ~directory ~ledger_depth =
 
 let create_instance_exn t =
   assert (Option.is_none t.instance) ;
-  let instance = Instance.create t in
+  let instance = Instance.create ~logger:t.logger t in
   t.instance <- Some instance ;
   instance
 

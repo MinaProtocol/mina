@@ -25,7 +25,7 @@ let load_ledger ~ignore_missing_fields ~pad_app_state
             ~pad_app_state account ) )
   in
   let packed =
-    Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+    Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts ~logger
       ~depth:constraint_constants.ledger_depth
       (lazy accounts)
   in
