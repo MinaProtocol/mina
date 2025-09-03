@@ -584,9 +584,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
       For more, see: https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e *)
     flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
       ~doc:
-        "MODE of Hardfork (auto|legacy, not applying any hardfork-mode when \
-         this flag is not set). THIS FLAG IS INTERNAL USE ONLY AND WOULD BE \
-         REMOVED WITHOUT NOTICE"
+        "auto|legacy Mode of hardfork. Under auto mode, the daemon would back \
+         all ledgers that are needed for post-hardfork node to bootstrap with \
+         2 databases, one for before, and one for after the hardfork. Under \
+         legacy mode, all databased backed ledgers are backed by one database. \
+         THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
       (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
   in
   let to_pubsub_topic_mode_option =
