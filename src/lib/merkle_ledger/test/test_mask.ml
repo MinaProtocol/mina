@@ -636,7 +636,8 @@ module Make (Test : Test_intf) = struct
   let () =
     add_test "all_accounts_on_masks works on a chain" (fun () ->
         Test.with_chain (fun base ~mask:m1_lazy ~mask2:m2_lazy ->
-            let num_accounts = 1 lsl min Test.depth 5 in
+            (* Subtract one for a shared account *)
+            let num_accounts = (1 lsl min Test.depth 5) - 1 in
             let num_layer_accounts = num_accounts / 3 in
             let account_ids = Account_id.gen_accounts num_accounts in
             let balances =
@@ -653,6 +654,14 @@ module Make (Test : Test_intf) = struct
             let middle_accounts, top_accounts =
               List.split_n accounts num_layer_accounts
             in
+            (* Two accounts with the same id to go in both masks *)
+            let shared_account_id = Account_id.gen_accounts 1 |> List.hd_exn in
+            let shared_account_middle =
+              Account.create shared_account_id (Balance.of_nanomina_int_exn 11)
+            in
+            let shared_account_top =
+              Account.create shared_account_id (Balance.of_nanomina_int_exn 12)
+            in
             let create_accounts_map ~create ledger accounts =
               List.map accounts ~f:(fun account ->
                   let location = create ledger account in
@@ -668,14 +677,29 @@ module Make (Test : Test_intf) = struct
               create_accounts_map ~create:create_new_account_exn middle_ledger
                 middle_accounts
             in
+            let shared_account_loc =
+              Mask.Attached.get_or_create_account middle_ledger
+                shared_account_id shared_account_middle
+              |> Or_error.ok_exn |> snd
+            in
+            let middle_map =
+              middle_map
+              |> Map.add_exn ~key:shared_account_loc ~data:shared_account_middle
+            in
             let top_ledger = Lazy.force m2_lazy in
             let top_map =
               create_accounts_map ~create:create_new_account_exn top_ledger
                 top_accounts
             in
+            Mask.Attached.set top_ledger shared_account_loc shared_account_top ;
+            let top_map =
+              top_map
+              |> Map.add_exn ~key:shared_account_loc ~data:shared_account_top
+            in
             let harvested = Mask.Attached.all_accounts_on_masks top_ledger in
             let expected =
-              Map.merge_skewed middle_map top_map ~combine:(fun ~key:_ x _ -> x)
+              Map.merge_skewed middle_map top_map
+                ~combine:(fun ~key:_ _middle top -> top)
             in
             [%test_eq: Account.t Test.Location.Map.t] harvested expected ) )
 
