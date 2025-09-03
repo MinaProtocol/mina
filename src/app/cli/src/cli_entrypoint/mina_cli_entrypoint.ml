@@ -570,18 +570,10 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
       no_arg
   and hardfork_mode =
     (*
-      There's 2 hardfork mode, namely Legacy and Auto:
-        In Legacy Mode:
-          - Behavior matching Berkeley hardfork;
-          - No automatic shutdown at network transition;
-          - No automatic data extraction;
-        In Auto Mode:
-          - New behavior for seamless transitions;
-          - Default behavior for Fall2025 hardfork;
-          - Automatic shutdown after last slot of previous network;
-          - Automatic data dump to specified directory;
-          - Integration with Docker script logic;
-      For more, see: https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e *)
+      There's 2 hardfork mode, namely Legacy and Auto. Reference:
+        - https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e 
+        - https://www.notion.so/o1labs/V2-MIP-draft-HF-automation-250e79b1f9108010b0c5f2b1f416640b
+        *)
     flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
       ~doc:
         "auto|legacy Mode of hardfork. Under auto mode, the daemon would back \
