@@ -1,5 +1,47 @@
 #!/usr/bin/env bash
-set -euox pipefail
+#
+# Docker Buildx Multi-Architecture Builder Setup Script
+#
+# This script automates the creation and configuration of Docker Buildx builders
+# for multi-architecture container image builds. It supports different drivers
+# and can optionally install binary format emulation for cross-compilation.
+#
+# USAGE:
+#   ./setup_buildx.sh [BUILDER_NAME]
+#
+# ARGUMENTS:
+#   BUILDER_NAME    Optional name for the buildx builder (default: "xbuilder")
+#
+# ENVIRONMENT VARIABLES:
+#   BUILDX_NAME       Alternative way to set builder name (default: "xbuilder")
+#   DRIVER            Buildx driver to use: docker | docker-container | kubernetes (default: "docker")
+#   ARCHS             Target architectures for binfmt emulation (default: "arm64")
+#   INSTALL_BINFMT    Enable/disable binfmt installation: 1 | 0 (default: "1")
+#
+# EXAMPLES:
+#   # Create default builder with docker driver
+#   ./setup_buildx.sh
+#
+#   # Create custom builder with docker-container driver
+#   DRIVER=docker-container ./setup_buildx.sh mybuilder
+#
+#   # Setup for multiple architectures without binfmt
+#   ARCHS="arm64,amd64" INSTALL_BINFMT=0 ./setup_buildx.sh
+#
+# FEATURES:
+#   - Validates Docker and Buildx availability
+#   - Handles special case for 'docker' driver (uses default builder)
+#   - Creates or reuses existing builders for other drivers
+#   - Bootstraps builder instances
+#   - Installs binfmt emulation for cross-architecture builds
+#   - Provides summary of available builders
+#
+# REQUIREMENTS:
+#   - Docker with Buildx plugin
+#   - Privileged access (for binfmt installation)
+set -euo pipefail
+
+
 
 # Config (override via env or args)
 NAME="${1:-${BUILDX_NAME:-xbuilder}}"
