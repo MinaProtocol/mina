@@ -2646,7 +2646,37 @@ module Hardfork_config = struct
     | `Block_height block_height ->
         best_chain_block_by_height mina block_height |> Deferred.return
 
-  let epoch_ledgers ~breadcrumb mina =
+  let genesis_source_of_snapshot = function
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger l
+      ->
+        `Genesis l
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
+        `Root l
+
+  let genesis_source_ledger_cast = function
+    | `Genesis l ->
+        let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+        Ledger.Any_ledger.cast (module Ledger) l_inner
+    | `Root l ->
+        Ledger.Root.as_unmasked l
+    | `Uncommitted l ->
+        Ledger.Any_ledger.cast (module Ledger) l
+
+  let genesis_source_ledger_merkle_root l =
+    genesis_source_ledger_cast l |> Ledger.Any_ledger.M.merkle_root
+
+  type genesis_source_ledgers =
+    { root_snarked_ledger : Ledger.Root.t
+    ; staged_ledger : Ledger.t
+    ; staking_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t | `Root of Ledger.Root.t ]
+    ; next_epoch_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Ledger.Root.t
+        | `Uncommitted of Ledger.t ]
+    }
+
+  let source_ledgers ~breadcrumb mina =
     let open Deferred.Result.Let_syntax in
     let mina_config = config mina in
     let frontier_consensus_local_state = mina_config.consensus_local_state in
@@ -2662,19 +2692,21 @@ module Hardfork_config = struct
       Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
         consensus_state
     in
-    let cast_ledger = function
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
-          l ->
-          let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
-          Ledger.Any_ledger.cast (module Ledger) l_inner
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
-          Ledger.Root.as_unmasked l
+    let frontier =
+      transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
+      |> Option.value_exn
     in
     let root_consensus_state =
-      transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
-      |> Option.value_exn |> Transition_frontier.root
+      frontier |> Transition_frontier.root
       |> Transition_frontier.Breadcrumb.protocol_state
       |> Mina_state.Protocol_state.consensus_state
+    in
+    let root_snarked_ledger =
+      frontier |> Transition_frontier.root_snarked_ledger
+    in
+    let staged_ledger =
+      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+      |> Staged_ledger.ledger
     in
     let%map staking_ledger, next_epoch_ledger =
       match
@@ -2686,7 +2718,9 @@ module Hardfork_config = struct
           ~local_state:frontier_consensus_local_state
       with
       | `Both (staking_ledger, next_epoch_ledger) ->
-          return (cast_ledger staking_ledger, cast_ledger next_epoch_ledger)
+          return
+            ( genesis_source_of_snapshot staking_ledger
+            , genesis_source_of_snapshot next_epoch_ledger )
       | `Snarked_ledger (staking_ledger, num_parents) ->
           (* The epoch transition was at a block between the given block and
              the root. We find it by walking back by `num_parents` blocks.
@@ -2713,18 +2747,18 @@ module Hardfork_config = struct
           let%map next_epoch_ledger =
             get_snarked_ledger_full mina (Some epoch_transition_state_hash)
           in
-          ( cast_ledger staking_ledger
-          , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
+          ( genesis_source_of_snapshot staking_ledger
+          , `Uncommitted next_epoch_ledger )
     in
     assert (
       Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root staking_ledger)
+        (genesis_source_ledger_merkle_root staking_ledger)
         staking_epoch.ledger.hash ) ;
     assert (
       Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
+        (genesis_source_ledger_merkle_root next_epoch_ledger)
         next_epoch.ledger.hash ) ;
-    (staking_ledger, next_epoch_ledger)
+    { root_snarked_ledger; staged_ledger; staking_ledger; next_epoch_ledger }
 
   type inputs =
     { staged_ledger : Ledger.t
@@ -2746,10 +2780,6 @@ module Hardfork_config = struct
       Mina_block.consensus_state block
       |> Consensus.Data.Consensus_state.global_slot_since_genesis
     in
-    let staged_ledger =
-      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-      |> Staged_ledger.ledger
-    in
     let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
     let protocol_state =
       Transition_frontier.Breadcrumb.protocol_state breadcrumb
@@ -2763,15 +2793,19 @@ module Hardfork_config = struct
     in
     let staking_epoch_seed = staking_epoch.Epoch_data.Poly.seed in
     let next_epoch_seed = next_epoch.Epoch_data.Poly.seed in
-    let%map staking_ledger, next_epoch_ledger =
-      epoch_ledgers ~breadcrumb mina
+    let%map { root_snarked_ledger = _
+            ; staged_ledger
+            ; staking_ledger
+            ; next_epoch_ledger
+            } =
+      source_ledgers ~breadcrumb mina
     in
     { staged_ledger
     ; global_slot_since_genesis
     ; state_hash
-    ; staking_ledger
+    ; staking_ledger = genesis_source_ledger_cast staking_ledger
     ; staking_epoch_seed
-    ; next_epoch_ledger
+    ; next_epoch_ledger = genesis_source_ledger_cast next_epoch_ledger
     ; next_epoch_seed
     ; blockchain_length
     }
