@@ -31,7 +31,7 @@ end
 let run_test_with_cache (module Cache_impl : Cache_intf) ~timeout_seconds
     ~tmpdir =
   let module Cache = Cache_impl.Make (Evil_data) in
-  let%bind cache_result = Cache.initialize tmpdir ~logger:(Logger.null ()) in
+  let%bind cache_result = Cache.initialize tmpdir ~logger:(Logger.null ()) () in
   let cache =
     match cache_result with
     | Ok cache ->

@@ -46,7 +46,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
 
   let initialize_cache_or_fail tmpd ~logger =
     let open Deferred.Let_syntax in
-    let%bind cache_res = Cache.initialize tmpd ~logger in
+    let%bind cache_res = Cache.initialize tmpd ~logger () in
     match cache_res with
     | Ok cache ->
         return cache
@@ -107,7 +107,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
       ~f:(remove_data_on_gc_impl ~gc_strict)
 
   let initialize_and_expect_failure path ~logger =
-    let%bind cache_res = Cache.initialize path ~logger in
+    let%bind cache_res = Cache.initialize path ~logger () in
     match cache_res with
     | Ok _ ->
         failwith "unexpected initialization success"
@@ -130,7 +130,7 @@ module Make_impl (Cache : Disk_cache_intf.S_with_count with module Data := Mock)
       Core.Unix.mkdir some_dir ;
       let dir_symlink = tmp_dir ^/ "dir_link" in
       Core.Unix.symlink ~target:some_dir_name ~link_name:dir_symlink ;
-      Cache.initialize dir_symlink ~logger
+      Cache.initialize dir_symlink ~logger ()
       >>| function
       | Ok _ ->
           ()

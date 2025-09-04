@@ -127,7 +127,7 @@ let%test_module "transaction_status" =
           ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
           ~signature_kind:Mina_signature_kind.t_DEPRECATED
       in
-      let transaction_pool, _, local_sink =
+      let%bind transaction_pool, _, local_sink =
         Transaction_pool.create ~config
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants

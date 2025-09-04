@@ -71,6 +71,9 @@ module Transition_frontier = struct
 
   let work_is_referenced t = Hashtbl.mem t.refcount_table
 
+  let all_referenced_work t =
+    Transaction_snark_work.Statement.Set.of_hashtbl_keys t.refcount_table
+
   let best_tip_table t = t.best_tip_table
 
   (*Adds statements to the table of referenced work. Snarks for only the referenced statements are added to the pool*)
