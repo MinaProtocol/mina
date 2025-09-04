@@ -6,6 +6,8 @@ let Prelude = ../External/Prelude.dhall
 
 let List/map = Prelude.List.map
 
+let Optional/default = Prelude.Optional.default
+
 let Command = ./Base.dhall
 
 let Cmd = ../Lib/Cmds.dhall
@@ -51,16 +53,20 @@ let MinaBuildSpec =
           , network : Network.Type
           , buildFlags : BuildFlags.Type
           , toolchainSelectMode : Toolchain.SelectionMode
+          , extraBuildEnvs : List Text
           , scope : List PipelineScope.Type
           , tags : List PipelineTag.Type
           , channel : DebianChannel.Type
           , debianRepo : DebianRepo.Type
+          , buildScript : Text
           , deb_legacy_version : Text
+          , suffix : Optional Text
           , if : Optional B/If
           }
       , default =
           { prefix = "MinaArtifact"
           , artifacts = Artifacts.AllButTests
+          , buildScript = "./buildkite/scripts/build-release.sh"
           , debVersion = DebianVersions.DebVersion.Bullseye
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
@@ -70,6 +76,8 @@ let MinaBuildSpec =
           , scope = PipelineScope.Full
           , channel = DebianChannel.Type.Unstable
           , debianRepo = DebianRepo.Type.Unstable
+          , extraBuildEnvs = [] : List Text
+          , suffix = None Text
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , if = None B/If
           }
@@ -112,16 +120,17 @@ let build_artifacts
                         , Network.buildMainnetEnv spec.network
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
+                      # spec.extraBuildEnvs
                     )
-                    "./buildkite/scripts/build-release.sh ${Artifacts.toDebianNames
-                                                              spec.artifacts
-                                                              spec.network}"
+                    "${spec.buildScript} ${Artifacts.toDebianNames
+                                             spec.artifacts
+                                             spec.network}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                         spec.debVersion}"
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
-            , key = "build-deb-pkg"
+            , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
             , target = Size.XLarge
             , if = spec.if
             , retries =
@@ -167,7 +176,7 @@ let docker_step
                     , if = spec.if
                     }
                   ]
-                , DaemonHardfork =
+                , DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
                           deps
@@ -178,7 +187,28 @@ let docker_step
                             , profile = spec.profile
                             , artifact = Artifacts.Type.Daemon
                             }
-                    , service = Artifacts.Type.DaemonHardfork
+                    , service = Artifacts.Type.DaemonAutoHardfork
+                    , network = spec.network
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    }
+                  ]
+                , DaemonLegacyHardfork =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps =
+                          deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = spec.network
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.DaemonLegacyHardfork
+                            }
+                    , service = Artifacts.Type.DaemonLegacyHardfork
                     , network = spec.network
                     , deb_codename = spec.debVersion
                     , deb_profile = spec.profile
@@ -323,4 +353,5 @@ in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
     , MinaBuildSpec = MinaBuildSpec
     , labelSuffix = labelSuffix
+    , buildArtifacts = build_artifacts
     }

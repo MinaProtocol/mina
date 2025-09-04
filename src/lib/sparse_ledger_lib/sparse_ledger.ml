@@ -1,3 +1,45 @@
+(** Sparse Ledger implementation.
+
+    This module provides a space-efficient representation of a Merkle ledger
+    where most branches can be stored as hashes without holding the full
+    account data. It is parameterized over:
+    - the type of Merkle hashes,
+    - the type of account identifiers, and
+    - the type of account records.
+
+    A sparse ledger stores:
+    - [depth]: the height of the binary Merkle tree,
+    - [tree]: the partial Merkle tree structure with leaves that may be either
+      full accounts or hash placeholders,
+    - [indexes]: a mapping from account identifiers to their leaf index in the
+      tree.
+
+    The main functionality includes:
+    - Creating an empty ledger from a root hash ({!of_hash}),
+    - Retrieving accounts by index ({!get_exn}),
+    - Modifying accounts at a given index ({!set_exn}),
+    - Computing Merkle paths ({!path_exn}),
+    - Inserting accounts using Merkle paths ({!add_path}) or precomputed
+      sibling hashes ({!add_wide_path_unsafe}),
+    - Iterating over all accounts with their indices ({!iteri}),
+    - Computing the Merkle root ({!merkle_root}),
+    - Looking up the index of a given account ID ({!find_index_exn}).
+
+    {b Warning:}
+    - [add_wide_path_unsafe] does not recompute or verify hashes and can
+      produce an inconsistent tree if used incorrectly.
+    - Functions with [_exn] in their name will raise if the requested index or
+      path is invalid.
+
+    This structure is useful for:
+    - Incrementally reconstructing a Merkle ledger from partial proofs,
+    - Maintaining sparse proofs for a small set of accounts in a large ledger,
+    - Efficiently verifying account membership without storing all accounts.
+
+    See the test module for property-based tests ensuring consistency of index
+    tracking, Merkle path reconstruction, and hash correctness.
+*)
+
 open Core_kernel
 
 module Tree = struct

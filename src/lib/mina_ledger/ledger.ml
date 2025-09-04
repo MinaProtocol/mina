@@ -5,19 +5,19 @@ open Mina_base
 
 module Ledger_inner = struct
   module Location_at_depth : Merkle_ledger.Location_intf.S =
-    Merkle_ledger.Location.T
+    Merkle_ledger.Location
 
   module Location_binable = struct
     module Arg = struct
       type t = Location_at_depth.t =
-        | Generic of Location.Bigstring.Stable.Latest.t
+        | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
         | Account of Location_at_depth.Addr.Stable.Latest.t
         | Hash of Location_at_depth.Addr.Stable.Latest.t
       [@@deriving bin_io_unversioned, hash, sexp, compare]
     end
 
     type t = Arg.t =
-      | Generic of Location.Bigstring.t
+      | Generic of Mina_stdlib.Bigstring.t
       | Account of Location_at_depth.Addr.t
       | Hash of Location_at_depth.Addr.t
     [@@deriving hash, sexp, compare]
@@ -96,6 +96,23 @@ module Ledger_inner = struct
       let empty_account =
         Ledger_hash.of_digest (Lazy.force Account.Unstable.empty_digest)
     end
+
+    module Hardfork = struct
+      type t = Ledger_hash.Stable.V1.t
+      [@@deriving sexp, compare, hash, equal, yojson, bin_io_unversioned]
+
+      include Hashable.Make_binable (Arg)
+
+      let to_base58_check = Ledger_hash.to_base58_check
+
+      let merge = Ledger_hash.merge
+
+      let hash_account =
+        Fn.compose Ledger_hash.of_digest Mina_base.Account.Hardfork.digest
+
+      let empty_account =
+        Ledger_hash.of_digest (Lazy.force Account.Hardfork.empty_digest)
+    end
   end
 
   module Account = struct
@@ -139,6 +156,12 @@ module Ledger_inner = struct
 
       let token = token_id
     end
+
+    module Hardfork = struct
+      include Mina_base.Account.Hardfork
+
+      let token = token_id
+    end
   end
 
   module Make_inputs
@@ -177,11 +200,15 @@ module Ledger_inner = struct
 
   module Inputs = Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
   module Unstable_inputs = Make_inputs (Account.Unstable) (Hash.Unstable)
+  module Hardfork_inputs = Make_inputs (Account.Hardfork) (Hash.Hardfork)
 
   module Db : Account_Db with type account := Account.t = Database.Make (Inputs)
 
   module Unstable_db : Account_Db with type account := Account.Unstable.t =
     Database.Make (Unstable_inputs)
+
+  module Hardfork_db : Account_Db with type account := Account.Hardfork.t =
+    Database.Make (Hardfork_inputs)
 
   module Null = Null_ledger.Make (Inputs)
 
@@ -244,7 +271,21 @@ module Ledger_inner = struct
 
   type maskable_ledger = t
 
-  module Converting_ledger =
+  module Converting_ledger :
+    Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+      with module Location = Location
+       and module Addr = Location.Addr
+      with type root_hash := Ledger_hash.t
+       and type hash := Ledger_hash.t
+       and type account := Account.t
+       and type key := Signature_lib.Public_key.Compressed.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type converted_account := Account.Unstable.t
+       and type primary_ledger = Db.t
+       and type converting_ledger = Unstable_db.t =
     Converting_merkle_tree.With_database
       (struct
         type converted_account = Account.Unstable.t
@@ -293,7 +334,7 @@ module Ledger_inner = struct
     , Converting_ledger.converting_ledger converting_ledger )
 
   module Root = struct
-    include Root.Make (Any_ledger) (Db)
+    include Root.Make (Any_ledger) (Db) (Unstable_db) (Converting_ledger)
 
     let as_masked t = as_unmasked t |> of_any_ledger
   end
@@ -451,8 +492,7 @@ module Ledger_inner = struct
     | `Existed, _ ->
         failwith "create_empty for a key already present"
     | `Added, new_loc ->
-        Debug_assert.debug_assert (fun () ->
-            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
+        assert (Ledger_hash.equal start_hash (merkle_root ledger)) ;
         (merkle_path ledger new_loc, Account.empty)
 end
 

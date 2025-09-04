@@ -230,11 +230,10 @@ module Generator = struct
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
-    let genesis_ledger = Precomputed_values.genesis_ledger precomputed_values in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~context:(module Context)
-        ~genesis_ledger
+        ~genesis_ledger:precomputed_values.genesis_ledger
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:
@@ -273,11 +272,10 @@ module Generator = struct
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
     in
-    let genesis_ledger = Precomputed_values.genesis_ledger precomputed_values in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~context:(module Context)
-        ~genesis_ledger
+        ~genesis_ledger:precomputed_values.genesis_ledger
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:

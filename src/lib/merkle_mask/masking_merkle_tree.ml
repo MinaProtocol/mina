@@ -23,7 +23,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   end
 
   type maps_t =
-    { accounts : Account.t Location_binable.Map.t
+    { accounts : Account.t Location.Map.t
     ; token_owners : Account_id.t Token_id.Map.t
     ; hashes : Hash.t Addr.Map.t
     ; locations : Location.t Account_id.Map.t
@@ -92,7 +92,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type unattached = t
 
   let empty_maps =
-    { accounts = Location_binable.Map.empty
+    { accounts = Location.Map.empty
     ; token_owners = Token_id.Map.empty
     ; hashes = Addr.Map.empty
     ; locations = Account_id.Map.empty
@@ -623,15 +623,14 @@ module Make (Inputs : Inputs_intf.S) = struct
       let hash_cache = t.maps.hashes in
       t.maps <- empty_maps ;
       Base.set_batch ~hash_cache parent account_data ;
-      Debug_assert.debug_assert (fun () ->
-          [%test_result: Hash.t]
-            ~message:
-              "Parent merkle root after committing should be the same as the \
-               old one in the mask"
-            ~expect:old_root_hash (Base.merkle_root parent) ;
-          [%test_result: Hash.t]
-            ~message:"Merkle root of the mask should delegate to the parent now"
-            ~expect:(merkle_root t) (Base.merkle_root parent) ) ;
+      assert (
+        Hash.equal old_root_hash (Base.merkle_root parent)
+        || failwith
+             "Parent merkle root after committing should be the same as the \
+              old one in the mask" ) ;
+      assert (
+        Hash.equal (merkle_root t) (Base.merkle_root parent)
+        || failwith "Merkle root of the mask should delegate to the parent now" ) ;
       t.is_committing <- false
 
     (* copy tables in t; use same parent *)
@@ -1012,6 +1011,11 @@ module Make (Inputs : Inputs_intf.S) = struct
                 add_location () )
       | Some location ->
           Ok (`Existed, location)
+
+    let all_accounts_on_masks t =
+      let base = get_parent t |> Base.all_accounts_on_masks in
+      let combine ~key:_ _ v = v in
+      Map.merge_skewed ~combine base t.maps.accounts
   end
 
   let set_parent ?accumulated:accumulated_opt t parent =

@@ -344,7 +344,7 @@ module Ledger = struct
       pad_with_rev_balances (List.rev config.balances) accounts
       |> pad_to (Option.value ~default:0 config.num_accounts))
 
-  let packed_genesis_ledger_of_accounts ~depth accounts :
+  let packed_genesis_ledger_of_accounts ~logger ~depth accounts :
       Genesis_ledger.Packed.t =
     ( module Genesis_ledger.Make (struct
       let accounts = accounts
@@ -352,6 +352,8 @@ module Ledger = struct
       let directory = `New
 
       let depth = depth
+
+      let logger = logger
     end) )
 
   let report_no_genesis_ledger ~constraint_constants ~ledger_name_prefix ~logger
@@ -398,12 +400,17 @@ module Ledger = struct
   let load_extracted_ledger ~(config : Runtime_config.Ledger.t) ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~extracted_path : Genesis_ledger.Packed.t =
+    (* TODO: pass in from above *)
+    let genesis_backing_type = Mina_ledger.Ledger.Root.Config.Stable_db in
+    let genesis_config =
+      Mina_ledger.Ledger.Root.Config.with_directory
+        ~backing_type:genesis_backing_type ~directory_name:extracted_path
+    in
     ( module Genesis_ledger.Of_ledger (struct
       let backing_ledger =
         lazy
           (let ledger =
-             Mina_ledger.Ledger.Root.create_single
-               ~directory_name:extracted_path
+             Mina_ledger.Ledger.Root.create ~logger ~config:genesis_config
                ~depth:constraint_constants.ledger_depth ()
            in
            let ledger_root = Mina_ledger.Ledger.Root.merkle_root ledger in
@@ -444,7 +451,7 @@ module Ledger = struct
     match load_ledger_spec with
     | AccountsOnly { accounts } -> (
         let packed =
-          packed_genesis_ledger_of_accounts
+          packed_genesis_ledger_of_accounts ~logger
             ~depth:constraint_constants.ledger_depth accounts
         in
         let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
@@ -514,6 +521,8 @@ module Ledger = struct
             let directory = `Path extracted_path
 
             let depth = constraint_constants.ledger_depth
+
+            let logger = logger
           end) )
         in
         (packed, config, extracted_path)
@@ -604,8 +613,7 @@ module Epoch_data = struct
           in
           [%log trace] "Loaded staking epoch ledger from $ledger_file"
             ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-          ( { Consensus.Genesis_epoch_data.Data.ledger =
-                Genesis_ledger.Packed.t staking_ledger
+          ( { Consensus.Genesis_epoch_data.Data.ledger = staking_ledger
             ; seed = Epoch_seed.of_base58_check_exn config.staking.seed
             }
           , { config.staking with ledger = config' } )
@@ -622,8 +630,7 @@ module Epoch_data = struct
               [%log trace] "Loaded next epoch ledger from $ledger_file"
                 ~metadata:[ ("ledger_file", `String ledger_file) ] ;
               ( Some
-                  { Consensus.Genesis_epoch_data.Data.ledger =
-                      Genesis_ledger.Packed.t next_ledger
+                  { Consensus.Genesis_epoch_data.Data.ledger = next_ledger
                   ; seed = Epoch_seed.of_base58_check_exn seed
                   }
               , Some { Runtime_config.Epoch_data.Data.ledger = config''; seed }
@@ -707,8 +714,7 @@ module Genesis_proof = struct
     in
     let open Staged_ledger_diff in
     let protocol_state_with_hashes =
-      Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
+      Mina_state.Genesis_protocol_state.t ~genesis_ledger:ledger
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
         ~genesis_body_reference
     in

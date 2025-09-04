@@ -2198,6 +2198,7 @@ module T = struct
               Transaction_validator.apply_transaction_first_pass
                 ~constraint_constants ~global_slot validating_ledger
                 ~txn_state_view:current_state_view
+                ~signature_kind:Mina_signature_kind.t_DEPRECATED
             in
             (* Transactions in reverse order for faster removal if there is no
                space when creating the diff *)
@@ -2289,6 +2290,15 @@ module T = struct
       | Coinbase { new_accounts; _ } ->
           new_accounts )
     |> List.concat
+
+  let convert_and_apply_all_masks_to_ledger ~hardfork_db ({ ledger; _ } : t) =
+    let accounts =
+      Ledger.all_accounts_on_masks ledger
+      |> Map.to_alist
+      |> List.map ~f:(fun (loc, account) ->
+             (loc, Account.Hardfork.of_stable account) )
+    in
+    Ledger.Hardfork_db.set_batch hardfork_db accounts
 end
 
 include T
@@ -2308,7 +2318,7 @@ module Test_helpers = struct
         let open Staged_ledger_diff in
         (*not using Precomputed_values.for_unit_test because of dependency cycle*)
         Mina_state.Genesis_protocol_state.t
-          ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~genesis_ledger:Genesis_ledger.for_unit_tests
           ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
           ~constraint_constants ~consensus_constants ~genesis_body_reference
       in

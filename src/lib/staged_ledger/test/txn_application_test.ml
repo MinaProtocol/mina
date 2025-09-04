@@ -25,6 +25,7 @@ let gen_apply_and_txn : (apply * Application_state.txn) Quickcheck.Generator.t =
     Transaction_snark.Transaction_validator.apply_transaction_first_pass
       ~constraint_constants ~global_slot validating_ledger
       ~txn_state_view:current_state_view
+      ~signature_kind:Mina_signature_kind.Testnet
   in
   (apply, txn)
 

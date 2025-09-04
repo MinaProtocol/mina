@@ -18,8 +18,6 @@ module type S = sig
     module Controller : sig
       type t [@@deriving sexp, equal, compare]
 
-      val create : t -> t
-
       val basic : logger:Logger.t -> t
 
       (** Override the time offset set by the [MINA_TIME_OFFSET] environment

@@ -53,6 +53,32 @@ LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  
 help: ## Display this help information
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
+
+########################################
+.PHONY: add-o1labs-opam-repo
+add-o1labs-opam-repo:
+	opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
+
+.PHONY: prepare
+prepare: add-o1labs-opam-repo
+	@echo "Preparing the environment and installing dependencies..."
+	@# Check Go installation and version
+	@command -v go >/dev/null 2>&1 || { echo >&2 "Error: Go is not installed. Please install Go before continuing. You can use gvm to install the appropriate Go environment."; exit 1; }
+	@GO_VERSION=$$(go version | awk '{print $$3}' | sed 's/go//'); \
+	GO_MOD_PATH="src/app/libp2p_helper/src/go.mod"; \
+	REQUIRED_GO_VERSION=$$(grep -E "^go [0-9]+\.[0-9]" $$GO_MOD_PATH | awk '{print $$2}'); \
+	if ! printf '%s\n%s\n' "$$REQUIRED_GO_VERSION" "$$GO_VERSION" | sort -V | head -n1 | grep -q "^$$REQUIRED_GO_VERSION$$"; then \
+		echo "Error: Go version $$GO_VERSION is not compatible. Required version is $$REQUIRED_GO_VERSION or newer (only minor)."; \
+		exit 1; \
+	fi; \
+	echo "Go version $$GO_VERSION detected (requirement: $$REQUIRED_GO_VERSION or newer (only minor))"
+	opam switch import --switch mina --yes opam.export
+	eval $(opam env --switch=mina --set-switch)
+	chmod +x scripts/pin-external-packages.sh
+	./scripts/pin-external-packages.sh
+	@echo "Environment prepared. You can now run 'make build' to build the project."
+
+
 ########################################
 ## Code
 
@@ -553,6 +579,14 @@ debian-build-rosetta-devnet: ## Build the Debian Rosetta package for devnet
 debian-build-rosetta-mainnet: ## Build the Debian Rosetta package for mainnet
 	$(call build_debian_package,rosetta_mainnet)
 
+.PHONY: debian-build-daemon-devnet-hardfork
+debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devnet hardfork
+	$(call build_debian_package,daemon_devnet_hardfork)
+
+.PHONY: debian-download-create-legacy-hardfork
+debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
+	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
 ########################################
 # Docker images
 
@@ -648,6 +682,45 @@ docker-build-rosetta-devnet: start-local-debian-repo ## Build the Rosetta Docker
 docker-build-rosetta-mainnet: SHELL := /bin/bash
 docker-build-rosetta-mainnet: start-local-debian-repo ## Build the Rosetta Docker image for mainnet
 	$(call build_docker_image,mina-rosetta,mainnet)
+
+########################################
+# Generate hardfork packages
+
+.PHONY: hardfork-debian
+hardfork-debian: SHELL := /bin/bash
+hardfork-debian: ocaml_checks ## Generate hardfork packages
+	$(info 📦 Generating hardfork packages for network $(NETWORK_NAME))
+
+	@BUILD_DIR=./_build \
+	MINA_DEB_CODENAME=$(CODENAME) \
+	BRANCH_NAME=$(BRANCH_NAME) \
+	KEEP_MY_TAGS_INTACT=true \
+	./scripts/hardfork/build-packages.sh daemon_devnet_hardfork
+
+
+.PHONY: hardfork-docker
+hardfork-docker: SHELL := /bin/bash
+hardfork-docker: ocaml_checks ## Generate hardfork packages
+	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
+
+	$(MAKE) hardfork-debian
+	$(MAKE) start-local-debian-repo
+
+	@BUILD_DIR=./_build \
+	MINA_DEB_CODENAME=$(CODENAME) \
+	KEEP_MY_TAGS_INTACT=true \
+	. ./scripts/export-git-env-vars.sh \
+	&& ./scripts/docker/build.sh \
+		--deb-codename $(CODENAME) \
+		--service mina-daemon \
+		--version "$$MINA_DEB_VERSION" \
+		--branch $(BRANCH_NAME) \
+		--network $(NETWORK_NAME) \
+		--deb-suffix hardfork \
+		--no-cache
+
+	$(info 📦 stopping local Debian repository)
+	@./scripts/debian/aptly.sh stop
 
 ########################################
 # Generate odoc documentation

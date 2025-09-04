@@ -407,7 +407,7 @@ let dummy_state_view =
     let compile_time_genesis =
       (*not using Precomputed_values.for_unit_test because of dependency cycle*)
       Mina_state.Genesis_protocol_state.t
-        ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+        ~genesis_ledger:Genesis_ledger.for_unit_tests
         ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
         ~genesis_body_reference:Staged_ledger_diff.genesis_body_reference
         ~constraint_constants ~consensus_constants

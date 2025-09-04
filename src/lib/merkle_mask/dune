@@ -34,7 +34,6 @@
   stdio
   yojson
   ;; local libraries
-  debug_assert
   mina_stdlib
   logger
   merkle_ledger
