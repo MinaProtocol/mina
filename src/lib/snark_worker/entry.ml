@@ -37,8 +37,7 @@ let dispatch rpc shutdown_on_disconnect query address =
       res
 
 let main ~logger ~proof_level ~constraint_constants ~signature_kind
-    (module Rpcs_versioned : Intf.Rpcs_versioned_S) daemon_address
-    shutdown_on_disconnect =
+    daemon_address shutdown_on_disconnect =
   let%bind state =
     Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
       ~signature_kind ()
@@ -81,7 +80,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
+      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect `V3
         daemon_address
     with
     | Error e ->
@@ -96,25 +95,33 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
           ~metadata:[ ("time", `Float random_delay) ] ;
         let%bind () = wait ~sec:random_delay () in
         go ()
-    | Ok (Some (work, public_key)) -> (
+    | Ok (Some partitioned_spec) -> (
+        let address_json =
+          ("address", `String (Host_and_port.to_string daemon_address))
+        in
+        let work_ids_json =
+          ( "work_ids"
+          , Spec.Partitioned.Stable.Latest.statement partitioned_spec
+            |> Mina_state.Snarked_ledger_state.to_yojson )
+        in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
-          ~metadata:
-            [ ("address", `String (Host_and_port.to_string daemon_address))
-            ; ( "work_ids"
-              , Transaction_snark_work.Statement.compact_json
-                  (One_or_two.map (Work.Spec.instances work)
-                     ~f:Work.Single.Spec.statement ) )
-            ] ;
+          ~metadata:[ address_json; work_ids_json ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
-        match%bind Prod.Impl.perform state public_key work with
+        match%bind
+          Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
+        with
         | Error e ->
+            let partitioned_id =
+              Spec.Partitioned.Poly.map ~f_single_spec:ignore
+                ~f_subzkapp_spec:ignore ~f_data:ignore partitioned_spec
+            in
             let%bind () =
               match%map
-                dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-                  shutdown_on_disconnect (e, work, public_key) daemon_address
+                dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
+                  shutdown_on_disconnect (e, partitioned_id) daemon_address
               with
               | Error e ->
                   [%log error]
@@ -125,29 +132,33 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
-            One_or_two.zip_exn work.instances result.metrics
-            |> One_or_two.iter ~f:(fun (single_spec, (elapsed, _tag)) ->
-                   (* [_tag]'s purpose is replaced by the whole single spec *)
-                   Metrics.emit_single_metrics ~logger ~single_spec
-                     ~data:{ data = elapsed; proof = () }
-                     () ) ;
-            [%log info] "Submitted completed SNARK work $work_ids to $address"
-              ~metadata:
-                [ ("address", `String (Host_and_port.to_string daemon_address))
-                ; ( "work_ids"
-                  , Transaction_snark_work.Statement.compact_json
-                      (One_or_two.map (Work.Spec.instances work)
-                         ~f:Work.Single.Spec.statement ) )
-                ] ;
+            let result_without_spec =
+              Spec.Partitioned.Poly.map ~f_single_spec:ignore
+                ~f_subzkapp_spec:ignore ~f_data:Fn.id result
+            in
+            Metrics.emit_partitioned_metrics ~logger result ;
             let rec submit_work () =
               match%bind
-                dispatch Rpcs_versioned.Submit_work.Latest.rpc
-                  shutdown_on_disconnect result daemon_address
+                dispatch Rpc_submit_work.Stable.Latest.rpc
+                  shutdown_on_disconnect result_without_spec daemon_address
               with
               | Error e ->
                   log_and_retry "submitting work" e (retry_pause 10.)
                     submit_work
-              | Ok () ->
+              | Ok `Ok ->
+                  [%log info]
+                    "Submitted completed SNARK work $work_ids to $address"
+                    ~metadata:[ address_json; work_ids_json ] ;
+                  go ()
+              | Ok `Removed ->
+                  [%log info] "Result $work_ids slashed by $address"
+                    ~metadata:[ address_json; work_ids_json ] ;
+                  go ()
+              | Ok `SpecUnmatched ->
+                  [%log info]
+                    "Result $work_ids rejected by $address since it has wrong \
+                     shape"
+                    ~metadata:[ address_json; work_ids_json ] ;
                   go ()
             in
             submit_work () )
@@ -155,8 +166,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
   go ()
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants ~signature_kind
-    (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
+    ~constraint_constants ~signature_kind =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -198,7 +208,6 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
             !"Received signal to terminate. Aborting snark worker process" ;
           Core.exit 0 ) ;
       main ~logger ~proof_level ~constraint_constants ~signature_kind
-        (module Rpcs_versioned)
         daemon_port
         (Option.value ~default:true shutdown_on_disconnect))
 
