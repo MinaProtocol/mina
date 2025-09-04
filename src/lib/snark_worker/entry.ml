@@ -80,7 +80,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect `V3
+      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect `V4
         daemon_address
     with
     | Error e ->

@@ -379,7 +379,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ]
   in
   let snark_worker_impls =
-    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () `V3 ->
+    [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () `V4 ->
           match Mina_lib.request_work mina with
           | None ->
               Deferred.return None

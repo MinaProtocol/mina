@@ -250,15 +250,15 @@ module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = State_hash.Stable.V1.t
 
       type response =
-        ( Staged_ledger.Scan_state.Stable.V2.t
+        ( Staged_ledger.Scan_state.Stable.V3.t
         * Ledger_hash.Stable.V1.t
         * Pending_coinbase.Stable.V2.t
-        * Mina_state.Protocol_state.Value.Stable.V2.t list )
+        * Mina_state.Protocol_state.Value.Stable.V3.t list )
         option
 
       let query_of_caller_model = Fn.id
@@ -362,13 +362,13 @@ module Answer_sync_ledger_query = struct
     include Master
   end)
 
-  module V4 = struct
+  module V5 = struct
     module T = struct
       type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V2.t
       [@@deriving sexp]
 
       type response =
-        (( Sync_ledger.Answer.Stable.V3.t
+        (( Sync_ledger.Answer.Stable.V4.t
          , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
          Result.t
         [@version_asserted] )
@@ -381,49 +381,6 @@ module Answer_sync_ledger_query = struct
       let response_of_callee_model = Fn.id
 
       let caller_model_of_response = Fn.id
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io
-        (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-
-  module V3 = struct
-    module T = struct
-      type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
-      [@@deriving sexp]
-
-      type response =
-        (( Sync_ledger.Answer.Stable.V2.t
-         , Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t )
-         Result.t
-        [@version_asserted] )
-      [@@deriving sexp]
-
-      let query_of_caller_model : Master.T.query -> query =
-       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.from_v2 q)
-
-      let callee_model_of_query : query -> Master.T.query =
-       fun (h, q) -> (h, Sync_ledger.Query.Stable.V1.to_latest q)
-
-      let response_of_callee_model : Master.T.response -> response = function
-        | Ok a ->
-            Sync_ledger.Answer.Stable.V2.from_v3 a
-        | Error e ->
-            Error e
-
-      let caller_model_of_response : response -> Master.T.response = function
-        | Ok a ->
-            Ok (Sync_ledger.Answer.Stable.V2.to_latest a)
-        | Error e ->
-            Error e
     end
 
     module T' =
@@ -535,7 +492,7 @@ module Get_transition_chain = struct
     module T = struct
       type query = State_hash.Stable.V1.t list [@@deriving sexp]
 
-      type response = Mina_block.Stable.V2.t list option
+      type response = Mina_block.Stable.V3.t list option
 
       let query_of_caller_model = Fn.id
 
@@ -925,17 +882,17 @@ module Get_ancestry = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query =
-        ( Consensus.Data.Consensus_state.Value.Stable.V2.t
+        ( Consensus.Data.Consensus_state.Value.Stable.V3.t
         , State_hash.Stable.V1.t )
         With_hash.Stable.V1.t
       [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Mina_block.Stable.V3.t
+        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
         option
 
@@ -1134,13 +1091,13 @@ module Get_best_tip = struct
     include Master
   end)
 
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query = unit [@@deriving sexp]
 
       type response =
-        ( Mina_block.Stable.V2.t
-        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V2.t )
+        ( Mina_block.Stable.V3.t
+        , State_body_hash.Stable.V1.t list * Mina_block.Stable.V3.t )
         Proof_carrying_data.Stable.V1.t
         option
 
