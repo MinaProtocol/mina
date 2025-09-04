@@ -99,7 +99,7 @@ global options described below. It reads its **stdin** buffer, trying
 to parse a JSON list of objects. Objects don't need to follow any
 specific format; it's sufficient that they provide the essential data:
 
-* `submitted_at` – timestamp of the submission for indentification;
+* `submitted_at` – timestamp of the submission for identification;
 * `block_hash` – needed to identify the block to verify;
 * `snark_work` (optional) – a base64-encoded SNARK proof to verify;
 * `submitter` – the submitter's public key;
