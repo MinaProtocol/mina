@@ -18,7 +18,7 @@ module Worker = struct
     module Failed_to_generate_snark = Rpc_failed_to_generate_snark.Stable
   end
 
-  let command = command_from_rpcs (module Rpcs_versioned)
+  let command = command_from_rpcs
 end
 
 include Worker
