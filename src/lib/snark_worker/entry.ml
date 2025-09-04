@@ -130,7 +130,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
                    (* [_tag]'s purpose is replaced by the whole single spec *)
                    Metrics.emit_single_metrics ~logger ~single_spec
                      ~data:{ data = elapsed; proof = () }
-                     () ) ;
+                     ~on_zkapp_command:Metrics.emit_zkapp_metrics_legacy () ) ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", `String (Host_and_port.to_string daemon_address))
