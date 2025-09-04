@@ -129,7 +129,8 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
             |> One_or_two.iter ~f:(fun (single_spec, (elapsed, _tag)) ->
                    (* [_tag]'s purpose is replaced by the whole single spec *)
                    Metrics.emit_single_metrics ~logger ~single_spec
-                     ~data:{ data = elapsed; proof = () } ) ;
+                     ~data:{ data = elapsed; proof = () }
+                     () ) ;
             [%log info] "Submitted completed SNARK work $work_ids to $address"
               ~metadata:
                 [ ("address", `String (Host_and_port.to_string daemon_address))

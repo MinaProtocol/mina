@@ -418,7 +418,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           One_or_two.zip_exn work.spec.instances work.metrics
           |> One_or_two.iter ~f:(fun (single_spec, (elapsed, _tag)) ->
                  Snark_work_lib.Metrics.emit_single_metrics ~logger ~single_spec
-                   ~data:{ data = elapsed; proof = () } ) ;
+                   ~data:{ data = elapsed; proof = () }
+                   () ) ;
           Deferred.return @@ Mina_lib.add_work mina work )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
         (fun
