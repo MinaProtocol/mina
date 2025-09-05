@@ -16,7 +16,24 @@ module Transaction_type = struct
         `Fee_transfer
 end
 
-let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t)
+(* HACK: this is so we don't need to refactor stuff in txn witness recursively *)
+type stable
+
+type in_mem
+
+type _ witness =
+  | Stable_witness : Transaction_witness.Stable.Latest.t -> stable witness
+  | In_mem_witness : Transaction_witness.t -> stable witness
+
+let txn_type_of_witness (type kind) : kind witness -> Transaction_type.t =
+  function
+  | Stable_witness { transaction; _ } ->
+      Transaction_type.of_transaction transaction
+  | In_mem_witness { transaction; _ } ->
+      Transaction_type.of_transaction transaction
+
+let emit_single_metrics_poly (type kind) ~logger
+    ~(single_spec : (kind witness, _) Single_spec.Poly.t)
     ~data:
       ({ data = elapsed; _ } :
         (Core.Time.Stable.Span.V1.t, _) Proof_carrying_data.t ) =
@@ -28,9 +45,9 @@ let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t)
           Cryptography.snark_work_merge_time_sec (Time.Span.to_sec elapsed)) ;
       [%log info] "Merge SNARK generated in $elapsed seconds"
         ~metadata:[ ("elapsed", `Float (Time.Span.to_sec elapsed)) ]
-  | Transition (_, ({ transaction; _ } : Transaction_witness.Stable.Latest.t))
-    ->
-      ( match Transaction_type.of_transaction transaction with
+  | Transition (_, witness) ->
+      let txn_type = txn_type_of_witness witness in
+      ( match txn_type with
       | `Zkapp_command ->
           (* WARN: with work partitioner, each metrics emission would reach both
              this branch and [emit_partitioned_metrics] *)
@@ -50,9 +67,25 @@ let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t)
         "Base SNARK generated in $elapsed for $transaction_type transaction"
         ~metadata:
           [ ("elapsed", `Float (Time.Span.to_sec elapsed))
-          ; ( "transaction_type"
-            , Transaction_type.(to_yojson @@ of_transaction transaction) )
+          ; ("transaction_type", Transaction_type.(to_yojson @@ txn_type))
           ]
+
+let emit_single_metrics_in_mem ~logger ~(single_spec : _ Single_spec.Poly.t)
+    ~data =
+  emit_single_metrics_poly ~logger
+    ~single_spec:
+      (Single_spec.Poly.map ~f_proof:Fn.id
+         ~f_witness:(fun w -> In_mem_witness w)
+         single_spec )
+    ~data
+
+let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t) ~data =
+  emit_single_metrics_poly ~logger
+    ~single_spec:
+      (Single_spec.Poly.map ~f_proof:Fn.id
+         ~f_witness:(fun w -> Stable_witness w)
+         single_spec )
+    ~data
 
 let emit_partitioned_metrics ~logger
     (result_with_spec : _ Partitioned_spec.Poly.t) =
