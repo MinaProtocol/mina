@@ -1,5 +1,3 @@
-let ContainerImages = ../../Constants/ContainerImages.dhall
-
 let Cmd = ../../Lib/Cmds.dhall
 
 let S = ../../Lib/SelectFiles.dhall
@@ -41,19 +39,15 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Hardfork
           ]
         }
       , steps =
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.runInDocker
-                  Cmd.Docker::{
-                  , image = ContainerImages.nixos
-                  , privileged = True
-                  , useBash = False
-                  }
-                  "./scripts/hardfork/build-and-test.sh \$BUILDKITE_BRANCH"
+              [ Cmd.run
+                  "./scripts/hardfork/build-and-test.sh --mode docker --context ci --fork-branch \$BUILDKITE_BRANCH"
               ]
             , label = "hard fork test"
             , key = "hard-fork-test"
