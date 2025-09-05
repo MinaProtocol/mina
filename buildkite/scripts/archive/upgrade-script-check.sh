@@ -88,8 +88,8 @@ has_changes() {
     }
 
     # Check if file has differences
-    git diff --quiet "origin/$BRANCH" -- "$REPO_ROOT/$file" 2>/dev/null
-    return $?
+    git diff "origin/$BRANCH" -- "$REPO_ROOT/$file" 2>/dev/null | grep -q . && return 0
+    return 1
 }
 
 # Main execution
