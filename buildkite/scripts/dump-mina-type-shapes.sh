@@ -2,11 +2,7 @@
 
 set -eo pipefail
 
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
-sudo apt-get update
-sudo apt-get install -y git apt-transport-https ca-certificates tzdata curl
+buildkite/scripts/debian/update.sh --verbose
 
 TESTNET_NAME="berkeley"
 

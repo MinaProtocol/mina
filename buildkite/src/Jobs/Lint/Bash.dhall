@@ -38,8 +38,7 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchain
                   ([] : List Text)
-                  (     "sudo apt-get update"
-                    ++  " && wget https://github.com/koalaman/shellcheck/releases/download/${shellcheckVersion}/shellcheck-${shellcheckVersion}.linux.x86_64.tar.xz"
+                  (     " wget https://github.com/koalaman/shellcheck/releases/download/${shellcheckVersion}/shellcheck-${shellcheckVersion}.linux.x86_64.tar.xz"
                     ++  " && tar xvf shellcheck-${shellcheckVersion}.linux.x86_64.tar.xz"
                     ++  " && sudo cp shellcheck-${shellcheckVersion}/shellcheck /usr/local/bin/"
                     ++  " && make check-bash"
