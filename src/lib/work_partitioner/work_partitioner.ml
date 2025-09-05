@@ -271,8 +271,8 @@ let submit_into_combining_result ~submitted_result ~partitioner
       submitted_result
   in
   match
-    Combining_result.merge_single_result combining_result
-      ~submitted_result:submitted_result_cached ~submitted_half
+    Combining_result.merge_single_result ~logger:partitioner.logger
+      ~submitted_result:submitted_result_cached ~submitted_half combining_result
   with
   | Pending new_combining_result ->
       `Pending new_combining_result

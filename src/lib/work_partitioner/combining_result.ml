@@ -58,10 +58,10 @@ let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
   in
   Done { spec_with_proof; fee; prover }
 
-let merge_single_result (current : t)
+let merge_single_result ~logger
     ~(submitted_result :
        (unit, Ledger_proof.Cached.t) Snark_work_lib.Result.Single.Poly.t )
-    ~(submitted_half : submitted_half) : merge_outcome =
+    ~(submitted_half : submitted_half) (current : t) : merge_outcome =
   match (current, submitted_half) with
   | Spec_only { spec = `One spec; sok_message = { fee; prover } }, `One ->
       finalize_one ~submitted_result ~spec ~fee ~prover
@@ -69,6 +69,11 @@ let merge_single_result (current : t)
     , (`First as submitted_half) )
   | ( Spec_only { spec = `Two (other_spec, spec); sok_message }
     , (`Second as submitted_half) ) ->
+      Snark_work_lib.(
+        Metrics.emit_single_metrics ~logger
+          ~single_spec:(Spec.Single.read_all_proofs_from_disk spec)
+          ~data:{ data = submitted_result.elapsed; proof = () })
+        () ;
       Pending
         (One_of_two
            { other_spec
@@ -84,9 +89,14 @@ let merge_single_result (current : t)
         }
     , ((`First | `Second) as submitted_half) ) ->
       if equal_half in_pool_half submitted_half then HalfAlreadyInPool
-      else
+      else (
+        Snark_work_lib.(
+          Metrics.emit_single_metrics ~logger
+            ~single_spec:(Spec.Single.read_all_proofs_from_disk other_spec)
+            ~data:{ data = submitted_result.elapsed; proof = () })
+          () ;
         finalize_two ~submitted_result ~other_spec ~in_pool_result
-          ~submitted_half ~fee ~prover
+          ~submitted_half ~fee ~prover )
   | Spec_only { spec = `One _ as spec; _ }, (`First | `Second)
   | Spec_only { spec = `Two _ as spec; _ }, `One ->
       StructureMismatch { spec }
