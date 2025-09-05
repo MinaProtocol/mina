@@ -188,7 +188,195 @@ end
 
 let transaction_combinations = Transaction_key.Table.create ()
 
-let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
+(** Definitions related to constitutions of transactions.
+
+    The constitution of a single zkApp transaction (Zkapp_command) in isolation
+    is determined as follows. Take the list of account updates and group the
+    non-proof updates together into runs, separated by one or more individual
+    proof updates. (Proof updates have the authorization kind Control.Proof;
+    non-proof updates are either Control.Signature or Control.None_given). Take
+    the runs of non-proof updates and group adjacent updates into pairs (pair
+    segments); there will be one single update left over (a single segment) for
+    odd-length runs. Count the number of segments in each category: the
+    resulting triple of totals is the constitution. "In isolation" is important
+    here, because sequences of commands can have this process done to them, and
+    the last update of a command can be paired with the first update of the
+    next if both are non-proof. See
+    Account_group.group_by_zkapp_command_rev. *)
+module Constitution (Inputs : sig
+  val genesis_constants : Genesis_constants.t
+end) =
+struct
+  type t =
+    { proof_segments : int
+    ; signed_single_segments : int
+    ; signed_pair_segments : int
+    }
+
+  let cost_limit = Inputs.genesis_constants.zkapp_transaction_cost_limit
+
+  (* A strict bound on the maximum number of segments of each type *)
+  let max_num_segments = 7
+
+  (* The number of proof updates required for a command to have this
+     constitution *)
+  let num_proof_updates constitution = constitution.proof_segments
+
+  (* The number of payment-like updates required for a command to have this
+     constitution *)
+  let num_paymentlike_updates constitution =
+    constitution.signed_single_segments + (2 * constitution.signed_pair_segments)
+
+  (* The total number of updates required for a command to have this
+     constition. *)
+  let num_updates_needed constitution =
+    num_proof_updates constitution + num_paymentlike_updates constitution
+
+  let cost { proof_segments; signed_single_segments; signed_pair_segments } =
+    Zkapp_command.zkapp_cost ~proof_segments ~signed_single_segments
+      ~signed_pair_segments ~genesis_constants:Inputs.genesis_constants ()
+
+  (* A Constition.t is valid if it can be represented as the constitution of a
+     valid transaction *)
+  let is_valid t =
+    Float.(cost t <. cost_limit)
+    (* Pigeonhole principle - there cannot be more odd-length runs of
+       payment-like updates than there are spaces around the proof updates *)
+    && t.signed_single_segments <= t.proof_segments + 1
+    (* A zkApp transaction will always have an implicit fee payer update in
+       it *)
+    && num_paymentlike_updates t > 0
+
+  let all_valid_constitutions =
+    let constitutions_with_bound bound =
+      let values = List.init bound ~f:Fn.id in
+      let%bind.List proof_segments = values in
+      let%bind.List signed_single_segments = values in
+      let%bind.List signed_pair_segments = values in
+      let constitution =
+        { proof_segments; signed_single_segments; signed_pair_segments }
+      in
+      if is_valid constitution then [ constitution ] else []
+    in
+    let constitutions = constitutions_with_bound max_num_segments in
+    (* Make sure our max_num_segments isn't too small *)
+    assert (
+      List.length constitutions
+      = List.length (constitutions_with_bound @@ (max_num_segments + 1)) ) ;
+    constitutions
+
+  (* Arrange the account_updates of a Zkapp_command so that the resulting
+     transaction has the given constitution. The constitution is assumed to be
+     valid, and it is assumed that there are an appropriate number of updates
+     of each kind to satisfy the constitution. The orderings of proof_updates
+     and paymentlike_updates are both preserved in the resulting list.
+
+     Also important to note is the fact that a Zkapp_command must always have
+     a single implicit payment-like update at the start. This update is the
+     fee payer's update, and is not included in account_updates and should not
+     be given to this function. *)
+  let rearrange_updates
+      { proof_segments = p
+      ; signed_pair_segments = e
+      ; signed_single_segments = o
+      } proof_updates paymentlike_updates =
+    (* In the final command we will have p proof updates and (2 * e + o)
+       payment-like updates (including the implicit fee-payer update at the
+       beginning). We want to divide up those updates into p+1 segments, then
+       insert the p proofs between these segments. Exactly o of these segments
+       must have odd length, and the first segment must be non-empty. We'll
+       get these segments by generating a partition of the number (2 * e + o)
+       with certain properties. These will be the lengths of the segments; we
+       can then grab the segments from the paymentlike_updates in one go at
+       the end. We assume that we have been given p proof_updates and (2 * e +
+       o - 1) paymentlike_updates. *)
+
+    (* Decide which o segments of the p + 1 will be made odd in the final
+       command *)
+    let odds_adjustment =
+      if e = 0 then
+        (* If the command has exactly o payment-like updates, all payment-like
+           updates will be in single segments. Since the first update is the
+           implicit fee-payer update, the first segment must necessarily be
+           made odd. *)
+        List.init (o - 1) ~f:(Fn.const 1)
+        @ List.init (p + 1 - o) ~f:(Fn.const 0)
+        |> List.gen_permutations |> Quickcheck.random_value |> List.cons 1
+      else
+        (* Otherwise we have the freedom to make the first segment even if we
+           like. *)
+        List.init o ~f:(Fn.const 1) @ List.init (p + 1 - o) ~f:(Fn.const 0)
+        |> List.gen_permutations |> Quickcheck.random_value
+    in
+    (* We have to guarantee that the first segment has non-zero length. If it
+       will be made odd then there is no problem, but otherwise we have to
+       ensure it has length at least 2. *)
+    let first_segment_is_odd =
+      match odds_adjustment with 1 :: _ -> true | _ -> false
+    in
+    (* Partition the number 2 * e into p + 1 parts, all of which are even *)
+    let e_partition =
+      let minimum_cut = if first_segment_is_odd then 0 else 1 in
+      (* Non-decreasing sequence in the range [minimum_cut, e] *)
+      let sequence =
+        List.gen_with_length p (Int.gen_uniform_incl minimum_cut e)
+        |> Quickcheck.random_value |> List.sort ~compare
+      in
+      (* Successive differences starting at 0 and ending at e, then doubling,
+         for the required partition. *)
+      let successive_diffs start finish l =
+        List.map2_exn (start :: l) (l @ [ finish ]) ~f:(fun x y -> y - x)
+      in
+      sequence |> successive_diffs 0 e |> List.map ~f:(fun x -> 2 * x)
+    in
+    (* Now we can compute the lengths of the segments in our partition of the
+       command updates. *)
+    let segment_lengths =
+      List.map2_exn e_partition odds_adjustment ~f:(fun x y -> x + y)
+    in
+    assert (List.sum (module Int) segment_lengths ~f:Fn.id = (2 * e) + o) ;
+    (* Remember that we haven't been given the fee-payer update, so we should
+       take one less update for the first segment. *)
+    let segment_lengths =
+      match segment_lengths with
+      | segment_length :: segment_lengths ->
+          (segment_length - 1) :: segment_lengths
+      | _ ->
+          failwith "Invariant - must have at least one segment"
+    in
+    let from_segment_lengths lengths l =
+      let rec from_partition lengths l acc =
+        match lengths with
+        | [] ->
+            assert (List.is_empty l) ;
+            List.rev acc
+        | segment_length :: lengths ->
+            let part, l = List.split_n l segment_length in
+            from_partition lengths l (part :: acc)
+      in
+      from_partition lengths l []
+    in
+    let partitioned_payments =
+      from_segment_lengths segment_lengths paymentlike_updates
+    in
+    (* Put one marker between each element of ls *)
+    let interpose markers ls =
+      let markers = [] :: List.map markers ~f:(fun x -> [ x ]) in
+      List.zip_exn markers ls
+      |> List.concat_map ~f:(fun (marker, l) -> marker @ l)
+    in
+    interpose proof_updates partitioned_payments
+end
+
+(** Create a sequence of zkApp transactions and a ledger corresponding to those
+    transactions. Exactly one transaction will be generated for every possible
+    transaction constitution.
+
+    @param min_num_updates The minimum number of account updates per transaction (excluding the fee payer)
+    @param min_num_proof_updates The minimum number of proof updates per transaction
+    @param max_num_updates The maximum number of proof updates per transaction
+*)
+let create_ledger_and_zkapps ?(min_num_updates = 0) ?(min_num_proof_updates = 0)
     ~(proof_cache_db : Proof_cache_tag.cache_db)
     ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -200,6 +388,31 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
   in
   let zkapp_prover_and_vk = (prover, verification_key) in
   let%bind.Async.Deferred verification_key = verification_key in
+  let module Constitution = Constitution (struct
+    let genesis_constants = genesis_constants
+  end) in
+  (* Only consider constitutions that fit the given update bounds *)
+  let all_constitutions =
+    Constitution.all_valid_constitutions
+    |> List.filter ~f:(fun constitution ->
+           Constitution.num_updates_needed constitution <= max_num_updates
+           && Constitution.num_updates_needed constitution >= min_num_updates
+           && Constitution.num_proof_updates constitution
+              >= min_num_proof_updates )
+  in
+  if List.is_empty all_constitutions then
+    failwith
+      (Printf.sprintf
+         "No constitutions exist with %d <= updates <= %d and proof updates <= \
+          %d"
+         min_num_updates max_num_updates min_num_proof_updates ) ;
+  (* Once the constitutions have been filtered, we can calculate the actual
+     max_num_updates across all the commands we will generate very precisely. *)
+  let max_num_updates =
+    Constitution.all_valid_constitutions
+    |> List.map ~f:Constitution.num_updates_needed
+    |> List.max_elt ~compare |> Option.value_exn
+  in
   let num_keypairs = max_num_updates + 10 in
   let keypairs = List.init num_keypairs ~f:(fun _ -> Keypair.create ()) in
   let num_keypairs_in_ledger = max_num_updates + 1 in
@@ -336,114 +549,108 @@ let create_ledger_and_zkapps ?(min_num_updates = 1) ?(num_proof_updates = 0)
       ; preconditions = None
       } )
   in
-  let rec permute proof_parties non_proof_parties current_perm acc =
-    match (proof_parties, non_proof_parties) with
-    | [], [] ->
-        List.rev current_perm :: acc
-    | [], _ ->
-        List.rev (List.rev non_proof_parties @ current_perm) :: acc
-    | _, [] ->
-        List.rev (List.rev proof_parties @ current_perm) :: acc
-    | p :: ps, np :: nps ->
-        let perm1 = permute ps non_proof_parties (p :: current_perm) acc in
-        let perm2 = permute proof_parties nps (np :: current_perm) acc in
-        perm1 @ perm2
+  (* Given a target [constitution], generate a Zkapp_command that has that
+     constitution. Also record that command in the [transaction_combinations]
+     table so the benchmark can look it up later.
+
+     As an example, for the constitution {proof: 3; pair: 2; single: 2} we might
+     generate a command with perm_string SSPSSSPSP. A possible segmentation of
+     this command is (SS)(P)(SS)(S)(P)(S)(P), and the number of segments of each
+     type is correct, as you can see. *)
+  let generate_command_of_constitution constitution nonce =
+    let start = Time.now () in
+    let num_updates = Constitution.num_updates_needed constitution - 1 in
+    let num_proof_updates = constitution.proof_segments in
+    let empty_sender, spec = test_spec nonce ~num_proof_updates ~num_updates in
+    (* Generate a command with the right number of proof/non-proof updates, but
+       not necessarily in the right order. *)
+    let%bind.Async.Deferred parties =
+      Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
+        ~constraint_constants ~empty_sender spec
+        ~receiver_auth:Control.Tag.Signature
+    in
+    (* Harvest the updates (aside from the fee payer update) from the command
+       and partition them. *)
+    let simple_parties = Zkapp_command.to_simple parties in
+    let other_parties = simple_parties.account_updates in
+    let proof_parties, signature_parties, no_auths, _next_nonce =
+      List.fold ~init:([], [], [], nonce) other_parties
+        ~f:(fun (pc, sc, na, nonce) (p : Account_update.Simple.t) ->
+          let nonce =
+            if
+              Public_key.Compressed.equal p.body.public_key fee_payer_pk
+              && p.body.increment_nonce
+            then Mina_base.Account.Nonce.succ nonce
+            else nonce
+          in
+          match p.authorization with
+          | Proof _ ->
+              (p :: pc, sc, na, nonce)
+          | Signature _ ->
+              (pc, p :: sc, na, nonce)
+          | _ ->
+              (pc, sc, p :: na, nonce) )
+    in
+    printf
+      !"\n\n\
+        Generated zkapp transaction with %d updates and %d proof updates in %f \
+        secs\n\
+        %!"
+      (List.length other_parties + 1)
+      (List.length proof_parties)
+      Time.(Span.to_sec (diff (now ()) start)) ;
+    (* Arrange the account updates according to the target constitution *)
+    let account_updates =
+      Constitution.rearrange_updates constitution proof_parties
+        (signature_parties @ no_auths)
+    in
+    (* Create the command we want, with the right constitution *)
+    let p =
+      Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+        { simple_parties with account_updates }
+    in
+    let combination =
+      Transaction_key.of_zkapp_command ~constraint_constants ~ledger p
+    in
+    let perm_string =
+      List.fold ~init:"S" account_updates
+        ~f:(fun acc (p : Account_update.Simple.t) ->
+          match p.authorization with
+          | Proof _ ->
+              acc ^ "P"
+          | Signature _ ->
+              acc ^ "S"
+          | None_given ->
+              acc ^ "N" )
+    in
+    printf
+      !"Generated updates permutation for constitution {proof: %d; pair: %d; \
+        single: %d}: %s\n\
+        Updating authorizations...\n\
+        %!"
+      constitution.proof_segments constitution.signed_pair_segments
+      constitution.signed_single_segments perm_string ;
+    assert (combination.proof_segments = constitution.proof_segments) ;
+    assert (combination.signed_pair = constitution.signed_pair_segments) ;
+    assert (combination.signed_single = constitution.signed_single_segments) ;
+    Transaction_key.Table.add_exn transaction_combinations ~key:combination
+      ~data:(p, Time_values.empty, perm_string) ;
+    (* Update the authorizations *)
+    let%map.Async.Deferred p =
+      Zkapp_command_builder.replace_authorizations ~prover ~keymap p
+    in
+    (p, nonce)
   in
-  let rec generate_zkapp ~num_proof_updates ~num_updates acc nonce =
-    if num_updates > max_num_updates then Async.Deferred.return @@ List.rev acc
-    else if num_proof_updates > num_updates then
-      (* start a new iteration for transactions with one more update *)
-      generate_zkapp ~num_proof_updates:0 ~num_updates:(num_updates + 1) acc
-        nonce
-    else
-      let start = Time.now () in
-      let empty_sender, spec =
-        test_spec nonce ~num_proof_updates ~num_updates
-      in
-      let%bind.Async.Deferred parties =
-        Transaction_snark.For_tests.update_states ~zkapp_prover_and_vk
-          ~constraint_constants ~empty_sender spec
-          ~receiver_auth:Control.Tag.Signature
-      in
-      let simple_parties = Zkapp_command.to_simple parties in
-      let other_parties = simple_parties.account_updates in
-      let proof_parties, signature_parties, no_auths, _next_nonce =
-        List.fold ~init:([], [], [], nonce) other_parties
-          ~f:(fun (pc, sc, na, nonce) (p : Account_update.Simple.t) ->
-            let nonce =
-              if
-                Public_key.Compressed.equal p.body.public_key fee_payer_pk
-                && p.body.increment_nonce
-              then Mina_base.Account.Nonce.succ nonce
-              else nonce
-            in
-            match p.authorization with
-            | Proof _ ->
-                (p :: pc, sc, na, nonce)
-            | Signature _ ->
-                (pc, p :: sc, na, nonce)
-            | _ ->
-                (pc, sc, p :: na, nonce) )
-      in
-      printf
-        !"\n\n\
-          Generated zkapp transactions with %d updates and %d proof updates in \
-          %f secs\n\
-          %!"
-        (List.length other_parties + 1)
-        (List.length proof_parties)
-        Time.(Span.to_sec (diff (now ()) start)) ;
-      let%bind.Async.Deferred permutations =
-        permute proof_parties (signature_parties @ no_auths) [] []
-        |> Async.Deferred.List.filter_mapi ~how:`Sequential
-             ~f:(fun i (account_updates : Account_update.Simple.t list) ->
-               let p =
-                 Zkapp_command.of_simple ~signature_kind ~proof_cache_db
-                   { simple_parties with account_updates }
-               in
-               let combination =
-                 Transaction_key.of_zkapp_command ~constraint_constants ~ledger
-                   p
-               in
-               let perm_string =
-                 List.fold ~init:"S" account_updates
-                   ~f:(fun acc (p : Account_update.Simple.t) ->
-                     match p.authorization with
-                     | Proof _ ->
-                         acc ^ "P"
-                     | Signature _ ->
-                         acc ^ "S"
-                     | None_given ->
-                         acc ^ "N" )
-               in
-               if Transaction_key.Table.mem transaction_combinations combination
-               then (
-                 printf "Skipping %s\n%!" perm_string ;
-                 Async.Deferred.return None )
-               else (
-                 printf
-                   !"Generated updates permutation %d: %s\n\
-                     Updating authorizations...\n\
-                     %!"
-                   i perm_string ;
-                 (*Update the authorizations*)
-                 let%map.Async.Deferred p =
-                   Zkapp_command_builder.replace_authorizations ~prover ~keymap
-                     p
-                 in
-                 Transaction_key.Table.add_exn transaction_combinations
-                   ~key:combination
-                   ~data:(p, Time_values.empty, perm_string) ;
-                 Some p ) )
-      in
-      generate_zkapp ~num_proof_updates:(num_proof_updates + 1) ~num_updates
-        (permutations @ acc) nonce
+  let%map.Async.Deferred zkapp_rev, _nonce =
+    Async.Deferred.List.fold Constitution.all_valid_constitutions
+      ~init:([], Mina_base.Account.Nonce.zero)
+      ~f:(fun (commands, nonce) constitution ->
+        let%map.Async.Deferred command, nonce =
+          generate_command_of_constitution constitution nonce
+        in
+        (command :: commands, nonce) )
   in
-  let%map.Async.Deferred zkapp =
-    generate_zkapp ~num_proof_updates ~num_updates:min_num_updates []
-      Mina_base.Account.Nonce.zero
-  in
-  (ledger, zkapp)
+  (ledger, List.rev zkapp_rev)
 
 let time thunk =
   let start = Time.now () in
