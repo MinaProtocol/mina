@@ -31,6 +31,7 @@ function usage() {
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
+  echo "      --deb-suffix          The debian suffix to use for the docker image"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -52,6 +53,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-profile) DEB_PROFILE="$2"; shift;;
   --deb-repo) INPUT_REPO="$2"; shift;;
   --deb-build-flags) DEB_BUILD_FLAGS="$2"; shift;;
+  --deb-suffix) 
+      # shellcheck disable=SC2034
+      DOCKER_DEB_SUFFIX="--build-arg deb_suffix=$2"; shift;;
   --deb-repo-key) 
       # shellcheck disable=SC2034
       DEB_REPO_KEY="$2"; shift;;
@@ -137,9 +141,13 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
-    mina-daemon-hardfork)
+    mina-daemon-legacy-hardfork)
+        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        DOCKER_CONTEXT="dockerfiles/"
+        ;;
+    mina-daemon-auto-hardfork)
         if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
-          echo "Legacy version is not set for mina-daemon-hardfork."
+          echo "Legacy version is not set for mina-daemon-auto-hardfork."
           echo "Please provide the --deb-legacy-version argument."
           exit 1
         fi

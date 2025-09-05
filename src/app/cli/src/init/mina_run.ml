@@ -1,3 +1,9 @@
+(*
+  Mina_run provides the runtime layer for the Mina daemon, building on 
+  Mina_lib’s core protocol logic. It manages GraphQL APIs, node status 
+  reporting, crash/shutdown handling, and configuration setup, acting as the 
+  control panel connecting Mina_lib to CLI tools and external services. *)
+
 open Core
 open Async
 module Graphql_cohttp_async =
@@ -306,7 +312,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           | Ok ledger -> (
               match ledger with
               | Genesis_epoch_ledger l ->
-                  let%map accts = Mina_ledger.Ledger.to_list l in
+                  let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+                  let%map accts = Mina_ledger.Ledger.to_list l_inner in
                   Ok accts
               | Ledger_root l ->
                   let casted = Mina_ledger.Ledger.Root.as_unmasked l in

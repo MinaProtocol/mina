@@ -15,7 +15,8 @@
   genesis_constants
   logger
   mina_runtime_config
-  mina_version)
+  mina_version
+  mina_caqti)
  (instrumentation
   (backend bisect_ppx --bisect-sigterm))
  (preprocess

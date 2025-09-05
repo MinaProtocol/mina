@@ -1708,6 +1708,7 @@ function pull(){
     local __target="."
     local __codenames="$DEFAULT_CODENAMES"
     local __networks="$DEFAULT_NETWORKS"
+    local __from_special_folder
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -1731,6 +1732,10 @@ function pull(){
                 __buildkite_build_id=${2:?$error_message}
                 shift 2;
             ;;
+            --from-special-folder )
+                __from_special_folder=${2:?$error_message}
+                shift 2;
+            ;;
             --target )
                 __target=${2:?$error_message}
                 shift 2;
@@ -1747,20 +1752,27 @@ function pull(){
         esac
     done
 
+    if [[ -z ${__buildkite_build_id+x} && -z ${__from_special_folder+x} ]]; then
+        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
+        pull_help; exit 1;
+    fi
+
+
     echo ""
     echo " ℹ️  Pulling mina artifacts with following parameters:"
     echo " - Backend: $__backend"
     echo " - Artifacts: $__artifacts"
-    echo " - Buildkite build id: $__buildkite_build_id"
     echo " - Target: $__target"
     echo " - Codenames: $__codenames"
     echo " - Networks: $__networks"
-
-    if [[ -z ${__buildkite_build_id+x} ]]; then
-        echo -e "❌ ${RED} !! Buildkite build id (--buildkite-build-id) is required${CLEAR}\n";
-        pull_help; exit 1;
+    if [[ -n ${__from_special_folder+x} ]]; then
+        echo " - From special folder: $__from_special_folder"
     fi
-    
+    if [[ -n ${__buildkite_build_id+x} ]]; then
+        echo " - Buildkite build id: $__buildkite_build_id"
+    fi
+
+
     IFS=', '
     read -r -a __artifacts_arr <<< "$__artifacts"
     read -r -a __codenames_arr <<< "$__codenames"
@@ -1771,8 +1783,16 @@ function pull(){
             for network in "${__networks_arr[@]}"; do
                 echo "  📥  Pulling $__artifact for $__codename codename and $network network"
                 local __artifact_full_name
+                local __source_path
                 __artifact_full_name=$(get_artifact_with_suffix $__artifact $network)
-                storage_download "$__backend" "$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact_full_name}_*" "$__target"
+
+                if [[ -n ${__from_special_folder+x} ]]; then
+                    __source_path="$(storage_root "$__backend")/$__from_special_folder/${__artifact_full_name}_*"
+                else
+                    __source_path="$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact_full_name}_*"
+                fi
+
+                storage_download "$__backend" "$__source_path" "$__target"
             done
         done
     done

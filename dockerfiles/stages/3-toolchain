@@ -35,6 +35,7 @@ RUN apt-get update --yes \
     python3-pip \
     python3-sexpdata \
     rubygems \
+    wget \
   && rm -rf /var/lib/apt/lists/*
 
 # --- deb-s3 tool

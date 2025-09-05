@@ -71,3 +71,24 @@ let deriver inner obj =
   iso ~map:V.of_list_exn ~contramap:V.to_list
     ((list ~static_length:max_size_int @@ inner @@ o ()) (o ()))
     obj
+
+module Hardfork = struct
+  module Max_state_size = Nat.N32
+
+  module State_length_vec :
+    Vector.VECTOR with type 'a t = ('a, Max_state_size.n) Vector.vec =
+    Vector.Vector_32
+
+  module V = struct
+    type 'a t = 'a State_length_vec.Stable.V1.t
+    [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
+  end
+
+  module Value = struct
+    type t = Zkapp_basic.F.Stable.V1.t V.t
+    [@@deriving sexp, equal, hash, compare, yojson, bin_io_unversioned]
+
+    let of_stable (value : Value.Stable.Latest.t) : t =
+      Vector.extend_front_exn value Nat.N32.n Zkapp_basic.F.zero
+  end
+end

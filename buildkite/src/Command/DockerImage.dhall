@@ -44,6 +44,7 @@ let ReleaseSpec =
           , deb_release : Text
           , deb_version : Text
           , deb_legacy_version : Text
+          , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
@@ -71,6 +72,7 @@ let ReleaseSpec =
           , no_debian = False
           , step_key_suffix = "-docker-image"
           , verify = False
+          , deb_suffix = None Text
           , if = None B/If
           }
       }
@@ -101,8 +103,8 @@ let generateStep =
 
                 then  " && echo Skipping local debian repo setup "
 
-                else      " && apt update && apt install -y aptly"
-                      ++  " && ./buildkite/scripts/debian/start_local_repo.sh"
+                else      " && ./buildkite/scripts/debian/update.sh --verbose"
+                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh"
 
           let maybeStopDebianRepo =
                       if spec.no_debian
@@ -128,7 +130,13 @@ let generateStep =
                           "${BuildFlags.toSuffixLowercase spec.build_flags}"
                       }
                       spec.build_flags
+                  , spec.deb_suffix
                   ]
+
+          let debSuffix =
+                merge
+                  { None = "", Some = \(s : Text) -> " --deb-suffix " ++ s }
+                  spec.deb_suffix
 
           let maybeVerify =
                       if     spec.verify
@@ -167,6 +175,7 @@ let generateStep =
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
+                ++  debSuffix
                 ++  " --repo ${spec.repo}"
 
           let releaseDockerCmd =

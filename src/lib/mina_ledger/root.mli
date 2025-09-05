@@ -1,9 +1,19 @@
-open Core_kernel
 open Mina_base
 
 module type Stable_db_intf =
   Merkle_ledger.Intf.Ledger.DATABASE
     with type account := Account.t
+     and type key := Signature_lib.Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type hash := Ledger_hash.t
+     and type root_hash := Ledger_hash.t
+
+module type Unstable_db_intf =
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with type account := Account.Unstable.t
      and type key := Signature_lib.Public_key.Compressed.t
      and type token_id := Token_id.t
      and type token_id_set := Token_id.Set.t
@@ -22,6 +32,18 @@ module type Any_ledger_intf =
      and type account_id_set := Account_id.Set.t
      and type hash := Ledger_hash.t
 
+module type Converting_ledger_intf =
+  Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Signature_lib.Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type converted_account := Account.Unstable.t
+
 (** Make a root ledger. A root ledger is a database-backed, unmasked ledger used
     at the root of a mina ledger mask tree. Currently only a single stable
     database is supported; an option will be added in future to create root
@@ -32,7 +54,15 @@ module Make
     (Any_ledger : Any_ledger_intf)
     (Stable_db : Stable_db_intf
                    with module Location = Any_ledger.M.Location
-                    and module Addr = Any_ledger.M.Addr) : sig
+                    and module Addr = Any_ledger.M.Addr)
+    (Unstable_db : Unstable_db_intf
+                     with module Location = Any_ledger.M.Location
+                      and module Addr = Any_ledger.M.Addr)
+    (Converting_ledger : Converting_ledger_intf
+                           with module Location = Any_ledger.M.Location
+                            and module Addr = Any_ledger.M.Addr
+                           with type primary_ledger = Stable_db.t
+                            and type converting_ledger = Unstable_db.t) : sig
   type t
 
   type root_hash = Ledger_hash.t
@@ -45,6 +75,35 @@ module Make
 
   type path = Stable_db.path
 
+  module Config : sig
+    type t [@@deriving yojson]
+
+    (** The kind of database that should be used for this root. Only a single
+        database of [Account.Stable.Latest.t] accounts is supported. A future
+        update will add a converting merkle tree backing. *)
+    type backing_type = Stable_db | Converting_db
+
+    (** Create a root ledger configuration with the given backing type, using
+        the [directory_name] as a template for its location *)
+    val with_directory : backing_type:backing_type -> directory_name:string -> t
+
+    (** Test if a root ledger backing already exists with this config *)
+    val exists_backing : t -> bool
+
+    (** Delete a backing of any type that might exist with this config, if present. this function will try any backing type *)
+    val delete_any_backing : string -> unit
+
+    (** Delete backing of a specific config *)
+    val delete_backing : t -> unit
+
+    (** Move the root backing at [src] to [dst]. Assumptions: the [src] and
+        [dst] configs must have the same configured backing, there must be a
+        root backing of the appropriate type at [src], there must not be a root
+        backing at [dst], and there must be no database connections open for
+        [src]. *)
+    val move_backing_exn : src:t -> dst:t -> unit
+  end
+
   (** Close the root ledger instance *)
   val close : t -> unit
 
@@ -53,31 +112,25 @@ module Make
 
   (** Create a root ledger backed by a single database in the given
       directory. *)
-  val create_single : ?directory_name:string -> depth:int -> unit -> t
+  val create : logger:Logger.t -> config:Config.t -> depth:int -> unit -> t
+
+  val create_temporary :
+       logger:Logger.t
+    -> backing_type:Config.backing_type
+    -> depth:int
+    -> unit
+    -> t
 
   (** Make a checkpoint of the root ledger and return a new root ledger backed
       by that checkpoint *)
-  val create_checkpoint : t -> directory_name:string -> unit -> t
+  val create_checkpoint : t -> config:Config.t -> unit -> t
 
   (** Make a checkpoint of the root ledger *)
-  val make_checkpoint : t -> directory_name:string -> unit
+  val make_checkpoint : t -> config:Config.t -> unit
 
   (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
       that does not need to know how the root is implemented *)
   val as_unmasked : t -> Any_ledger.witness
-
-  (** Use the given [stable] account transfer method to transfer the accounts
-      from one root ledger instance to another. For a root ledger backed by a
-      single database (currently the only option) it is equivalent to using
-      [stable] or a normal ledger transfer on the root. Future root backings
-      should be able to support more efficient transfers (e.g., for a converting
-      databases the accounts could be transferred directly between the
-      underlying pair of databases)*)
-  val transfer_accounts_with :
-       stable:(src:Stable_db.t -> dest:Stable_db.t -> Stable_db.t Or_error.t)
-    -> src:t
-    -> dest:t
-    -> t Or_error.t
 
   (** Retrieve the depth of the root ledger *)
   val depth : t -> int

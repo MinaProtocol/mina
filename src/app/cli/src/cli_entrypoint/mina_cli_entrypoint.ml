@@ -725,9 +725,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         in
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
-        let time_controller =
-          Block_time.Controller.create @@ Block_time.Controller.basic ~logger
-        in
+        let time_controller = Block_time.Controller.basic ~logger in
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
           let config_file_installed =
@@ -1144,8 +1142,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let consensus_local_state =
             Consensus.Data.Local_state.create
               ~context:(module Context)
-              ~genesis_ledger:
-                (Precomputed_values.genesis_ledger precomputed_values)
+              ~genesis_ledger:precomputed_values.genesis_ledger
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
               ( Option.map block_production_keypair ~f:(fun keypair ->
@@ -1689,7 +1686,8 @@ let internal_commands logger ~itn_features =
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-        ~commit_id:Mina_version.commit_id )
+        ~commit_id:Mina_version.commit_id
+        ~signature_kind:Mina_signature_kind.t_DEPRECATED )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
