@@ -368,7 +368,7 @@ let submit_single ~is_from_zkapp ~partitioner
 let submit_into_pending_zkapp_command ~partitioner
     ~job_id:({ range; _ } as job_id : Work.Id.Sub_zkapp.t)
     ~data:
-      ({ proof; data = elapsed } :
+      ({ proof; data = elapsed } as data :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
   let single_id = Work.Id.Sub_zkapp.to_single job_id in
   let finalize_zkapp_proof pending =
@@ -388,7 +388,9 @@ let submit_into_pending_zkapp_command ~partitioner
         partitioner.zkapp_jobs_sent_by_partitioner
     , Single_id_map.find partitioner.pending_zkapp_commands single_id )
   with
-  | Some _, Some pending -> (
+  | Some job, Some pending -> (
+      Work.Spec.Partitioned.Poly.Stable.Latest.Sub_zkapp_command { job; data }
+      |> Work.Metrics.emit_partitioned_metrics ~logger:partitioner.logger ;
       match
         Pending_zkapp_command.submit_proof ~proof ~elapsed ~range pending
       with
