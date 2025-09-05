@@ -457,13 +457,13 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-      let location =
-        Persistent_root.Instance.Locations.make_potential_snarked_ledger
+      let config =
+        Persistent_root.Instance.Config.make_potential_snarked_ledger
           t.persistent_root_instance.factory
       in
       let () =
         Ledger.Root.make_checkpoint t.persistent_root_instance.snarked_ledger
-          ~directory_name:location
+          ~config
       in
       [%log' info t.logger]
         ~metadata:
@@ -473,7 +473,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
                    t.persistent_root_instance.snarked_ledger )
           ]
         "Enqueued a snarked ledger" ;
-      Persistent_root.Instance.enqueue_snarked_ledger ~location
+      Persistent_root.Instance.enqueue_snarked_ledger ~config
         t.persistent_root_instance ;
       let s = t.root_ledger in
       (* STEP 4 *)
@@ -880,34 +880,30 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
           `Disabled ) )
     && not has_long_catchup_job
   then
-    Debug_assert.debug_assert (fun () ->
-        match
-          Consensus.Hooks.required_local_state_sync
-            ~constants:consensus_constants
-            ~consensus_state:
-              (Breadcrumb.consensus_state
-                 (Hashtbl.find_exn t.table t.best_tip).breadcrumb )
-            ~local_state:t.consensus_local_state
-        with
-        | Some jobs ->
-            (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
-            if local_state_was_synced_at_start then (
-              [%log' fatal t.logger]
-                "after lock transition, the best tip consensus state is out of \
-                 sync with the local state -- bug in either \
-                 required_local_state_sync or frontier_root_transition."
-                ~metadata:
-                  [ ( "sync_jobs"
-                    , Consensus.Hooks.local_state_sync_to_yojson jobs )
-                  ; ( "local_state"
-                    , Consensus.Data.Local_state.to_yojson
-                        t.consensus_local_state )
-                  ; ("tf_viz", `String (visualize_to_string t))
-                  ] ;
-              failwith
-                "local state desynced after applying diffs to full frontier" )
-        | None ->
-            () ) ;
+    assert (
+      match
+        Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
+          ~consensus_state:
+            (Breadcrumb.consensus_state
+               (Hashtbl.find_exn t.table t.best_tip).breadcrumb )
+          ~local_state:t.consensus_local_state
+      with
+      | Some jobs when local_state_was_synced_at_start ->
+          (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
+          [%log' fatal t.logger]
+            "after lock transition, the best tip consensus state is out of \
+             sync with the local state -- bug in either \
+             required_local_state_sync or frontier_root_transition."
+            ~metadata:
+              [ ("sync_jobs", Consensus.Hooks.local_state_sync_to_yojson jobs)
+              ; ( "local_state"
+                , Consensus.Data.Local_state.to_yojson t.consensus_local_state
+                )
+              ; ("tf_viz", `String (visualize_to_string t))
+              ] ;
+          failwith "local state desynced after applying diffs to full frontier"
+      | _ ->
+          true ) ;
   `New_root_and_diffs_with_mutants (new_root, diffs_with_mutants)
 
 module For_tests = struct
@@ -999,7 +995,8 @@ module For_tests = struct
     let consensus_local_state =
       Consensus.Data.Local_state.create
         ~context:(module Context)
-        Public_key.Compressed.Set.empty ~genesis_ledger:Genesis_ledger.t
+        Public_key.Compressed.Set.empty
+        ~genesis_ledger:(module Genesis_ledger)
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:
@@ -1028,7 +1025,7 @@ module For_tests = struct
         ~directory:(Filename.temp_file "snarked_ledger" "")
         ~ledger_depth
     in
-    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    Persistent_root.reset_to_genesis_exn ~precomputed_values persistent_root ;
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in

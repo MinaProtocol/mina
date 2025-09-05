@@ -28,30 +28,21 @@ end)
                         and type root_hash := Inputs.Hash.t
                         and type hash := Inputs.Hash.t
                         and type account_id := Inputs.Account_id.t
-                        and type account_id_set := Inputs.Account_id.Set.t) : sig
-  include
-    Intf.Ledger.S
-      with module Location = Inputs.Location
-       and module Addr = Inputs.Location.Addr
-       and type key := Inputs.Key.t
-       and type token_id := Inputs.Token_id.t
-       and type token_id_set := Inputs.Token_id.Set.t
-       and type account := Inputs.Account.t
-       and type root_hash := Inputs.Hash.t
-       and type hash := Inputs.Hash.t
-       and type account_id := Inputs.Account_id.t
-       and type account_id_set := Inputs.Account_id.Set.t
-
-  val of_ledgers : Primary_ledger.t -> Converting_ledger.t -> t
-
-  val of_ledgers_with_migration : Primary_ledger.t -> Converting_ledger.t -> t
-
-  val primary_ledger : t -> Primary_ledger.t
-
-  val converting_ledger : t -> Converting_ledger.t
-
-  val convert : Inputs.Account.t -> Inputs.converted_account
-end = struct
+                        and type account_id_set := Inputs.Account_id.Set.t) :
+  Intf.Ledger.Converting.S
+    with module Location = Inputs.Location
+     and module Addr = Inputs.Location.Addr
+     and type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account := Inputs.Account.t
+     and type root_hash := Inputs.Hash.t
+     and type hash := Inputs.Hash.t
+     and type account_id := Inputs.Account_id.t
+     and type account_id_set := Inputs.Account_id.Set.t
+     and type converted_account := Inputs.converted_account
+     and type primary_ledger = Primary_ledger.t
+     and type converting_ledger = Converting_ledger.t = struct
   let convert = Inputs.convert
 
   module Location = Inputs.Location
@@ -61,6 +52,10 @@ end = struct
   type path = Primary_ledger.path
 
   type index = int
+
+  type primary_ledger = Primary_ledger.t
+
+  type converting_ledger = Converting_ledger.t
 
   type t =
     { primary_ledger : Primary_ledger.t
@@ -211,6 +206,23 @@ end = struct
     Primary_ledger.get_hash_batch_exn t.primary_ledger locations
 
   let detached_signal t = Primary_ledger.detached_signal t.primary_ledger
+
+  let all_accounts_on_masks _ = Location.Map.empty
+end
+
+module With_database_config = struct
+  type t = { primary_directory : string; converting_directory : string }
+  [@@deriving yojson]
+
+  type create = Temporary | In_directories of t
+
+  let default_converting_directory_name primary_directory_name =
+    primary_directory_name ^ "_converting"
+
+  let with_primary ~directory_name =
+    { primary_directory = directory_name
+    ; converting_directory = default_converting_directory_name directory_name
+    }
 end
 
 module With_database (Inputs : sig
@@ -246,20 +258,7 @@ end)
                     and type account_id_set := Inputs.Account_id.Set.t) =
 struct
   include Make (Inputs) (Primary_db) (Converting_db)
-
-  module Config = struct
-    type t = { primary_directory : string; converting_directory : string }
-
-    type create = Temporary | In_directories of t
-
-    let default_converting_directory_name primary_directory_name =
-      primary_directory_name ^ "_converting"
-
-    let with_primary ~directory_name =
-      { primary_directory = directory_name
-      ; converting_directory = default_converting_directory_name directory_name
-      }
-  end
+  module Config = With_database_config
 
   let dbs_synced db1 db2 =
     Primary_db.num_accounts db1 = Converting_db.num_accounts db2

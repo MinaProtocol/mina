@@ -171,4 +171,6 @@ end = struct
   let depth t = t.depth
 
   let detached_signal _ = Async_kernel.Deferred.never ()
+
+  let all_accounts_on_masks _ = Location.Map.empty
 end

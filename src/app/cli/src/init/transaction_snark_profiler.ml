@@ -56,19 +56,19 @@ let run ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
     go repeats
 
 let dry ~genesis_constants ~constraint_constants ~proof_level ~max_num_updates
-    ?min_num_updates num_transactions repeats preeval use_zkapps () =
+    ~logger ?min_num_updates num_transactions repeats preeval use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't check base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
       run ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
-          (check_base_snarks ~genesis_constants ~constraint_constants)
+          (check_base_snarks ~genesis_constants ~constraint_constants ~logger)
         ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
         repeats preeval use_zkapps )
 
 let witness ~genesis_constants ~constraint_constants ~proof_level
-    ~max_num_updates ?min_num_updates num_transactions repeats preeval
+    ~max_num_updates ~logger ?min_num_updates num_transactions repeats preeval
     use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't generate witnesses for base SNARKs on zkApps"
@@ -76,14 +76,15 @@ let witness ~genesis_constants ~constraint_constants ~proof_level
   Test_util.with_randomness 123456789 (fun () ->
       run ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
-          (generate_base_snarks_witness ~genesis_constants ~constraint_constants)
+          (generate_base_snarks_witness ~genesis_constants ~constraint_constants
+             ~logger )
         ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
         repeats preeval use_zkapps )
 
 let main ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
-    preeval use_zkapps () =
+    ~proof_level ~max_num_updates ~logger ?min_num_updates num_transactions
+    repeats preeval use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
         let signature_kind = Mina_signature_kind.t_DEPRECATED
@@ -94,7 +95,7 @@ let main ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       end) in
       run ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
-          (profile_user_command ~genesis_constants ~constraint_constants
+          (profile_user_command ~genesis_constants ~constraint_constants ~logger
              (module T) )
         ~zkapp_profiler:(profile_zkapps ~constraint_constants)
         num_transactions ~max_num_updates ?min_num_updates repeats preeval
@@ -146,6 +147,7 @@ let command =
             fee payer). Minimum: 1 Default: 1 "
          (optional int)
      in
+     let logger = Logger.create () in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
        |> Option.value ~default:`Two_from_same
@@ -180,13 +182,13 @@ let command =
      let proof_cache_db = Proof_cache_tag.create_identity_db () in
      if witness_only then
        witness ~proof_cache_db ~genesis_constants ~constraint_constants
-         ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
-         preeval use_zkapps
+         ~proof_level ~max_num_updates ~logger ?min_num_updates num_transactions
+         repeats preeval use_zkapps
      else if check_only then
        dry ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
-         ~max_num_updates ?min_num_updates num_transactions repeats preeval
-         use_zkapps
+         ~max_num_updates ~logger ?min_num_updates num_transactions repeats
+         preeval use_zkapps
      else
        main ~proof_cache_db ~genesis_constants ~constraint_constants
-         ~proof_level ~max_num_updates ?min_num_updates num_transactions repeats
-         preeval use_zkapps )
+         ~proof_level ~max_num_updates ~logger ?min_num_updates num_transactions
+         repeats preeval use_zkapps )

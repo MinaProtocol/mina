@@ -70,8 +70,10 @@ esac
 
 if [[ "$SIGNED" == 1 ]]; then
   SIGNED=" (wget -q https://'$REPO'/repo-signing-key.gpg -O /etc/apt/trusted.gpg.d/minaprotocol.gpg ) && apt-get update > /dev/null && "
+  TRUSTED=""
 else 
   SIGNED=""
+  TRUSTED="[trusted=yes]"
 fi
 
 
@@ -80,7 +82,7 @@ SCRIPT=' set -x \
     && echo installing '$PACKAGE' \
     && apt-get update > /dev/null \
     && apt-get install -y lsb-release ca-certificates wget gnupg > /dev/null \
-    && '$SIGNED' echo "deb https://'$REPO' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
+    && '$SIGNED' echo "deb '$TRUSTED' https://'$REPO' '$CODENAME' '$CHANNEL'" > /etc/apt/sources.list.d/mina.list \
     && apt-get update > /dev/null \
     && apt list -a '$PACKAGE' \
     && apt-get install -y --allow-downgrades '$PACKAGE'='$VERSION' \
