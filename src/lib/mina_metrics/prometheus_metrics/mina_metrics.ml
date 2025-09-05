@@ -285,11 +285,11 @@ module Cryptography = struct
     in
     Counter.v "snark_work_zkapp_base_submissions" ~help ~namespace ~subsystem
 
-  let snark_work_base_submissions =
+  let snark_work_nonzkapp_base_submissions =
     let help =
       "Number of base transactions snarks for non-zkapp transactions submitted"
     in
-    Counter.v "snark_work_base_submissions" ~help ~namespace ~subsystem
+    Counter.v "snark_work_nonzkapp_base_submissions" ~help ~namespace ~subsystem
 
   let zkapp_transaction_length =
     let help = "Number of updates in a zkapp transaction" in

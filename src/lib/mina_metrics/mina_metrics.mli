@@ -67,7 +67,7 @@ module Cryptography : sig
      worker. *)
   val snark_work_zkapp_base_submissions : Counter.t
 
-  val snark_work_base_submissions : Counter.t
+  val snark_work_nonzkapp_base_submissions : Counter.t
 
   val zkapp_transaction_length : Counter.t
 

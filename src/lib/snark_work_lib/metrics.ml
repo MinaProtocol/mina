@@ -76,8 +76,10 @@ let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t)
           Perf_histograms.add_span ~name:"snark_worker_nonzkapp_transition_time"
             elapsed ;
           Mina_metrics.(
-            Counter.inc Cryptography.snark_work_nonzkapp_base_time_sec
-              (Time.Span.to_sec elapsed)) ) ;
+            Cryptography.(
+              Counter.inc snark_work_nonzkapp_base_time_sec
+                (Time.Span.to_sec elapsed) ;
+              Counter.inc_one snark_work_nonzkapp_base_submissions)) ) ;
       [%log info]
         "Base SNARK generated in $elapsed for $transaction_type transaction"
         ~metadata:
@@ -101,7 +103,7 @@ let emit_partitioned_metrics ~logger
         ~name:"snark_worker_sub_zkapp_command_segment_time" elapsed ;
       Mina_metrics.(
         Cryptography.(
-          Counter.inc zkapp_transaction_length 1.0 ;
+          Counter.inc_one zkapp_transaction_length ;
           Counter.inc zkapp_proof_updates
             (match spec with Proved -> 1.0 | _ -> 0.0) ;
           Counter.inc snark_work_zkapp_base_time_sec (Time.Span.to_sec elapsed))) ;

@@ -74,7 +74,7 @@ module Cryptography = struct
 
   let snark_work_zkapp_base_submissions : Counter.t = ()
 
-  let snark_work_base_submissions : Counter.t = ()
+  let snark_work_nonzkapp_base_submissions : Counter.t = ()
 
   let zkapp_proof_updates : Counter.t = ()
 
