@@ -32,6 +32,8 @@ let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t)
     ->
       ( match Transaction_type.of_transaction transaction with
       | `Zkapp_command ->
+          (* WARN: with work partitioner, each metrics emission would reach both
+             this branch and [emit_partitioned_metrics] *)
           Perf_histograms.add_span ~name:"snark_worker_zkapp_transition_time"
             elapsed ;
           Mina_metrics.(
