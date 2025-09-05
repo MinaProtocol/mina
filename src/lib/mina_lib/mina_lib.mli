@@ -118,7 +118,11 @@ val snark_work_fee : t -> Currency.Fee.t
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
 val request_work :
-  t -> Snark_work_lib.Spec.Partitioned.Stable.Latest.t Or_error.t option
+     t
+  -> ( Snark_work_lib.Spec.Partitioned.Stable.Latest.t
+     , Work_partitioner.Snark_worker_shared.Failed_to_generate_inputs.t )
+     Result.t
+     option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 

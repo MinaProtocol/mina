@@ -393,9 +393,17 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
 
               Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
               Deferred.return (Some spec)
-          | Some (Error e) ->
-              [%log error] "Mina_lib.request_work failed"
-                ~metadata:[ ("error", `String (Error.to_string_hum e)) ] ;
+          | Some (Error (`Failed_to_generate_inputs (zkapp_cmd, e))) ->
+              let open Mina_base.Zkapp_command in
+              [%log error]
+                "Mina_lib.request_work failed to generate inputs for a zkapp \
+                 command"
+                ~metadata:
+                  [ ("error", `String (Error.to_string_hum e))
+                  ; ( "zkapp_cmd"
+                    , Stable.Latest.to_yojson
+                      @@ read_all_proofs_from_disk zkapp_cmd )
+                  ] ;
               Deferred.return None )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
