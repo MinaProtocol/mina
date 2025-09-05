@@ -74,6 +74,7 @@ module Instance = struct
     let make_instance_config subdirectory t =
       Ledger.Root.Config.with_directory ~backing_type:t.backing_type
         ~directory_name:(make_instance_location subdirectory t)
+        ()
 
     (** The config for the actual snarked ledger that is initialized and used by
         the daemon *)

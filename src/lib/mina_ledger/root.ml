@@ -79,16 +79,17 @@ struct
     let exists_backing = function
       | Stable_db_config path ->
           file_exists path
-      | Converting_db_config { primary_directory; converting_directory } ->
+      | Converting_db_config { primary_directory; converting_directory; _ } ->
           file_exists primary_directory && file_exists converting_directory
 
-    let with_directory ~backing_type ~directory_name =
+    let with_directory ~backing_type ~directory_name ?monitor_in_sync () =
       match backing_type with
       | Stable_db ->
           Stable_db_config directory_name
       | Converting_db ->
           Converting_db_config
-            (Converting_ledger.Config.with_primary ~directory_name)
+            (Converting_ledger.Config.with_primary ~directory_name
+               ?monitor_in_sync () )
 
     let delete_any_backing primary =
       let converting =
@@ -100,7 +101,7 @@ struct
     let delete_backing = function
       | Stable_db_config primary ->
           Mina_stdlib_unix.File_system.rmrf primary
-      | Converting_db_config { primary_directory; converting_directory } ->
+      | Converting_db_config { primary_directory; converting_directory; _ } ->
           Mina_stdlib_unix.File_system.rmrf primary_directory ;
           Mina_stdlib_unix.File_system.rmrf converting_directory
 
@@ -114,10 +115,12 @@ struct
       | ( Converting_db_config
             { primary_directory = src_primary
             ; converting_directory = src_converted
+            ; _
             }
         , Converting_db_config
             { primary_directory = dst_primary
             ; converting_directory = dst_converted
+            ; _
             } ) ->
           Sys.rename src_primary dst_primary ;
           Sys.rename src_converted dst_converted
