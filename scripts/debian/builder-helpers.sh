@@ -21,7 +21,7 @@ GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 SUGGESTED_DEPS="jq, curl, wget"
 
-TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker"
+TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce "
 
 case "${MINA_DEB_CODENAME}" in
   noble)
