@@ -97,8 +97,8 @@ main() {
     parse_args "$@"
 
     local create_schema="src/app/archive/create_schema.sql"
-    local drop_table="src/app/archive/drop_table.sql"
-    local upgrade_script="src/app/archive/upgrade_to_mesa.sql"
+    local drop_table="src/app/archive/drop_tables.sql"
+    local upgrade_script="src/app/archive/upgrade-to-mesa.sql"
 
     # Check if either monitored file has changes
     local schema_changed=false
