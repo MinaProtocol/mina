@@ -1,8 +1,8 @@
 ## Background
 
-This is library implements a SNARK worker. A SNARK worker is an abstraction of a running CPU thread, generating proofs as they poll works from the SNARK coordinator, and submitting the proofs back to coordinator so the coordinator could broadcast them proofs to other daemons, or include them in a block, etc. 
+This library implements a SNARK worker. A SNARK worker is an abstraction of a running CPU thread, generating proofs as they poll works from the SNARK coordinator, and submitting the proofs back to coordinator so the coordinator could broadcast the resulting proofs to other Mina nodes, or include them in a block, etc. 
 
-While there's a clear abstraction for a SNARK worker, there isn't one for a SNARK coordinator. Instead, we have a daemon, which can act as a coordinator, or a block producer, etc. based on the configuration. The "server" endpoint of SNARK Worker RPCs defined in this folder could be found in function `setup_local_server` in `app/cli/src/init/mina_run.ml`.
+A SNARK coordinator, is a Mina node exposing an "server" endpoint accessible by SNARK workers, implemented all RPCs necessary. These endpoints are defined in function `setup_local_server` in `app/cli/src/init/mina_run.ml`.
 
 
 ## What is a work? 
