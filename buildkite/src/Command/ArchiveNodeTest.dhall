@@ -1,7 +1,3 @@
-let B = ../External/Buildkite.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 let Artifacts = ../Constants/Artifacts.dhall
 
 let Command = ./Base.dhall
@@ -35,7 +31,6 @@ in  { step =
               , label = "Archive: Node Test"
               , key = key
               , target = Size.Large
-              , soft_fail = Some (B/SoftFail.Boolean True)
               , depends_on = dependsOn
               }
     }
