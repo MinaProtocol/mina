@@ -128,6 +128,18 @@ main() {
             exit 1
         fi
 
+        # Check if upgrade script was also modified
+        if has_changes "$upgrade_script"; then
+            if [[ "$MODE" == "assert" ]]; then
+            echo "✓ Upgrade script has been modified"
+            fi
+        else
+            if [[ "$MODE" == "assert" ]]; then
+            echo "Warning: Schema files changed but upgrade script was not modified"
+            echo "Consider updating: $upgrade_script"
+            fi
+        fi
+
         if [[ "$MODE" == "assert" ]]; then
             echo "✓ Archive schema changes detected and upgrade script exists"
         fi
