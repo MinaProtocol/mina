@@ -15,6 +15,9 @@ module Make (Inputs : sig
 
   (** A method to convert a stable account into a Converting_ledger account *)
   val convert : Account.t -> converted_account
+
+  (** An [equal] method for the converted account type, used to check that  *)
+  val converted_equal : converted_account -> converted_account -> bool
 end)
 (Primary_ledger : Intf.Ledger.S
                     with module Location = Inputs.Location

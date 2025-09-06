@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 
 module Make (Inputs : sig
   include Intf.Inputs.Intf
@@ -6,6 +7,8 @@ module Make (Inputs : sig
   type converted_account
 
   val convert : Account.t -> converted_account
+
+  val converted_equal : converted_account -> converted_account -> bool
 end)
 (Primary_ledger : Intf.Ledger.S
                     with module Location = Inputs.Location
@@ -60,19 +63,53 @@ end)
   type t =
     { primary_ledger : Primary_ledger.t
     ; converting_ledger : Converting_ledger.t
+    ; stop_monitor : unit Ivar.t
     }
 
-  let of_ledgers primary_ledger converting_ledger =
-    { primary_ledger; converting_ledger }
+  let dbs_synced db1 db2 =
+    Primary_ledger.num_accounts db1 = Converting_ledger.num_accounts db2
+    &&
+    let is_synced = ref true in
+    Primary_ledger.iteri db1 ~f:(fun idx stable_account ->
+        let expected_unstable_account = convert stable_account in
+        let actual_unstable_account =
+          Converting_ledger.get_at_index_exn db2 idx
+        in
+        if
+          not
+            (Inputs.converted_equal expected_unstable_account
+               actual_unstable_account )
+        then is_synced := false ) ;
+    !is_synced
 
-  let of_ledgers_with_migration primary_ledger converting_ledger =
+  exception Db_out_of_sync of t
+
+  let of_ledgers ?monitor_in_sync primary_ledger converting_ledger () =
+    let stop_monitor = Ivar.create () in
+    let self = { primary_ledger; converting_ledger; stop_monitor } in
+    ( match monitor_in_sync with
+    | Some interval ->
+        let open Deferred.Let_syntax in
+        Deferred.repeat_until_finished () (fun () ->
+            let%bind () = after interval in
+            if Ivar.is_full stop_monitor then Deferred.return (`Finished ())
+            else if not (dbs_synced primary_ledger converting_ledger) then
+              raise (Db_out_of_sync self)
+            else Deferred.return (`Repeat ()) )
+        |> don't_wait_for
+    | None ->
+        () ) ;
+    self
+
+  let of_ledgers_with_migration ?monitor_in_sync primary_ledger
+      converting_ledger () =
     assert (Converting_ledger.num_accounts converting_ledger = 0) ;
     let accounts =
       Primary_ledger.foldi primary_ledger ~init:[] ~f:(fun addr acc account ->
           (addr, convert account) :: acc )
     in
     Converting_ledger.set_batch_accounts converting_ledger accounts ;
-    { primary_ledger; converting_ledger }
+    of_ledgers ?monitor_in_sync primary_ledger converting_ledger ()
 
   let primary_ledger { primary_ledger; _ } = primary_ledger
 
@@ -155,6 +192,7 @@ end)
     res
 
   let close t =
+    Ivar.fill t.stop_monitor () ;
     Primary_ledger.close t.primary_ledger ;
     Converting_ledger.close t.converting_ledger
 
@@ -211,7 +249,11 @@ end)
 end
 
 module With_database_config = struct
-  type t = { primary_directory : string; converting_directory : string }
+  type t =
+    { primary_directory : string
+    ; converting_directory : string
+    ; monitor_in_sync : Mina_stdlib.Time_ns.Span.t option
+    }
   [@@deriving yojson]
 
   type create = Temporary | In_directories of t
@@ -219,9 +261,10 @@ module With_database_config = struct
   let default_converting_directory_name primary_directory_name =
     primary_directory_name ^ "_converting"
 
-  let with_primary ~directory_name =
+  let with_primary ~directory_name ?monitor_in_sync () =
     { primary_directory = directory_name
     ; converting_directory = default_converting_directory_name directory_name
+    ; monitor_in_sync
     }
 end
 
@@ -260,27 +303,14 @@ struct
   include Make (Inputs) (Primary_db) (Converting_db)
   module Config = With_database_config
 
-  let dbs_synced db1 db2 =
-    Primary_db.num_accounts db1 = Converting_db.num_accounts db2
-    &&
-    let is_synced = ref true in
-    Primary_db.iteri db1 ~f:(fun idx stable_account ->
-        let expected_unstable_account = convert stable_account in
-        let actual_unstable_account = Converting_db.get_at_index_exn db2 idx in
-        if
-          not
-            (Inputs.converted_equal expected_unstable_account
-               actual_unstable_account )
-        then is_synced := false ) ;
-    !is_synced
-
   let create ~config ~logger ~depth () =
-    let primary_directory_name, converting_directory_name =
+    let primary_directory_name, converting_directory_name, monitor_in_sync =
       match config with
       | Config.Temporary ->
-          (None, None)
-      | In_directories { primary_directory; converting_directory } ->
-          (Some primary_directory, Some converting_directory)
+          (None, None, None)
+      | In_directories
+          { primary_directory; converting_directory; monitor_in_sync } ->
+          (Some primary_directory, Some converting_directory, monitor_in_sync)
     in
     let db1 =
       Primary_db.create ?directory_name:primary_directory_name ~depth ()
@@ -294,8 +324,9 @@ struct
     let db2 =
       Converting_db.create ?directory_name:db2_directory_name ~depth ()
     in
-    if Converting_db.num_accounts db2 = 0 then of_ledgers_with_migration db1 db2
-    else if dbs_synced db1 db2 then of_ledgers db1 db2
+    if Converting_db.num_accounts db2 = 0 then
+      of_ledgers_with_migration ?monitor_in_sync db1 db2 ()
+    else if dbs_synced db1 db2 then of_ledgers ?monitor_in_sync db1 db2 ()
     else (
       [%log warn]
         "Migrating DB desync, cleaning up unstable DB and remigrating..." ;
@@ -304,18 +335,20 @@ struct
         Converting_db.create ?directory_name:db2_directory_name ~fresh:true
           ~depth ()
       in
-      of_ledgers_with_migration db1 db2 )
+      of_ledgers_with_migration ?monitor_in_sync db1 db2 () )
 
-  let create_checkpoint t ~config () =
+  let create_checkpoint t
+      ~config:
+        Config.{ primary_directory; converting_directory; monitor_in_sync } () =
     let primary' =
       Primary_db.create_checkpoint (primary_ledger t)
-        ~directory_name:config.Config.primary_directory ()
+        ~directory_name:primary_directory ()
     in
     let converting' =
       Converting_db.create_checkpoint (converting_ledger t)
-        ~directory_name:config.converting_directory ()
+        ~directory_name:converting_directory ()
     in
-    of_ledgers primary' converting'
+    of_ledgers ?monitor_in_sync primary' converting' ()
 
   let make_checkpoint t ~config =
     Primary_db.make_checkpoint (primary_ledger t)

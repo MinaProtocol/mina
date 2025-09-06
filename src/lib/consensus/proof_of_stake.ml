@@ -405,6 +405,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~directory_name:
             ( !t.epoch_ledger_location
             ^ Uuid.to_string !t.epoch_ledger_uuids.staking )
+          ()
 
       let next_epoch_ledger_config (t : t) =
         Mina_ledger.Ledger.Root.Config.with_directory
@@ -412,6 +413,7 @@ module Make_str (A : Wire_types.Concrete) = struct
           ~directory_name:
             ( !t.epoch_ledger_location
             ^ Uuid.to_string !t.epoch_ledger_uuids.next )
+          ()
 
       let current_epoch_delegatee_table ~(local_state : t) =
         !local_state.staking_epoch_snapshot.delegatee_table
@@ -505,7 +507,8 @@ module Make_str (A : Wire_types.Concrete) = struct
         let ledger_config uuid =
           Mina_ledger.Ledger.Root.Config.(
             with_directory ~backing_type:epoch_ledger_backing_type
-              ~directory_name:(epoch_ledger_location ^ Uuid.to_string uuid))
+              ~directory_name:(epoch_ledger_location ^ Uuid.to_string uuid)
+              ())
         in
         let epoch_ledger_uuids =
           if Sys.file_exists epoch_ledger_uuids_location then (
@@ -3086,6 +3089,7 @@ module Make_str (A : Wire_types.Concrete) = struct
                      ~directory_name:
                        ( !local_state.epoch_ledger_location
                        ^ Uuid.to_string epoch_ledger_uuids.next )
+                     ()
                  in
                  Local_state.Snapshot.Ledger_snapshot.Ledger_root
                    (Mina_ledger.Ledger.Root.create_checkpoint snarked_ledger

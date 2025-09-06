@@ -504,16 +504,29 @@ module Ledger = struct
 
       type converted_account
 
+      (* whether 2 ledgers are synced? *)
+      val dbs_synced : primary_ledger -> converting_ledger -> bool
+
       (** Create a converting ledger based on two component ledgers. No migration is
       performed (use [of_ledgers_with_migration] if you need this) but all
       subsequent write operations on the converting merkle tree will be applied
       to both ledgers. *)
-      val of_ledgers : primary_ledger -> converting_ledger -> t
+      val of_ledgers :
+           ?monitor_in_sync:Time_ns.Span.t
+        -> primary_ledger
+        -> converting_ledger
+        -> unit
+        -> t
 
       (** Create a converting ledger with an already-existing [Primary_ledger.t] and
       an empty [Converting_ledger.t] that will be initialized with the migrated
       account data. *)
-      val of_ledgers_with_migration : primary_ledger -> converting_ledger -> t
+      val of_ledgers_with_migration :
+           ?monitor_in_sync:Time_ns.Span.t
+        -> primary_ledger
+        -> converting_ledger
+        -> unit
+        -> t
 
       (** Retrieve the primary ledger backing the converting merkle tree *)
       val primary_ledger : t -> primary_ledger
@@ -526,7 +539,11 @@ module Ledger = struct
     end
 
     module type Config = sig
-      type t = { primary_directory : string; converting_directory : string }
+      type t =
+        { primary_directory : string
+        ; converting_directory : string
+        ; monitor_in_sync : Mina_stdlib.Time_ns.Span.t option
+        }
       [@@deriving yojson]
 
       type create =
@@ -537,7 +554,8 @@ module Ledger = struct
 
       (** Create a [checkpoint] config with the default converting directory
         name *)
-      val with_primary : directory_name:string -> t
+      val with_primary :
+        directory_name:string -> ?monitor_in_sync:Time_ns.Span.t -> unit -> t
 
       (** Given a primary dir, returns the default converting_directory path associated with that primary dir *)
       val default_converting_directory_name : string -> string

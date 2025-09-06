@@ -142,7 +142,7 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
                    ~config:
                      (Ledger.Root.Config.with_directory
                         ~backing_type:Ledger.Root.Config.Stable_db
-                        ~directory_name )
+                        ~directory_name () )
                    ~depth () )
             , false )
     in
