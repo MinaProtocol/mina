@@ -295,6 +295,12 @@ module Hardfork_config : sig
         | `Uncommitted of Mina_ledger.Ledger.t ]
     }
 
+  val genesis_source_ledger_cast :
+       [< `Genesis of Genesis_ledger.Packed.t
+       | `Root of Mina_ledger.Ledger.Root.t
+       | `Uncommitted of Mina_ledger.Ledger.t ]
+    -> Mina_ledger.Ledger.Any_ledger.witness
+
   (** Retrieve the [genesis_source_ledgers] from the transition frontier,
       starting at the given [breadcrumb]. *)
   val source_ledgers :
@@ -303,12 +309,10 @@ module Hardfork_config : sig
     -> genesis_source_ledgers Deferred.Or_error.t
 
   type inputs =
-    { staged_ledger : Mina_ledger.Ledger.t
+    { source_ledgers : genesis_source_ledgers
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
     ; state_hash : State_hash.t
-    ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
     ; staking_epoch_seed : Epoch_seed.t
-    ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
     }
