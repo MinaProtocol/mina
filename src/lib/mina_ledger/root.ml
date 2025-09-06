@@ -215,26 +215,24 @@ struct
              ; backing_2 = Config.backing_of_config config
              } )
 
-  let create_component_checkpoints t ~directory_name =
-    let stable_db, unstable_db_opt =
-      match t with
-      | Stable_db db ->
-          (db, None)
-      | Converting_db db ->
-          ( Converting_ledger.primary_ledger db
-          , Some (Converting_ledger.converting_ledger db) )
-    in
-    let config = Converting_ledger.Config.with_primary ~directory_name in
-    let stable_checkpoint =
-      Stable_db.create_checkpoint stable_db
-        ~directory_name:config.primary_directory ()
-    in
-    let unstable_checkpoint =
-      Option.map unstable_db_opt ~f:(fun unstable_db ->
-          Unstable_db.create_checkpoint unstable_db
-            ~directory_name:config.converting_directory () )
-    in
-    (stable_checkpoint, unstable_checkpoint)
+  let create_stable_checkpoint t ~directory_name =
+    match t with
+    | Stable_db db ->
+        Stable_db.create_checkpoint db ~directory_name ()
+    | Converting_db db ->
+        Stable_db.create_checkpoint
+          (Converting_ledger.primary_ledger db)
+          ~directory_name ()
+
+  let create_migrated_checkpoint t ~directory_name =
+    match t with
+    | Stable_db _db ->
+        None
+    | Converting_db db ->
+        Some
+          (Migrated_db.create_checkpoint
+             (Converting_ledger.converting_ledger db)
+             ~directory_name () )
 
   let as_unmasked t =
     match t with
