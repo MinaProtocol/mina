@@ -5,6 +5,7 @@ ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
+ARG TARGETARCH
 
 ARG psql_version=15
 # Golang version number used to detemine tarball name
@@ -87,7 +88,7 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
+RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Install rosetta-cli
 # The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
