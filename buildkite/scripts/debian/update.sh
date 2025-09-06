@@ -29,8 +29,7 @@ APT_SOURCES_DIR="/etc/apt/sources.list.d"
 export DEBIAN_FRONTEND=noninteractive
 
 # Configuration
-BLACKLISTED_REPOS=( helm-stable-debian.list )  # Default blacklisted repositories
-# BLACKLISTED_REPOS=()  # Uncomment to start with no blacklisted repos
+BLACKLISTED_REPOS=()  # Uncomment to start with no blacklisted repos
 VERBOSE=false
 DRY_RUN=false
 SUDO_CMD=""
