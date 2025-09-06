@@ -2617,6 +2617,7 @@ module Queries = struct
                  ; staking_epoch_seed
                  ; next_epoch_seed
                  ; blockchain_length
+                 ; block_timestamp = _
                  } =
           Mina_lib.Hardfork_config.prepare_inputs ~breadcrumb_spec mina
         in

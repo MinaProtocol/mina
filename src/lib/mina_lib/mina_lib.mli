@@ -315,10 +315,20 @@ module Hardfork_config : sig
     ; staking_epoch_seed : Epoch_seed.t
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
+    ; block_timestamp : Block_time.t
     }
 
   val prepare_inputs :
     breadcrumb_spec:breadcrumb_spec -> mina_lib -> inputs Deferred.Or_error.t
+
+  (** Compute the hard fork config (genesis ledger, genesis epoch ledgers, and
+      node config) and save it to [directory_name] *)
+  val hardfork_config_dump :
+       legacy_format:bool
+    -> breadcrumb_spec:breadcrumb_spec
+    -> directory_name:string
+    -> mina_lib
+    -> unit Deferred.Or_error.t
 end
 
 val zkapp_cmd_limit : t -> int option ref
