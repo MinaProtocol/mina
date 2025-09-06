@@ -426,6 +426,7 @@ module For_tests = struct
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
             ~zkapp_cmd_limit_hardcap:
               precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
+            ~signature_kind:Mina_signature_kind.t_DEPRECATED
         with
         | Ok r ->
             return r

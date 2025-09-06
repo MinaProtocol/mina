@@ -70,7 +70,7 @@ let reschedule_if_old ~reassignment_timeout
 let reschedule_old_zkapp_job
     ~partitioner:
       ({ reassignment_timeout; zkapp_jobs_sent_by_partitioner; _ } : t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+    (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t option =
   let%map.Option job =
     Sent_zkapp_job_pool.remove_until_reschedule
       ~f:(reschedule_if_old ~reassignment_timeout)
@@ -81,7 +81,7 @@ let reschedule_old_zkapp_job
 let reschedule_old_single_job
     ~partitioner:
       ({ reassignment_timeout; single_jobs_sent_by_partitioner; _ } : t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+    (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t option =
   let%map.Option job =
     Sent_single_job_pool.remove_until_reschedule
       ~f:(reschedule_if_old ~reassignment_timeout)
@@ -118,7 +118,7 @@ let schedule_from_pending_zkapp_command ~(id : Work.Id.Single.t)
     ~pending
 
 let schedule_from_any_pending_zkapp_command ~(partitioner : t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+    (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t option =
   let spec_generated = ref None in
   (* TODO: Consider remove all works no longer relevant for current frontier,
      this may need changes from underlying work selector. *)
@@ -155,7 +155,7 @@ let convert_zkapp_command_from_selector ~partitioner ~job ~pairing
 
 let convert_single_work_from_selector ~(partitioner : t)
     ~(single_spec : Work.Spec.Single.t) ~sok_message ~pairing :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t =
+    (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t =
   let job =
     Work.With_job_meta.
       { spec = single_spec
@@ -208,7 +208,7 @@ let schedule_from_tmp_slot ~(partitioner : t) =
     ~sok_message
 
 let schedule_job_from_partitioner ~(partitioner : t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+    (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t option =
   List.find_map ~f:Lazy.force
     [ lazy (reschedule_old_zkapp_job ~partitioner)
     ; lazy (reschedule_old_single_job ~partitioner)
@@ -220,7 +220,7 @@ let schedule_job_from_partitioner ~(partitioner : t) :
 let consume_job_from_selector ~(partitioner : t)
     ~(sok_message : Mina_base.Sok_message.t)
     ~(instances : Work.Spec.Single.t One_or_two.t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t =
+    (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t =
   let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
     ~data:(Spec_only { spec = instances; sok_message }) ;
@@ -248,7 +248,7 @@ let request_from_selector_and_consume_by_partitioner ~(partitioner : t)
 
 let request_partitioned_work ~(sok_message : Mina_base.Sok_message.t)
     ~(work_from_selector : work_from_selector) ~(partitioner : t) :
-    Work.Spec.Partitioned.Stable.Latest.t Or_error.t option =
+    (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t option =
   List.find_map ~f:Lazy.force
     [ lazy (schedule_job_from_partitioner ~partitioner)
     ; lazy

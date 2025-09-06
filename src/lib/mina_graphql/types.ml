@@ -270,7 +270,8 @@ module DaemonStatus = struct
              ~rpc_timings:(id ~typ:(non_null rpc_timings))
              ~external_transition_latency:h ~accepted_transition_local_latency:h
              ~accepted_transition_remote_latency:h
-             ~snark_worker_transition_time:h ~snark_worker_merge_time:h )
+             ~snark_worker_zkapp_transition_time:h
+             ~snark_worker_nonzkapp_transition_time:h ~snark_worker_merge_time:h )
 
   let consensus_configuration : (_, Consensus.Configuration.t option) typ =
     obj "ConsensusConfiguration" ~fields:(fun _ ->

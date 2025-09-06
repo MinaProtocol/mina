@@ -284,6 +284,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               ~state_and_body_hash:
                 (previous_protocol_state_hash, previous_protocol_state_body_hash)
               ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED
           with
           | Ok
               ( `Hash_after_applying next_staged_ledger_hash

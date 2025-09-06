@@ -347,8 +347,10 @@ let get_status ~flag t =
               r ~name:"accepted_transition_local_latency"
           ; accepted_transition_remote_latency =
               r ~name:"accepted_transition_remote_latency"
-          ; snark_worker_transition_time =
-              r ~name:"snark_worker_transition_time"
+          ; snark_worker_zkapp_transition_time =
+              r ~name:"snark_worker_zkapp_transition_time"
+          ; snark_worker_nonzkapp_transition_time =
+              r ~name:"snark_worker_nonzkapp_transition_time"
           ; snark_worker_merge_time = r ~name:"snark_worker_merge_time"
           }
     | `None ->

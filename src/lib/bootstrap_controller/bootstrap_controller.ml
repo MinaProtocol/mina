@@ -447,6 +447,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                       ~verifier ~constraint_constants ~scan_state
                       ~snarked_ledger:temp_mask ~expected_merkle_root
                       ~pending_coinbases ~get_state
+                      ~signature_kind:Mina_signature_kind.t_DEPRECATED
                   in
                   ignore
                     ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask
@@ -1023,6 +1024,7 @@ let%test_module "Bootstrap_controller tests" =
                   ~scan_state ~logger ~verifier ~constraint_constants
                   ~snarked_ledger ~snarked_local_state ~expected_merkle_root
                   ~pending_coinbases ~get_state
+                  ~signature_kind:Mina_signature_kind.t_DEPRECATED
                 |> Deferred.Or_error.ok_exn
               in
               let height =

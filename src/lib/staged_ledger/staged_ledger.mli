@@ -219,6 +219,7 @@ val apply :
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
+  -> signature_kind:Mina_signature_kind.t
   -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
   -> t
   -> Staged_ledger_diff.t
@@ -239,14 +240,15 @@ val apply :
 val apply_diff_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
-  -> t
-  -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
+  -> signature_kind:Mina_signature_kind.t
+  -> t
+  -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
            ( Ledger_proof.Cached.t
@@ -329,6 +331,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> signature_kind:Mina_signature_kind.t
   -> t Or_error.t Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
@@ -340,6 +343,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> signature_kind:Mina_signature_kind.t
   -> t Or_error.t Deferred.t
 
 (** All the pending work in t and the data required to generate proofs. *)
@@ -387,6 +391,7 @@ module Test_helpers : sig
     -> first_partition_slots:int
     -> no_second_partition:bool
     -> is_new_stack:bool
+    -> signature_kind:Mina_signature_kind.t
     -> Ledger.t
     -> Pending_coinbase.t
     -> Transaction.t With_status.t list
