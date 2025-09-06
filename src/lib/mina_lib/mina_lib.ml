@@ -2764,12 +2764,10 @@ module Hardfork_config = struct
     { root_snarked_ledger; staged_ledger; staking_ledger; next_epoch_ledger }
 
   type inputs =
-    { staged_ledger : Ledger.t
+    { source_ledgers : genesis_source_ledgers
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
     ; state_hash : State_hash.t
-    ; staking_ledger : Ledger.Any_ledger.witness
     ; staking_epoch_seed : Epoch_seed.t
-    ; next_epoch_ledger : Ledger.Any_ledger.witness
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
     }
@@ -2796,19 +2794,11 @@ module Hardfork_config = struct
     in
     let staking_epoch_seed = staking_epoch.Epoch_data.Poly.seed in
     let next_epoch_seed = next_epoch.Epoch_data.Poly.seed in
-    let%map { root_snarked_ledger = _
-            ; staged_ledger
-            ; staking_ledger
-            ; next_epoch_ledger
-            } =
-      source_ledgers ~breadcrumb mina
-    in
-    { staged_ledger
+    let%map source_ledgers = source_ledgers ~breadcrumb mina in
+    { source_ledgers
     ; global_slot_since_genesis
     ; state_hash
-    ; staking_ledger = genesis_source_ledger_cast staking_ledger
     ; staking_epoch_seed
-    ; next_epoch_ledger = genesis_source_ledger_cast next_epoch_ledger
     ; next_epoch_seed
     ; blockchain_length
     }
