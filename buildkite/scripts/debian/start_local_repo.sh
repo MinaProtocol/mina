@@ -10,10 +10,6 @@ LOCAL_DEB_FOLDER=_build
 set -eou pipefail
 set -x
 
-
-apt-get update 
-apt-get install -y aptly
-
 # Download locally static debians (for example mina-legacy )
 
 mkdir -p $LOCAL_DEB_FOLDER

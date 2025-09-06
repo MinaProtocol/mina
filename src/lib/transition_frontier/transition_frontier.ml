@@ -616,8 +616,8 @@ module For_tests = struct
                      )
                    ~snarked_ledger:genesis_ledger
                    ~snarked_local_state:(Mina_state.Local_state.empty ())
-                   ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) )
-            )
+                   ~expected_merkle_root:(Ledger.merkle_root genesis_ledger)
+                   ~signature_kind:Mina_signature_kind.t_DEPRECATED ) )
         in
         Breadcrumb.create ~validated_transition:genesis_transition
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false

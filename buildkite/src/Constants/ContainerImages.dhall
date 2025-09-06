@@ -4,15 +4,15 @@
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 { toolchainBase = "codaprotocol/ci-toolchain-base:v3"
 , minaToolchainBookworm =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:33275bbe44bb8e5b2678d1482705f964df3b37e2540a43ef9a1d92433b795f83"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:cb7253baa6389779bf6986285dfc34ed60ce389bebdeae3bb68c25945ba6670b"
 , minaToolchainBullseye =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:3b17e388d8974fdbe4bbd5f77315519763c78148a4c91434d9add62de87ab792"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:f26c26154d8185dc473d25bf19e71670beee8d8083c03acb3a242a56154d9511"
 , minaToolchainNoble =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:4a2483e94a4bcf03b82e511a4f1ef926659b3c6c42e31e03c0b9765a12225ac1"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:190f31de9aa9b6da0f2be93e467f0307fbc85fd0c32e2e742e8b566bb2e23a45"
 , minaToolchainJammy =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:78486314cf93bafb7e5f8f8be92ade269ad94c311cb9a92fb4b0bcaf0348c385"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:969baf296735abc81958c0a2192973562287f5c9f170442b44076047bde7a1e1"
 , minaToolchain =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:3b17e388d8974fdbe4bbd5f77315519763c78148a4c91434d9add62de87ab792"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:f26c26154d8185dc473d25bf19e71670beee8d8083c03acb3a242a56154d9511"
 , postgres = "postgres:12.4-alpine"
 , xrefcheck =
     "dkhamsing/awesome_bot@sha256:a8adaeb3b3bd5745304743e4d8a6d512127646e420544a6d22d9f58a07f35884"
