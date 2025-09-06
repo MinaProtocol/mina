@@ -1573,6 +1573,17 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
+let ledger_of_hashes ~root_hash ~s3_data_hash () =
+  Ledger.
+    { base = Hash
+    ; num_accounts = None
+    ; balances = []
+    ; hash = Some root_hash
+    ; s3_data_hash = Some s3_data_hash
+    ; name = None
+    ; add_genesis_winner = Some false
+    }
+
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed =
@@ -1649,3 +1660,40 @@ let slot_tx_end, slot_chain_end =
     t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
+
+let fork_config_of_ledgers ~genesis_state_timestamp ~genesis_ledger_config
+    ~global_slot_since_genesis ~state_hash ~blockchain_length
+    ~staking_ledger_config ~staking_epoch_seed ~next_epoch_ledger_config
+    ~next_epoch_seed =
+  let genesis =
+    Genesis.
+      { genesis_state_timestamp = Some genesis_state_timestamp
+      ; k = None
+      ; delta = None
+      ; slots_per_epoch = None
+      ; slots_per_sub_window = None
+      ; grace_period_slots = None
+      }
+  in
+  let global_slot_since_genesis =
+    Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
+  in
+  let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
+  let fork =
+    Fork_config.
+      { state_hash = Mina_base.State_hash.to_base58_check state_hash
+      ; blockchain_length
+      ; global_slot_since_genesis
+      }
+  in
+  let epoch_data =
+    let open Epoch_data in
+    let open Data in
+    { staking = { ledger = staking_ledger_config; seed = staking_epoch_seed }
+    ; next =
+        Option.map next_epoch_ledger_config ~f:(fun config ->
+            { ledger = config; seed = next_epoch_seed } )
+    }
+  in
+  make ~genesis ~epoch_data ~ledger:genesis_ledger_config
+    ~proof:(Proof_keys.make ~fork ()) ()
