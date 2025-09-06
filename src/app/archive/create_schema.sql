@@ -19,7 +19,6 @@
 CREATE TABLE public_keys
 ( id    serial PRIMARY KEY
 , value text   NOT NULL UNIQUE
-, created_at timestamp NOT NULL DEFAULT NOW()
 );
 
 /* for the default token only, owner_public_key_id and owner_token_id are NULL
