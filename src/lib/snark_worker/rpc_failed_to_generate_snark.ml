@@ -27,11 +27,11 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 
 [%%versioned_rpc
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     module T = struct
       type query =
         Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t
-        * Selector.Spec.Stable.V1.t
+        * Selector.Spec.Stable.V2.t
         * Signature_lib.Public_key.Compressed.Stable.V1.t
 
       type response = unit
@@ -49,5 +49,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module Latest = V2
+  module Latest = V3
 end]

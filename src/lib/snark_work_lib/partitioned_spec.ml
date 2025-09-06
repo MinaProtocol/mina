@@ -50,10 +50,10 @@ end
 module Stable = struct
   [@@@no_toplevel_latest_type]
 
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Single_spec.Stable.V1.t
-      , Sub_zkapp_spec.Stable.V1.t
+      ( Single_spec.Stable.V2.t
+      , Sub_zkapp_spec.Stable.V2.t
       , unit )
       Poly.Stable.V1.t
     [@@deriving sexp, yojson]
