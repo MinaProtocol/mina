@@ -36,7 +36,7 @@ let runInToolchainJammy
     =     \(environment : List Text)
       ->  \(innerScript : Text)
       ->  runInToolchainImage
-            ContainerImages.minaToolchainJammy
+            ContainerImages.minaToolchainJammy.amd64
             environment
             innerScript
 
