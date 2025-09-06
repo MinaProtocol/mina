@@ -130,6 +130,12 @@ module Make
   (** Make a checkpoint of the root ledger *)
   val make_checkpoint : t -> config:Config.t -> unit
 
+  val create_stable_copy :
+    parent_directory:string -> name:string -> t -> Stable_db.t
+
+  val create_migrated_copy :
+    parent_directory:string -> name:string -> t -> Unstable_db.t
+
   (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
       that does not need to know how the root is implemented *)
   val as_unmasked : t -> Any_ledger.witness
