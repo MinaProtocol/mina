@@ -34,7 +34,9 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:4
         ~f:(fun make_breadcrumb ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%map breadcrumb = make_breadcrumb root in
               add_breadcrumb frontier breadcrumb ;
@@ -56,7 +58,9 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test gen_branches ~trials:4
         ~f:(fun (make_short_branch, make_long_branch) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let test_best_tip ?message breadcrumb =
                 [%test_eq: State_hash.t] ?message
                   (Breadcrumb.state_hash breadcrumb)
@@ -89,7 +93,9 @@ let%test_module "Full_frontier tests" =
         ~trials:4
         ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%map seq = make_seq root in
               ignore
@@ -117,7 +123,9 @@ let%test_module "Full_frontier tests" =
         ~trials:2
         ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%map rest = make_seq root in
               List.iter rest ~f:(fun breadcrumb ->
@@ -144,7 +152,9 @@ let%test_module "Full_frontier tests" =
       in
       Quickcheck.test gen ~trials:4 ~f:(fun make_seq ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%map breadcrumbs = make_seq root in
               List.iter breadcrumbs ~f:(fun b ->
@@ -171,7 +181,9 @@ let%test_module "Full_frontier tests" =
       Quickcheck.test gen ~trials:4
         ~f:(fun (make_ancestors, make_branch_a, make_branch_b) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let frontier = create_frontier () in
+              let frontier =
+                create_frontier ~epoch_ledger_backing_type:Stable_db ()
+              in
               let root = Full_frontier.root frontier in
               let%bind ancestors = make_ancestors root in
               let youngest_ancestor = List.last_exn ancestors in

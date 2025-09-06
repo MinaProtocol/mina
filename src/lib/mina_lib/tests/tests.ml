@@ -82,6 +82,7 @@ let%test_module "Epoch ledger sync tests" =
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger
             ~proof_level:No_check runtime_config ~cli_proof_level:None
+            ~genesis_backing_type:Stable_db
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -136,7 +137,7 @@ let%test_module "Epoch ledger sync tests" =
           ~context:(module Context)
           ~genesis_ledger ~genesis_epoch_data
           ~epoch_ledger_location:(make_dirname "epoch_ledger")
-          ~genesis_state_hash
+          ~genesis_state_hash ~epoch_ledger_backing_type:Stable_db
           (Signature_lib.Public_key.Compressed.Set.of_list [])
       in
       let module Context = struct
@@ -159,11 +160,12 @@ let%test_module "Epoch ledger sync tests" =
         ~conf_dir:(Some (make_dirname "verifier"))
         ()
 
-    let make_empty_ledger (module Context : CONTEXT) : Genesis_ledger.Packed.t =
+    let make_empty_ledger ~backing_type (module Context : CONTEXT) :
+        Genesis_ledger.Packed.t =
       ( module Genesis_ledger.Make (struct
         include Test_genesis_ledger
 
-        let directory = `New
+        let directory = `New backing_type
 
         let depth = constraint_constants.ledger_depth
 
@@ -360,7 +362,8 @@ let%test_module "Epoch ledger sync tests" =
           ~get_completed_work:(Fn.const None) ~catchup_mode:`Super
           ~network_transition_reader:block_reader ~producer_transition_reader
           ~get_most_recent_valid_block ~most_recent_valid_block_writer
-          ~notify_online ?transaction_pool_proxy:None ()
+          ~notify_online ?transaction_pool_proxy:None ~ledger_backing:Stable_db
+          ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
       let tr_tm1 = Unix.gettimeofday () in
@@ -556,9 +559,9 @@ let%test_module "Epoch ledger sync tests" =
           failwithf "unexpected connection failure: %s"
             (Error.to_string_hum err) ()
 
-    let make_genesis_ledger (module Context : CONTEXT)
+    let make_genesis_ledger ~backing_type (module Context : CONTEXT)
         (accounts : Account.t list) =
-      let ledger = make_empty_ledger (module Context) in
+      let ledger = make_empty_ledger ~backing_type (module Context) in
       let ledger_inner = Lazy.force @@ Genesis_ledger.Packed.t ledger in
       List.iter accounts ~f:(fun acct ->
           let acct_id = Account_id.create acct.public_key Token_id.default in
@@ -672,7 +675,9 @@ let%test_module "Epoch ledger sync tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind (module Context) = make_context () in
           let staking_epoch_ledger =
-            make_genesis_ledger (module Context) (List.take test_accounts 10)
+            make_genesis_ledger ~backing_type:Stable_db
+              (module Context)
+              (List.take test_accounts 10)
           in
           let next_epoch_ledger = staking_epoch_ledger in
           setup_test ~name:"fail to sync genesis ledgers" ~test_number:3
