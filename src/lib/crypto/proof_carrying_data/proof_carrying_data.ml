@@ -1,4 +1,5 @@
-(* A convenient data structure to bundle statements along with their proofs together *)
+(* A convenient data structure to bundle statements along with their proofs
+   together *)
 
 open Core_kernel
 
