@@ -8,16 +8,34 @@ if [[ $# -ne 1 ]]; then
   exit 1
 fi
 
+# Keep CI in sync with flake pin & harden fetches
+
+# More robust network retries for fixed-output fetches (e.g., findlib 1.9.3 mirror hiccups).
+export NIX_CURL_FLAGS="${NIX_CURL_FLAGS:---retry 8 --retry-delay 2 --connect-timeout 20}"
+
+# point legacy `import <nixpkgs>` / nix-build / nix-shell
+# to the same nixpkgs used by the flake. This keeps CI consistent with `nix build`.
+if [ -f "./flake.nix" ]; then
+  # Works with nix >= 2.8; gets the outPath of the flake input `nixpkgs`.
+  if NIXPKGS_PATH="$(nix eval --raw --impure --expr '(builtins.getFlake ".").inputs.nixpkgs.outPath' 2>/dev/null)"; then
+    export NIX_PATH="nixpkgs=${NIXPKGS_PATH}"
+    export MINA_USE_FLAKE_NIXPKGS=1
+  else
+    # Fallback: a stable channel pin to avoid stale/broken mirrors if eval fails.
+    export NIX_PATH="${NIX_PATH:-nixpkgs=https://github.com/NixOS/nixpkgs/archive/refs/heads/nixos-24.05.tar.gz}"
+  fi
+fi
+
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 NIX_OPTS=( --accept-flake-config --experimental-features 'nix-command flakes' )
 
-if [[ "$NIX_CACHE_NAR_SECRET" != "" ]]; then
+if [[ "${NIX_CACHE_NAR_SECRET:-}" != "" ]]; then
   echo "$NIX_CACHE_NAR_SECRET" > /tmp/nix-cache-secret
   echo "Configuring the NAR signing secret"
   NIX_SECRET_KEY=/tmp/nix-cache-secret
 fi
 
-if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
+if [[ "${NIX_CACHE_GCP_ID:-}" != "" ]] && [[ "${NIX_CACHE_GCP_SECRET:-}" != "" ]]; then
   echo "GCP uploading configured (for nix binaries)"
   cat <<'EOF'> /tmp/nix-post-build
 #!/bin/sh
@@ -32,10 +50,10 @@ EOF
   NIX_POST_BUILD_HOOK=/tmp/nix-post-build
 fi
 
-if [[ "$NIX_POST_BUILD_HOOK" != "" ]]; then
+if [[ "${NIX_POST_BUILD_HOOK:-}" != "" ]]; then
   NIX_OPTS+=( --post-build-hook "$NIX_POST_BUILD_HOOK" )
 fi
-if [[ "$NIX_SECRET_KEY" != "" ]]; then
+if [[ "${NIX_SECRET_KEY:-}" != "" ]]; then
   NIX_OPTS+=( --secret-key-files "$NIX_SECRET_KEY" )
 fi
 
