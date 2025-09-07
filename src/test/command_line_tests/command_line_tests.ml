@@ -26,6 +26,7 @@ module BackgroundMode = struct
         Reader.file_contents log_file
       in
       let () = Printf.printf "Daemon logs:\n%s\n" logs in
+      let%bind () = Deferred.return (failwith "Bootstrap failed") in
       Deferred.return ()
     in
     let%bind () = Daemon.Client.stop_daemon process.client in

@@ -54,8 +54,10 @@ module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
     let open Deferred.Or_error.Let_syntax in
     let config = Daemon.Config.default () in
     let executor = Daemon.of_config config in
-    let ledger_file = config.dirs.conf ^/ "daemon.json" in
-    let%bind.Deferred _ = generate_random_ledger executor ledger_file in
+    let daemon_file = config.dirs.conf ^/ "daemon.json" in
+    let ledger_file = config.dirs.conf ^/ "ledger.json" in
+    let%bind.Deferred accounts = generate_random_ledger executor daemon_file in
+    Runtime_config.Accounts.to_yojson accounts |> Yojson.Safe.to_file ledger_file ;
     [%log info] "Starting daemon" ;
     let%bind.Deferred daemon = Daemon.start executor in
     [%log info] "Daemon started successfully" ;
