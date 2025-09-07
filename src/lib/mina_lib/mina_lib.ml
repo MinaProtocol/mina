@@ -2633,151 +2633,155 @@ let best_chain_block_before_stop_slot (t : t) =
           find_block_older_than_stop_slot breadcrumb )
 
 module Hardfork_config = struct
-  type mina_lib = t
-
   type breadcrumb_spec =
     [ `Stop_slot
     | `State_hash of State_hash.t
     | `Block_height of Unsigned.UInt32.t ]
 
-  let breadcrumb ~breadcrumb_spec mina =
-    match breadcrumb_spec with
-    | `Stop_slot ->
-        best_chain_block_before_stop_slot mina
-    | `State_hash state_hash_base58 ->
-        best_chain_block_by_state_hash mina state_hash_base58 |> Deferred.return
-    | `Block_height block_height ->
-        best_chain_block_by_height mina block_height |> Deferred.return
+  module Berkeley = struct
+    type inputs =
+      { staged_ledger : Ledger.t
+      ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+      ; state_hash : State_hash.t
+      ; staking_ledger : Ledger.Any_ledger.witness
+      ; staking_epoch_seed : Epoch_seed.t
+      ; next_epoch_ledger : Ledger.Any_ledger.witness
+      ; next_epoch_seed : Epoch_seed.t
+      ; blockchain_length : Mina_numbers.Length.t
+      }
 
-  let epoch_ledgers ~breadcrumb mina =
-    let open Deferred.Result.Let_syntax in
-    let mina_config = config mina in
-    let frontier_consensus_local_state = mina_config.consensus_local_state in
-    let consensus_state =
-      breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
-      |> Mina_state.Protocol_state.consensus_state
-    in
-    let staking_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
-        consensus_state
-    in
-    let next_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
-        consensus_state
-    in
-    let cast_ledger = function
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
-          l ->
-          let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
-          Ledger.Any_ledger.cast (module Ledger) l_inner
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
-          Ledger.Root.as_unmasked l
-    in
-    let root_consensus_state =
-      transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
-      |> Option.value_exn |> Transition_frontier.root
-      |> Transition_frontier.Breadcrumb.protocol_state
-      |> Mina_state.Protocol_state.consensus_state
-    in
-    let%map staking_ledger, next_epoch_ledger =
-      match
-        (* We pretend that the block is finalized, so that we can query it in
-           advance, for redundancy.
-        *)
-        Consensus.Hooks.get_epoch_ledgers_for_finalized_frontier_block
-          ~root_consensus_state ~target_consensus_state:consensus_state
-          ~local_state:frontier_consensus_local_state
-      with
-      | `Both (staking_ledger, next_epoch_ledger) ->
-          return (cast_ledger staking_ledger, cast_ledger next_epoch_ledger)
-      | `Snarked_ledger (staking_ledger, num_parents) ->
-          (* The epoch transition was at a block between the given block and
-             the root. We find it by walking back by `num_parents` blocks.
+    let breadcrumb ~breadcrumb_spec mina =
+      match breadcrumb_spec with
+      | `Stop_slot ->
+          best_chain_block_before_stop_slot mina
+      | `State_hash state_hash_base58 ->
+          best_chain_block_by_state_hash mina state_hash_base58
+          |> Deferred.return
+      | `Block_height block_height ->
+          best_chain_block_by_height mina block_height |> Deferred.return
+
+    let epoch_ledgers ~breadcrumb mina =
+      let open Deferred.Result.Let_syntax in
+      let mina_config = config mina in
+      let frontier_consensus_local_state = mina_config.consensus_local_state in
+      let consensus_state =
+        breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
+        |> Mina_state.Protocol_state.consensus_state
+      in
+      let staking_epoch =
+        Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+          consensus_state
+      in
+      let next_epoch =
+        Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+          consensus_state
+      in
+      let cast_ledger = function
+        | Consensus.Data.Local_state.Snapshot.Ledger_snapshot
+          .Genesis_epoch_ledger l ->
+            let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+            Ledger.Any_ledger.cast (module Ledger) l_inner
+        | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
+            Ledger.Root.as_unmasked l
+      in
+      let root_consensus_state =
+        transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
+        |> Option.value_exn |> Transition_frontier.root
+        |> Transition_frontier.Breadcrumb.protocol_state
+        |> Mina_state.Protocol_state.consensus_state
+      in
+      let%map staking_ledger, next_epoch_ledger =
+        match
+          (* We pretend that the block is finalized, so that we can query it in
+             advance, for redundancy.
           *)
-          let%bind epoch_transition_state_hash =
-            let open Result.Let_syntax in
-            let rec ancestor breadcrumb i =
-              if i = 0 then return breadcrumb
-              else
-                let parent_hash =
-                  Transition_frontier.Breadcrumb.parent_hash breadcrumb
-                in
-                let%bind breadcrumb =
-                  best_chain_block_by_state_hash mina parent_hash
-                in
-                ancestor breadcrumb (i - 1)
+          Consensus.Hooks.get_epoch_ledgers_for_finalized_frontier_block
+            ~root_consensus_state ~target_consensus_state:consensus_state
+            ~local_state:frontier_consensus_local_state
+        with
+        | `Both (staking_ledger, next_epoch_ledger) ->
+            return (cast_ledger staking_ledger, cast_ledger next_epoch_ledger)
+        | `Snarked_ledger (staking_ledger, num_parents) ->
+            (* The epoch transition was at a block between the given block and
+               the root. We find it by walking back by `num_parents` blocks.
+            *)
+            let%bind epoch_transition_state_hash =
+              let open Result.Let_syntax in
+              let rec ancestor breadcrumb i =
+                if i = 0 then return breadcrumb
+                else
+                  let parent_hash =
+                    Transition_frontier.Breadcrumb.parent_hash breadcrumb
+                  in
+                  let%bind breadcrumb =
+                    best_chain_block_by_state_hash mina parent_hash
+                  in
+                  ancestor breadcrumb (i - 1)
+              in
+              ancestor breadcrumb num_parents
+              >>| Transition_frontier.Breadcrumb.state_hash |> Deferred.return
             in
-            ancestor breadcrumb num_parents
-            >>| Transition_frontier.Breadcrumb.state_hash |> Deferred.return
-          in
-          (* When this block reaches the root of the frontier, its snarked
-             ledger will become the next epoch ledger; we simulate that here.
-          *)
-          let%map next_epoch_ledger =
-            get_snarked_ledger_full mina (Some epoch_transition_state_hash)
-          in
-          ( cast_ledger staking_ledger
-          , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
-    in
-    assert (
-      Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root staking_ledger)
-        staking_epoch.ledger.hash ) ;
-    assert (
-      Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
-        next_epoch.ledger.hash ) ;
-    (staking_ledger, next_epoch_ledger)
+            (* When this block reaches the root of the frontier, its snarked
+               ledger will become the next epoch ledger; we simulate that here.
+            *)
+            let%map next_epoch_ledger =
+              get_snarked_ledger_full mina (Some epoch_transition_state_hash)
+            in
+            ( cast_ledger staking_ledger
+            , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
+      in
+      assert (
+        Ledger_hash.equal
+          (Ledger.Any_ledger.M.merkle_root staking_ledger)
+          staking_epoch.ledger.hash ) ;
+      assert (
+        Ledger_hash.equal
+          (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
+          next_epoch.ledger.hash ) ;
+      (staking_ledger, next_epoch_ledger)
 
-  type inputs =
-    { staged_ledger : Ledger.t
-    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
-    ; state_hash : State_hash.t
-    ; staking_ledger : Ledger.Any_ledger.witness
-    ; staking_epoch_seed : Epoch_seed.t
-    ; next_epoch_ledger : Ledger.Any_ledger.witness
-    ; next_epoch_seed : Epoch_seed.t
-    ; blockchain_length : Mina_numbers.Length.t
-    }
-
-  let prepare_inputs ~breadcrumb_spec mina =
-    let open Deferred.Result.Let_syntax in
-    let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
-    let block = Transition_frontier.Breadcrumb.block breadcrumb in
-    let blockchain_length = Mina_block.blockchain_length block in
-    let global_slot_since_genesis =
-      Mina_block.consensus_state block
-      |> Consensus.Data.Consensus_state.global_slot_since_genesis
-    in
-    let staged_ledger =
-      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-      |> Staged_ledger.ledger
-    in
-    let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-    let protocol_state =
-      Transition_frontier.Breadcrumb.protocol_state breadcrumb
-    in
-    let consensus = Mina_state.Protocol_state.consensus_state protocol_state in
-    let staking_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data consensus
-    in
-    let next_epoch =
-      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
-    in
-    let staking_epoch_seed = staking_epoch.Epoch_data.Poly.seed in
-    let next_epoch_seed = next_epoch.Epoch_data.Poly.seed in
-    let%map staking_ledger, next_epoch_ledger =
-      epoch_ledgers ~breadcrumb mina
-    in
-    { staged_ledger
-    ; global_slot_since_genesis
-    ; state_hash
-    ; staking_ledger
-    ; staking_epoch_seed
-    ; next_epoch_ledger
-    ; next_epoch_seed
-    ; blockchain_length
-    }
+    let prepare_inputs ~breadcrumb_spec mina =
+      let open Deferred.Result.Let_syntax in
+      let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
+      let block = Transition_frontier.Breadcrumb.block breadcrumb in
+      let blockchain_length = Mina_block.blockchain_length block in
+      let global_slot_since_genesis =
+        Mina_block.consensus_state block
+        |> Consensus.Data.Consensus_state.global_slot_since_genesis
+      in
+      let staged_ledger =
+        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+        |> Staged_ledger.ledger
+      in
+      let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+      let protocol_state =
+        Transition_frontier.Breadcrumb.protocol_state breadcrumb
+      in
+      let consensus =
+        Mina_state.Protocol_state.consensus_state protocol_state
+      in
+      let staking_epoch =
+        Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+          consensus
+      in
+      let next_epoch =
+        Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
+      in
+      let staking_epoch_seed = staking_epoch.Epoch_data.Poly.seed in
+      let next_epoch_seed = next_epoch.Epoch_data.Poly.seed in
+      let%map staking_ledger, next_epoch_ledger =
+        epoch_ledgers ~breadcrumb mina
+      in
+      { staged_ledger
+      ; global_slot_since_genesis
+      ; state_hash
+      ; staking_ledger
+      ; staking_epoch_seed
+      ; next_epoch_ledger
+      ; next_epoch_seed
+      ; blockchain_length
+      }
+  end
 end
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
