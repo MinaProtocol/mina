@@ -146,3 +146,17 @@ let work_selection_method_to_module :
       (module Work_selector.Selection_methods.Random)
   | Random_offset ->
       (module Work_selector.Selection_methods.Random_offset)
+
+module Hardfork_mode = struct
+  type t = Auto | Legacy
+
+  let of_string = function
+    | "auto" ->
+        Auto
+    | "legacy" ->
+        Legacy
+    | _ ->
+        failwith "Invalid hardfork mode"
+
+  let arg = Command.Arg_type.map Command.Param.string ~f:of_string
+end
