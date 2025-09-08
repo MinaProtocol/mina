@@ -938,11 +938,8 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
            lower fee or the statement isn't referenced anymore or any other 
            error. In any case remove it from the seen jobs so that it can be 
            picked up if needed *)
-        One_or_two.map
-          ~f:(fun x ->
-            let spec = Tuple2.get1 x in
+        One_or_two.map spec_with_proof ~f:(fun (spec, _) ->
             Snark_work_lib.Work.Single.Spec.statement spec )
-          spec_with_proof
         |> Work_selector.remove t.work_selector ;
         Result.iter_error result ~f:(fun err ->
             [%log info] "Failed to push completed work to local snark sink"
