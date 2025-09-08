@@ -930,20 +930,36 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
       |> Result.iter_error ~f:(fun err ->
              [%log debug] "Failed to update metrics on adding work"
                ~metadata:[ ("error", `String (Error.to_string_hum err)) ] ) ;
+      let cb result =
+        (* remove it from seen jobs after attempting to adding it to the pool to
+           avoid this work being reassigned.
+         * If the diff is accepted then remove it from the seen jobs.
+         * If not then the work should have already been in the pool with a 
+           lower fee or the statement isn't referenced anymore or any other 
+           error. In any case remove it from the seen jobs so that it can be 
+           picked up if needed *)
+        One_or_two.map
+          ~f:(fun x ->
+            let spec = Tuple2.get1 x in
+            Snark_work_lib.Work.Single.Spec.statement spec )
+          spec_with_proof
+        |> Work_selector.remove t.work_selector ;
+        Result.iter_error result ~f:(fun err ->
+            [%log info] "Failed to push completed work to local snark sink"
+              ~metadata:
+                [ ( "stmts"
+                  , One_or_two.to_yojson
+                      Mina_state.Snarked_ledger_state.to_yojson stmts )
+                ; ("error", `String (Error.to_string_hum err))
+                ] )
+      in
       Network_pool.Snark_pool.(
         Local_sink.push t.pipes.snark_local_sink
           ( Add_solved_work
               ( stmts
               , Network_pool.Priced_proof.
                   { proof = proofs; fee = fee_with_prover } )
-          , Result.iter_error ~f:(fun err ->
-                [%log info] "Failed to push completed work to local snark sink"
-                  ~metadata:
-                    [ ( "stmts"
-                      , One_or_two.to_yojson
-                          Mina_state.Snarked_ledger_state.to_yojson stmts )
-                    ; ("error", `String (Error.to_string_hum err))
-                    ] ) ))
+          , cb ))
       |> Deferred.don't_wait_for ;
       `Ok
 
