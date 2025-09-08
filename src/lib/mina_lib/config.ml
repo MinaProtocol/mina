@@ -67,5 +67,13 @@ type t =
   ; zkapp_cmd_limit : int option ref
   ; compile_config : Mina_compile_config.t
   ; itn_features : bool
+  ; hardfork_mode : Cli_lib.Arg_type.Hardfork_mode.t
   }
 [@@deriving make]
+
+let ledger_backing ~hardfork_mode =
+  match hardfork_mode with
+  | Cli_lib.Arg_type.Hardfork_mode.Auto ->
+      Mina_ledger.Ledger.Root.Config.Converting_db
+  | _ ->
+      Stable_db

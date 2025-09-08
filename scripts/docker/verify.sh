@@ -45,7 +45,7 @@ DOCKER_PLATFORM="--platform linux/$ARCH"
 
 DOCKER_IMAGE="$REPO/$PACKAGE:$VERSION-${CODENAME}${SUFFIX}${DOCKER_ARCH_SUFFIX}"
 
-if ! docker  pull "$DOCKER_IMAGE" ; then
+if ! docker pull "$DOCKER_IMAGE" ; then
   echo "❌ Docker verification for $CODENAME $PACKAGE $ARCH failed"
   echo "❌ Please check if the image $DOCKER_IMAGE exists."
   exit 1

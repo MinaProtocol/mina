@@ -32,6 +32,7 @@ function usage() {
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
+  echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -45,6 +46,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -b|--branch) INPUT_BRANCH="$2"; shift;;
   -c|--cache-from) INPUT_CACHE="$2"; shift;;
   -r|--repo) MINA_REPO="$2"; shift;;
+  -p|--platform) INPUT_PLATFORM="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;
@@ -96,6 +98,39 @@ if [[ -z "$INPUT_CODENAME" ]]; then
   DEB_CODENAME="--build-arg deb_codename=bullseye"
 fi
 
+if [[ -z "$INPUT_PLATFORM" ]]; then
+  INPUT_PLATFORM="linux/amd64"
+fi
+
+PLATFORM="--platform ${INPUT_PLATFORM}"
+
+case "${INPUT_PLATFORM}" in
+      linux/amd64)
+        RUSTARCH="x86_64"
+        ;;
+      linux/arm64)
+        RUSTARCH="aarch64"
+        ;;
+      *)
+        echo "unsupported platform"; exit 1
+        ;;
+esac
+RUSTARCH_ARG="--build-arg RUSTARCH=$RUSTARCH"
+
+case "${INPUT_PLATFORM}" in
+      linux/amd64)
+        OPAMARCH="x86_64"
+        ;;
+      linux/arm64)
+        OPAMARCH="arm64"
+        ;;
+      *)
+        echo "unsupported platform"; exit 1
+        ;;
+esac
+OPAMARCH_ARG="--build-arg OPAMARCH=$OPAMARCH"
+
+
 DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 if [[ -z "$INPUT_RELEASE" ]]; then
   echo "Debian release is not set. Using the default (unstable)"
@@ -123,9 +158,15 @@ if [[ -z "$INPUT_CACHE" ]]; then
 fi
 
 DEB_REPO="--build-arg deb_repo=$INPUT_REPO"
+GW=$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')
+LOCALHOST_REPLACEMENT=$GW
 if [[ -z "$INPUT_REPO" ]]; then
-  echo "Debian repository is not set. Using the default (http://localhost:8080)"
-  DEB_REPO="--build-arg deb_repo=http://localhost:8080"
+  echo "Debian repository is not set. Using the default (http://$LOCALHOST_REPLACEMENT:8080)"
+  DEB_REPO="--build-arg deb_repo=http://$LOCALHOST_REPLACEMENT:8080"
+else
+  echo "Converting localhost to $LOCALHOST_REPLACEMENT in repository URL"
+  CONVERTED_REPO=$(echo "$INPUT_REPO" | sed "s/localhost/$LOCALHOST_REPLACEMENT/g")
+  DEB_REPO="--build-arg deb_repo=$CONVERTED_REPO"
 fi
 
 if [[ $(echo "${VALID_SERVICES[@]}" | grep -o "$SERVICE" - | wc -w) -eq 0 ]]; then usage "Invalid service!"; fi
@@ -211,13 +252,14 @@ esac
 export_version
 export_docker_tag
 
-BUILD_NETWORK="--network=host"
+BUILD_NETWORK="--allow=network.host"
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
-  cat $DOCKERFILE_PATH | docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
+  cat $DOCKERFILE_PATH | docker buildx build  --network=host \
+  --load --progress=plain $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
-  docker build $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx build --load --network=host --progress=plain $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

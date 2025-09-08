@@ -2158,6 +2158,9 @@ let create ~commit_id ?wallets (config : Config.t) =
             }
           in
 
+          let ledger_backing =
+            Config.ledger_backing ~hardfork_mode:config.hardfork_mode
+          in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2174,7 +2177,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ()
+              ~notify_online ~transaction_pool_proxy ~ledger_backing ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
