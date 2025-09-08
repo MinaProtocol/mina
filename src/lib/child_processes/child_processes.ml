@@ -353,20 +353,43 @@ let%test_module _ =
 
     let process_wait_timeout = Time.Span.of_sec 2.1
 
+    let expected_lines = 10
+
+    let stdout_lines_correct_til_eof ~pipe =
+      let counter = ref 0 in
+      let%map () =
+        Strict_pipe.Reader.iter pipe ~f:(fun line ->
+            [%test_eq: string] line "hello" ;
+            incr counter ;
+            Deferred.unit )
+      in
+      [%test_eq: int] !counter expected_lines
+
+    let stdout_lines_correct_prefix ~pipe =
+      let%map result =
+        Strict_pipe.Reader.fold_until ~init:0 pipe ~f:(fun counter line ->
+            [%test_eq: string] line "hello" ;
+            let counter = succ counter in
+            Deferred.return
+            @@ if counter = expected_lines then `Stop () else `Continue counter )
+      in
+      match result with
+      | `Eof actual_lines ->
+          failwithf "Early EOF: expected %d line got %d" expected_lines
+            actual_lines ()
+      | `Terminated () ->
+          ()
+
     let%test_unit "can launch and get stdout" =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:[ "exit" ] ~stdout:`Chunks ~stderr:`Chunks
+              ~args:[ "exit" ] ~stdout:`Lines ~stderr:`Chunks
               ~termination:`Raise_on_failure ()
             |> Deferred.map ~f:Or_error.ok_exn
           in
-          let%bind () =
-            Strict_pipe.Reader.iter (stdout process) ~f:(fun line ->
-                [%test_eq: string] "hello\n" line ;
-                Deferred.unit )
-          in
+          let%bind () = stdout_lines_correct_til_eof ~pipe:(stdout process) in
           (* Pipe will be closed before the ivar is filled, so we need to wait a
              bit. *)
           let%bind () = after process_wait_timeout in
@@ -389,23 +412,15 @@ let%test_module _ =
               ~f:(function `Yes -> true | _ -> false)
           in
           let assert_lock_exists () =
-            Deferred.map (lock_exists ()) ~f:(fun exists -> assert exists)
+            let%map exists = lock_exists () in
+            assert exists
           in
           let assert_lock_does_not_exist () =
-            Deferred.map (lock_exists ()) ~f:(fun exists -> assert (not exists))
+            let%map exists = lock_exists () in
+            assert (not exists)
           in
           let%bind () = assert_lock_exists () in
-          let output = ref [] in
-          let rec go () =
-            match%bind Strict_pipe.Reader.read (stdout process) with
-            | `Eof ->
-                failwith "pipe closed when process should've run forever"
-            | `Ok line ->
-                output := line :: !output ;
-                if List.length !output = 10 then Deferred.unit else go ()
-          in
-          let%bind () = go () in
-          [%test_eq: string list] !output (List.init 10 ~f:(fun _ -> "hello")) ;
+          let%bind () = stdout_lines_correct_prefix ~pipe:(stdout process) in
           let%bind () = after process_wait_timeout in
           assert (Option.is_none @@ termination_status process) ;
           let%bind kill_res = kill process in
@@ -447,15 +462,11 @@ let%test_module _ =
           let%bind () = Async.Writer.save lock_path ~contents:"123" in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:[ "exit" ] ~stdout:`Chunks ~stderr:`Chunks
+              ~args:[ "exit" ] ~stdout:`Lines ~stderr:`Chunks
               ~termination:`Raise_on_failure ()
             |> Deferred.map ~f:Or_error.ok_exn
           in
-          let%bind () =
-            Strict_pipe.Reader.iter (stdout process) ~f:(fun line ->
-                [%test_eq: string] "hello\n" line ;
-                Deferred.unit )
-          in
+          let%bind () = stdout_lines_correct_til_eof ~pipe:(stdout process) in
           let%map () = after process_wait_timeout in
           [%test_eq: Unix.Exit_or_signal.t Or_error.t option] (Some (Ok (Ok ())))
             (termination_status process) )
