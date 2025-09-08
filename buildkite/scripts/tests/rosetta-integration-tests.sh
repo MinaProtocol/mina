@@ -4,10 +4,6 @@ set -eox pipefail
 # These tests use the mina binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
-# Defines scope of test. Currently supported are:
-# - minimal -> only quick checks (~5 mins)
-# - full -> all checks
-MODE="minimal"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -247,9 +243,7 @@ send_zkapp_transactions() {
 }
 
 # There is no point to generate transaction just for minimal mode
-if [[ "$MODE" == "full" ]]; then
-  send_zkapp_transactions &
-fi
+send_zkapp_transactions &
 
 next_block_time=$(mina client status --json | jq '.next_block_production.timing[1].time' | tr -d '"') curr_time=$(date +%s%N | cut -b1-13)
 sleep_time=$((($next_block_time - $curr_time) / 1000))
@@ -263,27 +257,23 @@ rosetta-cli configuration:validate ${ROSETTA_CONFIGURATION_FILE}
 echo "========================= ROSETTA CLI: CHECK:SPEC ==========================="
 rosetta-cli check:spec --all --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
-if [[ "$MODE" == "full" ]]; then
+echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
+rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
-  echo "========================= ROSETTA CLI: CHECK:CONSTRUCTION ==========================="
-  rosetta-cli check:construction --configuration-file ${ROSETTA_CONFIGURATION_FILE}
-
-  # wait until block height 11 is reached before starting check:data
-  # so it gives enough time to vest the time-vesting accounts
+# wait until block height 11 is reached before starting check:data
+# so it gives enough time to vest the time-vesting accounts
+current_block_height=$(mina client status --json | jq -r '.blockchain_length')
+while [[ ${current_block_height} -lt 11 ]]; do
   current_block_height=$(mina client status --json | jq -r '.blockchain_length')
-  while [[ ${current_block_height} -lt 11 ]]; do
-    current_block_height=$(mina client status --json | jq -r '.blockchain_length')
-    echo "Waiting for block height 11 to be reached..."
-    echo "Current block height is: ${current_block_height}"
-    sleep 30
-  done
+  echo "Waiting for block height 11 to be reached..."
+  echo "Current block height is: ${current_block_height}"
+  sleep 30
+done
 
-  echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
+echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
 
-  echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
-  rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
+echo "========================= ROSETTA CLI: CHECK:DATA ==========================="
+rosetta-cli check:data --configuration-file ${ROSETTA_CONFIGURATION_FILE}
 
-  echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
-  echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
-
-fi
+echo "========================= ROSETTA CLI: CHECK:PERF ==========================="
+echo "rosetta-cli check:perf" # Will run this command when tests are fully implemented
