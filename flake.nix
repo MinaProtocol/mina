@@ -96,6 +96,7 @@
         rust = import ./nix/rust.nix;
         go = import ./nix/go.nix;
         javascript = import ./nix/javascript.nix;
+        findlib-override = import ./nix/overlays/findlib-override.nix;
         ocaml = pkgs: prev: {
           ocamlPackages_mina =
             requireSubmodules (import ./nix/ocaml.nix { inherit inputs pkgs; });
