@@ -114,10 +114,9 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
   let try_cleanup_lock_file ~pid_metadata () =
     match%bind Sys.file_exists lockpath with
     | `Yes | `Unknown -> (
-        match%bind try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
+        match%map try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
         | Ok () ->
-            [%log debug] "Deleted existing lock file %s" lockpath ;
-            Deferred.unit
+            [%log debug] "Deleted existing lock file %s" lockpath
         | Error exn ->
             [%log warn]
               !"Couldn't delete lock file for %s (pid $childPid). If another \
@@ -127,8 +126,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
               ~metadata:
                 [ ("childPid", pid_metadata)
                 ; ("exn", `String (Exn.to_string exn))
-                ] ;
-            Deferred.unit )
+                ] )
     | `No ->
         [%log debug] "Lock file %s does not exist" lockpath ;
         Deferred.unit
@@ -157,16 +155,15 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
             | `Ok -> (
                 [%log debug] "Successfully sent TERM signal to %s (%s)" name
                   pid_str ;
-                let%bind () = after (Time.Span.of_sec 0.5) in
+                let%map () = after (Time.Span.of_sec 0.5) in
                 match Signal.send Signal.kill (`Pid pid) with
                 | `No_such_process ->
-                    Deferred.unit
+                    ()
                 | `Ok ->
                     [%log error]
                       "helper process %s (%s) didn't die after being sent \
                        TERM, KILLed it"
-                      name pid_str ;
-                    Deferred.unit )
+                      name pid_str )
           in
           try_cleanup_lock_file ~pid_metadata:(`Int (Pid.to_int pid)) () )
   | `Unknown | `No ->
@@ -219,14 +216,12 @@ let start_custom :
                conf_dir )
   in
   let lock_path = conf_dir ^/ name ^ ".lock" in
-  let%bind () =
+  let%bind.Deferred () =
     (* we may not wish to use a lockfile, in order to start multiple processes
        from the same executable
     *)
-    if allow_multiple_instances then Deferred.Or_error.return ()
-    else
-      Deferred.map ~f:Or_error.return
-      @@ maybe_kill_and_unlock name lock_path logger
+    if allow_multiple_instances then Deferred.return ()
+    else maybe_kill_and_unlock name lock_path logger
   in
   [%log debug] "Starting custom child process $name with args $args"
     ~metadata:
@@ -461,8 +456,7 @@ let%test_module _ =
                 [%test_eq: string] "hello\n" line ;
                 Deferred.unit )
           in
-          let%bind () = after process_wait_timeout in
+          let%map () = after process_wait_timeout in
           [%test_eq: Unix.Exit_or_signal.t Or_error.t option] (Some (Ok (Ok ())))
-            (termination_status process) ;
-          Deferred.unit )
+            (termination_status process) )
   end )
