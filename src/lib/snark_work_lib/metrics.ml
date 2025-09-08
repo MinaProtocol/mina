@@ -16,24 +16,18 @@ module Transaction_type = struct
         `Fee_transfer
 end
 
-(* HACK: this is so we don't need to refactor stuff in txn witness recursively *)
-type stable
+type any_witness =
+  | Stable_witness of Transaction_witness.Stable.Latest.t
+  | In_mem_witness of Transaction_witness.t
 
-type in_mem
-
-type _ witness =
-  | Stable_witness : Transaction_witness.Stable.Latest.t -> stable witness
-  | In_mem_witness : Transaction_witness.t -> stable witness
-
-let txn_type_of_witness (type kind) : kind witness -> Transaction_type.t =
-  function
+let txn_type_of_witness : any_witness -> Transaction_type.t = function
   | Stable_witness { transaction; _ } ->
       Transaction_type.of_transaction transaction
   | In_mem_witness { transaction; _ } ->
       Transaction_type.of_transaction transaction
 
-let emit_single_metrics_poly (type kind) ~logger
-    ~(single_spec : (kind witness, _) Single_spec.Poly.t)
+let emit_single_metrics_poly ~logger
+    ~(single_spec : (any_witness, _) Single_spec.Poly.t)
     ~data:
       ({ data = elapsed; _ } :
         (Core.Time.Stable.Span.V1.t, _) Proof_carrying_data.t ) =
