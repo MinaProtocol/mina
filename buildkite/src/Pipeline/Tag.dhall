@@ -21,6 +21,7 @@ let Tag
       | Debian
       | Hardfork
       | Promote
+      | Rosetta
       >
 
 let toNatural
@@ -40,6 +41,7 @@ let toNatural
             , Promote = 11
             , Debian = 12
             , Docker = 13
+            , Rosetta = 14
             }
             tag
 
@@ -77,6 +79,7 @@ let capitalName =
             , Promote = "Promote"
             , Docker = "Docker"
             , Debian = "Debian"
+            , Rosetta = "Rosetta"
             }
             tag
 
@@ -96,6 +99,7 @@ let lowerName =
             , Promote = "promote"
             , Docker = "docker"
             , Debian = "debian"
+            , Rosetta = "rosetta"
             }
             tag
 

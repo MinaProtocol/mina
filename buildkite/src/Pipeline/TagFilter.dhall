@@ -16,6 +16,7 @@ let Filter
       | Promote
       | DebianBuild
       | DockerBuild
+      | Rosetta
       >
 
 let tags
@@ -32,6 +33,7 @@ let tags
             , AllTests = [ Tag.Type.Lint, Tag.Type.Release, Tag.Type.Test ]
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
+            , Rosetta = [ Tag.Type.Rosetta ]
             }
             filter
 
@@ -49,6 +51,7 @@ let show
             , Promote = "Promote"
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
+            , Rosetta = "Rosetta"
             }
             filter
 

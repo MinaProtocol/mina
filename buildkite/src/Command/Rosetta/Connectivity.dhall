@@ -108,6 +108,7 @@ let pipeline
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test
               , PipelineTag.Type.Stable
+              , PipelineTag.Type.Rosetta
               ]
             }
           , steps = [ command spec ]
