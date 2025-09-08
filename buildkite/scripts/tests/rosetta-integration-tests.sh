@@ -4,16 +4,6 @@ set -eox pipefail
 # These tests use the mina binary, as rosetta-cli assumes we use a testnet.
 # See https://github.com/coinbase/rosetta-sdk-go/blob/master/keys/signer_pallas.go#L222
 
-
-while [ $# -gt 0 ]; do
-  case "$1" in
-  --mode=*)
-    MODE="${1#*=}"
-    ;;
-  esac
-  shift
-done
-
 export MINA_NETWORK=${MINA_NETWORK:=testnet}
 export LOG_LEVEL="${LOG_LEVEL:=Info}"
 
