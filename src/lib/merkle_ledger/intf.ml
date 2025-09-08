@@ -573,7 +573,12 @@ module Ledger = struct
       the primary database. Existing but incompatible converting databases (such
       as out-of-sync databases) will be deleted and re-migrated. *)
       val create :
-        config:Config.create -> logger:Logger.t -> depth:int -> unit -> t
+           config:Config.create
+        -> logger:Logger.t
+        -> depth:int
+        -> ?assert_synced:bool
+        -> unit
+        -> t
 
       (** Make checkpoints of the databases backing the converting merkle tree and
       create a new converting ledger based on those checkpoints *)

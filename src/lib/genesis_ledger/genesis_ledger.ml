@@ -129,19 +129,17 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       match directory with
       | `Ephemeral ->
           lazy (`Ephemeral (Ledger.create_ephemeral ~depth ()), true)
-      | `New ->
+      | `New backing_type ->
           lazy
             ( `Root
-                (Ledger.Root.create_temporary ~logger
-                   ~backing_type:Ledger.Root.Config.Stable_db ~depth () )
+                (Ledger.Root.create_temporary ~logger ~backing_type ~depth ())
             , true )
-      | `Path directory_name ->
+      | `Path (directory_name, backing_type) ->
           lazy
             ( `Root
                 (Ledger.Root.create ~logger
                    ~config:
-                     (Ledger.Root.Config.with_directory
-                        ~backing_type:Ledger.Root.Config.Stable_db
+                     (Ledger.Root.Config.with_directory ~backing_type
                         ~directory_name () )
                    ~depth () )
             , false )

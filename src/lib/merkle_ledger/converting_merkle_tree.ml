@@ -303,7 +303,7 @@ struct
   include Make (Inputs) (Primary_db) (Converting_db)
   module Config = With_database_config
 
-  let create ~config ~logger ~depth () =
+  let create ~config ~logger ~depth ?(assert_synced = false) () =
     let primary_directory_name, converting_directory_name, monitor_in_sync =
       match config with
       | Config.Temporary ->
@@ -324,10 +324,13 @@ struct
     let db2 =
       Converting_db.create ?directory_name:db2_directory_name ~depth ()
     in
-    if Converting_db.num_accounts db2 = 0 then
-      of_ledgers_with_migration ?monitor_in_sync db1 db2 ()
+    if Converting_db.num_accounts db2 = 0 then (
+      if assert_synced then failwith "Converting DB is empty!" ;
+      of_ledgers_with_migration ?monitor_in_sync db1 db2 () )
     else if dbs_synced db1 db2 then of_ledgers ?monitor_in_sync db1 db2 ()
     else (
+      if assert_synced then
+        failwith "Converting DB is not in sync with primary DB!" ;
       [%log warn]
         "Migrating DB desync, cleaning up unstable DB and remigrating..." ;
       Converting_db.close db2 ;

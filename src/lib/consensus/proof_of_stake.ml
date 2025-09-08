@@ -473,14 +473,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                ~depth:constraint_constants.ledger_depth () ) )
         else Genesis_epoch_ledger genesis_epoch_ledger
 
-      let create block_producer_pubkeys ~context:(module Context : CONTEXT)
-          ~genesis_ledger ~genesis_epoch_data ~epoch_ledger_location
-          ~genesis_state_hash =
-        (* TODO: Pass in from above. The backing type should ultimately be based
-           on the value of the HF automation flag. *)
-        let epoch_ledger_backing_type =
-          Mina_ledger.Ledger.Root.Config.Stable_db
-        in
+      let create ~context:(module Context : CONTEXT) ~genesis_ledger
+          ~genesis_epoch_data ~epoch_ledger_location ~genesis_state_hash
+          ~epoch_ledger_backing_type block_producer_pubkeys =
         let open Context in
         (* TODO: remove this duplicate of the genesis ledger *)
         let genesis_epoch_ledger_staking, genesis_epoch_ledger_next =

@@ -86,7 +86,10 @@ module For_tests : sig
         -> Frontier_base.Breadcrumb.t list Async_kernel.Deferred.t )
        Base_quickcheck.Generator.t
 
-  val create_frontier : unit -> t
+  val create_frontier :
+       epoch_ledger_backing_type:Mina_ledger.Ledger.Root.Config.backing_type
+    -> unit
+    -> t
 
   val clean_up_persistent_root : frontier:t -> unit
 

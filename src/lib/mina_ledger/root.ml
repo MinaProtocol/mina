@@ -62,6 +62,10 @@ struct
   module Config = struct
     type backing_type = Stable_db | Converting_db [@@deriving equal, yojson]
 
+    (* WARN: always construct Converting_db_config with
+       [with_directory ~backing_type ~directory_name], instead of manual
+       creation. This is because [delete_any_backing] expect there's a
+       relation between primary dir and converting dir name *)
     type t =
       | Stable_db_config of string
       | Converting_db_config of Converting_ledger.Config.t
@@ -91,9 +95,16 @@ struct
             (Converting_ledger.Config.with_primary ~directory_name
                ?monitor_in_sync () )
 
-    let delete_any_backing primary =
-      let converting =
-        Converting_ledger.Config.default_converting_directory_name primary
+    let delete_any_backing config =
+      let primary, converting =
+        match config with
+        | Stable_db_config primary ->
+            let converting =
+              Converting_ledger.Config.default_converting_directory_name primary
+            in
+            (primary, converting)
+        | Converting_db_config { primary_directory; converting_directory; _ } ->
+            (primary_directory, converting_directory)
       in
       Mina_stdlib_unix.File_system.rmrf primary ;
       Mina_stdlib_unix.File_system.rmrf converting

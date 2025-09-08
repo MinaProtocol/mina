@@ -125,13 +125,13 @@ module Instance = struct
 
   let dequeue_snarked_ledger t =
     let config = Queue.dequeue_exn t.potential_snarked_ledgers in
-    Ledger.Root.Config.delete_backing config ;
+    Ledger.Root.Config.delete_any_backing config ;
     write_potential_snarked_ledgers_to_disk t
 
   let destroy t =
     List.iter
       (Queue.to_list t.potential_snarked_ledgers)
-      ~f:Ledger.Root.Config.delete_backing ;
+      ~f:Ledger.Root.Config.delete_any_backing ;
     Mina_stdlib_unix.File_system.rmrf
       (Config.potential_snarked_ledgers t.factory) ;
     Ledger.Root.close t.snarked_ledger ;
@@ -192,20 +192,20 @@ module Instance = struct
             with
             | Ok _ ->
                 Ledger.Root.close potential_snarked_ledger ;
-                Ledger.Root.Config.delete_backing
+                Ledger.Root.Config.delete_any_backing
                 @@ Config.snarked_ledger factory ;
                 Ledger.Root.Config.move_backing_exn
                   ~src:(Config.tmp_snarked_ledger factory)
                   ~dst:(Config.snarked_ledger factory) ;
                 List.iter potential_snarked_ledgers
-                  ~f:Ledger.Root.Config.delete_backing ;
+                  ~f:Ledger.Root.Config.delete_any_backing ;
                 Mina_stdlib_unix.File_system.rmrf
                   (Config.potential_snarked_ledgers factory) ;
                 Stop (Some snarked_ledger)
             | Error e ->
                 Ledger.Root.close potential_snarked_ledger ;
                 List.iter potential_snarked_ledgers
-                  ~f:Ledger.Root.Config.delete_backing ;
+                  ~f:Ledger.Root.Config.delete_any_backing ;
                 Mina_stdlib_unix.File_system.rmrf
                   (Config.potential_snarked_ledgers factory) ;
                 [%log' error factory.logger]
@@ -217,7 +217,7 @@ module Instance = struct
             Continue None ) )
         ~finish:(fun _ ->
           List.iter potential_snarked_ledgers
-            ~f:Ledger.Root.Config.delete_backing ;
+            ~f:Ledger.Root.Config.delete_any_backing ;
           Mina_stdlib_unix.File_system.rmrf
             (Config.potential_snarked_ledgers factory) ;
           None )
@@ -289,10 +289,7 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~directory ~ledger_depth =
-  (* TODO: Pass in from above. This should ultimately be determined by the value
-     of the HF automation flag. *)
-  let backing_type = Ledger.Root.Config.Stable_db in
+let create ~logger ~directory ~backing_type ~ledger_depth =
   { directory; logger; instance = None; ledger_depth; backing_type }
 
 let create_instance_exn t =
