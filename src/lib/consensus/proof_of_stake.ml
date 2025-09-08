@@ -48,7 +48,7 @@ module Make_str (A : Wire_types.Concrete) = struct
         (* only default token matters for total currency used to determine stake *)
         if Mina_base.(Token_id.equal account.token_id Token_id.default) then
           Amount.add sum (Balance.to_amount @@ account.balance)
-          |> Option.value_exn ?here:None ?error:None
+          |> Option.value_exn ~here:[%here]
                ~message:"failed to calculate total currency in genesis ledger"
         else sum )
 
@@ -59,51 +59,47 @@ module Make_str (A : Wire_types.Concrete) = struct
   let compute_delegatee_table keys ~iter_accounts =
     let open Mina_base in
     let outer_table = Public_key.Compressed.Table.create () in
+    let num_delegators = ref 0 in
     iter_accounts (fun i (acct : Account.t) ->
-        if
-          Option.is_some acct.delegate
-          (* Only default tokens may delegate. *)
-          && Token_id.equal acct.token_id Token_id.default
-          && Public_key.Compressed.Set.mem keys (Option.value_exn acct.delegate)
-        then
-          Public_key.Compressed.Table.update outer_table
-            (Option.value_exn acct.delegate) ~f:(function
-            | None ->
-                Account.Index.Table.of_alist_exn [ (i, acct) ]
-            | Some table ->
-                Account.Index.Table.add_exn table ~key:i ~data:acct ;
-                table ) ) ;
+        match acct.delegate with
+        | Some delegate
+          when Token_id.equal acct.token_id Token_id.default
+               && Public_key.Compressed.Set.mem keys delegate ->
+            incr num_delegators ;
+            Public_key.Compressed.Table.update outer_table delegate ~f:(function
+              | None ->
+                  Account.Index.Table.of_alist_exn [ (i, acct) ]
+              | Some table ->
+                  Account.Index.Table.add_exn table ~key:i ~data:acct ;
+                  table )
+        | _ ->
+            () ) ;
     (* TODO: this metric tracking currently assumes that the result of
        compute_delegatee_table is called with the full set of block production
-       keypairs every time the set changes, which is true right now, but this
-       should be control flow should be refactored to make this clearer *)
-    let num_delegators =
-      Public_key.Compressed.Table.fold outer_table ~init:0
-        ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
-    in
+       keypairs every time the set changes, which is true right now, but the
+       control flow should be refactored to make this clearer *)
     Mina_metrics.Gauge.set Mina_metrics.Consensus.staking_keypairs
       (Float.of_int @@ Public_key.Compressed.Set.length keys) ;
     Mina_metrics.Gauge.set Mina_metrics.Consensus.stake_delegators
-      (Float.of_int num_delegators) ;
+      (Float.of_int !num_delegators) ;
     outer_table
 
   let compute_delegatee_table_ledger_root keys ledger =
     O1trace.sync_thread "compute_delegatee_table_ledger_root" (fun () ->
         compute_delegatee_table keys ~iter_accounts:(fun f ->
             Mina_ledger.Ledger.Any_ledger.M.iteri
-              (Mina_ledger.Ledger.Root.as_unmasked ledger) ~f:(fun i acct ->
-                f i acct ) ) )
+              (Mina_ledger.Ledger.Root.as_unmasked ledger)
+              ~f ) )
 
   let compute_delegatee_table_ledger_any keys ledger =
     O1trace.sync_thread "compute_delegatee_table_ledger_any" (fun () ->
         compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.Any_ledger.M.iteri ledger ~f:(fun i acct ->
-                f i acct ) ) )
+            Mina_ledger.Ledger.Any_ledger.M.iteri ledger ~f ) )
 
   let compute_delegatee_table_genesis_ledger keys ledger =
     O1trace.sync_thread "compute_delegatee_table_genesis_ledger" (fun () ->
         compute_delegatee_table keys ~iter_accounts:(fun f ->
-            Mina_ledger.Ledger.iteri ledger ~f:(fun i acct -> f i acct) ) )
+            Mina_ledger.Ledger.iteri ledger ~f ) )
 
   module Typ = Snark_params.Tick.Typ
 
@@ -520,7 +516,9 @@ module Make_str (A : Wire_types.Concrete) = struct
                       ] ;
                   create_new_uuids ()
             in
-            (*If the genesis hash matches and both the files are present. If only one of them is present then it could be stale data and might cause the node to never be able to bootstrap*)
+            (*If the genesis hash matches and both the files are present. If
+              only one of them is present then it could be stale data and might
+              cause the node to never be able to bootstrap*)
             if
               Mina_base.State_hash.equal epoch_ledger_uuids.genesis_state_hash
                 genesis_state_hash
@@ -591,7 +589,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let block_production_keys_swap ~(constants : Constants.t) t
           block_production_pubkeys now =
         let old : Data.t = !t in
-        let s { Snapshot.ledger; delegatee_table = _ } =
+        let s { Snapshot.ledger; _ } =
           { Snapshot.ledger
           ; delegatee_table =
               Snapshot.Ledger_snapshot.compute_delegatee_table
@@ -899,11 +897,10 @@ module Make_str (A : Wire_types.Concrete) = struct
                     delegators
                 in
                 match acc with
-                | Some (`Vrf_eval prev_best_vrf_eval, _, _) ->
-                    if String.compare prev_best_vrf_eval vrf_eval < 0 then
-                      this_vrf ()
-                    else go acc delegators
-                | None ->
+                | Some (`Vrf_eval prev_best_vrf_eval, _, _)
+                  when String.compare prev_best_vrf_eval vrf_eval >= 0 ->
+                    go acc delegators
+                | _ ->
                     this_vrf ()
               else go acc delegators
         in

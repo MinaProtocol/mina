@@ -89,6 +89,7 @@
    ppx_deriving.std
    ppx_deriving_yojson
    ppx_fields_conv
+   ppx_here
    ppx_inline_test
    ppx_let
    ppx_sexp_conv
@@ -113,6 +114,7 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_version ppx_jane))
- (enabled_if false) ;; Compilation is disabled until this executable has been fixed.
- )
+  (pps ppx_jane ppx_version))
+ (enabled_if false))
+
+;; Compilation is disabled until this executable has been fixed.
