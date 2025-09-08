@@ -44,6 +44,12 @@ module Poly = struct
         job.sok_message
     | Sub_zkapp_command { job; _ } ->
         job.sok_message
+
+  let id_to_json : _ t -> Yojson.Safe.t = function
+    | Single { job = { job_id; _ }; _ } ->
+        `List [ `String "single"; Id.Single.to_yojson job_id ]
+    | Sub_zkapp_command { job = { job_id; _ }; _ } ->
+        `List [ `String "sub_zkapp"; Id.Sub_zkapp.to_yojson job_id ]
 end
 
 [%%versioned

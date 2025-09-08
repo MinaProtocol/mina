@@ -30,7 +30,9 @@ module Poly : sig
     -> ('a, 'c, 'e) t
     -> ('b, 'd, 'f) t
 
-  val sok_message : ('a, 'b, 'c) t -> Mina_base.Sok_message.t
+  val sok_message : _ t -> Mina_base.Sok_message.t
+
+  val id_to_json : _ t -> Yojson.Safe.t
 end
 
 [%%versioned:
