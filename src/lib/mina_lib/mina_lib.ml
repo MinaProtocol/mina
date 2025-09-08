@@ -871,7 +871,7 @@ let best_chain ?max_length t =
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
   let%bind.Option prover =
-    Option.merge (snark_worker_key t) (snark_coordinator_key t) ~f:Fn.const
+    Option.first_some (snark_worker_key t) (snark_coordinator_key t)
   in
   let fee = snark_work_fee t in
   let sok_message = Sok_message.create ~fee ~prover in
@@ -888,6 +888,7 @@ let request_work t =
 let work_selection_method t = t.config.work_selection_method
 
 let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
+  let logger = t.config.logger in
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -918,15 +919,17 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
         |> One_or_two.map ~f:(fun (spec, _) ->
                Snark_work_lib.Selector.Single.Spec.Poly.statement spec )
       in
-      [%log' info t.config.logger] "Partitioner combined work"
+      [%log debug] "Partitioner combined work"
         ~metadata:
           [ ( "stmts"
             , One_or_two.to_yojson Mina_state.Snarked_ledger_state.to_yojson
                 stmts )
           ; ("fee_with_prover", Fee_with_prover.to_yojson fee_with_prover)
-          ; ("proofs", proofs |> One_or_two.to_yojson Ledger_proof.to_yojson)
           ] ;
-      ignore (Or_error.try_with update_metrics : unit Or_error.t) ;
+      Or_error.try_with update_metrics
+      |> Result.iter_error ~f:(fun err ->
+             [%log debug] "Failed to update metrics on adding work"
+               ~metadata:[ ("error", `String (Error.to_string_hum err)) ] ) ;
       Network_pool.Snark_pool.(
         Local_sink.push t.pipes.snark_local_sink
           ( Add_solved_work
@@ -934,9 +937,7 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
               , Network_pool.Priced_proof.
                   { proof = proofs; fee = fee_with_prover } )
           , Result.iter_error ~f:(fun err ->
-                [%log' info t.config.logger]
-                  "Failed to push completed work to local snark sink, \
-                   returning them to work selector"
+                [%log info] "Failed to push completed work to local snark sink"
                   ~metadata:
                     [ ( "stmts"
                       , One_or_two.to_yojson
