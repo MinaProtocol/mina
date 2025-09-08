@@ -70,7 +70,7 @@ let merge_single_result ~logger
   | ( Spec_only { spec = `Two (other_spec, spec); sok_message }
     , (`Second as submitted_half) ) ->
       Snark_work_lib.(
-        Metrics.emit_single_metrics_in_mem ~logger ~single_spec:spec
+        Metrics.emit_single_metrics ~logger ~single_spec:spec
           ~data:{ data = submitted_result.elapsed; proof = () }) ;
       Pending
         (One_of_two
@@ -89,7 +89,7 @@ let merge_single_result ~logger
       if equal_half in_pool_half submitted_half then HalfAlreadyInPool
       else (
         Snark_work_lib.(
-          Metrics.emit_single_metrics_in_mem ~logger ~single_spec:other_spec
+          Metrics.emit_single_metrics ~logger ~single_spec:other_spec
             ~data:{ data = submitted_result.elapsed; proof = () }) ;
         finalize_two ~submitted_result ~other_spec ~in_pool_result
           ~submitted_half ~fee ~prover )
