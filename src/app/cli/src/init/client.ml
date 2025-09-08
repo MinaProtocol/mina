@@ -2312,6 +2312,35 @@ let test_genesis_creation =
      Cli_lib.Exceptions.handle_nicely
        Test_genesis_creation.time_genesis_creation )
 
+let test_generate_hardfork_config =
+  let open Command.Param in
+  let hardfork_config_dir_flag =
+    flag "--hardfork-config-dir"
+      ~doc:"DIR Directory to generate hardfork configuration" (required string)
+  in
+  let legacy_format_flag =
+    flag "--legacy-format"
+      ~doc:"Generate config in legacy format (default: false)" no_arg
+  in
+  let flags = Args.zip2 hardfork_config_dir_flag legacy_format_flag in
+  Command.async ~summary:"Generate hardfork configuration for testing"
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun port (directory_name, legacy_format) ->
+         match%bind
+           Daemon_rpcs.Client.dispatch_join_errors
+             Daemon_rpcs.Generate_hardfork_config.rpc
+             (directory_name, legacy_format)
+             port
+         with
+         | Error e ->
+             eprintf "Failed to request hardfork config generation: %s\n"
+               (Error.to_string_hum e) ;
+             exit 17
+         | Ok () ->
+             printf "Hardfork configuration successfully requested in %s\n"
+               directory_name ;
+             exit 0 ) )
+
 let test_ledger_application =
   Command.async ~summary:"Test ledger application"
     (let%map_open.Command privkey_path = Cli_lib.Flag.privkey_read_path
@@ -2535,7 +2564,9 @@ let advanced ~itn_features =
     ; ("print-signature-kind", signature_kind)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("generate-hardfork-config", test_generate_hardfork_config)
+          ] )
     ]
   in
   let cmds =

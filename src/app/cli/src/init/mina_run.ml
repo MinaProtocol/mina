@@ -369,6 +369,23 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ()) )
+    ; implement Daemon_rpcs.Generate_hardfork_config.rpc
+        (fun () (directory_name, legacy_format) ->
+          let dump () =
+            let%map result =
+              Mina_lib.Hardfork_config.hardfork_config_dump ~legacy_format
+                ~breadcrumb_spec:`Stop_slot ~directory_name mina
+            in
+            match result with
+            | Error e ->
+                [%log warn]
+                  !"Failed to generate hardfork config: %s"
+                  (Error.to_string_hum e)
+            | Ok _ ->
+                ()
+          in
+          don't_wait_for (dump ()) ;
+          return (Ok ()) )
     ; implement Daemon_rpcs.Submit_internal_log.rpc
         (fun () { timestamp; message; metadata; process } ->
           let metadata =

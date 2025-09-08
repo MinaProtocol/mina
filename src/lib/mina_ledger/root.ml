@@ -215,6 +215,36 @@ struct
              ; backing_2 = Config.backing_of_config config
              } )
 
+  let create_stable_copy ~parent_directory ~name t =
+    let stable_db =
+      match t with
+      | Stable_db db ->
+          db
+      | Converting_db db ->
+          Converting_ledger.primary_ledger db
+    in
+    Unix.mkdir_p parent_directory ;
+    Stable_db.create_checkpoint stable_db
+      ~directory_name:(parent_directory ^/ name) ()
+
+  let create_migrated_copy ~parent_directory ~name t =
+    Unix.mkdir_p parent_directory ;
+    let directory_name = parent_directory ^/ name in
+    match t with
+    | Stable_db db ->
+        let unstable_db =
+          Unstable_db.create ~directory_name ~depth:(Stable_db.depth db) ()
+        in
+        (* Used only for the migration side effect *)
+        let _ledger =
+          Converting_ledger.of_ledgers_with_migration db unstable_db
+        in
+        unstable_db
+    | Converting_db db ->
+        let unstable_db = Converting_ledger.converting_ledger db in
+        Unstable_db.create_checkpoint unstable_db
+          ~directory_name:(parent_directory ^/ name) ()
+
   let as_unmasked t =
     match t with
     | Stable_db db ->

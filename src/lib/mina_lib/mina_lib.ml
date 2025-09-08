@@ -2649,7 +2649,37 @@ module Hardfork_config = struct
     | `Block_height block_height ->
         best_chain_block_by_height mina block_height |> Deferred.return
 
-  let epoch_ledgers ~breadcrumb mina =
+  let genesis_source_of_snapshot = function
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger l
+      ->
+        `Genesis l
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
+        `Root l
+
+  let genesis_source_ledger_cast = function
+    | `Genesis l ->
+        let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+        Ledger.Any_ledger.cast (module Ledger) l_inner
+    | `Root l ->
+        Ledger.Root.as_unmasked l
+    | `Uncommitted l ->
+        Ledger.Any_ledger.cast (module Ledger) l
+
+  let genesis_source_ledger_merkle_root l =
+    genesis_source_ledger_cast l |> Ledger.Any_ledger.M.merkle_root
+
+  type genesis_source_ledgers =
+    { root_snarked_ledger : Ledger.Root.t
+    ; staged_ledger : Ledger.t
+    ; staking_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t | `Root of Ledger.Root.t ]
+    ; next_epoch_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Ledger.Root.t
+        | `Uncommitted of Ledger.t ]
+    }
+
+  let source_ledgers ~breadcrumb mina =
     let open Deferred.Result.Let_syntax in
     let mina_config = config mina in
     let frontier_consensus_local_state = mina_config.consensus_local_state in
@@ -2665,19 +2695,21 @@ module Hardfork_config = struct
       Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
         consensus_state
     in
-    let cast_ledger = function
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
-          l ->
-          let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
-          Ledger.Any_ledger.cast (module Ledger) l_inner
-      | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
-          Ledger.Root.as_unmasked l
+    let frontier =
+      transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
+      |> Option.value_exn
     in
     let root_consensus_state =
-      transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
-      |> Option.value_exn |> Transition_frontier.root
+      frontier |> Transition_frontier.root
       |> Transition_frontier.Breadcrumb.protocol_state
       |> Mina_state.Protocol_state.consensus_state
+    in
+    let root_snarked_ledger =
+      frontier |> Transition_frontier.root_snarked_ledger
+    in
+    let staged_ledger =
+      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+      |> Staged_ledger.ledger
     in
     let%map staking_ledger, next_epoch_ledger =
       match
@@ -2689,7 +2721,9 @@ module Hardfork_config = struct
           ~local_state:frontier_consensus_local_state
       with
       | `Both (staking_ledger, next_epoch_ledger) ->
-          return (cast_ledger staking_ledger, cast_ledger next_epoch_ledger)
+          return
+            ( genesis_source_of_snapshot staking_ledger
+            , genesis_source_of_snapshot next_epoch_ledger )
       | `Snarked_ledger (staking_ledger, num_parents) ->
           (* The epoch transition was at a block between the given block and
              the root. We find it by walking back by `num_parents` blocks.
@@ -2716,28 +2750,27 @@ module Hardfork_config = struct
           let%map next_epoch_ledger =
             get_snarked_ledger_full mina (Some epoch_transition_state_hash)
           in
-          ( cast_ledger staking_ledger
-          , Ledger.Any_ledger.cast (module Ledger) next_epoch_ledger )
+          ( genesis_source_of_snapshot staking_ledger
+          , `Uncommitted next_epoch_ledger )
     in
     assert (
       Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root staking_ledger)
+        (genesis_source_ledger_merkle_root staking_ledger)
         staking_epoch.ledger.hash ) ;
     assert (
       Ledger_hash.equal
-        (Ledger.Any_ledger.M.merkle_root next_epoch_ledger)
+        (genesis_source_ledger_merkle_root next_epoch_ledger)
         next_epoch.ledger.hash ) ;
-    (staking_ledger, next_epoch_ledger)
+    { root_snarked_ledger; staged_ledger; staking_ledger; next_epoch_ledger }
 
   type inputs =
-    { staged_ledger : Ledger.t
+    { source_ledgers : genesis_source_ledgers
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
     ; state_hash : State_hash.t
-    ; staking_ledger : Ledger.Any_ledger.witness
     ; staking_epoch_seed : Epoch_seed.t
-    ; next_epoch_ledger : Ledger.Any_ledger.witness
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
+    ; block_timestamp : Block_time.t
     }
 
   let prepare_inputs ~breadcrumb_spec mina =
@@ -2749,11 +2782,8 @@ module Hardfork_config = struct
       Mina_block.consensus_state block
       |> Consensus.Data.Consensus_state.global_slot_since_genesis
     in
-    let staged_ledger =
-      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-      |> Staged_ledger.ledger
-    in
     let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+    let block_timestamp = block |> Mina_block.timestamp in
     let protocol_state =
       Transition_frontier.Breadcrumb.protocol_state breadcrumb
     in
@@ -2766,18 +2796,169 @@ module Hardfork_config = struct
     in
     let staking_epoch_seed = staking_epoch.Epoch_data.Poly.seed in
     let next_epoch_seed = next_epoch.Epoch_data.Poly.seed in
-    let%map staking_ledger, next_epoch_ledger =
-      epoch_ledgers ~breadcrumb mina
-    in
-    { staged_ledger
+    let%map source_ledgers = source_ledgers ~breadcrumb mina in
+    { source_ledgers
     ; global_slot_since_genesis
     ; state_hash
-    ; staking_ledger
     ; staking_epoch_seed
-    ; next_epoch_ledger
     ; next_epoch_seed
     ; blockchain_length
+    ; block_timestamp
     }
+
+  let copy_genesis_source_legacy ~snarked_root ~target_dir ~target_name
+      genesis_source =
+    let merkle_root =
+      match genesis_source with
+      | `Genesis _l ->
+          failwith "Unimplemented"
+      | `Root l ->
+          let root_copy =
+            Ledger.Root.create_stable_copy ~parent_directory:target_dir
+              ~name:target_name l
+          in
+          let merkle_root = Ledger.Db.merkle_root root_copy in
+          Ledger.Db.close root_copy ; merkle_root
+      | `Uncommitted l ->
+          let account_diff = Ledger.all_accounts_on_masks l |> Map.to_alist in
+          let snarked_root_copy =
+            Ledger.Root.create_stable_copy ~parent_directory:target_dir
+              ~name:target_name snarked_root
+          in
+          Ledger.Db.set_batch snarked_root_copy account_diff ;
+          let merkle_root = Ledger.Db.merkle_root snarked_root_copy in
+          Ledger.Db.close snarked_root_copy ;
+          merkle_root
+    in
+    (merkle_root, target_dir ^/ target_name)
+
+  let copy_genesis_source ~snarked_root ~target_dir ~target_name genesis_source
+      =
+    let merkle_root =
+      match genesis_source with
+      | `Genesis _l ->
+          failwith "Unimplemented"
+      | `Root l ->
+          let root_copy =
+            Ledger.Root.create_migrated_copy ~parent_directory:target_dir
+              ~name:target_name l
+          in
+          let merkle_root = Ledger.Unstable_db.merkle_root root_copy in
+          Ledger.Unstable_db.close root_copy ;
+          merkle_root
+      | `Uncommitted l ->
+          let account_diff =
+            Ledger.all_accounts_on_masks l
+            |> Map.to_alist
+            |> List.map ~f:(fun (loc, account) ->
+                   (loc, Account.Unstable.of_stable account) )
+          in
+          let snarked_root_copy =
+            Ledger.Root.create_migrated_copy ~parent_directory:target_dir
+              ~name:target_name snarked_root
+          in
+          Ledger.Unstable_db.set_batch snarked_root_copy account_diff ;
+          let merkle_root = Ledger.Unstable_db.merkle_root snarked_root_copy in
+          Ledger.Unstable_db.close snarked_root_copy ;
+          merkle_root
+    in
+    (merkle_root, target_dir ^/ target_name)
+
+  let generate_tar_and_config ~copy_source ~logger ~snarked_root ~target_dir
+      ~ledger_name_prefix genesis_source =
+    let open Deferred.Result.Let_syntax in
+    Mina_stdlib_unix.File_system.with_temp_dir
+      (Filename.temp_dir_name ^/ "generate_tar_" ^ ledger_name_prefix)
+      ~f:(fun work_dir ->
+        let root_hash, ledger_dirname =
+          copy_source ~snarked_root ~target_dir:work_dir
+            ~target_name:ledger_name_prefix genesis_source
+        in
+        let%bind tar_path =
+          Genesis_ledger_helper.Ledger.generate_tar ~logger ~target_dir
+            ~ledger_name_prefix ~root_hash ~ledger_dirname ()
+        in
+        let%map s3_data_hash =
+          Genesis_ledger_helper.sha3_hash tar_path
+          |> Deferred.map ~f:Or_error.return
+        in
+        Runtime_config.ledger_of_hashes
+          ~root_hash:(Mina_base.Ledger_hash.to_base58_check root_hash)
+          ~s3_data_hash () )
+
+  let genesis_timestamp_str ~hardfork_genesis_timestamp_offset block_timestamp =
+    block_timestamp |> Block_time.to_time_exn
+    |> Fn.flip Time.add hardfork_genesis_timestamp_offset
+    |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+
+  let hardfork_config_dump ~legacy_format ~breadcrumb_spec ~directory_name mina
+      =
+    let open Deferred.Result.Let_syntax in
+    let logger = mina.config.logger in
+    [%log info] "Creating hard fork config in $directory_name"
+      ~metadata:[ ("directory_name", `String directory_name) ] ;
+    Mina_stdlib_unix.File_system.with_temp_dir
+      (Filename.temp_dir_name ^/ "hardfork_config_dump")
+      ~f:(fun temp_dir ->
+        let%bind { source_ledgers
+                 ; global_slot_since_genesis
+                 ; state_hash
+                 ; staking_epoch_seed
+                 ; next_epoch_seed
+                 ; blockchain_length
+                 ; block_timestamp
+                 } =
+          prepare_inputs ~breadcrumb_spec mina
+        in
+        let genesis_state_timestamp =
+          genesis_timestamp_str
+            ~hardfork_genesis_timestamp_offset:(Time.Span.of_int_sec 0)
+            block_timestamp
+        in
+        let copy_source =
+          if legacy_format then copy_genesis_source_legacy
+          else copy_genesis_source
+        in
+        let%bind genesis_ledger_config =
+          generate_tar_and_config ~copy_source ~logger
+            ~snarked_root:source_ledgers.root_snarked_ledger
+            ~target_dir:temp_dir ~ledger_name_prefix:"genesis_ledger"
+            (`Uncommitted source_ledgers.staged_ledger)
+        in
+        let%bind staking_ledger_config =
+          generate_tar_and_config ~copy_source ~logger
+            ~snarked_root:source_ledgers.root_snarked_ledger
+            ~target_dir:temp_dir ~ledger_name_prefix:"epoch_ledger"
+            source_ledgers.staking_ledger
+        in
+        let%bind next_epoch_ledger_config =
+          generate_tar_and_config ~copy_source ~logger
+            ~snarked_root:source_ledgers.root_snarked_ledger
+            ~target_dir:temp_dir ~ledger_name_prefix:"epoch_ledger"
+            source_ledgers.next_epoch_ledger
+        in
+        let daemon_config =
+          Runtime_config.fork_config_of_ledgers ~genesis_state_timestamp
+            ~genesis_ledger_config ~global_slot_since_genesis ~state_hash
+            ~blockchain_length ~staking_ledger_config
+            ~staking_epoch_seed:
+              (Mina_base.Ledger_hash.to_base58_check staking_epoch_seed)
+            ~next_epoch_ledger_config:(Some next_epoch_ledger_config)
+            ~next_epoch_seed:
+              (Mina_base.Ledger_hash.to_base58_check next_epoch_seed)
+        in
+        let config_output_file = temp_dir ^/ "daemon.json" in
+        let%bind () =
+          Async.Writer.save config_output_file
+            ~contents:
+              (Yojson.Safe.to_string (Runtime_config.to_yojson daemon_config))
+          |> Deferred.map ~f:Or_error.return
+        in
+        let%bind.Deferred () = Sys.rename temp_dir directory_name in
+        [%log info]
+          !"Successfully wrote hard fork config to $directory_name"
+          ~metadata:[ ("directory_name", `String directory_name) ] ;
+        return () )
 end
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit

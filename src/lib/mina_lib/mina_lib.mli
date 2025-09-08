@@ -279,26 +279,56 @@ module Hardfork_config : sig
     -> mina_lib
     -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
 
-  val epoch_ledgers :
+  (** The ledgers that will be used to compute the hard fork genesis ledgers.
+      Note that a [Mina_ledger.Ledger.t] here, like the [staged_ledger] or
+      (potentially) the [next_epoch_ledger], must have the [root_snarked_ledger]
+      as its root. *)
+  type genesis_source_ledgers =
+    { root_snarked_ledger : Mina_ledger.Ledger.Root.t
+    ; staged_ledger : Mina_ledger.Ledger.t
+    ; staking_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Mina_ledger.Ledger.Root.t ]
+    ; next_epoch_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Mina_ledger.Ledger.Root.t
+        | `Uncommitted of Mina_ledger.Ledger.t ]
+    }
+
+  val genesis_source_ledger_cast :
+       [< `Genesis of Genesis_ledger.Packed.t
+       | `Root of Mina_ledger.Ledger.Root.t
+       | `Uncommitted of Mina_ledger.Ledger.t ]
+    -> Mina_ledger.Ledger.Any_ledger.witness
+
+  (** Retrieve the [genesis_source_ledgers] from the transition frontier,
+      starting at the given [breadcrumb]. *)
+  val source_ledgers :
        breadcrumb:Transition_frontier.Breadcrumb.t
     -> mina_lib
-    -> ( Mina_ledger.Ledger.Any_ledger.witness
-       * Mina_ledger.Ledger.Any_ledger.witness )
-       Deferred.Or_error.t
+    -> genesis_source_ledgers Deferred.Or_error.t
 
   type inputs =
-    { staged_ledger : Mina_ledger.Ledger.t
+    { source_ledgers : genesis_source_ledgers
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
     ; state_hash : State_hash.t
-    ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
     ; staking_epoch_seed : Epoch_seed.t
-    ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
+    ; block_timestamp : Block_time.t
     }
 
   val prepare_inputs :
     breadcrumb_spec:breadcrumb_spec -> mina_lib -> inputs Deferred.Or_error.t
+
+  (** Compute the hard fork config (genesis ledger, genesis epoch ledgers, and
+      node config) and save it to [directory_name] *)
+  val hardfork_config_dump :
+       legacy_format:bool
+    -> breadcrumb_spec:breadcrumb_spec
+    -> directory_name:string
+    -> mina_lib
+    -> unit Deferred.Or_error.t
 end
 
 val zkapp_cmd_limit : t -> int option ref
