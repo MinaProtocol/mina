@@ -87,6 +87,22 @@ let
 
       core =
         super.core.overrideAttrs { propagatedBuildInputs = [ pkgs.tzdata ]; };
+
+      # Override findlib to use GitHub source instead of problematic mirror
+      findlib = super.findlib.overrideAttrs (old: {
+        version = "1.9.3";
+        src = pkgs.fetchFromGitHub {
+          owner = "ocaml";
+          repo  = "ocamlfind";
+          rev   = "findlib-1.9.3";
+          hash  = "sha256-lOAfGE0JKDtgFNnvbVQvJfUEKPqsqTQDFIZlJjenHUo=";
+        };
+        patches = [];
+        postPatch = ''
+          echo 'ldconf="ignore"' >> findlib.conf.in
+          sed -i 's|$(prefix)$(OCAML_CORE_STDLIB)|$(prefix)$(OCAML_SITELIB)|g' src/findlib/Makefile
+        '';
+      });
     };
 
   scope =

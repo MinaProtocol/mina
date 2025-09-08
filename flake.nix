@@ -290,6 +290,7 @@
           (nixpkgs.lib.composeManyExtensions ([
             (import nixpkgs-mozilla)
             nix-npm-buildPackage.overlays.default
+            self.overlays.findlib-override
             (final: prev: {
               rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
               mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };

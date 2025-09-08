@@ -11,7 +11,8 @@ fi
 # Keep CI in sync with flake pin & harden fetches
 
 # More robust network retries for fixed-output fetches (e.g., findlib 1.9.3 mirror hiccups).
-export NIX_CURL_FLAGS="${NIX_CURL_FLAGS:---retry 8 --retry-delay 2 --connect-timeout 20}"
+# Also add much longer timeouts and more retries for problematic mirrors
+export NIX_CURL_FLAGS="${NIX_CURL_FLAGS:---retry 15 --retry-delay 5 --connect-timeout 60 --max-time 300}"
 
 # point legacy `import <nixpkgs>` / nix-build / nix-shell
 # to the same nixpkgs used by the flake. This keeps CI consistent with `nix build`.
