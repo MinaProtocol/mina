@@ -16,21 +16,19 @@ module Transaction_type = struct
         `Fee_transfer
 end
 
-type any_witness =
-  | Stable_witness of Transaction_witness.Stable.Latest.t
-  | In_mem_witness of Transaction_witness.t
-
-let txn_type_of_witness : any_witness -> Transaction_type.t = function
-  | Stable_witness { transaction; _ } ->
-      Transaction_type.of_transaction transaction
-  | In_mem_witness { transaction; _ } ->
-      Transaction_type.of_transaction transaction
-
-let emit_single_metrics_poly ~logger
-    ~(single_spec : (any_witness, _) Single_spec.Poly.t)
+let emit_single_metrics_impl ~logger
+    ~(single_spec : (Transaction_type.t, _) Single_spec.Poly.t)
     ~data:
       ({ data = elapsed; _ } :
         (Core.Time.Stable.Span.V1.t, _) Proof_carrying_data.t ) =
+  let log_base txn_type =
+    [%log info]
+      "Base SNARK generated in $elapsed for $transaction_type transaction"
+      ~metadata:
+        [ ("elapsed", `Float (Time.Span.to_sec elapsed))
+        ; ("transaction_type", Transaction_type.to_yojson txn_type)
+        ]
+  in
   match single_spec with
   | Single_spec.Poly.Merge (_, _, _) ->
       Perf_histograms.add_span ~name:"snark_worker_merge_time" elapsed ;
@@ -39,54 +37,47 @@ let emit_single_metrics_poly ~logger
           Cryptography.snark_work_merge_time_sec (Time.Span.to_sec elapsed)) ;
       [%log info] "Merge SNARK generated in $elapsed seconds"
         ~metadata:[ ("elapsed", `Float (Time.Span.to_sec elapsed)) ]
-  | Transition (_, witness) ->
-      let txn_type = txn_type_of_witness witness in
-      ( match txn_type with
-      | `Zkapp_command ->
-          (* WARN: with work partitioner, each metrics emission would reach both
-             this branch and [emit_partitioned_metrics] *)
-          Perf_histograms.add_span ~name:"snark_worker_zkapp_transition_time"
-            elapsed ;
-          Mina_metrics.(
-            Cryptography.(Counter.inc_one snark_work_zkapp_base_submissions))
-      | _ ->
-          Perf_histograms.add_span ~name:"snark_worker_nonzkapp_transition_time"
-            elapsed ;
-          Mina_metrics.(
-            Cryptography.(
-              Counter.inc snark_work_nonzkapp_base_time_sec
-                (Time.Span.to_sec elapsed) ;
-              Counter.inc_one snark_work_nonzkapp_base_submissions)) ) ;
-      [%log info]
-        "Base SNARK generated in $elapsed for $transaction_type transaction"
-        ~metadata:
-          [ ("elapsed", `Float (Time.Span.to_sec elapsed))
-          ; ("transaction_type", Transaction_type.(to_yojson @@ txn_type))
-          ]
+  | Transition (_, `Zkapp_command) ->
+      (* WARN: with work partitioner, each metrics emission would reach both
+         this branch and [emit_partitioned_metrics] *)
+      Perf_histograms.add_span ~name:"snark_worker_zkapp_transition_time"
+        elapsed ;
+      Mina_metrics.(
+        Cryptography.(Counter.inc_one snark_work_zkapp_base_submissions)) ;
+      log_base `Zkapp_command
+  | Transition (_, txn_type) ->
+      Perf_histograms.add_span ~name:"snark_worker_nonzkapp_transition_time"
+        elapsed ;
+      Mina_metrics.(
+        Cryptography.(
+          Counter.inc snark_work_nonzkapp_base_time_sec
+            (Time.Span.to_sec elapsed) ;
+          Counter.inc_one snark_work_nonzkapp_base_submissions)) ;
+      log_base txn_type
 
-let emit_single_metrics_in_mem ~logger ~(single_spec : _ Single_spec.Poly.t)
-    ~data =
-  emit_single_metrics_poly ~logger
+let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t) =
+  emit_single_metrics_impl ~logger
     ~single_spec:
       (Single_spec.Poly.map ~f_proof:Fn.id
-         ~f_witness:(fun w -> In_mem_witness w)
+         ~f_witness:(fun { Transaction_witness.transaction = tx; _ } ->
+           Transaction_type.of_transaction tx )
          single_spec )
-    ~data
 
-let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t) ~data =
-  emit_single_metrics_poly ~logger
+let emit_single_metrics_stable ~logger ~(single_spec : _ Single_spec.Poly.t) =
+  emit_single_metrics_impl ~logger
     ~single_spec:
       (Single_spec.Poly.map ~f_proof:Fn.id
-         ~f_witness:(fun w -> Stable_witness w)
+         ~f_witness:(fun { Transaction_witness.Stable.Latest.transaction = tx
+                         ; _
+                         } -> Transaction_type.of_transaction tx )
          single_spec )
-    ~data
 
 let emit_partitioned_metrics ~logger
     (result_with_spec : _ Partitioned_spec.Poly.t) =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
   match result_with_spec with
   | Partitioned_spec.Poly.Single { job; data; _ } ->
-      emit_single_metrics ~logger ~single_spec:job.spec ~data
+      emit_single_metrics_stable ~logger ~single_spec:job.spec ~data
   | Sub_zkapp_command
       { job = { spec = Sub_zkapp_spec.Stable.Latest.Segment { spec; _ }; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
