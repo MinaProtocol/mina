@@ -10,9 +10,9 @@
 #   upgrade-script-check.sh [OPTIONS]
 #
 # OPTIONS:
-#   -m, --mode MODE     Execution mode: 'conditional' or 'assert' (default: conditional)
-#                       conditional: Returns exit code 0/1 without error messages
-#                       assert: Prints error messages and fails with descriptive output
+#   -m, --mode MODE     Execution mode: 'default' or 'verbose' (default: default)
+#                       default: Returns exit code 0/1 without error messages
+#                       verbose: Prints error messages and fails with descriptive output
 #   -b, --branch BRANCH Target branch for comparison (default: develop)
 #   -h, --help          Show this help message
 #
@@ -27,7 +27,7 @@
 
 set -euo pipefail
 
-MODE="conditional"
+MODE="default"
 BRANCH="develop"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
@@ -37,8 +37,8 @@ parse_args() {
         case $1 in
             -m|--mode)
                 MODE="$2"
-                if [[ "$MODE" != "conditional" && "$MODE" != "assert" ]]; then
-                    echo "Error: Mode must be 'conditional' or 'assert'" >&2
+                if [[ "$MODE" != "default" && "$MODE" != "verbose" ]]; then
+                    echo "Error: Mode must be 'default' or 'verbose'" >&2
                     exit 1
                 fi
                 shift 2
@@ -81,7 +81,7 @@ has_changes() {
 
     # Fetch latest branch to ensure accurate comparison
     git fetch origin "$BRANCH" >/dev/null 2>&1 || {
-        if [[ "$MODE" == "assert" ]]; then
+        if [[ "$MODE" == "verbose" ]]; then
             echo "Error: Failed to fetch origin/$BRANCH" >&2
         fi
         return 1
@@ -96,31 +96,28 @@ has_changes() {
 main() {
     parse_args "$@"
 
-    local create_schema="src/app/archive/create_schema.sql"
-    local drop_table="src/app/archive/drop_table.sql"
+    local monitored_scripts=(
+        "src/app/archive/create_schema.sql"
+        "src/app/archive/drop_table.sql"
+    )
     local upgrade_script="src/app/archive/upgrade_to_mesa.sql"
 
     # Check if either monitored file has changes
     local schema_changed=false
 
-    if has_changes "$create_schema"; then
-        schema_changed=true
-        if [[ "$MODE" == "assert" ]]; then
-            echo "Detected changes in: $create_schema"
+    for script in "${monitored_scripts[@]}"; do
+        if has_changes "$script"; then
+            schema_changed=true
+            if [[ "$MODE" == "verbose" ]]; then
+                echo "Detected changes in: $script"
+            fi
         fi
-    fi
-
-    if has_changes "$drop_table"; then
-        schema_changed=true
-        if [[ "$MODE" == "assert" ]]; then
-            echo "Detected changes in: $drop_table"
-        fi
-    fi
+    done
 
     # If schema files changed, verify upgrade script exists
     if [[ "$schema_changed" == "true" ]]; then
         if ! check_file_exists "$upgrade_script"; then
-            if [[ "$MODE" == "assert" ]]; then
+            if [[ "$MODE" == "verbose" ]]; then
                 echo "Error: Archive schema files have been modified but upgrade script is missing!"
                 echo "Please create: $upgrade_script"
                 echo "This script should contain the necessary database migration steps."
@@ -128,11 +125,11 @@ main() {
             exit 1
         fi
 
-        if [[ "$MODE" == "assert" ]]; then
+        if [[ "$MODE" == "verbose" ]]; then
             echo "✓ Archive schema changes detected and upgrade script exists"
         fi
     else
-        if [[ "$MODE" == "assert" ]]; then
+        if [[ "$MODE" == "verbose" ]]; then
             echo "✓ No archive schema changes detected"
         fi
     fi
