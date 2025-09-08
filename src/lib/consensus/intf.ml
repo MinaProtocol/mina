@@ -328,12 +328,14 @@ module type S = sig
       type t [@@deriving to_yojson]
 
       val create :
-           Signature_lib.Public_key.Compressed.Set.t
-        -> context:(module CONTEXT)
+           context:(module CONTEXT)
         -> genesis_ledger:Genesis_ledger.Packed.t
         -> genesis_epoch_data:Genesis_epoch_data.t
         -> epoch_ledger_location:string
         -> genesis_state_hash:State_hash.t
+        -> epoch_ledger_backing_type:
+             Genesis_ledger.Ledger.Root.Config.backing_type
+        -> Signature_lib.Public_key.Compressed.Set.t
         -> t
 
       val current_block_production_keys :
