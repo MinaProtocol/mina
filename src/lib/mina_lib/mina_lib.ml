@@ -2895,7 +2895,7 @@ module Hardfork_config = struct
       =
     let open Deferred.Result.Let_syntax in
     let logger = mina.config.logger in
-    [%log info] "Creating unmigrated hard fork config in $directory_name"
+    [%log info] "Creating hard fork config in $directory_name"
       ~metadata:[ ("directory_name", `String directory_name) ] ;
     Mina_stdlib_unix.File_system.with_temp_dir
       (Filename.temp_dir_name ^/ "hardfork_config_dump")
