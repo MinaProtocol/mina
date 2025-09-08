@@ -2,7 +2,7 @@ FROM build-deps AS build-deps-bookworm
 
 # Debian style naming convention
 # : arm64/amd64
-ARG DEBIANARCH
+ARG DEBIAN_ARCH
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -15,7 +15,7 @@ RUN apt-get update --quiet \
     libproc2-0 \
   && rm -rf /var/lib/apt/lists/*
 
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-${DEBIANARCH}.zip" -o "awscliv2.zip" \
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-${DEBIAN_ARCH}.zip" -o "awscliv2.zip" \
   && unzip awscliv2.zip \
   && ./aws/install \
   && rm -rf awscliv2.zip aws

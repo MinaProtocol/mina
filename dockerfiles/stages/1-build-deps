@@ -23,7 +23,7 @@ ARG BUILDPLATFORM
 ARG CANONICAL_ARCH
 # Debian style naming convention
 # : arm64/amd64
-ARG DEBIANARCH
+ARG DEBIAN_ARCH
 
 # We need to define the target architecture as it is still different from CANONICAL_ARCH
 # For example: Canonical names are aarch64/x86_64 while TARGETARCH: aarch64/amd64
@@ -117,7 +117,7 @@ RUN git config --global advice.detachedHead false
 
 # --- Opam install of a given OPAM_VERSION from github release
 RUN curl -sL \
-  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${DEBIANARCH}-linux" \
+  "https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-${OPAM_VERSION}-${DEBIAN_ARCH}-linux" \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
