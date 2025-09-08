@@ -4,6 +4,8 @@ let Network = ./Network.dhall
 
 let BuildFlags = ./BuildFlags.dhall
 
+let Arch = ./Arch.dhall
+
 let S = ../Lib/SelectFiles.dhall
 
 let DebVersion = < Bookworm | Bullseye | Jammy | Focal | Noble >
@@ -38,6 +40,7 @@ let DepsSpec =
           , build_flag : BuildFlags.Type
           , step : Text
           , prefix : Text
+          , arch : Arch.Type
           }
       , default =
           { deb_version = DebVersion.Bullseye
@@ -46,6 +49,7 @@ let DepsSpec =
           , build_flag = BuildFlags.Type.None
           , step = "build"
           , prefix = "MinaArtifact"
+          , arch = Arch.Type.Amd64
           }
       }
 
@@ -57,7 +61,8 @@ let dependsOn =
                 "${spec.prefix}${capitalName
                                    spec.deb_version}${Network.capitalName
                                                         spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
-                                                                                         spec.build_flag}"
+                                                                                         spec.build_flag}${Arch.nameSuffix
+                                                                                                             spec.arch}"
 
           in  [ { name = name, key = "${spec.step}-deb-pkg" } ]
 
@@ -66,6 +71,7 @@ let minimalDirtyWhen =
       , S.exactly "buildkite/src/Constants/ContainerImages" "dhall"
       , S.exactly "buildkite/src/Command/MinaArtifact" "dhall"
       , S.exactly "buildkite/src/Command/PatchArchiveTest" "dhall"
+      , S.exactly "buildkite/src/Command/ArchiveNodeTest" "dhall"
       , S.exactly "buildkite/src/Command/Bench/Base" "dhall"
       , S.strictlyStart (S.contains "scripts/benchmarks")
       , S.strictlyStart (S.contains "buildkite/scripts/bench")

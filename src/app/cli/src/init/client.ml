@@ -853,7 +853,7 @@ let hash_ledger =
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
              ~logger:(Logger.create ()) ~depth:constraint_constants.ledger_depth
-             accounts
+             ~genesis_backing_type:Stable_db accounts
          in
          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
          Format.printf "%s@."
@@ -1854,6 +1854,7 @@ let compile_time_constants =
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
                  ~cli_proof_level:None ~genesis_dir
+                 ~genesis_backing_type:Stable_db
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -2371,7 +2372,8 @@ let test_ledger_application =
        Genesis_constants.Compiled.constraint_constants
      in
      let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-     Test_ledger_application.test ~privkey_path ~ledger_path ?prev_block_path
+     Test_ledger_application.test ~privkey_path
+       ~ledger_path:(ledger_path, Stable_db) ?prev_block_path
        ~first_partition_slots ~no_new_stack ~has_second_partition
        ~num_txs_per_round ~rounds ~no_masks ~max_depth ~tracing
        ~transfer_parties_get_actions_events num_txs ~constraint_constants
