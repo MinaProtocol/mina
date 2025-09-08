@@ -78,9 +78,9 @@ git config --global --add safe.directory /workdir
 #       error: program 'git' failed with exit code 128
 # That is why we checkout branch explicitly
 
-git branch -D $BUILDKITE_BRANCH 2>/dev/null || true
-git checkout -b $BUILDKITE_BRANCH
-git reset --hard $BUILDKITE_COMMIT
+#git branch -D $BUILDKITE_BRANCH 2>/dev/null || true
+#git checkout -b $BUILDKITE_BRANCH
+#git reset --hard $BUILDKITE_COMMIT
 
 # Test developer terminal with lsp server
 nix "${NIX_OPTS[@]}" develop "$PWD?submodules=1#with-lsp" --command bash -c "echo tested"
