@@ -158,7 +158,8 @@ let apply_txs ~transfer_parties_get_actions_events ~action_elements
     Staged_ledger.Test_helpers.update_coinbase_stack_and_get_data_impl
       ~first_partition_slots ~is_new_stack:(not no_new_stack)
       ~no_second_partition:(not has_second_partition) ~constraint_constants
-      ~logger ~global_slot ledger pending_coinbase zkapps' prev_state_view
+      ~logger ~global_slot ~signature_kind:Mina_signature_kind.Testnet ledger
+      pending_coinbase zkapps' prev_state_view
       (prev_protocol_state_hash, prev_protocol_state_body_hash)
   with
   | Ok (b, _, _, _, _) ->
