@@ -24,7 +24,7 @@ open Result.Let_syntax
 (* TODO: implement versions with module versioning. For
  * now, this is just stubbed so we can add db migrations
  * later. (#3736) *)
-let version = 2
+let version = 3
 
 module Schema = struct
   module Keys = struct
