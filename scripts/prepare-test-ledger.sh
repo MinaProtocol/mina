@@ -20,6 +20,12 @@ MAINNET_START='2024-06-05T00:00:00Z'
 now=$(date +%s)
 mainnet_start=$(date --date="$MAINNET_START" -u +%s)
 
+# Exit if ledger with specified prefix is really old (i.e. not synced for a long time)
+# This is a safety mechanism to avoid using an old ledger by mistake
+# (e.g. when ledger prefix is not updated for a long time)
+# If set, script will exit with code 2 if the ledger is older than 1 year
+EXIT_ON_OLD_LEDGER=${EXIT_ON_OLD_LEDGER:-}
+
 # Ledger prefix to use for structuring ledger
 LEDGER_PREFIX=${LEDGER_PREFIX:-staking-$(( (now-mainnet_start)/7140/180 ))}
 
@@ -44,6 +50,8 @@ while [[ $# -gt 0 ]]; do
       KEY_BALANCE="$2"; shift; shift ;;
     -p|--ledger-prefix)
       LEDGER_PREFIX="$2"; shift; shift ;;
+    -o|--exit-on-old-ledger)
+      EXIT_ON_OLD_LEDGER=1; shift ;;
     -*|--*)
       echo "Unknown option $1"; exit 1 ;;
     *)
@@ -73,7 +81,8 @@ echo "Using ledger with prefix: $LEDGER_PREFIX" >&2
 if [[ ! -f "$ledger_file" ]]; then
   ledgers_url="https://storage.googleapis.com/storage/v1/b/mina-staking-ledgers/o?maxResults=1000&prefix=$LEDGER_PREFIX"
   echo "$ledgers_url" >&2
-  ledger_url=$(curl "$ledgers_url" | jq -r '.items | sort_by(.size|tonumber) | last.mediaLink')
+  ledger_url_content=$(curl -s "$ledgers_url")
+  ledger_url=$(echo "$ledger_url_content" | jq -r '.items | sort_by(.size|tonumber) | last.mediaLink')
   if [[ "$ledger_url" == null ]]; then
     echo "Couldn't fine ledger with prefix $LEDGER_PREFIX" >&2
     exit 2
@@ -82,6 +91,17 @@ if [[ ! -f "$ledger_file" ]]; then
   not_finalized_msg="Ledger not found: next staking ledger is not finalized yet"
   if [[ "$(head -c ${#not_finalized_msg} "$ledger_file")" == "$not_finalized_msg" ]]; then
     echo "Next ledger not finalized yet" >&2 && rm "$ledger_file" && exit 2
+  fi
+  if [[ "$EXIT_ON_OLD_LEDGER" != "" ]]; then
+    ledger_timestamp=$(echo "$ledger_url_content" | jq -r '.items | sort_by(.size|tonumber) | last.timeCreated')
+    ledger_time=$(date --date="$ledger_timestamp" -u +%s 2>/dev/null || echo 0)
+    one_year_ago=$((now - 365*24*3600))
+
+    if [[ $ledger_time -lt $one_year_ago ]]; then
+      echo "Ledger is older than 1 year (timestamp: $ledger_timestamp), exiting" >&2
+      rm "$ledger_file"
+      exit 2
+    fi
   fi
 fi
 
