@@ -17,10 +17,7 @@ module Transaction_type = struct
 end
 
 let emit_single_metrics_impl ~logger
-    ~(single_spec : (Transaction_type.t, _) Single_spec.Poly.t)
-    ~data:
-      ({ data = elapsed; _ } :
-        (Core.Time.Stable.Span.V1.t, _) Proof_carrying_data.t ) =
+    ~(single_spec : (Transaction_type.t, _) Single_spec.Poly.t) ~elapsed =
   let log_base txn_type =
     [%log info]
       "Base SNARK generated in $elapsed for $transaction_type transaction"
@@ -76,8 +73,9 @@ let emit_partitioned_metrics ~logger
     (result_with_spec : _ Partitioned_spec.Poly.t) =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
   match result_with_spec with
-  | Partitioned_spec.Poly.Single { job; data; _ } ->
-      emit_single_metrics_stable ~logger ~single_spec:job.spec ~data
+  | Partitioned_spec.Poly.Single
+      { job; data = Proof_carrying_data.{ data = elapsed; _ }; _ } ->
+      emit_single_metrics_stable ~logger ~single_spec:job.spec ~elapsed
   | Sub_zkapp_command
       { job = { spec = Sub_zkapp_spec.Stable.Latest.Segment { spec; _ }; _ }
       ; data = Proof_carrying_data.{ data = elapsed; _ }
