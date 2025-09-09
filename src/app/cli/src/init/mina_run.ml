@@ -411,6 +411,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               [ ( "work_id"
                 , Snark_work_lib.Spec.Partitioned.Poly.id_to_json result )
               ] ;
+          Mina_metrics.(
+            Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           Deferred.return @@ Mina_lib.add_work mina result )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
         (fun () (error, _) ->

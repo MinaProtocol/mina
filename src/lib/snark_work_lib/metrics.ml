@@ -71,7 +71,6 @@ let emit_single_metrics_stable ~logger ~(single_spec : _ Single_spec.Poly.t) =
 
 let emit_partitioned_metrics ~logger
     (result_with_spec : _ Partitioned_spec.Poly.t) =
-  Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
   match result_with_spec with
   | Partitioned_spec.Poly.Single
       { job; data = Proof_carrying_data.{ data = elapsed; _ }; _ } ->
