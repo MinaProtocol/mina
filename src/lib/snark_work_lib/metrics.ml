@@ -88,6 +88,45 @@ let emit_single_metrics ~logger ~(single_spec : _ Single_spec.Poly.t)
             , Transaction_type.(to_yojson @@ of_transaction transaction) )
           ]
 
+(* TODO: remove this copy-paste in follow up PRs *)
+let emit_single_metrics_in_mem ~logger ~(single_spec : _ Single_spec.Poly.t)
+    ~data:
+      ({ data = elapsed; _ } :
+        (Core.Time.Stable.Span.V1.t, _) Proof_carrying_data.t )
+    ?(on_zkapp_command = fun _ _ -> ()) () =
+  match single_spec with
+  | Single_spec.Poly.Merge (_, _, _) ->
+      Perf_histograms.add_span ~name:"snark_worker_merge_time" elapsed ;
+      Mina_metrics.(
+        Cryptography.Snark_work_histogram.observe
+          Cryptography.snark_work_merge_time_sec (Time.Span.to_sec elapsed)) ;
+      [%log info] "Merge SNARK generated in $elapsed seconds"
+        ~metadata:[ ("elapsed", `Float (Time.Span.to_sec elapsed)) ]
+  | Transition (_, ({ transaction; _ } : Transaction_witness.t)) ->
+      ( match transaction with
+      | Mina_transaction.Transaction.Command
+          (Mina_base.User_command.Zkapp_command zkapp_command) ->
+          on_zkapp_command elapsed zkapp_command ;
+          Perf_histograms.add_span ~name:"snark_worker_zkapp_transition_time"
+            elapsed ;
+          Mina_metrics.(
+            Cryptography.(Counter.inc_one snark_work_zkapp_base_submissions))
+      | _ ->
+          Perf_histograms.add_span ~name:"snark_worker_nonzkapp_transition_time"
+            elapsed ;
+          Mina_metrics.(
+            Cryptography.(
+              Counter.inc snark_work_nonzkapp_base_time_sec
+                (Time.Span.to_sec elapsed) ;
+              Counter.inc_one snark_work_nonzkapp_base_submissions)) ) ;
+      [%log info]
+        "Base SNARK generated in $elapsed for $transaction_type transaction"
+        ~metadata:
+          [ ("elapsed", `Float (Time.Span.to_sec elapsed))
+          ; ( "transaction_type"
+            , Transaction_type.(to_yojson @@ of_transaction transaction) )
+          ]
+
 let emit_partitioned_metrics ~logger
     (result_with_spec : _ Partitioned_spec.Poly.t) =
   Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
