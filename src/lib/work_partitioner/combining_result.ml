@@ -30,24 +30,26 @@ let finalize_one ~submitted_result ~spec ~fee ~prover =
     Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
       ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
   in
-  let Snark_work_lib.Result.Single.Poly.{ proof; _ } = submitted_result in
-  Done { spec_with_proof = `One (spec, proof); fee; prover }
+  let Snark_work_lib.Result.Single.Poly.{ proof; elapsed; _ } =
+    submitted_result
+  in
+  Done { spec_with_proof = `One (spec, proof, elapsed); fee; prover }
 
 let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
     ~fee ~prover =
   let submitted_result =
-    let Snark_work_lib.Result.Single.Poly.{ spec; proof; _ } =
+    let Snark_work_lib.Result.Single.Poly.{ spec; proof; elapsed } =
       Snark_work_lib.Result.Single.Poly.map ~f_spec:(const other_spec)
         ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
     in
-    (spec, proof)
+    (spec, proof, elapsed)
   in
   let in_pool_result =
-    let Snark_work_lib.Result.Single.Poly.{ spec; proof; _ } =
+    let Snark_work_lib.Result.Single.Poly.{ spec; proof; elapsed } =
       Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
         ~f_proof:Ledger_proof.Cached.read_proof_from_disk in_pool_result
     in
-    (spec, proof)
+    (spec, proof, elapsed)
   in
   let spec_with_proof =
     match submitted_half with
@@ -58,7 +60,7 @@ let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
   in
   Done { spec_with_proof; fee; prover }
 
-let merge_single_result ~logger
+let merge_single_result
     ~(submitted_result :
        (unit, Ledger_proof.Cached.t) Snark_work_lib.Result.Single.Poly.t )
     ~(submitted_half : submitted_half) (current : t) : merge_outcome =
@@ -69,9 +71,6 @@ let merge_single_result ~logger
     , (`First as submitted_half) )
   | ( Spec_only { spec = `Two (other_spec, spec); sok_message }
     , (`Second as submitted_half) ) ->
-      Snark_work_lib.(
-        Metrics.emit_single_metrics ~logger ~single_spec:spec
-          ~data:{ data = submitted_result.elapsed; proof = () }) ;
       Pending
         (One_of_two
            { other_spec
@@ -87,12 +86,9 @@ let merge_single_result ~logger
         }
     , ((`First | `Second) as submitted_half) ) ->
       if equal_half in_pool_half submitted_half then HalfAlreadyInPool
-      else (
-        Snark_work_lib.(
-          Metrics.emit_single_metrics ~logger ~single_spec:other_spec
-            ~data:{ data = submitted_result.elapsed; proof = () }) ;
+      else
         finalize_two ~submitted_result ~other_spec ~in_pool_result
-          ~submitted_half ~fee ~prover )
+          ~submitted_half ~fee ~prover
   | Spec_only { spec = `One _ as spec; _ }, (`First | `Second)
   | Spec_only { spec = `Two _ as spec; _ }, `One ->
       StructureMismatch { spec }

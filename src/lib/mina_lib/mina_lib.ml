@@ -912,11 +912,11 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
   | Processed None ->
       `Ok
   | Processed (Some { spec_with_proof; fee; prover }) ->
-      let proofs = spec_with_proof |> One_or_two.map ~f:Tuple2.get2 in
+      let proofs = spec_with_proof |> One_or_two.map ~f:Tuple3.get2 in
       let fee_with_prover = Fee_with_prover.{ fee; prover } in
       let stmts =
         spec_with_proof
-        |> One_or_two.map ~f:(fun (spec, _) ->
+        |> One_or_two.map ~f:(fun (spec, _, _) ->
                Snark_work_lib.Selector.Single.Spec.Poly.statement spec )
       in
       [%log debug] "Partitioner combined work"
@@ -936,7 +936,7 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
            lower fee or the statement isn't referenced anymore or any other 
            error. In any case remove it from the seen jobs so that it can be 
            picked up if needed *)
-        One_or_two.map spec_with_proof ~f:(fun (spec, _) ->
+        One_or_two.map spec_with_proof ~f:(fun (spec, _, _) ->
             Snark_work_lib.Work.Single.Spec.statement spec )
         |> Work_selector.remove t.work_selector ;
         Result.iter_error result ~f:(fun err ->

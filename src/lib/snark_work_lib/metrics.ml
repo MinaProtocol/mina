@@ -69,10 +69,10 @@ let emit_single_metrics_stable ~logger ~(single_spec : _ Single_spec.Poly.t) =
                          } -> Transaction_type.of_transaction tx )
          single_spec )
 
-let emit_subzkapp_metrics ~logger ~(sub_zkapp_spec : Sub_zkapp_spec.t) ~elapsed
-    =
+let emit_subzkapp_metrics ~logger
+    ~(sub_zkapp_spec : Sub_zkapp_spec.Stable.Latest.t) ~elapsed =
   match sub_zkapp_spec with
-  | Sub_zkapp_spec.Segment { spec; _ } ->
+  | Sub_zkapp_spec.Stable.Latest.Segment { spec; _ } ->
       Perf_histograms.add_span
         ~name:"snark_worker_sub_zkapp_command_segment_time" elapsed ;
       Mina_metrics.(
@@ -87,7 +87,7 @@ let emit_subzkapp_metrics ~logger ~(sub_zkapp_spec : Sub_zkapp_spec.t) ~elapsed
           [ ("elapsed", `Float (Time.Span.to_sec elapsed))
           ; ("kind", `String "Segment")
           ]
-  | Sub_zkapp_spec.Merge _ ->
+  | Merge _ ->
       Perf_histograms.add_span ~name:"snark_worker_sub_zkapp_command_merge_time"
         elapsed ;
       Mina_metrics.(

@@ -136,7 +136,18 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
               Spec.Partitioned.Poly.map ~f_single_spec:ignore
                 ~f_subzkapp_spec:ignore ~f_data:Fn.id result
             in
-            Metrics.emit_partitioned_metrics ~logger result ;
+            ( match result with
+            | Spec.Partitioned.Poly.Single
+                { job = { spec = single_spec; _ }
+                ; data = { data = elapsed; _ }
+                } ->
+                Metrics.emit_single_metrics_stable ~logger ~single_spec ~elapsed
+            | Spec.Partitioned.Poly.Sub_zkapp_command
+                { job = { spec = sub_zkapp_spec; _ }
+                ; data = { data = elapsed; _ }
+                } ->
+                Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
+            ) ;
             let rec submit_work () =
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc

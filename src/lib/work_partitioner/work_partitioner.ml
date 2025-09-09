@@ -271,12 +271,17 @@ let submit_into_combining_result ~submitted_result ~partitioner
       submitted_result
   in
   match
-    Combining_result.merge_single_result ~logger:partitioner.logger
+    Combining_result.merge_single_result
       ~submitted_result:submitted_result_cached ~submitted_half combining_result
   with
   | Pending new_combining_result ->
       `Pending new_combining_result
   | Done combined ->
+      One_or_two.iter
+        ~f:(fun (single_spec, _, elapsed) ->
+          Work.Metrics.emit_single_metrics ~logger:partitioner.logger
+            ~single_spec ~elapsed )
+        combined.spec_with_proof ;
       `Done combined
   | HalfAlreadyInPool ->
       [%log' debug partitioner.logger]
@@ -368,7 +373,7 @@ let submit_single ~is_from_zkapp ~partitioner
 let submit_into_pending_zkapp_command ~partitioner
     ~job_id:({ range; _ } as job_id : Work.Id.Sub_zkapp.t)
     ~data:
-      ({ proof; data = elapsed } as data :
+      ({ proof; data = elapsed } :
         (Core.Time.Span.t, Ledger_proof.t) Proof_carrying_data.t ) =
   let single_id = Work.Id.Sub_zkapp.to_single job_id in
   let finalize_zkapp_proof pending =
@@ -389,12 +394,12 @@ let submit_into_pending_zkapp_command ~partitioner
     , Single_id_map.find partitioner.pending_zkapp_commands single_id )
   with
   | Some job, Some pending -> (
-      Work.Spec.Partitioned.Poly.Stable.Latest.Sub_zkapp_command { job; data }
-      |> Work.Metrics.emit_partitioned_metrics ~logger:partitioner.logger ;
       match
         Pending_zkapp_command.submit_proof ~proof ~elapsed ~range pending
       with
       | Ok () ->
+          Work.Metrics.emit_subzkapp_metrics ~logger:partitioner.logger
+            ~sub_zkapp_spec:job.spec ~elapsed ;
           finalize_zkapp_proof pending
       | Error exn ->
           [%log' debug partitioner.logger]

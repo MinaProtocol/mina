@@ -41,12 +41,11 @@ type merge_outcome =
       (** submitted work is doesn't match the spec, it happens when submitting a
           `One to a `Two spec, or `First/`Second to a `On spec *)
 
-(** [merge_single_result ~logger ~submitted_result ~submitted_half t] attempts 
+(** [merge_single_result ~submitted_result ~submitted_half t] attempts 
     to combine what we have in pool, [t], with the incoming single result 
     [submitted_result] corresponding to incoming half [submitted_half] *)
 val merge_single_result :
-     logger:Logger.t
-  -> submitted_result:
+     submitted_result:
        (unit, Ledger_proof.Cached.t) Snark_work_lib.Result.Single.Poly.t
   -> submitted_half:submitted_half
   -> t
