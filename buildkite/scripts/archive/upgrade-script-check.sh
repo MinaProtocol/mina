@@ -102,8 +102,8 @@ main() {
     )
 
     local scripts=(
-        upgrade_script="src/app/archive/upgrade-to-mesa.sql"
-        rollback_script="src/app/archive/downgrade-to-berkeley.sql"
+        "src/app/archive/upgrade-to-mesa.sql"
+        "src/app/archive/downgrade-to-berkeley.sql"
     )
 
     # Check if either monitored file has changes
