@@ -149,7 +149,12 @@ sleep 5
 # Run load test
 if [[ "$RUN_LOAD_TEST" == true ]]; then
         echo "Running load test for $LOAD_TEST_DURATION seconds..."
-        docker exec $container_id bash -c "/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK "
+        if docker exec $container_id bash -c "/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK "; then
+                echo -e "${GREEN}Load test completed successfully.${CLEAR}"
+        else
+                echo -e "${RED}Load test failed.${CLEAR}"
+                exit 1
+        fi
 else
         echo "Skipping load test."
 fi
@@ -159,7 +164,7 @@ if [[ "$RUN_COMPATIBILITY_TEST" == true ]]; then
         echo "Running compatibility test with branch: $COMPATIBILITY_BRANCH"
 
         # Check if there are schema differences
-        if buildkite/scripts/archive/upgrade-script-check.sh --mode conditional --branch "$COMPATIBILITY_BRANCH"; then
+        if buildkite/scripts/archive/upgrade-script-check.sh --mode default --branch "$COMPATIBILITY_BRANCH"; then
                 echo -e "${GREEN}No schema differences found. Compatibility test passed.${CLEAR}"
         else
                 echo "Schema differences detected. Running upgrade/rollback test cycle..."
