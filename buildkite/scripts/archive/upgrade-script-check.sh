@@ -100,7 +100,11 @@ main() {
         "src/app/archive/create_schema.sql"
         "src/app/archive/drop_table.sql"
     )
-    local upgrade_script="src/app/archive/upgrade_to_mesa.sql"
+
+    local scripts=(
+        "src/app/archive/upgrade-to-mesa.sql"
+        "src/app/archive/downgrade-to-berkeley.sql"
+    )
 
     # Check if either monitored file has changes
     local schema_changed=false
@@ -116,14 +120,17 @@ main() {
 
     # If schema files changed, verify upgrade script exists
     if [[ "$schema_changed" == "true" ]]; then
-        if ! check_file_exists "$upgrade_script"; then
+        # Check that all required scripts exist
+        for script_path in "${scripts[@]}"; do
+            if ! check_file_exists "$script_path"; then
             if [[ "$MODE" == "verbose" ]]; then
-                echo "Error: Archive schema files have been modified but upgrade script is missing!"
-                echo "Please create: $upgrade_script"
+                echo "Error: Archive schema files have been modified but required script is missing!"
+                echo "Please create: $script_path"
                 echo "This script should contain the necessary database migration steps."
             fi
             exit 1
-        fi
+            fi
+        done
 
         if [[ "$MODE" == "verbose" ]]; then
             echo "✓ Archive schema changes detected and upgrade script exists"
