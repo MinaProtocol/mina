@@ -112,24 +112,17 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
  fun name lockpath logger ->
   let open Deferred.Let_syntax in
   let try_cleanup_lock_file ~pid_metadata () =
-    match%bind Sys.file_exists lockpath with
-    | `Yes | `Unknown -> (
-        match%map try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
-        | Ok () ->
-            [%log debug] "Deleted existing lock file %s" lockpath
-        | Error exn ->
-            [%log warn]
-              !"Couldn't delete lock file for %s (pid $childPid). If another \
-                Mina daemon was already running it may have cleaned it up for \
-                us. ($exn)"
-              name
-              ~metadata:
-                [ ("childPid", pid_metadata)
-                ; ("exn", `String (Exn.to_string exn))
-                ] )
-    | `No ->
-        [%log debug] "Lock file %s does not exist" lockpath ;
-        Deferred.unit
+    match%map try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
+    | Ok () ->
+        [%log debug] "Deleted existing lock file %s" lockpath
+    | Error exn ->
+        [%log warn]
+          !"Couldn't delete lock file for %s (pid $childPid). If another Mina \
+            daemon was already running it may have cleaned it up for us. \
+            ($exn)"
+          name
+          ~metadata:
+            [ ("childPid", pid_metadata); ("exn", `String (Exn.to_string exn)) ]
   in
   match%bind Sys.file_exists lockpath with
   | `Yes -> (
