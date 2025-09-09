@@ -921,9 +921,7 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
       in
       [%log debug] "Partitioner combined work"
         ~metadata:
-          [ ( "stmts"
-            , One_or_two.to_yojson Mina_state.Snarked_ledger_state.to_yojson
-                stmts )
+          [ ("work_ids", Transaction_snark_work.Statement.compact_json stmts)
           ; ("fee_with_prover", Fee_with_prover.to_yojson fee_with_prover)
           ] ;
       Or_error.try_with update_metrics
@@ -944,9 +942,8 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
         Result.iter_error result ~f:(fun err ->
             [%log info] "Failed to push completed work to local snark sink"
               ~metadata:
-                [ ( "stmts"
-                  , One_or_two.to_yojson
-                      Mina_state.Snarked_ledger_state.to_yojson stmts )
+                [ ( "work_ids"
+                  , Transaction_snark_work.Statement.compact_json stmts )
                 ; ("error", `String (Error.to_string_hum err))
                 ] )
       in
