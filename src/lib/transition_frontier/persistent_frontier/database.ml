@@ -46,8 +46,6 @@ module Schema = struct
     end
   end
 
-  [@@@warning "-22"]
-
   type _ t =
     | Db_version : int t
     | Transition : State_hash.Stable.Latest.t -> Mina_block.Stable.Latest.t t
@@ -57,8 +55,6 @@ module Schema = struct
     | Best_tip : State_hash.Stable.Latest.t t
     | Protocol_states_for_root_scan_state
         : Mina_state.Protocol_state.Value.Stable.Latest.t list t
-
-  [@@@warning "+22"]
 
   let to_string : type a. a t -> string = function
     | Db_version ->
