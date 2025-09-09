@@ -16,6 +16,10 @@ ARG BUILDPLATFORM
 # : aarch64/x86_64
 ARG CANONICAL_ARCH
 
+# Debian naming convention
+# : arm64/x86_64
+ARG DEBIAN_ARCH
+
 USER root
 
 # OS package dependencies
@@ -81,7 +85,7 @@ RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Hadolint
-RUN curl -sL https://github.com/hadolint/hadolint/releases/download/v$HADOLINT_VERSION/hadolint-Linux-${TARGETARCH} \
+RUN curl -sL https://github.com/hadolint/hadolint/releases/download/v$HADOLINT_VERSION/hadolint-Linux-${DEBIAN_ARCH} \
     -o /usr/bin/hadolint \
     && chmod +x /usr/bin/hadolint
 
