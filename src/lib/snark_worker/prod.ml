@@ -136,11 +136,13 @@ module Impl = struct
 
   let perform_single_untimed ~(m : (module Worker_state.S)) ~logger
       ~proof_cache_db ~single_spec ~signature_kind ~sok_digest () =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let (module M) = m in
     match single_spec with
     | Work.Work.Single.Spec.Transition
         (input, (w : Transaction_witness.Stable.Latest.t)) -> (
+        (* TODO: remove this case after delivering the full snark worker
+           optimization PR series *)
         match w.transaction with
         | Command (Zkapp_command zkapp_command) -> (
             let%bind witnesses_specs_stmts =
@@ -148,6 +150,7 @@ module Impl = struct
                 ~zkapp_command:
                   (Zkapp_command.write_all_proofs_to_disk ~signature_kind
                      ~proof_cache_db zkapp_command )
+              |> Result.map_error ~f:Failed_to_generate_inputs.error_of_t
               |> Deferred.return
             in
             match Mina_stdlib.Nonempty_list.uncons witnesses_specs_stmts with
