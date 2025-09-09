@@ -50,6 +50,13 @@ module Schema = struct
     | Db_version : int t
     | Transition : State_hash.Stable.Latest.t -> Mina_block.Stable.Latest.t t
     | Arcs : State_hash.Stable.Latest.t -> State_hash.Stable.Latest.t list t
+    (* NOTE:
+        The reason for storing Root_hash and Root_common separately, instead of
+        storing a complete [Root_data.Minimal.Stable.Latest.t] is that the whole
+        Root_data is very big (~250MB+), causing a 90s bottleneck to deserialize
+        the whole thing. However, most of the time we just want the hash, so we
+        get away with storing the hash and common part of Root_data sepearately.
+    *)
     | Root_hash : State_hash.Stable.Latest.t t
     | Root_common : Root_data.Common.Stable.Latest.t t
     | Best_tip : State_hash.Stable.Latest.t t
