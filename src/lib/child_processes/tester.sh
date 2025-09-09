@@ -12,8 +12,5 @@ done
 
 if [ "$1" = "loop" ]
 then
-    while true
-    do
-        sleep 999999
-    done
+    sleep infinity
 fi
