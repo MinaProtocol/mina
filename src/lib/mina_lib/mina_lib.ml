@@ -942,7 +942,9 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
             Snark_work_lib.Work.Single.Spec.statement spec )
         |> Work_selector.remove t.work_selector ;
         Result.iter_error result ~f:(fun err ->
-            [%log info] "Failed to push completed work to local snark sink"
+            (* Possible reasons of failure: receiving pipe's capacity exceeded,
+                fee that isn't the lowest, failure in verification or application to the pool *)
+            [%log warn] "Failed to add completed work to the pool"
               ~metadata:
                 [ ( "stmts"
                   , One_or_two.to_yojson
