@@ -52,17 +52,6 @@ module Schema = struct
     | Db_version : int t
     | Transition : State_hash.Stable.Latest.t -> Mina_block.Stable.Latest.t t
     | Arcs : State_hash.Stable.Latest.t -> State_hash.Stable.Latest.t list t
-    (* TODO:
-       In hard forks, `Root` should be replaced by `(Root_hash, Root_common)`;
-       For now, we try to replace `Root` with `(Root_hash, Root_common)` when:
-         1. initializing a new DB.
-         2. trying to moving the root.
-         3. trying to query `root` or `root_hash`.
-       The reason for this is `Root_common` is too big(250MB+);
-       Most of the time, we just need the hash, but whole `Root` is being read;
-       This combos with `bin_prot` being slow results in 90s bottleneck.
-    *)
-    | Root : Root_data.Minimal.Stable.Latest.t t
     | Root_hash : State_hash.Stable.Latest.t t
     | Root_common : Root_data.Common.Stable.Latest.t t
     | Best_tip : State_hash.Stable.Latest.t t
@@ -78,8 +67,6 @@ module Schema = struct
         "Transition _"
     | Arcs _ ->
         "Arcs _"
-    | Root ->
-        "Root"
     | Root_hash ->
         "Root_hash"
     | Root_common ->
@@ -96,8 +83,6 @@ module Schema = struct
         [%bin_type_class: Mina_block.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
-    | Root ->
-        [%bin_type_class: Root_data.Minimal.Stable.Latest.t]
     | Root_hash ->
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Root_common ->
@@ -151,11 +136,6 @@ module Schema = struct
           (module Keys.Prefixed_state_hash.Stable.Latest)
           ~to_gadt:(fun (_, hash) -> Arcs hash)
           ~of_gadt:(fun (Arcs hash) -> ("arcs", hash))
-    | Root ->
-        gadt_input_type_class
-          (module Keys.String)
-          ~to_gadt:(fun _ -> Root)
-          ~of_gadt:(fun Root -> "root")
     | Root_hash ->
         gadt_input_type_class
           (module Keys.String)
@@ -181,8 +161,7 @@ end
 
 module Error = struct
   type not_found_member =
-    [ `Root
-    | `Root_hash
+    [ `Root_hash
     | `Root_common
     | `Best_tip
     | `Frontier_hash
@@ -204,8 +183,6 @@ module Error = struct
   let not_found_message (`Not_found member) =
     let member_name, member_id =
       match member with
-      | `Root ->
-          ("root", None)
       | `Root_hash ->
           ("root hash", None)
       | `Root_common ->
@@ -278,27 +255,12 @@ let get_root t =
     ; Some (Some_key_value (Root_common, common))
     ] ->
       Ok (Root_data.Minimal.Stable.Latest.of_limited ~common hash)
-  | _ -> (
-      match get t.db ~key:Root ~error:(`Not_found `Root) with
-      | Ok root ->
-          (* automatically split Root into (Root_hash, Root_common) *)
-          Batch.with_batch t.db ~f:(fun batch ->
-              let hash = Root_data.Minimal.Stable.Latest.hash root in
-              let common = Root_data.Minimal.Stable.Latest.common root in
-              Batch.remove batch ~key:Root ;
-              Batch.set batch ~key:Root_hash ~data:hash ;
-              Batch.set batch ~key:Root_common ~data:common ) ;
+  | Some _ :: _ ->
+      Error (`Not_found `Root_common)
+  | _ ->
+      Error (`Not_found `Root_hash)
 
-          Ok root
-      | Error _ as e ->
-          e )
-
-let get_root_hash t =
-  match get t.db ~key:Root_hash ~error:(`Not_found `Root_hash) with
-  | Ok hash ->
-      Ok hash
-  | Error _ ->
-      Result.map ~f:Root_data.Minimal.Stable.Latest.hash (get_root t)
+let get_root_hash t = get t.db ~key:Root_hash ~error:(`Not_found `Root_hash)
 
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
@@ -442,7 +404,6 @@ let move_root ~old_root_hash ~new_root ~garbage =
     (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
   in
   fun batch ->
-    Batch.remove batch ~key:Root ;
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
     Batch.set batch ~key:Root_common
       ~data:(Root_data.Limited.Stable.Latest.common new_root) ;
