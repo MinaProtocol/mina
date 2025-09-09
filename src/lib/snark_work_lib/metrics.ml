@@ -69,17 +69,10 @@ let emit_single_metrics_stable ~logger ~(single_spec : _ Single_spec.Poly.t) =
                          } -> Transaction_type.of_transaction tx )
          single_spec )
 
-let emit_partitioned_metrics ~logger
-    (result_with_spec : _ Partitioned_spec.Poly.t) =
-  match result_with_spec with
-  | Partitioned_spec.Poly.Single
-      { job; data = Proof_carrying_data.{ data = elapsed; _ }; _ } ->
-      emit_single_metrics_stable ~logger ~single_spec:job.spec ~elapsed
-  | Sub_zkapp_command
-      { job = { spec = Sub_zkapp_spec.Stable.Latest.Segment { spec; _ }; _ }
-      ; data = Proof_carrying_data.{ data = elapsed; _ }
-      ; _
-      } ->
+let emit_subzkapp_metrics ~logger ~(sub_zkapp_spec : Sub_zkapp_spec.t) ~elapsed
+    =
+  match sub_zkapp_spec with
+  | Sub_zkapp_spec.Segment { spec; _ } ->
       Perf_histograms.add_span
         ~name:"snark_worker_sub_zkapp_command_segment_time" elapsed ;
       Mina_metrics.(
@@ -94,11 +87,7 @@ let emit_partitioned_metrics ~logger
           [ ("elapsed", `Float (Time.Span.to_sec elapsed))
           ; ("kind", `String "Segment")
           ]
-  | Sub_zkapp_command
-      { job = { spec = Sub_zkapp_spec.Stable.Latest.Merge _; _ }
-      ; data = Proof_carrying_data.{ data = elapsed; _ }
-      ; _
-      } ->
+  | Sub_zkapp_spec.Merge _ ->
       Perf_histograms.add_span ~name:"snark_worker_sub_zkapp_command_merge_time"
         elapsed ;
       Mina_metrics.(
