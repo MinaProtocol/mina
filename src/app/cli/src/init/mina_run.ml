@@ -417,10 +417,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           One_or_two.zip_exn work.spec.instances work.metrics
           |> One_or_two.iter ~f:(fun (single_spec, (elapsed, _tag)) ->
-                 Snark_work_lib.Metrics.(
-                   emit_single_metrics ~logger ~single_spec
-                     ~data:{ data = elapsed; proof = () }
-                     ~on_zkapp_command:emit_zkapp_metrics_legacy ()) ) ;
+                 let open Snark_work_lib in
+                 let single_spec =
+                   Spec.Single.Poly.map
+                     ~f_witness:(fun w -> Metrics.Stable w)
+                     ~f_proof:Fn.id single_spec
+                 in
+                 Metrics.emit_single_metrics ~logger ~single_spec ~elapsed ) ;
           Deferred.return @@ Mina_lib.add_work mina work )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
         (fun
