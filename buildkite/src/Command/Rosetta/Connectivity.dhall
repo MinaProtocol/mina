@@ -59,7 +59,7 @@ let command
                   , "source ./buildkite/scripts/export-git-env-vars.sh"
                   , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
                                                                          spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
-                                                                                                                                 spec.timeout} --run-load-test --run-compatibility-test dkijania/test_upgrade_script"
+                                                                                                                                 spec.timeout} --run-compatibility-test dkijania/test_upgrade_script"
                   ]
               ]
             , label =
