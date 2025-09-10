@@ -1,6 +1,21 @@
 open Integration_test_lib
 open Async
-open Core_kernel
+open Core
+
+let paths =
+  Option.value_map ~f:(String.split ~on:':') ~default:[] (Sys.getenv "PATH")
+
+let possible_locations ~file possible_locations =
+  let exists_at_path folder file =
+    match Sys.file_exists (folder ^ "/" ^ file) with
+    | `Yes ->
+        Some (folder ^ "/" ^ file)
+    | _ ->
+        None
+  in
+
+  possible_locations @ paths
+  |> List.find_map ~f:(fun folder -> exists_at_path folder file)
 
 let wget ~url ~target = Util.run_cmd_exn "." "wget" [ "-c"; url; "-O"; target ]
 

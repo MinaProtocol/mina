@@ -17,5 +17,5 @@ let path () =
   Deferred.map PathFinder.standalone_path ~f:(fun opt ->
       Option.value_exn opt
         ~message:
-          "Could not find standalone path for missing block auditor. App is \
-           not executable outside the dune" )
+          "Could not find standalone for missing block auditor. Missing block \
+           auditor is not executable outside the dune" )
