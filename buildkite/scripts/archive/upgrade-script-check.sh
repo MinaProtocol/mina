@@ -81,10 +81,8 @@ has_changes() {
 
     # Fetch latest branch to ensure accurate comparison
     git fetch origin "$BRANCH" >/dev/null 2>&1 || {
-        if [[ "$MODE" == "verbose" ]]; then
-            echo "Error: Failed to fetch origin/$BRANCH" >&2
-        fi
-        return 1
+        echo "Error: Failed to fetch origin/$BRANCH" >&2
+        exit 1
     }
 
     # Check if file has differences

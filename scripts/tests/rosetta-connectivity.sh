@@ -163,37 +163,30 @@ fi
 if [[ "$RUN_COMPATIBILITY_TEST" == true ]]; then
         echo "Running compatibility test with branch: $COMPATIBILITY_BRANCH"
 
-        # Check if there are schema differences
-        if buildkite/scripts/archive/upgrade-script-check.sh --mode default --branch "$COMPATIBILITY_BRANCH"; then
-                echo -e "${GREEN}No schema differences found. Compatibility test passed.${CLEAR}"
-        else
-                echo "Schema differences detected. Running upgrade/rollback test cycle..."
+        # Get initial block count
+        initial_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')
 
-                # Get initial block count
-                initial_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')
+        # Test 1: Double upgrade test
+        echo "Test 1: Running double upgrade test..."
+        execute_operation "upgrade-to-mesa.sh" "First upgrade"
+        execute_operation "upgrade-to-mesa.sh" "Second upgrade (should handle already upgraded state)"
+        wait_for_new_blocks "$initial_blocks" "double upgrade"
 
-                # Test 1: Double upgrade test
-                echo "Test 1: Running double upgrade test..."
-                execute_operation "upgrade-to-mesa.sh" "First upgrade"
-                execute_operation "upgrade-to-mesa.sh" "Second upgrade (should handle already upgraded state)"
-                wait_for_new_blocks "$initial_blocks" "double upgrade"
+        # Test 2: Rollback and upgrade test
+        echo "Test 2: Running rollback and upgrade test..."
+        execute_operation "rollback-from-mesa.sh" "Rollback"
+        rollback_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')
+        execute_operation "upgrade-to-mesa.sh" "Upgrade after rollback"
+        wait_for_new_blocks "$rollback_blocks" "rollback and upgrade"
 
-                # Test 2: Rollback and upgrade test
-                echo "Test 2: Running rollback and upgrade test..."
-                execute_operation "rollback-from-mesa.sh" "Rollback"
-                rollback_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')
-                execute_operation "upgrade-to-mesa.sh" "Upgrade after rollback"
-                wait_for_new_blocks "$rollback_blocks" "rollback and upgrade"
+        # Test 3: Second rollback and upgrade test
+        echo "Test 3: Running second rollback and upgrade test..."
+        execute_operation "rollback-from-mesa.sh" "Second rollback"
+        second_rollback_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')
+        execute_operation "upgrade-to-mesa.sh" "Second upgrade after rollback"
+        wait_for_new_blocks "$second_rollback_blocks" "second rollback and upgrade"
 
-                # Test 3: Second rollback and upgrade test
-                echo "Test 3: Running second rollback and upgrade test..."
-                execute_operation "rollback-from-mesa.sh" "Second rollback"
-                second_rollback_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')
-                execute_operation "upgrade-to-mesa.sh" "Second upgrade after rollback"
-                wait_for_new_blocks "$second_rollback_blocks" "second rollback and upgrade"
-
-                echo -e "${GREEN}All compatibility tests completed successfully.${CLEAR}"
-        fi
+        echo -e "${GREEN}All compatibility tests completed successfully.${CLEAR}"
 else
         echo "Skipping compatibility test."
 fi
