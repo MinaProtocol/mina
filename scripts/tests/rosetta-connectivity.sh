@@ -128,15 +128,15 @@ wait_for_new_blocks() {
 }
 
 # Function to execute upgrade/rollback operations
-execute_operation() {
-        local operation=$1
-        local operation_name=$2
+execute_script() {
+        local script_path=$1
+        local script_name=$2
 
-        if docker exec $container_id bash -c "$operation $DB_CONN_STR"; then
-                echo "$operation_name completed successfully."
+        if docker exec $container_id bash -c "psql $DB_CONN_STR -f $script_path"; then
+                echo "$script_name completed successfully."
                 return 0
         else
-                echo -e "${RED}$operation_name failed.${CLEAR}"
+                echo -e "${RED}$script_name failed.${CLEAR}"
                 exit 1
         fi
 }
@@ -171,22 +171,22 @@ if [[ "$RUN_COMPATIBILITY_TEST" == true ]]; then
 
         # Test 1: Double upgrade test
         echo "Test 1: Running double upgrade test..."
-        execute_operation "$upgrade_script_path" "First upgrade"
-        execute_operation "$upgrade_script_path" "Second upgrade (should handle already upgraded state)"
+        execute_script "$upgrade_script_path" "First upgrade"
+        execute_script "$upgrade_script_path" "Second upgrade (should handle already upgraded state)"
         wait_for_new_blocks "$initial_blocks" "double upgrade"
 
         # Test 2: Rollback and upgrade test
         echo "Test 2: Running rollback and upgrade test..."
-        execute_operation "$rollback_script_path" "Rollback"
+        execute_script "$rollback_script_path" "Rollback"
         rollback_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')
-        execute_operation "$upgrade_script_path" "Upgrade after rollback"
+        execute_script "$upgrade_script_path" "Upgrade after rollback"
         wait_for_new_blocks "$rollback_blocks" "rollback and upgrade"
 
         # Test 3: Second rollback and upgrade test
         echo "Test 3: Running second rollback and upgrade test..."
-        execute_operation "$rollback_script_path" "Second rollback"
+        execute_script "$rollback_script_path" "Second rollback"
         second_rollback_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')
-        execute_operation "$upgrade_script_path" "Second upgrade after rollback"
+        execute_script "$upgrade_script_path" "Second upgrade after rollback"
         wait_for_new_blocks "$second_rollback_blocks" "second rollback and upgrade"
 
         echo -e "${GREEN}All compatibility tests completed successfully.${CLEAR}"
