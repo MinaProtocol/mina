@@ -2,6 +2,17 @@ open Async
 open Core
 open Mina_automation
 
+(** Assert that the replayer runs successfully against the latest block in the archive.
+
+  This function queries the archive database to find the latest state hash,
+  then runs the replayer with the specified input configuration file against
+  that target state hash. It verifies that the output ledger's target epoch
+  ledgers state hash matches the latest state hash from the database.
+
+  @param replayer_input_file_path Path to the replayer input configuration file
+  @param archive_uri URI connection string for the archive database
+  @param output Output directory path where the ledger will be written
+  @return Unit deferred that completes when assertion passes *)
 let assert_replayer_run_against_last_block ~replayer_input_file_path archive_uri
     output =
   let open Deferred.Let_syntax in
@@ -31,6 +42,14 @@ let assert_replayer_run_against_last_block ~replayer_input_file_path archive_uri
     String.equal output_ledger.target_epoch_ledgers_state_hash latest_state_hash ) ;
   Deferred.unit
 
+(** Unpack precomputed blocks from a source archive to a temporary directory.
+
+  This function extracts precomputed blocks from a tar archive into the specified
+  temporary directory and filters the results to only include JSON files.
+
+  @param temp_dir Temporary directory path where blocks will be extracted
+  @param source Source path of the tar archive containing precomputed blocks
+  @return Deferred list of file paths to extracted JSON block files *)
 let unpack_precomputed_blocks ~temp_dir source =
   let open Deferred.Let_syntax in
   let%bind precomputed_blocks =
