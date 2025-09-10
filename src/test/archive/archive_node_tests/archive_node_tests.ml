@@ -23,4 +23,13 @@ let () =
                         .Make_FixtureWithoutBootstrap
                           (Load_genesis_ledger) ) )
         ] )
+    ; ( "upgrade_archive"
+      , [ test_case
+            "Recreate database from precomputed blocks after upgrade script is \
+             applied"
+            `Quick
+            (Runner.run_blocking
+               ( module Mina_automation_fixture.Archive.Make_FixtureWithBootstrap
+                          (Upgrade_archive) ) )
+        ] )
     ]
