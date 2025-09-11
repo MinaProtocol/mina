@@ -1,6 +1,8 @@
 (library
  (name node_backend)
  (public_name bindings_js.node_backend)
+ ;(enabled_if (or (= %{env:KIMCHI_NODE_BACKEND} "wasm")
+ ;               (= %{env:KIMCHI_NODE_BACKEND} ""))) ; default
  (js_of_ocaml
   (flags
    (:include flags.sexp))
