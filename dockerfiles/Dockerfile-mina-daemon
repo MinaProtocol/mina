@@ -41,6 +41,7 @@ else \
 fi
 
 # Dependencies
+# Inotify tools are needed so freeze-alert can watch log files
 RUN apt-get update --quiet --yes \
   && apt-get upgrade --quiet --yes \
   && apt-get install --quiet --yes --no-install-recommends \
@@ -57,6 +58,7 @@ RUN apt-get update --quiet --yes \
     procps \
     python3 \
     tzdata \
+    inotify-tools \
   && rm -rf /var/lib/apt/lists/*
 
 # Install google-cloud-sdk for GCLOUD_UPLOAD feature
@@ -100,6 +102,7 @@ USER 0
 COPY --chown=${UID} scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
 COPY --chown=${UID} scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
 COPY --chown=${UID} scripts/daemon-entrypoint.sh /entrypoint.sh
+COPY --chown=${UID} scripts/freeze-alert.sh /freeze-alert.sh
 # Solve this by marking scripts executable in git
 COPY --chown=${UID} ./auxiliary_entrypoints /entrypoint.d
 
