@@ -134,8 +134,6 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
           ~metadata ;
-        let%bind () = wait () in
-        (* Pause to wait for stdout to flush *)
         match%bind
           Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
         with
