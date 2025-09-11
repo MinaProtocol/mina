@@ -104,32 +104,27 @@ fi
 
 PLATFORM="--platform ${INPUT_PLATFORM}"
 
+# Unfortunately we cannot use the same naming convention for all architectures
+# for all tooling in toolchain or mina docker
+# therefore we need to define couple of naming conventions
+
+# Canonical style naming convention : aarch/x86_64
+# Debian style naming convention : arm64/amd64
 case "${INPUT_PLATFORM}" in
       linux/amd64)
-        RUSTARCH="x86_64"
+        CANONICAL_ARCH="x86_64"
+        DEBIAN_ARCH="x86_64"
         ;;
       linux/arm64)
-        RUSTARCH="aarch64"
+        CANONICAL_ARCH="aarch64"
+        DEBIAN_ARCH="arm64"
         ;;
       *)
         echo "unsupported platform"; exit 1
         ;;
 esac
-RUSTARCH_ARG="--build-arg RUSTARCH=$RUSTARCH"
-
-case "${INPUT_PLATFORM}" in
-      linux/amd64)
-        OPAMARCH="x86_64"
-        ;;
-      linux/arm64)
-        OPAMARCH="arm64"
-        ;;
-      *)
-        echo "unsupported platform"; exit 1
-        ;;
-esac
-OPAMARCH_ARG="--build-arg OPAMARCH=$OPAMARCH"
-
+CANONICAL_ARCH_ARG="--build-arg CANONICAL_ARCH=$CANONICAL_ARCH"
+DEBIAN_ARCH_ARG="--build-arg DEBIAN_ARCH=$DEBIAN_ARCH"
 
 DEB_RELEASE="--build-arg deb_release=$INPUT_RELEASE"
 if [[ -z "$INPUT_RELEASE" ]]; then
@@ -257,9 +252,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --load --progress=plain $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
+  --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
-  docker buildx build --load --network=host --progress=plain $PLATFORM $RUSTARCH_ARG $OPAMARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx build --load --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."
