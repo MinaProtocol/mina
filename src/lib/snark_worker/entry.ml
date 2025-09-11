@@ -83,13 +83,13 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
     Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
       ~signature_kind ()
   in
+  let%bind cwd = Sys.getcwd () in
+  [%log debug]
+    !"Snark worker working directory $dir"
+    ~metadata:[ ("dir", `String cwd) ] ;
   let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
   let rec go () =
     let%bind daemon_address =
-      let%bind cwd = Sys.getcwd () in
-      [%log debug]
-        !"Snark worker working directory $dir"
-        ~metadata:[ ("dir", `String cwd) ] ;
       let path = "snark_coordinator" in
       match%bind Sys.file_exists path with
       | `Yes -> (
