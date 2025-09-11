@@ -36,6 +36,48 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
+let log_and_retry ~logger label error sec k =
+  let error_str = Error.to_string_hum error in
+  (* HACK: the bind before the call to go () produces an evergrowing
+       backtrace history which takes forever to print and fills our disks.
+       If the string becomes too long, chop off the first 10 lines and include
+       only that *)
+  ( if String.length error_str < 4096 then
+    [%log error] !"Error %s: %{sexp:Error.t}" label error
+  else
+    let lines = String.split ~on:'\n' error_str in
+    [%log error] !"Error %s: %s" label
+      (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
+  let%bind () = after (Time.Span.of_sec sec) in
+  (* FIXME: Use a backoff algo here *)
+  k ()
+
+(** retry interval with jitter *)
+let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0)
+
+let rec submit_work ~go ~logger ~metadata ~shutdown_on_disconnect
+    ~daemon_address result_without_spec () =
+  match%bind
+    dispatch Rpc_submit_work.Stable.Latest.rpc shutdown_on_disconnect
+      result_without_spec daemon_address
+  with
+  | Error e ->
+      log_and_retry ~logger "submitting work" e (retry_pause 10.)
+        (submit_work ~go ~logger ~metadata ~shutdown_on_disconnect
+           ~daemon_address result_without_spec )
+  | Ok `Ok ->
+      [%log info] "Submitted completed SNARK work $work_ids to $address"
+        ~metadata ;
+      go ()
+  | Ok `Removed ->
+      [%log info] "Result $work_ids slashed by $address" ~metadata ;
+      go ()
+  | Ok `SpecUnmatched ->
+      [%log info]
+        "Result $work_ids rejected by $address since it has wrong shape"
+        ~metadata ;
+      go ()
+
 let main ~logger ~proof_level ~constraint_constants ~signature_kind
     daemon_address shutdown_on_disconnect =
   let%bind state =
@@ -43,24 +85,6 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
       ~signature_kind ()
   in
   let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
-  (* retry interval with jitter *)
-  let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0) in
-  let log_and_retry label error sec k =
-    let error_str = Error.to_string_hum error in
-    (* HACK: the bind before the call to go () produces an evergrowing
-         backtrace history which takes forever to print and fills our disks.
-         If the string becomes too long, chop off the first 10 lines and include
-         only that *)
-    ( if String.length error_str < 4096 then
-      [%log error] !"Error %s: %{sexp:Error.t}" label error
-    else
-      let lines = String.split ~on:'\n' error_str in
-      [%log error] !"Error %s: %s" label
-        (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
-    let%bind () = wait ~sec () in
-    (* FIXME: Use a backoff algo here *)
-    k ()
-  in
   let rec go () =
     let%bind daemon_address =
       let%bind cwd = Sys.getcwd () in
@@ -84,7 +108,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
         daemon_address
     with
     | Error e ->
-        log_and_retry "getting work" e (retry_pause 10.) go
+        log_and_retry ~logger "getting work" e (retry_pause 10.) go
     | Ok None ->
         let random_delay =
           Prod.Impl.Worker_state.worker_wait_time
@@ -96,18 +120,17 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
         let%bind () = wait ~sec:random_delay () in
         go ()
     | Ok (Some partitioned_spec) -> (
-        let address_json =
-          ("address", `String (Host_and_port.to_string daemon_address))
-        in
-        let work_ids_json =
-          ( "work_ids"
-          , Spec.Partitioned.Stable.Latest.statement partitioned_spec
-            |> Mina_state.Snarked_ledger_state.to_yojson )
+        let metadata =
+          [ ("address", `String (Host_and_port.to_string daemon_address))
+          ; ( "work_ids"
+            , Spec.Partitioned.Stable.Latest.statement partitioned_spec
+              |> Mina_state.Snarked_ledger_state.to_yojson )
+          ]
         in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
-          ~metadata:[ address_json; work_ids_json ] ;
+          ~metadata ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
         match%bind
@@ -130,7 +153,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
               | Ok () ->
                   ()
             in
-            log_and_retry "performing work" e (retry_pause 10.) go
+            log_and_retry ~logger "performing work" e (retry_pause 10.) go
         | Ok result ->
             let result_without_spec =
               Spec.Partitioned.Poly.map ~f_single_spec:ignore
@@ -148,31 +171,8 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
                 } ->
                 Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
             ) ;
-            let rec submit_work () =
-              match%bind
-                dispatch Rpc_submit_work.Stable.Latest.rpc
-                  shutdown_on_disconnect result_without_spec daemon_address
-              with
-              | Error e ->
-                  log_and_retry "submitting work" e (retry_pause 10.)
-                    submit_work
-              | Ok `Ok ->
-                  [%log info]
-                    "Submitted completed SNARK work $work_ids to $address"
-                    ~metadata:[ address_json; work_ids_json ] ;
-                  go ()
-              | Ok `Removed ->
-                  [%log info] "Result $work_ids slashed by $address"
-                    ~metadata:[ address_json; work_ids_json ] ;
-                  go ()
-              | Ok `SpecUnmatched ->
-                  [%log info]
-                    "Result $work_ids rejected by $address since it has wrong \
-                     shape"
-                    ~metadata:[ address_json; work_ids_json ] ;
-                  go ()
-            in
-            submit_work () )
+            submit_work ~go ~logger ~metadata ~shutdown_on_disconnect
+              ~daemon_address result_without_spec () )
   in
   go ()
 
