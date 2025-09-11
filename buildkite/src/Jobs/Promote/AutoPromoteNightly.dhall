@@ -56,7 +56,8 @@ let specs_for_branch =
       ->  \(channel : DebianChannel.Type)
       ->  PublishPackages.Spec::{
           , artifacts =
-            [ Artifacts.Type.Daemon
+            [ Artifacts.Type.LogProc
+            , Artifacts.Type.Daemon
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             ]
