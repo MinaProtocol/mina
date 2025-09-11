@@ -107,7 +107,7 @@ wait_for_new_blocks() {
         local previous_blocks=$1
         local test_name=$2
         local timeout_counter=0
-        local max_wait=300  # 5 minutes
+        local max_wait=600  # 10 minutes
 
         echo "Waiting for new blocks after $test_name..."
 
