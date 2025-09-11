@@ -67,6 +67,7 @@ let Spec =
           , publish_to_docker_io : Bool
           , depends_on : List Command.TaggedKey.Type
           , branch : Text
+          , if : Optional Text
           }
       , default =
           { artifacts = [] : List Package.Type
@@ -82,6 +83,7 @@ let Spec =
           , publish_to_docker_io = False
           , verify = True
           , branch = ""
+          , if = None Text
           }
       }
 
@@ -198,9 +200,12 @@ let publish
                               )
                           ]
                     , label = "Debian Packages Publishing"
-                    , key = "publish-debians"
+                    , key =
+                        "publish-debians-${DebianChannel.lowerName
+                                             spec.channel}"
                     , target = Size.Small
                     , depends_on = spec.depends_on
+                    , if = spec.if
                     }
                 ]
               # Prelude.List.map
@@ -227,9 +232,13 @@ let publish
                                 )
                             ]
                           , label = "Docker Packages Publishing"
-                          , key = "publish-dockers-${Natural/show r.index}"
+                          , key =
+                              "publish-dockers-${DebianChannel.lowerName
+                                                   spec.channel}-${Natural/show
+                                                                     r.index}"
                           , target = Size.Small
                           , depends_on = spec.depends_on
+                          , if = spec.if
                           }
                   )
                   indexedAdditionalTags

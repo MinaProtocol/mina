@@ -17,6 +17,7 @@ module Config = struct
     ; t.postgres_uri
     ; "--server-port"
     ; string_of_int t.server_port
+    ; "--log-json"
     ]
 
   let create ~config_file ~postgres_uri ~server_port =
@@ -53,21 +54,31 @@ module Process = struct
   *)
   let force_kill t = Utils.force_kill t.process
 
-  (** [start_logging t] starts logging the stdout of the given process [t].
+  (** [start_logging t ~log_file] starts logging the stdout of the given process [t].
     It creates a logger and asynchronously iterates over the stdout pipe of the process,
     logging each line with a debug level and attaching the stdout content as metadata.
+    Also writes the output to the specified log file.
 
     @param t The process whose stdout will be logged.
+    @param log_file The filename where stdout will be written.
   *)
-  let start_logging t =
+  let start_logging t ~log_file =
     let logger = Logger.create () in
     don't_wait_for
     @@ Pipe.iter
          (Process.stdout t.process |> Reader.pipe)
          ~f:(fun stdout ->
+           let%bind () =
+             Writer.with_file log_file ~append:true ~f:(fun writer ->
+                 Writer.write_line writer stdout ;
+                 Writer.flushed writer )
+           in
            return
            @@ [%log debug] "Archive stdout: $stdout"
                 ~metadata:[ ("stdout", `String stdout) ] )
+
+  let get_memory_usage_mib t =
+    Utils.get_memory_usage_mib @@ (Process.pid t.process |> Pid.to_int)
 end
 
 (** [start t] starts the archive process using the given configuration [t].

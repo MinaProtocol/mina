@@ -40,14 +40,28 @@ module Zkapp_command_inputs = struct
         , stmt ) )
 end
 
+module Failed_to_generate_inputs = struct
+  type t = [ `Failed_to_generate_inputs of Zkapp_command.t * Error.t ]
+
+  (* TODO: remove this after fully delivering the snark worker
+     optimization PR series *)
+  let error_of_t (`Failed_to_generate_inputs (tx, e) : t) =
+    Error.tag_s e
+      ~tag:
+        ( Zkapp_command.Stable.Latest.sexp_of_t
+        @@ Zkapp_command.read_all_proofs_from_disk tx )
+    |> Error.tag ~tag:"failed to generate inputs for zkapp command"
+end
+
 let extract_zkapp_segment_works ~m:(module M : S)
     ~(input : Mina_state.Snarked_ledger_state.t)
     ~(witness : Transaction_witness.Stable.Latest.t)
-    ~(zkapp_command : Zkapp_command.t) : Zkapp_command_inputs.t Or_error.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~(zkapp_command : Zkapp_command.t) :
+    (Zkapp_command_inputs.t, Failed_to_generate_inputs.t) Result.t =
   let inputs =
     Or_error.try_with (fun () ->
-        Transaction_snark.zkapp_command_witnesses_exn ~signature_kind
+        Transaction_snark.zkapp_command_witnesses_exn
+          ~signature_kind:M.signature_kind
           ~constraint_constants:M.constraint_constants
           ~global_slot:witness.block_global_slot
           ~state_body:witness.protocol_state_body
@@ -67,12 +81,7 @@ let extract_zkapp_segment_works ~m:(module M : S)
   in
   match inputs with
   | Error e ->
-      Error
-        (Error.createf
-           !"Failed to generate inputs for zkapp_command : %s: %s"
-           ( Zkapp_command.read_all_proofs_from_disk zkapp_command
-           |> Zkapp_command.Stable.Latest.to_yojson |> Yojson.Safe.to_string )
-           (Error.to_string_hum e) )
+      Result.fail (`Failed_to_generate_inputs (zkapp_command, e))
   | Ok (first_segment :: rest_segments) ->
       Ok (Nonempty_list.init first_segment rest_segments)
   | Ok [] ->

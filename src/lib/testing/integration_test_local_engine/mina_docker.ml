@@ -201,7 +201,7 @@ module Network_config = struct
               let genesis_winner_account : Runtime_config.Accounts.single =
                 Runtime_config.Accounts.Single.of_account
                   Mina_state.Consensus_state_hooks.genesis_winner_account
-                |> Result.ok_or_failwith
+                |> Or_error.ok_exn
               in
               let ledger_of_epoch_accounts
                   (epoch_accounts : Test_config.Test_account.t list) =

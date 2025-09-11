@@ -93,13 +93,10 @@ module Builder = struct
               Some (index, account) )
     in
     let accounts_accessed_time = Time.now () in
-    [%log debug]
-      "Archive data generation for $state_hash: accounts-accessed took $time ms"
-      ~metadata:
-        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
-        ; ( "time"
-          , `Float (Time.Span.to_ms (Time.diff accounts_accessed_time start)) )
-        ] ;
+    Metrics.report_time ~logger ~label:"accounts-accessed"
+      ~extra_metadata:
+        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ]
+      (Time.diff accounts_accessed_time start) ;
     let accounts_created =
       let account_creation_fee =
         precomputed_values.constraint_constants.account_creation_fee
@@ -125,15 +122,11 @@ module Builder = struct
           (token_id, owner) )
     in
     let account_created_time = Time.now () in
-    [%log debug]
-      "Archive data generation for $state_hash: accounts-created took $time ms"
-      ~metadata:
-        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash)
-        ; ( "time"
-          , `Float
-              (Time.Span.to_ms
-                 (Time.diff account_created_time accounts_accessed_time) ) )
-        ] ;
+    Metrics.report_time ~logger ~label:"accounts-created"
+      ~extra_metadata:
+        [ ("state_hash", Mina_base.State_hash.to_yojson state_hash) ]
+      (Time.diff account_created_time accounts_accessed_time) ;
+
     Transition_frontier.Breadcrumb_added
       { block =
           With_hash.map ~f:Mina_block.read_all_proofs_from_disk block_with_hash

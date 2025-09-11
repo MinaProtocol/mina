@@ -48,6 +48,8 @@ module Stable : sig
     val to_latest : t -> t
 
     val statement : t -> Transaction_snark.Statement.t
+
+    val sok_message : t -> Mina_base.Sok_message.t
   end
 end]
 

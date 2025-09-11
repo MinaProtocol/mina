@@ -55,8 +55,11 @@ module Impl = struct
      [log_subzkapp_base_snark] and [log_subzkapp_merge_snark] is that when
      receiving a partitioned spec holding a subzkapp merge/segment, we don't
      know all of [witnesses_specs_stmts]. *)
-  let log_subzkapp_base_snark ?witnesses_specs_stmts ~logger ~statement ~spec f
-      () =
+  let log_subzkapp_base_snark ?witnesses_specs_stmts ~logger ~statement ~spec
+      ~sok_digest f () =
+    let statement =
+      Mina_state.Snarked_ledger_state.Poly.{ statement with sok_digest }
+    in
     match%map.Deferred
       Deferred.Or_error.try_with ~here:[%here] (fun () -> f ~statement ~spec)
     with
@@ -133,11 +136,13 @@ module Impl = struct
 
   let perform_single_untimed ~(m : (module Worker_state.S)) ~logger
       ~proof_cache_db ~single_spec ~signature_kind ~sok_digest () =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let (module M) = m in
     match single_spec with
     | Work.Work.Single.Spec.Transition
         (input, (w : Transaction_witness.Stable.Latest.t)) -> (
+        (* TODO: remove this case after delivering the full snark worker
+           optimization PR series *)
         match w.transaction with
         | Command (Zkapp_command zkapp_command) -> (
             let%bind witnesses_specs_stmts =
@@ -145,24 +150,25 @@ module Impl = struct
                 ~zkapp_command:
                   (Zkapp_command.write_all_proofs_to_disk ~signature_kind
                      ~proof_cache_db zkapp_command )
+              |> Result.map_error ~f:Failed_to_generate_inputs.error_of_t
               |> Deferred.return
             in
             match Mina_stdlib.Nonempty_list.uncons witnesses_specs_stmts with
-            | (witness, spec, stmt), rest ->
+            | (witness, spec, statement), rest ->
                 let%bind (p1 : Ledger_proof.t) =
                   log_subzkapp_base_snark ~witnesses_specs_stmts ~logger
-                    ~statement:{ stmt with sok_digest } ~spec
+                    ~statement ~spec ~sok_digest
                     (M.of_zkapp_command_segment_exn ~witness)
                     ()
                 in
 
                 let%bind (p : Ledger_proof.t) =
                   Deferred.List.fold ~init:(Ok p1) rest
-                    ~f:(fun acc (witness, spec, stmt) ->
+                    ~f:(fun acc (witness, spec, statement) ->
                       let%bind (prev : Ledger_proof.t) = Deferred.return acc in
                       let%bind (curr : Ledger_proof.t) =
                         log_subzkapp_base_snark ~witnesses_specs_stmts ~logger
-                          ~statement:{ stmt with sok_digest } ~spec
+                          ~statement ~spec ~sok_digest
                           (M.of_zkapp_command_segment_exn ~witness)
                           ()
                       in
@@ -326,6 +332,7 @@ module Impl = struct
 
             let%map proof, elapsed =
               log_subzkapp_base_snark ~logger ~statement ~spec:segment_spec
+                ~sok_digest
                 (M.of_zkapp_command_segment_exn ~witness)
               |> measure_runtime ~logger
                    ~spec_json:

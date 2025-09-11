@@ -9,6 +9,7 @@ BUCKET=packages.o1test.net
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--names) DEB_NAMES="$2"; shift;;
+  -a|--arch) ARCH="$2"; shift;;
   -r|--release) DEB_RELEASE="$2"; shift;;
   -v|--version) DEB_VERSION="$2"; shift;;
   -c|--codename) DEB_CODENAME="$2"; shift;;
@@ -70,6 +71,7 @@ for _ in {1..10}; do (
 deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
   --fail-if-exists \
   --lock \
+  --arch $ARCH \
   --preserve-versions \
   --cache-control=max-age=120 \
   $SIGN_ARG \
@@ -82,9 +84,9 @@ deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
 for deb in $DEB_NAMES
 do
   # extracting name from debian package path. E.g:
-  # _build/mina-archive_3.0.1-develop-a2a872a.deb -> mina-archive
+  # _build/mina-archive_3.0.1-develop-a2a872a_arm64.deb -> mina-archive
   deb=$(basename "$deb")
-  deb="${deb%_*}"
+  deb="${deb%%_*}"
   debs+=("$deb")
 done
 

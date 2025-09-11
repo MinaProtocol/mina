@@ -26,6 +26,7 @@ val create :
      reassignment_timeout:Time.Span.t
   -> logger:Logger.t
   -> proof_cache_db:Proof_cache_tag.cache_db
+  -> signature_kind:Mina_signature_kind.t
   -> t
 
 type work_from_selector =
@@ -55,7 +56,10 @@ val request_partitioned_work :
      sok_message:Mina_base.Sok_message.t
   -> work_from_selector:work_from_selector
   -> partitioner:t
-  -> Snark_work_lib.Spec.Partitioned.Stable.V1.t Or_error.t option
+  -> ( Snark_work_lib.Spec.Partitioned.Stable.V1.t
+     , Snark_worker_shared.Failed_to_generate_inputs.t )
+     Result.t
+     option
 
 type submit_result =
   | SpecUnmatched  (** Submitted work doesn't match the scheme in pool *)
