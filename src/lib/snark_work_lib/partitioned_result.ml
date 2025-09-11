@@ -22,7 +22,7 @@ type t =
   ( unit
   , unit
   , (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t )
-  Partitioned_spec.Poly.Stable.V1.t
+  Partitioned_spec.Poly.t
 
 let read_all_proofs_from_disk : t -> Stable.Latest.t =
   Partitioned_spec.Poly.map ~f_single_spec:Fn.id ~f_subzkapp_spec:Fn.id
