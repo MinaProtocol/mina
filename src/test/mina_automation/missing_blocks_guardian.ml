@@ -14,7 +14,7 @@ module Config = struct
     ; run_mode : mode
     ; missing_blocks_auditor : string
     ; archive_blocks : string
-    ; block_format : Archive_blocks.format
+    ; block_format : [ `Precomputed | `Extensional ]
     }
 
   let to_args t =
@@ -34,7 +34,7 @@ module Config = struct
       ; ("DB_PORT", Int.to_string (Option.value_exn (Uri.port t.archive_uri)))
       ; ("DB_NAME", path_no_leading_slash)
       ; ("PGPASSWORD", Option.value_exn (Uri.password t.archive_uri))
-      ; ("BLOCKS_FORMAT", Archive_blocks.format_to_string t.block_format)
+      ; ("BLOCKS_FORMAT", (match t.block_format with `Precomputed -> "precomputed" | `Extensional -> "extensional"))
       ; ("MISSING_BLOCKS_AUDITOR", t.missing_blocks_auditor)
       ; ("ARCHIVE_BLOCKS", t.archive_blocks)
       ]
