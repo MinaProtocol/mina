@@ -98,6 +98,15 @@ let emit_metrics ~logger = function
       { job = { spec = sub_zkapp_spec; _ }; data = { data = elapsed; _ } } ->
       Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
 
+(** Handle the `Result case - submits completed SNARK work to the daemon.
+    
+    This handler processes successfully generated SNARK proofs by:
+    1. Submitting the work result to the daemon via RPC
+    2. On success: transitions to `No_spec state to request new work
+    3. On failure: retries after a delay, staying in `Result state
+    
+    @param result_without_spec The completed SNARK work result
+    @return Next state, either `No_spec or `Result *)
 let handle_result ~logger ~shutdown_on_disconnect daemon_address
     result_without_spec metadata =
   match%bind
@@ -111,6 +120,16 @@ let handle_result ~logger ~shutdown_on_disconnect daemon_address
   | Ok () ->
       return `No_spec
 
+(** Handle the `Failed case - reports SNARK work generation failures to the daemon.
+    
+    This handler processes failed SNARK work generation by:
+    1. Notifying the daemon about the failure via RPC
+    2. Logging the error details for debugging
+    3. Transitioning to `No_spec state after a retry delay
+    
+    @param e The error that caused the work generation to fail
+    @param partitioned_id Identifier of the failed work partition
+    @return Next state, `No_spec *)
 let handle_failed ~logger ~shutdown_on_disconnect daemon_address e
     partitioned_id =
   let%bind () =
@@ -127,6 +146,17 @@ let handle_failed ~logger ~shutdown_on_disconnect daemon_address e
   [%log error] !"Error performing work: %{sexp:Error.t}" e ;
   after @@ Time.Span.of_sec @@ retry_pause 10. >>| const `No_spec
 
+(** Handle the `Spec case - processes new SNARK work specifications.
+    
+    This handler performs the actual SNARK proof generation by:
+    1. Logging the received work specification
+    2. Executing the partitioned SNARK work using the worker state
+    3. On success: emits metrics and transitions to `Result state
+    4. On failure: transitions to `Failed state with error details
+    
+    @param state SNARK worker state
+    @param partitioned_spec The SNARK work specification to process
+    @return Next state, either `Result or `Failed *)
 let handle_spec ~logger ~state daemon_address partitioned_spec =
   let metadata =
     [ ("address", `String (Host_and_port.to_string daemon_address))
@@ -153,6 +183,17 @@ let handle_spec ~logger ~state daemon_address partitioned_spec =
       emit_metrics ~logger result ;
       return (`Result (daemon_address, result_without_spec, metadata))
 
+(** Handle the `No_spec case - requests new SNARK work from the daemon.
+    
+    This handler manages the work request cycle by:
+    1. Determining the daemon address (from file or default)
+    2. Requesting available work from the daemon via RPC
+    3. On work available: transitions to `Spec state with the work
+    4. On no work: sleeps with jitter and stays in `No_spec state
+    5. On error: retries after delay, staying in `No_spec state
+    
+    @param default_daemon_address Default daemon address if no coordinator file
+    @return Next state, either `Spec or `No_spec *)
 let handle_no_spec ~logger ~shutdown_on_disconnect default_daemon_address =
   let%bind daemon_address = get_daemon_address default_daemon_address in
   [%log debug]
@@ -177,6 +218,49 @@ let handle_no_spec ~logger ~shutdown_on_disconnect default_daemon_address =
   | Ok (Some partitioned_spec) ->
       return (`Spec (daemon_address, partitioned_spec))
 
+(** Main SNARK worker event loop implementing a state machine for work processing.
+    
+    The worker operates as a finite state machine with four states, continuously
+    cycling through work request, processing, and submission phases:
+    
+    Flow Diagram:
+    ┌─────────────┐    get_work RPC     ┌──────────────┐
+    │   No_spec   │ ──────────────────> │     Spec     │
+    │ (idle/wait) │                     │ (processing) │
+    └─────────────┘                     └──────────────┘
+           ^                                     │
+           │                                     │ perform_partitioned
+           │ retry_delay                         │
+           │                                     v
+    ┌─────────────┐                     ┌──────────────┐
+    │   Failed    │                     │    Result    │
+    │ (error rpt) │ <─────────────────  │ (completed)  │
+    └─────────────┘    on failure       └──────────────┘
+           │                                     │
+           │ report_failure RPC                  │ submit_work RPC
+           │                                     │
+           └─────────────────────────────────────┘
+                         │
+                         v
+                   ┌─────────────┐
+                   │   No_spec   │
+                   │ (next cycle)│
+                   └─────────────┘
+    
+    State Transitions:
+    • No_spec → Spec: When work is available from daemon
+    • No_spec → No_spec: When no work available (with sleep)
+    • Spec → Result: When SNARK proof generation succeeds
+    • Spec → Failed: When SNARK proof generation fails
+    • Result → No_spec: When work submission succeeds
+    • Result → Result: When work submission fails (infinite retry)
+    • Failed → No_spec: After reporting failure to daemon (no retry on failure to report)
+    
+    Error Handling:
+    • Network failures: Retry for get_work and submit_work RPCs
+    • Work generation failures: Report to daemon and continue
+    
+    Worker loop runs indefinitely. *)
 let main ~logger ~proof_level ~constraint_constants ~signature_kind
     default_daemon_address shutdown_on_disconnect =
   let%bind state =
