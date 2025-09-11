@@ -36,22 +36,6 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
-let log_and_retry ~logger label error sec k =
-  let error_str = Error.to_string_hum error in
-  (* HACK: the bind before the call to go () produces an evergrowing
-       backtrace history which takes forever to print and fills our disks.
-       If the string becomes too long, chop off the first 10 lines and include
-       only that *)
-  ( if String.length error_str < 4096 then
-    [%log error] !"Error %s: %{sexp:Error.t}" label error
-  else
-    let lines = String.split ~on:'\n' error_str in
-    [%log error] !"Error %s: %s" label
-      (String.concat ~sep:"\\n" (List.take lines 10)) ) ;
-  let%bind () = after (Time.Span.of_sec sec) in
-  (* FIXME: Use a backoff algo here *)
-  k ()
-
 (** retry interval with jitter *)
 let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0)
 
