@@ -100,7 +100,6 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
   [%log debug]
     !"Snark worker working directory $dir"
     ~metadata:[ ("dir", `String cwd) ] ;
-  let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
   let rec go () =
     let%bind daemon_address = get_daemon_address daemon_address in
     [%log debug]
@@ -120,7 +119,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
         (* No work to be done -- quietly take a brief nap *)
         [%log info] "No jobs available. Napping for $time seconds"
           ~metadata:[ ("time", `Float random_delay) ] ;
-        let%bind () = wait ~sec:random_delay () in
+        let%bind () = after (Time.Span.of_sec random_delay) in
         go ()
     | Ok (Some partitioned_spec) -> (
         let metadata =
