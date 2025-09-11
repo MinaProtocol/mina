@@ -34,7 +34,12 @@ module Config = struct
       ; ("DB_PORT", Int.to_string (Option.value_exn (Uri.port t.archive_uri)))
       ; ("DB_NAME", path_no_leading_slash)
       ; ("PGPASSWORD", Option.value_exn (Uri.password t.archive_uri))
-      ; ("BLOCKS_FORMAT", (match t.block_format with `Precomputed -> "precomputed" | `Extensional -> "extensional"))
+      ; ( "BLOCKS_FORMAT"
+        , match t.block_format with
+          | `Precomputed ->
+              "precomputed"
+          | `Extensional ->
+              "extensional" )
       ; ("MISSING_BLOCKS_AUDITOR", t.missing_blocks_auditor)
       ; ("ARCHIVE_BLOCKS", t.archive_blocks)
       ]
