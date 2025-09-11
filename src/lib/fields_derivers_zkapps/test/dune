@@ -1,22 +1,23 @@
-(library
- (name fields_derivers_zkapps)
- (public_name fields_derivers.zkapps)
+(test
+ (name test_fields_derivers_zkapps)
  (libraries
   ;; opam libraries
+  alcotest
   base
-  base.caml
   core_kernel
   fieldslib
   graphql
   graphql_parser
   integers
-  result
   sexplib0
+  yojson
+  result
   ;; local libraries
   currency
   fields_derivers
   fields_derivers.graphql
   fields_derivers.json
+  fields_derivers.zkapps
   mina_numbers
   pickles
   sgn
@@ -35,4 +36,5 @@
    ppx_deriving_yojson
    ppx_fields_conv
    ppx_let
+   ppx_sexp_conv
    ppx_version)))
