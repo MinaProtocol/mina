@@ -55,28 +55,27 @@ let log_and_retry ~logger label error sec k =
 (* retry interval with jitter *)
 let retry_pause sec = Random.float_range (sec -. 2.0) (sec +. 2.0)
 
-let rec submit_work ~go ~logger ~metadata ~shutdown_on_disconnect
-    ~daemon_address wire_result () =
+let rec submit_work ~logger ~metadata ~shutdown_on_disconnect ~daemon_address
+    wire_result () =
+  let log_result msg =
+    [%log info] msg ~metadata ;
+    Deferred.unit
+  in
   match%bind
     dispatch Rpc_submit_work.Stable.Latest.rpc shutdown_on_disconnect
       wire_result daemon_address
   with
   | Error e ->
       log_and_retry ~logger "submitting work" e (retry_pause 10.)
-        (submit_work ~go ~logger ~metadata ~shutdown_on_disconnect
-           ~daemon_address wire_result )
+        (submit_work ~logger ~metadata ~shutdown_on_disconnect ~daemon_address
+           wire_result )
   | Ok `Ok ->
-      [%log info] "Submitted completed SNARK work $work_ids to $address"
-        ~metadata ;
-      go ()
+      log_result "Submitted completed SNARK work $work_ids to $address"
   | Ok `Removed ->
-      [%log info] "Result $work_ids slashed by $address" ~metadata ;
-      go ()
+      log_result "Result $work_ids slashed by $address"
   | Ok `SpecUnmatched ->
-      [%log info]
+      log_result
         "Result $work_ids rejected by $address since it has wrong shape"
-        ~metadata ;
-      go ()
 
 let main ~logger ~proof_level ~constraint_constants ~signature_kind
     daemon_address shutdown_on_disconnect =
@@ -159,8 +158,11 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
                 { spec = sub_zkapp_spec; _ } ->
                 Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
             ) ;
-            submit_work ~go ~logger ~metadata ~shutdown_on_disconnect
-              ~daemon_address wire_result () )
+            let%bind () =
+              submit_work ~logger ~metadata ~shutdown_on_disconnect
+                ~daemon_address wire_result ()
+            in
+            go () )
   in
   go ()
 
