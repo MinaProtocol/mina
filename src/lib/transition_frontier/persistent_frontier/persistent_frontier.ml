@@ -53,7 +53,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
     | Some protocol_state ->
         Ok protocol_state
   in
-  let mask = Mina_ledger.Ledger.of_database root_ledger in
+  let mask = Mina_ledger.Ledger.Root.as_masked root_ledger in
   let local_state = Blockchain_state.snarked_local_state blockchain_state in
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
@@ -68,7 +68,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
       ~constraint_constants:precomputed_values.constraint_constants ~logger
       ~pending_coinbases
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
-      ~get_state
+      ~get_state ~signature_kind:Mina_signature_kind.t_DEPRECATED
   in
   let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
   if
@@ -263,10 +263,7 @@ module Instance = struct
               List.map protocol_states
                 ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
           }
-        ~root_ledger:
-          (Mina_ledger.Ledger.Any_ledger.cast
-             (module Mina_ledger.Ledger.Db)
-             root_ledger )
+        ~root_ledger:(Mina_ledger.Ledger.Root.as_unmasked root_ledger)
         ~consensus_local_state ~max_length ~persistent_root_instance
     in
     let%bind extensions =
@@ -393,17 +390,19 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
   with_instance_exn t ~f:(fun instance ->
       Database.initialize instance.db ~root_data ;
       (* sanity check database after initialization on debug builds *)
-      Debug_assert.debug_assert (fun () ->
-          ignore
-            ( Database.check instance.db ~genesis_state_hash
-              |> Result.map_error ~f:(function
-                   | `Invalid_version ->
-                       "invalid version"
-                   | `Not_initialized ->
-                       "not initialized"
-                   | `Genesis_state_mismatch _ ->
-                       "genesis state mismatch"
-                   | `Corrupt err ->
-                       Database.Error.message err )
-              |> Result.ok_or_failwith
-              : Frozen_ledger_hash.t ) ) )
+      assert (
+        match Database.check instance.db ~genesis_state_hash with
+        | Ok _ ->
+            true
+        | Error reason ->
+            let string_of_reason = function
+              | `Invalid_version ->
+                  "invalid version"
+              | `Not_initialized ->
+                  "not initialized"
+              | `Genesis_state_mismatch _ ->
+                  "genesis state mismatch"
+              | `Corrupt err ->
+                  Database.Error.message err
+            in
+            failwith (string_of_reason reason) ) )

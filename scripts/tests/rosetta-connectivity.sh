@@ -1,6 +1,42 @@
 #!/usr/bin/env bash
 
-# end to end test for rosetta connectivity with given network 
+# Rosetta Connectivity Test Script
+#
+# This script tests the connectivity and functionality of the Mina Rosetta API
+# by running a Docker container with the Rosetta service and executing various tests.
+#
+# DESCRIPTION:
+#   - Starts a Mina Rosetta Docker container with specified network configuration
+#   - Runs sanity tests to verify basic connectivity and synchronization
+#   - Optionally runs load tests to stress-test the Rosetta API
+#   - Automatically cleans up Docker resources on completion or error
+#
+# REQUIREMENTS:
+#   - Docker must be installed and running
+#   - Script must be executed from the root of the mina repository
+#   - rosetta-sanity.sh and rosetta-load.sh scripts must be available
+#
+# PARAMETERS:
+#   -t, --tag           Docker image tag version (required)
+#   -n, --network       Network configuration: devnet or mainnet (default: devnet)
+#   --timeout           Timeout duration in seconds for tests (default: 900)
+#   --run-load-test     Enable load testing (default: false)
+#   -h, --help          Display usage information
+#
+# EXAMPLES:
+#   ./rosetta-connectivity.sh --tag 3.0.3-bullseye-berkeley --network devnet
+#   ./rosetta-connectivity.sh --tag 3.0.3 --network mainnet --run-load-test --timeout 1200
+#
+# EXIT CODES:
+#   0 - Success
+#   1 - Invalid parameters or missing required arguments
+#
+# NOTES:
+#   - The script sets up error trapping to ensure Docker cleanup
+#   - Container runs on port 3087 and mounts current directory as /workdir
+#   - Load test duration is fixed at 600 seconds when enabled
+
+
 set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -8,8 +44,12 @@ RED='\033[0;31m'
 NETWORK=devnet
 TIMEOUT=900
 
+LOAD_TEST_DURATION=600
+RUN_LOAD_TEST=false
+
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--network) NETWORK="$2"; shift;;
+  --run-load-test) RUN_LOAD_TEST=true ;;
   -t|--tag) TAG="$2"; shift;;
   --timeout) TIMEOUT="$2"; shift;;
   -h|--help) usage; exit 0;;
@@ -36,7 +76,7 @@ function usage() {
 
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
-container_id=$(docker run -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
+container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
 
 stop_docker() {
     { docker stop "$container_id" ; docker rm "$container_id" ; } || true
@@ -48,5 +88,13 @@ trap stop_docker ERR
 sleep 5
 #run sanity test
 ./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
+
+# Run load test
+if [[ "$RUN_LOAD_TEST" == true ]]; then
+    echo "Running load test for $LOAD_TEST_DURATION seconds..."
+    docker exec $container_id bash -c "/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str postgres://pguser:pguser@localhost:5432/archive --duration $LOAD_TEST_DURATION --network $NETWORK "
+else
+    echo "Skipping load test."
+fi
 
 stop_docker

@@ -34,22 +34,9 @@ if [[ "${TEST_NAME:0:15}" == "block-prod-prio" ]] && [[ "$RUN_OPT_TESTS" == "" ]
   exit 0
 fi
 
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
-
-apt-get update
-apt-get install -y git \
-  apt-transport-https \
-  aptly \
-  ca-certificates \
-  curl \
-  docker \
-  docker-compose-plugin \
-  docker-ce \
-  tzdata
-
 git config --global --add safe.directory /workdir
 
+source buildkite/scripts/debian/update.sh --verbose
 
 source buildkite/scripts/debian/install.sh "mina-test-executive"
 

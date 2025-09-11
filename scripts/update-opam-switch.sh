@@ -8,6 +8,14 @@ cd "$SCRIPT_DIR/.."
 # Don't do anything if we're in a nix shell
 [[ "$IN_NIX_SHELL$CI$BUILDKITE" == "" ]] || exit 0
 
+# Some users do not have the setup with using local switches and multiple
+# switches in the directory `opam_switch`. We want to support that, so we allow
+# bypassing the switch update.
+if [ -n "${BYPASS_OPAM_SWITCH_UPDATE+x}" ]; then
+    echo "BYPASS_OPAM_SWITCH_UPDATE is set, skipping opam switch update."
+    exit 0
+fi
+
 sum="$(cksum opam.export | grep -oE '^\S*')"
 switch_dir=opam_switches/"$sum"
 # The version must be the same as the version used in:
@@ -24,7 +32,7 @@ ocaml_version=4.14.2
 opam_repository_commit=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
 
 if [[ -d _opam ]]; then
-    read -rp "Directory '_opam' exists and will be removed. Continue? [y/N] " \
+    read -rp "Directory '_opam' exists and will be removed. You can also bypass the check by setting the variable BYPASS_OPAM_SWITCH_UPDATE to any value. Continue? [y/N] " \
          confirm
     if [[ "${confirm}" =~ ^[Yy]$ ]]; then
         rm -Rf _opam

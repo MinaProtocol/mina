@@ -33,7 +33,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_archive_nodes = 1
     }
 
-  let run network t =
+  let run ~config:_ network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let all_mina_nodes = Network.all_mina_nodes network in

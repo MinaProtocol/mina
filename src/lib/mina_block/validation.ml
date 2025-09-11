@@ -523,7 +523,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       ~zkapp_cmd_limit_hardcap:
         precomputed_values.Precomputed_values.genesis_constants
           .zkapp_cmd_limit_hardcap
-      ?transaction_pool_proxy
+      ~signature_kind:Mina_signature_kind.t_DEPRECATED ?transaction_pool_proxy
     |> Deferred.Result.map_error ~f:(fun e ->
            `Staged_ledger_application_failed e )
   in

@@ -1,3 +1,9 @@
+(*
+  Mina_run provides the runtime layer for the Mina daemon, building on 
+  Mina_lib’s core protocol logic. It manages GraphQL APIs, node status 
+  reporting, crash/shutdown handling, and configuration setup, acting as the 
+  control panel connecting Mina_lib to CLI tools and external services. *)
+
 open Core
 open Async
 module Graphql_cohttp_async =
@@ -306,10 +312,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           | Ok ledger -> (
               match ledger with
               | Genesis_epoch_ledger l ->
-                  let%map accts = Mina_ledger.Ledger.to_list l in
+                  let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+                  let%map accts = Mina_ledger.Ledger.to_list l_inner in
                   Ok accts
-              | Ledger_db db ->
-                  let%map accts = Mina_ledger.Ledger.Db.to_list db in
+              | Ledger_root l ->
+                  let casted = Mina_ledger.Ledger.Root.as_unmasked l in
+                  let%map accts =
+                    Mina_ledger.Ledger.Any_ledger.M.to_list casted
+                  in
                   Ok accts )
           | Error err ->
               return (Error err) )
@@ -368,65 +378,6 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return @@ Itn_logger.log ~process ~timestamp ~message ~metadata () )
     ]
   in
-  let log_snark_work_metrics
-      (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
-    Mina_metrics.(Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
-    One_or_two.iter
-      (One_or_two.zip_exn work.metrics
-         (Snark_work_lib.Selector.Result.Stable.Latest.transactions work) )
-      ~f:(fun ((total, tag), transaction_opt) ->
-        ( match tag with
-        | `Merge ->
-            Perf_histograms.add_span ~name:"snark_worker_merge_time" total ;
-            Mina_metrics.(
-              Cryptography.Snark_work_histogram.observe
-                Cryptography.snark_work_merge_time_sec (Time.Span.to_sec total))
-        | `Transition -> (
-            (*should be Some in the case of `Transition*)
-            match Option.value_exn transaction_opt with
-            | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Zkapp_command parties) ->
-                let init =
-                  match
-                    (Mina_base.Account_update.of_fee_payer parties.fee_payer)
-                      .authorization
-                  with
-                  | Proof _ ->
-                      (1, 1)
-                  | _ ->
-                      (1, 0)
-                in
-                let parties_count, proof_parties_count =
-                  Mina_base.Zkapp_command.Call_forest.fold
-                    parties.account_updates ~init
-                    ~f:(fun (count, proof_parties_count) party ->
-                      ( count + 1
-                      , if
-                          Mina_base.Control.(
-                            Tag.equal Proof
-                              (tag
-                                 (Mina_base.Account_update.Poly.authorization
-                                    party ) ))
-                        then proof_parties_count + 1
-                        else proof_parties_count ) )
-                in
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc snark_work_zkapp_base_time_sec
-                      (Time.Span.to_sec total) ;
-                    Counter.inc_one snark_work_zkapp_base_submissions ;
-                    Counter.inc zkapp_transaction_length
-                      (Float.of_int parties_count) ;
-                    Counter.inc zkapp_proof_updates
-                      (Float.of_int proof_parties_count)))
-            | _ ->
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc_one snark_work_base_submissions ;
-                    Counter.inc snark_work_base_time_sec
-                      (Time.Span.to_sec total))) ) ) ;
-        Perf_histograms.add_span ~name:"snark_worker_transition_time" total )
-  in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
           Deferred.return
@@ -461,7 +412,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 , Snark_work_lib.Selector.Spec.Stable.Latest.to_yojson work.spec
                 )
               ] ;
-          log_snark_work_metrics work ;
+
+          Mina_metrics.(
+            Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
+          One_or_two.zip_exn work.spec.instances work.metrics
+          |> One_or_two.iter ~f:(fun (single_spec, (elapsed, _tag)) ->
+                 Snark_work_lib.Metrics.(
+                   emit_single_metrics ~logger ~single_spec
+                     ~data:{ data = elapsed; proof = () }
+                     ~on_zkapp_command:emit_zkapp_metrics_legacy ()) ) ;
           Deferred.return @@ Mina_lib.add_work mina work )
     ; implement Snark_worker.Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
         (fun

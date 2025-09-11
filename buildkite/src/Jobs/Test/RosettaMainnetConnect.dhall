@@ -1,5 +1,7 @@
 let Pipeline = ../../Pipeline/Dsl.dhall
 
+let PipelineScope = ../../Pipeline/Scope.dhall
+
 let Network = ../../Constants/Network.dhall
 
 let Connectivity = ../../Command/Rosetta/Connectivity.dhall
@@ -12,5 +14,7 @@ in  Pipeline.build
           , network = Network.Type.Mainnet
           , profile = Profile.Type.Mainnet
           , timeout = 2400
+          , scope =
+            [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
       )

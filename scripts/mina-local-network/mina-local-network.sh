@@ -15,11 +15,12 @@ trap kill_background_jobs EXIT SIGTERM SIGINT
 # ================================================
 # Constants
 
-MINA_EXE=_build/default/src/app/cli/src/mina.exe
-ARCHIVE_EXE=_build/default/src/app/archive/archive.exe
-LOGPROC_EXE=_build/default/src/app/logproc/logproc.exe
-ZKAPP_EXE=_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe
+MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
+ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
+LOGPROC_EXE=${LOGPROC_EXE:-_build/default/src/app/logproc/logproc.exe}
+ZKAPP_EXE=${ZKAPP_EXE:-_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe}
 
+export MINA_BP_PRIVKEY=
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
 SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
@@ -62,6 +63,7 @@ PG_PORT=${PG_PORT:-5432}
 PG_URI="postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 
 ARCHIVE_ADDRESS_CLI_ARG=""
+DEMO_MODE=false
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -136,6 +138,8 @@ help() {
   echo "                                         |   Default: ${UPDATE_GENESIS_TIMESTAMP}"
   echo "-st  |--override-slot-time <milliseconds>| Override the slot time for block production"
   echo "                                         |   Default: value from executable"
+  echo "-d   |--demo                             | Whether to run the demo (presence of argument). Demo mode is used to run the single node which is already bootstrapped and synced with the network."
+  echo "                                         |   Default: false"
   echo "-h   |--help                             | Displays this help message"
 
   printf "\n"
@@ -367,6 +371,7 @@ while [[ "$#" -gt 0 ]]; do
       OVERRIDE_SLOT_TIME_MS="${2}"
       shift
       ;;
+  -d | --demo) DEMO_MODE=true ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -442,28 +447,14 @@ if ${ZKAPP_TRANSACTIONS}; then
   fi
 fi
 
-echo "Starting the Network with:"
-echo -e "\t1 seed"
-echo -e "\t1 snark coordinator"
-echo -e "\t${SNARK_WORKERS_COUNT} snark worker(s)"
-
-if ${ARCHIVE}; then
-  echo -e "\t1 archive"
-fi
-
-echo -e "\t${WHALES} whales"
-echo -e "\t${FISH} fish"
-echo -e "\t${NODES} non block-producing nodes"
-echo -e "\tSending transactions: ${VALUE_TRANSFERS}"
-echo -e "\tSending zkApp transactions: ${ZKAPP_TRANSACTIONS}"
-printf "\n"
-echo "================================"
-printf "\n"
-
 # ================================================
 # Create the Genesis Ledger
 
-LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
+if ${DEMO_MODE}; then
+  LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-demo"
+else
+  LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
+fi
 
 if ${RESET}; then
   rm -rf "${LEDGER_FOLDER}"
@@ -551,6 +542,51 @@ fi
 
 SNARK_COORDINATOR_PUBKEY=$(cat "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account.pub)
 
+
+# ================================================
+# Check the demo mode
+
+if ${DEMO_MODE}; then
+  echo "Demo mode requires no Whale nodes, no Fish nodes and no non block-producing nodes!"
+  echo "Resetting the values to 0."
+
+  # Set the default values for demo mode
+  SNARK_WORKERS_COUNT=0
+  WHALES=0
+  FISH=0
+  NODES=0
+
+  if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
+    echo "Demo mode does not support transactions!"
+    printf "\n"
+
+    exit 1
+  fi
+
+fi
+
+# ================================================
+# Print the configuration summary
+
+echo "Starting the Network with:"
+echo -e "\t1 seed"
+echo -e "\t1 snark coordinator"
+echo -e "\t${SNARK_WORKERS_COUNT} snark worker(s)"
+
+if ${ARCHIVE}; then
+  echo -e "\t1 archive"
+fi
+
+echo -e "\t${WHALES} whales"
+echo -e "\t${FISH} fish"
+echo -e "\t${NODES} non block-producing nodes"
+echo -e "\tSending transactions: ${VALUE_TRANSFERS}"
+echo -e "\tSending zkApp transactions: ${ZKAPP_TRANSACTIONS}"
+printf "\n"
+echo "================================"
+printf "\n"
+
+
 # ================================================
 # Update the Genesis State Timestamp or Reset the Genesis Ledger
 
@@ -587,10 +623,13 @@ fi
 # ================================================
 # Launch the Nodes
 
-NODES_FOLDER="${LEDGER_FOLDER}"/nodes
-mkdir -p "${NODES_FOLDER}"/seed
-mkdir -p "${NODES_FOLDER}"/snark_coordinator
-mkdir -p "${NODES_FOLDER}"/snark_workers
+NODES_FOLDER=${LEDGER_FOLDER}/nodes
+mkdir -p ${NODES_FOLDER}/seed
+
+if ! ${DEMO_MODE}; then
+  mkdir -p "${NODES_FOLDER}"/snark_coordinator
+  mkdir -p "${NODES_FOLDER}"/snark_workers
+fi
 
 if ${RESET}; then
   clean-dir "${NODES_FOLDER}"
@@ -613,10 +652,24 @@ fi
 
 # ----------
 
-spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" \
-           -seed \
-           -libp2p-keypair "${SEED_PEER_KEY}" \
-           "${ARCHIVE_ADDRESS_CLI_ARG}"
+if ${DEMO_MODE}; then
+  echo "Running in demo mode, only seed node is going to be started."
+  printf "\n"
+
+  spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} \
+    -block-producer-key ${LEDGER_FOLDER}/online_whale_keys/online_whale_account_0 \
+    --run-snark-worker "$(cat ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account.pub)" \
+    --snark-worker-fee 0.001 \
+    --proof-level ${PROOF_LEVEL} \
+    --demo-mode \
+    --external-ip "$(hostname -i)" \
+    --seed \
+    ${ARCHIVE_ADDRESS_CLI_ARG}
+
+else 
+  spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+fi
+
 SEED_PID=$!
 
 echo 'Waiting for seed to go up...'
@@ -628,20 +681,23 @@ done
 
 #---------- Starting snark coordinator
 
-SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
-spawn-node "${NODES_FOLDER}"/snark_coordinator \
-           "${SNARK_COORDINATOR_PORT}" \
-           -peer ${SEED_PEER_ID} \
-           -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} \
-           "${SNARK_COORDINATOR_FLAGS}"
-SNARK_COORDINATOR_PID=$!
+if [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
+  echo "Skipping snark coordinator because SNARK_WORKERS_COUNT is 0"
+  SNARK_COORDINATOR_PID=""
 
-echo 'Waiting for snark coordinator to go up...'
-printf "\n"
+else
 
-until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
-  sleep 1
-done
+  SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
+  spawn-node "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+  SNARK_COORDINATOR_PID=$!
+
+  echo 'Waiting for snark coordinator to go up...'
+  printf "\n"
+
+  until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
+    sleep 1
+  done
+fi
 
 #---------- Starting snark workers
 
@@ -704,13 +760,13 @@ echo -e "\t\t  pid ${SEED_PID}"
 echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}"
 echo -e "\t\t  logs: cat ${NODES_FOLDER}/seed/log.txt | ${LOGPROC_EXE}"
 
-echo -e "\tSnark Coordinator:"
-echo -e "\t\tInstance #0:"
-echo -e "\t\t  pid ${SNARK_COORDINATOR_PID}"
-echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}"
-echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_EXE}"
-
 if [ "${SNARK_WORKERS_COUNT}" -gt "0" ]; then
+  echo -e "\tSnark Coordinator:"
+  echo -e "\t\tInstance #0:"
+  echo -e "\t\t  pid ${SNARK_COORDINATOR_PID}"
+  echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}"
+  echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_EXE}"
+
   echo -e "\tSnark Workers:"
   for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
     echo -e "\t\tInstance #${i}:"
