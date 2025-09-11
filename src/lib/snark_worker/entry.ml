@@ -78,26 +78,34 @@ let emit_metrics ~logger ~elapsed = function
   | Sub_zkapp_command { spec = sub_zkapp_spec; _ } ->
       Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
 
-(** Handle the `Result case - submits completed SNARK work to the daemon.
+(** Handle the `Result case - submits completed SNARK work to the daemon with retry logic.
     
     This handler processes successfully generated SNARK proofs by:
     1. Submitting the work result to the daemon via RPC
     2. On success: transitions to `No_spec state to request new work
-    3. On failure: retries after a delay, staying in `Result state
+    3. On failure: retries a limited number of times with exponential backoff (1.5x factor)
+    4. After exhausting retries: logs rejection and transitions to `No_spec
     
-    @param result_without_spec The completed SNARK work result
-    @return Next state, either `No_spec or `Result *)
+    @param wire_result The completed SNARK work result
+    @param retry_count Number of retries remaining
+    @return Next state, either `No_spec or `Result with decremented retry count *)
 let handle_result ~logger ~shutdown_on_disconnect daemon_address wire_result
-    metadata =
+    metadata retry_count retry_delay =
   match%bind
     submit_work ~logger ~metadata ~shutdown_on_disconnect ~daemon_address
       wire_result ()
   with
-  | Error e ->
-      [%log error] "Error submitting work"
+  | Error e when retry_count <= 0 ->
+      [%log error] "Work submission failed after all retries. Work rejected."
         ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
-      after @@ Time.Span.of_sec @@ retry_pause 10.
-      >>| const (`Result (daemon_address, wire_result, metadata))
+      return `No_spec
+  | Error e ->
+      [%log error] "Error submitting work (retries remaining: %d)" retry_count
+        ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
+      let%map () = after @@ Time.Span.of_sec @@ retry_pause retry_delay in
+      let retry_delay = retry_delay *. 1.5 in
+      `Result
+        (daemon_address, wire_result, metadata, retry_count - 1, retry_delay)
   | Ok () ->
       return `No_spec
 
@@ -159,7 +167,7 @@ let handle_spec ~logger ~state daemon_address partitioned_spec =
         Result.Partitioned.Stable.Latest.{ id = partitioned_id; data }
       in
       emit_metrics ~logger ~elapsed partitioned_spec ;
-      return (`Result (daemon_address, wire_result, metadata))
+      return (`Result (daemon_address, wire_result, metadata, 3, 10.))
 
 (** Handle the `No_spec case - requests new SNARK work from the daemon.
     
@@ -250,9 +258,9 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
     ~metadata:[ ("dir", `String cwd) ] ;
   Deferred.forever `No_spec
   @@ function
-  | `Result (daemon_address, wire_result, metadata) ->
+  | `Result (daemon_address, wire_result, metadata, retry_count, retry_delay) ->
       handle_result ~logger ~shutdown_on_disconnect daemon_address wire_result
-        metadata
+        metadata retry_count retry_delay
   | `Failed (daemon_address, e, partitioned_id) ->
       handle_failed ~logger ~shutdown_on_disconnect daemon_address e
         partitioned_id
