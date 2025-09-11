@@ -96,10 +96,7 @@ let pipeline
                       "buildkite/src/Command/Rosetta/Connectivity"
                       "dhall"
                   , S.exactly "scripts/tests/rosetta-connectivity" "sh"
-                  , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
-                  , S.exactly
-                      "buildkite/scripts/rosetta-integration-tests-full"
-                      "sh"
+                  , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
                   ]
                 # spec.additionalDirtyWhen
             , path = "Test"
