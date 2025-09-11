@@ -273,11 +273,11 @@ module Cryptography = struct
     let help = "time elapsed while doing base proof for a zkapp transaction" in
     Counter.v "snark_work_zkapp_base_time_sec" ~help ~namespace ~subsystem
 
-  let snark_work_base_time_sec =
+  let snark_work_nonzkapp_base_time_sec =
     let help =
       "time elapsed while doing base proof for a non-zkapp transaction"
     in
-    Counter.v "snark_work_base_time_sec" ~help ~namespace ~subsystem
+    Counter.v "snark_work_nonzkapp_base_time_sec" ~help ~namespace ~subsystem
 
   let snark_work_zkapp_base_submissions =
     let help =
@@ -285,11 +285,11 @@ module Cryptography = struct
     in
     Counter.v "snark_work_zkapp_base_submissions" ~help ~namespace ~subsystem
 
-  let snark_work_base_submissions =
+  let snark_work_nonzkapp_base_submissions =
     let help =
       "Number of base transactions snarks for non-zkapp transactions submitted"
     in
-    Counter.v "snark_work_base_submissions" ~help ~namespace ~subsystem
+    Counter.v "snark_work_nonzkapp_base_submissions" ~help ~namespace ~subsystem
 
   let zkapp_transaction_length =
     let help = "Number of updates in a zkapp transaction" in
@@ -1011,10 +1011,6 @@ module Pipe = struct
   module Drop_on_overflow = struct
     let subsystem = subsystem ^ "_overflow"
 
-    let bootstrap_sync_ledger : Counter.t =
-      let help = "Overflow in sync ledger pipe when bootstrapping" in
-      Counter.v "bootstrap_sync_ledger_pipe" ~help ~namespace ~subsystem
-
     let verified_network_pool_diffs : Counter.t =
       let help =
         "Overflow in verified network pool diffs pipe (transactions or snark \
@@ -1034,17 +1030,6 @@ module Pipe = struct
       let help = "Overflow in primary transitions pipe" in
       Counter.v "transition_frontier_primary_transitions" ~help ~namespace
         ~subsystem
-
-    let router_transition_frontier_controller : Counter.t =
-      let help =
-        "Overflow in transition frontier controller pipe in Transition_router"
-      in
-      Counter.v "router_transition_frontier_controller" ~help ~namespace
-        ~subsystem
-
-    let router_bootstrap_controller : Counter.t =
-      let help = "Overflow in bootstrap controller pipe in Transition_router" in
-      Counter.v "router_bootstrap_controller_pipe" ~help ~namespace ~subsystem
 
     let router_verified_transitions : Counter.t =
       let help = "Overflow in verified transitions pipe in Transition_router" in

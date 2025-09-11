@@ -4,6 +4,8 @@ let Mina = ../Command/Mina.dhall
 
 let ContainerImages = ../Constants/ContainerImages.dhall
 
+let Arch = ../Constants/Arch.dhall
+
 let runInToolchainImage
     : Text -> List Text -> Text -> List Cmd.Type
     =     \(image : Text)
@@ -15,21 +17,50 @@ let runInToolchainImage
                 innerScript
             ]
 
-let runInToolchainBookworm
+let runInToolchainNoble
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
+      ->  \(innerScript : Text)
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainNoble.amd64
+                  , Arm64 = ContainerImages.minaToolchainNoble.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage image environment innerScript
+
+let runInToolchainJammy
     : List Text -> Text -> List Cmd.Type
     =     \(environment : List Text)
       ->  \(innerScript : Text)
       ->  runInToolchainImage
-            ContainerImages.minaToolchainBookworm
+            ContainerImages.minaToolchainJammy.amd64
             environment
             innerScript
 
+let runInToolchainBookworm
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
+      ->  \(innerScript : Text)
+      ->  let image =
+                merge
+                  { Amd64 = ContainerImages.minaToolchainBookworm.amd64
+                  , Arm64 = ContainerImages.minaToolchainBookworm.arm64
+                  }
+                  arch
+
+          in  runInToolchainImage image environment innerScript
+
 let runInToolchainBullseye
-    : List Text -> Text -> List Cmd.Type
-    =     \(environment : List Text)
+    : Arch.Type -> List Text -> Text -> List Cmd.Type
+    =     \(arch : Arch.Type)
+      ->  \(environment : List Text)
       ->  \(innerScript : Text)
       ->  runInToolchainImage
-            ContainerImages.minaToolchainBullseye
+            ContainerImages.minaToolchainBullseye.amd64
             environment
             innerScript
 
@@ -44,6 +75,8 @@ let runInToolchain
 
 in  { runInToolchain = runInToolchain
     , runInToolchainImage = runInToolchainImage
+    , runInToolchainNoble = runInToolchainNoble
     , runInToolchainBookworm = runInToolchainBookworm
     , runInToolchainBullseye = runInToolchainBullseye
+    , runInToolchainJammy = runInToolchainJammy
     }

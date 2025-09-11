@@ -348,6 +348,7 @@ struct
       -> ?override_wrap_main:
            (max_proofs_verified, branches, prev_varss) wrap_main_generic
       -> ?num_chunks:int
+      -> ?lazy_mode:bool
       -> branches:branches Nat.t
       -> prev_varss_length:(prev_varss, branches) Length.t
       -> max_proofs_verified:
@@ -379,9 +380,9 @@ struct
        ~storables:
          { step_storable; step_vk_storable; wrap_storable; wrap_vk_storable }
        ~proof_cache ?disk_keys ?override_wrap_domain ?override_wrap_main
-       ?(num_chunks = Plonk_checks.num_chunks_by_default) ~branches
-       ~prev_varss_length ~max_proofs_verified ~name ?constraint_constants
-       ~public_input ~auxiliary_typ ~choices () ->
+       ?(num_chunks = Plonk_checks.num_chunks_by_default) ?(lazy_mode = false)
+       ~branches ~prev_varss_length ~max_proofs_verified ~name
+       ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
         match constraint_constants with
@@ -615,7 +616,8 @@ struct
                 Common.time "step read or generate" (fun () ->
                     Cache.Step.read_or_generate
                       ~prev_challenges:(Nat.to_int (fst b.proofs_verified))
-                      cache ~s_p:step_storable k_p ~s_v:step_vk_storable k_v )
+                      cache ~s_p:step_storable ~s_v:step_vk_storable ~lazy_mode
+                      k_p k_v )
               in
               accum_dirty (Lazy.map pk ~f:(Promise.map ~f:snd)) ;
               accum_dirty (Lazy.map vk ~f:(Promise.map ~f:snd)) ;
@@ -697,8 +699,8 @@ struct
       let r =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate (* Due to Wrap_hack *)
-              ~prev_challenges:2 cache ~s_p:wrap_storable disk_key_prover
-              ~s_v:wrap_vk_storable disk_key_verifier )
+              ~prev_challenges:2 cache ~s_p:wrap_storable ~s_v:wrap_vk_storable
+              ~lazy_mode disk_key_prover disk_key_verifier )
       in
       (r, disk_key_verifier)
     in
@@ -989,6 +991,7 @@ let compile_with_wrap_main_override_promise :
     -> ?override_wrap_main:
          (max_proofs_verified, branches, prev_varss) wrap_main_generic
     -> ?num_chunks:int
+    -> ?lazy_mode:bool
     -> public_input:
          ( var
          , value
@@ -1033,7 +1036,7 @@ let compile_with_wrap_main_override_promise :
     and the underlying Make(_).compile function which builds the circuits.
  *)
  fun ?self ?(cache = []) ?(storables = Storables.default) ?proof_cache
-     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks
+     ?disk_keys ?override_wrap_domain ?override_wrap_main ?num_chunks ?lazy_mode
      ~public_input ~auxiliary_typ ~max_proofs_verified ~name
      ?constraint_constants ~choices () ->
   let self =
@@ -1108,7 +1111,7 @@ let compile_with_wrap_main_override_promise :
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
-      ?override_wrap_domain ?override_wrap_main ?num_chunks ~branches
+      ?override_wrap_domain ?override_wrap_main ?num_chunks ?lazy_mode ~branches
       ~prev_varss_length ~max_proofs_verified ~name ~public_input ~auxiliary_typ
       ?constraint_constants ~choices:(conv_irs choices) ()
   in

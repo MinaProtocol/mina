@@ -60,9 +60,20 @@ type t =
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
+  ; file_log_level : Logger.Level.t [@default Logger.Level.Info]
+  ; log_level : Logger.Level.t [@default Logger.Level.Info]
+  ; log_json : bool [@default false]
   ; graphql_control_port : int option [@default None]
   ; zkapp_cmd_limit : int option ref
   ; compile_config : Mina_compile_config.t
   ; itn_features : bool
+  ; hardfork_mode : Cli_lib.Arg_type.Hardfork_mode.t
   }
 [@@deriving make]
+
+let ledger_backing ~hardfork_mode =
+  match hardfork_mode with
+  | Cli_lib.Arg_type.Hardfork_mode.Auto ->
+      Mina_ledger.Ledger.Root.Config.Converting_db
+  | _ ->
+      Stable_db

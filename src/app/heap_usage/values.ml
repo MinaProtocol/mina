@@ -11,12 +11,8 @@ let account : Mina_base.Account.t =
      the zkapp_uri field is not currently bounded in size
   *)
   let zkapp_account : Mina_base.Zkapp_account.t =
-    let app_state =
-      Pickles_types.Vector.to_list Mina_base.Zkapp_account.default.app_state
-      |> Pickles_types.Vector.Vector_8.of_list_exn
-    in
     { Mina_base.Zkapp_account.default with
-      app_state
+      app_state = Mina_base.Zkapp_account.default.app_state
     ; verification_key =
         Some
           With_hash.
@@ -38,7 +34,8 @@ let zkapp_command ~proof_cache_db ~genesis_constants ~constraint_constants =
   let%map.Async.Deferred _, zkapp_commands =
     Snark_profiler_lib.create_ledger_and_zkapps ~proof_cache_db
       ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
-      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+      ~num_proof_updates:num_updates ~max_num_updates:num_updates
+      ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
   in
   List.hd_exn zkapp_commands
 

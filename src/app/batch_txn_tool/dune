@@ -1,5 +1,7 @@
 (executable
  (name batch_txn_tool)
+ (package mina_batch_txn)
+ (public_name mina-batch-txn)
  (libraries
   ;; opam libraries
   async.async_command
@@ -26,7 +28,7 @@
   mina_wire_types
   integration_test_lib
   logger
-  bounded_types)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocessor_deps ../../../graphql_schema.json)

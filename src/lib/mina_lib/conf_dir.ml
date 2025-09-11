@@ -32,7 +32,7 @@ let rec check_and_set_lockfile ~logger conf_dir =
       | Ok () ->
           [%log debug] "Created daemon lockfile $lockfile"
             ~metadata:[ ("lockfile", `String lockfile) ] ;
-          Exit_handlers.register_async_shutdown_handler ~logger
+          Mina_stdlib_unix.Exit_handlers.register_async_shutdown_handler ~logger
             ~description:"Remove daemon lockfile" (fun () ->
               match%bind Sys.file_exists lockfile with
               | `Yes ->
@@ -52,7 +52,7 @@ let rec check_and_set_lockfile ~logger conf_dir =
                 let%bind pid =
                   let rm_and_raise () =
                     Core.Unix.unlink lockfile ;
-                    Mina_user_error.raise
+                    Mina_stdlib.Mina_user_error.raise
                       "Invalid format in lockfile (removing it)"
                   in
                   match%map Reader.read_line reader with
@@ -74,7 +74,7 @@ let rec check_and_set_lockfile ~logger conf_dir =
                     (* can happen when running in Docker *)
                     return ()
                   else
-                    Mina_user_error.raisef
+                    Mina_stdlib.Mina_user_error.raisef
                       "A daemon (process id %d) is already running with the \
                        current configuration directory (%s)"
                       (Pid.to_int pid) conf_dir

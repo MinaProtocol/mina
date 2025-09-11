@@ -34,11 +34,9 @@
   stdio
   yojson
   ;; local libraries
-  debug_assert
-  empty_hashes
+  mina_stdlib
   logger
   merkle_ledger
-  mina_stdlib
   visualization)
  (preprocess
   (pps

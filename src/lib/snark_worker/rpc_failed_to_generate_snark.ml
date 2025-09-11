@@ -12,7 +12,7 @@ module Master = struct
 
   module T = struct
     type query =
-      Bounded_types.Wrapped_error.Stable.V1.t
+      Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t
       * Selector.Spec.Stable.Latest.t
       * Signature_lib.Public_key.Compressed.Stable.Latest.t
 
@@ -30,7 +30,7 @@ module Stable = struct
   module V2 = struct
     module T = struct
       type query =
-        Bounded_types.Wrapped_error.Stable.V1.t
+        Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t
         * Selector.Spec.Stable.V1.t
         * Signature_lib.Public_key.Compressed.Stable.V1.t
 

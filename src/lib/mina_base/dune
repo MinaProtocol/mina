@@ -38,7 +38,7 @@
   sparse_ledger_lib
   snark_params
   signature_lib
-  bounded_types
+  mina_stdlib
   rosetta_coding
   random_oracle
   hash_prefix_states
@@ -52,7 +52,6 @@
   bignum_bigint
   codable
   crypto_params
-  debug_assert
   fold_lib
   fields_derivers.zkapps
   fields_derivers.json

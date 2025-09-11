@@ -2,7 +2,7 @@
 
 Thread execution timing is provided by the [O1trace module](../../src/lib/o1trace). With it, the Mina daemon is instrumented in a hierarchical fashion, where there is one root through (called "Mina") under which there is a tree of descendant threads. As opposed to naive timing techniques which time the delay it takes for a thread to execute, this timing technique times the amount of time spent actually executing the thread in a way that allows us to generate dashboards showing the amount of time spent per second in various threads of the daemon.
 
-Thread timings are inclusive of descendants. This means that, for a given thread A that has children B and C, the amount of time that is reported for the execution of A includes the exection time of B and C. Therefore, when reasoning about the actual time spent in A, but not in B or C, we need to subtract the execution of B and C to find the leftover time spent in A that wasn't in a child thread. This makes writing Grafana charts for thread timing annoying and brittle. Luckily, there are scripts which can be used to automate the generation of the Grafana charts.
+Thread timings are inclusive of descendants. This means that, for a given thread A that has children B and C, the amount of time that is reported for the execution of A includes the execution time of B and C. Therefore, when reasoning about the actual time spent in A, but not in B or C, we need to subtract the execution of B and C to find the leftover time spent in A that wasn't in a child thread. This makes writing Grafana charts for thread timing annoying and brittle. Luckily, there are scripts which can be used to automate the generation of the Grafana charts.
 
 ## Generating Charts
 

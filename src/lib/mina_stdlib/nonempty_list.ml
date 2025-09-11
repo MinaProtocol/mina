@@ -28,6 +28,8 @@ let tail_opt t = of_list_opt (tail t)
 
 let map (x, xs) ~f = (f x, List.map ~f xs)
 
+let mapi (x, xs) ~f = (f 0 x, List.mapi ~f:(fun idx x -> f (idx + 1) x) xs)
+
 let rev (x, xs) = List.fold xs ~init:(singleton x) ~f:(Fn.flip cons)
 
 (* As the Base.Container docs state, we'll add each function from C explicitly
@@ -57,8 +59,8 @@ let take (x, xs) = function
       Some (x, List.take xs (n - 1))
 
 let min_elt ~compare (x, xs) =
-  Option.value_map ~default:x (List.min_elt ~compare xs) ~f:(fun mininum ->
-      if compare x mininum < 0 then x else mininum )
+  Option.value_map ~default:x (List.min_elt ~compare xs) ~f:(fun minimum ->
+      if compare x minimum < 0 then x else minimum )
 
 let max_elt ~compare (x, xs) =
   Option.value_map ~default:x (List.max_elt ~compare xs) ~f:(fun maximum ->

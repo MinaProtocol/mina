@@ -939,7 +939,7 @@ let must_send_payment_with_raw_sig ~logger node_uri ~sender_pub_key
 
 let sign_and_send_payment ~logger node_uri
     ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
-    ~fee ~nonce ~memo ~valid_until =
+    ~fee ~nonce ~memo ~valid_until ~signature_kind =
   let sender_pub_key =
     sender_keypair.public_key |> Signature_lib.Public_key.compress
   in
@@ -959,19 +959,12 @@ let sign_and_send_payment ~logger node_uri
     { Signed_command_payload.Poly.common; body }
   in
   let raw_signature =
-    Signed_command.sign_payload sender_keypair.private_key payload
+    Signed_command.sign_payload ~signature_kind sender_keypair.private_key
+      payload
     |> Signature.Raw.encode
   in
   send_payment_with_raw_sig ~logger node_uri ~sender_pub_key ~receiver_pub_key
     ~amount ~fee ~nonce ~memo ~valid_until ~raw_signature
-
-let must_sign_and_send_payment ~logger node_uri
-    ~(sender_keypair : Import.Signature_keypair.t) ~receiver_pub_key ~amount
-    ~fee ~nonce ~memo ~valid_until =
-  sign_and_send_payment ~logger node_uri
-    ~(sender_keypair : Import.Signature_keypair.t)
-    ~receiver_pub_key ~amount ~fee ~nonce ~memo ~valid_until
-  |> Deferred.bind ~f:Malleable_error.or_hard_error
 
 let send_test_payments ~(repeat_count : Unsigned.UInt32.t)
     ~(repeat_delay_ms : Unsigned.UInt32.t) ~logger node_uri

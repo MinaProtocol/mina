@@ -50,7 +50,8 @@ let plugin_flag =
   else Command.Param.return []
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
-    ~genesis_dir ~cli_proof_level ~proof_level config_files =
+    ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
+    config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -69,7 +70,8 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
         | Error err -> (
             match handle_missing with
             | `Must_exist ->
-                Mina_user_error.raisef ~where:"reading configuration file"
+                Mina_stdlib.Mina_user_error.raisef
+                  ~where:"reading configuration file"
                   "The configuration file %s could not be read:\n%s" config_file
                   (Error.to_string_hum err)
             | `May_be_missing ->
@@ -100,7 +102,8 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
-        ~logger ~genesis_constants ~constraint_constants ~proof_level config
+        ~logger ~genesis_constants ~constraint_constants ~proof_level
+        ~genesis_backing_type config
     with
     | Ok (precomputed_values, _) ->
         precomputed_values
@@ -538,7 +541,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
            Option.value_map opt ~default:None ~f:(fun s ->
                if String.length s < 200 then Some s
                else
-                 Mina_user_error.raisef
+                 Mina_stdlib.Mina_user_error.raisef
                    "The length of contact info exceeds 200 characters:\n %s" s ) )
   and uptime_url_string =
     flag "--uptime-url" ~aliases:[ "uptime-url" ] (optional string)
@@ -565,6 +568,20 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
+  and hardfork_mode =
+    (*
+      There's 2 hardfork mode, namely Legacy and Auto. Reference:
+        - https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e 
+        - https://www.notion.so/o1labs/V2-MIP-draft-HF-automation-250e79b1f9108010b0c5f2b1f416640b
+        *)
+    flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
+      ~doc:
+        "auto|legacy Mode of hardfork. Under auto mode, the daemon would back \
+         all ledgers that are needed for post-hardfork node to bootstrap with \
+         2 databases, one for before, and one for after the hardfork. Under \
+         legacy mode, all databased backed ledgers are backed by one database. \
+         THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
+      (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -584,7 +601,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
     O1trace.thread "mina" (fun () ->
         let open Deferred.Let_syntax in
         let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
-        let%bind () = File_system.create_dir conf_dir in
+        let%bind () = Mina_stdlib_unix.File_system.create_dir conf_dir in
         let () =
           if is_background then (
             Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
@@ -686,7 +703,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let make_version () =
             let%map () =
               (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
-              File_system.remove_dir (conf_dir ^/ "trace")
+              Mina_stdlib_unix.File_system.remove_dir (conf_dir ^/ "trace")
             in
             Yojson.Safe.to_file version_filename (`Assoc version_metadata)
           in
@@ -724,9 +741,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         in
         Parallel.init_master () ;
         let monitor = Async.Monitor.create ~name:"coda" () in
-        let time_controller =
-          Block_time.Controller.create @@ Block_time.Controller.basic ~logger
-        in
+        let time_controller = Block_time.Controller.basic ~logger in
         let pids = Child_processes.Termination.create_pid_table () in
         let mina_initialization_deferred () =
           let config_file_installed =
@@ -775,10 +790,14 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Genesis_constants.Compiled.constraint_constants
           in
           let compile_config = Mina_compile_config.Compiled.t in
+          let ledger_backing_type =
+            Mina_lib.Config.ledger_backing ~hardfork_mode
+          in
           let%bind precomputed_values, config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
+              ~genesis_backing_type:ledger_backing_type
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
@@ -902,14 +921,15 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    | Ok key -> (
                        match Public_key.decompress key with
                        | None ->
-                           Mina_user_error.raisef
+                           Mina_stdlib.Mina_user_error.raisef
                              ~where:"decompressing a public key"
                              "The %s public key %s could not be decompressed."
                              which pk_str
                        | Some _ ->
                            Some key )
                    | Error _e ->
-                       Mina_user_error.raisef ~where:"decoding a public key"
+                       Mina_stdlib.Mina_user_error.raisef
+                         ~where:"decoding a public key"
                          "The %s public key %s could not be decoded." which
                          pk_str )
           in
@@ -977,11 +997,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               , Sys.getenv "MINA_BP_PRIVKEY" )
             with
             | Some _, Some _, _ ->
-                Mina_user_error.raise
+                Mina_stdlib.Mina_user_error.raise
                   "You cannot provide both `block-producer-key` and \
                    `block_production_pubkey`"
             | None, Some _, Some _ ->
-                Mina_user_error.raise
+                Mina_stdlib.Mina_user_error.raise
                   "You cannot provide both `MINA_BP_PRIVKEY` and \
                    `block_production_pubkey`"
             | None, None, None ->
@@ -1142,8 +1162,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let consensus_local_state =
             Consensus.Data.Local_state.create
               ~context:(module Context)
-              ~genesis_ledger:
-                (Precomputed_values.genesis_ledger precomputed_values)
+              ~genesis_ledger:precomputed_values.genesis_ledger
               ~genesis_epoch_data:precomputed_values.genesis_epoch_data
               ~epoch_ledger_location
               ( Option.map block_production_keypair ~f:(fun keypair ->
@@ -1152,6 +1171,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
               |> Option.to_list |> Public_key.Compressed.Set.of_list )
               ~genesis_state_hash:
                 precomputed_values.protocol_state_with_hashes.hash.state_hash
+              ~epoch_ledger_backing_type:ledger_backing_type
           in
           trace_database_initialization "epoch ledger" __LOC__
             epoch_ledger_location ;
@@ -1167,7 +1187,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                 | Ok contents ->
                     return (Mina_net2.Multiaddr.of_file_contents contents)
                 | Error _ ->
-                    Mina_user_error.raisef
+                    Mina_stdlib.Mina_user_error.raisef
                       ~where:"reading libp2p peer address file"
                       "The file %s could not be read.\n\n\
                        It must be a newline-separated list of libp2p \
@@ -1177,7 +1197,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           List.iter libp2p_peers_raw ~f:(fun raw_peer ->
               if not Mina_net2.Multiaddr.(valid_as_peer @@ of_string raw_peer)
               then
-                Mina_user_error.raisef ~where:"decoding peer as a multiaddress"
+                Mina_stdlib.Mina_user_error.raisef
+                  ~where:"decoding peer as a multiaddress"
                   "The given peer \"%s\" is not a valid multiaddress (ex: \
                    /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
                   raw_peer ) ;
@@ -1241,7 +1262,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           else if
             List.is_empty initial_peers && Option.is_none seed_peer_list_url
           then
-            Mina_user_error.raise
+            Mina_stdlib.Mina_user_error.raise
               {|No peers were given.
 
 Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
@@ -1315,7 +1336,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           | Some _, Some _, None | Some _, None, Some _ | None, None, None ->
               ()
           | _ ->
-              Mina_user_error.raise
+              Mina_stdlib.Mina_user_error.raise
                 "Must provide both --uptime-url and exactly one of \
                  --uptime-submitter-key or --uptime-submitter-pubkey" ) ;
           let uptime_url =
@@ -1334,7 +1355,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                            not decompress)"
                           s () )
                 | Error err ->
-                    Mina_user_error.raisef
+                    Mina_stdlib.Mina_user_error.raisef
                       "Invalid public key %s for uptime submitter, %s" s
                       (Error.to_string_hum err) () )
           in
@@ -1374,9 +1395,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           let%map mina =
             Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~disable_node_status ~demo_mode
-                 ~coinbase_receiver ~net_config ~gossip_net_params
-                 ~proposed_protocol_version_opt
+                 ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
+                 ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
+                 ~gossip_net_params ~proposed_protocol_version_opt
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method )
@@ -1402,7 +1423,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~uptime_send_node_commit ~stop_time ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config () )
+                 ~itn_features ~compile_config ~hardfork_mode () )
           in
           { mina
           ; client_trustlist
@@ -1582,9 +1603,9 @@ let primitive_ok = function
       true
   | "kimchi_backend_bigint_32_V1" ->
       true
-  | "Bounded_types.String.t"
-  | "Bounded_types.String.Tagged.t"
-  | "Bounded_types.Array.t" ->
+  | "Mina_stdlib.Bounded_types.String.t"
+  | "Mina_stdlib.Bounded_types.String.Tagged.t"
+  | "Mina_stdlib.Bounded_types.Array.t" ->
       true
   | "8fabab0a-4992-11e6-8cca-9ba2c4686d9e" ->
       true (* hashtbl *)
@@ -1686,7 +1707,8 @@ let internal_commands logger ~itn_features =
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-        ~commit_id:Mina_version.commit_id )
+        ~commit_id:Mina_version.commit_id
+        ~signature_kind:Mina_signature_kind.t_DEPRECATED )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
@@ -1705,7 +1727,8 @@ let internal_commands logger ~itn_features =
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
                      ~proof_level ~constraint_constants
-                     ~pids:(Pid.Table.create ()) ~conf_dir ()
+                     ~pids:(Pid.Table.create ()) ~conf_dir
+                     ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
@@ -1732,9 +1755,10 @@ let internal_commands logger ~itn_features =
                 Reader.read_sexp reader )
           with
           | `Ok sexp -> (
+              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let%bind worker_state =
-                Snark_worker.Prod.Inputs.Worker_state.create ~proof_level
-                  ~constraint_constants ()
+                Snark_worker.Inputs.Worker_state.create ~proof_level
+                  ~constraint_constants ~signature_kind ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1748,7 +1772,7 @@ let internal_commands logger ~itn_features =
                   Snark_work_lib.Work.Single.Spec.t] sexp
               in
               match%map
-                Snark_worker.Prod.Inputs.perform_single worker_state
+                Snark_worker.Inputs.perform_single worker_state
                   ~message:sok_message spec
               with
               | Ok _ ->
@@ -1953,8 +1977,8 @@ let internal_commands logger ~itn_features =
           in
           let%bind precomputed_values, _config_jsons, _config =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
-              ~constraint_constants ~proof_level config_files
-              ~cli_proof_level:None
+              ~constraint_constants ~proof_level ~cli_proof_level:None
+              ~genesis_backing_type:Stable_db config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =
@@ -1963,7 +1987,8 @@ let internal_commands logger ~itn_features =
             *)
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
               ~conf_dir ~proof_level
-              ~constraint_constants:precomputed_values.constraint_constants ()
+              ~constraint_constants:precomputed_values.constraint_constants
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
           in
           match%bind
             Prover.create_genesis_block prover

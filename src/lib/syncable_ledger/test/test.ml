@@ -326,19 +326,19 @@ module Db = struct
       let to_hash = Fn.id
     end
 
-    module Location = Merkle_ledger.Location.T
+    module Location = Merkle_ledger.Location
 
     module Location_binable = struct
       module Arg = struct
         type t = Location.t =
-          | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+          | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
           | Account of Location.Addr.Stable.Latest.t
           | Hash of Location.Addr.Stable.Latest.t
         [@@deriving bin_io_unversioned, hash, sexp, compare]
       end
 
       type t = Arg.t =
-        | Generic of Merkle_ledger.Location.Bigstring.t
+        | Generic of Mina_stdlib.Bigstring.t
         | Account of Location.Addr.t
         | Hash of Location.Addr.t
       [@@deriving hash, sexp, compare]
@@ -368,6 +368,7 @@ module Db = struct
         let account_ids = Account_id.gen_accounts num_accounts in
         let currency_balance = Currency.Balance.of_nanomina_int_exn balance in
         List.iter account_ids ~f:(fun aid ->
+            let T = Account_id.eq2 in
             let account = Account.create aid currency_balance in
             ignore
               ( get_or_create_account ledger aid account |> Or_error.ok_exn
@@ -541,6 +542,7 @@ module Mask = struct
           Int.pow 2 Input.mask_layers * balance
         in
         List.iter account_ids ~f:(fun account_id ->
+            let T = Account_id.eq2 in
             let account =
               Account.create account_id
                 (Currency.Balance.of_nanomina_int_exn
@@ -565,6 +567,7 @@ module Mask = struct
             let child_mask = Mask.create ~depth:Input.depth () in
             let attached_mask = Maskable.register_mask parent_base child_mask in
             List.iter account_ids ~f:(fun account_id ->
+                let T = Account_id.eq2 in
                 let account =
                   Account.create account_id
                     (Currency.Balance.of_nanomina_int_exn child_balance)

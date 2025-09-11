@@ -60,11 +60,14 @@ module Cryptography : sig
 
   val snark_work_zkapp_base_time_sec : Counter.t
 
-  val snark_work_base_time_sec : Counter.t
+  val snark_work_nonzkapp_base_time_sec : Counter.t
 
+  (* WARN: At snark worker side this metrics is just wrong. This is because
+     there's no way to know how many full zkapp command is processed by a
+     worker. *)
   val snark_work_zkapp_base_submissions : Counter.t
 
-  val snark_work_base_submissions : Counter.t
+  val snark_work_nonzkapp_base_submissions : Counter.t
 
   val zkapp_transaction_length : Counter.t
 
@@ -319,17 +322,11 @@ end
 
 module Pipe : sig
   module Drop_on_overflow : sig
-    val bootstrap_sync_ledger : Counter.t
-
     val verified_network_pool_diffs : Counter.t
 
     val transition_frontier_valid_transitions : Counter.t
 
     val transition_frontier_primary_transitions : Counter.t
-
-    val router_transition_frontier_controller : Counter.t
-
-    val router_bootstrap_controller : Counter.t
 
     val router_verified_transitions : Counter.t
 

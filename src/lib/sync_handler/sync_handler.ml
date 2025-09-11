@@ -49,7 +49,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
-      Ledger.Any_ledger.cast (module Ledger.Db)
+      Ledger.Root.as_unmasked
       @@ Transition_frontier.root_snarked_ledger frontier
     in
     let staking_epoch_ledger =
@@ -73,8 +73,8 @@ module Make (Inputs : Inputs_intf) :
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+      | Ledger_root ledger ->
+          Some (Ledger.Root.as_unmasked ledger)
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
@@ -84,8 +84,8 @@ module Make (Inputs : Inputs_intf) :
       | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger
           _ ->
           None
-      | Ledger_db ledger ->
-          Some (Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+      | Ledger_root ledger ->
+          Some (Ledger.Root.as_unmasked ledger)
     else None
 
   let answer_query :

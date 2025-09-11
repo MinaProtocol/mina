@@ -111,49 +111,54 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
     =
  fun name lockpath logger ->
   let open Deferred.Let_syntax in
+  let try_cleanup_lock_file ~pid_metadata () =
+    match%map try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
+    | Ok () ->
+        [%log debug] "Deleted existing lock file %s" lockpath
+    | Error exn ->
+        [%log warn]
+          !"Couldn't delete lock file for %s (pid $childPid). If another Mina \
+            daemon was already running it may have cleaned it up for us. \
+            ($exn)"
+          name
+          ~metadata:
+            [ ("childPid", pid_metadata); ("exn", `String (Exn.to_string exn)) ]
+  in
   match%bind Sys.file_exists lockpath with
   | `Yes -> (
       let%bind pid_str = Reader.file_contents lockpath in
-      let pid = Pid.of_string pid_str in
-      [%log debug] "Found PID file for %s %s with contents %s" name lockpath
-        pid_str ;
-      let%bind () =
-        match Signal.send Signal.term (`Pid pid) with
-        | `No_such_process ->
-            [%log debug] "Couldn't kill %s with PID %s, does not exist" name
-              pid_str ;
-            Deferred.unit
-        | `Ok -> (
-            [%log debug] "Successfully sent TERM signal to %s (%s)" name pid_str ;
-            let%bind () = after (Time.Span.of_sec 0.5) in
-            match Signal.send Signal.kill (`Pid pid) with
+      let pid_opt = try Some (Pid.of_string pid_str) with _ -> None in
+      match pid_opt with
+      | None ->
+          let pid_log_str = String.escaped pid_str in
+          [%log warn]
+            "Found corrupted PID file for %s %s containing \"%s\", unable to \
+             clean up leftover process if it still exists"
+            name lockpath pid_log_str ;
+          try_cleanup_lock_file ~pid_metadata:(`String pid_log_str) ()
+      | Some pid ->
+          [%log debug] "Found PID file for %s %s with contents %s" name lockpath
+            pid_str ;
+          let%bind () =
+            match Signal.send Signal.term (`Pid pid) with
             | `No_such_process ->
+                [%log debug] "Couldn't kill %s with PID %s, does not exist" name
+                  pid_str ;
                 Deferred.unit
-            | `Ok ->
-                [%log error]
-                  "helper process %s (%s) didn't die after being sent TERM, \
-                   KILLed it"
-                  name pid_str ;
-                Deferred.unit )
-      in
-      match%bind Sys.file_exists lockpath with
-      | `Yes | `Unknown -> (
-          match%bind try_with ~here:[%here] (fun () -> Sys.remove lockpath) with
-          | Ok () ->
-              Deferred.unit
-          | Error exn ->
-              [%log warn]
-                !"Couldn't delete lock file for %s (pid $childPid) after \
-                  killing it. If another Mina daemon was already running it \
-                  may have cleaned it up for us. ($exn)"
-                name
-                ~metadata:
-                  [ ("childPid", `Int (Pid.to_int pid))
-                  ; ("exn", `String (Exn.to_string exn))
-                  ] ;
-              Deferred.unit )
-      | `No ->
-          Deferred.unit )
+            | `Ok -> (
+                [%log debug] "Successfully sent TERM signal to %s (%s)" name
+                  pid_str ;
+                let%map () = after (Time.Span.of_sec 0.5) in
+                match Signal.send Signal.kill (`Pid pid) with
+                | `No_such_process ->
+                    ()
+                | `Ok ->
+                    [%log error]
+                      "helper process %s (%s) didn't die after being sent \
+                       TERM, KILLed it"
+                      name pid_str )
+          in
+          try_cleanup_lock_file ~pid_metadata:(`Int (Pid.to_int pid)) () )
   | `Unknown | `No ->
       [%log debug] "No PID file for %s" name ;
       Deferred.unit
@@ -204,14 +209,12 @@ let start_custom :
                conf_dir )
   in
   let lock_path = conf_dir ^/ name ^ ".lock" in
-  let%bind () =
+  let%bind.Deferred () =
     (* we may not wish to use a lockfile, in order to start multiple processes
        from the same executable
     *)
-    if allow_multiple_instances then Deferred.Or_error.return ()
-    else
-      Deferred.map ~f:Or_error.return
-      @@ maybe_kill_and_unlock name lock_path logger
+    if allow_multiple_instances then Deferred.return ()
+    else maybe_kill_and_unlock name lock_path logger
   in
   [%log debug] "Starting custom child process $name with args $args"
     ~metadata:
@@ -249,6 +252,7 @@ let start_custom :
       Deferred.map ~f:Or_error.return
       @@ Async.Writer.save lock_path
            ~contents:(Pid.to_string @@ Process.pid process)
+           ~fsync:true
   in
   let terminated_ivar = Ivar.create () in
   let stdout_pipe = reader_to_strict_pipe (Process.stdout process) stdout in
@@ -332,7 +336,7 @@ let%test_module _ =
 
     let async_with_temp_dir f =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          File_system.with_temp_dir
+          Mina_stdlib_unix.File_system.with_temp_dir
             (Filename.temp_dir_name ^/ "child-processes")
             ~f )
 
@@ -342,20 +346,43 @@ let%test_module _ =
 
     let process_wait_timeout = Time.Span.of_sec 2.1
 
+    let expected_lines = 10
+
+    let stdout_lines_correct_til_eof ~pipe =
+      let counter = ref 0 in
+      let%map () =
+        Strict_pipe.Reader.iter pipe ~f:(fun line ->
+            [%test_eq: string] line "hello" ;
+            incr counter ;
+            Deferred.unit )
+      in
+      [%test_eq: int] !counter expected_lines
+
+    let stdout_lines_correct_prefix ~pipe =
+      let%map result =
+        Strict_pipe.Reader.fold_until ~init:0 pipe ~f:(fun counter line ->
+            [%test_eq: string] line "hello" ;
+            let counter = succ counter in
+            Deferred.return
+            @@ if counter = expected_lines then `Stop () else `Continue counter )
+      in
+      match result with
+      | `Eof actual_lines ->
+          failwithf "Early EOF: expected %d line got %d" expected_lines
+            actual_lines ()
+      | `Terminated () ->
+          ()
+
     let%test_unit "can launch and get stdout" =
       async_with_temp_dir (fun conf_dir ->
           let open Deferred.Let_syntax in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:[ "exit" ] ~stdout:`Chunks ~stderr:`Chunks
+              ~args:[ "exit" ] ~stdout:`Lines ~stderr:`Chunks
               ~termination:`Raise_on_failure ()
             |> Deferred.map ~f:Or_error.ok_exn
           in
-          let%bind () =
-            Strict_pipe.Reader.iter (stdout process) ~f:(fun line ->
-                [%test_eq: string] "hello\n" line ;
-                Deferred.unit )
-          in
+          let%bind () = stdout_lines_correct_til_eof ~pipe:(stdout process) in
           (* Pipe will be closed before the ivar is filled, so we need to wait a
              bit. *)
           let%bind () = after process_wait_timeout in
@@ -378,23 +405,15 @@ let%test_module _ =
               ~f:(function `Yes -> true | _ -> false)
           in
           let assert_lock_exists () =
-            Deferred.map (lock_exists ()) ~f:(fun exists -> assert exists)
+            let%map exists = lock_exists () in
+            assert exists
           in
           let assert_lock_does_not_exist () =
-            Deferred.map (lock_exists ()) ~f:(fun exists -> assert (not exists))
+            let%map exists = lock_exists () in
+            assert (not exists)
           in
           let%bind () = assert_lock_exists () in
-          let output = ref [] in
-          let rec go () =
-            match%bind Strict_pipe.Reader.read (stdout process) with
-            | `Eof ->
-                failwith "pipe closed when process should've run forever"
-            | `Ok line ->
-                output := line :: !output ;
-                if List.length !output = 10 then Deferred.unit else go ()
-          in
-          let%bind () = go () in
-          [%test_eq: string list] !output (List.init 10 ~f:(fun _ -> "hello")) ;
+          let%bind () = stdout_lines_correct_prefix ~pipe:(stdout process) in
           let%bind () = after process_wait_timeout in
           assert (Option.is_none @@ termination_status process) ;
           let%bind kill_res = kill process in
@@ -436,17 +455,12 @@ let%test_module _ =
           let%bind () = Async.Writer.save lock_path ~contents:"123" in
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
-              ~args:[ "exit" ] ~stdout:`Chunks ~stderr:`Chunks
+              ~args:[ "exit" ] ~stdout:`Lines ~stderr:`Chunks
               ~termination:`Raise_on_failure ()
             |> Deferred.map ~f:Or_error.ok_exn
           in
-          let%bind () =
-            Strict_pipe.Reader.iter (stdout process) ~f:(fun line ->
-                [%test_eq: string] "hello\n" line ;
-                Deferred.unit )
-          in
-          let%bind () = after process_wait_timeout in
+          let%bind () = stdout_lines_correct_til_eof ~pipe:(stdout process) in
+          let%map () = after process_wait_timeout in
           [%test_eq: Unix.Exit_or_signal.t Or_error.t option] (Some (Ok (Ok ())))
-            (termination_status process) ;
-          Deferred.unit )
+            (termination_status process) )
   end )

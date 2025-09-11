@@ -33,13 +33,13 @@ val run :
            , State_hash.t )
            Cached.t
          * Mina_net2.Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list )
        Strict_pipe.Reader.t
   -> catchup_breadcrumbs_writer:
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Mina_net2.Validation_callback.t option )
-         Rose_tree.t
+         Mina_stdlib.Rose_tree.t
          list
          * [ `Ledger_catchup of unit Ivar.t | `Catchup_scheduler ]
        , Strict_pipe.crash Strict_pipe.buffered

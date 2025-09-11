@@ -10,7 +10,7 @@
   ;; local libraries
   mina_base
   genesis_constants
-  bounded_types)
+  mina_stdlib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

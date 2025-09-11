@@ -2,7 +2,7 @@ open Core
 open Async
 module Timeout = Timeout_lib.Core_time
 
-let run_cmd dir prog args ?env () =
+let create_process_exn dir prog args ?env () =
   let envs =
     match env with
     | Some (`Extend list) ->
@@ -17,7 +17,9 @@ let run_cmd dir prog args ?env () =
       ; ("envs", `List envs)
       ] ;
   Process.create_exn ~working_dir:dir ~prog ~args ?env ()
-  >>= Process.collect_output_and_wait
+
+let run_cmd dir prog args ?env () =
+  create_process_exn dir prog args ?env () >>= Process.collect_output_and_wait
 
 let check_cmd_output ~prog ~args output =
   let open Process.Output in

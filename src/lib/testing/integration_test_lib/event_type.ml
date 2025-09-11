@@ -635,7 +635,7 @@ let parse_error_log (message : Logger.Message.t) =
   | _ ->
       failwith
         "Log_error.parse should always be a `From_error_log variant, but was \
-         mis-programmed as something else. this is a progammer error"
+         mis-programmed as something else. this is a programmer error"
 
 let parse_daemon_event (message : Logger.Message.t) =
   let open Or_error.Let_syntax in
@@ -654,7 +654,7 @@ let parse_daemon_event (message : Logger.Message.t) =
           failwith
             "the 'parse' field of a daemon event should always be a \
              `From_daemon_log variant, but was mis-programmed as something \
-             else. this is a progammer error" )
+             else. this is a programmer error" )
   | None ->
       (* TODO: check log level to ensure it matches error log level *)
       parse_error_log message
@@ -675,7 +675,7 @@ let parse_puppeteer_event (message : Puppeteer_message.t) =
           failwith
             "the 'parse' field of a puppeteer event should always be a \
              `From_puppeteer_log variant, but was mis-programmed as something \
-             else. this is a progammer error" )
+             else. this is a programmer error" )
   | None ->
       failwith
         (Printf.sprintf

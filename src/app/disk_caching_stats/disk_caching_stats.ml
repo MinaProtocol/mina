@@ -297,8 +297,9 @@ module Values (S : Sample) = struct
     Mina_base.User_command.Signed_command (signed_command' ())
 
   let zkapp_account_update () : Mina_base.Account_update.t =
-    { body =
-        { public_key = public_key ()
+    Mina_base.Account_update.with_aux
+      ~body:
+        { Mina_base.Account_update.Body.public_key = public_key ()
         ; token_id = token_id ()
         ; update =
             { app_state =
@@ -325,23 +326,23 @@ module Values (S : Sample) = struct
         ; may_use_token = No
         ; authorization_kind = Proof (field ())
         }
-    ; authorization = Proof side_loaded_proof
-    }
+      ~authorization:(Mina_base.Control.Poly.Proof side_loaded_proof)
 
   let zkapp_command' () : Mina_base.Zkapp_command.t =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { fee_payer =
-        { body =
+        Mina_base.Account_update.Fee_payer.make
+          ~body:
             { public_key = public_key ()
             ; fee = fee ()
             ; valid_until = Some (global_slot_since_genesis ())
             ; nonce = account_nonce ()
             }
-        ; authorization = (field (), private_key ())
-        }
+          ~authorization:(field (), private_key ())
     ; account_updates =
         List.init Params.max_zkapp_txn_account_updates ~f:(Fn.const ())
         |> List.fold_left ~init:[] ~f:(fun acc () ->
-               Mina_base.Zkapp_command.Call_forest.cons
+               Mina_base.Zkapp_command.Call_forest.cons ~signature_kind
                  (zkapp_account_update ()) acc )
     ; memo = signed_command_memo ()
     }
@@ -718,7 +719,8 @@ let () =
     Snark_profiler_lib.create_ledger_and_zkapps
       ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
       ~genesis_constants ~constraint_constants ~min_num_updates:num_updates
-      ~num_proof_updates:num_updates ~max_num_updates:num_updates ()
+      ~num_proof_updates:num_updates ~max_num_updates:num_updates
+      ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
   in
   let%map.Async_kernel.Deferred vk =
     let `VK vk, `Prover _ =

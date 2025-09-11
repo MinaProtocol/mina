@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#set -x
+set -x
 
 # Exit script when commands fail
 set -e
@@ -9,11 +9,12 @@ trap "killall background" EXIT
 # ================================================
 # Constants
 
-MINA_EXE=_build/default/src/app/cli/src/mina.exe
-ARCHIVE_EXE=_build/default/src/app/archive/archive.exe
-LOGPROC_EXE=_build/default/src/app/logproc/logproc.exe
-ZKAPP_EXE=_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe
+MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
+ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
+LOGPROC_EXE=${LOGPROC_EXE:-_build/default/src/app/logproc/logproc.exe}
+ZKAPP_EXE=${ZKAPP_EXE:-_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe}
 
+export MINA_BP_PRIVKEY=
 export MINA_PRIVKEY_PASS='naughty blue worm'
 export MINA_LIBP2P_PASS="${MINA_PRIVKEY_PASS}"
 SEED_PEER_KEY="CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
@@ -54,6 +55,7 @@ PG_PASSWD=""
 PG_DB="archive"
 
 ARCHIVE_ADDRESS_CLI_ARG=""
+DEMO_MODE=false
 
 # ================================================
 # Globals (assigned during execution of script)
@@ -118,8 +120,8 @@ help() {
   echo "                                         |   Default: ${TRANSACTION_FREQUENCY}"
   echo "-sf  |--snark-worker-fee <#>             | SNARK Worker fee"
   echo "                                         |   Default: ${SNARK_WORKER_FEE}"
-  echo "-lp  |--log-precomputed-blocks     		 | Log precomputed blocks"
-  echo "                                  		 |   Default: ${LOG_PRECOMPUTED_BLOCKS}"
+  echo "-lp  |--log-precomputed-blocks           | Log precomputed blocks"
+  echo "                                         |   Default: ${LOG_PRECOMPUTED_BLOCKS}"
   echo "-pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)"
   echo "                                         |   Default: ${PROOF_LEVEL}"
   echo "-r   |--reset                            | Whether to reset the Mina Local Network storage file-system (presence of argument)"
@@ -128,6 +130,8 @@ help() {
   echo "                                         |   Default: ${UPDATE_GENESIS_TIMESTAMP}"
   echo "-st  |--override-slot-time <milliseconds>| Override the slot time for block production"
   echo "                                         |   Default: value from executable"
+  echo "-d   |--demo                             | Whether to run the demo (presence of argument). Demo mode is used to run the single node which is already bootstrapped and synced with the network."
+  echo "                                         |   Default: false"
   echo "-h   |--help                             | Displays this help message"
 
   printf "\n"
@@ -142,16 +146,16 @@ help() {
 }
 
 clean-dir() {
-  rm -rf ${1}
-  mkdir -p ${1}
+  rm -rf "${1}"
+  mkdir -p "${1}"
 }
 
 generate-keypair() {
-  ${MINA_EXE} advanced generate-keypair -privkey-path ${1}
+  ${MINA_EXE} advanced generate-keypair -privkey-path "${1}"
 }
 
 generate-libp2p-keypair() {
-  ${MINA_EXE} libp2p generate-keypair -privkey-path ${1}
+  ${MINA_EXE} libp2p generate-keypair -privkey-path "${1}"
 }
 
 # Executes the Mina Daemon, exposing all 5 ports in
@@ -160,23 +164,28 @@ exec-daemon() {
   BASE_PORT=${1}
   shift
   CLIENT_PORT=${BASE_PORT}
+  # shellcheck disable=SC2004
   REST_PORT=$((${BASE_PORT} + 1))
+  # shellcheck disable=SC2004
   EXTERNAL_PORT=$((${BASE_PORT} + 2))
+  # shellcheck disable=SC2004
   DAEMON_METRICS_PORT=$((${BASE_PORT} + 3))
+  # shellcheck disable=SC2004
   LIBP2P_METRICS_PORT=$((${BASE_PORT} + 4))
 
+  # shellcheck disable=SC2068
   exec ${MINA_EXE} daemon \
-    -client-port ${CLIENT_PORT} \
+    -client-port "${CLIENT_PORT}" \
     -rest-port ${REST_PORT} \
     -insecure-rest-server \
     -external-port ${EXTERNAL_PORT} \
     -metrics-port ${DAEMON_METRICS_PORT} \
     -libp2p-metrics-port ${LIBP2P_METRICS_PORT} \
-    -config-file ${CONFIG} \
+    -config-file "${CONFIG}" \
     -log-json \
-    -log-level ${LOG_LEVEL} \
-    -file-log-level ${FILE_LOG_LEVEL} \
-    -precomputed-blocks-file ${FOLDER}/precomputed_blocks.log \
+    -log-level "${LOG_LEVEL}" \
+    -file-log-level "${FILE_LOG_LEVEL}" \
+    -precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
     -log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
     $@
 }
@@ -188,20 +197,22 @@ exec-worker-daemon() {
   SHUTDOWN_ON_DISCONNECT="false"
   COORDINATOR_HOST_AND_PORT="localhost:${COORDINATOR_PORT}"
 
+  # shellcheck disable=SC2068
   exec ${MINA_EXE} internal snark-worker \
-    -proof-level ${PROOF_LEVEL} \
-    -shutdown-on-disconnect ${SHUTDOWN_ON_DISCONNECT} \
-    -daemon-address ${COORDINATOR_HOST_AND_PORT} \
+    -proof-level "${PROOF_LEVEL}" \
+    -shutdown-on-disconnect "${SHUTDOWN_ON_DISCONNECT}" \
+    -daemon-address "${COORDINATOR_HOST_AND_PORT}" \
     $@
 }
 
 # Executes the Archive node
 exec-archive-node() {
+  # shellcheck disable=SC2068
   exec ${ARCHIVE_EXE} run \
-    --config-file ${CONFIG} \
-    --log-level ${LOG_LEVEL} \
-    --postgres-uri postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} \
-    --server-port ${ARCHIVE_SERVER_PORT} \
+    --config-file "${CONFIG}" \
+    --log-level "${LOG_LEVEL}" \
+    --postgres-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
+    --server-port "${ARCHIVE_SERVER_PORT}" \
     $@
 }
 
@@ -209,21 +220,24 @@ exec-archive-node() {
 spawn-node() {
   FOLDER=${1}
   shift
-  exec-daemon $@ -config-directory ${FOLDER} &>${FOLDER}/log.txt &
+  # shellcheck disable=SC2068
+  exec-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
 }
 
 # Spawns worker in background
 spawn-worker() {
   FOLDER=${1}
   shift
-  exec-worker-daemon $@ -config-directory ${FOLDER} &>${FOLDER}/log.txt &
+  # shellcheck disable=SC2068
+  exec-worker-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
 }
 
 # Spawns the Archive Node in background
 spawn-archive-node() {
   FOLDER=${1}
   shift
-  exec-archive-node $@ &>${FOLDER}/log.txt &
+  # shellcheck disable=SC2068
+  exec-archive-node $@ &>"${FOLDER}"/log.txt &
 }
 
 # Resets genesis ledger
@@ -234,21 +248,21 @@ reset-genesis-ledger() {
   printf "\n"
 
   jq "{genesis: {genesis_state_timestamp:\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"}, ledger:.}" \
-    <${GENESIS_LEDGER_FOLDER}/genesis_ledger.json \
-    >${DAEMON_CONFIG}
+    <"${GENESIS_LEDGER_FOLDER}"/genesis_ledger.json \
+    >"${DAEMON_CONFIG}"
 }
 
 recreate-schema() {
   echo "Recreating database '${PG_DB}'..."
 
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "DROP DATABASE IF EXISTS ${PG_DB};"
+  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "DROP DATABASE IF EXISTS ${PG_DB};"
 
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT} -c "CREATE DATABASE ${PG_DB};"
+  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}" -c "CREATE DATABASE ${PG_DB};"
 
   # We need to change our working directory as script has relation to others subscripts
   # and calling them from local folder
   cd ./src/app/archive
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} < create_schema.sql
+  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" < create_schema.sql
   cd ../../../
 
   echo "Schema '${PG_DB}' created successfully."
@@ -356,6 +370,7 @@ while [[ "$#" -gt 0 ]]; do
       OVERRIDE_SLOT_TIME_MS="${2}"
       shift
       ;;
+  -d | --demo) DEMO_MODE=true ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -400,7 +415,7 @@ if ${ARCHIVE}; then
     recreate-schema
   fi
 
-  psql postgresql://${PG_USER}:${PG_PASSWD}@${PG_HOST}:${PG_PORT}/${PG_DB} -c "SELECT * FROM user_commands;" &>/dev/null
+  psql postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" -c "SELECT * FROM user_commands;" &>/dev/null
 
   ARCHIVE_ADDRESS_CLI_ARG="-archive-address ${ARCHIVE_SERVER_PORT}"
 fi
@@ -431,6 +446,131 @@ if ${ZKAPP_TRANSACTIONS}; then
   fi
 fi
 
+# ================================================
+# Create the Genesis Ledger
+
+if ${DEMO_MODE}; then
+  LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-demo"
+else
+  LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
+fi
+
+if ${RESET}; then
+  rm -rf "${LEDGER_FOLDER}"
+  if ${ARCHIVE}; then
+    recreate-schema
+  fi
+fi
+
+if [ ! -d "${LEDGER_FOLDER}" ]; then
+  echo "Making the Ledger..."
+  printf "\n"
+
+  mkdir -p "${LEDGER_FOLDER}"
+
+  clean-dir "${LEDGER_FOLDER}"/offline_whale_keys
+  clean-dir "${LEDGER_FOLDER}"/offline_fish_keys
+  clean-dir "${LEDGER_FOLDER}"/online_whale_keys
+  clean-dir "${LEDGER_FOLDER}"/online_fish_keys
+  clean-dir "${LEDGER_FOLDER}"/snark_coordinator_keys
+  clean-dir "${LEDGER_FOLDER}"/service-keys
+  clean-dir "${LEDGER_FOLDER}"/libp2p_keys
+  clean-dir "${LEDGER_FOLDER}"/zkapp_keys
+
+  if ${ZKAPP_TRANSACTIONS}; then
+    generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
+  fi
+
+  generate-keypair "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account
+  # shellcheck disable=SC2004
+  for ((i = 0; i < ${FISH}; i++)); do
+    generate-keypair "${LEDGER_FOLDER}"/offline_fish_keys/offline_fish_account_${i}
+    generate-keypair "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_${i}
+    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i}
+  done
+  # shellcheck disable=SC2004
+  for ((i = 0; i < ${WHALES}; i++)); do
+    generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
+    generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
+    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i}
+  done
+  # shellcheck disable=SC2004
+  for ((i = 0; i < ${NODES}; i++)); do
+    generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
+    generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
+    generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i}
+  done
+
+  if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
+    # shellcheck disable=SC2012
+    FILE=$(ls "${LEDGER_FOLDER}"/offline_fish_keys/ | head -n 1)
+    OWNER=$(stat -c "%U" "${LEDGER_FOLDER}"/offline_fish_keys/"${FILE}")
+
+    if [ "${FILE}" != "${OWNER}" ]; then
+      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/zkapp_keys
+      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_fish_keys
+      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_fish_keys
+      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_whale_keys
+      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_whale_keys
+      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/snark_coordinator_keys
+      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/service-keys
+      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/libp2p_keys
+    fi
+  fi
+
+  chmod -R 0700 "${LEDGER_FOLDER}"/zkapp_keys
+  chmod -R 0700 "${LEDGER_FOLDER}"/offline_fish_keys
+  chmod -R 0700 "${LEDGER_FOLDER}"/online_fish_keys
+  chmod -R 0700 "${LEDGER_FOLDER}"/offline_whale_keys
+  chmod -R 0700 "${LEDGER_FOLDER}"/online_whale_keys
+  chmod -R 0700 "${LEDGER_FOLDER}"/snark_coordinator_keys
+  chmod -R 0700 "${LEDGER_FOLDER}"/service-keys
+  chmod -R 0700 "${LEDGER_FOLDER}"/libp2p_keys
+
+  python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
+    --num-whale-accounts "${WHALES}" \
+    --num-fish-accounts "${FISH}" \
+    --offline-whale-accounts-directory "${LEDGER_FOLDER}"/offline_whale_keys \
+    --offline-fish-accounts-directory "${LEDGER_FOLDER}"/offline_fish_keys \
+    --online-whale-accounts-directory "${LEDGER_FOLDER}"/online_whale_keys \
+    --online-fish-accounts-directory "${LEDGER_FOLDER}"/online_fish_keys \
+    --snark-coordinator-accounts-directory "${LEDGER_FOLDER}"/snark_coordinator_keys
+
+  mv -f scripts/mina-local-network/genesis_ledger.json "${LEDGER_FOLDER}"/genesis_ledger.json
+
+  printf "\n"
+  echo "================================"
+  printf "\n"
+fi
+
+SNARK_COORDINATOR_PUBKEY=$(cat "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account.pub)
+
+
+# ================================================
+# Check the demo mode
+
+if ${DEMO_MODE}; then
+  echo "Demo mode requires no Whale nodes, no Fish nodes and no non block-producing nodes!"
+  echo "Resetting the values to 0."
+
+  # Set the default values for demo mode
+  SNARK_WORKERS_COUNT=0
+  WHALES=0
+  FISH=0
+  NODES=0
+
+  if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
+    echo "Demo mode does not support transactions!"
+    printf "\n"
+
+    exit 1
+  fi
+
+fi
+
+# ================================================
+# Print the configuration summary
+
 echo "Starting the Network with:"
 echo -e "\t1 seed"
 echo -e "\t1 snark coordinator"
@@ -449,96 +589,6 @@ printf "\n"
 echo "================================"
 printf "\n"
 
-# ================================================
-# Create the Genesis Ledger
-
-LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
-
-if ${RESET}; then
-  rm -rf ${LEDGER_FOLDER}
-  if ${ARCHIVE}; then
-    recreate-schema
-  fi
-fi
-
-if [ ! -d "${LEDGER_FOLDER}" ]; then
-  echo "Making the Ledger..."
-  printf "\n"
-
-  mkdir -p ${LEDGER_FOLDER}
-
-  clean-dir ${LEDGER_FOLDER}/offline_whale_keys
-  clean-dir ${LEDGER_FOLDER}/offline_fish_keys
-  clean-dir ${LEDGER_FOLDER}/online_whale_keys
-  clean-dir ${LEDGER_FOLDER}/online_fish_keys
-  clean-dir ${LEDGER_FOLDER}/snark_coordinator_keys
-  clean-dir ${LEDGER_FOLDER}/service-keys
-  clean-dir ${LEDGER_FOLDER}/libp2p_keys
-  clean-dir ${LEDGER_FOLDER}/zkapp_keys
-
-  if ${ZKAPP_TRANSACTIONS}; then
-    generate-keypair ${LEDGER_FOLDER}/zkapp_keys/zkapp_account
-  fi
-
-  generate-keypair ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account
-  for ((i = 0; i < ${FISH}; i++)); do
-    generate-keypair ${LEDGER_FOLDER}/offline_fish_keys/offline_fish_account_${i}
-    generate-keypair ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
-    generate-libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/fish_${i}
-  done
-  for ((i = 0; i < ${WHALES}; i++)); do
-    generate-keypair ${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_${i}
-    generate-keypair ${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/whale_${i}
-  done
-  for ((i = 0; i < ${NODES}; i++)); do
-    generate-keypair ${LEDGER_FOLDER}/offline_whale_keys/offline_whale_account_${i}
-    generate-keypair ${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
-    generate-libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/node_${i}
-  done
-
-  if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
-    FILE=$(ls ${LEDGER_FOLDER}/offline_fish_keys/ | head -n 1)
-    OWNER=$(stat -c "%U" ${LEDGER_FOLDER}/offline_fish_keys/${FILE})
-
-    if [ "${FILE}" != "${USER}" ]; then
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/zkapp_keys
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/offline_fish_keys
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/online_fish_keys
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/offline_whale_keys
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/online_whale_keys
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/snark_coordinator_keys
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/service-keys
-      sudo chown -R ${USER} ${LEDGER_FOLDER}/libp2p_keys
-    fi
-  fi
-
-  chmod -R 0700 ${LEDGER_FOLDER}/zkapp_keys
-  chmod -R 0700 ${LEDGER_FOLDER}/offline_fish_keys
-  chmod -R 0700 ${LEDGER_FOLDER}/online_fish_keys
-  chmod -R 0700 ${LEDGER_FOLDER}/offline_whale_keys
-  chmod -R 0700 ${LEDGER_FOLDER}/online_whale_keys
-  chmod -R 0700 ${LEDGER_FOLDER}/snark_coordinator_keys
-  chmod -R 0700 ${LEDGER_FOLDER}/service-keys
-  chmod -R 0700 ${LEDGER_FOLDER}/libp2p_keys
-
-  python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
-    --num-whale-accounts ${WHALES} \
-    --num-fish-accounts ${FISH} \
-    --offline-whale-accounts-directory ${LEDGER_FOLDER}/offline_whale_keys \
-    --offline-fish-accounts-directory ${LEDGER_FOLDER}/offline_fish_keys \
-    --online-whale-accounts-directory ${LEDGER_FOLDER}/online_whale_keys \
-    --online-fish-accounts-directory ${LEDGER_FOLDER}/online_fish_keys \
-    --snark-coordinator-accounts-directory ${LEDGER_FOLDER}/snark_coordinator_keys
-
-  mv -f scripts/mina-local-network/genesis_ledger.json ${LEDGER_FOLDER}/genesis_ledger.json
-
-  printf "\n"
-  echo "================================"
-  printf "\n"
-fi
-
-SNARK_COORDINATOR_PUBKEY=$(cat ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account.pub)
 
 # ================================================
 # Update the Genesis State Timestamp or Reset the Genesis Ledger
@@ -546,7 +596,7 @@ SNARK_COORDINATOR_PUBKEY=$(cat ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coo
 CONFIG=${LEDGER_FOLDER}/daemon.json
 
 if ${RESET}; then
-  reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
+  reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
 fi
 
 if ${UPDATE_GENESIS_TIMESTAMP}; then
@@ -555,9 +605,9 @@ if ${UPDATE_GENESIS_TIMESTAMP}; then
     printf "\n"
 
     tmp=$(mktemp)
-    jq ".genesis.genesis_state_timestamp=\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"" ${CONFIG} >"$tmp" && mv -f "$tmp" ${CONFIG}
+    jq ".genesis.genesis_state_timestamp=\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"" "${CONFIG}" >"$tmp" && mv -f "$tmp" "${CONFIG}"
   else
-    reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
+    reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
   fi
 fi
 
@@ -565,12 +615,12 @@ if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
   echo 'Modifying configuration to override slot time'
   
   if [ ! -f "${CONFIG}" ]; then
-    reset-genesis-ledger ${LEDGER_FOLDER} ${CONFIG}
+    reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
   fi
   
   printf "\n"
   tmp=$(mktemp)
-  jq ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" ${CONFIG} >"$tmp" && mv -f "$tmp" ${CONFIG}
+  jq ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}" >"$tmp" && mv -f "$tmp" "${CONFIG}"
 fi
 
 # ================================================
@@ -578,14 +628,17 @@ fi
 
 NODES_FOLDER=${LEDGER_FOLDER}/nodes
 mkdir -p ${NODES_FOLDER}/seed
-mkdir -p ${NODES_FOLDER}/snark_coordinator
-mkdir -p ${NODES_FOLDER}/snark_workers
+
+if ! ${DEMO_MODE}; then
+  mkdir -p "${NODES_FOLDER}"/snark_coordinator
+  mkdir -p "${NODES_FOLDER}"/snark_workers
+fi
 
 if ${RESET}; then
-  clean-dir ${NODES_FOLDER}
-  mkdir -p ${NODES_FOLDER}/seed
-  mkdir -p ${NODES_FOLDER}/snark_coordinator
-  mkdir -p ${NODES_FOLDER}/snark_workers
+  clean-dir "${NODES_FOLDER}"
+  mkdir -p "${NODES_FOLDER}"/seed
+  mkdir -p "${NODES_FOLDER}"/snark_coordinator
+  mkdir -p "${NODES_FOLDER}"/snark_workers
 fi
 
 # ----------
@@ -594,75 +647,103 @@ if ${ARCHIVE}; then
   echo 'Starting the Archive Node...'
   printf "\n"
 
-  mkdir -p ${NODES_FOLDER}/archive
+  mkdir -p "${NODES_FOLDER}"/archive
 
-  spawn-archive-node ${NODES_FOLDER}/archive
+  spawn-archive-node "${NODES_FOLDER}"/archive
   ARCHIVE_PID=$!
 fi
 
 # ----------
 
-spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} -seed -libp2p-keypair ${SEED_PEER_KEY} ${ARCHIVE_ADDRESS_CLI_ARG}
+if ${DEMO_MODE}; then
+  echo "Running in demo mode, only seed node is going to be started."
+  printf "\n"
+
+  spawn-node ${NODES_FOLDER}/seed ${SEED_START_PORT} \
+    -block-producer-key ${LEDGER_FOLDER}/online_whale_keys/online_whale_account_0 \
+    --run-snark-worker "$(cat ${LEDGER_FOLDER}/snark_coordinator_keys/snark_coordinator_account.pub)" \
+    --snark-worker-fee 0.001 \
+    --proof-level ${PROOF_LEVEL} \
+    --demo-mode \
+    --external-ip "$(hostname -i)" \
+    --seed \
+    ${ARCHIVE_ADDRESS_CLI_ARG}
+
+else 
+  spawn-node "${NODES_FOLDER}"/seed "${SEED_START_PORT}" -seed -libp2p-keypair ${SEED_PEER_KEY} "${ARCHIVE_ADDRESS_CLI_ARG}"
+fi
+
 SEED_PID=$!
 
 echo 'Waiting for seed to go up...'
 printf "\n"
 
-until ${MINA_EXE} client status -daemon-port ${SEED_START_PORT} &>/dev/null; do
+until ${MINA_EXE} client status -daemon-port "${SEED_START_PORT}" &>/dev/null; do
   sleep 1
 done
 
 #---------- Starting snark coordinator
 
-SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
-spawn-node ${NODES_FOLDER}/snark_coordinator ${SNARK_COORDINATOR_PORT} -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
-SNARK_COORDINATOR_PID=$!
+if [ "${SNARK_WORKERS_COUNT}" -eq "0" ]; then
+  echo "Skipping snark coordinator because SNARK_WORKERS_COUNT is 0"
+  SNARK_COORDINATOR_PID=""
 
-echo 'Waiting for snark coordinator to go up...'
-printf "\n"
+else
 
-until ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT} &>/dev/null; do
-  sleep 1
-done
+  SNARK_COORDINATOR_FLAGS="-snark-worker-fee ${SNARK_WORKER_FEE} -run-snark-coordinator ${SNARK_COORDINATOR_PUBKEY} -work-selection seq"
+  spawn-node "${NODES_FOLDER}"/snark_coordinator "${SNARK_COORDINATOR_PORT}" -peer ${SEED_PEER_ID} -libp2p-keypair ${SNARK_COORDINATOR_PEER_KEY} ${SNARK_COORDINATOR_FLAGS}
+  SNARK_COORDINATOR_PID=$!
+
+  echo 'Waiting for snark coordinator to go up...'
+  printf "\n"
+
+  until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
+    sleep 1
+  done
+fi
 
 #---------- Starting snark workers
 
+# shellcheck disable=SC2004
 for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
   FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
-  mkdir -p ${FOLDER}
-  spawn-worker ${FOLDER} ${SNARK_COORDINATOR_PORT}
+  mkdir -p "${FOLDER}"
+  spawn-worker "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
   SNARK_WORKERS_PIDS[${i}]=$!
 done
 
 # ----------
 
+# shellcheck disable=SC2004
 for ((i = 0; i < ${WHALES}; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
-  mkdir -p ${FOLDER}
-  spawn-node ${FOLDER} $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
-    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/whale_${i} ${ARCHIVE_ADDRESS_CLI_ARG}
+  mkdir -p "${FOLDER}"
+  spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
+    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
 done
 
 # ----------
 
+# shellcheck disable=SC2004
 for ((i = 0; i < ${FISH}; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
-  mkdir -p ${FOLDER}
-  spawn-node ${FOLDER} $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
-    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/fish_${i} ${ARCHIVE_ADDRESS_CLI_ARG}
+  mkdir -p "${FOLDER}"
+  spawn-node "${FOLDER}" $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
+    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   FISH_PIDS[${i}]=$!
 done
 
 # ----------
 
+# shellcheck disable=SC2004
 for ((i = 0; i < ${NODES}; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
-  mkdir -p ${FOLDER}
-  spawn-node ${FOLDER} $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
-    -libp2p-keypair ${LEDGER_FOLDER}/libp2p_keys/node_${i} ${ARCHIVE_ADDRESS_CLI_ARG}
+  mkdir -p "${FOLDER}"
+  spawn-node "${FOLDER}" $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
+    -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
 
@@ -678,14 +759,15 @@ echo -e "\t\t  pid ${SEED_PID}"
 echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}"
 echo -e "\t\t  logs: cat ${NODES_FOLDER}/seed/log.txt | ${LOGPROC_EXE}"
 
-echo -e "\tSnark Coordinator:"
-echo -e "\t\tInstance #0:"
-echo -e "\t\t  pid ${SNARK_COORDINATOR_PID}"
-echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}"
-echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_EXE}"
-
 if [ "${SNARK_WORKERS_COUNT}" -gt "0" ]; then
+  echo -e "\tSnark Coordinator:"
+  echo -e "\t\tInstance #0:"
+  echo -e "\t\t  pid ${SNARK_COORDINATOR_PID}"
+  echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}"
+  echo -e "\t\t  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_EXE}"
+
   echo -e "\tSnark Workers:"
+  # shellcheck disable=SC2004
   for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${SNARK_WORKERS_PIDS[${i}]}"
@@ -703,9 +785,11 @@ fi
 
 if [ "${WHALES}" -gt "0" ]; then
   echo -e "\tWhales:"
+  # shellcheck disable=SC2004
   for ((i = 0; i < ${WHALES}; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${WHALE_PIDS[${i}]}"
+    # shellcheck disable=SC2004
     echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port $((${WHALE_START_PORT} + (${i} * 5)))"
     echo -e "\t\t  logs: cat ${NODES_FOLDER}/whale_${i}/log.txt | ${LOGPROC_EXE}"
   done
@@ -713,9 +797,11 @@ fi
 
 if [ "${FISH}" -gt "0" ]; then
   echo -e "\tFish:"
+  # shellcheck disable=SC2004
   for ((i = 0; i < ${FISH}; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${FISH_PIDS[${i}]}"
+    # shellcheck disable=SC2004
     echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port $((${FISH_START_PORT} + (${i} * 5)))"
     echo -e "\t\t  logs: cat ${NODES_FOLDER}/fish_${i}/log.txt | ${LOGPROC_EXE}"
   done
@@ -726,6 +812,7 @@ if [ "${NODES}" -gt "0" ]; then
   for ((i = 0; i < ${NODES}; i++)); do
     echo -e "\t\tInstance #${i}:"
     echo -e "\t\t  pid ${NODE_PIDS[${i}]}"
+    # shellcheck disable=SC2004
     echo -e "\t\t  status: ${MINA_EXE} client status -daemon-port $((${NODE_START_PORT} + (${i} * 5)))"
     echo -e "\t\t  logs: cat ${NODES_FOLDER}/node_${i}/log.txt | ${LOGPROC_EXE}"
   done
@@ -744,13 +831,13 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   ZKAPP_ACCOUNT_PUB_KEY=$(cat ${LEDGER_FOLDER}/zkapp_keys/zkapp_account.pub)
 
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
-  PUB_KEY=$(cat ${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0.pub)
+  PUB_KEY=$(cat "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_0.pub)
   REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
 
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
 
-  until ${MINA_EXE} client status -daemon-port ${FISH_START_PORT} &>/dev/null; do
+  until ${MINA_EXE} client status -daemon-port "${FISH_START_PORT}" &>/dev/null; do
     sleep 1
   done
 
@@ -763,7 +850,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
   while [ $SYNCED -eq 0 ]; do
     SYNC_STATUS=$(curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
-    SYNCED=$(echo ${SYNC_STATUS} | grep -c "SYNCED")
+    SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
     sleep 1
   done
 
@@ -774,16 +861,16 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
     echo "Set up zkapp account"
     printf "\n"
 
-    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key ${FEE_PAYER_KEY_FILE} --nonce 0 --sender-key ${SENDER_KEY_FILE} --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,7d)
+    QUERY=$(${ZKAPP_EXE} create-zkapp-account --fee-payer-key "${FEE_PAYER_KEY_FILE}" --nonce 0 --sender-key "${SENDER_KEY_FILE}" --sender-nonce 0 --receiver-amount 1000 --zkapp-account-key ${ZKAPP_ACCOUNT_KEY_FILE} --fee 5 | sed 1,7d)
     python3 scripts/mina-local-network/send-graphql-query.py ${REST_SERVER} "${QUERY}"
   fi
 
-  if ${VALUE_TRANSFER}; then
-    ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path ${KEY_FILE}
-    ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key ${PUB_KEY}
+  if ${VALUE_TRANSFERS}; then
+    ${MINA_EXE} account import -rest-server ${REST_SERVER} -privkey-path "${KEY_FILE}"
+    ${MINA_EXE} account unlock -rest-server ${REST_SERVER} -public-key "${PUB_KEY}"
 
-    sleep ${TRANSACTION_FREQUENCY}
-    ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+    sleep "${TRANSACTION_FREQUENCY}"
+    ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -nonce 0 -receiver "${PUB_KEY}" -sender "${PUB_KEY}"
   fi
 
   fee_payer_nonce=1
@@ -793,7 +880,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   while true; do
     sleep ${TRANSACTION_FREQUENCY}
 
-    if ${VALUE_TRANSFER}; then
+    if ${VALUE_TRANSFERS}; then
       ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
     fi
 
