@@ -291,12 +291,28 @@ module Hardfork_config : sig
     -> mina_lib
     -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
 
-  val epoch_ledgers :
+  (** The ledgers that will be used to compute the hard fork genesis ledgers.
+      Note that a [Mina_ledger.Ledger.t] here, like the [staged_ledger] or
+      (potentially) the [next_epoch_ledger], must have the [root_snarked_ledger]
+      as its root. *)
+  type genesis_source_ledgers =
+    { root_snarked_ledger : Mina_ledger.Ledger.Root.t
+    ; staged_ledger : Mina_ledger.Ledger.t
+    ; staking_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Mina_ledger.Ledger.Root.t ]
+    ; next_epoch_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Mina_ledger.Ledger.Root.t
+        | `Uncommitted of Mina_ledger.Ledger.t ]
+    }
+
+  (** Retrieve the [genesis_source_ledgers] from the transition frontier,
+      starting at the given [breadcrumb]. *)
+  val source_ledgers :
        breadcrumb:Transition_frontier.Breadcrumb.t
     -> mina_lib
-    -> ( Mina_ledger.Ledger.Any_ledger.witness
-       * Mina_ledger.Ledger.Any_ledger.witness )
-       Deferred.Or_error.t
+    -> genesis_source_ledgers Deferred.Or_error.t
 
   type inputs =
     { staged_ledger : Mina_ledger.Ledger.t

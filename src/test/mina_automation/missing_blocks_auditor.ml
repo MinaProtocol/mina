@@ -13,9 +13,9 @@ end
 
 module PathFinder = Executor.Make_PathFinder (Paths)
 
-let path =
+let path () =
   Deferred.map PathFinder.standalone_path ~f:(fun opt ->
       Option.value_exn opt
         ~message:
-          "Could not find standalone path. App is not executable outside the \
-           dune" )
+          "Could not find standalone path for missing block auditor. App is \
+           not executable outside the dune" )

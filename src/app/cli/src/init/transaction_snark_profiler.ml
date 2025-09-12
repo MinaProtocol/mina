@@ -4,15 +4,16 @@ open Snark_profiler_lib
 let name = "transaction-snark-profiler"
 
 let run ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
-    ~user_command_profiler ~zkapp_profiler num_transactions ~max_num_updates
-    ?min_num_updates repeats preeval use_zkapps : unit =
+    ~user_command_profiler ~zkapp_profiler ~max_num_updates ~signature_kind
+    ?min_num_updates num_transactions repeats preeval use_zkapps : unit =
   let logger = Logger.null () in
   let print n msg = printf !"[%i] %s\n%!" n msg in
   if use_zkapps then (
     let ledger, transactions =
       Async.Thread_safe.block_on_async_exn (fun () ->
           create_ledger_and_zkapps ~proof_cache_db ~genesis_constants
-            ~constraint_constants ?min_num_updates ~max_num_updates () )
+            ~constraint_constants ~signature_kind ?min_num_updates
+            ~max_num_updates () )
     in
     Parallel.init_master () ;
     let verifier =
@@ -33,7 +34,8 @@ let run ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
     go repeats )
   else
     let ledger, transactions =
-      create_ledger_and_transactions ~constraint_constants num_transactions
+      create_ledger_and_transactions ~constraint_constants ~signature_kind
+        num_transactions
     in
     let sparse_ledger =
       Mina_ledger.Sparse_ledger.of_ledger_subset_exn ledger
@@ -56,20 +58,22 @@ let run ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
     go repeats
 
 let dry ~genesis_constants ~constraint_constants ~proof_level ~max_num_updates
-    ~logger ?min_num_updates num_transactions repeats preeval use_zkapps () =
+    ~logger ~signature_kind ?min_num_updates num_transactions repeats preeval
+    use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't check base SNARKs on zkApps"
   in
   Test_util.with_randomness 123456789 (fun () ->
       run ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
-          (check_base_snarks ~genesis_constants ~constraint_constants ~logger)
-        ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
-        repeats preeval use_zkapps )
+          (check_base_snarks ~genesis_constants ~constraint_constants ~logger
+             ~signature_kind )
+        ~zkapp_profiler num_transactions ~max_num_updates ~signature_kind
+        ?min_num_updates repeats preeval use_zkapps )
 
 let witness ~genesis_constants ~constraint_constants ~proof_level
-    ~max_num_updates ~logger ?min_num_updates num_transactions repeats preeval
-    use_zkapps () =
+    ~max_num_updates ~logger ~signature_kind ?min_num_updates num_transactions
+    repeats preeval use_zkapps () =
   let zkapp_profiler ~verifier:_ _ _ =
     failwith "Can't generate witnesses for base SNARKs on zkApps"
   in
@@ -77,14 +81,14 @@ let witness ~genesis_constants ~constraint_constants ~proof_level
       run ~genesis_constants ~constraint_constants ~proof_level
         ~user_command_profiler:
           (generate_base_snarks_witness ~genesis_constants ~constraint_constants
-             ~logger )
-        ~zkapp_profiler num_transactions ~max_num_updates ?min_num_updates
-        repeats preeval use_zkapps )
+             ~logger ~signature_kind )
+        ~zkapp_profiler num_transactions ~max_num_updates ~signature_kind
+        ?min_num_updates repeats preeval use_zkapps )
 
 let main ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~proof_level ~max_num_updates ~logger ?min_num_updates num_transactions
-    repeats preeval use_zkapps () =
+    ~proof_level ~max_num_updates ~logger ~signature_kind ?min_num_updates
+    num_transactions repeats preeval use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
         let signature_kind = Mina_signature_kind.t_DEPRECATED
@@ -97,9 +101,9 @@ let main ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~user_command_profiler:
           (profile_user_command ~genesis_constants ~constraint_constants ~logger
              (module T) )
-        ~zkapp_profiler:(profile_zkapps ~constraint_constants)
-        num_transactions ~max_num_updates ?min_num_updates repeats preeval
-        use_zkapps )
+        ~zkapp_profiler:(profile_zkapps ~constraint_constants ~signature_kind)
+        ~max_num_updates ~signature_kind ?min_num_updates num_transactions
+        repeats preeval use_zkapps )
 
 let command =
   let open Command.Let_syntax in
@@ -180,15 +184,16 @@ let command =
      in
      let proof_level = Genesis_constants.Proof_level.Full in
      let proof_cache_db = Proof_cache_tag.create_identity_db () in
+     let signature_kind = Mina_signature_kind.t_DEPRECATED in
      if witness_only then
        witness ~proof_cache_db ~genesis_constants ~constraint_constants
-         ~proof_level ~max_num_updates ~logger ?min_num_updates num_transactions
-         repeats preeval use_zkapps
+         ~proof_level ~max_num_updates ~logger ~signature_kind ?min_num_updates
+         num_transactions repeats preeval use_zkapps
      else if check_only then
        dry ~proof_cache_db ~genesis_constants ~constraint_constants ~proof_level
-         ~max_num_updates ~logger ?min_num_updates num_transactions repeats
-         preeval use_zkapps
+         ~max_num_updates ~logger ~signature_kind ?min_num_updates
+         num_transactions repeats preeval use_zkapps
      else
        main ~proof_cache_db ~genesis_constants ~constraint_constants
-         ~proof_level ~max_num_updates ~logger ?min_num_updates num_transactions
-         repeats preeval use_zkapps )
+         ~proof_level ~max_num_updates ~logger ~signature_kind ?min_num_updates
+         num_transactions repeats preeval use_zkapps )
