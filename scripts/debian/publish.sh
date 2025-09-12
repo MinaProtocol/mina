@@ -7,6 +7,9 @@ RED='\033[0;31m'
 ARCH=amd64
 BUCKET=packages.o1test.net
 
+# Forcing upload debian even if it exists already
+FORCE=0
+
 while [[ "$#" -gt 0 ]]; do case $1 in
   -n|--names) DEB_NAMES="$2"; shift;;
   -a|--arch) ARCH="$2"; shift;;
@@ -14,6 +17,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -v|--version) DEB_VERSION="$2"; shift;;
   -c|--codename) DEB_CODENAME="$2"; shift;;
   -b|--bucket) BUCKET="$2"; shift;;
+  -f|--force) FORCE=1;;
   -s|--sign) SIGN="$2"; shift;;
   *) echo "❌  Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
@@ -33,6 +37,45 @@ function usage() {
   echo "Example: $0 --name mina-archive --release unstable --version 2.0.0-rc1-48efea4 --codename bullseye "
   exit 1
 }
+
+# Invalidate CloudFront cache for the given bucket or CNAME and paths
+# This is to ensure that after uploading new debs, users don't get stale
+# package lists from CloudFront cache
+# Usage: invalidate_cache [bucket-or-cname] codename
+# Example: invalidate_cache nightly.apt.packages.minaprotocol.com bookworm
+function invalidate_cache() {
+  BUCKET_OR_CNAME="${1:-nightly.apt.packages.minaprotocol.com}"
+  PATHS_TO_INVALIDATE="/dists/$2/*"
+
+  echo "🔎 Resolving ${BUCKET_OR_CNAME}..."
+  CF_DOMAIN=$(dig +short CNAME "${BUCKET_OR_CNAME}" | sed 's/\.$//')
+  CF_DOMAIN=$(dig +short CNAME "${BUCKET_OR_CNAME}" | sed 's/\.$//')
+
+  if [[ -z "$CF_DOMAIN" ]]; then
+    echo "❌ Could not resolve ${BUCKET_OR_CNAME} to a CloudFront domain."
+    exit 1
+  fi
+
+  echo "✅ Found CloudFront domain: ${CF_DOMAIN}"
+
+  echo "📋 Searching for distribution ID in CloudFront..."
+  DIST_ID=$(aws cloudfront list-distributions \
+    --query "DistributionList.Items[?DomainName=='${CF_DOMAIN}'].Id" \
+    --output text)
+
+  if [[ -z "$DIST_ID" ]]; then
+    echo "❌ No CloudFront distribution found for domain ${CF_DOMAIN}"
+    exit 1
+  fi
+
+  echo "✅ Found CloudFront distribution ID: ${DIST_ID}"
+
+  echo "🚀 Creating invalidation for paths: ${PATHS_TO_INVALIDATE}"
+  aws cloudfront create-invalidation \
+    --distribution-id "${DIST_ID}" \
+    --paths "${PATHS_TO_INVALIDATE}"
+}
+
 
 if [[ -z "$DEB_NAMES" ]]; then usage "❌  Debian(s) to upload are not set!"; fi;
 if [[ -z "$DEB_VERSION" ]]; then usage "❌  Version is not set!"; fi;
@@ -55,8 +98,6 @@ else
   GPG_OPTS=("--gpg-options=\"--batch" "--pinentry-mode=loopback" "--yes")
 fi
 
-
-
 echo "Publishing debs: ${DEB_NAMES} to Release: ${DEB_RELEASE} and Codename: ${DEB_CODENAME}"
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
@@ -69,17 +110,19 @@ for _ in {1..10}; do (
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
 deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
-  --fail-if-exists \
+  $([ "$FORCE" -eq 0 ] && echo "--fail-if-exists") \
   --lock \
   --arch $ARCH \
   --preserve-versions \
-  --cache-control=max-age=120 \
+  --cache-control "no-store,no-cache,must-revalidate" \
   $SIGN_ARG \
   --component "${DEB_RELEASE}" \
   --codename "${DEB_CODENAME}" \
   "${GPG_OPTS[@]}" \
   "${DEB_NAMES}"
 ) && break || (MINA_DEB_BUCKET=${BUCKET} scripts/debian/clear-s3-lockfile.sh); done
+
+invalidate_cache "$BUCKET" "$DEB_CODENAME"
 
 for deb in $DEB_NAMES
 do
