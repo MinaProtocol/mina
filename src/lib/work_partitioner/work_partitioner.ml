@@ -278,10 +278,10 @@ let submit_into_combining_result ~submitted_result ~partitioner
       `Pending new_combining_result
   | Done combined ->
       One_or_two.iter
-        ~f:(fun (single_spec, _, elapsed) ->
-          Work.Metrics.emit_single_metrics ~logger:partitioner.logger
+        ~f:(fun { spec = single_spec; elapsed; _ } ->
+          Work.Metrics.emit_single_metrics_stable ~logger:partitioner.logger
             ~single_spec ~elapsed )
-        combined.spec_with_proof ;
+        combined.results ;
       `Done combined
   | HalfAlreadyInPool ->
       [%log' debug partitioner.logger]

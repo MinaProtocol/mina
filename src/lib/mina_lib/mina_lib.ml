@@ -875,7 +875,7 @@ let request_work t =
   in
   let fee = snark_work_fee t in
   let sok_message = Sok_message.create ~fee ~prover in
-  [%log' info t.config.logger] "Received work request with sok message"
+  [%log' debug t.config.logger] "Received work request"
     ~metadata:[ ("sok_message", Sok_message.to_yojson sok_message) ] ;
   let work_from_selector =
     lazy
@@ -887,8 +887,8 @@ let request_work t =
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
-  let logger = t.config.logger in
+let add_complete_work ~logger ~fee ~prover
+    ~(results : Snark_work_lib.Result.Single.Stable.Latest.t One_or_two.t) t =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
@@ -901,6 +901,51 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
+  let proofs = One_or_two.map ~f:(fun { proof; _ } -> proof) results in
+  let fee_with_prover = Fee_with_prover.{ fee; prover } in
+  let stmts =
+    One_or_two.map
+      ~f:(fun { spec; _ } -> Snark_work_lib.Spec.Single.Poly.statement spec)
+      results
+  in
+  [%log debug] "Partitioner combined work"
+    ~metadata:
+      [ ("work_ids", Transaction_snark_work.Statement.compact_json stmts)
+      ; ("fee_with_prover", Fee_with_prover.to_yojson fee_with_prover)
+      ] ;
+  Or_error.try_with update_metrics
+  |> Result.iter_error ~f:(fun err ->
+         [%log warn] "Failed to update metrics on adding work"
+           ~metadata:[ ("error", `String (Error.to_string_hum err)) ] ) ;
+  let cb result =
+    (* remove it from seen jobs after attempting to adding it to the pool to
+           avoid this work being reassigned.
+     * If the diff is accepted then remove it from the seen jobs.
+     * If not then the work should have already been in the pool with a 
+           lower fee or the statement isn't referenced anymore or any other 
+           error. In any case remove it from the seen jobs so that it can be 
+           picked up if needed *)
+    Work_selector.remove t.work_selector stmts ;
+    Result.iter_error result ~f:(fun err ->
+        (* Possible reasons of failure: receiving pipe's capacity exceeded,
+            fee that isn't the lowest, failure in verification or application to the pool *)
+        [%log warn] "Failed to add completed work to the pool"
+          ~metadata:
+            [ ("work_ids", Transaction_snark_work.Statement.compact_json stmts)
+            ; ("error", `String (Error.to_string_hum err))
+            ] )
+  in
+  Network_pool.Snark_pool.(
+    Local_sink.push t.pipes.snark_local_sink
+      ( Add_solved_work
+          ( stmts
+          , Network_pool.Priced_proof.{ proof = proofs; fee = fee_with_prover }
+          )
+      , cb ))
+  |> Deferred.don't_wait_for
+
+let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
+  let logger = t.config.logger in
   match
     Work_partitioner.submit_partitioned_work ~result:work
       ~partitioner:t.work_partitioner
@@ -911,52 +956,8 @@ let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
       `Removed
   | Processed None ->
       `Ok
-  | Processed (Some { spec_with_proof; fee; prover }) ->
-      let proofs = spec_with_proof |> One_or_two.map ~f:Tuple3.get2 in
-      let fee_with_prover = Fee_with_prover.{ fee; prover } in
-      let stmts =
-        spec_with_proof
-        |> One_or_two.map ~f:(fun (spec, _, _) ->
-               Snark_work_lib.Selector.Single.Spec.Poly.statement spec )
-      in
-      [%log debug] "Partitioner combined work"
-        ~metadata:
-          [ ("work_ids", Transaction_snark_work.Statement.compact_json stmts)
-          ; ("fee_with_prover", Fee_with_prover.to_yojson fee_with_prover)
-          ] ;
-      Or_error.try_with update_metrics
-      |> Result.iter_error ~f:(fun err ->
-             [%log debug] "Failed to update metrics on adding work"
-               ~metadata:[ ("error", `String (Error.to_string_hum err)) ] ) ;
-      let cb result =
-        (* remove it from seen jobs after attempting to adding it to the pool to
-           avoid this work being reassigned.
-         * If the diff is accepted then remove it from the seen jobs.
-         * If not then the work should have already been in the pool with a 
-           lower fee or the statement isn't referenced anymore or any other 
-           error. In any case remove it from the seen jobs so that it can be 
-           picked up if needed *)
-        One_or_two.map spec_with_proof ~f:(fun (spec, _, _) ->
-            Snark_work_lib.Work.Single.Spec.statement spec )
-        |> Work_selector.remove t.work_selector ;
-        Result.iter_error result ~f:(fun err ->
-            (* Possible reasons of failure: receiving pipe's capacity exceeded,
-                fee that isn't the lowest, failure in verification or application to the pool *)
-            [%log warn] "Failed to add completed work to the pool"
-              ~metadata:
-                [ ( "work_ids"
-                  , Transaction_snark_work.Statement.compact_json stmts )
-                ; ("error", `String (Error.to_string_hum err))
-                ] )
-      in
-      Network_pool.Snark_pool.(
-        Local_sink.push t.pipes.snark_local_sink
-          ( Add_solved_work
-              ( stmts
-              , Network_pool.Priced_proof.
-                  { proof = proofs; fee = fee_with_prover } )
-          , cb ))
-      |> Deferred.don't_wait_for ;
+  | Processed (Some { results; fee; prover }) ->
+      add_complete_work ~logger ~fee ~prover ~results t ;
       `Ok
 
 let add_work_graphql t diff =

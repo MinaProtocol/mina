@@ -406,7 +406,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               Deferred.return None )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
-          [%log trace] "received completed work from a snark worker"
+          [%log debug] "received completed work from a snark worker"
             ~metadata:
               [ ( "work_id"
                 , Snark_work_lib.Spec.Partitioned.Poly.id_to_json result )

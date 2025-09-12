@@ -13,7 +13,21 @@ module Master = struct
   module T = struct
     type query = Result.Partitioned.Stable.Latest.t
 
-    type response = [ `SpecUnmatched | `Removed | `Ok ]
+    (* For more details, see Work_partitioner.Work_partitioner *)
+    type response =
+      [ `SpecUnmatched
+        (** The submitted result doesn't match up with the spec in pool. For 
+            example, the partitioner requires first/second in a pair, but the 
+            worker responded with a unpaired result. This should only happen 
+            when there's a bug in worker.  *)
+      | `Removed
+        (** The partitioner already removed the work spec from its pool, meaning
+            it's already completed by another worker or no longer needed. It's 
+            safe to ignore this error and continue polling partitioner for other
+            work specs. *)
+      | `Ok
+        (** The partitioner successfully accepts work into its internal states. *)
+      ]
   end
 
   module Caller = T
