@@ -507,14 +507,14 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     OWNER=$(stat -c "%U" "${LEDGER_FOLDER}"/offline_fish_keys/"${FILE}")
 
     if [ "${FILE}" != "${OWNER}" ]; then
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/zkapp_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_fish_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_fish_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_whale_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_whale_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/snark_coordinator_keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/service-keys
-      sudo chown -R "${OWNER}" "${LEDGER_FOLDER}"/libp2p_keys
+      chown -R "${OWNER}" "${LEDGER_FOLDER}"/zkapp_keys
+      chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_fish_keys
+      chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_fish_keys
+      chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_whale_keys
+      chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_whale_keys
+      chown -R "${OWNER}" "${LEDGER_FOLDER}"/snark_coordinator_keys
+      chown -R "${OWNER}" "${LEDGER_FOLDER}"/service-keys
+      chown -R "${OWNER}" "${LEDGER_FOLDER}"/libp2p_keys
     fi
   fi
 
