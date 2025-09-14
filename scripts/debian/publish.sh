@@ -110,7 +110,7 @@ for _ in {1..10}; do (
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
 deb-s3 upload $BUCKET_ARG $S3_REGION_ARG \
-  $([ "$FORCE" -eq 0 ] && echo "--fail-if-exists") \
+  "$([ "$FORCE" -eq 0 ] && echo "--fail-if-exists")" \
   --lock \
   --arch $ARCH \
   --preserve-versions \
