@@ -4,7 +4,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
   type job = (Spec.t, Id.t) Snark_work_lib.With_job_meta.t
 
   type t =
-    { timeline : Id.t Deque.t (* For iteration *)
+    { mutable timeline : Id.t Deque.t (* For iteration *)
     ; index : (Id.t, job) Hashtbl.t (* For marking job as done *)
     }
 
@@ -32,27 +32,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     | _ ->
         remove_until_reschedule ~f t
 
-  (* TODO: this seems unused, except in [add] we might want simplify it *)
-  let iter_until ~f t =
-    let rec loop preserved_jobs =
-      match Deque.dequeue_front t.timeline with
-      | None ->
-          (None, preserved_jobs)
-      | Some job_id -> (
-          match Hashtbl.find t.index job_id with
-          | None ->
-              loop preserved_jobs
-          | Some job -> (
-              match f job with
-              | Some _ as result ->
-                  (result, job_id :: preserved_jobs)
-              | None ->
-                  loop (job_id :: preserved_jobs) ) )
-    in
-    let result, preserved_jobs = loop [] in
-    List.iter ~f:(Deque.enqueue_front t.timeline) preserved_jobs ;
-    result
-
   let add ~id ~job t =
     match Hashtbl.add ~key:id ~data:job t.index with
     | `Ok ->
@@ -62,8 +41,11 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
            [t.timeline] to remove IDs that are no longer present in the
            [t.index] *)
         if Deque.length t.timeline > 4 * Hashtbl.length t.index then
-          (* ignoring the result because it will be [None] *)
-          ignore (iter_until ~f:(const None) t) ;
+          t.timeline <-
+            Deque.to_array t.timeline
+            |> Array.filter
+                 ~f:(Fn.compose Option.is_some @@ Hashtbl.find t.index)
+            |> Deque.of_array ;
         `Ok
     | `Duplicate ->
         `Duplicate
