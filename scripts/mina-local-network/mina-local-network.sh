@@ -507,14 +507,21 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
     OWNER=$(stat -c "%U" "${LEDGER_FOLDER}"/offline_fish_keys/"${FILE}")
 
     if [ "${FILE}" != "${OWNER}" ]; then
-      chown -R "${OWNER}" "${LEDGER_FOLDER}"/zkapp_keys
-      chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_fish_keys
-      chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_fish_keys
-      chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_whale_keys
-      chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_whale_keys
-      chown -R "${OWNER}" "${LEDGER_FOLDER}"/snark_coordinator_keys
-      chown -R "${OWNER}" "${LEDGER_FOLDER}"/service-keys
-      chown -R "${OWNER}" "${LEDGER_FOLDER}"/libp2p_keys
+      # Check if sudo command exists
+      if command -v sudo >/dev/null 2>&1; then
+        SUDO_CMD="sudo"
+      else
+        SUDO_CMD=""
+      fi
+
+      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/zkapp_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_fish_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_fish_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_whale_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_whale_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/snark_coordinator_keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/service-keys
+      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/libp2p_keys
     fi
   fi
 
