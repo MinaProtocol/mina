@@ -63,9 +63,7 @@ let specs_for_branch =
           , profile = Profiles.Type.Devnet
           , networks = [ Network.Type.Devnet ]
           , codenames =
-            [ DebianVersions.DebVersion.Bullseye
-            , DebianVersions.DebVersion.Focal
-            , DebianVersions.DebVersion.Noble
+            [ DebianVersions.DebVersion.Noble
             , DebianVersions.DebVersion.Bookworm
             ]
           , debian_repo = DebianRepo.Type.Nightly
