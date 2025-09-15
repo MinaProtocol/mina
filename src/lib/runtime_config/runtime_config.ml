@@ -1661,7 +1661,16 @@ let slot_tx_end, slot_chain_end =
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
-let fork_config_of_ledgers ~genesis_state_timestamp ~genesis_ledger_config
+(** This method creates a runtime daemon config for a hard fork, containing the
+    data that can't necessarily be computed in advance of the hard fork. This
+    ends up being data that's computed based on the last block produced before
+    the transaction stop slot. The only exception is the
+    [genesis_state_timestamp]; this value will be known in advance if the hard
+    fork automation MIP is accepted, but it is convenient to include this
+    parameter in the config for testing purposes. That way, the output of
+    [make_automatic_fork_config] will set the same fields as the config created
+    by the legacy hard fork config generation procedure. *)
+let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
     ~global_slot_since_genesis ~state_hash ~blockchain_length
     ~staking_ledger_config ~staking_epoch_seed ~next_epoch_ledger_config
     ~next_epoch_seed =
