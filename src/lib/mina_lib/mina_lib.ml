@@ -2177,7 +2177,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ~ledger_backing ()
+              ~notify_online ~transaction_pool_proxy ~ledger_backing
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
