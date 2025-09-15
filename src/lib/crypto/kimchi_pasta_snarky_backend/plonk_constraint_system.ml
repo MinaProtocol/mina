@@ -95,8 +95,8 @@ module Position = struct
     Array.append cols padding
 
   (** Converts an array of [Constants.columns] to [Constants.permutation_cols].
-    This is useful to truncate arrays of cells to the ones that only matter for the permutation argument.
-    *)
+      This is useful to truncate arrays of cells to the ones that only matter for
+      the permutation argument. *)
   let cols_to_perms cols = Array.slice cols 0 Constants.permutation_cols
 
   (** Converts a [Position.t] into the Rust-compatible type [Kimchi_types.wire].
@@ -110,7 +110,9 @@ module Gate_spec = struct
 
   (* TODO: split kind/coeffs from row/wired_to *)
 
-  (** A gate/row/constraint consists of a type (kind), a row, the other cells its columns/cells are connected to (wired_to), and the selector polynomial associated with the gate. *)
+  (** A gate/row/constraint consists of a type (kind), a row, the other cells
+      its columns/cells are connected to (wired_to), and the selector polynomial
+      associated with the gate. *)
   type ('row, 'f) t =
     { kind : Kimchi_gate_type.t
     ; wired_to : 'row Position.t array
@@ -118,7 +120,8 @@ module Gate_spec = struct
     }
   [@@deriving sexp_of]
 
-  (** Applies a function [f] to the [row] of [t] and all the rows of its [wired_to]. *)
+  (** Applies a function [f] to the [row] of [t] and all the rows of its
+      [wired_to]. *)
   let map_rows (t : (_, _) t) ~f : (_, _) t =
     (* { wire with row = f row } *)
     let wired_to =
@@ -161,7 +164,8 @@ module Plonk_constraint = struct
           ; m : 'fp
           ; c : 'fp
           }
-          (** the Poseidon state is an array of states (and states are arrays of size 3). *)
+          (** the Poseidon state is an array of states (and states are arrays of
+              size 3). *)
       | Poseidon of { state : 'field_var array array }
       | EC_add_complete of
           { p1 : 'field_var * 'field_var
@@ -899,16 +903,21 @@ let finalize_runtime_lookup_tables sys =
   | Compiled_runtime_tables_cfg _ ->
       failwith "Runtime table configurations have already been finalized"
 
-(* TODO: shouldn't that Make create something bounded by a signature? As we know what a back end should be? Check where this is used *)
+(* TODO: shouldn't that Make create something bounded by a signature? As we know
+   what a back end should be? Check where this is used *)
 
-(* TODO: glossary of terms in this file (terms, reducing, feeding) + module doc *)
+(* TODO: glossary of terms in this file (terms, reducing, feeding) + module
+   doc *)
 
 (* TODO: rename Fp to F or Field *)
 
 (** ? *)
 module Make
     (Fp : Field.S)
-    (* We create a type for gate vector, instead of using `Gate.t list`. If we did, we would have to convert it to a `Gate.t array` to pass it across the FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more efficient to just create the `Vec<Gate>` directly.
+    (* We create a type for gate vector, instead of using `Gate.t list`. If we
+       did, we would have to convert it to a `Gate.t array` to pass it across the
+       FFI boundary, where then it gets converted to a `Vec<Gate>`; it's more
+       efficient to just create the `Vec<Gate>` directly.
     *)
     (Gates : Gate_vector_intf with type field := Fp.t)
     (Params : sig
@@ -1048,7 +1057,8 @@ end = struct
     res
 
   (** Compute the witness, given the constraint system `sys`
-      and a function that converts the indexed secret inputs to their concrete values.
+      and a function that converts the indexed secret inputs to their concrete
+      values.
    *)
   let compute_witness (sys : t) (external_values : int -> Fp.t) :
       Fp.t array array * Fp.t Kimchi_types.runtime_table array =
@@ -1199,7 +1209,8 @@ end = struct
   let set_primary_input_size (sys : t) num_pub_inputs =
     Set_once.set_exn sys.public_input_size [%here] num_pub_inputs
 
-  (** Sets the number of previous challenges. It must and can only be called once. *)
+  (** Sets the number of previous challenges. It must and can only be called
+      once. *)
   let set_prev_challenges (sys : t) num_prev_challenges =
     Set_once.set_exn sys.prev_challenges [%here] num_prev_challenges
 
@@ -1227,9 +1238,11 @@ end = struct
     ignore (union_find sys key : V.t Union_find.t) ;
     V.Table.add_multi sys.equivalence_classes ~key ~data:{ row; col }
 
-  (* TODO: rename to wire_abs and wire_rel? or wire_public and wire_after_public? or force a single use function that takes a Row.t? *)
+  (* TODO: rename to wire_abs and wire_rel? or wire_public and
+     wire_after_public? or force a single use function that takes a Row.t? *)
 
-  (** Same as wire', except that the row must be given relatively to the end of the public-input rows. *)
+  (** Same as wire', except that the row must be given relatively to the end of
+      the public-input rows. *)
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
   (** Adds a row/gate/constraint to a constraint system `sys`. *)
@@ -1400,7 +1413,8 @@ end = struct
             if Fp.(equal zero res) then None else Some res ) )
 
   (** Converts a [Cvar.t] to a `(terms, terms_length, has_constant)`.
-      if `has_constant` is set, then terms start with a constant term in the form of (c, 0).
+      if `has_constant` is set, then terms start with a constant term in the
+      form of (c, 0).
     *)
   let canonicalize x =
     let c, terms =
