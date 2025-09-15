@@ -10,11 +10,11 @@
 #   upgrade-script-check.sh [OPTIONS]
 #
 # OPTIONS:
-#   -m, --mode MODE     Execution mode: 'default' or 'verbose' (default: default)
-#                       default: Returns exit code 0/1 without error messages
-#                       verbose: Prints error messages and fails with descriptive output
-#   -b, --branch BRANCH Target branch for comparison (default: develop)
-#   -h, --help          Show this help message
+#   -m, --mode MODE                 Execution mode: 'default' or 'verbose' (default: default)
+#                                   default: Returns exit code 0/1 without error messages
+#                                   verbose: Prints error messages and fails with descriptive output
+#   -b, --comparison-branch BRANCH  Target branch for comparison (default: develop)
+#   -h, --help                      Show this help message
 #
 # EXIT CODES:
 #   0: Success (no schema changes or upgrade script exists)
@@ -43,7 +43,7 @@ parse_args() {
                 fi
                 shift 2
                 ;;
-            -b|--branch)
+            -b|--comparison-branch)
                 BRANCH="$2"
                 shift 2
                 ;;
@@ -93,7 +93,7 @@ has_changes() {
     fi
 }
 
-has_changes_in_in_git() {
+has_changes_in_git() {
     local file="$1"
     if ! check_file_exists "$file"; then
         return 1
@@ -155,6 +155,12 @@ main() {
 
     # If schema files changed, verify upgrade script exists
     if [[ "$schema_changed" == "true" ]]; then
+
+        if ./buildkite/scripts/git/check-bypass.sh "!ci-bypass-upgrade-script-check"; then
+            echo "⏭️  Skipping upgrade script check as PR is bypassed"
+            exit 0
+        fi
+
         # Check that all required scripts exist
         for script_path in "${scripts[@]}"; do
             if ! check_file_exists "$script_path"; then
@@ -167,7 +173,7 @@ main() {
             fi
 
             # Check if the upgrade script itself has changes
-            if has_changes_in_in_git "$script_path"; then
+            if has_changes_in_git "$script_path"; then
                 if [[ "$MODE" == "verbose" ]]; then
                     echo "✓ Upgrade script has been modified: $script_path"
                 fi

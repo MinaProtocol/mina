@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eou pipefail
+
 # This script checks if a changelog entry is required for a given pull request.
 # It compares the current commit with the base branch of the pull request and looks for changes
 # in the specified trigger files. If changes are found, it checks if the required changelog entry
@@ -20,9 +22,6 @@ BASE_PATH=""
 CHANGELOG_FILE=""
 # List of users who can bypass the changelog check by commenting !ci-bypass-changelog
 # separated by space
-GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie deepthiskumar Trivo25 45930 SanabriaRusso nicc georgeee dannywillems cjjdespres"
-
-BYPASS_PHRASE="!ci-bypass-changelog"
 
 PIPELINE_SLUG="mina-o-1-labs"
 
@@ -75,23 +74,7 @@ if [[ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ]]; then
     exit 1
 fi
 
-# Check if PR is bypassed by a !ci-bypass-changelog comment
-pip install -r scripts/github/github_info/requirements.txt
-
-COMMENTED_CODE=0
-(python3 scripts/github/github_info is_pr_commented --comment "$BYPASS_PHRASE" \
-  --by $GITHUB_USERS_ELIGIBLE_FOR_BYPASS --pr "$BUILDKITE_PULL_REQUEST") \
-   || COMMENTED_CODE=$?
-
-if [[ "$COMMENTED_CODE" == 0 ]]; then
-    echo "⏭️  Skipping run as PR is bypassed"
-    exit 0
-elif [[ "$COMMENTED_CODE" == 1 ]]; then
-    echo "⚙️  PR is not bypassed. Proceeding with changelog check..."
-else
-    echo "❌ Failed to check PR for being eligible for changelog check bypass"
-    exit 1
-fi
+./buildkite/scripts/git/check-bypass.sh "!ci-bypass-changelog"
 
 REMOTE_BRANCH="origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
 
