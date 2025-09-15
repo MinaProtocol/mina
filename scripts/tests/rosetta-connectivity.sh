@@ -46,20 +46,19 @@ CLEAR='\033[0m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 
-NETWORK=devnet
+DEFAULT_NETWORK=devnet
+NETWORK=$DEFAULT_NETWORK
 TIMEOUT=900
 DB_CONN_STR="postgres://pguser:pguser@localhost:5432/archive"
 UPGRADE_SCRIPTS_WORKDIR="src/app/archive"
 
 LOAD_TEST_DURATION=600
 RUN_LOAD_TEST=false
-RUN_COMPATIBILITY_TEST=false
-COMPATIBILITY_BRANCH=""
 
 while [[ "$#" -gt 0 ]]; do case $1 in
     -n|--network) NETWORK="$2"; shift;;
     --run-load-test) RUN_LOAD_TEST=true ;;
-    --run-compatibility-test) RUN_COMPATIBILITY_TEST=true; COMPATIBILITY_BRANCH="$2"; shift;;
+    --run-compatibility-test) COMPATIBILITY_BRANCH="$2"; shift;;
     -t|--tag) TAG="$2"; shift;;
     --timeout) TIMEOUT="$2"; shift;;
     --upgrade-scripts-workdir) UPGRADE_SCRIPTS_WORKDIR="$2"; shift;;
@@ -73,7 +72,7 @@ function usage() {
     fi
     echo "Usage: $0 [-t docker-tag] [-n network]"
     echo "  -t, --version             The version to be used in the docker image tag"
-    echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=$NETWORK"
+    echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=$DEFAULT_NETWORK"
     echo "  --timeout                 The timeout duration in seconds. Default=$TIMEOUT"
     echo "  --run-compatibility-test  Enable compatibility testing with specified branch"
     echo "  --upgrade-scripts-workdir Working directory for upgrade/downgrade scripts. Default=$UPGRADE_SCRIPTS_WORKDIR"
@@ -88,11 +87,14 @@ function usage() {
     echo ""
 }   
 
+if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" && "$NETWORK" != "berkeley" ]]; then
+    echo "❌  Invalid network: $NETWORK"
+    echo "❌  Network must be either 'devnet' or 'mainnet' or 'berkeley'"
+    echo ""
+    usage; exit 1;
+fi
+
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
-if [[ "$RUN_COMPATIBILITY_TEST" == true && -z "$COMPATIBILITY_BRANCH" ]]; then
-        usage "Compatibility branch is required when running compatibility test!";
-        exit 1;
-fi;
 
 container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
 
@@ -160,7 +162,7 @@ else
 fi
 
 # Run compatibility test
-if [[ "$RUN_COMPATIBILITY_TEST" == true ]]; then
+if [[ -n "${COMPATIBILITY_BRANCH:-}" ]]; then
         echo "Running compatibility test with branch: $COMPATIBILITY_BRANCH"
 
         upgrade_script_path="/etc/mina/archive/upgrade-to-mesa.sql"
