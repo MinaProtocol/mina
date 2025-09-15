@@ -142,11 +142,11 @@ let%test_module "Archive node unit tests" =
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
-              Processor.User_command.add_if_doesn't_exist conn ~logger
+              Models.User_command.add_if_doesn't_exist conn ~logger
                 ~v1_transaction_hash:false user_command
             in
             let%map result =
-              Processor.User_command.find conn ~transaction_hash
+              Models.User_command.find conn ~transaction_hash
                 ~v1_transaction_hash:false
               >>| function
               | Some (`Signed_command_id signed_command_id) ->
@@ -190,12 +190,11 @@ let%test_module "Archive node unit tests" =
                       let token_id =
                         Account_id.derive_token_id ~owner:acct_id
                       in
-                      Processor.Token_owners.add_if_doesn't_exist token_id
-                        acct_id ;
+                      Models.Token_owners.add_if_doesn't_exist token_id acct_id ;
                       add_token_owners tree.calls )
               in
               let%bind _ =
-                Processor.Protocol_versions.add_if_doesn't_exist conn
+                Models.Protocol_versions.add_if_doesn't_exist conn
                   ~transaction:Protocol_version.(transaction current)
                   ~network:Protocol_version.(network current)
                   ~patch:Protocol_version.(patch current)
@@ -204,11 +203,11 @@ let%test_module "Archive node unit tests" =
               match%map
                 let open Deferred.Result.Let_syntax in
                 let%bind user_command_id =
-                  Processor.User_command.add_if_doesn't_exist conn ~logger
+                  Models.User_command.add_if_doesn't_exist conn ~logger
                     ~v1_transaction_hash:false user_command
                 in
                 let%map result =
-                  Processor.User_command.find conn ~transaction_hash
+                  Models.User_command.find conn ~transaction_hash
                     ~v1_transaction_hash:false
                   >>| function
                   | Some (`Zkapp_command_id zkapp_command_id) ->
@@ -244,12 +243,12 @@ let%test_module "Archive node unit tests" =
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind fee_transfer_id =
-              Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
+              Models.Fee_transfer.add_if_doesn't_exist conn fee_transfer kind
             in
             let%map result =
-              Processor.Internal_command.find_opt conn ~transaction_hash
+              Models.Internal_command.find_opt conn ~transaction_hash
                 ~v1_transaction_hash:false
-                ~command_type:(Processor.Fee_transfer.Kind.to_string kind)
+                ~command_type:(Models.Fee_transfer.Kind.to_string kind)
             in
             [%test_result: int] ~expect:fee_transfer_id
               (Option.value_exn result)
@@ -269,12 +268,12 @@ let%test_module "Archive node unit tests" =
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind coinbase_id =
-              Processor.Coinbase.add_if_doesn't_exist conn coinbase
+              Models.Coinbase.add_if_doesn't_exist conn coinbase
             in
             let%map result =
-              Processor.Internal_command.find_opt conn ~transaction_hash
+              Models.Internal_command.find_opt conn ~transaction_hash
                 ~v1_transaction_hash:false
-                ~command_type:Processor.Coinbase.coinbase_command_type
+                ~command_type:Models.Coinbase.coinbase_command_type
             in
             [%test_result: int] ~expect:coinbase_id (Option.value_exn result)
           with
@@ -324,13 +323,13 @@ let%test_module "Archive node unit tests" =
                   (fun conn ->
                     let open Deferred.Result.Let_syntax in
                     match%bind
-                      Processor.Block.find_opt conn
+                      Models.Block.find_opt conn
                         ~state_hash:
                           (Transition_frontier.Breadcrumb.state_hash breadcrumb)
                     with
                     | Some id ->
-                        let%bind Processor.Block.{ parent_id; _ } =
-                          Processor.Block.load conn ~id
+                        let%bind Models.Block.{ parent_id; _ } =
+                          Models.Block.load conn ~id
                         in
                         if
                           Unsigned.UInt32.compare
@@ -398,7 +397,7 @@ let%test_module "Archive node unit tests" =
           Strict_pipe.Writer.close writer ;
           let%bind () = processor_deferred_computation in
           match%map
-            Processor.deferred_result_list_fold breadcrumbs ~init:()
+            Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
                 let open Deferred.Result.Let_syntax in
                 let height =
@@ -406,7 +405,7 @@ let%test_module "Archive node unit tests" =
                   |> Transition_frontier.Breadcrumb.blockchain_length
                 in
                 match%bind
-                  Processor.Block.find_opt conn
+                  Models.Block.find_opt conn
                     ~state_hash:
                       (Transition_frontier.Breadcrumb.state_hash breadcrumb)
                 with
@@ -429,7 +428,7 @@ let%test_module "Archive node unit tests" =
                           (Transition_frontier.Breadcrumb.commands breadcrumb)
                           ~f:(fun cmd ->
                             match%map.Async
-                              Processor.User_command.find conn
+                              Models.User_command.find conn
                                 ~transaction_hash:
                                   (Transaction_hash.hash_command
                                      (User_command.forget_check cmd.data))
@@ -465,7 +464,7 @@ let%test_module "Archive node unit tests" =
                           (Transition_frontier.Breadcrumb.commands breadcrumb)
                           ~f:(fun cmd ->
                             match%map.Async
-                              Processor.User_command.find conn
+                              Models.User_command.find conn
                                 ~transaction_hash:
                                   (Transaction_hash.hash_command
                                      (User_command.forget_check cmd.data))

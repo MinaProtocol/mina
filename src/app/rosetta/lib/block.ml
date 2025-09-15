@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 module Mina_currency = Currency
+module Models = Archive_lib.Models
 open Rosetta_lib
 open Rosetta_models
 open Commands_common
@@ -86,18 +87,15 @@ module Sql = struct
     end
 
     type t =
-      { block_id : int
-      ; raw_block : Archive_lib.Processor.Block.t
-      ; block_extras : Extras.t
-      }
+      { block_id : int; raw_block : Models.Block.t; block_extras : Extras.t }
     [@@deriving hlist]
 
     let typ =
       Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-        Caqti_type.[ int; Archive_lib.Processor.Block.typ; Extras.typ ]
+        Caqti_type.[ int; Models.Block.typ; Extras.typ ]
 
     let block_fields ?prefix () =
-      let names = Archive_lib.Processor.Block.Fields.names in
+      let names = Models.Block.Fields.names in
       let fields =
         Option.value_map prefix ~default:names ~f:(fun prefix ->
             List.map ~f:(fun n -> prefix ^ n) names )
@@ -322,14 +320,13 @@ module Sql = struct
     end
 
     let typ =
-      Caqti_type.(
-        t3 int Archive_lib.Processor.User_command.Signed_command.typ Extras.typ)
+      Caqti_type.(t3 int Models.User_command.Signed_command.typ Extras.typ)
 
     let fields =
       String.concat ~sep:","
       @@ List.map
            ~f:(fun n -> "u." ^ n)
-           Archive_lib.Processor.User_command.Signed_command.Fields.names
+           Models.User_command.Signed_command.Fields.names
 
     let query =
       Mina_caqti.collect_req
@@ -392,7 +389,7 @@ module Sql = struct
     module Cte = struct
       type t =
         { internal_command_id : int
-        ; raw_internal_command : Archive_lib.Processor.Internal_command.t
+        ; raw_internal_command : Models.Internal_command.t
         ; receiver_account_creation_fee_paid : int64 option
         ; receiver : string
         ; sequence_no : int
@@ -402,9 +399,7 @@ module Sql = struct
 
       let fields' =
         String.concat ~sep:","
-        @@ List.map
-             ~f:(fun n -> "i." ^ n)
-             Archive_lib.Processor.Internal_command.Fields.names
+        @@ List.map ~f:(fun n -> "i." ^ n) Models.Internal_command.Fields.names
 
       let fields =
         String.concat ~sep:","
@@ -421,13 +416,7 @@ module Sql = struct
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
-            [ int
-            ; Archive_lib.Processor.Internal_command.typ
-            ; option int64
-            ; string
-            ; int
-            ; int
-            ]
+            [ int; Models.Internal_command.typ; option int64; string; int; int ]
 
       let query =
         [%string
@@ -469,7 +458,7 @@ module Sql = struct
       let to_info ~coinbase_receiver ({ raw_internal_command = ic; _ } as t) =
         let open Result.Let_syntax in
         let%map kind =
-          match ic.Archive_lib.Processor.Internal_command.command_type with
+          match ic.Models.Internal_command.command_type with
           | "fee_transfer" ->
               return `Fee_transfer
           | "coinbase" ->
@@ -594,7 +583,7 @@ module Sql = struct
 
     module Zkapp_account_update = struct
       type t =
-        { body : Archive_lib.Processor.Zkapp_account_update_body.t
+        { body : Models.Zkapp_account_update_body.t
         ; account : string
         ; token : string
         }
@@ -602,8 +591,8 @@ module Sql = struct
 
       let fields =
         String.concat ~sep:","
-        @@ List.map Archive_lib.Processor.Zkapp_account_update_body.Fields.names
-             ~f:(fun n -> "zaub." ^ n)
+        @@ List.map Models.Zkapp_account_update_body.Fields.names ~f:(fun n ->
+               "zaub." ^ n )
         @ [ "pk_update_body.value as account"
           ; "token_update_body.value as token"
           ]
@@ -614,11 +603,7 @@ module Sql = struct
 
       let typ =
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
-          Caqti_type.
-            [ Archive_lib.Processor.Zkapp_account_update_body.typ
-            ; string
-            ; string
-            ]
+          Caqti_type.[ Models.Zkapp_account_update_body.typ; string; string ]
     end
 
     type t =
@@ -739,9 +724,7 @@ module Sql = struct
           in
           let body = upd.body in
           { Zkapp_account_update_info.authorization_kind =
-              body
-                .Archive_lib.Processor.Zkapp_account_update_body
-                 .authorization_kind
+              body.Models.Zkapp_account_update_body.authorization_kind
           ; account = Zkapp_account_update.account upd
           ; balance_change = body.balance_change
           ; increment_nonce = body.increment_nonce
@@ -848,11 +831,7 @@ module Sql = struct
       @@ Result.List.map raw_user_commands ~f:(fun (_, uc, extras) ->
              let open Result.Let_syntax in
              let%bind kind =
-               match
-                 uc
-                   .Archive_lib.Processor.User_command.Signed_command
-                    .command_type
-               with
+               match uc.Models.User_command.Signed_command.command_type with
                | "payment" ->
                    return `Payment
                | "delegation" ->

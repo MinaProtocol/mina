@@ -8,13 +8,11 @@ open Mina_base
 open Mina_transaction
 open Archive_lib
 
-let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
-    =
+let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Models.Epoch_data.t) =
   let query_db = Mina_caqti.query pool in
   let%bind hash_str =
     query_db ~f:(fun db ->
-        Processor.Snarked_ledger_hash.find_by_id db
-          raw_epoch_data.ledger_hash_id )
+        Models.Snarked_ledger_hash.find_by_id db raw_epoch_data.ledger_hash_id )
   in
   let hash = Frozen_ledger_hash.of_base58_check_exn hash_str in
   let total_currency =
@@ -40,8 +38,8 @@ let epoch_data_of_raw_epoch_data ~pool (raw_epoch_data : Processor.Epoch_data.t)
     ; epoch_length
     }
 
-let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
-    Extensional.Block.t Deferred.t =
+let fill_in_block pool (block : Models.Block.t) : Extensional.Block.t Deferred.t
+    =
   let query_db = Mina_caqti.query pool in
   let state_hash = State_hash.of_base58_check_exn block.state_hash in
   let parent_hash = State_hash.of_base58_check_exn block.parent_hash in
@@ -54,21 +52,20 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let%bind snarked_ledger_hash_str =
     query_db ~f:(fun db ->
-        Processor.Snarked_ledger_hash.find_by_id db block.snarked_ledger_hash_id )
+        Models.Snarked_ledger_hash.find_by_id db block.snarked_ledger_hash_id )
   in
   let snarked_ledger_hash =
     Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
   in
   let%bind staking_epoch_data_raw =
     query_db ~f:(fun db ->
-        Processor.Epoch_data.load db block.staking_epoch_data_id )
+        Models.Epoch_data.load db block.staking_epoch_data_id )
   in
   let%bind staking_epoch_data =
     epoch_data_of_raw_epoch_data ~pool staking_epoch_data_raw
   in
   let%bind next_epoch_data_raw =
-    query_db ~f:(fun db ->
-        Processor.Epoch_data.load db block.next_epoch_data_id )
+    query_db ~f:(fun db -> Models.Epoch_data.load db block.next_epoch_data_id)
   in
   let%bind next_epoch_data =
     epoch_data_of_raw_epoch_data ~pool next_epoch_data_raw
@@ -99,7 +96,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   let%bind protocol_version =
     let%map { transaction; network; patch } =
       query_db ~f:(fun db ->
-          Processor.Protocol_versions.load db block.protocol_version_id )
+          Models.Protocol_versions.load db block.protocol_version_id )
     in
     Protocol_version.create ~transaction ~network ~patch
   in
@@ -107,7 +104,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     Option.value_map block.proposed_protocol_version_id ~default:(return None)
       ~f:(fun id ->
         let%map { transaction; network; patch } =
-          query_db ~f:(fun db -> Processor.Protocol_versions.load db id)
+          query_db ~f:(fun db -> Models.Protocol_versions.load db id)
         in
         let protocol_version =
           Protocol_version.create ~transaction ~network ~patch
@@ -147,11 +144,10 @@ let fill_in_accounts_accessed pool block_state_hash =
   let query_db = Mina_caqti.query pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
-    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+    query_db ~f:(fun db -> Models.Block.find db ~state_hash:block_state_hash)
   in
   let%bind accounts_accessed =
-    query_db ~f:(fun db ->
-        Processor.Accounts_accessed.all_from_block db block_id )
+    query_db ~f:(fun db -> Models.Accounts_accessed.all_from_block db block_id)
   in
   Deferred.List.map accounts_accessed ~f:(Load_data.get_account_accessed ~pool)
 
@@ -160,42 +156,38 @@ let fill_in_accounts_created pool block_state_hash =
   let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
-    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+    query_db ~f:(fun db -> Models.Block.find db ~state_hash:block_state_hash)
   in
   let%bind accounts_created =
-    query_db ~f:(fun db ->
-        Processor.Accounts_created.all_from_block db block_id )
+    query_db ~f:(fun db -> Models.Accounts_created.all_from_block db block_id)
   in
   Deferred.List.map accounts_created ~f:(fun acct_created ->
       let ({ block_id = _; account_identifier_id; creation_fee }
-            : Processor.Accounts_created.t ) =
+            : Models.Accounts_created.t ) =
         acct_created
       in
-      let%bind ({ public_key_id; token_id; _ } : Processor.Account_identifiers.t)
-          =
+      let%bind { public_key_id; token_id; _ } =
         query_db ~f:(fun db ->
-            Processor.Account_identifiers.load db account_identifier_id )
+            Models.Account_identifiers.load db account_identifier_id )
       in
       let%bind pk = pk_of_id public_key_id in
-      let%bind token_id =
-        let%map { value; _ } =
-          query_db ~f:(fun db -> Processor.Token.find_by_id db token_id)
-        in
-        Token_id.of_string value
+      let%map token =
+        query_db ~f:(fun db -> Models.Token.find_by_id db token_id)
       in
+      let token_id = Token_id.of_string token.value in
       let account_id = Account_id.create pk token_id in
       let fee = Currency.Fee.of_string creation_fee in
-      return (account_id, fee) )
+      (account_id, fee) )
 
 let fill_in_tokens_used pool block_state_hash =
   let query_db = Mina_caqti.query pool in
   let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
-    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+    query_db ~f:(fun db -> Models.Block.find db ~state_hash:block_state_hash)
   in
   let get_token_owner
-      ({ value; owner_public_key_id; owner_token_id } : Processor.Token.t) =
+      ({ value; owner_public_key_id; owner_token_id } : Models.Token.t) =
     let token_id = Token_id.of_string value in
     match (owner_public_key_id, owner_token_id) with
     | None, None ->
@@ -204,7 +196,7 @@ let fill_in_tokens_used pool block_state_hash =
         let%bind owner_pk = pk_of_id owner_pk_id in
         let%bind owner_token_id =
           let%map owner_token =
-            query_db ~f:(fun db -> Processor.Token.find_by_id db owner_tok_id)
+            query_db ~f:(fun db -> Models.Token.find_by_id db owner_tok_id)
           in
           Token_id.of_string owner_token.value
         in
@@ -226,19 +218,19 @@ let fill_in_tokens_used pool block_state_hash =
   in
   let%bind zkapps_in_block =
     query_db ~f:(fun db ->
-        Processor.Block_and_zkapp_command.all_from_block db ~block_id )
+        Models.Block_and_zkapp_command.all_from_block db ~block_id )
   in
   let%bind zkapp_cmd_tokens =
     let%bind zkapp_cmds =
       Deferred.List.map zkapps_in_block ~f:(fun { zkapp_command_id; _ } ->
           query_db ~f:(fun db ->
-              Processor.User_command.Zkapp_command.load db zkapp_command_id ) )
+              Models.User_command.Zkapp_command.load db zkapp_command_id ) )
     in
     let%bind fee_payer_token =
       let%bind default_id =
-        query_db ~f:(fun db -> Processor.Token.find db Token_id.default)
+        query_db ~f:(fun db -> Models.Token.find db Token_id.default)
       in
-      query_db ~f:(fun db -> Processor.Token.find_by_id db default_id)
+      query_db ~f:(fun db -> Models.Token.find_by_id db default_id)
     in
     let%map account_updates_tokenss =
       Deferred.List.map zkapp_cmds ~f:(fun { zkapp_account_updates_ids; _ } ->
@@ -247,18 +239,18 @@ let fill_in_tokens_used pool block_state_hash =
               ~f:(fun account_update_id ->
                 let%bind { body_id; _ } =
                   query_db ~f:(fun db ->
-                      Processor.Zkapp_account_update.load db account_update_id )
+                      Models.Zkapp_account_update.load db account_update_id )
                 in
                 query_db ~f:(fun db ->
-                    Processor.Zkapp_account_update_body.load db body_id ) )
+                    Models.Zkapp_account_update_body.load db body_id ) )
           in
           Deferred.List.map account_update_bodies
             ~f:(fun { account_identifier_id; _ } ->
               let%bind { token_id; _ } =
                 query_db ~f:(fun db ->
-                    Processor.Account_identifiers.load db account_identifier_id )
+                    Models.Account_identifiers.load db account_identifier_id )
               in
-              query_db ~f:(fun db -> Processor.Token.find_by_id db token_id) ) )
+              query_db ~f:(fun db -> Models.Token.find_by_id db token_id) ) )
     in
     fee_payer_token :: List.concat account_updates_tokenss
   in
@@ -276,7 +268,7 @@ let fill_in_user_commands pool block_state_hash =
   let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
-    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+    query_db ~f:(fun db -> Models.Block.find db ~state_hash:block_state_hash)
   in
   let%bind user_command_ids_and_sequence_nos =
     query_db ~f:(fun db -> Sql.Blocks_and_user_commands.run db ~block_id)
@@ -286,7 +278,7 @@ let fill_in_user_commands pool block_state_hash =
     ~f:(fun (user_command_id, sequence_no) ->
       let%bind user_cmd =
         query_db ~f:(fun db ->
-            Processor.User_command.Signed_command.load db ~id:user_command_id )
+            Models.User_command.Signed_command.load db ~id:user_command_id )
       in
       let command_type = user_cmd.command_type in
       let%bind fee_payer = pk_of_id user_cmd.fee_payer_id in
@@ -306,8 +298,8 @@ let fill_in_user_commands pool block_state_hash =
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_user_cmd =
         query_db ~f:(fun db ->
-            Processor.Block_and_signed_command.load db ~block_id
-              ~user_command_id ~sequence_no )
+            Models.Block_and_signed_command.load db ~block_id ~user_command_id
+              ~sequence_no )
       in
       let status = block_user_cmd.status in
       let failure_reason =
@@ -340,7 +332,7 @@ let fill_in_internal_commands pool block_state_hash =
   let pk_of_id = Load_data.pk_of_id pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
-    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+    query_db ~f:(fun db -> Models.Block.find db ~state_hash:block_state_hash)
   in
   let%bind internal_cmd_info =
     query_db ~f:(fun db -> Sql.Blocks_and_internal_commands.run db ~block_id)
@@ -350,7 +342,7 @@ let fill_in_internal_commands pool block_state_hash =
       (* pieces from the internal_commands table *)
       let%bind internal_cmd =
         query_db ~f:(fun db ->
-            Processor.Internal_command.load db ~id:internal_command_id )
+            Models.Internal_command.load db ~id:internal_command_id )
       in
       let command_type = internal_cmd.command_type in
       let%bind receiver = pk_of_id internal_cmd.receiver_id in
@@ -358,7 +350,7 @@ let fill_in_internal_commands pool block_state_hash =
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_internal_cmd =
         query_db ~f:(fun db ->
-            Processor.Block_and_internal_command.load db ~block_id
+            Models.Block_and_internal_command.load db ~block_id
               ~internal_command_id ~sequence_no ~secondary_sequence_no )
       in
       let status = block_internal_cmd.status in
@@ -388,7 +380,7 @@ let fill_in_zkapp_commands pool block_state_hash =
   let query_db = Mina_caqti.query pool in
   let open Deferred.Let_syntax in
   let%bind block_id =
-    query_db ~f:(fun db -> Processor.Block.find db ~state_hash:block_state_hash)
+    query_db ~f:(fun db -> Models.Block.find db ~state_hash:block_state_hash)
   in
   let%bind zkapp_command_ids_and_sequence_nos =
     query_db ~f:(fun db -> Sql.Blocks_and_zkapp_commands.run db ~block_id)
@@ -398,7 +390,7 @@ let fill_in_zkapp_commands pool block_state_hash =
     ~f:(fun (zkapp_command_id, sequence_no) ->
       let%bind zkapp_cmd =
         query_db ~f:(fun db ->
-            Processor.User_command.Zkapp_command.load db zkapp_command_id )
+            Models.User_command.Zkapp_command.load db zkapp_command_id )
       in
       let%bind fee_payer =
         Load_data.get_fee_payer_body ~pool zkapp_cmd.zkapp_fee_payer_body_id
@@ -412,8 +404,8 @@ let fill_in_zkapp_commands pool block_state_hash =
       let hash = zkapp_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let%bind block_zkapp_cmd =
         query_db ~f:(fun db ->
-            Processor.Block_and_zkapp_command.load db ~block_id
-              ~zkapp_command_id ~sequence_no )
+            Models.Block_and_zkapp_command.load db ~block_id ~zkapp_command_id
+              ~sequence_no )
       in
 
       let status = block_zkapp_cmd.status in
@@ -424,7 +416,7 @@ let fill_in_zkapp_commands pool block_state_hash =
               Deferred.List.map (Array.to_list ids) ~f:(fun id ->
                   let%map { index; failures } =
                     query_db ~f:(fun db ->
-                        Processor.Zkapp_account_update_failures.load db id )
+                        Models.Zkapp_account_update_failures.load db id )
                   in
                   ( index
                   , List.map (Array.to_list failures) ~f:(fun s ->

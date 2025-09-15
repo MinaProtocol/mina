@@ -10,21 +10,20 @@ open Mina_base
 
 let pk_of_id pool pk_id =
   let%map pk_str =
-    Mina_caqti.query pool ~f:(fun db ->
-        Processor.Public_key.find_by_id db pk_id )
+    Mina_caqti.query pool ~f:(fun db -> Models.Public_key.find_by_id db pk_id)
   in
   Signature_lib.Public_key.Compressed.of_base58_check_exn pk_str
 
 let token_of_id pool token_id =
   let%map { value; _ } =
-    Mina_caqti.query pool ~f:(fun db -> Processor.Token.find_by_id db token_id)
+    Mina_caqti.query pool ~f:(fun db -> Models.Token.find_by_id db token_id)
   in
   Token_id.of_string value
 
 let account_identifier_of_id pool account_identifier_id =
   let%bind { public_key_id; token_id } =
     Mina_caqti.query pool ~f:(fun db ->
-        Processor.Account_identifiers.load db account_identifier_id )
+        Models.Account_identifiers.load db account_identifier_id )
   in
   let%bind pk = pk_of_id pool public_key_id in
   let%map token = token_of_id pool token_id in
@@ -36,7 +35,7 @@ let get_amount_bounds pool amount_id =
   let%map amount_db_opt =
     Option.value_map amount_id ~default:(return None) ~f:(fun id ->
         let%map amount =
-          query_db ~f:(fun db -> Processor.Zkapp_amount_bounds.load db id)
+          query_db ~f:(fun db -> Models.Zkapp_amount_bounds.load db id)
         in
         Some amount )
   in
@@ -56,7 +55,7 @@ let get_global_slot_bounds pool id =
   let%map bounds_opt =
     Option.value_map id ~default:(return None) ~f:(fun id ->
         let%map bounds =
-          query_db ~f:(fun db -> Processor.Zkapp_global_slot_bounds.load db id)
+          query_db ~f:(fun db -> Models.Zkapp_global_slot_bounds.load db id)
         in
         let slot_of_int64 int64 =
           int64 |> Unsigned.UInt32.of_int64
@@ -74,7 +73,7 @@ let get_length_bounds pool id =
   let%map bl_db_opt =
     Option.value_map id ~default:(return None) ~f:(fun id ->
         let%map ts =
-          query_db ~f:(fun db -> Processor.Zkapp_length_bounds.load db id)
+          query_db ~f:(fun db -> Models.Zkapp_length_bounds.load db id)
         in
         Some ts )
   in
@@ -106,19 +105,18 @@ let update_of_id pool update_id =
            ; timing_id
            ; voting_for_id
            } =
-    query_db ~f:(fun db -> Processor.Zkapp_updates.load db update_id)
+    query_db ~f:(fun db -> Models.Zkapp_updates.load db update_id)
   in
   let%bind app_state =
     let%bind elements =
-      query_db ~f:(fun db ->
-          Processor.Zkapp_states_nullable.load db app_state_id )
+      query_db ~f:(fun db -> Models.Zkapp_states_nullable.load db app_state_id)
     in
     let field_ids = Pickles_types.Vector.to_list elements in
     let%map field_strs =
       Deferred.List.map field_ids ~f:(fun id_opt ->
           Option.value_map id_opt ~default:(return None) ~f:(fun id ->
               let%map field =
-                query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
+                query_db ~f:(fun db -> Models.Zkapp_field.load db id)
               in
               Some field ) )
     in
@@ -132,7 +130,7 @@ let update_of_id pool update_id =
   let%bind delegate =
     let%map pk_str =
       Mina_caqti.get_opt_item delegate_id
-        ~f:(with_pool ~f:Processor.Public_key.find_by_id)
+        ~f:(with_pool ~f:Models.Public_key.find_by_id)
     in
     Option.map pk_str ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
     |> Set_or_keep.of_option
@@ -141,7 +139,7 @@ let update_of_id pool update_id =
     let%bind vk_opt =
       Option.value_map verification_key_id ~default:(return None) ~f:(fun id ->
           let%map vk =
-            query_db ~f:(fun db -> Processor.Zkapp_verification_keys.load db id)
+            query_db ~f:(fun db -> Models.Zkapp_verification_keys.load db id)
           in
           Some vk )
     in
@@ -157,7 +155,7 @@ let update_of_id pool update_id =
             let%bind hash =
               let%map hash_str =
                 query_db ~f:(fun db ->
-                    Processor.Zkapp_verification_key_hashes.load db hash_id )
+                    Models.Zkapp_verification_key_hashes.load db hash_id )
               in
               Pickles.Backend.Tick.Field.of_string hash_str
             in
@@ -184,7 +182,7 @@ let update_of_id pool update_id =
                   ; set_voting_for
                   ; set_timing
                   } =
-            query_db ~f:(fun db -> Processor.Zkapp_permissions.load db id)
+            query_db ~f:(fun db -> Models.Zkapp_permissions.load db id)
           in
           (* same fields, different types *)
           Some
@@ -211,11 +209,11 @@ let update_of_id pool update_id =
   in
   let%bind zkapp_uri =
     Mina_caqti.get_zkapp_set_or_keep zkapp_uri_id
-      ~f:(with_pool ~f:Processor.Zkapp_uri.load)
+      ~f:(with_pool ~f:Models.Zkapp_uri.load)
   in
   let%bind token_symbol =
     Mina_caqti.get_zkapp_set_or_keep token_symbol_id
-      ~f:(with_pool ~f:Processor.Token_symbols.load)
+      ~f:(with_pool ~f:Models.Token_symbols.load)
   in
   let%bind timing =
     let%map tm_opt =
@@ -226,7 +224,7 @@ let update_of_id pool update_id =
                   ; vesting_period
                   ; vesting_increment
                   } =
-            query_db ~f:(fun db -> Processor.Zkapp_timing_info.load db id)
+            query_db ~f:(fun db -> Models.Zkapp_timing_info.load db id)
           in
           let initial_minimum_balance =
             Currency.Balance.of_string initial_minimum_balance
@@ -255,7 +253,7 @@ let update_of_id pool update_id =
   let%bind voting_for =
     let%map str_opt =
       Mina_caqti.get_opt_item
-        ~f:(with_pool ~f:Processor.Voting_for.load)
+        ~f:(with_pool ~f:Models.Voting_for.load)
         voting_for_id
     in
     Option.map str_opt ~f:State_hash.of_base58_check_exn
@@ -282,18 +280,17 @@ let staking_data_of_id pool id =
            ; lock_checkpoint
            ; epoch_length_id
            } =
-    query_db ~f:(fun db -> Processor.Zkapp_epoch_data.load db id)
+    query_db ~f:(fun db -> Models.Zkapp_epoch_data.load db id)
   in
   let%bind ledger =
     let%bind { hash_id; total_currency_id } =
-      query_db ~f:(fun db ->
-          Processor.Zkapp_epoch_ledger.load db epoch_ledger_id )
+      query_db ~f:(fun db -> Models.Zkapp_epoch_ledger.load db epoch_ledger_id)
     in
     let%bind hash =
       let%map hash_opt =
         Option.value_map hash_id ~default:(return None) ~f:(fun id ->
             let%map hash_str =
-              query_db ~f:(fun db -> Processor.Snarked_ledger_hash.load db id)
+              query_db ~f:(fun db -> Models.Snarked_ledger_hash.load db id)
             in
             Some (Frozen_ledger_hash.of_base58_check_exn hash_str) )
       in
@@ -325,23 +322,22 @@ let staking_data_of_id pool id =
 let protocol_state_precondition_of_id pool id =
   let open Zkapp_basic in
   let query_db ~f = Mina_caqti.query ~f pool in
-  let%bind ({ snarked_ledger_hash_id
-            ; blockchain_length_id
-            ; min_window_density_id
-            ; total_currency_id
-            ; global_slot_since_genesis
-            ; staking_epoch_data_id
-            ; next_epoch_data_id
-            }
-             : Processor.Zkapp_network_precondition.t ) =
-    query_db ~f:(fun db -> Processor.Zkapp_network_precondition.load db id)
+  let%bind { snarked_ledger_hash_id
+           ; blockchain_length_id
+           ; min_window_density_id
+           ; total_currency_id
+           ; global_slot_since_genesis
+           ; staking_epoch_data_id
+           ; next_epoch_data_id
+           } =
+    query_db ~f:(fun db -> Models.Zkapp_network_precondition.load db id)
   in
   let%bind snarked_ledger_hash =
     let%map hash_opt =
       Option.value_map snarked_ledger_hash_id ~default:(return None)
         ~f:(fun id ->
           let%map hash =
-            query_db ~f:(fun db -> Processor.Snarked_ledger_hash.load db id)
+            query_db ~f:(fun db -> Models.Snarked_ledger_hash.load db id)
           in
           Some (Frozen_ledger_hash.of_base58_check_exn hash) )
     in
@@ -370,15 +366,15 @@ let load_events pool id =
   let%map fields_list =
     (* each id refers to an item in 'zkapp_field_array' *)
     let%bind field_array_ids =
-      query_db ~f:(fun db -> Processor.Zkapp_events.load db id)
+      query_db ~f:(fun db -> Models.Zkapp_events.load db id)
     in
     Deferred.List.map (Array.to_list field_array_ids) ~f:(fun array_id ->
         let%bind field_ids =
-          query_db ~f:(fun db -> Processor.Zkapp_field_array.load db array_id)
+          query_db ~f:(fun db -> Models.Zkapp_field_array.load db array_id)
         in
         Deferred.List.map (Array.to_list field_ids) ~f:(fun field_id ->
             let%map field_str =
-              query_db ~f:(fun db -> Processor.Zkapp_field.load db field_id)
+              query_db ~f:(fun db -> Models.Zkapp_field.load db field_id)
             in
             Zkapp_basic.F.of_string field_str ) )
   in
@@ -387,7 +383,7 @@ let load_events pool id =
 let get_fee_payer_body ~pool body_id =
   let query_db ~f = Mina_caqti.query ~f pool in
   let%bind { public_key_id; fee; valid_until; nonce } =
-    query_db ~f:(fun db -> Processor.Zkapp_fee_payer_body.load db body_id)
+    query_db ~f:(fun db -> Models.Zkapp_fee_payer_body.load db body_id)
   in
   let%bind public_key = pk_of_id pool public_key_id in
   let fee = Currency.Fee.of_string fee in
@@ -423,7 +419,7 @@ let get_account_update_body ~pool body_id =
            ; authorization_kind
            ; verification_key_hash_id
            } =
-    query_db ~f:(fun db -> Processor.Zkapp_account_update_body.load db body_id)
+    query_db ~f:(fun db -> Models.Zkapp_account_update_body.load db body_id)
   in
   let%bind account_id = account_identifier_of_id pool account_identifier_id in
   let public_key = Account_id.public_key account_id in
@@ -446,7 +442,7 @@ let get_account_update_body ~pool body_id =
   let%bind actions = load_events pool actions_id in
   let%bind call_data =
     let%map field_str =
-      query_db ~f:(fun db -> Processor.Zkapp_field.load db call_data_id)
+      query_db ~f:(fun db -> Models.Zkapp_field.load db call_data_id)
     in
     Zkapp_basic.F.of_string field_str
   in
@@ -454,25 +450,24 @@ let get_account_update_body ~pool body_id =
     protocol_state_precondition_of_id pool zkapp_network_precondition_id
   in
   let%bind account_precondition =
-    let%bind ({ balance_id
-              ; nonce_id
-              ; receipt_chain_hash
-              ; delegate_id
-              ; state_id
-              ; action_state_id
-              ; proved_state
-              ; is_new
-              }
-               : Processor.Zkapp_account_precondition.t ) =
+    let%bind { balance_id
+             ; nonce_id
+             ; receipt_chain_hash
+             ; delegate_id
+             ; state_id
+             ; action_state_id
+             ; proved_state
+             ; is_new
+             } =
       query_db ~f:(fun db ->
-          Processor.Zkapp_account_precondition.load db
+          Models.Zkapp_account_precondition.load db
             zkapp_account_precondition_id )
     in
     let%bind balance =
       let%map balance_opt =
         Option.value_map balance_id ~default:(return None) ~f:(fun id ->
             let%map { balance_lower_bound; balance_upper_bound } =
-              query_db ~f:(fun db -> Processor.Zkapp_balance_bounds.load db id)
+              query_db ~f:(fun db -> Models.Zkapp_balance_bounds.load db id)
             in
             let lower = Currency.Balance.of_string balance_lower_bound in
             let upper = Currency.Balance.of_string balance_upper_bound in
@@ -484,7 +479,7 @@ let get_account_update_body ~pool body_id =
       let%map nonce_opt =
         Option.value_map nonce_id ~default:(return None) ~f:(fun id ->
             let%map { nonce_lower_bound; nonce_upper_bound } =
-              query_db ~f:(fun db -> Processor.Zkapp_nonce_bounds.load db id)
+              query_db ~f:(fun db -> Models.Zkapp_nonce_bounds.load db id)
             in
             let balance_of_int64 int64 =
               int64 |> Unsigned.UInt32.of_int64
@@ -511,15 +506,14 @@ let get_account_update_body ~pool body_id =
     let%bind delegate = get_pk delegate_id in
     let%bind state =
       let%bind elements =
-        query_db ~f:(fun db ->
-            Processor.Zkapp_states_nullable.load db state_id )
+        query_db ~f:(fun db -> Models.Zkapp_states_nullable.load db state_id)
       in
       let elements = Pickles_types.Vector.to_list elements in
       let%map fields =
         Deferred.List.map elements ~f:(fun id_opt ->
             Option.value_map id_opt ~default:(return None) ~f:(fun id ->
                 let%map field_str =
-                  query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
+                  query_db ~f:(fun db -> Models.Zkapp_field.load db id)
                 in
                 Some (Zkapp_basic.F.of_string field_str) ) )
       in
@@ -529,7 +523,7 @@ let get_account_update_body ~pool body_id =
       let%map action_state_opt =
         Option.value_map action_state_id ~default:(return None) ~f:(fun id ->
             let%map field_str =
-              query_db ~f:(fun db -> Processor.Zkapp_field.load db id)
+              query_db ~f:(fun db -> Models.Zkapp_field.load db id)
             in
             Some (Zkapp_basic.F.of_string field_str) )
       in
@@ -560,7 +554,7 @@ let get_account_update_body ~pool body_id =
         | Some id ->
             let%map vk_hash_str =
               Mina_caqti.query pool ~f:(fun db ->
-                  Processor.Zkapp_verification_key_hashes.load db id )
+                  Models.Zkapp_verification_key_hashes.load db id )
             in
             Account_update.Authorization_kind.Proof
               (Zkapp_basic.F.of_string vk_hash_str)
@@ -597,7 +591,7 @@ let get_account_update_body ~pool body_id =
       }
       : Account_update.Body.Simple.t )
 
-let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
+let get_account_accessed ~pool (account : Models.Accounts_accessed.t) :
     (int * Account.t) Deferred.t =
   let query_db ~f = Mina_caqti.query ~f pool in
   let with_pool ~f arg =
@@ -622,17 +616,17 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
        ; permissions_id
        ; zkapp_id
        }
-        : Processor.Accounts_accessed.t ) =
+        : Models.Accounts_accessed.t ) =
     account
   in
-  let%bind ({ public_key_id; token_id } : Processor.Account_identifiers.t) =
+  let%bind ({ public_key_id; token_id } : Models.Account_identifiers.t) =
     query_db ~f:(fun db ->
-        Processor.Account_identifiers.load db account_identifier_id )
+        Models.Account_identifiers.load db account_identifier_id )
   in
   let%bind public_key = pk_of_id public_key_id in
   let%bind token_id = token_of_id token_id in
   let%bind token_symbol =
-    query_db ~f:(fun db -> Processor.Token_symbols.load db token_symbol_id)
+    query_db ~f:(fun db -> Models.Token_symbols.load db token_symbol_id)
   in
   let balance = Currency.Balance.of_string balance in
   let nonce = nonce |> Unsigned.UInt32.of_int64 |> Account.Nonce.of_uint32 in
@@ -642,20 +636,20 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
   let%bind delegate =
     let%map pk_str_opt =
       Mina_caqti.get_opt_item delegate_id
-        ~f:(with_pool ~f:Processor.Public_key.find_by_id)
+        ~f:(with_pool ~f:Models.Public_key.find_by_id)
     in
     Option.map pk_str_opt
       ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
   in
   let%bind voting_for =
     let%map hash_str =
-      query_db ~f:(fun db -> Processor.Voting_for.load db voting_for_id)
+      query_db ~f:(fun db -> Models.Voting_for.load db voting_for_id)
     in
     State_hash.of_base58_check_exn hash_str
   in
   let%bind timing =
     match%map
-      query_db ~f:(fun db -> Processor.Timing_info.load_opt db timing_id)
+      query_db ~f:(fun db -> Models.Timing_info.load_opt db timing_id)
     with
     | None ->
         Account_timing.Untimed
@@ -667,7 +661,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
              ; vesting_increment
              ; _
              }
-              : Processor.Timing_info.t ) =
+              : Models.Timing_info.t ) =
           timing
         in
         if
@@ -714,7 +708,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ; set_voting_for
             ; set_timing
             } =
-      query_db ~f:(fun db -> Processor.Zkapp_permissions.load db permissions_id)
+      query_db ~f:(fun db -> Models.Zkapp_permissions.load db permissions_id)
     in
     ( { edit_state
       ; send
@@ -735,8 +729,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
       : Permissions.t )
   in
   let%bind zkapp_db =
-    Mina_caqti.get_opt_item zkapp_id
-      ~f:(with_pool ~f:Processor.Zkapp_account.load)
+    Mina_caqti.get_opt_item zkapp_id ~f:(with_pool ~f:Models.Zkapp_account.load)
   in
   let%bind zkapp =
     Option.value_map ~default:(return None) zkapp_db
@@ -751,13 +744,13 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
            }
          ->
         let%bind elements =
-          query_db ~f:(fun db -> Processor.Zkapp_states.load db app_state_id)
+          query_db ~f:(fun db -> Models.Zkapp_states.load db app_state_id)
         in
         let elements = Pickles_types.Vector.to_list elements in
         let%bind app_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
-                query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
+                query_db ~f:(fun db -> Models.Zkapp_field.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Zkapp_state.V.of_list_exn fields
@@ -767,7 +760,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
             ~f:(fun id ->
               let%bind { verification_key; hash_id } =
                 query_db ~f:(fun db ->
-                    Processor.Zkapp_verification_keys.load db id )
+                    Models.Zkapp_verification_keys.load db id )
               in
               let data =
                 match Base64.decode verification_key with
@@ -782,7 +775,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
               let%map hash =
                 let%map hash_str =
                   query_db ~f:(fun db ->
-                      Processor.Zkapp_verification_key_hashes.load db hash_id )
+                      Models.Zkapp_verification_key_hashes.load db hash_id )
                 in
                 Zkapp_basic.F.of_string hash_str
               in
@@ -794,13 +787,13 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
         in
         let%bind elements =
           query_db ~f:(fun db ->
-              Processor.Zkapp_action_states.load db action_state_id )
+              Models.Zkapp_action_states.load db action_state_id )
         in
         let elements = Pickles_types.Vector.to_list elements in
         let%bind action_state =
           let%map field_strs =
             Deferred.List.map elements ~f:(fun id ->
-                query_db ~f:(fun db -> Processor.Zkapp_field.load db id) )
+                query_db ~f:(fun db -> Models.Zkapp_field.load db id) )
           in
           let fields = List.map field_strs ~f:Zkapp_basic.F.of_string in
           Pickles_types.Vector.Vector_5.of_list_exn fields
@@ -810,7 +803,7 @@ let get_account_accessed ~pool (account : Processor.Accounts_accessed.t) :
           |> Mina_numbers.Global_slot_since_genesis.of_uint32
         in
         let%map zkapp_uri =
-          query_db ~f:(fun db -> Processor.Zkapp_uri.load db zkapp_uri_id)
+          query_db ~f:(fun db -> Models.Zkapp_uri.load db zkapp_uri_id)
         in
         Some
           ( { app_state

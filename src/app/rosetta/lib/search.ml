@@ -5,6 +5,7 @@ open Rosetta_lib
 module Rosetta_lib_block = Block
 open Rosetta_models
 open Commands_common
+module Models = Archive_lib.Models
 
 module Transaction_query = struct
   module Filter = struct
@@ -211,9 +212,9 @@ module Sql = struct
       let success =
         Option.map filter.success ~f:(function
           | true ->
-              Archive_lib.Processor.applied_str
+              Models.applied_str
           | false ->
-              Archive_lib.Processor.failed_str )
+              Models.failed_str )
       in
       { max_block
       ; txn_hash = filter.transaction_hash
@@ -324,7 +325,7 @@ module Sql = struct
     module Cte = struct
       type t =
         { id : int
-        ; signed_command : Archive_lib.Processor.User_command.Signed_command.t
+        ; signed_command : Models.User_command.Signed_command.t
         ; block_id : int
         ; sequence_no : int
         ; status : string
@@ -336,9 +337,7 @@ module Sql = struct
       [@@deriving hlist, fields]
 
       let fields' =
-        List.map
-          ( "id"
-          :: Archive_lib.Processor.User_command.Signed_command.Fields.names )
+        List.map ("id" :: Models.User_command.Signed_command.Fields.names)
           ~f:(fun n -> "u." ^ n)
 
       let fields =
@@ -356,7 +355,7 @@ module Sql = struct
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
             [ int
-            ; Archive_lib.Processor.User_command.Signed_command.typ
+            ; Models.User_command.Signed_command.typ
             ; int
             ; int
             ; string
@@ -517,9 +516,7 @@ module Sql = struct
     let to_info ({ command = { signed_command = uc; _ } as command; _ } as t) =
       let open Result.Let_syntax in
       let%bind kind =
-        match
-          uc.Archive_lib.Processor.User_command.Signed_command.command_type
-        with
+        match uc.Models.User_command.Signed_command.command_type with
         | "payment" ->
             Result.return `Payment
         | "delegation" ->
@@ -582,7 +579,7 @@ module Sql = struct
     module Filtered_commands_cte = struct
       type t =
         { internal_command_id : int
-        ; raw_internal_command : Archive_lib.Processor.Internal_command.t
+        ; raw_internal_command : Models.Internal_command.t
         ; receiver : string
         ; coinbase_receiver : string option
         ; sequence_no : int
@@ -595,9 +592,7 @@ module Sql = struct
 
       let fields' =
         String.concat ~sep:","
-        @@ List.map
-             ~f:(fun n -> "i." ^ n)
-             Archive_lib.Processor.Internal_command.Fields.names
+        @@ List.map ~f:(fun n -> "i." ^ n) Models.Internal_command.Fields.names
 
       let fields =
         String.concat ~sep:","
@@ -621,7 +616,7 @@ module Sql = struct
         Mina_caqti.Type_spec.custom_type ~to_hlist ~of_hlist
           Caqti_type.
             [ int
-            ; Archive_lib.Processor.Internal_command.typ
+            ; Models.Internal_command.typ
             ; string
             ; option string
             ; int
