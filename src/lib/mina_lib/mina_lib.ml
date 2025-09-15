@@ -726,7 +726,7 @@ let get_snarked_ledger_full t state_hash_opt =
               in
               Staged_ledger.Scan_state.get_snarked_ledger_async ~ledger
                 ~get_protocol_state ~apply_first_pass ~apply_second_pass
-                ~apply_first_pass_sparse_ledger
+                ~apply_first_pass_sparse_ledger ~signature_kind
                 (Staged_ledger.scan_state
                    (Transition_frontier.Breadcrumb.staged_ledger b) )
               |> Deferred.Result.map_error ~f:(fun e ->
