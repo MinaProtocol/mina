@@ -833,6 +833,8 @@ module Accounts = struct
     Result.bind ~f:of_json_layout (Json_layout.Accounts.of_yojson json)
 end
 
+(** Parameters for protocol constants that specify the genesis ledger used by
+    the network *)
 module Ledger = struct
   type base =
     | Named of string  (** One of the named ledgers in [Genesis_ledger] *)
@@ -1186,6 +1188,8 @@ module Proof_keys = struct
     }
 end
 
+(** Parameters for protocol constants that specify slot spans, and relate slot
+    spans to system times *)
 module Genesis = struct
   type t = Json_layout.Genesis.t =
     { k : int option (* the depth of finality constant (in slots) *)
@@ -1349,6 +1353,8 @@ module Daemon = struct
     }
 end
 
+(** Parameters for protocol constants that specify the genesis epoch ledger
+    snapshots used by the network *)
 module Epoch_data = struct
   module Data = struct
     type t = { ledger : Ledger.t; seed : string }
