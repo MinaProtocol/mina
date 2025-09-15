@@ -444,7 +444,7 @@ function publish_debian() {
             --names "$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb" \
             --version $__target_version \
             --bucket $__debian_repo \
-            $(if [[ $__force_upload_debians == 1 ]]; then echo "--force"; fi) \
+            "$(if [[ $__force_upload_debians == 1 ]]; then echo "--force"; fi)" \
             -c $__codename \
             -r $__channel \
             --arch $__arch \
