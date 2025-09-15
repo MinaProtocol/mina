@@ -61,10 +61,7 @@ end
 module type Ledger_input_intf = sig
   include Accounts_intf
 
-  val directory :
-    [ `Ephemeral
-    | `New of Mina_ledger.Ledger.Root.Config.backing_type
-    | `Path of string * Mina_ledger.Ledger.Root.Config.backing_type ]
+  val directory : [ `Ephemeral | `New | `Path of string ]
 
   val depth : int
 
