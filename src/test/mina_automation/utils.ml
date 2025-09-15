@@ -7,9 +7,9 @@ let paths =
 
 let possible_locations ~file possible_locations =
   let exists_at_path folder file =
-    match Sys.file_exists (folder ^ "/" ^ file) with
+    match Sys.file_exists (folder ^/ file) with
     | `Yes ->
-        Some (folder ^ "/" ^ file)
+        Some (folder ^/ file)
     | _ ->
         None
   in
