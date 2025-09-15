@@ -222,7 +222,7 @@ module Ledger = struct
   let generate_tar ~logger ~target_dir ~ledger_name_prefix ~root_hash
       ~ledger_dirname () =
     let root_hash = Ledger_hash.to_base58_check root_hash in
-    let%bind.Deferred () = Unix.mkdir ~p:() target_dir in
+    let%bind () = Unix.mkdir ~p:() target_dir in
     let tar_path = target_dir ^/ hash_filename root_hash ~ledger_name_prefix in
     [%log trace]
       "Creating $ledger tar file for $root_hash at $path from database at $dir"
@@ -234,8 +234,8 @@ module Ledger = struct
         ] ;
     (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
        time to stablize *)
-    let%bind.Deferred () = after (Time.Span.of_int_sec 5) in
-    match%map.Deferred
+    let%bind () = after (Time.Span.of_int_sec 5) in
+    match%map
       Tar.create ~root:ledger_dirname ~file:tar_path ~directory:"." ()
     with
     | Ok () ->
