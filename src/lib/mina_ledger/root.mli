@@ -130,6 +130,11 @@ module Make
   (** Make a checkpoint of the root ledger *)
   val make_checkpoint : t -> config:Config.t -> unit
 
+  (** Make a checkpoint of the existing components of the root ledger and return
+      new ledgers backed by those separate components *)
+  val create_component_checkpoints :
+    t -> directory_name:string -> Stable_db.t * Unstable_db.t option
+
   (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
       that does not need to know how the root is implemented *)
   val as_unmasked : t -> Any_ledger.witness
