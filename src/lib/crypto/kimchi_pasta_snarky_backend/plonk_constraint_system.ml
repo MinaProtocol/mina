@@ -806,11 +806,14 @@ type 'f runtime_tables_cfg =
 
 (** The constraint system. *)
 type ('f, 'rust_gates) t =
-  { (* Map of cells that share the same value (enforced by to the permutation). *)
+  { (* Map of cells that share the same value (enforced by to the
+       permutation). *)
     equivalence_classes : Row.t Position.t list V.Table.t
-  ; (* How to compute each internal variable (as a linear combination of other variables). *)
+  ; (* How to compute each internal variable (as a linear combination of other
+       variables). *)
     internal_vars : (('f * V.t) list * 'f option) Internal_var.Table.t
-  ; (* The variables that hold each witness value for each row, in reverse order. *)
+  ; (* The variables that hold each witness value for each row, in reverse
+       order. *)
     mutable rows_rev : V.t option array list
   ; (* A circuit is described by a series of gates.
        A gate is finalized once [finalize_and_get_gates] is called.
@@ -826,7 +829,8 @@ type ('f, 'rust_gates) t =
   ; mutable runtime_tables_cfg : 'f runtime_tables_cfg
   ; (* The row to use the next time we add a constraint. *)
     mutable next_row : int
-  ; (* The size of the public input (which fills the first rows of our constraint system. *)
+  ; (* The size of the public input (which fills the first rows of our
+       constraint system. *)
     public_input_size : int Core_kernel.Set_once.t
   ; (* The number of previous recursion challenges. *)
     prev_challenges : int Core_kernel.Set_once.t
@@ -840,15 +844,16 @@ type ('f, 'rust_gates) t =
     *)
     cached_constants : ('f, V.t) Core_kernel.Hashtbl.t
         (* The [equivalence_classes] field keeps track of the positions which must be
-             enforced to be equivalent due to the fact that they correspond to the same V.t value.
-             I.e., positions that are different usages of the same [V.t].
+           enforced to be equivalent due to the fact that they correspond to
+           the same V.t value.
+           I.e., positions that are different usages of the same [V.t].
 
-             We use a union-find data structure to track equalities that a constraint system wants
-             enforced *between* [V.t] values. Then, at the end, for all [V.t]s that have been unioned
-             together, we combine their equivalence classes in the [equivalence_classes] table into
-             a single equivalence class, so that the permutation argument enforces these desired equalities
-             as well.
-        *)
+           We use a union-find data structure to track equalities that a
+           constraint system wants enforced *between* [V.t] values. Then, at
+           the end, for all [V.t]s that have been unioned together, we combine
+           their equivalence classes in the [equivalence_classes] table into a
+           single equivalence class, so that the permutation argument enforces
+           these desired equalities as well. *)
   ; union_finds : V.t Core_kernel.Union_find.t V.Table.t
   }
 
