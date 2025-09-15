@@ -402,8 +402,9 @@ function publish_debian() {
     local __backend=$9
     local __debian_repo=${10}
     local __arch=${11:-DEFAULT_ARCHITECTURE}
-    local __debian_sign_key=${12}
-    local __new_artifact_name=${13:-""}
+    local __force_upload_debians=${12:-0}
+    local __debian_sign_key=${13}
+    local __new_artifact_name=${14:-""}
 
     get_cached_debian_or_download $__backend $__artifact $__codename "$__network" "$__arch"
     local __artifact_full_name
@@ -443,6 +444,7 @@ function publish_debian() {
             --names "$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb" \
             --version $__target_version \
             --bucket $__debian_repo \
+            "$(if [[ $__force_upload_debians == 1 ]]; then echo "--force"; fi)" \
             -c $__codename \
             -r $__channel \
             --arch $__arch \
@@ -604,6 +606,8 @@ function publish_help(){
     printf "  %-25s %s\n" "--backend" "[string] backend to use for storage. e.g gs,hetzner. default: gs";
     printf "  %-25s %s\n" "--debian-repo" "[string] debian repository to publish to. default: $DEBIAN_REPO";
     printf "  %-25s %s\n" "--debian-sign-key" "[string] debian signing key to use. default: lack of presence = no signing";
+    printf "  %-25s %s\n" "--strip-network-from-archive" "[bool] strip network from archive name. E.g mina-archive-devnet -> mina-archive";
+    printf "  %-25s %s\n" "--force-upload-debians" "[bool] force upload debian packages even if they exist already in the repository";
     echo ""
     echo "Example:"
     echo ""
@@ -636,6 +640,7 @@ function publish(){
     local __debian_sign_key=""
     local __strip_network_from_archive=0
     local __arch=${DEFAULT_ARCHITECTURE}
+    local __force_upload_debians=0
 
     while [ ${#} -gt 0 ]; do
         error_message="❌ Error: a value is needed for '$1'";
@@ -711,6 +716,10 @@ function publish(){
                 __arch=${2:?$error_message}
                 shift 2;
             ;;
+            --force-upload-debians )
+                __force_upload_debians=1
+                shift 1;
+            ;;
             * )
                 echo -e "❌ ${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -758,6 +767,7 @@ function publish(){
     echo " - Debian sign key: $__debian_sign_key"
     echo " - Strip network from archive: $__strip_network_from_archive"
     echo " - Architecture: $__arch"
+    echo " - Force upload debians: $__force_upload_debians"
     echo ""
 
     if [[ $__backend != "gs" && $__backend != "hetzner" && $__backend != "local" ]]; then
@@ -798,6 +808,7 @@ function publish(){
                                         $__backend \
                                         $__debian_repo \
                                         "$__arch" \
+                                        "$__force_upload_debians" \
                                         "$__debian_sign_key"
                             fi
 
@@ -827,6 +838,7 @@ function publish(){
                                             $__backend \
                                             $__debian_repo \
                                             "$__arch" \
+                                            "$__force_upload_debians" \
                                             "$__debian_sign_key" \
                                             "$new_name"
                                 fi
@@ -850,6 +862,7 @@ function publish(){
                                             $__backend \
                                             $__debian_repo \
                                             "$__arch" \
+                                            "$__force_upload_debians" \
                                             "$__debian_sign_key"
                                 fi
 
@@ -872,6 +885,7 @@ function publish(){
                                             $__backend \
                                             $__debian_repo \
                                             "$__arch" \
+                                            "$__force_upload_debians" \
                                             "$__debian_sign_key"
                                 fi
 
