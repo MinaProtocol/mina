@@ -62,7 +62,12 @@ module Step : sig
     , Kimchi_bindings.Protocol.VerifierIndex.Fp.t )
     Key_cache.Sync.Disk_storable.t
 
-  (** Default disk storage handler for proving keys. *)
+  (** Default disk storage handler for proving keys.
+
+      When writing keys to disk, this storage handler will optionally dump
+      extra circuit data (constraint system details) based on the
+      MINA_DUMP_CIRCUIT_DATA environment variable. The dumping is disabled
+      by default. Set MINA_DUMP_CIRCUIT_DATA to "true", "1", or "yes" to enable. *)
   val storable : storable
 
   (** Default disk storage handler for verification keys. *)
@@ -160,7 +165,12 @@ module Wrap : sig
   type vk_storable =
     (Key.Verification.t, Verification_key.t) Key_cache.Sync.Disk_storable.t
 
-  (** Default disk storage handler for wrap proving keys. *)
+  (** Default disk storage handler for wrap proving keys.
+
+      When writing keys to disk, this storage handler will optionally dump
+      extra circuit data (constraint system details) based on the
+      MINA_DUMP_CIRCUIT_DATA environment variable. The dumping is disabled
+      by default. Set MINA_DUMP_CIRCUIT_DATA to "true", "1", or "yes" to enable. *)
   val storable : storable
 
   (** Default disk storage handler for wrap verification keys. *)
