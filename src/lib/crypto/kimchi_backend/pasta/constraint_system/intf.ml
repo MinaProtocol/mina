@@ -159,4 +159,14 @@ module type Full = sig
   (** Serialize the constraint system to JSON format.
       Useful for debugging and external analysis. *)
   val to_json : t -> string
+
+  (** Dump extra circuit data to a file for use by external systems.
+
+      This function exports additional circuit metadata and configuration
+      that is needed by the Mina Rust node for circuit verification and
+      proof processing.
+
+      @param t The constraint system
+      @param string The file path where the circuit data should be written *)
+  val dump_extra_circuit_data : t -> string -> unit
 end

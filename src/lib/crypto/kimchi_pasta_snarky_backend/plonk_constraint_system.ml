@@ -777,7 +777,7 @@ module V = struct
           (** An internal variable is generated to hold an intermediate value
               (e.g., in reducing linear combinations to single PLONK positions).
           *)
-    [@@deriving compare, hash, sexp]
+    [@@deriving compare, hash, sexp, bin_io]
   end
 
   include T
@@ -1003,6 +1003,8 @@ module Make
   val digest : t -> Md5.t
 
   val to_json : t -> string
+
+  val dump_extra_circuit_data : t -> string -> unit
 end = struct
   open Core_kernel
   module Constraint = Plonk_constraint.Make (Fp)
@@ -2434,4 +2436,36 @@ end = struct
               Option.try_with (fun () -> reduce_to_v values.(i)) )
         in
         add_row sys values kind coeffs
+
+  (* ((Fp.t * V.t) list * Fp.t option) *)
+  type concrete_table = ((Fp.t * V.t) list * Fp.t option) Internal_var.Table.t
+  [@@deriving bin_io]
+
+  (* V.t option array list *)
+  type concrete_rows_rev = V.t option array list [@@deriving bin_io]
+
+  let dump_extra_circuit_data (sys : t) base_path =
+    let rows_rev_name = base_path ^ "_rows_rev.bin" in
+    let internal_vars_name = base_path ^ "_internal_vars.bin" in
+    let gates_json_name = base_path ^ "_gates.json" in
+    if Sys.file_exists rows_rev_name then Sys.remove rows_rev_name ;
+    if Sys.file_exists internal_vars_name then Sys.remove internal_vars_name ;
+    if Sys.file_exists gates_json_name then Sys.remove gates_json_name ;
+
+    let table : concrete_rows_rev = sys.rows_rev in
+    let size = bin_size_concrete_rows_rev table in
+    let buf = Bigstring.create size in
+    ignore (bin_write_concrete_rows_rev buf ~pos:0 table : int) ;
+    Core_kernel.Out_channel.write_all rows_rev_name
+      ~data:(Bigstring.to_string buf) ;
+
+    let table : concrete_table = sys.internal_vars in
+    let size = bin_size_concrete_table table in
+    let buf = Bigstring.create size in
+    ignore (bin_write_concrete_table buf ~pos:0 table : int) ;
+    Core_kernel.Out_channel.write_all internal_vars_name
+      ~data:(Bigstring.to_string buf) ;
+
+    let gates_json = to_json sys in
+    Core_kernel.Out_channel.write_all gates_json_name ~data:gates_json
 end
