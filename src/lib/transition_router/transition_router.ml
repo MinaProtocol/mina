@@ -613,6 +613,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location
+          ~signature_kind:Mina_signature_kind.t_DEPRECATED
       in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger
