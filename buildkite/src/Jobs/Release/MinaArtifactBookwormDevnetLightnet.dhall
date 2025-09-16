@@ -18,7 +18,7 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts = [ Artifacts.Type.LogProc, Artifacts.Type.Daemon ]
-          , network = Network.Type.Berkeley
+          , network = Network.Type.Devnet
           , profile = Profiles.Type.Lightnet
           , tags =
             [ PipelineTag.Type.Long

@@ -20,7 +20,7 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts = [ Artifacts.Type.LogProc, Artifacts.Type.Daemon ]
-          , network = Network.Type.Berkeley
+          , network = Network.Type.Devnet
           , arch = Arch.Type.Arm64
           , profile = Profiles.Type.Lightnet
           , tags =
