@@ -569,7 +569,7 @@ end = struct
       let account_updates =
         Call_forest.mapi account_updates ~f:(fun update_idx p ->
             let account_id = Account_update.account_id p in
-            let vks_overriden' =
+            let vks_overridden' =
               match Account_update.verification_key_update_to_option p with
               | Zkapp_basic.Set_or_keep.Set vk_next ->
                   Account_id.Map.set !vks_overridden ~key:account_id
@@ -636,10 +636,10 @@ end = struct
                 Account_id.Table.update tbl account_id
                   ~f:(const @@ With_hash.hash prioritized_vk) ;
                 (* return the updated overrides *)
-                vks_overridden := vks_overriden' ;
+                vks_overridden := vks_overridden' ;
                 (p, Some prioritized_vk)
             | _ ->
-                vks_overridden := vks_overriden' ;
+                vks_overridden := vks_overridden' ;
                 (p, None) )
       in
       match Queue.to_list error_messages with
