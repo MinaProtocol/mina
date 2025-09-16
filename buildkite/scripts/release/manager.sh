@@ -120,7 +120,7 @@ function main_help(){
     echo " artifacts: $DEFAULT_ARTIFACTS"
     echo " networks: $DEFAULT_NETWORKS"
     echo " codenames: $DEFAULT_CODENAMES"
-    echo " architectures: $DEFAULT_ARCHITECTURE"
+    echo " architectures: $DEFAULT_ARCHITECTURES"
     echo ""
     echo "Available values: "
     echo " artifacts: mina-logproc,mina-archive,mina-rosetta,mina"
@@ -617,7 +617,7 @@ function publish_help(){
     echo "Parameters:"
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
-    printf "  %-25s %s\n" "--archs" "[list string] target architectures list. Default: $DEFAULT_ARCHITECTURE";
+    printf "  %-25s %s\n" "--archs" "[list string] target architectures list. Default: $DEFAULT_ARCHITECTURES";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to publish. e.g mina-logproc,mina-archive,mina-rosetta";
     printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet";
     printf "  %-25s %s\n" "--buildkite-build-id" "[string] buildkite build id of release build to publish";
@@ -970,7 +970,7 @@ function promote_help(){
     echo "Parameters:"
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
-    printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURE";
+    printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURES";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to publish. e.g mina-logproc,mina-archive,mina-rosetta";
     printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet";
     printf "  %-25s %s\n" "--source-version" "[path] source version of build to publish";
@@ -1015,7 +1015,7 @@ function promote(){
     local __dry_run=0
     local __debian_repo=$DEBIAN_REPO
     local __debian_sign_key=""
-    local __arch="$DEFAULT_ARCHITECTURE"
+    local __arch="$DEFAULT_ARCHITECTURES"
 
 
     while [ ${#} -gt 0 ]; do
@@ -1278,7 +1278,7 @@ function verify_help(){
     echo "Parameters:"
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
-    printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURE";
+    printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURES";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to publish. e.g mina-logproc,mina-archive,mina-rosetta";
     printf "  %-25s %s\n" "--networks" "[comma separated list] list of networks to publish. e.g devnet,mainnet";
     printf "  %-25s %s\n" "--version" "[path] target version of build to publish";
@@ -1288,8 +1288,8 @@ function verify_help(){
     printf "  %-25s %s\n" "--docker-io" "[bool] publish to docker.io instead of gcr.io";
     printf "  %-25s %s\n" "--only-dockers" "[bool] publish only docker images";
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
-    printf "  %-25s %s\n" "--docker-suffix" "[string] suffix to append to docker image tags";
     printf "  %-25s %s\n" "--arch" "[string] architecture (amd64 or arm64)";
+    printf "  %-25s %s\n" "--profile" "[string] build profile to publish. e.g lightnet, mainnet. default: $DEFAULT_PROFILE";
     echo ""
     echo "Example:"
     echo ""
@@ -1326,7 +1326,6 @@ function verify(){
     local __only_debians=0
     local __debian_repo=$DEBIAN_REPO
     local __debian_repo_signed=0
-    local __docker_suffix=""
     local __archs="$DEFAULT_ARCHITECTURES"
     local __profile=$DEFAULT_PROFILE
 
@@ -1672,7 +1671,7 @@ function persist_help(){
     echo "Parameters:"
     echo ""
     printf "  %-25s %s\n" "-h  | --help" "show help";
-    printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURE";
+    printf "  %-25s %s\n" "--arch" "[string] target architecture. Default: $DEFAULT_ARCHITECTURES";
     printf "  %-25s %s\n" "--backend" "[string] backend to persist artifacts. e.g gs,hetzner";
     printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to persist. e.g mina-logproc,mina-archive,mina-rosetta";
     printf "  %-25s %s\n" "--build_id" "[string] buildkite build id to persist artifacts";
@@ -1699,7 +1698,7 @@ function persist(){
     local __codename
     local __new_version
     local __suite="unstable"
-    local __arch="$DEFAULT_ARCHITECTURE"
+    local __arch="$DEFAULT_ARCHITECTURES"
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";

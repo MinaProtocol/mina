@@ -28,8 +28,6 @@ let DockerPublish = ../Constants/DockerPublish.dhall
 
 let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
-let Extensions = ../Lib/Extensions.dhall
-
 let Arch = ../Constants/Arch.dhall
 
 let ReleaseSpec =
@@ -120,25 +118,10 @@ let generateStep =
 
                 else  " && ./scripts/debian/aptly.sh stop"
 
-          let suffix =
-                Extensions.joinOptionals
-                  "-"
-                  [ merge
-                      { Mainnet = None Text
-                      , Devnet = None Text
-                      , Dev = None Text
-                      , Lightnet = Some
-                          "${Profiles.toSuffixLowercase spec.deb_profile}"
-                      }
-                      spec.deb_profile
-                  , merge
-                      { None = None Text
-                      , Instrumented = Some
-                          "${BuildFlags.toSuffixLowercase spec.build_flags}"
-                      }
-                      spec.build_flags
-                  , spec.deb_suffix
-                  ]
+          let profile =
+                "${Profiles.toSuffixLowercase
+                     spec.deb_profile}${BuildFlags.toLabelSegment
+                                          spec.build_flags}"
 
           let debSuffix =
                 merge
@@ -158,8 +141,8 @@ let generateStep =
                             , networks = [ spec.network ]
                             , version = spec.deb_version
                             , codenames = [ spec.deb_codename ]
-                            , suffix = suffix
-                            , arch = spec.arch
+                            , profile = profile
+                            , archs = [ spec.arch ]
                             }
 
                 else  ""
