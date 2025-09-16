@@ -27,24 +27,17 @@ type merge_outcome =
 
 let finalize_one ~submitted_result ~spec ~fee ~prover =
   let open Snark_work_lib in
-  let spec = Spec.Single.read_all_proofs_from_disk spec in
   let submitted_result =
-    Result.Single.Poly.map ~f_spec:(const spec)
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
+    Result.Single.Poly.map ~f_spec:(const spec) ~f_proof:Fn.id submitted_result
   in
   Done { results = `One submitted_result; fee; prover }
 
 let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
     ~fee ~prover =
   let open Snark_work_lib in
-  let other_spec = Spec.Single.read_all_proofs_from_disk other_spec in
   let submitted_result =
-    Result.Single.Poly.map ~f_spec:(const other_spec)
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
-  in
-  let in_pool_result =
-    Result.Single.Poly.map ~f_spec:Spec.Single.read_all_proofs_from_disk
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk in_pool_result
+    Result.Single.Poly.map ~f_spec:(const other_spec) ~f_proof:Fn.id
+      submitted_result
   in
   let results =
     match submitted_half with

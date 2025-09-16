@@ -279,7 +279,7 @@ let submit_into_combining_result ~submitted_result ~partitioner
   | Done combined ->
       One_or_two.iter
         ~f:(fun { spec = single_spec; elapsed; _ } ->
-          Work.Metrics.emit_single_metrics_stable ~logger:partitioner.logger
+          Work.Metrics.emit_single_metrics ~logger:partitioner.logger
             ~single_spec ~elapsed )
         combined.results ;
       `Done combined
