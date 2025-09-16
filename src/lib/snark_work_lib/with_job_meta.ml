@@ -6,6 +6,7 @@ module Stable = struct
       ; job_id : 'job_id
       ; scheduled_since_unix_epoch : Mina_stdlib.Time.Span.Stable.V1.t
       ; sok_message : Mina_base.Sok_message.Stable.V1.t
+            (* ; work_spec_hash:   *)
       }
     [@@deriving sexp, yojson]
   end
