@@ -439,12 +439,12 @@ function publish_debian() {
     echo " 🍥  Publishing $__artifact debian to $__channel channel with $__target_version version"
     echo "     📦  Target debian version: $(calculate_debian_version $__artifact $__target_version $__codename "$__network" "$__arch")"
     if [[ $__dry_run == 0 ]]; then
-        # shellcheck disable=SC2068
+        # shellcheck disable=SC2068,SC2046
         prefix_cmd "$SUBCOMMAND_TAB" source $SCRIPTPATH/../../../scripts/debian/publish.sh \
             --names "$DEBIAN_CACHE_FOLDER/$__codename/${__new_artifact_name}_${__target_version}_${__arch}.deb" \
             --version $__target_version \
             --bucket $__debian_repo \
-            "$(if [[ $__force_upload_debians == 1 ]]; then echo "--force"; fi)" \
+            $(if [[ $__force_upload_debians == 1 ]]; then echo "--force"; fi) \
             -c $__codename \
             -r $__channel \
             --arch $__arch \
