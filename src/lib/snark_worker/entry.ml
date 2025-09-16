@@ -132,9 +132,14 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
             in
             log_and_retry "performing work" e (retry_pause 10.) go
         | Ok result ->
-            let result_without_spec =
-              Spec.Partitioned.Poly.map ~f_single_spec:ignore
-                ~f_subzkapp_spec:ignore ~f_data:Fn.id result
+            let wire_result =
+              match result with
+              | Spec.Partitioned.Poly.Single { job; data } ->
+                  Result.Partitioned.Stable.Latest.
+                    { id = `Single job.job_id; data }
+              | Sub_zkapp_command { job; data } ->
+                  Result.Partitioned.Stable.Latest.
+                    { id = `Sub_zkapp job.job_id; data }
             in
             ( match result with
             | Spec.Partitioned.Poly.Single
@@ -151,7 +156,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
             let rec submit_work () =
               match%bind
                 dispatch Rpc_submit_work.Stable.Latest.rpc
-                  shutdown_on_disconnect result_without_spec daemon_address
+                  shutdown_on_disconnect wire_result daemon_address
               with
               | Error e ->
                   log_and_retry "submitting work" e (retry_pause 10.)

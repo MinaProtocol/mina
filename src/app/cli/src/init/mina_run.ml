@@ -409,7 +409,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           [%log debug] "received completed work from a snark worker"
             ~metadata:
               [ ( "work_id"
-                , Snark_work_lib.Spec.Partitioned.Poly.id_to_json result )
+                , Snark_work_lib.Result.Partitioned.Stable.Latest.id_to_json
+                    result )
               ] ;
           Mina_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;

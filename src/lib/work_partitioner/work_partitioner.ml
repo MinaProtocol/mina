@@ -417,12 +417,10 @@ let submit_into_pending_zkapp_command ~partitioner
 let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
     ~(partitioner : t) =
   match result with
-  | Work.Spec.Partitioned.Poly.Single
-      { job = Work.With_job_meta.{ job_id; spec; _ }
-      ; data = { proof; data = elapsed }
-      } ->
-      let submitted_result = Work.Result.Single.Poly.{ spec; proof; elapsed } in
+  | { id = `Single job_id; data = { proof; data = elapsed } } ->
+      let submitted_result =
+        Work.Result.Single.Poly.{ spec = (); proof; elapsed }
+      in
       submit_single ~is_from_zkapp:false ~partitioner ~submitted_result ~job_id
-  | Work.Spec.Partitioned.Poly.Sub_zkapp_command
-      { job = Work.With_job_meta.{ job_id; _ }; data } ->
+  | { id = `Sub_zkapp job_id; data } ->
       submit_into_pending_zkapp_command ~partitioner ~job_id ~data
