@@ -35,6 +35,28 @@ module Paths = struct
   let official_name = "mina-archive"
 end
 
+module Scripts = struct
+  type t = [ `CreateSchema | `DropTables | `Upgrade | `Rollback ]
+
+  let possible_locations = [ "/etc/mina/archive"; "src/app/archive" ]
+
+  let file t =
+    match t with
+    | `CreateSchema ->
+        "create_schema.sql"
+    | `DropTables ->
+        "drop_tables.sql"
+    | `Upgrade ->
+        "upgrade-to-mesa.sql"
+    | `Rollback ->
+        "rollback_to-berkeley.sql"
+
+  let filepath t =
+    let file = file t in
+    let possible_locations = [ "/etc/mina/archive"; "src/app/archive" ] in
+    Utils.possible_locations ~file possible_locations
+end
+
 module Executor = Executor.Make (Paths)
 
 type t = { config : Config.t; executor : Executor.t }
