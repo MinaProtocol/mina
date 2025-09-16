@@ -80,14 +80,14 @@ let extract_perf_metrics log_file =
               if String.Map.mem entry.metadata "is_perf_metric" then
                 let time_in_ms =
                   String.Map.find entry.metadata "elapsed"
-                  |> Option.value_exn
+                  |> Option.value_exn ~here:[%here]
                        ~message:
                          ("Missing elapsed in log entry in log line: " ^ line)
                   |> Yojson.Safe.Util.to_float
                 in
                 let label =
                   String.Map.find entry.metadata "label"
-                  |> Option.value_exn
+                  |> Option.value_exn ~here:[%here]
                        ~message:
                          ("Missing label in log entry in log line: " ^ line)
                   |> Yojson.Safe.Util.to_string
