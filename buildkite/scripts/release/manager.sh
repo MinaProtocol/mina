@@ -1290,6 +1290,7 @@ function verify_help(){
     printf "  %-25s %s\n" "--only-debians" "[bool] publish only debian packages";
     printf "  %-25s %s\n" "--arch" "[string] architecture (amd64 or arm64)";
     printf "  %-25s %s\n" "--profile" "[string] build profile to publish. e.g lightnet, mainnet. default: $DEFAULT_PROFILE";
+    printf "  %-25s %s\n" "--build-flag" "[string] build flag which was used while building mina. e.g instrumented";
     echo ""
     echo "Example:"
     echo ""
@@ -1302,12 +1303,27 @@ function verify_help(){
 
 function combine_docker_suffixes() {
     local network=$1
-    local __docker_suffix=$2
+    local __profile=$2
+    local __build_flag=$3
 
-    if [[ -n "$__docker_suffix" ]]; then
-        echo "-$network-$__docker_suffix"
+    if [[ "$__profile" == "lightnet" ]]; then
+        local __docker_suffix=$__profile
     else
-        echo "-$network"
+        local __docker_suffix=""
+    fi
+
+    if [[ -n "$__build_flag" ]]; then
+        if [[ -n "$__docker_suffix" ]]; then
+            echo "${network}-${__docker_suffix}-${__build_flag}"
+        else
+            echo "${network}-${__build_flag}"
+        fi
+    else
+        if [[ -n "$__docker_suffix" ]]; then
+            echo "${network}-${__docker_suffix}"
+        else
+            echo "${network}"
+        fi
     fi
 }
 
@@ -1328,6 +1344,7 @@ function verify(){
     local __debian_repo_signed=0
     local __archs="$DEFAULT_ARCHITECTURES"
     local __profile=$DEFAULT_PROFILE
+    local __build_flag=""
 
     while [ ${#} -gt 0 ]; do
         error_message="Error: a value is needed for '$1'";
@@ -1383,6 +1400,10 @@ function verify(){
                 __profile=${2:?$error_message}
                 shift 2;
             ;;
+            --build-flag )
+                __build_flag=${2:?$error_message}
+                shift 2;
+            ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -1405,6 +1426,7 @@ function verify(){
     echo " - Only dockers: $__only_dockers"
     echo " - Architectures: $__archs"
     echo " - Profile: $__profile"
+    echo " - Build flag: $__build_flag"
     echo ""
 
     #check environment setup
@@ -1451,7 +1473,7 @@ function verify(){
                                         __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                 local __docker_suffix_combined
-                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "")
+                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
 
                                 if [[ $__only_dockers == 0 ]]; then
                                         echo "     📋  Verifying: $artifact debian on $__channel channel with $__version version for $__codename codename"
@@ -1490,7 +1512,7 @@ function verify(){
                                 __artifact_full_name=$(get_artifact_with_suffix $artifact $network)
 
                                 local __docker_suffix_combined
-                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "")
+                                __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
 
                                 if [[ $__only_dockers == 0 ]]; then
 
@@ -1533,7 +1555,7 @@ function verify(){
                                     __artifact_full_name=$(get_artifact_with_suffix $artifact $network $__profile)
 
                                     local __docker_suffix_combined
-                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile")
+                                    __docker_suffix_combined=$(combine_docker_suffixes "$network" "$__profile" "$__build_flag")
 
 
                                 if [[ $__only_dockers == 0 ]]; then

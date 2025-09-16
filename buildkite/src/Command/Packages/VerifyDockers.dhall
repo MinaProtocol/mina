@@ -16,6 +16,10 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let Arch = ../../Constants/Arch.dhall
 
+let BuildFlags = ../../Constants/BuildFlags.dhall
+
+let Profiles = ../../Constants/Profiles.dhall
+
 let Spec =
       { Type =
           { artifacts : List Artifact.Type
@@ -23,8 +27,9 @@ let Spec =
           , version : Text
           , codenames : List DebianVersions.DebVersion
           , published_to_docker_io : Bool
-          , profile : Text
+          , profile : Profiles.Type
           , archs : List Arch.Type
+          , buildFlag : BuildFlags.Type
           }
       , default =
           { artifacts = [] : List Package.Type
@@ -34,7 +39,8 @@ let Spec =
             , DebianVersions.DebVersion.Bullseye
             ]
           , published_to_docker_io = False
-          , profile = Text
+          , profile = Profiles.Type.Devnet
+          , buildFlag = BuildFlags.Type.None
           , archs = [ Arch.Type.Amd64 ]
           }
       }
@@ -86,7 +92,15 @@ let verify
     =     \(spec : Spec.Type)
       ->  let archFlag = "--archs " ++ joinArchitectures spec ++ " "
 
-          let profileFlag = "--profile ${spec.profile} "
+          let profileFlag = "--profile ${Profiles.lowerName spec.profile} "
+
+          let buildFlag =
+                merge
+                  { None = ""
+                  , Instrumented =
+                      "--build-flag ${BuildFlags.lowerName spec.buildFlag} "
+                  }
+                  spec.buildFlag
 
           in      ". ./buildkite/scripts/export-git-env-vars.sh && "
               ++  "./buildkite/scripts/release/manager.sh verify "
@@ -96,6 +110,7 @@ let verify
               ++  "--codenames ${joinCodenames spec} "
               ++  profileFlag
               ++  archFlag
+              ++  buildFlag
               ++  "--only-dockers "
 
 in  { verify = verify, Spec = Spec }

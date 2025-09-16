@@ -118,11 +118,6 @@ let generateStep =
 
                 else  " && ./scripts/debian/aptly.sh stop"
 
-          let profile =
-                "${Profiles.toSuffixLowercase
-                     spec.deb_profile}${BuildFlags.toLabelSegment
-                                          spec.build_flags}"
-
           let debSuffix =
                 merge
                   { None = "", Some = \(s : Text) -> " --deb-suffix " ++ s }
@@ -141,7 +136,8 @@ let generateStep =
                             , networks = [ spec.network ]
                             , version = spec.deb_version
                             , codenames = [ spec.deb_codename ]
-                            , profile = profile
+                            , profile = spec.deb_profile
+                            , buildFlag = spec.build_flags
                             , archs = [ spec.arch ]
                             }
 
