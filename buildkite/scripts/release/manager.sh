@@ -635,7 +635,7 @@ function publish_help(){
     printf "  %-25s %s\n" "--debian-sign-key" "[string] debian signing key to use. default: lack of presence = no signing";
     printf "  %-25s %s\n" "--strip-network-from-archive" "[bool] strip network from archive name. E.g mina-archive-devnet -> mina-archive";
     printf "  %-25s %s\n" "--force-upload-debians" "[bool] force upload debian packages even if they exist already in the repository";
-    printf "  %-25s %s\n" "--profile [string] build profile to publish. e.g lightnet, mainnet. default: $DEFAULT_PROFILE";
+    printf "  %-25s %s\n" "--profile" "[string] build profile to publish. e.g lightnet, mainnet. default: $DEFAULT_PROFILE";
     echo ""
     echo "Example:"
     echo ""
