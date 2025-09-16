@@ -4,6 +4,20 @@ open Mina_automation
 open Mina_automation_fixture.Archive
 open Common
 
+(* NOTE:
+   To run this test, several preparation is needed
+   - ensure we have this test, replayer & archive node build with devnet profile
+   - ensure we have a data base instance up
+   - Run the following:
+     ```
+     MINA_TEST_POSTGRES_URI=postgres://postgres:xxxx@localhost:5432 \
+     MINA_TEST_NETWORK_DATA=./src/test/archive/sample_db \
+     DUNE_PROFILE=devnet \
+     dune exec src/test/archive/archive_node_tests/archive_node_tests.exe -- \
+     test upgrade_archive
+     ```
+*)
+
 type t = Mina_automation_fixture.Archive.after_bootstrap
 
 let test_case (test_data : t) =
