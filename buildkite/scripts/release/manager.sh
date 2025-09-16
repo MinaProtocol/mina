@@ -1314,15 +1314,15 @@ function combine_docker_suffixes() {
 
     if [[ -n "$__build_flag" ]]; then
         if [[ -n "$__docker_suffix" ]]; then
-            echo "${network}-${__docker_suffix}-${__build_flag}"
+            echo "-${network}-${__docker_suffix}-${__build_flag}"
         else
-            echo "${network}-${__build_flag}"
+            echo "-${network}-${__build_flag}"
         fi
     else
         if [[ -n "$__docker_suffix" ]]; then
-            echo "${network}-${__docker_suffix}"
+            echo "-${network}-${__docker_suffix}"
         else
-            echo "${network}"
+            echo "-${network}"
         fi
     fi
 }
