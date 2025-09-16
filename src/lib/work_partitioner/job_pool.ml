@@ -1,11 +1,13 @@
 open Core_kernel
 
+type 'a scheduled = { job : 'a; scheduled : Time.t }
+
 module Make (Id : Hashtbl.Key) (Spec : T) = struct
   type job = (Spec.t, Id.t) Snark_work_lib.With_job_meta.t
 
   type t =
     { mutable timeline : Id.t Deque.t (* For iteration *)
-    ; index : (Id.t, job) Hashtbl.t (* For marking job as done *)
+    ; index : (Id.t, job scheduled) Hashtbl.t (* For marking job as done *)
     }
 
   let create () =
@@ -18,22 +20,26 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
   let rec remove_until_reschedule ~f t =
     let%bind.Option job_id = Deque.dequeue_front t.timeline in
     match Hashtbl.find t.index job_id with
-    | Some job -> (
-        match f job with
+    | Some scheduled_job -> (
+        match f scheduled_job with
         | `Remove ->
             remove_until_reschedule ~f t
         | `Stop_keep ->
             Deque.enqueue_front t.timeline job_id ;
             None
-        | `Stop_reschedule rescheduled_job ->
-            Hashtbl.set t.index ~key:job_id ~data:rescheduled_job ;
+        | `Stop_reschedule (job : job) ->
+            assert (Id.compare job.job_id job_id = 0) ;
+            let job_rescheduled = { job; scheduled = Time.now () } in
+            Hashtbl.set t.index ~key:job_id ~data:job_rescheduled ;
             Deque.enqueue_back t.timeline job_id ;
-            Some rescheduled_job )
+            Some job_rescheduled )
     | _ ->
         remove_until_reschedule ~f t
 
-  let add ~id ~job t =
-    match Hashtbl.add ~key:id ~data:job t.index with
+  let add_now ~id ~job t =
+    match
+      Hashtbl.add ~key:id ~data:{ job; scheduled = Time.now () } t.index
+    with
     | `Ok ->
         Deque.enqueue_back t.timeline id ;
         (* NOTE: when removal of jobs from the [t.timeline] happens much less
@@ -50,6 +56,6 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
     | `Duplicate ->
         `Duplicate
 
-  let add_exn ~id ~job ~message t =
-    match add ~id ~job t with `Ok -> () | `Duplicate -> failwith message
+  let add_now_exn ~id ~job ~message t =
+    match add_now ~id ~job t with `Ok -> () | `Duplicate -> failwith message
 end

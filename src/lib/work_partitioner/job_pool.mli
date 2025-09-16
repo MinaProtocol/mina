@@ -1,5 +1,7 @@
 open Core_kernel
 
+type 'a scheduled = { job : 'a; scheduled : Time.t }
+
 module Make (Id : Hashtbl.Key) (Spec : T) : sig
   type job = (Spec.t, Id.t) Snark_work_lib.With_job_meta.t
 
@@ -14,28 +16,29 @@ module Make (Id : Hashtbl.Key) (Spec : T) : sig
   (** [remove ~id t] removes job corresponding to [id] in [t] and returns it if
       it does exist. It's assumed that such ID would never be reused again,
       because the underlying queue is not cleaned for that [id]. *)
-  val remove : id:Id.t -> t -> job option
+  val remove : id:Id.t -> t -> job scheduled option
 
   (** [find ~id t] finds the job corresponding to id [id] in [t]. *)
-  val find : id:Id.t -> t -> job option
+  val find : id:Id.t -> t -> job scheduled option
 
   (** [remove_until_reschedule ~f t] iterates through the timeline, for each
       encountered job [j], pattern match on [f j]:
       - If it's [`Remove], remove [j] and continue iteration;
       - If it's [`Stop_keep], stop the iteration and return [None];
       - If it's [`Stop_reschedule j'], reschedule [j'] at the end of timeline,
-        and returns [Some j']. *)
+        and returns j' with scheduling metadata. *)
   val remove_until_reschedule :
-       f:(job -> [< `Remove | `Stop_keep | `Stop_reschedule of job ])
+       f:(job scheduled -> [< `Remove | `Stop_keep | `Stop_reschedule of job ])
     -> t
-    -> job option
+    -> job scheduled option
 
-  (** [add ~id ~job t] attempts to add a job [job] with id [id] to [t]. It
-      returns [`Ok] on successful, and [`Duplicate] if the key [id] is already
-      occupied in the pool. *)
-  val add : id:Id.t -> job:job -> t -> [> `Duplicate | `Ok ]
+  (** [add_now ~id ~job t] attempts to add a job [job] with id [id] to [t], 
+      marking scheduled timestamp as the current instant. It returns [`Ok] on 
+      successful, and [`Duplicate] if the key [id] is already occupied in the 
+      pool. *)
+  val add_now : id:Id.t -> job:job -> t -> [> `Duplicate | `Ok ]
 
-  (** [add_exn ~id ~job ~message t] add a job [job] with id [id] to [t]. If that
-      job is already in the pool failwith [message] *)
-  val add_exn : id:Id.t -> job:job -> message:string -> t -> unit
+  (** [add_now_exn ~id ~job ~message t] works just like [add_now] excepts it 
+      fails with [message] if the job is already in pool *)
+  val add_now_exn : id:Id.t -> job:job -> message:string -> t -> unit
 end

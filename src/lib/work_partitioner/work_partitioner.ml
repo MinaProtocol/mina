@@ -52,18 +52,13 @@ let create ~(reassignment_timeout : Time.Span.t) ~(logger : Logger.t)
   ; proof_cache_db
   }
 
-let epoch_now () = Time.(now () |> to_span_since_epoch)
-
 (* TODO: Consider remove all works no longer relevant for current frontier,
    this may need changes from underlying work selector. *)
 let reschedule_if_old ~reassignment_timeout
-    (job : _ Work.With_job_meta.Stable.Latest.t) =
-  let scheduled = Time.of_span_since_epoch job.scheduled_since_unix_epoch in
+    ({ job; scheduled } :
+      _ Work.With_job_meta.Stable.Latest.t Job_pool.scheduled ) =
   let delta = Time.(diff (now ()) scheduled) in
-  if Time.Span.( > ) delta reassignment_timeout then
-    `Stop_reschedule
-      Work.With_job_meta.Stable.Latest.
-        { job with scheduled_since_unix_epoch = epoch_now () }
+  if Time.Span.( > ) delta reassignment_timeout then `Stop_reschedule job
   else `Stop_keep
 
 (* NOTE: below are logics for work requesting *)
@@ -71,7 +66,7 @@ let reschedule_old_zkapp_job
     ~partitioner:
       ({ reassignment_timeout; zkapp_jobs_sent_by_partitioner; _ } : t) :
     (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t option =
-  let%map.Option job =
+  let%map.Option { job; _ } =
     Sent_zkapp_job_pool.remove_until_reschedule
       ~f:(reschedule_if_old ~reassignment_timeout)
       zkapp_jobs_sent_by_partitioner
@@ -82,7 +77,7 @@ let reschedule_old_single_job
     ~partitioner:
       ({ reassignment_timeout; single_jobs_sent_by_partitioner; _ } : t) :
     (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t option =
-  let%map.Option job =
+  let%map.Option { job; _ } =
     Sent_single_job_pool.remove_until_reschedule
       ~f:(reschedule_if_old ~reassignment_timeout)
       single_jobs_sent_by_partitioner
@@ -97,11 +92,10 @@ let register_pending_zkapp_command_job ~(id : Work.Id.Single.t)
     Work.With_job_meta.
       { spec = sub_zkapp_spec
       ; job_id
-      ; scheduled_since_unix_epoch = epoch_now ()
       ; sok_message = (Pending_zkapp_command.zkapp_job pending).sok_message
       }
   in
-  Sent_zkapp_job_pool.add_exn ~id:job_id ~job
+  Sent_zkapp_job_pool.add_now_exn ~id:job_id ~job
     ~message:
       "Work Partitioner generated a duplicated ID for a subzkapp job that \
        happens to be still used by another job."
@@ -157,12 +151,7 @@ let convert_single_work_from_selector ~(partitioner : t)
     ~(single_spec : Work.Spec.Single.t) ~sok_message ~pairing :
     (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t =
   let job =
-    Work.With_job_meta.
-      { spec = single_spec
-      ; job_id = pairing
-      ; scheduled_since_unix_epoch = epoch_now ()
-      ; sok_message
-      }
+    Work.With_job_meta.{ spec = single_spec; job_id = pairing; sok_message }
   in
   match single_spec with
   | Transition (input, witness) -> (
@@ -182,7 +171,7 @@ let convert_single_work_from_selector ~(partitioner : t)
             Work.With_job_meta.map
               ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
           in
-          Sent_single_job_pool.add_exn ~id:pairing ~job
+          Sent_single_job_pool.add_now_exn ~id:pairing ~job
             ~message:
               "Id generator generated a repeated Id that happens to be \
                occupied by a job in sent single job pool"
@@ -193,7 +182,7 @@ let convert_single_work_from_selector ~(partitioner : t)
         Work.With_job_meta.map
           ~f_spec:Work.Spec.Single.read_all_proofs_from_disk job
       in
-      Sent_single_job_pool.add_exn ~id:pairing ~job
+      Sent_single_job_pool.add_now_exn ~id:pairing ~job
         ~message:
           "Id generator generated a repeated Id that happens to be occupied by \
            a job in sent single job pool"
@@ -393,7 +382,7 @@ let submit_into_pending_zkapp_command ~partitioner
         partitioner.zkapp_jobs_sent_by_partitioner
     , Single_id_map.find partitioner.pending_zkapp_commands single_id )
   with
-  | Some job, Some pending -> (
+  | Some { job; _ }, Some pending -> (
       match
         Pending_zkapp_command.submit_proof ~proof ~elapsed ~range pending
       with
