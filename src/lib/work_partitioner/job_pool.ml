@@ -43,7 +43,7 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
         if Deque.length t.timeline > 4 * Hashtbl.length t.index then
           t.timeline <-
             Deque.to_array t.timeline
-            |> Array.filter ~f:(fun job_id ->
+            |> Array.filter ~f:(Fn.compose Option.is_some @@ Hashtbl.find t.index)
                    Hashtbl.find t.index job_id |> Option.is_some )
             |> Deque.of_array ;
         `Ok
