@@ -551,82 +551,110 @@ end = struct
    * subsequent account_updates use the replaced key instead of looking in the
    * ledger for the key (ie set by a previous transaction).
    *)
-  let create ({ fee_payer; account_updates; memo } : T.t) ~failed ~find_vk =
-    With_return.with_return (fun { return } ->
-        let tbl = Account_id.Table.create () in
-        let vks_overridden =
-          (* Keep track of the verification keys that have been set so far
-             during this transaction.
-          *)
-          ref Account_id.Map.empty
-        in
-        let account_updates =
-          Call_forest.map account_updates ~f:(fun p ->
-              let account_id = Account_update.account_id p in
-              let vks_overriden' =
-                match Account_update.verification_key_update_to_option p with
-                | Zkapp_basic.Set_or_keep.Set vk_next ->
-                    Account_id.Map.set !vks_overridden ~key:account_id
-                      ~data:vk_next
-                | Zkapp_basic.Set_or_keep.Keep ->
-                    !vks_overridden
-              in
-              let () =
-                match Account_update.check_authorization p with
-                | Ok () ->
-                    ()
-                | Error _ as err ->
-                    return err
-              in
-              match (p.body.authorization_kind, failed) with
-              | Proof vk_hash, false -> (
-                  let prioritized_vk =
-                    (* only lookup _past_ vk setting, ie exclude the new one we
-                     * potentially set in this account_update (use the non-'
-                     * vks_overrided) . *)
-                    match Account_id.Map.find !vks_overridden account_id with
-                    | Some (Some vk) -> (
-                        match
-                          ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
-                        with
-                        | Ok vk ->
-                            Some vk
-                        | Error err ->
-                            return (Error err) )
-                    | Some None ->
-                        (* we explicitly have erased the key *)
-                        let err =
-                          Error.create
-                            "No verification key found for proved account \
-                             update: the verification key was removed by a \
-                             previous account update"
-                            ("account_id", account_id)
-                            [%sexp_of: string * Account_id.t]
-                        in
-                        return (Error err)
-                    | None -> (
-                        (* we haven't set anything; lookup the vk in the fallback *)
-                        match find_vk vk_hash account_id with
-                        | Error e ->
-                            return (Error e)
-                        | Ok vk ->
-                            Some vk )
-                  in
-                  match prioritized_vk with
-                  | Some prioritized_vk ->
-                      Account_id.Table.update tbl account_id ~f:(fun _ ->
-                          With_hash.hash prioritized_vk ) ;
-                      (* return the updated overrides *)
-                      vks_overridden := vks_overriden' ;
-                      (p, Some prioritized_vk)
-                  | None ->
-                      (* The transaction failed, so we allow the vk to be missing. *)
-                      (p, None) )
-              | _ ->
-                  vks_overridden := vks_overriden' ;
-                  (p, None) )
-        in
-        Ok { Poly.fee_payer; account_updates; memo } )
+  let create =
+    let dummy_vk =
+      { With_hash.data = Side_loaded_verification_key.dummy
+      ; hash = Pasta_bindings.Fp.of_int 0
+      }
+    in
+    fun ({ fee_payer; account_updates; memo } : T.t) ~failed ~find_vk ->
+      let error_messages = Queue.create () in
+      let tbl = Account_id.Table.create () in
+      let vks_overridden =
+        (* Keep track of the verification keys that have been set so far
+           during this transaction.
+        *)
+        ref Account_id.Map.empty
+      in
+      let account_updates =
+        Call_forest.mapi account_updates ~f:(fun update_idx p ->
+            let account_id = Account_update.account_id p in
+            let vks_overriden' =
+              match Account_update.verification_key_update_to_option p with
+              | Zkapp_basic.Set_or_keep.Set vk_next ->
+                  Account_id.Map.set !vks_overridden ~key:account_id
+                    ~data:vk_next
+              | Zkapp_basic.Set_or_keep.Keep ->
+                  !vks_overridden
+            in
+            Account_update.check_authorization p
+            |> Result.iter_error ~f:(fun err ->
+                   Queue.enqueue error_messages
+                     (`Assoc
+                       [ ("account_id", Account_id.to_yojson account_id)
+                       ; ("update_index", `Int update_idx)
+                       ; ("error", Error_json.error_to_yojson err)
+                       ] ) ) ;
+            match (p.body.authorization_kind, failed) with
+            | Proof vk_hash, false -> (
+                let prioritized_vk =
+                  (* only lookup _past_ vk setting, ie exclude the new one we
+                   * potentially set in this account_update (use the non-'
+                   * vks_overrided) . *)
+                  match Account_id.Map.find !vks_overridden account_id with
+                  | Some (Some vk) -> (
+                      match
+                        ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
+                      with
+                      | Ok vk ->
+                          Some vk
+                      | Error err ->
+                          Queue.enqueue error_messages
+                            (`Assoc
+                              [ ("account_id", Account_id.to_yojson account_id)
+                              ; ("update_index", `Int update_idx)
+                              ; ("error", Error_json.error_to_yojson err)
+                              ] ) ;
+                          Some dummy_vk )
+                  | Some None ->
+                      (* we explicitly have erased the key *)
+                      Queue.enqueue error_messages
+                        (`Assoc
+                          [ ("account_id", Account_id.to_yojson account_id)
+                          ; ("update_index", `Int update_idx)
+                          ; ( "error"
+                            , `String
+                                "No verification key found for proved account \
+                                 update: the verification key was removed by a \
+                                 previous account update" )
+                          ] ) ;
+                      Some dummy_vk
+                  | None -> (
+                      (* we haven't set anything; lookup the vk in the fallback *)
+                      match find_vk vk_hash account_id with
+                      | Error err ->
+                          Queue.enqueue error_messages
+                            (`Assoc
+                              [ ("account_id", Account_id.to_yojson account_id)
+                              ; ("update_index", `Int update_idx)
+                              ; ("error", Error_json.error_to_yojson err)
+                              ] ) ;
+                          Some dummy_vk
+                      | Ok vk ->
+                          Some vk )
+                in
+                match prioritized_vk with
+                | Some prioritized_vk ->
+                    Account_id.Table.update tbl account_id ~f:(fun _ ->
+                        With_hash.hash prioritized_vk ) ;
+                    (* return the updated overrides *)
+                    vks_overridden := vks_overriden' ;
+                    (p, Some prioritized_vk)
+                | None ->
+                    (* The transaction failed, so we allow the vk to be missing. *)
+                    (p, None) )
+            | _ ->
+                vks_overridden := vks_overriden' ;
+                (p, None) )
+      in
+      match Queue.to_list error_messages with
+      | [] ->
+          Ok { Poly.fee_payer; account_updates; memo }
+      | errs ->
+          let errs_strings = List.map ~f:Yojson.Safe.to_string errs in
+          Error
+            (Error.create "Failed to create zkApp command:" errs_strings
+               [%sexp_of: string list] )
 
   module type Cache_intf = sig
     type t
