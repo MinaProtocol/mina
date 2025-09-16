@@ -921,24 +921,6 @@ let add_complete_work ~logger ~fee ~prover
   |> Result.iter_error ~f:(fun err ->
          [%log warn] "Failed to update metrics on adding work"
            ~metadata:[ ("error", `String (Error.to_string_hum err)) ] ) ;
-  let cb result =
-    (* remove it from seen jobs after attempting to adding it to the pool to
-           avoid this work being reassigned.
-     * If the diff is accepted then remove it from the seen jobs.
-     * If not then the work should have already been in the pool with a 
-           lower fee or the statement isn't referenced anymore or any other 
-           error. In any case remove it from the seen jobs so that it can be 
-           picked up if needed *)
-    Work_selector.remove t.work_selector stmts ;
-    Result.iter_error result ~f:(fun err ->
-        (* Possible reasons of failure: receiving pipe's capacity exceeded,
-            fee that isn't the lowest, failure in verification or application to the pool *)
-        [%log warn] "Failed to add completed work to the pool"
-          ~metadata:
-            [ ("work_ids", Transaction_snark_work.Statement.compact_json stmts)
-            ; ("error", `String (Error.to_string_hum err))
-            ] )
-  in
   Network_pool.Snark_pool.(
     Local_sink.push t.pipes.snark_local_sink
       ( Add_solved_work
@@ -949,7 +931,15 @@ let add_complete_work ~logger ~fee ~prover
                   |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
               ; fee = fee_with_prover
               } )
-      , cb ))
+      , Result.iter_error ~f:(fun err ->
+            (* Possible reasons of failure: receiving pipe's capacity exceeded,
+                fee that isn't the lowest, failure in verification or application to the pool *)
+            [%log warn] "Failed to add completed work to the pool"
+              ~metadata:
+                [ ( "work_ids"
+                  , Transaction_snark_work.Statement.compact_json stmts )
+                ; ("error", `String (Error.to_string_hum err))
+                ] ) ))
   |> Deferred.don't_wait_for
 
 let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
@@ -2137,7 +2127,6 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           let work_selector =
             Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~logger:config.logger
           in
