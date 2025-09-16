@@ -101,5 +101,12 @@
  (instrumentation
   (backend bisect_ppx))
  (preprocess
-  (pps ppx_jane ppx_mina ppx_version ppx_inline_test ppx_deriving.std))
+  (pps 
+    ppx_jane 
+    ppx_mina
+    ppx_version
+    ppx_inline_test
+    ppx_deriving.std
+    ppx_sexp_conv
+    ppx_here))
  (synopsis "Mina gut layer"))
