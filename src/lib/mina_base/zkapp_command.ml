@@ -574,7 +574,7 @@ end = struct
               | Zkapp_basic.Set_or_keep.Set vk_next ->
                   Account_id.Map.set !vks_overridden ~key:account_id
                     ~data:vk_next
-              | Zkapp_basic.Set_or_keep.Keep ->
+              | Keep ->
                   !vks_overridden
             in
             Account_update.check_authorization p
@@ -586,7 +586,7 @@ end = struct
                        ; ("error", Error_json.error_to_yojson err)
                        ] ) ) ;
             match (p.body.authorization_kind, failed) with
-            | Proof vk_hash, false -> (
+            | Proof vk_hash, false ->
                 let prioritized_vk =
                   (* only lookup _past_ vk setting, ie exclude the new one we
                    * potentially set in this account_update (use the non-'
@@ -597,7 +597,7 @@ end = struct
                         ok_if_vk_hash_expected ~got:vk ~expected:vk_hash
                       with
                       | Ok vk ->
-                          Some vk
+                          vk
                       | Error err ->
                           Queue.enqueue error_messages
                             (`Assoc
@@ -605,7 +605,7 @@ end = struct
                               ; ("update_index", `Int update_idx)
                               ; ("error", Error_json.error_to_yojson err)
                               ] ) ;
-                          Some dummy_vk )
+                          dummy_vk )
                   | Some None ->
                       (* we explicitly have erased the key *)
                       Queue.enqueue error_messages
@@ -618,7 +618,7 @@ end = struct
                                  update: the verification key was removed by a \
                                  previous account update" )
                           ] ) ;
-                      Some dummy_vk
+                      dummy_vk
                   | None -> (
                       (* we haven't set anything; lookup the vk in the fallback *)
                       match find_vk vk_hash account_id with
@@ -629,20 +629,15 @@ end = struct
                               ; ("update_index", `Int update_idx)
                               ; ("error", Error_json.error_to_yojson err)
                               ] ) ;
-                          Some dummy_vk
+                          dummy_vk
                       | Ok vk ->
-                          Some vk )
+                          vk )
                 in
-                match prioritized_vk with
-                | Some prioritized_vk ->
-                    Account_id.Table.update tbl account_id ~f:(fun _ ->
-                        With_hash.hash prioritized_vk ) ;
-                    (* return the updated overrides *)
-                    vks_overridden := vks_overriden' ;
-                    (p, Some prioritized_vk)
-                | None ->
-                    (* The transaction failed, so we allow the vk to be missing. *)
-                    (p, None) )
+                Account_id.Table.update tbl account_id
+                  ~f:(const @@ With_hash.hash prioritized_vk) ;
+                (* return the updated overrides *)
+                vks_overridden := vks_overriden' ;
+                (p, Some prioritized_vk)
             | _ ->
                 vks_overridden := vks_overriden' ;
                 (p, None) )
