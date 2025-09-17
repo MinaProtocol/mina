@@ -101,8 +101,8 @@ let generateStep =
 
                 then  " && echo Skipping local debian repo setup "
 
-                else      " && apt update && apt install -y aptly"
-                      ++  " && ./buildkite/scripts/debian/start_local_repo.sh"
+                else      " && ./buildkite/scripts/debian/update.sh --verbose"
+                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh"
 
           let maybeStopDebianRepo =
                       if spec.no_debian

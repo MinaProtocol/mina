@@ -30,6 +30,7 @@ RUN apt-get update --yes \
     postgresql \
     postgresql-contrib \
     perl \
+    procps \
     python3 \
     python3-pip \
     python3-sexpdata \
@@ -64,13 +65,6 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
     && rm -rf /var/lib/apt/lists/*
 
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
-
-# --- Helm tools
-RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - \
-    && echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list \
-    && apt-get update --yes \
-    && apt-get install --yes --no-install-recommends helm \
-    && rm -rf /var/lib/apt/lists/*
 
 # --- yarn + nodejs, pinned version
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - \
