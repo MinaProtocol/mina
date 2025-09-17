@@ -41,19 +41,40 @@
 #   - Container runs on port 3087 and mounts current directory as /workdir
 #   - Load test duration is fixed at 600 seconds when enabled
 
-set -x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 
-DEFAULT_NETWORK=devnet
-NETWORK=$DEFAULT_NETWORK
+NETWORK=devnet
 TIMEOUT=900
 DB_CONN_STR="postgres://pguser:pguser@localhost:5432/archive"
 UPGRADE_SCRIPTS_WORKDIR="src/app/archive"
 
 LOAD_TEST_DURATION=600
 RUN_LOAD_TEST=false
+
+USAGE="Usage: $0 [-t docker-tag] [-n network]
+  -t, --version             The version to be used in the docker image tag
+  -n, --network             The network configuration to use (devnet or mainnet). Default=$NETWORK
+  --timeout                 The timeout duration in seconds. Default=$TIMEOUT
+  --run-compatibility-test  Enable compatibility testing with specified branch
+  --upgrade-scripts-workdir Working directory for upgrade/downgrade scripts. Default=$UPGRADE_SCRIPTS_WORKDIR
+  -h, --help                Show help
+
+Example: $0 --network devnet --tag 3.0.3-bullseye-berkeley
+Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop
+Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop --upgrade-scripts-workdir /custom/path
+
+Warning:
+Please execute this script from the root of the mina repository.
+"
+
+function usage() {
+    if [[ -n "$1" ]]; then
+        echo -e "${RED}☞  $1${CLEAR}\n";
+    fi
+    echo "$USAGE"
+}   
 
 while [[ "$#" -gt 0 ]]; do case $1 in
     -n|--network) NETWORK="$2"; shift;;
@@ -66,27 +87,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
     *) echo "Unknown parameter passed: $1"; usage; exit 1;;
 esac; shift; done
 
-function usage() {
-    if [[ -n "$1" ]]; then
-        echo -e "${RED}☞  $1${CLEAR}\n";
-    fi
-    echo "Usage: $0 [-t docker-tag] [-n network]"
-    echo "  -t, --version             The version to be used in the docker image tag"
-    echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=$DEFAULT_NETWORK"
-    echo "  --timeout                 The timeout duration in seconds. Default=$TIMEOUT"
-    echo "  --run-compatibility-test  Enable compatibility testing with specified branch"
-    echo "  --upgrade-scripts-workdir Working directory for upgrade/downgrade scripts. Default=$UPGRADE_SCRIPTS_WORKDIR"
-    echo "  -h, --help                Show help"
-    echo ""
-    echo "Example: $0 --network devnet --tag 3.0.3-bullseye-berkeley "
-    echo "Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop"
-    echo "Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop --upgrade-scripts-workdir /custom/path"
-    echo ""
-    echo "Warning:"
-    echo "Please execute this script from the root of the mina repository."
-    echo ""
-}   
-
 if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" && "$NETWORK" != "berkeley" ]]; then
     echo "❌  Invalid network: $NETWORK"
     echo "❌  Network must be either 'devnet' or 'mainnet' or 'berkeley'"
@@ -95,6 +95,8 @@ if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" && "$NETWORK" != "berkel
 fi
 
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
+
+set -x
 
 container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
 
