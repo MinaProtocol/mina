@@ -168,9 +168,6 @@ let convert_single_work_from_selector ~(partitioner : t)
   | Transition (input, witness) -> (
       match witness.transaction with
       | Command (Zkapp_command zkapp_command) ->
-          (* TODO: we have read from disk followed by write to disk in shared
-             function followed by read from disk again. Should consider refactor
-             this. *)
           let witness = Transaction_witness.read_all_proofs_from_disk witness in
           Snark_worker_shared.extract_zkapp_segment_works
             ~m:partitioner.transaction_snark ~input ~witness ~zkapp_command
