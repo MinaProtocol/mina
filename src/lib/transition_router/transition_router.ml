@@ -547,7 +547,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~frontier_broadcast_writer:frontier_w ~network_transition_reader
     ~producer_transition_reader ~get_most_recent_valid_block
     ~most_recent_valid_block_writer ~get_completed_work ~catchup_mode
-    ~notify_online ~ledger_backing () =
+    ~notify_online ~ledger_backing:_ () =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -616,7 +616,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger
-          ~backing_type:ledger_backing ~directory:persistent_root_location
+          ~directory:persistent_root_location
           ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       let network_transition_pipe : _ Strict_pipe.Swappable.t =

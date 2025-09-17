@@ -5,7 +5,7 @@ open Mina_ledger.Ledger
 
 module rec Instance_type : sig
   type t =
-    { snarked_ledger : Root.t
+    { mutable snarked_ledger : Root.t
     ; potential_snarked_ledgers : Root.Config.t Queue.t
     ; factory : Factory_type.t
     }
@@ -17,7 +17,6 @@ and Factory_type : sig
     ; logger : Logger.t
     ; mutable instance : Instance_type.t option
     ; ledger_depth : int
-    ; backing_type : Root.Config.backing_type
     }
 end
 
@@ -88,12 +87,7 @@ end
 
 type t = Factory_type.t
 
-val create :
-     logger:Logger.t
-  -> directory:string
-  -> backing_type:Root.Config.backing_type
-  -> ledger_depth:int
-  -> t
+val create : logger:Logger.t -> directory:string -> ledger_depth:int -> t
 
 val create_instance_exn : t -> Instance_type.t
 
@@ -102,6 +96,8 @@ val load_from_disk_exn :
   -> snarked_ledger_hash:Frozen_ledger_hash.t
   -> logger:Logger.t
   -> (Instance_type.t, [> `Snarked_ledger_mismatch ]) result
+
+val convert_instance_exn : logger:Logger.t -> here:Lexing.position -> t -> unit
 
 val with_instance_exn : t -> f:(Instance_type.t -> 'a) -> 'a
 
