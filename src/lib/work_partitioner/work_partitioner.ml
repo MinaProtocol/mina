@@ -223,7 +223,7 @@ let consume_job_from_selector ~(partitioner : t)
     (Work.Spec.Partitioned.Stable.Latest.t, _) Result.t =
   let pairing_id = Id_generator.next_id partitioner.single_id_gen () in
   Hashtbl.add_exn partitioner.pairing_pool ~key:pairing_id
-    ~data:(Spec_only { spec = instances; sok_message }) ;
+    ~data:(Combining_result.of_spec ~sok_message instances) ;
 
   match instances with
   | `One single_spec ->
@@ -263,16 +263,9 @@ type submit_result =
 
 let submit_into_combining_result ~submitted_result ~partitioner
     ~combining_result ~submitted_half =
-  let submitted_result_cached =
-    Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-      ~f_proof:
-        (Ledger_proof.Cached.write_proof_to_disk
-           ~proof_cache_db:partitioner.proof_cache_db )
-      submitted_result
-  in
   match
-    Combining_result.merge_single_result
-      ~submitted_result:submitted_result_cached ~submitted_half combining_result
+    Combining_result.merge_single_result ~submitted_result ~submitted_half
+      combining_result
   with
   | Pending new_combining_result ->
       `Pending new_combining_result
