@@ -278,9 +278,11 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
-  let get_at_index_exn mdb index =
+  let get_at_index mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
+    get mdb (Location.Account addr)
+
+  let get_at_index_exn mdb index = get_at_index mdb index |> Option.value_exn
 
   let all_accounts (t : t) =
     match Account_location.last_location_address t with
@@ -571,6 +573,14 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location ->
         Ok (`Existed, location)
+
+  let iteri_untrusted t ~f =
+    match Account_location.last_location_address t with
+    | None ->
+        ()
+    | Some last_addr ->
+        Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
+        |> Sequence.iter ~f:(fun i -> f i (get_at_index t i))
 
   let iteri t ~f =
     match Account_location.last_location_address t with

@@ -109,6 +109,8 @@ end)
 
   let to_list_sequential t = Primary_ledger.to_list_sequential t.primary_ledger
 
+  let iteri_untrusted t ~f = Primary_ledger.iteri_untrusted t.primary_ledger ~f
+
   let iteri t ~f = Primary_ledger.iteri t.primary_ledger ~f
 
   let foldi t ~init ~f = Primary_ledger.foldi t.primary_ledger ~init ~f
@@ -179,6 +181,8 @@ end)
       (List.map
          ~f:(fun (loc, account) -> (loc, convert account))
          located_accounts )
+
+  let get_at_index t idx = Primary_ledger.get_at_index t.primary_ledger idx
 
   let get_at_index_exn t idx =
     Primary_ledger.get_at_index_exn t.primary_ledger idx
@@ -264,12 +268,12 @@ struct
     Primary_db.num_accounts db1 = Converting_db.num_accounts db2
     &&
     let is_synced = ref true in
-    Primary_db.iteri db1 ~f:(fun idx stable_account ->
-        let expected_unstable_account = convert stable_account in
-        let actual_unstable_account = Converting_db.get_at_index_exn db2 idx in
+    Primary_db.iteri_untrusted db1 ~f:(fun idx stable_account ->
+        let expected_unstable_account = Option.map ~f:convert stable_account in
+        let actual_unstable_account = Converting_db.get_at_index db2 idx in
         if
           not
-            (Inputs.converted_equal expected_unstable_account
+            (Option.equal Inputs.converted_equal expected_unstable_account
                actual_unstable_account )
         then is_synced := false ) ;
     !is_synced
