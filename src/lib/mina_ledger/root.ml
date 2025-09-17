@@ -215,6 +215,27 @@ struct
              ; backing_2 = Config.backing_of_config config
              } )
 
+  let make_converting ~logger = function
+    | Converting_db db ->
+        Converting_db db
+    | Stable_db db ->
+        let depth = Stable_db.depth db in
+        let directory_name =
+          Stable_db.get_directory db
+          |> Option.map
+               ~f:
+                 Merkle_ledger.Converting_merkle_tree.With_database_config
+                 .default_converting_directory_name
+        in
+        let dir_repr = Option.value ~default:"<in memory>" directory_name in
+        [%log info] "creating unstable DB backing of root, making it converting"
+          ~metadata:[ ("directory", `String dir_repr) ] ;
+        let converting_db =
+          Unstable_db.create ?directory_name ~fresh:true ~depth ()
+        in
+        Converting_db
+          (Converting_ledger.of_ledgers_with_migration db converting_db)
+
   let as_unmasked t =
     match t with
     | Stable_db db ->

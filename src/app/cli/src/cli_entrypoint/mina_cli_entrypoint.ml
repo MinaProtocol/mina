@@ -50,8 +50,7 @@ let plugin_flag =
   else Command.Param.return []
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
-    ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
-    config_files =
+    ~genesis_dir ~cli_proof_level ~proof_level config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -102,8 +101,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
-        ~logger ~genesis_constants ~constraint_constants ~proof_level
-        ~genesis_backing_type config
+        ~logger ~genesis_constants ~constraint_constants ~proof_level config
     with
     | Ok (precomputed_values, _) ->
         precomputed_values
@@ -797,7 +795,6 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
-              ~genesis_backing_type:ledger_backing_type
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
@@ -1978,7 +1975,7 @@ let internal_commands logger ~itn_features =
           let%bind precomputed_values, _config_jsons, _config =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
-              ~genesis_backing_type:Stable_db config_files
+              config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =

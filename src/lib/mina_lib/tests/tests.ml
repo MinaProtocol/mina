@@ -82,7 +82,6 @@ let%test_module "Epoch ledger sync tests" =
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger
             ~proof_level:No_check runtime_config ~cli_proof_level:None
-            ~genesis_backing_type:Stable_db
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -160,12 +159,11 @@ let%test_module "Epoch ledger sync tests" =
         ~conf_dir:(Some (make_dirname "verifier"))
         ()
 
-    let make_empty_ledger ~backing_type (module Context : CONTEXT) :
-        Genesis_ledger.Packed.t =
+    let make_empty_ledger (module Context : CONTEXT) : Genesis_ledger.Packed.t =
       ( module Genesis_ledger.Make (struct
         include Test_genesis_ledger
 
-        let directory = `New backing_type
+        let directory = `New
 
         let depth = constraint_constants.ledger_depth
 
@@ -559,9 +557,9 @@ let%test_module "Epoch ledger sync tests" =
           failwithf "unexpected connection failure: %s"
             (Error.to_string_hum err) ()
 
-    let make_genesis_ledger ~backing_type (module Context : CONTEXT)
+    let make_genesis_ledger (module Context : CONTEXT)
         (accounts : Account.t list) =
-      let ledger = make_empty_ledger ~backing_type (module Context) in
+      let ledger = make_empty_ledger (module Context) in
       let ledger_inner = Lazy.force @@ Genesis_ledger.Packed.t ledger in
       List.iter accounts ~f:(fun acct ->
           let acct_id = Account_id.create acct.public_key Token_id.default in
@@ -675,9 +673,7 @@ let%test_module "Epoch ledger sync tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind (module Context) = make_context () in
           let staking_epoch_ledger =
-            make_genesis_ledger ~backing_type:Stable_db
-              (module Context)
-              (List.take test_accounts 10)
+            make_genesis_ledger (module Context) (List.take test_accounts 10)
           in
           let next_epoch_ledger = staking_epoch_ledger in
           setup_test ~name:"fail to sync genesis ledgers" ~test_number:3

@@ -679,7 +679,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    =
+    ~ledger_backing =
   let open Context in
   let run_cycle =
     run_cycle
@@ -699,6 +699,11 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ; ( "bootstrap_stats"
         , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) )
       ] ;
+  if
+    Mina_ledger.Ledger.Root.Config.(
+      equal_backing_type ledger_backing Converting_db)
+  then
+    Persistent_root.convert_instance_exn ~logger ~here:[%here] persistent_root ;
   Mina_metrics.(
     Gauge.set Bootstrap.bootstrap_time_ms Core.Time.(Span.to_ms @@ time_elapsed)) ;
   result
@@ -905,7 +910,8 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~network_transition_pipe ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Super ~initial_root_transition )
+           ~catchup_mode:`Super ~initial_root_transition
+           ~ledger_backing:Stable_db )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
