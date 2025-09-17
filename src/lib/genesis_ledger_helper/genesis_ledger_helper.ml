@@ -402,7 +402,7 @@ module Ledger = struct
       ~extracted_path ~genesis_backing_type : Genesis_ledger.Packed.t =
     let genesis_config =
       Mina_ledger.Ledger.Root.Config.with_directory
-        ~backing_type:genesis_backing_type ~directory_name:extracted_path
+        ~backing_type:genesis_backing_type ~directory_name:extracted_path ()
     in
     ( module Genesis_ledger.Of_ledger (struct
       let backing_ledger =

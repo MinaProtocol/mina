@@ -85,7 +85,12 @@ module Make
 
     (** Create a root ledger configuration with the given backing type, using
         the [directory_name] as a template for its location *)
-    val with_directory : backing_type:backing_type -> directory_name:string -> t
+    val with_directory :
+         backing_type:backing_type
+      -> directory_name:string
+      -> ?monitor_in_sync:Mina_stdlib.Time_ns.Span.t
+      -> unit
+      -> t
 
     (** Test if a root ledger backing already exists with this config *)
     val exists_backing : t -> bool

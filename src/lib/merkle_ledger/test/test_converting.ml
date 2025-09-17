@@ -87,7 +87,7 @@ struct
   let with_instance ~f =
     let db1 = Db.create ~depth:Cfg.depth () in
     let db2 = Db_migrated.create ~depth:Cfg.depth () in
-    let ledger = Db_converting.of_ledgers db1 db2 in
+    let ledger = Db_converting.of_ledgers db1 db2 () in
     try
       let result = f ledger in
       Db_converting.close ledger ; result
@@ -214,7 +214,7 @@ struct
             let depth = Db.depth primary in
             let max_height = Int.min 5 depth in
             with_migrated ~f:(fun migrated ->
-                let converting = Db_converting.of_ledgers primary migrated in
+                let converting = Db_converting.of_ledgers primary migrated () in
                 populate_converting_ledger converting max_height ;
                 assert (
                   Db.num_accounts primary = Db_migrated.num_accounts migrated ) ;

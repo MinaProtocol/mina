@@ -64,7 +64,7 @@ module Root_test = struct
         (* STEP 1: create a stable root, fill with some accounts, get the locs
            and closing *)
         let cfg =
-          L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger")
+          L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger") ()
         in
         let stable_root =
           L.Root.create ~logger
@@ -101,7 +101,7 @@ module Root_test = struct
         in
         let config =
           L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger")
-            ~backing_type
+            ~backing_type ()
         in
         let root = L.Root.create ~logger ~config ~depth:ledger_depth () in
         let loc_with_accounts =
@@ -111,7 +111,7 @@ module Root_test = struct
         let moved_primary_dir = cwd ^/ "ledger_moved" in
         let config_moved =
           L.Root.Config.with_directory ~directory_name:moved_primary_dir
-            ~backing_type
+            ~backing_type ()
         in
         L.Root.Config.move_backing_exn ~src:config ~dst:config_moved ;
         assert (
@@ -131,7 +131,7 @@ module Root_test = struct
             create
               ~config:
                 (In_directories
-                   (Config.with_primary ~directory_name:moved_primary_dir) )
+                   (Config.with_primary ~directory_name:moved_primary_dir ()) )
               ~logger ~depth:ledger_depth ~assert_synced:true ()
             |> close) ) ;
         Deferred.unit )
@@ -151,7 +151,7 @@ module Root_test = struct
         in
         let config =
           L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger")
-            ~backing_type
+            ~backing_type ()
         in
         let root = L.Root.create ~logger ~config ~depth:ledger_depth () in
         let loc_with_accounts =
@@ -160,7 +160,7 @@ module Root_test = struct
         let checkpointed_primary_dir = cwd ^/ "ledger_checkpointed" in
         let config_checkpoint =
           L.Root.Config.with_directory ~directory_name:checkpointed_primary_dir
-            ~backing_type
+            ~backing_type ()
         in
         L.Root.make_checkpoint root ~config:config_checkpoint ;
         L.Root.close root ;
@@ -175,8 +175,8 @@ module Root_test = struct
             create
               ~config:
                 (In_directories
-                   (Config.with_primary ~directory_name:checkpointed_primary_dir)
-                )
+                   (Config.with_primary ~directory_name:checkpointed_primary_dir
+                      () ) )
               ~logger ~depth:ledger_depth ~assert_synced:true ()
             |> close) ) ;
         Deferred.unit )

@@ -140,7 +140,7 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
                 (Ledger.Root.create ~logger
                    ~config:
                      (Ledger.Root.Config.with_directory ~backing_type
-                        ~directory_name )
+                        ~directory_name () )
                    ~depth () )
             , false )
     in
