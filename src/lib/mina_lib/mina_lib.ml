@@ -890,7 +890,7 @@ let work_selection_method t = t.config.work_selection_method
 let add_complete_work ~logger ~fee ~prover
     ~(results :
        ( Snark_work_lib.Spec.Single.t
-       , Ledger_proof.Cached.t )
+       , Ledger_proof.t )
        Snark_work_lib.Result.Single.Poly.t
        One_or_two.t ) t =
   let update_metrics () =
@@ -943,12 +943,8 @@ let add_complete_work ~logger ~fee ~prover
     Local_sink.push t.pipes.snark_local_sink
       ( Add_solved_work
           ( stmts
-          , Network_pool.Priced_proof.
-              { proof =
-                  proofs
-                  |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
-              ; fee = fee_with_prover
-              } )
+          , Network_pool.Priced_proof.{ proof = proofs; fee = fee_with_prover }
+          )
       , cb ))
   |> Deferred.don't_wait_for
 
