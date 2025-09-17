@@ -81,7 +81,7 @@ module Make
     (** The kind of database that should be used for this root. Only a single
         database of [Account.Stable.Latest.t] accounts is supported. A future
         update will add a converting merkle tree backing. *)
-    type backing_type = Stable_db | Converting_db
+    type backing_type = Stable_db | Converting_db [@@deriving equal]
 
     (** Create a root ledger configuration with the given backing type, using
         the [directory_name] as a template for its location *)

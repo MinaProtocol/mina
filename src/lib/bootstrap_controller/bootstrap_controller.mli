@@ -52,4 +52,5 @@ val run :
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:Mina_block.Validated.t
   -> catchup_mode:[ `Super ]
+  -> ledger_backing:Mina_ledger.Ledger.Root.Config.backing_type
   -> (Transition_frontier.t * Transition_cache.element list) Deferred.t
