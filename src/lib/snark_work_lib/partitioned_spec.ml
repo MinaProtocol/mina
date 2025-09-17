@@ -81,32 +81,3 @@ module Stable = struct
 end]
 
 type t = (Single_spec.t, Sub_zkapp_spec.t, unit) Poly.t
-
-let read_all_proofs_from_disk : t -> Stable.Latest.t = function
-  | Single { job; data } ->
-      let job =
-        With_job_meta.map ~f_spec:Single_spec.read_all_proofs_from_disk job
-      in
-      Single { job; data }
-  | Sub_zkapp_command { job; data } ->
-      let job =
-        With_job_meta.map ~f_spec:Sub_zkapp_spec.read_all_proofs_from_disk job
-      in
-      Sub_zkapp_command { job; data }
-
-let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-    Stable.Latest.t -> t = function
-  | Single { job; data } ->
-      let job =
-        With_job_meta.map
-          ~f_spec:(Single_spec.write_all_proofs_to_disk ~proof_cache_db)
-          job
-      in
-      Single { job; data }
-  | Sub_zkapp_command { job; data } ->
-      let job =
-        With_job_meta.map
-          ~f_spec:(Sub_zkapp_spec.write_all_proofs_to_disk ~proof_cache_db)
-          job
-      in
-      Sub_zkapp_command { job; data }
