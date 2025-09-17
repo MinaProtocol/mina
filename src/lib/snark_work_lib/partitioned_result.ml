@@ -6,9 +6,7 @@ module Stable = struct
 
   module V1 = struct
     type t =
-      { id :
-          [ `Single of Id.Single.Stable.V1.t
-          | `Sub_zkapp of Id.Sub_zkapp.Stable.V1.t ]
+      { id : Id.Any.Stable.V1.t
       ; data :
           (* NOTE: the time here correspond to time elapsed for creating the
              proof by a worker *)
@@ -18,18 +16,12 @@ module Stable = struct
       }
     [@@deriving to_yojson]
 
-    let id_to_json : t -> Yojson.Safe.t = function
-      | { id = `Single id; _ } ->
-          `List [ `String "single"; Id.Single.to_yojson id ]
-      | { id = `Sub_zkapp id; _ } ->
-          `List [ `String "sub_zkapp"; Id.Sub_zkapp.to_yojson id ]
-
     let to_latest = Fn.id
   end
 end]
 
 type t =
-  { id : [ `Single of Id.Single.t | `Sub_zkapp of Id.Sub_zkapp.t ]
+  { id : Id.Any.t
   ; data : (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t
   }
 

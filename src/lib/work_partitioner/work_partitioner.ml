@@ -71,7 +71,7 @@ let reschedule_old_zkapp_job
       ~f:(reschedule_if_old ~reassignment_timeout)
       zkapp_jobs_sent_by_partitioner
   in
-  Ok (Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () })
+  Ok (Work.Spec.Partitioned.Poly.Sub_zkapp_command job)
 
 let reschedule_old_single_job
     ~partitioner:
@@ -82,7 +82,7 @@ let reschedule_old_single_job
       ~f:(reschedule_if_old ~reassignment_timeout)
       single_jobs_sent_by_partitioner
   in
-  Ok (Work.Spec.Partitioned.Poly.Single { job; data = () })
+  Ok (Work.Spec.Partitioned.Poly.Single job)
 
 let register_pending_zkapp_command_job ~(id : Work.Id.Single.t)
     ~(partitioner : t) ~range ~sub_zkapp_spec
@@ -101,7 +101,7 @@ let register_pending_zkapp_command_job ~(id : Work.Id.Single.t)
        happens to be still used by another job."
     partitioner.zkapp_jobs_sent_by_partitioner ;
 
-  Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; data = () }
+  Work.Spec.Partitioned.Poly.Sub_zkapp_command job
 
 let schedule_from_pending_zkapp_command ~(id : Work.Id.Single.t)
     ~(partitioner : t) (pending : Pending_zkapp_command.t) =
@@ -176,7 +176,7 @@ let convert_single_work_from_selector ~(partitioner : t)
               "Id generator generated a repeated Id that happens to be \
                occupied by a job in sent single job pool"
             partitioner.single_jobs_sent_by_partitioner ;
-          Ok (Single { job; data = () }) )
+          Ok (Single job) )
   | Merge _ ->
       let job =
         Work.With_job_meta.map
@@ -187,7 +187,7 @@ let convert_single_work_from_selector ~(partitioner : t)
           "Id generator generated a repeated Id that happens to be occupied by \
            a job in sent single job pool"
         partitioner.single_jobs_sent_by_partitioner ;
-      Ok (Single { job; data = () })
+      Ok (Single job)
 
 let schedule_from_tmp_slot ~(partitioner : t) =
   let%map.Option spec = partitioner.tmp_slot in
@@ -417,10 +417,10 @@ let submit_into_pending_zkapp_command ~partitioner
 let submit_partitioned_work ~(result : Work.Result.Partitioned.Stable.Latest.t)
     ~(partitioner : t) =
   match result with
-  | { id = `Single job_id; data = { proof; data = elapsed } } ->
+  | { id = Single job_id; data = { proof; data = elapsed } } ->
       let submitted_result =
         Work.Result.Single.Poly.{ spec = (); proof; elapsed }
       in
       submit_single ~is_from_zkapp:false ~partitioner ~submitted_result ~job_id
-  | { id = `Sub_zkapp job_id; data } ->
+  | { id = Sub_zkapp job_id; data } ->
       submit_into_pending_zkapp_command ~partitioner ~job_id ~data

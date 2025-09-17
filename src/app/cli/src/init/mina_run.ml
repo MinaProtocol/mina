@@ -387,7 +387,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               [%log debug] "responding to a Get_work request with some new work"
                 ~metadata:
                   [ ( "work_id"
-                    , Snark_work_lib.Spec.Partitioned.Poly.id_to_json spec )
+                    , Snark_work_lib.(
+                        Spec.Partitioned.Poly.get_id spec |> Id.Any.to_yojson)
+                    )
                   ] ;
 
               Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
@@ -407,11 +409,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (result : Snark_work_lib.Result.Partitioned.Stable.Latest.t) ->
           [%log debug] "received completed work from a snark worker"
-            ~metadata:
-              [ ( "work_id"
-                , Snark_work_lib.Result.Partitioned.Stable.Latest.id_to_json
-                    result )
-              ] ;
+            ~metadata:[ ("work_id", Snark_work_lib.Id.Any.to_yojson result.id) ] ;
           Mina_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           Deferred.return @@ Mina_lib.add_work mina result )

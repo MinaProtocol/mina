@@ -110,18 +110,15 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
           ~metadata:[ address_json; work_ids_json ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
+        let id = Spec.Partitioned.Poly.get_id partitioned_spec in
         match%bind
           Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
         with
         | Error e ->
-            let partitioned_id =
-              Spec.Partitioned.Poly.map ~f_single_spec:ignore
-                ~f_subzkapp_spec:ignore ~f_data:ignore partitioned_spec
-            in
             let%bind () =
               match%map
                 dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
-                  shutdown_on_disconnect (e, partitioned_id) daemon_address
+                  shutdown_on_disconnect (e, id) daemon_address
               with
               | Error e ->
                   [%log error]
@@ -131,26 +128,13 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
                   ()
             in
             log_and_retry "performing work" e (retry_pause 10.) go
-        | Ok result ->
-            let wire_result =
-              match result with
-              | Spec.Partitioned.Poly.Single { job; data } ->
-                  Result.Partitioned.Stable.Latest.
-                    { id = `Single job.job_id; data }
-              | Sub_zkapp_command { job; data } ->
-                  Result.Partitioned.Stable.Latest.
-                    { id = `Sub_zkapp job.job_id; data }
-            in
-            ( match result with
-            | Spec.Partitioned.Poly.Single
-                { job = { spec = single_spec; _ }
-                ; data = { data = elapsed; _ }
-                } ->
+        | Ok ({ data = elapsed; _ } as data) ->
+            let wire_result = Result.Partitioned.Stable.Latest.{ id; data } in
+            ( match partitioned_spec with
+            | Spec.Partitioned.Poly.Single { spec = single_spec; _ } ->
                 Metrics.emit_single_metrics_stable ~logger ~single_spec ~elapsed
             | Spec.Partitioned.Poly.Sub_zkapp_command
-                { job = { spec = sub_zkapp_spec; _ }
-                ; data = { data = elapsed; _ }
-                } ->
+                { spec = sub_zkapp_spec; _ } ->
                 Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
             ) ;
             let rec submit_work () =

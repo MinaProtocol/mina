@@ -6,9 +6,7 @@ module Stable : sig
 
   module V1 : sig
     type t =
-      { id :
-          [ `Single of Id.Single.Stable.V1.t
-          | `Sub_zkapp of Id.Sub_zkapp.Stable.V1.t ]
+      { id : Id.Any.Stable.V1.t
       ; data :
           ( Mina_stdlib.Time.Span.Stable.V1.t
           , Ledger_proof.Stable.V2.t )
@@ -16,14 +14,12 @@ module Stable : sig
       }
     [@@deriving to_yojson]
 
-    val id_to_json : t -> Yojson.Safe.t
-
     val to_latest : t -> t
   end
 end]
 
 type t =
-  { id : [ `Single of Id.Single.t | `Sub_zkapp of Id.Sub_zkapp.t ]
+  { id : Id.Any.t
   ; data : (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t
   }
 
