@@ -20,8 +20,8 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
   let rec remove_until_reschedule ~f t =
     let%bind.Option job_id = Deque.dequeue_front t.timeline in
     match Hashtbl.find t.index job_id with
-    | Some scheduled_job -> (
-        match f scheduled_job with
+    | Some original_job -> (
+        match f original_job with
         | `Remove ->
             remove_until_reschedule ~f t
         | `Stop_keep ->
@@ -29,10 +29,10 @@ module Make (Id : Hashtbl.Key) (Spec : T) = struct
             None
         | `Stop_reschedule (job : job) ->
             assert (Id.compare job.job_id job_id = 0) ;
-            let job_rescheduled = { job; scheduled = Time.now () } in
-            Hashtbl.set t.index ~key:job_id ~data:job_rescheduled ;
+            let rescheduled_job = { job; scheduled = Time.now () } in
+            Hashtbl.set t.index ~key:job_id ~data:rescheduled_job ;
             Deque.enqueue_back t.timeline job_id ;
-            Some job_rescheduled )
+            Some rescheduled_job )
     | _ ->
         remove_until_reschedule ~f t
 
