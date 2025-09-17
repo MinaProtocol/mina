@@ -28,7 +28,7 @@ RUN apt-get update --yes \
     aptly \
     apt-transport-https \
     apt-utils \
-    dig \
+    dnsutils \
     fakeroot \
     gnupg2 \
     jq \
