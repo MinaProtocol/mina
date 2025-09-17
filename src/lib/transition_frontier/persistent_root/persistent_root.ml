@@ -313,11 +313,13 @@ let reset_to_genesis_exn t ~precomputed_values =
   assert (Option.is_none t.instance) ;
   Mina_stdlib_unix.File_system.rmrf t.directory ;
   with_instance_exn t ~f:(fun instance ->
-      ignore
-        ( Precomputed_values.populate_root precomputed_values
-            (Instance.snarked_ledger instance)
-          |> Or_error.map ~f:Ledger.Root.as_unmasked
-          : Ledger.Any_ledger.witness Or_error.t ) ;
+      Precomputed_values.populate_root precomputed_values
+        (Instance.snarked_ledger instance)
+      |> Result.iter_error ~f:(fun err ->
+             [%log' error t.logger]
+               "Failed to populate persistent instance with genesis ledger \
+                when resetting to genesis"
+               ~metadata:[ ("reason", Error_json.error_to_yojson err) ] ) ;
       Instance.set_root_identifier instance
         (genesis_root_identifier
            ~genesis_state_hash:
