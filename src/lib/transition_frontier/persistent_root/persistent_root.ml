@@ -40,7 +40,8 @@ let with_file ?size filename access_level ~f =
 (* TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
   type t =
-    { snarked_ledger : Ledger.Root.t
+    { mutable snarked_ledger : Ledger.Root.t
+          (* NOTE: potential_snarked_ledgers is not needed outside of persistent root *)
     ; potential_snarked_ledgers : Ledger.Root.Config.t Queue.t
     ; factory : Factory_type.t
     }
@@ -53,7 +54,6 @@ and Factory_type : sig
     ; logger : Logger.t
     ; mutable instance : Instance_type.t option
     ; ledger_depth : int
-    ; backing_type : Ledger.Root.Config.backing_type
     }
 end =
   Factory_type
@@ -72,7 +72,7 @@ module Instance = struct
     (** Helper to create a [Root.Config.t] for a snarked ledger based on a
         subdirectory of the [Factory_type.t] directory *)
     let make_instance_config subdirectory t =
-      Ledger.Root.Config.with_directory ~backing_type:t.backing_type
+      Ledger.Root.Config.with_directory ~backing_type:Stable_db
         ~directory_name:(make_instance_location subdirectory t)
 
     (** The config for the actual snarked ledger that is initialized and used by
@@ -288,8 +288,8 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~directory ~backing_type ~ledger_depth =
-  { directory; logger; instance = None; ledger_depth; backing_type }
+let create ~logger ~directory ~ledger_depth =
+  { directory; logger; instance = None; ledger_depth }
 
 let create_instance_exn t =
   assert (Option.is_none t.instance) ;
@@ -303,6 +303,14 @@ let load_from_disk_exn t ~snarked_ledger_hash ~logger =
   let%map instance = Instance.load_from_disk t ~snarked_ledger_hash ~logger in
   t.instance <- Some instance ;
   instance
+
+let convert_instance_exn ~logger ~here t =
+  let instance =
+    Option.value_exn ~here ~message:"No instance is present in persistent root!"
+      t.instance
+  in
+  instance.snarked_ledger <-
+    Ledger.Root.make_converting ~logger instance.snarked_ledger
 
 let with_instance_exn t ~f =
   let instance = create_instance_exn t in
