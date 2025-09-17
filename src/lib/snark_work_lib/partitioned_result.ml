@@ -10,6 +10,8 @@ module Stable = struct
           [ `Single of Id.Single.Stable.V1.t
           | `Sub_zkapp of Id.Sub_zkapp.Stable.V1.t ]
       ; data :
+          (* NOTE: the time here correspond to time elapsed for creating the
+             proof by a worker *)
           ( Mina_stdlib.Time.Span.Stable.V1.t
           , Ledger_proof.Stable.V2.t )
           Proof_carrying_data.Stable.V1.t
