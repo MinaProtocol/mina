@@ -130,6 +130,9 @@ module Make
   (** Make a checkpoint of the root ledger *)
   val make_checkpoint : t -> config:Config.t -> unit
 
+  (** Make a root backed by converting ledger, no matter if it's such case before or not *)
+  val make_converting : logger:Logger.t -> t -> t
+
   (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
       that does not need to know how the root is implemented *)
   val as_unmasked : t -> Any_ledger.witness
