@@ -119,14 +119,14 @@ DECLARE
     col_name TEXT := 'element' || p_element_num;
 BEGIN
 
-    RAISE NOTICE 'DEBUG: adding column % for zkapp_states_nullable', col_name;
+    RAISE DEBUG 'Adding column % for zkapp_states_nullable', col_name;
 
     EXECUTE format(
         'ALTER TABLE zkapp_states_nullable ADD COLUMN IF NOT EXISTS %I INT REFERENCES zkapp_field(id)',
         col_name
     );
 
-    RAISE NOTICE 'DEBUG: added column % for zkapp_states_nullable', col_name;
+    RAISE DEBUG 'Added column % for zkapp_states_nullable', col_name;
 
 EXCEPTION
     WHEN OTHERS THEN

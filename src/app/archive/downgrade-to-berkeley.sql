@@ -112,14 +112,14 @@ DECLARE
     col_name TEXT := 'element' || p_element_num;
 BEGIN
 
-    RAISE NOTICE 'DEBUG: trying to removing column % for zkapp_states_nullable', col_name;
+    RAISE DEBUG 'Trying to removing column % for zkapp_states_nullable', col_name;
 
     EXECUTE format(
         'ALTER TABLE zkapp_states_nullable DROP COLUMN IF EXISTS %I',
         col_name
     );
 
-    RAISE NOTICE 'DEBUG: ensured column % for zkapp_states_nullable not existent', col_name;
+    RAISE DEBUG 'Ensured column % for zkapp_states_nullable not existent', col_name;
 EXCEPTION
     WHEN OTHERS THEN
         PERFORM set_migration_status('failed'::migration_status);
