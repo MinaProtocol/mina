@@ -2,6 +2,7 @@ open Async
 open Core
 open Mina_automation
 open Mina_automation_fixture.Archive
+open Common
 
 (**
  * Test the basic functionality of the mina archive with mocked deamon
@@ -114,54 +115,32 @@ type t = Mina_automation_fixture.Archive.after_bootstrap
 
 let test_case (test_data : t) =
   let open Deferred.Let_syntax in
-  let daemon = Daemon.default in
+  let daemon = Daemon.default () in
   let archive_uri = test_data.archive.config.postgres_uri in
   let output = test_data.temp_dir in
   let%bind precomputed_blocks =
-    Network_data.untar_precomputed_blocks test_data.network_data output
-  in
-  let precomputed_blocks =
-    List.map precomputed_blocks ~f:(fun file -> output ^ "/" ^ file)
-    |> List.filter ~f:(fun file -> String.is_suffix file ~suffix:".json")
+    unpack_precomputed_blocks test_data.network_data
+      ~temp_dir:test_data.temp_dir
   in
   let log_file = output ^ "/precomputed_blocks_test.log" in
   Archive.Process.start_logging test_data.archive ~log_file ;
   let%bind () =
-    Daemon.archive_blocks_from_files daemon
-      ~archive_address:test_data.archive.config.server_port
-      ~format:Archive_blocks.Precomputed precomputed_blocks
+    Daemon.archive_blocks_from_files daemon.executor
+      ~archive_address:test_data.archive.config.server_port ~format:`Precomputed
+      precomputed_blocks
   in
 
   let%bind () =
     assert_archived_blocks ~archive_uri
       ~expected:(List.length precomputed_blocks)
   in
-  let connection = Psql.Conn_str archive_uri in
-  let%bind latest_state_hash =
-    Psql.run_command ~connection
-      "SELECT state_hash FROM blocks ORDER BY id DESC LIMIT 1"
-  in
-  let latest_state_hash =
-    match latest_state_hash with
-    | Ok hash ->
-        hash
-    | Error err ->
-        failwith
-          ("Failed to query latest state hash: " ^ Error.to_string_hum err)
-  in
-  let output_ledger = output ^ "/output_ledger.json" in
-  let replayer = Replayer.default in
-  let%bind replayer_output =
-    Replayer.run replayer ~archive_uri
-      ~input_config:
+
+  let%bind () =
+    assert_replayer_run_against_last_block
+      ~replayer_input_file_path:
         (Network_data.replayer_input_file_path test_data.network_data)
-      ~target_state_hash:latest_state_hash ~interval_checkpoint:10
-      ~output_ledger ()
+      archive_uri test_data.temp_dir
   in
-  let () = print_endline replayer_output in
-  let output_ledger = Replayer.Output.of_json_file_exn output_ledger in
-  assert (
-    String.equal output_ledger.target_epoch_ledgers_state_hash latest_state_hash ) ;
 
   let%bind perf_data = extract_perf_metrics log_file in
   perf_metrics_to_yojson perf_data |> Yojson.to_file "archive.perf" ;
