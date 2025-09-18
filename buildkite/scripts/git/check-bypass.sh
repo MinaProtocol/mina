@@ -32,7 +32,7 @@
 # AUTHORIZED USERS:
 #   Only users listed in GITHUB_USERS_ELIGIBLE_FOR_BYPASS can bypass checks
 
-GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie deepthiskumar Trivo25 45930 SanabriaRusso nicc georgeee dannywillems cjjdespres"
+GITHUB_USERS_ELIGIBLE_FOR_BYPASS="amc-ie deepthiskumar Trivo25 45930 SanabriaRusso georgeee dannywillems cjjdespres"
 
 BYPASS_PHRASE=$1
 
