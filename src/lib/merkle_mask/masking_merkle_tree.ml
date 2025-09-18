@@ -917,10 +917,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       |> Sequence.iter ~f:(fun i -> f i (get_at_index t i))
 
     let iteri t ~f =
-      assert_is_attached t ;
-      let num_accounts = num_accounts t in
-      Sequence.range ~stop:`exclusive 0 num_accounts
-      |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
+      iteri_untrusted t ~f:(fun index account_opt ->
+          f index (Option.value_exn account_opt) )
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;
