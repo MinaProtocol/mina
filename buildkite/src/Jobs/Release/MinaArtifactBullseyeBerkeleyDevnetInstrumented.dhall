@@ -23,6 +23,8 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Amd64
             ]
           }
       )

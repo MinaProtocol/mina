@@ -22,6 +22,11 @@ let Tag
       | Hardfork
       | Promote
       | Rosetta
+      | Devnet
+      | Lightnet
+      | Arm64
+      | Amd64
+      | Mainnet
       >
 
 let toNatural
@@ -42,6 +47,11 @@ let toNatural
             , Debian = 12
             , Docker = 13
             , Rosetta = 14
+            , Devnet = 15
+            , Lightnet = 16
+            , Arm64 = 17
+            , Amd64 = 18
+            , Mainnet = 19
             }
             tag
 
@@ -80,6 +90,11 @@ let capitalName =
             , Docker = "Docker"
             , Debian = "Debian"
             , Rosetta = "Rosetta"
+            , Devnet = "Devnet"
+            , Lightnet = "Lightnet"
+            , Arm64 = "Arm64"
+            , Amd64 = "Amd64"
+            , Mainnet = "Mainnet"
             }
             tag
 
@@ -100,6 +115,11 @@ let lowerName =
             , Docker = "docker"
             , Debian = "debian"
             , Rosetta = "rosetta"
+            , Devnet = "devnet"
+            , Lightnet = "lightnet"
+            , Arm64 = "arm64"
+            , Amd64 = "amd64"
+            , Mainnet = "mainnet"
             }
             tag
 
