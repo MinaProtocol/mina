@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -eox pipefail
+set -T
+PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
 
 export MINA_LIBP2P_PASS=
 export MINA_PRIVKEY_PASS=
@@ -37,8 +39,17 @@ GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
 # Slot duration (a.k.a. block window duration), seconds
 SLOT=${SLOT:-30}
 
+
+# localnet mode (app or docker).
+# Controls execution environment. If app is specified local mina app is used.
+# Otherwise docker is used and all commands will be run in a docker container.
+MODE=app
+
+BP_CONTAINER_NAME=mina_bp
+SW_CONTAINER_NAME=mina_sw
+
 echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
-echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [--develop] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
+echo "Usage: $0 [-m|--mina $MINA_EXE] [--mina-docker $MINA_DOCKER] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [--develop] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
 echo "Consider reading script's code for information on optional arguments" >&2
 
 ##########################################################
@@ -54,7 +65,11 @@ while [[ $# -gt 0 ]]; do
     --develop)
       CONF_SUFFIX=".develop"; shift ;;
     -m|--mina)
+      MODE=app
       MINA_EXE="$2"; shift; shift ;;
+    --mina-docker)
+      MODE=docker
+      MINA_DOCKER="$2"; shift; shift ;;
     -s|--slot)
       SLOT="$2"; shift; shift ;;
     -c|--config)
@@ -65,6 +80,10 @@ while [[ $# -gt 0 ]]; do
       SLOT_TX_END="$2"; shift; shift ;;
     --genesis-ledger-dir)
       GENESIS_LEDGER_DIR="$2"; shift; shift ;;
+    --bp-container-name)
+      BP_CONTAINER_NAME="$2"; shift; shift ;;
+    --sw-container-name)
+      SW_CONTAINER_NAME="$2"; shift; shift ;;
     -*)
       echo "Unknown option $1"; exit 1 ;;
     *)
@@ -77,8 +96,15 @@ if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
   exit 1
 fi
 
+if [[ "$MINA_EXE" != "mina" ]] && [[ "$MINA_DOCKER" != "" ]]; then
+  echo "Can't use both --mina and --mina-docker options" >&2
+  exit 1
+fi
+
 # Check mina command exists
-command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
+if [[ "$MODE" == "app" ]]; then
+  command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
+fi
 
 # Genesis timestamp to use in config
 calculated_timestamp="$( d=$(date +%s); date -u -d @$((d - d % 60 + DELAY_MIN*60)) '+%F %H:%M:%S+00:00' )"
@@ -94,14 +120,29 @@ mkdir -p $CONF_DIR
 chmod 0700 $CONF_DIR
 
 if [[ ! -f $CONF_DIR/bp ]]; then
-  "$MINA_EXE" advanced generate-keypair --privkey-path $CONF_DIR/bp
+  if [[ "$MODE" == "docker" ]]; then
+    docker run --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS --rm -v "$PWD/localnet:/localnet" "$MINA_DOCKER" advanced generate-keypair --privkey-path /localnet/config/bp
+  else
+    "$MINA_EXE" advanced generate-keypair --privkey-path $CONF_DIR/bp
+  fi
 fi
 
-NODE_ARGS_1=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" )
-NODE_ARGS_2=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
 
-"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1 
-"$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2 
+if [[ "$MODE" == "docker" ]]; then
+    NODE_ARGS_1=( --libp2p-keypair "/$CONF_DIR/libp2p_1" )
+    NODE_ARGS_2=( --libp2p-keypair "/$CONF_DIR/libp2p_2" )
+else
+    NODE_ARGS_1=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_1" )
+    NODE_ARGS_2=( --libp2p-keypair "$PWD/$CONF_DIR/libp2p_2" )
+fi
+
+if [[ "$MODE" == "docker" ]]; then
+  docker run --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS --rm -v "$PWD/localnet:/localnet" "$MINA_DOCKER" libp2p generate-keypair --privkey-path /localnet/config/libp2p_1
+  docker run --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS --rm -v "$PWD/localnet:/localnet" "$MINA_DOCKER" libp2p generate-keypair --privkey-path /localnet/config/libp2p_2
+else
+  "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_1
+  "$MINA_EXE" libp2p generate-keypair --privkey-path $CONF_DIR/libp2p_2
+fi
 
 if [[ "$CUSTOM_CONF" == "" ]] && [[ ! -f $CONF_DIR/ledger.json ]]; then
   ( cd $CONF_DIR && "$SCRIPT_DIR/../prepare-test-ledger.sh" --exit-on-old-ledger -c 100000 -b 1000000 "$(cat bp.pub)" >ledger.json )
@@ -142,63 +183,123 @@ fi
 ##############################################################
 
 COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
-COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
-COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
+COMMON_ARGS+=("--insecure-rest-server")
+
+if [[ "$MODE" == "docker" ]]; then
+  COMMON_ARGS+=( --config-file "/$CONF_DIR/base.json" )
+  COMMON_ARGS+=( --config-file "/$CONF_DIR/daemon$CONF_SUFFIX.json" )
+else
+  COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
+  COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
+fi
 
 if [[ "$GENESIS_LEDGER_DIR" != "" ]]; then
   rm -Rf localnet/genesis_{1,2}
   cp -Rf "$GENESIS_LEDGER_DIR" localnet/genesis_1
   cp -Rf "$GENESIS_LEDGER_DIR" localnet/genesis_2
-  NODE_ARGS_1+=( --genesis-ledger-dir "$PWD/localnet/genesis_1" )
-  NODE_ARGS_2+=( --genesis-ledger-dir "$PWD/localnet/genesis_2" )
+  if [[ "$MODE" == "docker" ]]; then
+    NODE_ARGS_1+=( --genesis-ledger-dir "/localnet/genesis_1" )
+    NODE_ARGS_2+=( --genesis-ledger-dir "/localnet/genesis_2" )
+  else
+    NODE_ARGS_1+=( --genesis-ledger-dir "$PWD/localnet/genesis_1" )
+    NODE_ARGS_2+=( --genesis-ledger-dir "$PWD/localnet/genesis_2" )
+  fi
 fi
 
 # Clean runtime directories
 rm -Rf localnet/runtime_1 localnet/runtime_2
 
-"$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
-  --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
-  "${NODE_ARGS_1[@]}" \
-  --block-producer-key "$PWD/$CONF_DIR/bp" \
+
+if [[ "$MODE" == "docker" ]]; then
+   bp_container_id=$(docker run --name "$BP_CONTAINER_NAME" --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS -p 10301:10301 -p 10302:10302 -p 10303:10303 -d -v "$PWD/localnet:/localnet" "$MINA_DOCKER" daemon "${COMMON_ARGS[@]}" \
+     --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
+     "${NODE_ARGS_1[@]}" \
+     --block-producer-key "/$CONF_DIR/bp" \
+     --config-directory "/localnet/runtime_1" \
+     --client-port 10301 --external-port 10302 --rest-port 10303 &
+     )
+   echo "Block producer container ID: $bp_container_id"
+else
+   "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
+     --peer "/ip4/127.0.0.1/tcp/10312/p2p/$(cat $CONF_DIR/libp2p_2.peerid)" \
+     "${NODE_ARGS_1[@]}" \
+     --block-producer-key "$PWD/$CONF_DIR/bp" \
   --config-directory "$PWD/localnet/runtime_1" \
   --client-port 10301 --external-port 10302 --rest-port 10303 &
+  bp_pid=$!
+  echo "Block producer PID: $bp_pid"
+fi
 
-bp_pid=$!
+if [[ "$MODE" == "docker" ]]; then
+  sw_container_id=$(docker run --name "$SW_CONTAINER_NAME" --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS -p 10311:10311 -p 10312:10312 -p 10313:10313 -d -v "$PWD/localnet:/localnet" "$MINA_DOCKER" daemon "${COMMON_ARGS[@]}" \
+    --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat $CONF_DIR/libp2p_1.peerid)" \
+    "${NODE_ARGS_2[@]}" \
+    --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
+    --config-directory "/localnet/runtime_2" \
+    --client-port 10311 --external-port 10312 --rest-port 10313
+    )
+  echo "Snark worker container ID: $sw_container_id"
 
-echo "Block producer PID: $bp_pid"
-
-"$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
+else
+   "$MINA_EXE" daemon "${COMMON_ARGS[@]}" \
   "${NODE_ARGS_2[@]}" \
   --peer "/ip4/127.0.0.1/tcp/10302/p2p/$(cat $CONF_DIR/libp2p_1.peerid)" \
   --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
   --config-directory "$PWD/localnet/runtime_2" \
   --client-port 10311 --external-port 10312 --rest-port 10313 &
 
-sw_pid=$!
+  sw_pid=$!
 
-echo "Snark worker PID: $sw_pid"
+  echo "Snark worker PID: $sw_pid"
+fi
 
-while ! "$MINA_EXE" accounts import --privkey-path "$PWD/$CONF_DIR/bp" --rest-server 10313 2>/dev/null; do
-  sleep 1m
-done
+if [[ "$MODE" == "docker" ]]; then
+  while ! docker exec --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS "$sw_container_id" mina accounts import --privkey-path "/$CONF_DIR/bp" --rest-server 10313 2>/dev/null; do
+    sleep 1m
+  done
+else
+  while ! "$MINA_EXE" accounts import --privkey-path "$PWD/$CONF_DIR/bp" --rest-server 10313 2>/dev/null; do
+    sleep 1m
+  done
+fi
 
-# Export staged ledger
-# Will succeed after bootstrap is over
-while ! "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 > localnet/exported_staged_ledger.json; do
-  sleep 1m
-done
+if [[ "$MODE" == "docker" ]]; then
+  while ! docker exec --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS "$sw_container_id" mina ledger export staged-ledger --daemon-port 10311 > localnet/exported_staged_ledger.json; do
+    sleep 1m
+  done
+else
+  while ! "$MINA_EXE" ledger export staged-ledger --daemon-port 10311 > localnet/exported_staged_ledger.json; do
+    sleep 1m
+  done
+fi
 
 i=0
-while kill -0 $sw_pid 2>/dev/null; do
+
+function check_if_mina_is_running() {
+  if [[ "$MODE" == "docker" ]]; then
+    docker container inspect "$sw_container_id" --format '{{.State.Status}}' | grep -q "running"
+  else
+    kill -0 $sw_pid 2>/dev/null
+  fi
+}
+
+while check_if_mina_is_running; do
   # shuf's exit code is masked by `true` because we do not expect
   # all of the output to be read
-  <localnet/exported_staged_ledger.json jq -r '.[].pk' | { shuf || true; } | while read acc; do
-    if ! kill -0 $sw_pid 2>/dev/null; then
+  jq -r '.[].pk' < localnet/exported_staged_ledger.json | { shuf || true; } | while read acc; do
+    if ! check_if_mina_is_running; then
       break
     fi
-    "$MINA_EXE" client send-payment --sender "$(cat $CONF_DIR/bp.pub)" --receiver "$acc" \
-      --amount 0.1 --memo "payment_$i" --rest-server 10313 2>/dev/null \
-      && i=$((i+1)) && echo "Sent tx #$i" || echo "Failed to send tx #$i"
+
+    if [[ "$MODE" == "docker" ]]; then
+      docker exec --env MINA_LIBP2P_PASS --env MINA_PRIVKEY_PASS "$sw_container_id" bash -c "mina client send-payment --sender '$(cat $CONF_DIR/bp.pub)' --receiver '$acc' \
+        --amount 0.1 --memo 'payment_$i' --rest-server 10313 2>/dev/null" \
+        && i=$((i+1)) && echo "Sent tx #$i" || echo "Failed to send tx #$i"
+    else
+      "$MINA_EXE" client send-payment --sender "$(cat $CONF_DIR/bp.pub)" --receiver "$acc" \
+        --amount 0.1 --memo "payment_$i" --rest-server 10313 2>/dev/null \
+        && i=$((i+1)) && echo "Sent tx #$i" || echo "Failed to send tx #$i"
+    fi
     sleep "$TX_INTERVAL"
   done
 done
