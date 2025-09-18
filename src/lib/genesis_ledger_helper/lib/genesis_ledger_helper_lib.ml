@@ -563,18 +563,9 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
   ; txpool_max_size =
       Option.value ~default:default.txpool_max_size
         (config.daemon >>= fun cfg -> cfg.txpool_max_size)
-  ; zkapp_proof_update_cost =
-      Option.value ~default:default.zkapp_proof_update_cost
-        (config.daemon >>= fun cfg -> cfg.zkapp_proof_update_cost)
-  ; zkapp_signed_single_update_cost =
-      Option.value ~default:default.zkapp_signed_single_update_cost
-        (config.daemon >>= fun cfg -> cfg.zkapp_signed_single_update_cost)
-  ; zkapp_signed_pair_update_cost =
-      Option.value ~default:default.zkapp_signed_pair_update_cost
-        (config.daemon >>= fun cfg -> cfg.zkapp_signed_pair_update_cost)
-  ; zkapp_transaction_cost_limit =
-      Option.value ~default:default.zkapp_transaction_cost_limit
-        (config.daemon >>= fun cfg -> cfg.zkapp_transaction_cost_limit)
+  ; max_zkapp_segment_per_transaction =
+      Option.value ~default:default.max_zkapp_segment_per_transaction
+        (config.daemon >>= fun cfg -> cfg.max_zkapp_segment_per_transaction)
   ; max_event_elements =
       Option.value ~default:default.max_event_elements
         (config.daemon >>= fun cfg -> cfg.max_event_elements)
