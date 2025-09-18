@@ -17,12 +17,12 @@ let Filter
       | DebianBuild
       | DockerBuild
       | Rosetta
-      | DockerBuildDevnetArm64
-      | DockerBuildDevnetAmd64
-      | DockerBuildMainnetArm64
-      | DockerBuildMainnetAmd64
-      | DockerBuildLightnetArm64
-      | DockerBuildLightnetAmd64
+      | DockerBuildArm64Devnet
+      | DockerBuildAmd64Devnet
+      | DockerBuildArm64Mainnet
+      | DockerBuildAmd64Mainnet
+      | DockerBuildArm64Lightnet
+      | DockerBuildAmd64Lightnet
       >
 
 let tags
@@ -40,17 +40,17 @@ let tags
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
             , Rosetta = [ Tag.Type.Rosetta ]
-            , DockerBuildDevnetArm64 =
+            , DockerBuildArm64Devnet =
               [ Tag.Type.Docker, Tag.Type.Devnet, Tag.Type.Arm64 ]
-            , DockerBuildDevnetAmd64 =
+            , DockerBuildAmd64Devnet =
               [ Tag.Type.Docker, Tag.Type.Devnet, Tag.Type.Amd64 ]
-            , DockerBuildMainnetArm64 =
+            , DockerBuildArm64Mainnet =
               [ Tag.Type.Docker, Tag.Type.Mainnet, Tag.Type.Arm64 ]
-            , DockerBuildMainnetAmd64 =
+            , DockerBuildAmd64Mainnet =
               [ Tag.Type.Docker, Tag.Type.Mainnet, Tag.Type.Amd64 ]
-            , DockerBuildLightnetArm64 =
+            , DockerBuildArm64Lightnet =
               [ Tag.Type.Docker, Tag.Type.Lightnet, Tag.Type.Arm64 ]
-            , DockerBuildLightnetAmd64 =
+            , DockerBuildAmd64Lightnet =
               [ Tag.Type.Docker, Tag.Type.Lightnet, Tag.Type.Amd64 ]
             }
             filter
@@ -70,12 +70,12 @@ let show
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
             , Rosetta = "Rosetta"
-            , DockerBuildDevnetArm64 = "DockerBuildDevnetArm64"
-            , DockerBuildDevnetAmd64 = "DockerBuildDevnetAmd64"
-            , DockerBuildMainnetArm64 = "DockerBuildMainnetArm64"
-            , DockerBuildMainnetAmd64 = "DockerBuildMainnetAmd64"
-            , DockerBuildLightnetArm64 = "DockerBuildLightnetArm64"
-            , DockerBuildLightnetAmd64 = "DockerBuildLightnetAmd64"
+            , DockerBuildArm64Devnet = "DockerBuildArm64Devnet"
+            , DockerBuildAmd64Devnet = "DockerBuildAmd64Devnet"
+            , DockerBuildArm64Mainnet = "DockerBuildArm64Mainnet"
+            , DockerBuildAmd64Mainnet = "DockerBuildAmd64Mainnet"
+            , DockerBuildArm64Lightnet = "DockerBuildArm64Lightnet"
+            , DockerBuildAmd64Lightnet = "DockerBuildAmd64Lightnet"
             }
             filter
 
