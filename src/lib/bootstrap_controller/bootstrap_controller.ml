@@ -2,11 +2,12 @@
 open Core
 open Async
 open Mina_base
-module Ledger = Mina_ledger.Ledger
-module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_state
 open Pipe_lib.Strict_pipe
 open Network_peer
+open Mina_stdlib
+module Ledger = Mina_ledger.Ledger
+module Sync_ledger = Mina_ledger.Sync_ledger
 module Transition_cache = Transition_cache
 
 module type CONTEXT = sig
@@ -36,27 +37,14 @@ type t =
   ; mutable num_of_root_snarked_ledger_retargeted : int
   }
 
-type time = Time.Span.t
-
-let time_to_yojson span =
-  `String (Printf.sprintf "%f seconds" (Time.Span.to_sec span))
-
-type opt_time = time option
-
-let opt_time_to_yojson = function
-  | Some time ->
-      time_to_yojson time
-  | None ->
-      `Null
-
 (** An auxiliary data structure for collecting various metrics for bootstrap controller. *)
 type bootstrap_cycle_stats =
   { cycle_result : string
-  ; sync_ledger_time : time
-  ; staged_ledger_data_download_time : time
-  ; staged_ledger_construction_time : opt_time
+  ; sync_ledger_time : Time.Span.t
+  ; staged_ledger_data_download_time : Time.Span.t
+  ; staged_ledger_construction_time : Time.Span.t option
   ; local_state_sync_required : bool
-  ; local_state_sync_time : opt_time
+  ; local_state_sync_time : Time.Span.t option
   }
 [@@deriving to_yojson]
 
@@ -695,7 +683,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   in
   [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
     ~metadata:
-      [ ("time_elapsed", time_to_yojson time_elapsed)
+      [ ("time_elapsed", Time.Span.to_yojson_hum time_elapsed)
       ; ( "bootstrap_stats"
         , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) )
       ] ;
