@@ -4804,7 +4804,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
       | Ok () ->
           () )
 
-let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
     ~block_window_duration_ms pool =
   match metrics_server_port with
   | None ->
@@ -4814,18 +4814,19 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
         Option.value ~default:Metrics.default_missing_blocks_width
           missing_blocks_width
       in
-      let%bind metric_server =
+      let%map metric_server =
         Mina_metrics.Archive.create_archive_server ~port ~logger ()
       in
-      let interval = Float.of_int (block_window_duration_ms * 2) in
-      let rec go () =
+      let interval =
+        Time.Span.of_ms @@ Float.of_int (block_window_duration_ms * 2)
+      in
+      let serve () =
         let%bind () =
           Metrics.update pool metric_server ~logger ~missing_blocks_width
         in
-        let%bind () = after (Time.Span.of_ms interval) in
-        go ()
+        after interval
       in
-      go ()
+      Deferred.forever () serve
 
 (* for running the archive process *)
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
@@ -4938,7 +4939,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
                      Deferred.unit ) ) )
       |> don't_wait_for ;
       (*Update archive metrics*)
-      create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+      serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
         ~block_window_duration_ms:constraint_constants.block_window_duration_ms
         pool
       |> don't_wait_for ;
