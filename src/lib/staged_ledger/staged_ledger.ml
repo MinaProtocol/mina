@@ -362,7 +362,8 @@ module T = struct
       Scan_state.get_staged_ledger_async
         ~async_batch_size:transaction_application_scheduler_batch_size
         ~ledger:snarked_ledger ~get_protocol_state:get_state ~apply_first_pass
-        ~apply_second_pass ~apply_first_pass_sparse_ledger scan_state
+        ~apply_second_pass ~apply_first_pass_sparse_ledger ~signature_kind
+        scan_state
     in
     let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
     let%bind () =
@@ -2834,7 +2835,8 @@ let%test_module "staged ledger tests" =
                       Sl.Scan_state.get_snarked_ledger_async
                         ~ledger:snarked_ledger ~get_protocol_state:get_state
                         ~apply_first_pass ~apply_second_pass
-                        ~apply_first_pass_sparse_ledger !sl.scan_state
+                        ~apply_first_pass_sparse_ledger ~signature_kind
+                        !sl.scan_state
                     in
                     let target_snarked_ledger =
                       let stmt = Ledger_proof.Cached.statement proof in

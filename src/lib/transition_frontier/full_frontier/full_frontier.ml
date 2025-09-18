@@ -508,12 +508,11 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
               (State_hash.to_base58_check state_hash)
       in
       Or_error.ok_exn
-        ( Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
-            ~get_protocol_state ~apply_first_pass ~apply_second_pass
-            ~apply_first_pass_sparse_ledger
-            (Staged_ledger.scan_state
-               (Breadcrumb.staged_ledger new_root_node.breadcrumb) )
-          : unit Or_error.t ) ;
+        (Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
+           ~get_protocol_state ~apply_first_pass ~apply_second_pass
+           ~apply_first_pass_sparse_ledger ~signature_kind
+           (Staged_ledger.scan_state
+              (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) ) ;
       (*Check that the new snarked ledger is as expected*)
       let new_snarked_ledger_hash = Ledger.merkle_root mt in
       let expected_snarked_ledger_hash =

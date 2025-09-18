@@ -34,7 +34,7 @@ let load_ledger ~ignore_missing_fields ~pad_app_state
 let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   let%bind tar_path =
     Deferred.Or_error.ok_exn
-    @@ Genesis_ledger_helper.Ledger.generate_tar ~genesis_dir ~logger
+    @@ Genesis_ledger_helper.Ledger.generate_ledger_tar ~genesis_dir ~logger
          ~ledger_name_prefix ledger
   in
   [%log info] "Generated ledger tar at %s" tar_path ;

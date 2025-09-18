@@ -13,10 +13,7 @@ module Master = struct
   module T = struct
     type query = unit
 
-    type response =
-      ( Selector.Spec.Stable.Latest.t
-      * Signature_lib.Public_key.Compressed.Stable.Latest.t )
-      option
+    type response = Spec.Partitioned.Stable.Latest.t option
   end
 
   module Caller = T
@@ -27,14 +24,11 @@ include Versioned_rpc.Both_convert.Plain.Make (Master)
 
 [%%versioned_rpc
 module Stable = struct
-  module V3 = struct
+  module V4 = struct
     module T = struct
       type query = unit
 
-      type response =
-        ( Selector.Spec.Stable.V2.t
-        * Signature_lib.Public_key.Compressed.Stable.V1.t )
-        option
+      type response = Spec.Partitioned.Stable.V2.t option
 
       let query_of_caller_model = Fn.id
 
@@ -49,5 +43,5 @@ module Stable = struct
     include Register (T)
   end
 
-  module Latest = V3
+  module Latest = V4
 end]

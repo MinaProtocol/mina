@@ -219,35 +219,28 @@ module Ledger = struct
         | _, Some name ->
             search_local_and_s3 name )
 
-  let generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
-    Mina_ledger.Ledger.commit ledger ;
-    let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
-    let root_hash =
-      Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
-    in
-    let%bind () = Unix.mkdir ~p:() genesis_dir in
-    let tar_path = genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix in
+  let generate_tar ~logger ~target_dir ~ledger_name_prefix ~root_hash
+      ~ledger_dirname () =
+    let root_hash = Ledger_hash.to_base58_check root_hash in
+    let%bind () = Unix.mkdir ~p:() target_dir in
+    let tar_path = target_dir ^/ hash_filename root_hash ~ledger_name_prefix in
     [%log trace]
       "Creating $ledger tar file for $root_hash at $path from database at $dir"
       ~metadata:
         [ ("ledger", `String ledger_name_prefix)
         ; ("root_hash", `String root_hash)
         ; ("path", `String tar_path)
-        ; ("dir", `String dirname)
+        ; ("dir", `String ledger_dirname)
         ] ;
     (* This sleep for 5s is a hack for rocksdb. It seems like rocksdb would need some
        time to stablize *)
     let%bind () = after (Time.Span.of_int_sec 5) in
-    match%map Tar.create ~root:dirname ~file:tar_path ~directory:"." () with
+    match%map
+      Tar.create ~root:ledger_dirname ~file:tar_path ~directory:"." ()
+    with
     | Ok () ->
         Ok tar_path
     | Error err ->
-        let root_hash =
-          Ledger_hash.to_base58_check @@ Mina_ledger.Ledger.merkle_root ledger
-        in
-        let tar_path =
-          genesis_dir ^/ hash_filename root_hash ~ledger_name_prefix
-        in
         [%log error] "Could not generate a $ledger file at $path: $error"
           ~metadata:
             [ ("ledger", `String ledger_name_prefix)
@@ -255,6 +248,13 @@ module Ledger = struct
             ; ("error", Error_json.error_to_yojson err)
             ] ;
         Error err
+
+  let generate_ledger_tar ~genesis_dir ~logger ~ledger_name_prefix ledger =
+    Mina_ledger.Ledger.commit ledger ;
+    let dirname = Option.value_exn (Mina_ledger.Ledger.get_directory ledger) in
+    let root_hash = Mina_ledger.Ledger.merkle_root ledger in
+    generate_tar ~logger ~target_dir:genesis_dir ~ledger_name_prefix ~root_hash
+      ~ledger_dirname:dirname ()
 
   let padded_accounts_from_runtime_config_opt ~logger ~proof_level
       ~ledger_name_prefix ?overwrite_version (config : Runtime_config.Ledger.t)
@@ -454,7 +454,7 @@ module Ledger = struct
         in
         let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
         let%bind.Deferred.Or_error tar_path =
-          generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
+          generate_ledger_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
         in
         let config =
           { config with
@@ -531,7 +531,7 @@ module Ledger = struct
         in
         let ledger = Lazy.force (Genesis_ledger.Packed.t packed) in
         let%map.Deferred.Or_error tar_file =
-          generate_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
+          generate_ledger_tar ~genesis_dir ~logger ~ledger_name_prefix ledger
         in
         (packed, config, tar_file)
     | Tar { tar_file; extracted_path } ->

@@ -11,10 +11,7 @@ module Master = struct
   let name = "failed_to_generate_snark"
 
   module T = struct
-    type query =
-      Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t
-      * Selector.Spec.Stable.Latest.t
-      * Signature_lib.Public_key.Compressed.Stable.Latest.t
+    type query = Mina_stdlib.Bounded_types.Wrapped_error.t * Id.Any.t
 
     type response = unit
   end
@@ -30,9 +27,7 @@ module Stable = struct
   module V3 = struct
     module T = struct
       type query =
-        Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t
-        * Selector.Spec.Stable.V2.t
-        * Signature_lib.Public_key.Compressed.Stable.V1.t
+        Mina_stdlib.Bounded_types.Wrapped_error.Stable.V1.t * Id.Any.Stable.V1.t
 
       type response = unit
 
