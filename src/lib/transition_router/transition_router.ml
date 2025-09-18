@@ -142,7 +142,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
     ~producer_transition_writer_ref ~verified_transition_writer ~clear_reader
     ~network_transition_pipe ~consensus_local_state ~frontier_w
     ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~cache_exceptions ~best_seen_transition ~catchup_mode =
+    ~cache_exceptions ~best_seen_transition ~catchup_mode ~signature_kind =
   let open Context in
   [%str_log info] Starting_bootstrap_controller ;
   producer_transition_writer_ref := None ;
@@ -165,7 +165,7 @@ let start_bootstrap_controller ~context:(module Context : CONTEXT) ~trust_system
        ~context:(module Context)
        ~trust_system ~verifier ~network ~consensus_local_state
        ~network_transition_pipe ~persistent_frontier ~persistent_root
-       ~initial_root_transition ~preferred_peers ~catchup_mode )
+       ~initial_root_transition ~preferred_peers ~catchup_mode ~signature_kind )
     (fun (new_frontier, collected_transitions) ->
       start_transition_frontier_controller
         ~context:(module Context)
@@ -372,7 +372,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
     ~producer_transition_writer_ref ~clear_reader ~verified_transition_writer
     ~cache_exceptions ~most_recent_valid_block_writer ~persistent_root
     ~persistent_frontier ~consensus_local_state ~catchup_mode ~notify_online
-    ~network_transition_pipe =
+    ~network_transition_pipe ~signature_kind =
   let open Context in
   [%log info] "Initializing transition router" ;
   let%bind () =
@@ -410,6 +410,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
         ~initial_root_transition ~catchup_mode
         ~best_seen_transition:
           (Option.map ~f:(fun x -> `Block x) best_seen_transition)
+        ~signature_kind
   | Some best_tip, Some frontier
     when is_transition_for_bootstrap
            ~context:(module Context)
@@ -438,6 +439,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
         ~frontier_w ~initial_root_transition ~persistent_root
         ~persistent_frontier ~cache_exceptions ~catchup_mode
         ~best_seen_transition:(Some (`Block best_tip))
+        ~signature_kind
   | best_tip_opt, Some frontier ->
       let collected_transitions =
         match best_tip_opt with
@@ -547,7 +549,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
     ~frontier_broadcast_writer:frontier_w ~network_transition_reader
     ~producer_transition_reader ~get_most_recent_valid_block
     ~most_recent_valid_block_writer ~get_completed_work ~catchup_mode
-    ~notify_online ~ledger_backing () =
+    ~notify_online ~ledger_backing ~signature_kind () =
   let open Context in
   [%log info] "Starting transition router" ;
   let initialization_finish_signal = Ivar.create () in
@@ -613,6 +615,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location
+          ~signature_kind:Mina_signature_kind.t_DEPRECATED
       in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger
@@ -640,7 +643,9 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
           ~producer_transition_writer_ref ~clear_reader
           ~verified_transition_writer ~most_recent_valid_block_writer
           ~consensus_local_state ~notify_online ~network_transition_pipe
+          ~signature_kind
       in
+
       Ivar.fill_if_empty initialization_finish_signal () ;
 
       let valid_transition_reader1, valid_transition_reader2 =
@@ -699,7 +704,8 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
                              ~clear_reader ~network_transition_pipe
                              ~consensus_local_state ~frontier_w ~persistent_root
                              ~persistent_frontier ~initial_root_transition
-                             ~best_seen_transition:(Some b_or_h) ~catchup_mode )
+                             ~best_seen_transition:(Some b_or_h) ~catchup_mode
+                             ~signature_kind )
                       else Deferred.unit
                   | None ->
                       Deferred.unit

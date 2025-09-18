@@ -22,7 +22,8 @@ exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
 let construct_staged_ledger_at_root ~proof_cache_db
     ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
-    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger =
+    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
+    ~signature_kind =
   let open Deferred.Or_error.Let_syntax in
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
@@ -68,7 +69,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
       ~constraint_constants:precomputed_values.constraint_constants ~logger
       ~pending_coinbases
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
-      ~get_state ~signature_kind:Mina_signature_kind.t_DEPRECATED
+      ~get_state ~signature_kind
   in
   let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
   if
@@ -96,6 +97,7 @@ and Factory_type : sig
     ; directory : string
     ; verifier : Verifier.t
     ; time_controller : Block_time.Controller.t
+    ; signature_kind : Mina_signature_kind.t
     ; mutable instance : Instance_type.t option
     }
 end =
@@ -244,7 +246,7 @@ module Instance = struct
       match%map
         construct_staged_ledger_at_root ~proof_cache_db ~precomputed_values
           ~root_ledger ~root_transition ~root ~protocol_states
-          ~logger:t.factory.logger
+          ~signature_kind:t.factory.signature_kind ~logger:t.factory.logger
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))
@@ -356,8 +358,14 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~verifier ~time_controller ~directory =
-  { logger; verifier; time_controller; directory; instance = None }
+let create ~logger ~verifier ~time_controller ~directory ~signature_kind =
+  { logger
+  ; verifier
+  ; time_controller
+  ; directory
+  ; signature_kind
+  ; instance = None
+  }
 
 let destroy_database_exn t =
   assert (Option.is_none t.instance) ;

@@ -52,4 +52,5 @@ val run :
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:Mina_block.Validated.t
   -> catchup_mode:[ `Super ]
+  -> signature_kind:Mina_signature_kind.t
   -> (Transition_frontier.t * Transition_cache.element list) Deferred.t
