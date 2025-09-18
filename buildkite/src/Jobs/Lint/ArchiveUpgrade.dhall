@@ -36,7 +36,7 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ Cmd.run
-                  "buildkite/scripts/archive/upgrade-script-check.sh --mode verbose --branch develop"
+                  "buildkite/scripts/archive/upgrade-script-check.sh --mode verbose --comparison-branch develop"
               ]
             , label = "Archive: Check upgrade script need"
             , key = "archive-check-upgrade-script"
