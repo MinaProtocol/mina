@@ -17,6 +17,7 @@ let Filter
       | DebianBuild
       | DockerBuild
       | Rosetta
+      | Hardfork
       >
 
 let tags
@@ -34,6 +35,7 @@ let tags
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
             , Rosetta = [ Tag.Type.Rosetta ]
+            , Hardfork = [ Tag.Type.Hardfork ]
             }
             filter
 
@@ -52,6 +54,7 @@ let show
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
             , Rosetta = "Rosetta"
+            , Hardfork = "Hardfork"
             }
             filter
 
