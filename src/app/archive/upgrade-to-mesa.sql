@@ -50,7 +50,7 @@ $$ LANGUAGE plpgsql STRICT;
 
 -- 1. Ensure version table exists & has desired columns
 CREATE TABLE IF NOT EXISTS migration_history (
-    commit_start_at timestamptz NOT NULL DEFAULT now() PRIMARY KEY,
+    commit_start_at   timestamptz NOT NULL DEFAULT now() PRIMARY KEY,
     protocol_version  text NOT NULL,
     migration_version text NOT NULL,
     description       text NOT NULL,
