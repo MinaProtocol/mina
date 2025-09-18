@@ -544,8 +544,7 @@ copy_common_archive_configs() {
   cp ./default/src/app/replayer/replayer.exe \
     "${BUILDDIR}/usr/local/bin/mina-replayer"
 
-  cp ../src/app/archive/create_schema.sql "${BUILDDIR}/etc/mina/archive"
-  cp ../src/app/archive/drop_tables.sql "${BUILDDIR}/etc/mina/archive"
+  rsync -Huav ../src/app/archive/*.sql "${BUILDDIR}/etc/mina/archive"
 
   build_deb "$ARCHIVE_DEB"
 }
