@@ -41,6 +41,9 @@ COVERAGE_DIR=_coverage
 # Distribution codename, to be used in Docker builds
 CODENAME ?= $(shell lsb_release -cs)
 
+# Backend for downloading artifacts from cache
+BACKEND ?= "hetzner"
+
 # This commit hash
 GITHASH := $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH := $(shell git rev-parse HEAD)
@@ -586,7 +589,7 @@ debian-build-daemon-devnet-hardfork: ## Build the Debian daemon package for devn
 .PHONY: debian-download-create-legacy-hardfork
 debian-download-create-legacy-hardfork: ## Download and create legacy hardfork Debian packages
 	$(info 📦 Downloading legacy hardfork Debian packages for debian $(CODENAME))
-	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend hetzner --target _build
+	@./buildkite/scripts/release/manager.sh pull --artifacts mina-create-legacy-genesis  --from-special-folder legacy/debians/$(CODENAME)  --backend $(BACKEND) --target _build
 ########################################
 # Docker images
 
@@ -620,7 +623,8 @@ define build_docker_image
 	&& ./scripts/docker/build.sh \
 		--deb-codename $(CODENAME) \
 		--service $(1) \
-		--version "$$MINA_DEB_VERSION" \
+		--deb-version "$$MINA_DEB_VERSION" \
+		--version "$$MINA_DOCKER_TAG" \
 		--branch "$$GITBRANCH" \
 		--network $(2) \
 		--no-cache
@@ -700,10 +704,9 @@ hardfork-debian: ocaml_checks ## Generate hardfork packages
 
 .PHONY: hardfork-docker
 hardfork-docker: SHELL := /bin/bash
-hardfork-docker: ocaml_checks ## Generate hardfork packages
+hardfork-docker: ## Generate hardfork packages
 	$(info 📦 Generating hardfork docker for network $(NETWORK_NAME))
 
-	$(MAKE) hardfork-debian
 	$(MAKE) start-local-debian-repo
 
 	@BUILD_DIR=./_build \
