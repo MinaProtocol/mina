@@ -28,7 +28,7 @@
 set -euo pipefail
 
 MODE="default"
-BRANCH="develop"
+COMPARISION_BRANCH="develop"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 # Parse command line arguments
@@ -44,7 +44,7 @@ parse_args() {
                 shift 2
                 ;;
             -b|--comparison-branch)
-                BRANCH="$2"
+                COMPARISION_BRANCH="$2"
                 shift 2
                 ;;
             -h|--help)
@@ -80,13 +80,13 @@ has_changes() {
     fi
 
     # Fetch latest branch to ensure accurate comparison
-    git fetch origin "$BRANCH" >/dev/null 2>&1 || {
-        echo "Error: Failed to fetch origin/$BRANCH" >&2
+    git fetch origin "$COMPARISION_BRANCH" >/dev/null 2>&1 || {
+        echo "Error: Failed to fetch origin/$COMPARISION_BRANCH" >&2
         exit 1
     }
 
     # Check if file has differences
-    if ! git diff --quiet "origin/$BRANCH" -- "$REPO_ROOT/$file" 2>/dev/null; then
+    if ! git diff --quiet "origin/$COMPARISION_BRANCH" -- "$REPO_ROOT/$file" 2>/dev/null; then
         return 0
     else
         return 1
@@ -100,9 +100,9 @@ has_changes_in_git() {
     fi
 
     # Fetch latest branch to ensure accurate comparison
-    git fetch origin "$BRANCH" >/dev/null 2>&1 || {
+    git fetch origin "$COMPARISION_BRANCH" >/dev/null 2>&1 || {
         if [[ "$MODE" == "verbose" ]]; then
-            echo "Error: Failed to fetch origin/$BRANCH" >&2
+            echo "Error: Failed to fetch origin/$COMPARISION_BRANCH" >&2
         fi
         return 1
     }
