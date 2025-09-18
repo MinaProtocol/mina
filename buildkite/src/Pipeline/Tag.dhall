@@ -4,7 +4,11 @@
 
 let Prelude = ../External/Prelude.dhall
 
+let FilterMode = ./FilterMode.dhall
+
 let List/any = Prelude.List.any
+
+let List/all = Prelude.List.all
 
 let Tag
     : Type
@@ -67,11 +71,30 @@ let hasAny
       ->  \(tags : List Tag)
       ->  List/any Tag (\(x : Tag) -> equal x input) tags
 
-let contains
+let hasAll
+    : List Tag -> List Tag -> Bool
+    =     \(input : List Tag)
+      ->  \(tags : List Tag)
+      ->  List/all Tag (\(x : Tag) -> hasAny x tags) input == True
+
+let containsAll
+    : List Tag -> List Tag -> Bool
+    = \(input : List Tag) -> \(tags : List Tag) -> hasAll input tags
+
+let containsAny
     : List Tag -> List Tag -> Bool
     =     \(input : List Tag)
       ->  \(tags : List Tag)
       ->  List/any Tag (\(x : Tag) -> hasAny x tags) input
+
+let contains
+    : List Tag -> List Tag -> FilterMode.Type -> Bool
+    =     \(input : List Tag)
+      ->  \(tags : List Tag)
+      ->  \(filterMode : FilterMode.Type)
+      ->  merge
+            { Any = containsAny input tags, All = containsAll input tags }
+            filterMode
 
 let capitalName =
           \(tag : Tag)
@@ -129,5 +152,7 @@ in  { Type = Tag
     , toNatural = toNatural
     , equal = equal
     , hasAny = hasAny
+    , containsAny = containsAny
+    , containsAll = containsAll
     , contains = contains
     }

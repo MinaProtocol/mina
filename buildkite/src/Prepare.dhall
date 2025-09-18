@@ -23,6 +23,8 @@ let tagFilter = env:BUILDKITE_PIPELINE_FILTER as Text ? "FastOnly"
 
 let scopeFilter = env:BUILDKITE_PIPELINE_SCOPE as Text ? "All"
 
+let filterMode = env:BUILDKITE_PIPELINE_FILTER_MODE as Text ? "Any"
+
 let config
     : Pipeline.Config.Type
     = Pipeline.Config::{
@@ -38,10 +40,11 @@ let config
               , Cmd.run "export BUILDKITE_PIPELINE_JOB_SELECTION=${selection}"
               , Cmd.run "export BUILDKITE_PIPELINE_FILTER=${tagFilter}"
               , Cmd.run "export BUILDKITE_PIPELINE_SCOPE=${scopeFilter}"
+              , Cmd.run "export BUILDKITE_PIPELINE_FILTER_MODE=${filterMode}"
               , Cmd.run
                   "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall"
               , Cmd.quietly
-                  "dhall-to-yaml --quoted <<< '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}  }' | buildkite-agent pipeline upload"
+                  "dhall-to-yaml --quoted <<< '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}, filterMode=(./buildkite/src/Pipeline/FilterMode.dhall).Type.${filterMode} }' | buildkite-agent pipeline upload"
               ]
             , label = "Prepare monorepo triage"
             , key = "monorepo-${selection}-${tagFilter}-${scopeFilter}"
