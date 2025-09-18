@@ -74,7 +74,7 @@ if [[ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" ]]; then
     exit 1
 fi
 
-./buildkite/scripts/git/check-bypass.sh "!ci-bypass-changelog"
+./buildkite/scripts/git/check-bypass.sh "!ci-bypass-changelog" && exit 0;
 
 REMOTE_BRANCH="origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
 
