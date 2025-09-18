@@ -65,7 +65,7 @@ let commands
 
                   let isIncludedInTag =
                         Prelude.Bool.show
-                          (PipelineTag.contains job.tags targetTags filterMode)
+                          (PipelineTag.contains targetTags job.tags filterMode)
 
                   let targetScopes = PipelineScopeFilter.tags scope
 
