@@ -75,23 +75,31 @@ const parseParams = (comment) => {
   return params;
 };
 
-const buildEnvFromParams = ({ arch, profile }) => {
-  if (!arch || !profile) {
-    return { BUILDKITE_PIPELINE_FILTER: "DockerBuild" };
+const buildEnvFromParams = ({ arch, profile, codename }) => {
+  var filter = "DockerBuild";
+
+  if (!arch || !profile || !codename ) {
+    return { BUILDKITE_PIPELINE_FILTER: filter };
   }
 
   const profiles = ["devnet", "lightnet", "mainnet"];
   const arches = ["amd64", "arm64"];
+  const codenames = ["jammy", "noble", "bullseye", "focal", "bookworm"];
 
-  if (arches.includes(arch) && profiles.includes(profile)) {
-    const filter =
-      "DockerBuild" +
-      arch.charAt(0).toUpperCase() + arch.slice(1) + // Amd64 / Arm64
-      profile.charAt(0).toUpperCase() + profile.slice(1); // Devnet / Lightnet / Mainnet
-    return { BUILDKITE_PIPELINE_FILTER: filter };
+
+  if (arches.includes(arch)) {
+    filter += arch.charAt(0).toUpperCase() + arch.slice(1); // Amd64 / Arm64
   }
 
-  return { BUILDKITE_PIPELINE_FILTER: "DockerBuild" };
+  if (profiles.includes(profile)) {
+    filter += profile.charAt(0).toUpperCase() + profile.slice(1); // Devnet / Lightnet / Mainnet
+  }
+
+  if (codenames.includes(codename)) {
+    filter += codename.charAt(0).toUpperCase() + codename.slice(1); // Jammy / Noble / Bullseye / Focal / Bookworm
+  }
+
+    return { BUILDKITE_PIPELINE_FILTER: filter, BUILDKITE_PIPELINE_FILTER_MODE: "All" };
 };
 // -------------------
 
