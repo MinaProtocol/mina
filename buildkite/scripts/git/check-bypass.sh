@@ -49,9 +49,9 @@ if [[ "$COMMENTED_CODE" == 0 ]]; then
     echo "⏭️  Skipping run as PR is bypassed"
     exit 0
 elif [[ "$COMMENTED_CODE" == 1 ]]; then
-    echo "⚙️  PR is not bypassed. Proceeding with changelog check..."
+    echo "⚙️  PR is not bypassed. Proceeding with check..."
     exit 2
 else
-    echo "❌ Failed to check PR for being eligible for changelog check bypass"
+    echo "❌ Failed to check PR for being eligible for check bypass"
     exit 1
 fi
