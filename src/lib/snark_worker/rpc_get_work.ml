@@ -28,7 +28,7 @@ module Stable = struct
     module T = struct
       type query = unit
 
-      type response = Spec.Partitioned.Stable.V1.t option
+      type response = Spec.Partitioned.Stable.V2.t option
 
       let query_of_caller_model = Fn.id
 
