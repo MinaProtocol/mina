@@ -50,6 +50,7 @@ if [[ "$COMMENTED_CODE" == 0 ]]; then
     exit 0
 elif [[ "$COMMENTED_CODE" == 1 ]]; then
     echo "⚙️  PR is not bypassed. Proceeding with changelog check..."
+    exit 2
 else
     echo "❌ Failed to check PR for being eligible for changelog check bypass"
     exit 1
