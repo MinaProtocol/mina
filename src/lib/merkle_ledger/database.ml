@@ -583,12 +583,8 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
         |> Sequence.iter ~f:(fun i -> f i (get_at_index t i))
 
   let iteri t ~f =
-    match Account_location.last_location_address t with
-    | None ->
-        ()
-    | Some last_addr ->
-        Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
-        |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
+    iteri_untrusted t ~f:(fun index account_opt ->
+        f index (Option.value_exn account_opt) )
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue
