@@ -19,6 +19,7 @@ in  Pipeline.build
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Lightnet
             , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bullseye
             ]
           }
       )

@@ -27,6 +27,7 @@ in  Pipeline.build
             , PipelineTag.Type.Rosetta
             , PipelineTag.Type.Devnet
             , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bullseye
             ]
           }
       )

@@ -33,6 +33,7 @@ in  Pipeline.build
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet
             , PipelineTag.Type.Arm64
+            , PipelineTag.Type.Noble
             ]
           , debVersion = DebianVersions.DebVersion.Noble
           , scope =

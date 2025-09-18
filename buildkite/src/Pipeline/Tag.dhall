@@ -31,6 +31,11 @@ let Tag
       | Arm64
       | Amd64
       | Mainnet
+      | Bullseye
+      | Bookworm
+      | Noble
+      | Focal
+      | Jammy
       >
 
 let toNatural
@@ -56,6 +61,11 @@ let toNatural
             , Arm64 = 17
             , Amd64 = 18
             , Mainnet = 19
+            , Bullseye = 20
+            , Bookworm = 21
+            , Noble = 22
+            , Focal = 23
+            , Jammy = 24
             }
             tag
 
@@ -118,6 +128,11 @@ let capitalName =
             , Arm64 = "Arm64"
             , Amd64 = "Amd64"
             , Mainnet = "Mainnet"
+            , Bullseye = "Bullseye"
+            , Bookworm = "Bookworm"
+            , Noble = "Noble"
+            , Focal = "Focal"
+            , Jammy = "Jammy"
             }
             tag
 
@@ -143,6 +158,11 @@ let lowerName =
             , Arm64 = "arm64"
             , Amd64 = "amd64"
             , Mainnet = "mainnet"
+            , Bullseye = "bullseye"
+            , Bookworm = "bookworm"
+            , Noble = "noble"
+            , Focal = "focal"
+            , Jammy = "jammy"
             }
             tag
 

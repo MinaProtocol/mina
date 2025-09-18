@@ -22,6 +22,8 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bookworm
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
           , network = Network.Type.MainnetLegacy
