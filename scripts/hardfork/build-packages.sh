@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eox pipefail
 
 
 # shellcheck disable=SC1091
@@ -8,10 +8,10 @@ source ./scripts/export-git-env-vars.sh
 
 PWD=$(pwd)
 
-if [ -z "${CONFIG_JSON_GZ_URL+x}" ] || [ -z "${NETWORK_NAME+x}" ] || [ -z "${MINA_DEB_CODENAME+x}" ]; then
+if { [ -z "${CONFIG_JSON_GZ_URL+x}" ] && [ -z "${RUNTIME_CONFIG_JSON+x}" ]; } || [ -z "${NETWORK_NAME+x}" ] || [ -z "${MINA_DEB_CODENAME+x}" ]; then
     echo "❌ Error: Required environment variables not provided:"
-    [ -z "${CONFIG_JSON_GZ_URL+x}" ] && echo "  - CONFIG_JSON_GZ_URL: URL to download the network configuration JSON file 🌐"
-    [ -z "${NETWORK_NAME+x}" ] && echo "  - NETWORK_NAME: Name of the network to create hardfork package for 🔗"
+    { [ -z "${CONFIG_JSON_GZ_URL+x}" ] && [ -z "${RUNTIME_CONFIG_JSON+x}" ]; } && echo "  - CONFIG_JSON_GZ_URL: URL to download the network configuration JSON file 🌐 or RUNTIME_CONFIG_JSON: Path to the runtime configuration file 📄"
+    [ -z "${NETWORK_NAME+x}" ] && echo "  - NETWORK_NAME: Name of the network to create hard fork package for 🔗"
     [ -z "${MINA_DEB_CODENAME+x}" ] && echo "  - MINA_DEB_CODENAME: Debian codename for package building 📦"
     exit 1
 fi
@@ -51,9 +51,18 @@ rm -rf hardfork_ledgers
 export FORKING_FROM_CONFIG_JSON="genesis_ledgers/${NETWORK_NAME}.json"
 [ ! -f "${FORKING_FROM_CONFIG_JSON}" ] && echo "${NETWORK_NAME} is not a known network name; check for existing network configs in 'genesis_ledgers/'" && exit 1
 
-echo "--- Download and extract previous network config"
-curl -o config.json.gz $CONFIG_JSON_GZ_URL
-gunzip config.json.gz
+echo "--- Setup network config"
+if [ -n "${CONFIG_JSON_GZ_URL:-}" ]; then
+  echo "--- Download and extract previous network config"
+  curl -o config.json.gz $CONFIG_JSON_GZ_URL
+  gunzip config.json.gz
+elif [ -n "${RUNTIME_CONFIG_JSON:-}" ]; then
+  echo "--- Copy provided config file"
+  cp "$RUNTIME_CONFIG_JSON" config.json
+else
+  echo "❌ Error: Neither CONFIG_JSON_GZ_URL nor RUNTIME_CONFIG_JSON is provided."
+  exit 1
+fi
 
 echo "--- Generate hardfork ledger tarballs"
 mkdir hardfork_ledgers
