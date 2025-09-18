@@ -281,7 +281,6 @@ function storage_list() {
         gs)
             gsutil list "$path"
             ;;
-
         hetzner)
             ssh -p23 -i $HETZNER_KEY $HETZNER_USER@$HETZNER_HOST "ls $path"
             ;;
@@ -879,8 +878,7 @@ function publish(){
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
-                                                "" \
-                                                $__profile \
+                                                $__profile  \
                                                 $__verify \
                                                 $__dry_run \
                                                 $__backend \
@@ -905,7 +903,6 @@ function publish(){
                                                 $__target_version \
                                                 $__channel \
                                                 $network \
-                                                "" \
                                                 $__profile \
                                                 $__verify \
                                                 $__dry_run \
