@@ -726,7 +726,7 @@ let get_snarked_ledger_full t state_hash_opt =
               in
               Staged_ledger.Scan_state.get_snarked_ledger_async ~ledger
                 ~get_protocol_state ~apply_first_pass ~apply_second_pass
-                ~apply_first_pass_sparse_ledger
+                ~apply_first_pass_sparse_ledger ~signature_kind
                 (Staged_ledger.scan_state
                    (Transition_frontier.Breadcrumb.staged_ledger b) )
               |> Deferred.Result.map_error ~f:(fun e ->
@@ -2177,7 +2177,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ~ledger_backing ()
+              ~notify_online ~transaction_pool_proxy ~ledger_backing
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
