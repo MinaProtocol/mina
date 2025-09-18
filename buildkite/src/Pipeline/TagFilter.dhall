@@ -17,6 +17,12 @@ let Filter
       | DebianBuild
       | DockerBuild
       | Rosetta
+      | DockerBuildDevnetArm64
+      | DockerBuildDevnetAmd64
+      | DockerBuildMainnetArm64
+      | DockerBuildMainnetAmd64
+      | DockerBuildLightnetArm64
+      | DockerBuildLightnetAmd64
       >
 
 let tags
@@ -34,6 +40,18 @@ let tags
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
             , Rosetta = [ Tag.Type.Rosetta ]
+            , DockerBuildDevnetArm64 =
+              [ Tag.Type.Docker, Tag.Type.Devnet, Tag.Type.Arm64 ]
+            , DockerBuildDevnetAmd64 =
+              [ Tag.Type.Docker, Tag.Type.Devnet, Tag.Type.Amd64 ]
+            , DockerBuildMainnetArm64 =
+              [ Tag.Type.Docker, Tag.Type.Mainnet, Tag.Type.Arm64 ]
+            , DockerBuildMainnetAmd64 =
+              [ Tag.Type.Docker, Tag.Type.Mainnet, Tag.Type.Amd64 ]
+            , DockerBuildLightnetArm64 =
+              [ Tag.Type.Docker, Tag.Type.Lightnet, Tag.Type.Arm64 ]
+            , DockerBuildLightnetAmd64 =
+              [ Tag.Type.Docker, Tag.Type.Lightnet, Tag.Type.Amd64 ]
             }
             filter
 
@@ -52,6 +70,12 @@ let show
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
             , Rosetta = "Rosetta"
+            , DockerBuildDevnetArm64 = "DockerBuildDevnetArm64"
+            , DockerBuildDevnetAmd64 = "DockerBuildDevnetAmd64"
+            , DockerBuildMainnetArm64 = "DockerBuildMainnetArm64"
+            , DockerBuildMainnetAmd64 = "DockerBuildMainnetAmd64"
+            , DockerBuildLightnetArm64 = "DockerBuildLightnetArm64"
+            , DockerBuildLightnetAmd64 = "DockerBuildLightnetAmd64"
             }
             filter
 

@@ -29,6 +29,7 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Amd64
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
           , scope =
