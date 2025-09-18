@@ -288,7 +288,7 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
 let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    previous_cycles =
+    ~signature_kind previous_cycles =
   let open Context in
   (* The short-lived pipe allocated here will be closed
      when a follow-up pipe is allocated: in the next cycle of bootstrap
@@ -446,8 +446,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           |> Blockchain_state.snarked_local_state)
                       ~verifier ~constraint_constants ~scan_state
                       ~snarked_ledger:temp_mask ~expected_merkle_root
-                      ~pending_coinbases ~get_state
-                      ~signature_kind:Mina_signature_kind.t_DEPRECATED
+                      ~pending_coinbases ~get_state ~signature_kind
                   in
                   ignore
                     ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask
@@ -679,7 +678,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    =
+    ~signature_kind =
   let open Context in
   let run_cycle =
     run_cycle
@@ -687,6 +686,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~trust_system ~verifier ~network ~consensus_local_state
       ~network_transition_pipe ~preferred_peers ~persistent_root
       ~persistent_frontier ~initial_root_transition ~catchup_mode
+      ~signature_kind
   in
   O1trace.thread "bootstrap"
   @@ fun () ->
@@ -905,7 +905,8 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~network_transition_pipe ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Super ~initial_root_transition )
+           ~catchup_mode:`Super ~initial_root_transition
+           ~signature_kind:Mina_signature_kind.t_DEPRECATED )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =

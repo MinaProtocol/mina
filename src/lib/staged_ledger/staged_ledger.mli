@@ -110,6 +110,7 @@ module Scan_state : sig
           -> Mina_transaction.Transaction.t
           -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
              Or_error.t )
+    -> signature_kind:Mina_signature_kind.t
     -> t
     -> unit Or_error.t
 
@@ -141,6 +142,7 @@ module Scan_state : sig
           -> Mina_transaction.Transaction.t
           -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
              Or_error.t )
+    -> signature_kind:Mina_signature_kind.t
     -> t
     -> unit Deferred.Or_error.t
 

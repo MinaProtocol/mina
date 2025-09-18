@@ -363,7 +363,7 @@ let%test_module "Epoch ledger sync tests" =
           ~network_transition_reader:block_reader ~producer_transition_reader
           ~get_most_recent_valid_block ~most_recent_valid_block_writer
           ~notify_online ?transaction_pool_proxy:None ~ledger_backing:Stable_db
-          ()
+          ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
       in
       let%bind () = Ivar.read initialization_finish_signal in
       let tr_tm1 = Unix.gettimeofday () in
