@@ -6,7 +6,7 @@ The development branches in progress in `mina` are as follows:
 - `master`: current stable release, currently mainnet 1.X.
   - It is frozen from the crypto side, does not depend on `proof-systems`.
   - Never commit to it directly, except to introduce a hotfix.
-- `compatible`: scheduled to be softwork released.
+- `compatible`: scheduled to be softfork released.
   - The staging branch for mainnet soft fork releases.
   - It contains all the changes which are literally backwards compatible with the current mainnet deployment. Any nodes running a version of mina based off of compatible should connect to the current mainnet.
   - It serves as the preparation ground for the next mainnet soft fork release.
