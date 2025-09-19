@@ -123,7 +123,7 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN
         PERFORM set_migration_status('failed'::migration_status);
-        RAISE NOTICE 'An error occurred: %', SQLERRM;
+        RAISE EXCEPTION 'An error occurred: %', SQLERRM;
 END
 $$ LANGUAGE plpgsql;
 
