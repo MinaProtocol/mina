@@ -84,7 +84,7 @@ let () =
             json_serialization_is_stable
         ; test_case "serialization roundtrips" `Quick
             json_serialization_roundtrips
-          (* TODO Restore these tests once hetzner-itn-1-1795 can be regenerated
+          (* TODO Restore these tests
              ; test_case "serialization is stable from file" `Quick
                  json_serialization_is_stable_from_file
              ; test_case "serialization roundtrips from file" `Quick
@@ -95,11 +95,10 @@ let () =
       , [ test_case "block is deserializable" `Quick
             field_element_decimal_deserialization
         ] )
-      (* TODO Restore these tests once hetzner-itn-1-1795 can be regenerated
-
-         ; ( "memory caching"
-           , [ test_case "caching works" `Quick (fun () ->
-                   Memory_caching.test large_precomputed_json_file )
-             ] )
-      *)
+      (*
+    ; ( "memory caching"
+      , [ test_case "caching works" `Quick (fun () ->
+              Memory_caching.test large_precomputed_json_file )
+        ] )
+    *)
     ]
