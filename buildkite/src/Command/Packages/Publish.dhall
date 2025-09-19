@@ -8,6 +8,8 @@ let Optional/map = Prelude.Optional.map
 
 let Optional/default = Prelude.Optional.default
 
+let List/map = Prelude.List.map
+
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Size = ../../Command/Size.dhall
@@ -33,6 +35,8 @@ let Cmd = ../../Lib/Cmds.dhall
 let Mina = ../Mina.dhall
 
 let Artifact = ../../Constants/Artifacts.dhall
+
+let Architecture = ../../Constants/Arch.dhall
 
 let Spec =
       { Type =
@@ -67,6 +71,7 @@ let Spec =
           , publish_to_docker_io : Bool
           , depends_on : List Command.TaggedKey.Type
           , branch : Text
+          , architectures : List Architecture.Type
           , if : Optional Text
           }
       , default =
@@ -83,6 +88,7 @@ let Spec =
           , publish_to_docker_io = False
           , verify = True
           , branch = ""
+          , architectures = [ Architecture.Type.Amd64, Architecture.Type.Arm64 ]
           , if = None Text
           }
       }
@@ -152,11 +158,12 @@ let publish
 
                 else  ""
 
-          in    [ Command.build
-                    Command.Config::{
-                    , commands =
-                          [ Mina.fixPermissionsCommand ]
-                        # [ Cmd.runInDocker
+          let commands =
+                List/map
+                  Architecture.Type
+                  (List Cmd.Type)
+                  (     \(architecture : Architecture.Type)
+                    ->    [ Cmd.runInDocker
                               Cmd.Docker::{
                               , image = ContainerImages.minaToolchain
                               , extraEnv =
@@ -181,6 +188,8 @@ let publish
                                 ++  "--debian-repo ${DebianRepo.bucket_or_default
                                                        spec.debian_repo} "
                                 ++  "--only-debians "
+                                ++  "--arch ${Architecture.lowerName
+                                                architecture} "
                                 ++  "${keyArg}"
                               )
                           ]
@@ -196,9 +205,19 @@ let publish
                                 ++  "--debian-repo ${DebianRepo.bucket_or_default
                                                        spec.debian_repo} "
                                 ++  "--only-debians "
+                                ++  "--arch ${Architecture.lowerName
+                                                architecture} "
                                 ++  "${signedArg}"
                               )
                           ]
+                  )
+                  spec.architectures
+
+          let flatCommands = Prelude.List.concat Cmd.Type commands
+
+          in    [ Command.build
+                    Command.Config::{
+                    , commands = [ Mina.fixPermissionsCommand ] # flatCommands
                     , label = "Debian Packages Publishing"
                     , key =
                         "publish-debians-${DebianChannel.lowerName
@@ -229,6 +248,7 @@ let publish
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
+                                  ++  "--force-upload-debians "
                                 )
                             ]
                           , label = "Docker Packages Publishing"
