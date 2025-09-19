@@ -56,11 +56,11 @@ let json_serialization_roundtrips () =
 
 let large_precomputed_json_file = "hetzner-itn-1-1795.json"
 
-let _json_serialization_is_stable_from_file () =
+let json_serialization_is_stable_from_file () =
   json_serialization_is_stable_impl
   @@ In_channel.read_all large_precomputed_json_file
 
-let _json_serialization_roundtrips_from_file () =
+let json_serialization_roundtrips_from_file () =
   json_serialization_roundtrips_impl
   @@ In_channel.read_all large_precomputed_json_file
 
@@ -84,21 +84,17 @@ let () =
             json_serialization_is_stable
         ; test_case "serialization roundtrips" `Quick
             json_serialization_roundtrips
-          (* TODO Restore these tests
-             ; test_case "serialization is stable from file" `Quick
-                 json_serialization_is_stable_from_file
-             ; test_case "serialization roundtrips from file" `Quick
-                 json_serialization_roundtrips_from_file
-          *)
+        ; test_case "serialization is stable from file" `Quick
+            json_serialization_is_stable_from_file
+        ; test_case "serialization roundtrips from file" `Quick
+            json_serialization_roundtrips_from_file
         ] )
     ; ( "field element represented by decimal"
       , [ test_case "block is deserializable" `Quick
             field_element_decimal_deserialization
         ] )
-      (*
     ; ( "memory caching"
       , [ test_case "caching works" `Quick (fun () ->
               Memory_caching.test large_precomputed_json_file )
         ] )
-    *)
     ]
