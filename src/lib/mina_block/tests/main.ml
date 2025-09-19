@@ -54,15 +54,17 @@ let json_serialization_roundtrips () =
   json_serialization_roundtrips_impl
   @@ Sample_precomputed_block.sample_block_json
 
-let large_precomputed_json_file = "hetzner-itn-1-1795.json"
+(** File contains a block with proof-based zkapp account updates and some payments *)
+let large_precomputed_json_file1 = "hetzner-itn-1-296991.json"
 
-let json_serialization_is_stable_from_file () =
-  json_serialization_is_stable_impl
-  @@ In_channel.read_all large_precomputed_json_file
+(** File contains a block with signature-based zkapp account updates and some payments *)
+let large_precomputed_json_file2 = "hetzner-itn-1-296998.json"
 
-let json_serialization_roundtrips_from_file () =
-  json_serialization_roundtrips_impl
-  @@ In_channel.read_all large_precomputed_json_file
+let json_serialization_is_stable_from_file filename () =
+  json_serialization_is_stable_impl @@ In_channel.read_all filename
+
+let json_serialization_roundtrips_from_file filename () =
+  json_serialization_roundtrips_impl @@ In_channel.read_all filename
 
 let field_element_decimal_deserialization () =
   let filename =
@@ -84,17 +86,25 @@ let () =
             json_serialization_is_stable
         ; test_case "serialization roundtrips" `Quick
             json_serialization_roundtrips
-        ; test_case "serialization is stable from file" `Quick
-            json_serialization_is_stable_from_file
-        ; test_case "serialization roundtrips from file" `Quick
-            json_serialization_roundtrips_from_file
+        ; test_case "serialization is stable from file (file 1)" `Quick
+            (json_serialization_is_stable_from_file large_precomputed_json_file1)
+        ; test_case "serialization roundtrips from file (file 1)" `Quick
+            (json_serialization_roundtrips_from_file
+               large_precomputed_json_file1 )
+        ; test_case "serialization is stable from file (file 2)" `Quick
+            (json_serialization_is_stable_from_file large_precomputed_json_file2)
+        ; test_case "serialization roundtrips from file (file 2)" `Quick
+            (json_serialization_roundtrips_from_file
+               large_precomputed_json_file2 )
         ] )
     ; ( "field element represented by decimal"
       , [ test_case "block is deserializable" `Quick
             field_element_decimal_deserialization
         ] )
     ; ( "memory caching"
-      , [ test_case "caching works" `Quick (fun () ->
-              Memory_caching.test large_precomputed_json_file )
+      , [ test_case "caching works (file 1)" `Quick (fun () ->
+              Memory_caching.test large_precomputed_json_file1 )
+        ; test_case "caching works (file 2)" `Quick (fun () ->
+              Memory_caching.test large_precomputed_json_file2 )
         ] )
     ]
