@@ -1,3 +1,9 @@
+(* NOTE:
+   Below is devnet-319281-3NKq8WXEzMFJH3VdmK4seCTpciyjSY2Rf39K7q1Yyt1p4HkqSzqA.json
+   This block is old, and we're using decimals for field eelement.
+*)
+let sample_block_json =
+  {json|
 {
   "version":4,
   "data":{
@@ -10765,3 +10771,4 @@
     ]
   }
 }
+   |json}
