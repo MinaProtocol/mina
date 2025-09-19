@@ -17,7 +17,7 @@ in  Pipeline.build
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
             [ Artifacts.Type.Daemon
-            , Artifacts.Type.DaemonHardfork
+            , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
@@ -29,6 +29,7 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
+            , PipelineTag.Type.Rosetta
             ]
           , profile = Profiles.Type.Mainnet
           , scope =

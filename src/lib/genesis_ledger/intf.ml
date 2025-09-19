@@ -61,17 +61,20 @@ end
 module type Ledger_input_intf = sig
   include Accounts_intf
 
-  val directory : [ `Ephemeral | `New | `Path of string ]
+  val directory :
+    [ `Ephemeral
+    | `New of Mina_ledger.Ledger.Root.Config.backing_type
+    | `Path of string * Mina_ledger.Ledger.Root.Config.backing_type ]
 
   val depth : int
+
+  val logger : Logger.t
 end
 
 module type S = sig
   val t : Mina_ledger.Ledger.t Lazy.t
 
-  (** Populate a root ledger with the unmasked ledger backing a genesis ledger.
-      Prefer using this to a transfer using [t], for the efficiency reasons
-      described in [Mina_ledger.Ledger.Root.transfer_accounts_with]. *)
+  (** Populate a root ledger with the content of the genesis ledger *)
   val populate_root :
     Mina_ledger.Ledger.Root.t -> Mina_ledger.Ledger.Root.t Or_error.t
 

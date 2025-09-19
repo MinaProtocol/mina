@@ -1,6 +1,5 @@
 open Core
 open Async
-open Events
 open Snark_work_lib
 
 let command_name = "snark-worker"
@@ -37,81 +36,8 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
-let emit_proof_metrics metrics instances logger =
-  One_or_two.iter (One_or_two.zip_exn metrics instances)
-    ~f:(fun ((time, tag), single) ->
-      match tag with
-      | `Merge ->
-          Mina_metrics.(
-            Cryptography.Snark_work_histogram.observe
-              Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
-          [%str_log info] (Merge_snark_generated { time })
-      | `Transition ->
-          let transaction_type, zkapp_command_count, proof_zkapp_command_count =
-            (*should be Some in the case of `Transition*)
-            match Option.value_exn single with
-            | Mina_transaction.Transaction.Command
-                (Mina_base.User_command.Zkapp_command zkapp_command) ->
-                let init =
-                  match
-                    (Mina_base.Account_update.of_fee_payer
-                       zkapp_command.Mina_base.Zkapp_command.Poly.fee_payer )
-                      .authorization
-                  with
-                  | Proof _ ->
-                      (1, 1)
-                  | _ ->
-                      (1, 0)
-                in
-                let c, p =
-                  Mina_base.Zkapp_command.Call_forest.fold
-                    zkapp_command.account_updates ~init
-                    ~f:(fun (count, proof_updates_count) account_update ->
-                      ( count + 1
-                      , if
-                          Mina_base.Control.(
-                            Tag.equal Proof
-                              (tag
-                                 account_update
-                                   .Mina_base.Account_update.Poly.authorization ))
-                        then proof_updates_count + 1
-                        else proof_updates_count ) )
-                in
-                Mina_metrics.(
-                  Cryptography.(
-                    Counter.inc snark_work_zkapp_base_time_sec
-                      (Time.Span.to_sec time) ;
-                    Counter.inc_one snark_work_zkapp_base_submissions ;
-                    Counter.inc zkapp_transaction_length (Float.of_int c) ;
-                    Counter.inc zkapp_proof_updates (Float.of_int p))) ;
-                ("zkapp_command", c, p)
-            | Command (Signed_command _) ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("signed command", 1, 0)
-            | Coinbase _ ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("coinbase", 1, 0)
-            | Fee_transfer _ ->
-                Mina_metrics.(
-                  Counter.inc Cryptography.snark_work_base_time_sec
-                    (Time.Span.to_sec time)) ;
-                ("fee_transfer", 1, 0)
-          in
-          [%str_log info]
-            (Base_snark_generated
-               { time
-               ; transaction_type
-               ; zkapp_command_count
-               ; proof_zkapp_command_count
-               } ) )
-
-let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
-    ~constraint_constants daemon_address shutdown_on_disconnect =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let main ~logger ~proof_level ~constraint_constants ~signature_kind
+    daemon_address shutdown_on_disconnect =
   let%bind state =
     Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
       ~signature_kind ()
@@ -154,7 +80,7 @@ let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
       !"Snark worker using daemon $addr"
       ~metadata:[ ("addr", `String (Host_and_port.to_string daemon_address)) ] ;
     match%bind
-      dispatch Rpcs_versioned.Get_work.Latest.rpc shutdown_on_disconnect ()
+      dispatch Rpc_get_work.Stable.Latest.rpc shutdown_on_disconnect ()
         daemon_address
     with
     | Error e ->
@@ -169,25 +95,30 @@ let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
           ~metadata:[ ("time", `Float random_delay) ] ;
         let%bind () = wait ~sec:random_delay () in
         go ()
-    | Ok (Some (work, public_key)) -> (
+    | Ok (Some partitioned_spec) -> (
+        let address_json =
+          ("address", `String (Host_and_port.to_string daemon_address))
+        in
+        let work_ids_json =
+          ( "work_ids"
+          , Spec.Partitioned.Stable.Latest.statement partitioned_spec
+            |> Mina_state.Snarked_ledger_state.to_yojson )
+        in
         [%log info]
           "SNARK work $work_ids received from $address. Starting proof \
            generation"
-          ~metadata:
-            [ ("address", `String (Host_and_port.to_string daemon_address))
-            ; ( "work_ids"
-              , Transaction_snark_work.Statement.compact_json
-                  (One_or_two.map (Work.Spec.instances work)
-                     ~f:Work.Single.Spec.statement ) )
-            ] ;
+          ~metadata:[ address_json; work_ids_json ] ;
         let%bind () = wait () in
         (* Pause to wait for stdout to flush *)
-        match%bind Prod.Impl.perform state public_key work with
+        let id = Spec.Partitioned.Poly.get_id partitioned_spec in
+        match%bind
+          Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
+        with
         | Error e ->
             let%bind () =
               match%map
-                dispatch Rpcs_versioned.Failed_to_generate_snark.Latest.rpc
-                  shutdown_on_disconnect (e, work, public_key) daemon_address
+                dispatch Rpc_failed_to_generate_snark.Stable.Latest.rpc
+                  shutdown_on_disconnect (e, id) daemon_address
               with
               | Error e ->
                   [%log error]
@@ -197,27 +128,37 @@ let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
                   ()
             in
             log_and_retry "performing work" e (retry_pause 10.) go
-        | Ok result ->
-            emit_proof_metrics result.metrics
-              (Selector.Result.Stable.Latest.transactions result)
-              logger ;
-            [%log info] "Submitted completed SNARK work $work_ids to $address"
-              ~metadata:
-                [ ("address", `String (Host_and_port.to_string daemon_address))
-                ; ( "work_ids"
-                  , Transaction_snark_work.Statement.compact_json
-                      (One_or_two.map (Work.Spec.instances work)
-                         ~f:Work.Single.Spec.statement ) )
-                ] ;
+        | Ok ({ data = elapsed; _ } as data) ->
+            let wire_result = Result.Partitioned.Stable.Latest.{ id; data } in
+            ( match partitioned_spec with
+            | Spec.Partitioned.Poly.Single { spec = single_spec; _ } ->
+                Metrics.emit_single_metrics_stable ~logger ~single_spec ~elapsed
+            | Spec.Partitioned.Poly.Sub_zkapp_command
+                { spec = sub_zkapp_spec; _ } ->
+                Metrics.emit_subzkapp_metrics ~logger ~sub_zkapp_spec ~elapsed
+            ) ;
             let rec submit_work () =
               match%bind
-                dispatch Rpcs_versioned.Submit_work.Latest.rpc
-                  shutdown_on_disconnect result daemon_address
+                dispatch Rpc_submit_work.Stable.Latest.rpc
+                  shutdown_on_disconnect wire_result daemon_address
               with
               | Error e ->
                   log_and_retry "submitting work" e (retry_pause 10.)
                     submit_work
-              | Ok () ->
+              | Ok `Ok ->
+                  [%log info]
+                    "Submitted completed SNARK work $work_ids to $address"
+                    ~metadata:[ address_json; work_ids_json ] ;
+                  go ()
+              | Ok `Removed ->
+                  [%log info] "Result $work_ids slashed by $address"
+                    ~metadata:[ address_json; work_ids_json ] ;
+                  go ()
+              | Ok `SpecUnmatched ->
+                  [%log info]
+                    "Result $work_ids rejected by $address since it has wrong \
+                     shape"
+                    ~metadata:[ address_json; work_ids_json ] ;
                   go ()
             in
             submit_work () )
@@ -225,7 +166,7 @@ let main (module Rpcs_versioned : Intf.Rpcs_versioned_S) ~logger ~proof_level
   go ()
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants (module Rpcs_versioned : Intf.Rpcs_versioned_S) =
+    ~constraint_constants ~signature_kind =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -266,9 +207,8 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
           [%log info]
             !"Received signal to terminate. Aborting snark worker process" ;
           Core.exit 0 ) ;
-      main
-        (module Rpcs_versioned)
-        ~logger ~proof_level ~constraint_constants daemon_port
+      main ~logger ~proof_level ~constraint_constants ~signature_kind
+        daemon_port
         (Option.value ~default:true shutdown_on_disconnect))
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir

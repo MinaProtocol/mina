@@ -51,6 +51,35 @@ let targetVersion =
       ->  \(todayDate : Text)
       ->  "${latestGitTag}-${todayDate}"
 
+let specs_for_branch =
+          \(branch : Text)
+      ->  \(channel : DebianChannel.Type)
+      ->  PublishPackages.Spec::{
+          , artifacts =
+            [ Artifacts.Type.LogProc
+            , Artifacts.Type.Daemon
+            , Artifacts.Type.Archive
+            , Artifacts.Type.Rosetta
+            ]
+          , profile = Profiles.Type.Devnet
+          , networks = [ Network.Type.Devnet ]
+          , codenames =
+            [ DebianVersions.DebVersion.Noble
+            , DebianVersions.DebVersion.Bookworm
+            ]
+          , debian_repo = DebianRepo.Type.Nightly
+          , channel = channel
+          , new_docker_tags = new_tags
+          , target_version = targetVersion
+          , publish_to_docker_io = False
+          , backend = "local"
+          , verify = True
+          , branch = "\\\${BUILDKITE_BRANCH}"
+          , source_version = "\\\${MINA_DEB_VERSION}"
+          , build_id = "\\\${BUILDKITE_BUILD_ID}"
+          , if = Some "build.branch == \"${branch}\""
+          }
+
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -61,31 +90,10 @@ in  Pipeline.build
         , scope = [ PipelineScope.Type.MainlineNightly ]
         }
       , steps =
-          PublishPackages.publish
-            PublishPackages.Spec::{
-            , artifacts =
-              [ Artifacts.Type.LogProc
-              , Artifacts.Type.Daemon
-              , Artifacts.Type.Archive
-              , Artifacts.Type.Rosetta
-              ]
-            , profile = Profiles.Type.Devnet
-            , networks = [ Network.Type.Devnet ]
-            , codenames =
-              [ DebianVersions.DebVersion.Bullseye
-              , DebianVersions.DebVersion.Focal
-              , DebianVersions.DebVersion.Bookworm
-              , DebianVersions.DebVersion.Noble
-              ]
-            , debian_repo = DebianRepo.Type.Nightly
-            , channel = DebianChannel.Type.Compatible
-            , new_docker_tags = new_tags
-            , target_version = targetVersion
-            , publish_to_docker_io = False
-            , backend = "local"
-            , verify = True
-            , branch = "\\\${BUILDKITE_BRANCH}"
-            , source_version = "\\\${MINA_DEB_VERSION}"
-            , build_id = "\\\${BUILDKITE_BUILD_ID}"
-            }
+            PublishPackages.publish
+              (specs_for_branch "compatible" DebianChannel.Type.Compatible)
+          # PublishPackages.publish
+              (specs_for_branch "develop" DebianChannel.Type.Develop)
+          # PublishPackages.publish
+              (specs_for_branch "master" DebianChannel.Type.Master)
       }

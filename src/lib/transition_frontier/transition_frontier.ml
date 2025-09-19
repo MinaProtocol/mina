@@ -616,8 +616,8 @@ module For_tests = struct
                      )
                    ~snarked_ledger:genesis_ledger
                    ~snarked_local_state:(Mina_state.Local_state.empty ())
-                   ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) )
-            )
+                   ~expected_merkle_root:(Ledger.merkle_root genesis_ledger)
+                   ~signature_kind:Mina_signature_kind.t_DEPRECATED ) )
         in
         Breadcrumb.create ~validated_transition:genesis_transition
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
@@ -651,13 +651,15 @@ module For_tests = struct
         Unix.mkdir root_dir ;
         Unix.mkdir frontier_dir ;
         let persistent_root =
-          Persistent_root.create ~logger ~directory:root_dir
+          Persistent_root.create ~logger ~backing_type:Stable_db
+            ~directory:root_dir
             ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
         in
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
             ~time_controller:(Block_time.Controller.basic ~logger)
             ~directory:frontier_dir
+            ~signature_kind:Mina_signature_kind.t_DEPRECATED
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->
@@ -714,13 +716,13 @@ module For_tests = struct
         ~default:
           (Consensus.Data.Local_state.create
              ~context:(module Context)
-             ~genesis_ledger:
-               (Precomputed_values.genesis_ledger precomputed_values)
+             ~genesis_ledger:precomputed_values.genesis_ledger
              ~genesis_epoch_data:precomputed_values.genesis_epoch_data
              ~epoch_ledger_location Public_key.Compressed.Set.empty
              ~genesis_state_hash:
                (State_hash.With_state_hashes.state_hash
-                  precomputed_values.protocol_state_with_hashes ) )
+                  precomputed_values.protocol_state_with_hashes )
+             ~epoch_ledger_backing_type:Stable_db )
     in
     let populate_root, root_ledger_accounts = populate_root_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)

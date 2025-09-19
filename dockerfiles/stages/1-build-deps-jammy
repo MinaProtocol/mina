@@ -1,5 +1,9 @@
 FROM build-deps AS build-deps-jammy
 
+# Canonical naming convention
+# : aarch64/x86_64
+ARG CANONICAL_ARCH
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 USER root
@@ -11,10 +15,9 @@ RUN apt-get update --quiet \
     libprocps8 \
   && rm -rf /var/lib/apt/lists/*
 
-USER opam
-
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-${CANONICAL_ARCH}.zip" -o "awscliv2.zip" \
   && unzip awscliv2.zip \
   && ./aws/install \
   && rm -rf awscliv2.zip aws
 
+USER opam

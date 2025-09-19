@@ -58,6 +58,12 @@ readonly DEFAULT_PAYMENT_TX_INTERVAL="2"
 # Default interval (in seconds) for zkApp transaction API calls
 readonly DEFAULT_ZKAPP_TX_INTERVAL="1"
 
+# Default memory threshold for PostgreSQL processes
+readonly DEFAULT_POSTGRES_MEMORY_THRESHOLD="2500"  # MB
+
+# Default memory threshold for Rosetta API processes
+readonly DEFAULT_ROSETTA_MEMORY_THRESHOLD="300"   # MB
+
 # Statistics reporting interval (in seconds)
 readonly STATS_REPORTING_INTERVAL="10"
 
@@ -77,6 +83,9 @@ BLOCK_INTERVAL="$DEFAULT_BLOCK_INTERVAL"
 ACCOUNT_BALANCE_INTERVAL="$DEFAULT_ACCOUNT_BALANCE_INTERVAL"
 PAYMENT_TX_INTERVAL="$DEFAULT_PAYMENT_TX_INTERVAL"
 ZKAPP_TX_INTERVAL="$DEFAULT_ZKAPP_TX_INTERVAL"
+# Memory thresholds for PostgreSQL and Rosetta processes
+POSTGRES_MEMORY_THRESHOLD="$DEFAULT_POSTGRES_MEMORY_THRESHOLD"
+ROSETTA_MEMORY_THRESHOLD="$DEFAULT_ROSETTA_MEMORY_THRESHOLD"
 
 # Optional duration limit for test run (in seconds)
 DURATION=""
@@ -122,9 +131,14 @@ function usage() {
     echo "  --max-requests N                 Stop after N total requests"
     echo "  If neither is specified, runs indefinitely"
     echo ""
+    echo "Memory thresholds (in MB):"
+    echo "  --postgres-memory-threshold N    PostgreSQL memory threshold (default: $DEFAULT_POSTGRES_MEMORY_THRESHOLD)"
+    echo "  --rosetta-memory-threshold N     Rosetta memory threshold (default: $DEFAULT_ROSETTA_MEMORY_THRESHOLD)"
+    echo ""
     echo "Examples:"
     echo "  $0 --network mainnet --duration 300 --max-requests 1000"
     echo "  $0 --network devnet --address http://localhost:3087 --block-interval 5"
+    echo "  $0 --postgres-memory-threshold 4096 --rosetta-memory-threshold 2048"
 }
 
 # Argument parsing
@@ -177,6 +191,14 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             usage
             exit 0
+            ;;
+        --postgres-memory-threshold)
+            POSTGRES_MEMORY_THRESHOLD="$2"
+            shift 2
+            ;;
+        --rosetta-memory-threshold)
+            ROSETTA_MEMORY_THRESHOLD="$2"
+            shift 2
             ;;
         *)
             echo "Unknown option: $1"
@@ -427,7 +449,61 @@ function print_load_test_statistics() {
     else
         echo "$(date '+%Y-%m-%d %H:%M:%S') - 🔄 Current TPS: $current_tps, 📈 Average TPS: $average_tps, 📊 Total Requests: $total_requests"
     fi
+
     print_memory_usage
+
+    # Assert memory usage is within thresholds
+    assert_memory_usage_within_thresholds "$POSTGRES_MEMORY_THRESHOLD" "$ROSETTA_MEMORY_THRESHOLD"
+}
+
+################################################################################
+# Memory Assertion Functions
+################################################################################
+
+# Check memory usage against defined thresholds and exit if exceeded
+#
+# This function monitors memory consumption of PostgreSQL and Rosetta processes
+# against specified thresholds. If any process exceeds its threshold, the script
+# will log an error and exit with a non-zero status code.
+#
+# Memory usage is calculated by summing RSS (Resident Set Size) values
+# for all matching processes and converting from KB to MB.
+#
+# Globals:
+#   None
+#
+# Arguments:
+#   $1 - PostgreSQL memory threshold in MB
+#   $2 - Rosetta memory threshold in MB
+#
+# Returns:
+#   0 if all memory usage is within thresholds
+#   Exits with code 1 if any threshold is exceeded
+function assert_memory_usage_within_thresholds() {
+    local postgres_threshold="$1"
+    local rosetta_threshold="$2"
+    
+    # Check PostgreSQL memory usage
+    local postgres_memory
+    postgres_memory=$(ps -p $(pgrep -d, -f postgres) -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}' 2>/dev/null)
+    if [[ -n "$postgres_memory" ]]; then
+        if (( $(echo "$postgres_memory > $postgres_threshold" | bc -l) )); then
+            echo "❌ MEMORY THRESHOLD EXCEEDED: PostgreSQL using ${postgres_memory} MB (threshold: ${postgres_threshold} MB)"
+            echo "Load test terminated due to excessive memory usage."
+            exit 1
+        fi
+    fi
+    
+    # Check Rosetta memory usage
+    local rosetta_memory
+    rosetta_memory=$(ps -p $(pgrep -d, -f mina-rosetta) -o rss= 2>/dev/null | awk '{sum+=$1} END {print sum/1024}' 2>/dev/null)
+    if [[ -n "$rosetta_memory" ]]; then
+        if (( $(echo "$rosetta_memory > $rosetta_threshold" | bc -l) )); then
+            echo "❌ MEMORY THRESHOLD EXCEEDED: Mina-rosetta using ${rosetta_memory} MB (threshold: ${rosetta_threshold} MB)"
+            echo "Load test terminated due to excessive memory usage."
+            exit 1
+        fi
+    fi
 }
 
 ################################################################################

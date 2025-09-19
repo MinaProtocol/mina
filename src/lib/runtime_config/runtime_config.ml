@@ -606,7 +606,7 @@ module Accounts = struct
 
     let default = Json_layout.Accounts.Single.default
 
-    let of_account (a : Mina_base.Account.t) : (t, string) Result.t =
+    let of_account (a : Mina_base.Account.t) : t Or_error.t =
       let open Result.Let_syntax in
       let open Signature_lib in
       return
@@ -640,8 +640,8 @@ module Accounts = struct
         ; permissions = Some (Permissions.of_permissions a.permissions)
         }
 
-    let to_account ?(ignore_missing_fields = false) (a : t) :
-        Mina_base.Account.t =
+    let to_account ?(ignore_missing_fields = false) ?(pad_app_state = false)
+        (a : t) : Mina_base.Account.t =
       let open Signature_lib in
       let timing =
         let open Mina_base.Account_timing.Poly in
@@ -716,6 +716,20 @@ module Accounts = struct
         | true, _ ->
             Mina_base.Permissions.user_default
       in
+      let pad_app_state_do app_state =
+        if pad_app_state then
+          let max = Mina_base.Zkapp_state.max_size_int in
+          let len = List.length app_state in
+          if len > max then
+            failwithf "zkapp app_state length (%d) exceeds max allowed (%d)" len
+              max ()
+          else
+            let zeros =
+              List.init (max - len) ~f:(const Snark_params.Tick.Field.zero)
+            in
+            app_state @ zeros
+        else app_state
+      in
       let mk_zkapp (app : Zkapp_account.t) :
           ( Mina_base.Zkapp_state.Value.t
           , Mina_base.Verification_key_wire.t option
@@ -727,7 +741,9 @@ module Accounts = struct
           Mina_base.Zkapp_account.Poly.t =
         let hash_data = Mina_base.Verification_key_wire.digest_vk in
         Zkapp_account.
-          { app_state = Mina_base.Zkapp_state.V.of_list_exn app.app_state
+          { app_state =
+              Mina_base.Zkapp_state.V.of_list_exn
+              @@ pad_app_state_do app.app_state
           ; verification_key =
               Option.map ~f:With_hash.(of_data ~hash_data) app.verification_key
           ; zkapp_version = app.zkapp_version
@@ -776,7 +792,7 @@ module Accounts = struct
     let gen =
       Quickcheck.Generator.map Mina_base.Account.gen ~f:(fun a ->
           (* This will never fail with a proper account generator. *)
-          of_account a |> Result.ok_or_failwith )
+          of_account a |> Or_error.ok_exn )
   end
 
   type single = Single.t =
@@ -817,6 +833,8 @@ module Accounts = struct
     Result.bind ~f:of_json_layout (Json_layout.Accounts.of_yojson json)
 end
 
+(** Parameters for protocol constants that specify the genesis ledger used by
+    the network *)
 module Ledger = struct
   type base =
     | Named of string  (** One of the named ledgers in [Genesis_ledger] *)
@@ -1170,6 +1188,8 @@ module Proof_keys = struct
     }
 end
 
+(** Parameters for protocol constants that specify slot spans, and relate slot
+    spans to system times *)
 module Genesis = struct
   type t = Json_layout.Genesis.t =
     { k : int option (* the depth of finality constant (in slots) *)
@@ -1333,6 +1353,8 @@ module Daemon = struct
     }
 end
 
+(** Parameters for protocol constants that specify the genesis epoch ledger
+    snapshots used by the network *)
 module Epoch_data = struct
   module Data = struct
     type t = { ledger : Ledger.t; seed : string }
@@ -1529,7 +1551,7 @@ let gen =
   }
 
 let ledger_accounts (ledger : Mina_ledger.Ledger.Any_ledger.witness) =
-  let open Async.Deferred.Result.Let_syntax in
+  let open Async.Deferred.Or_error.Let_syntax in
   let yield = Async_unix.Scheduler.yield_every ~n:100 |> Staged.unstage in
   let%bind accounts =
     Mina_ledger.Ledger.Any_ledger.M.to_list ledger
@@ -1557,10 +1579,21 @@ let ledger_of_accounts accounts =
     ; add_genesis_winner = Some false
     }
 
+let ledger_of_hashes ~root_hash ~s3_data_hash () =
+  Ledger.
+    { base = Hash
+    ; num_accounts = None
+    ; balances = []
+    ; hash = Some root_hash
+    ; s3_data_hash = Some s3_data_hash
+    ; name = None
+    ; add_genesis_winner = Some false
+    }
+
 let make_fork_config ~staged_ledger ~global_slot_since_genesis ~state_hash
     ~blockchain_length ~staking_ledger ~staking_epoch_seed ~next_epoch_ledger
     ~next_epoch_seed =
-  let open Async.Deferred.Result.Let_syntax in
+  let open Async.Deferred.Or_error.Let_syntax in
   let global_slot_since_genesis =
     Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
   in
@@ -1633,3 +1666,49 @@ let slot_tx_end, slot_chain_end =
     t.daemon >>= get_runtime >>| Mina_numbers.Global_slot_since_hard_fork.of_int
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
+
+(** This method creates a runtime daemon config for a hard fork, containing the
+    data that can't necessarily be computed in advance of the hard fork. This
+    ends up being data that's computed based on the last block produced before
+    the transaction stop slot. The only exception is the
+    [genesis_state_timestamp]; this value will be known in advance if the hard
+    fork automation MIP is accepted, but it is convenient to include this
+    parameter in the config for testing purposes. That way, the output of
+    [make_automatic_fork_config] will set the same fields as the config created
+    by the legacy hard fork config generation procedure. *)
+let make_automatic_fork_config ~genesis_state_timestamp ~genesis_ledger_config
+    ~global_slot_since_genesis ~state_hash ~blockchain_length
+    ~staking_ledger_config ~staking_epoch_seed ~next_epoch_ledger_config
+    ~next_epoch_seed =
+  let genesis =
+    Genesis.
+      { genesis_state_timestamp = Some genesis_state_timestamp
+      ; k = None
+      ; delta = None
+      ; slots_per_epoch = None
+      ; slots_per_sub_window = None
+      ; grace_period_slots = None
+      }
+  in
+  let global_slot_since_genesis =
+    Mina_numbers.Global_slot_since_genesis.to_int global_slot_since_genesis
+  in
+  let blockchain_length = Unsigned.UInt32.to_int blockchain_length in
+  let fork =
+    Fork_config.
+      { state_hash = Mina_base.State_hash.to_base58_check state_hash
+      ; blockchain_length
+      ; global_slot_since_genesis
+      }
+  in
+  let epoch_data =
+    let open Epoch_data in
+    let open Data in
+    { staking = { ledger = staking_ledger_config; seed = staking_epoch_seed }
+    ; next =
+        Option.map next_epoch_ledger_config ~f:(fun config ->
+            { ledger = config; seed = next_epoch_seed } )
+    }
+  in
+  make ~genesis ~epoch_data ~ledger:genesis_ledger_config
+    ~proof:(Proof_keys.make ~fork ()) ()

@@ -59,7 +59,7 @@ let command
                   , "source ./buildkite/scripts/export-git-env-vars.sh"
                   , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
                                                                          spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
-                                                                                                                                 spec.timeout} --run-load-test"
+                                                                                                                                 spec.timeout} --run-compatibility-test develop --run-load-test "
                   ]
               ]
             , label =
@@ -96,9 +96,8 @@ let pipeline
                       "buildkite/src/Command/Rosetta/Connectivity"
                       "dhall"
                   , S.exactly "scripts/tests/rosetta-connectivity" "sh"
-                  , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
                   , S.exactly
-                      "buildkite/scripts/rosetta-integration-tests-full"
+                      "buildkite/scripts/tests/rosetta-integration-tests"
                       "sh"
                   ]
                 # spec.additionalDirtyWhen
@@ -109,6 +108,7 @@ let pipeline
               [ PipelineTag.Type.Long
               , PipelineTag.Type.Test
               , PipelineTag.Type.Stable
+              , PipelineTag.Type.Rosetta
               ]
             }
           , steps = [ command spec ]

@@ -107,7 +107,8 @@ type t =
   ; pipes : pipes
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
-  ; snark_job_state : Work_selector.State.t
+  ; work_selector : Work_selector.State.t
+  ; work_partitioner : Work_partitioner.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
@@ -726,7 +727,7 @@ let get_snarked_ledger_full t state_hash_opt =
               in
               Staged_ledger.Scan_state.get_snarked_ledger_async ~ledger
                 ~get_protocol_state ~apply_first_pass ~apply_second_pass
-                ~apply_first_pass_sparse_ledger
+                ~apply_first_pass_sparse_ledger ~signature_kind
                 (Staged_ledger.scan_state
                    (Transition_frontier.Breadcrumb.staged_ledger b) )
               |> Deferred.Result.map_error ~f:(fun e ->
@@ -796,7 +797,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       let%map account = get_account t account_id in
       account.Account.nonce
 
-let snark_job_state t = t.snark_job_state
+let work_selector t = t.work_selector
 
 let add_block_subscriber t public_key =
   Mina_subscriptions.add_block_subscriber t.subscriptions public_key
@@ -869,45 +870,103 @@ let best_chain ?max_length t =
 
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
-  let fee = snark_work_fee t in
-  let instances_opt =
-    Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) (snark_job_state t)
+  let%bind.Option prover =
+    Option.first_some (snark_worker_key t) (snark_coordinator_key t)
   in
-  Option.map instances_opt ~f:(fun instances ->
-      { Snark_work_lib.Work.Spec.instances; fee } )
+  let fee = snark_work_fee t in
+  let sok_message = Sok_message.create ~fee ~prover in
+  [%log' debug t.config.logger] "Received work request"
+    ~metadata:[ ("sok_message", Sok_message.to_yojson sok_message) ] ;
+  let work_from_selector =
+    lazy
+      (Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
+         ~logger:t.config.logger t.work_selector )
+  in
+  Work_partitioner.request_partitioned_work ~work_from_selector ~sok_message
+    ~partitioner:t.work_partitioner
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
+let add_complete_work ~logger ~fee ~prover
+    ~(results :
+       ( Snark_work_lib.Spec.Single.t
+       , Ledger_proof.Cached.t )
+       Snark_work_lib.Result.Single.Poly.t
+       One_or_two.t ) t =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
       Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
     in
     let pending_work =
-      Work_selector.pending_work_statements ~snark_pool ~fee_opt
-        t.snark_job_state
+      Work_selector.pending_work_statements ~snark_pool ~fee_opt t.work_selector
       |> List.length
     in
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec =
-    One_or_two.map work.spec.instances
-      ~f:Snark_work_lib.Work.Single.Spec.statement
+  let proofs = One_or_two.map ~f:(fun { proof; _ } -> proof) results in
+  let fee_with_prover = Fee_with_prover.{ fee; prover } in
+  let stmts =
+    One_or_two.map
+      ~f:(fun { spec; _ } -> Snark_work_lib.Spec.Single.Poly.statement spec)
+      results
   in
-  let cb _ =
-    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
+  [%log debug] "Partitioner combined work"
+    ~metadata:
+      [ ("work_ids", Transaction_snark_work.Statement.compact_json stmts)
+      ; ("fee_with_prover", Fee_with_prover.to_yojson fee_with_prover)
+      ] ;
+  Or_error.try_with update_metrics
+  |> Result.iter_error ~f:(fun err ->
+         [%log warn] "Failed to update metrics on adding work"
+           ~metadata:[ ("error", `String (Error.to_string_hum err)) ] ) ;
+  let cb result =
+    (* remove it from seen jobs after attempting to adding it to the pool to
+           avoid this work being reassigned.
      * If the diff is accepted then remove it from the seen jobs.
-     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selector.remove t.snark_job_state spec
+     * If not then the work should have already been in the pool with a 
+           lower fee or the statement isn't referenced anymore or any other 
+           error. In any case remove it from the seen jobs so that it can be 
+           picked up if needed *)
+    Work_selector.remove t.work_selector stmts ;
+    Result.iter_error result ~f:(fun err ->
+        (* Possible reasons of failure: receiving pipe's capacity exceeded,
+            fee that isn't the lowest, failure in verification or application to the pool *)
+        [%log warn] "Failed to add completed work to the pool"
+          ~metadata:
+            [ ("work_ids", Transaction_snark_work.Statement.compact_json stmts)
+            ; ("error", `String (Error.to_string_hum err))
+            ] )
   in
-  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Network_pool.Snark_pool.(
     Local_sink.push t.pipes.snark_local_sink
-      (Resource_pool.Diff.of_result work, cb))
+      ( Add_solved_work
+          ( stmts
+          , Network_pool.Priced_proof.
+              { proof =
+                  proofs
+                  |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
+              ; fee = fee_with_prover
+              } )
+      , cb ))
   |> Deferred.don't_wait_for
+
+let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
+  let logger = t.config.logger in
+  match
+    Work_partitioner.submit_partitioned_work ~result:work
+      ~partitioner:t.work_partitioner
+  with
+  | SpecUnmatched ->
+      `SpecUnmatched
+  | Removed ->
+      `Removed
+  | Processed None ->
+      `Ok
+  | Processed (Some { results; fee; prover }) ->
+      add_complete_work ~logger ~fee ~prover ~results t ;
+      `Ok
 
 let add_work_graphql t diff =
   let results_ivar = Ivar.create () in
@@ -2018,6 +2077,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
               ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db ~proof_cache_db
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -2075,11 +2135,19 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; constraint_constants
               }
           in
-          let snark_jobs_state =
+          let work_selector =
             Work_selector.State.init
               ~reassignment_wait:config.work_reassignment_wait
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~logger:config.logger
+          in
+          (* NOTE: [reassignment_wait] is interpreted as milliseconds *)
+          let work_partitioner =
+            Work_partitioner.create
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED
+              ~reassignment_timeout:
+                (Time.Span.of_ms (Float.of_int config.work_reassignment_wait))
+              ~logger:config.logger ~proof_cache_db
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
@@ -2090,7 +2158,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   ~get_transition_frontier:(fun () ->
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
                   ~get_snark_pool:(fun () -> Some snark_pool)
-                  ~snark_job_state:(fun () -> Some snark_jobs_state)
+                  ~snark_job_state:(fun () -> Some work_selector)
                   ~get_node_status )
           in
           let user_command_input_reader, user_command_input_writer =
@@ -2105,7 +2173,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   match%bind
                     User_command_input.to_user_commands ~get_current_nonce
                       ~get_account ~constraint_constants ~logger:config.logger
-                      uc_inputs
+                      ~signature_kind:Mina_signature_kind.t_DEPRECATED uc_inputs
                   with
                   | Ok signed_commands ->
                       if List.is_empty signed_commands then (
@@ -2157,6 +2225,9 @@ let create ~commit_id ?wallets (config : Config.t) =
             }
           in
 
+          let ledger_backing =
+            Config.ledger_backing ~hardfork_mode:config.hardfork_mode
+          in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2173,7 +2244,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ()
+              ~notify_online ~transaction_pool_proxy ~ledger_backing
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2510,7 +2582,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               }
           ; wallets
           ; coinbase_receiver = ref config.coinbase_receiver
-          ; snark_job_state = snark_jobs_state
+          ; work_selector
+          ; work_partitioner
           ; subscriptions
           ; sync_status
           ; precomputed_block_writer
@@ -2560,7 +2633,8 @@ let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values
 
 let get_transition_frontier (t : t) =
   transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
-  |> Result.of_option ~error:"Could not obtain transition frontier"
+  |> Result.of_option
+       ~error:(Error.of_string "Could not obtain transition frontier")
 
 let best_chain_block_by_height (t : t) height =
   let open Result.Let_syntax in
@@ -2578,7 +2652,8 @@ let best_chain_block_by_height (t : t) height =
          Unsigned.UInt32.equal block_height height )
   |> Result.of_option
        ~error:
-         (sprintf "Could not find block in transition frontier with height %s"
+         (Error.createf
+            !"Could not find block in transition frontier with height %s"
             (Unsigned.UInt32.to_string height) )
 
 let best_chain_block_by_state_hash (t : t) hash =
@@ -2587,8 +2662,226 @@ let best_chain_block_by_state_hash (t : t) hash =
   Transition_frontier.find transition_frontier hash
   |> Result.of_option
        ~error:
-         (sprintf "Block with state hash %s not found in transition frontier"
+         (Error.createf
+            !"Block with state hash %s not found in transition frontier"
             (State_hash.to_base58_check hash) )
+
+let best_chain_block_before_stop_slot (t : t) =
+  let open Deferred.Result.Let_syntax in
+  let runtime_config = t.config.precomputed_values.runtime_config in
+  match best_tip t with
+  | `Bootstrapping ->
+      Deferred.Or_error.error_string "Daemon is bootstrapping"
+  | `Active breadcrumb -> (
+      let txn_stop_slot_opt = Runtime_config.slot_tx_end runtime_config in
+      match txn_stop_slot_opt with
+      | None ->
+          return breadcrumb
+      | Some stop_slot ->
+          let rec find_block_older_than_stop_slot breadcrumb =
+            let protocol_state =
+              Transition_frontier.Breadcrumb.protocol_state breadcrumb
+            in
+            let global_slot =
+              Mina_state.Protocol_state.consensus_state protocol_state
+              |> Consensus.Data.Consensus_state.curr_global_slot
+            in
+            if
+              Mina_numbers.Global_slot_since_hard_fork.( < ) global_slot
+                stop_slot
+            then return breadcrumb
+            else
+              let parent_hash =
+                Transition_frontier.Breadcrumb.parent_hash breadcrumb
+              in
+              let%bind breadcrumb =
+                Deferred.return @@ best_chain_block_by_state_hash t parent_hash
+              in
+              find_block_older_than_stop_slot breadcrumb
+          in
+          find_block_older_than_stop_slot breadcrumb )
+
+module Hardfork_config = struct
+  type mina_lib = t
+
+  type breadcrumb_spec =
+    [ `Stop_slot
+    | `State_hash of State_hash.t
+    | `Block_height of Unsigned.UInt32.t ]
+
+  let breadcrumb ~breadcrumb_spec mina =
+    match breadcrumb_spec with
+    | `Stop_slot ->
+        best_chain_block_before_stop_slot mina
+    | `State_hash state_hash_base58 ->
+        best_chain_block_by_state_hash mina state_hash_base58 |> Deferred.return
+    | `Block_height block_height ->
+        best_chain_block_by_height mina block_height |> Deferred.return
+
+  let genesis_source_of_snapshot = function
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger l
+      ->
+        `Genesis l
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
+        `Root l
+
+  let genesis_source_ledger_cast = function
+    | `Genesis l ->
+        let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+        Ledger.Any_ledger.cast (module Ledger) l_inner
+    | `Root l ->
+        Ledger.Root.as_unmasked l
+    | `Uncommitted l ->
+        Ledger.Any_ledger.cast (module Ledger) l
+
+  let genesis_source_ledger_merkle_root l =
+    genesis_source_ledger_cast l |> Ledger.Any_ledger.M.merkle_root
+
+  type genesis_source_ledgers =
+    { root_snarked_ledger : Ledger.Root.t
+    ; staged_ledger : Ledger.t
+    ; staking_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t | `Root of Ledger.Root.t ]
+    ; next_epoch_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Ledger.Root.t
+        | `Uncommitted of Ledger.t ]
+    }
+
+  let source_ledgers ~breadcrumb mina =
+    let open Deferred.Result.Let_syntax in
+    let mina_config = config mina in
+    let frontier_consensus_local_state = mina_config.consensus_local_state in
+    let consensus_state =
+      breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
+      |> Mina_state.Protocol_state.consensus_state
+    in
+    let staking_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+        consensus_state
+    in
+    let next_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+        consensus_state
+    in
+    let frontier =
+      transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
+      |> Option.value_exn
+    in
+    let root_consensus_state =
+      frontier |> Transition_frontier.root
+      |> Transition_frontier.Breadcrumb.protocol_state
+      |> Mina_state.Protocol_state.consensus_state
+    in
+    let root_snarked_ledger =
+      frontier |> Transition_frontier.root_snarked_ledger
+    in
+    let staged_ledger =
+      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+      |> Staged_ledger.ledger
+    in
+    let%map staking_ledger, next_epoch_ledger =
+      match
+        (* We pretend that the block is finalized, so that we can query it in
+           advance, for redundancy.
+        *)
+        Consensus.Hooks.get_epoch_ledgers_for_finalized_frontier_block
+          ~root_consensus_state ~target_consensus_state:consensus_state
+          ~local_state:frontier_consensus_local_state
+      with
+      | `Both (staking_ledger, next_epoch_ledger) ->
+          return
+            ( genesis_source_of_snapshot staking_ledger
+            , genesis_source_of_snapshot next_epoch_ledger )
+      | `Snarked_ledger (staking_ledger, num_parents) ->
+          (* The epoch transition was at a block between the given block and
+             the root. We find it by walking back by `num_parents` blocks.
+          *)
+          let%bind epoch_transition_state_hash =
+            let open Result.Let_syntax in
+            let rec ancestor breadcrumb i =
+              if i = 0 then return breadcrumb
+              else
+                let parent_hash =
+                  Transition_frontier.Breadcrumb.parent_hash breadcrumb
+                in
+                let%bind breadcrumb =
+                  best_chain_block_by_state_hash mina parent_hash
+                in
+                ancestor breadcrumb (i - 1)
+            in
+            ancestor breadcrumb num_parents
+            >>| Transition_frontier.Breadcrumb.state_hash |> Deferred.return
+          in
+          (* When this block reaches the root of the frontier, its snarked
+             ledger will become the next epoch ledger; we simulate that here.
+          *)
+          let%map next_epoch_ledger =
+            get_snarked_ledger_full mina (Some epoch_transition_state_hash)
+          in
+          ( genesis_source_of_snapshot staking_ledger
+          , `Uncommitted next_epoch_ledger )
+    in
+    assert (
+      Ledger_hash.equal
+        (genesis_source_ledger_merkle_root staking_ledger)
+        staking_epoch.ledger.hash ) ;
+    assert (
+      Ledger_hash.equal
+        (genesis_source_ledger_merkle_root next_epoch_ledger)
+        next_epoch.ledger.hash ) ;
+    { root_snarked_ledger; staged_ledger; staking_ledger; next_epoch_ledger }
+
+  type inputs =
+    { staged_ledger : Ledger.t
+    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; state_hash : State_hash.t
+    ; staking_ledger : Ledger.Any_ledger.witness
+    ; staking_epoch_seed : Epoch_seed.t
+    ; next_epoch_ledger : Ledger.Any_ledger.witness
+    ; next_epoch_seed : Epoch_seed.t
+    ; blockchain_length : Mina_numbers.Length.t
+    }
+
+  let prepare_inputs ~breadcrumb_spec mina =
+    let open Deferred.Result.Let_syntax in
+    let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
+    let block = Transition_frontier.Breadcrumb.block breadcrumb in
+    let blockchain_length = Mina_block.blockchain_length block in
+    let global_slot_since_genesis =
+      Mina_block.consensus_state block
+      |> Consensus.Data.Consensus_state.global_slot_since_genesis
+    in
+    let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+    let protocol_state =
+      Transition_frontier.Breadcrumb.protocol_state breadcrumb
+    in
+    let consensus = Mina_state.Protocol_state.consensus_state protocol_state in
+    let staking_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data consensus
+    in
+    let next_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
+    in
+    let staking_epoch_seed = staking_epoch.Epoch_data.Poly.seed in
+    let next_epoch_seed = next_epoch.Epoch_data.Poly.seed in
+    let%map { root_snarked_ledger = _
+            ; staged_ledger
+            ; staking_ledger
+            ; next_epoch_ledger
+            } =
+      source_ledgers ~breadcrumb mina
+    in
+    { staged_ledger
+    ; global_slot_since_genesis
+    ; state_hash
+    ; staking_ledger = genesis_source_ledger_cast staking_ledger
+    ; staking_epoch_seed
+    ; next_epoch_ledger = genesis_source_ledger_cast next_epoch_ledger
+    ; next_epoch_seed
+    ; blockchain_length
+    }
+end
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
 

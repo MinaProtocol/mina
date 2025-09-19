@@ -136,11 +136,13 @@ module Impl = struct
 
   let perform_single_untimed ~(m : (module Worker_state.S)) ~logger
       ~proof_cache_db ~single_spec ~signature_kind ~sok_digest () =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let (module M) = m in
     match single_spec with
     | Work.Work.Single.Spec.Transition
         (input, (w : Transaction_witness.Stable.Latest.t)) -> (
+        (* TODO: remove this case after delivering the full snark worker
+           optimization PR series *)
         match w.transaction with
         | Command (Zkapp_command zkapp_command) -> (
             let%bind witnesses_specs_stmts =
@@ -148,6 +150,7 @@ module Impl = struct
                 ~zkapp_command:
                   (Zkapp_command.write_all_proofs_to_disk ~signature_kind
                      ~proof_cache_db zkapp_command )
+              |> Result.map_error ~f:Failed_to_generate_inputs.error_of_t
               |> Deferred.return
             in
             match Mina_stdlib.Nonempty_list.uncons witnesses_specs_stmts with
@@ -158,7 +161,6 @@ module Impl = struct
                     (M.of_zkapp_command_segment_exn ~witness)
                     ()
                 in
-
                 let%bind (p : Ledger_proof.t) =
                   Deferred.List.fold ~init:(Ok p1) rest
                     ~f:(fun acc (witness, spec, statement) ->
@@ -287,8 +289,7 @@ module Impl = struct
       ~state:
         ({ proof_level_snark; proof_cache_db; logger; signature_kind } :
           Worker_state.t )
-      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) :
-      Work.Result.Partitioned.Stable.Latest.t Deferred.Or_error.t =
+      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) =
     let open Deferred.Or_error.Let_syntax in
     let sok_digest =
       Work.Spec.Partitioned.Poly.sok_message partitioned_spec
@@ -297,8 +298,7 @@ module Impl = struct
     match proof_level_snark with
     | Worker_state.Full ((module M) as m) -> (
         match partitioned_spec with
-        | Work.Spec.Partitioned.Poly.Single
-            { job = { spec = single_spec; _ } as job; data = () } ->
+        | Work.Spec.Partitioned.Poly.Single { spec = single_spec; _ } ->
             let%map proof, elapsed =
               measure_runtime ~logger
                 ~spec_json:
@@ -308,19 +308,13 @@ module Impl = struct
                 (perform_single_untimed ~m ~logger ~proof_cache_db ~single_spec
                    ~sok_digest ~signature_kind )
             in
-            Work.Spec.Partitioned.Poly.Single
-              { job = { job with spec = () }
-              ; data = { Proof_carrying_data.data = elapsed; proof }
-              }
+            { Proof_carrying_data.data = elapsed; proof }
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
-            { job =
-                { spec =
-                    Work.Spec.Sub_zkapp.Stable.Latest.Segment
-                      { statement; witness; spec = segment_spec; _ } as
-                    sub_zkapp_spec
-                ; _
-                } as job
-            ; data = ()
+            { spec =
+                Work.Spec.Sub_zkapp.Stable.Latest.Segment
+                  { statement; witness; spec = segment_spec; _ } as
+                sub_zkapp_spec
+            ; _
             } ->
             let witness =
               Transaction_witness.Zkapp_command_segment_witness
@@ -338,19 +332,12 @@ module Impl = struct
                        , Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
                            sub_zkapp_spec ) )
             in
-
-            Work.Spec.Partitioned.Poly.Sub_zkapp_command
-              { job = { job with spec = () }
-              ; data = { Proof_carrying_data.data = elapsed; proof }
-              }
+            { Proof_carrying_data.data = elapsed; proof }
         | Work.Spec.Partitioned.Poly.Sub_zkapp_command
-            { job =
-                { spec =
-                    Work.Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 }
-                    as sub_zkapp_spec
-                ; _
-                } as job
-            ; data = ()
+            { spec =
+                Work.Spec.Sub_zkapp.Stable.Latest.Merge { proof1; proof2 } as
+                sub_zkapp_spec
+            ; _
             } ->
             let%map proof, elapsed =
               log_subzkapp_merge_snark ~m ~logger ~sok_digest proof1 proof2
@@ -361,10 +348,7 @@ module Impl = struct
                        , Work.Spec.Sub_zkapp.Stable.Latest.to_yojson
                            sub_zkapp_spec ) )
             in
-            Work.Spec.Partitioned.Poly.Sub_zkapp_command
-              { job = { job with spec = () }
-              ; data = { Proof_carrying_data.data = elapsed; proof }
-              } )
+            { Proof_carrying_data.data = elapsed; proof } )
     | Worker_state.Check | Worker_state.No_check ->
         let elapsed = Time.Span.zero in
         let statement =
@@ -376,15 +360,5 @@ module Impl = struct
             ~statement:{ statement with sok_digest }
             ~proof:(Lazy.force Proof.transaction_dummy)
         in
-        let data = { Proof_carrying_data.data = elapsed; proof } in
-        let result =
-          match partitioned_spec with
-          | Work.Spec.Partitioned.Poly.Single { job; _ } ->
-              Work.Spec.Partitioned.Poly.Single
-                { job = { job with spec = () }; data }
-          | Work.Spec.Partitioned.Poly.Sub_zkapp_command { job; _ } ->
-              Work.Spec.Partitioned.Poly.Sub_zkapp_command
-                { job = { job with spec = () }; data }
-        in
-        Deferred.Or_error.return result
+        Deferred.Or_error.return { Proof_carrying_data.data = elapsed; proof }
 end

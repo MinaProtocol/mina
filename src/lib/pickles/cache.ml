@@ -1,5 +1,13 @@
 open Core_kernel
 
+(* Check if circuit data dumping is enabled via environment variable *)
+let should_dump_circuit_data () =
+  match Sys.getenv_opt "MINA_DUMP_CIRCUIT_DATA" with
+  | Some "true" | Some "1" | Some "yes" ->
+      true
+  | _ ->
+      false
+
 module Step = struct
   module Key = struct
     module Proving = struct
@@ -24,7 +32,6 @@ module Step = struct
             sprintf !"vk-step-%s-%s-%d-%s" header.kind.type_
               header.kind.identifier n header.identifying_hash
     end
-    [@@warning "-4"]
   end
 
   type storable =
@@ -54,7 +61,14 @@ module Step = struct
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
             { Backend.Tick.Keypair.index; cs } ) )
-      (fun (_, header, _, _) t path ->
+      (fun (_, header, _, cs) t path ->
+        (* Conditionally dump extra circuit data based on environment variable *)
+        if should_dump_circuit_data () then (
+          let logger = Logger.create () in
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "Dumping Step circuit data to %s" path ;
+          Kimchi_pasta_constraint_system.Vesta_constraint_system
+          .dump_extra_circuit_data cs path ) ;
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)
@@ -147,7 +161,6 @@ module Wrap = struct
             sprintf !"vk-wrap-%s-%s-%s" header.kind.type_ header.kind.identifier
               header.identifying_hash
     end
-    [@@warning "-4"]
 
     module Proving = struct
       type t =
@@ -187,7 +200,14 @@ module Wrap = struct
             [%test_eq: string] header.constraint_system_hash
               header_read.constraint_system_hash ;
             { Backend.Tock.Keypair.index; cs } ) )
-      (fun (_, header, _) t path ->
+      (fun (_, header, cs) t path ->
+        (* Conditionally dump extra circuit data based on environment variable *)
+        if should_dump_circuit_data () then (
+          let logger = Logger.create () in
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "Dumping Wrap circuit data to %s" path ;
+          Kimchi_pasta_constraint_system.Pallas_constraint_system
+          .dump_extra_circuit_data cs path ) ;
         Or_error.try_with (fun () ->
             Snark_keys_header.write_with_header
               ~expected_max_size_log2:33 (* 8 GB should be enough *)

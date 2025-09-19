@@ -2,11 +2,12 @@
 open Core
 open Async
 open Mina_base
-module Ledger = Mina_ledger.Ledger
-module Sync_ledger = Mina_ledger.Sync_ledger
 open Mina_state
 open Pipe_lib.Strict_pipe
 open Network_peer
+open Mina_stdlib
+module Ledger = Mina_ledger.Ledger
+module Sync_ledger = Mina_ledger.Sync_ledger
 module Transition_cache = Transition_cache
 
 module type CONTEXT = sig
@@ -36,27 +37,14 @@ type t =
   ; mutable num_of_root_snarked_ledger_retargeted : int
   }
 
-type time = Time.Span.t
-
-let time_to_yojson span =
-  `String (Printf.sprintf "%f seconds" (Time.Span.to_sec span))
-
-type opt_time = time option
-
-let opt_time_to_yojson = function
-  | Some time ->
-      time_to_yojson time
-  | None ->
-      `Null
-
 (** An auxiliary data structure for collecting various metrics for bootstrap controller. *)
 type bootstrap_cycle_stats =
   { cycle_result : string
-  ; sync_ledger_time : time
-  ; staged_ledger_data_download_time : time
-  ; staged_ledger_construction_time : opt_time
+  ; sync_ledger_time : Time.Span.t
+  ; staged_ledger_data_download_time : Time.Span.t
+  ; staged_ledger_construction_time : Time.Span.t option
   ; local_state_sync_required : bool
-  ; local_state_sync_time : opt_time
+  ; local_state_sync_time : Time.Span.t option
   }
 [@@deriving to_yojson]
 
@@ -288,7 +276,7 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
 let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    previous_cycles =
+    ~signature_kind previous_cycles =
   let open Context in
   (* The short-lived pipe allocated here will be closed
      when a follow-up pipe is allocated: in the next cycle of bootstrap
@@ -446,7 +434,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
                           |> Blockchain_state.snarked_local_state)
                       ~verifier ~constraint_constants ~scan_state
                       ~snarked_ledger:temp_mask ~expected_merkle_root
-                      ~pending_coinbases ~get_state
+                      ~pending_coinbases ~get_state ~signature_kind
                   in
                   ignore
                     ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask
@@ -678,7 +666,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    =
+    ~signature_kind =
   let open Context in
   let run_cycle =
     run_cycle
@@ -686,6 +674,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~trust_system ~verifier ~network ~consensus_local_state
       ~network_transition_pipe ~preferred_peers ~persistent_root
       ~persistent_frontier ~initial_root_transition ~catchup_mode
+      ~signature_kind
   in
   O1trace.thread "bootstrap"
   @@ fun () ->
@@ -694,7 +683,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
   in
   [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
     ~metadata:
-      [ ("time_elapsed", time_to_yojson time_elapsed)
+      [ ("time_elapsed", Time.Span.to_yojson_hum time_elapsed)
       ; ( "bootstrap_stats"
         , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) )
       ] ;
@@ -904,7 +893,8 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~network_transition_pipe ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Super ~initial_root_transition )
+           ~catchup_mode:`Super ~initial_root_transition
+           ~signature_kind:Mina_signature_kind.t_DEPRECATED )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
@@ -1023,6 +1013,7 @@ let%test_module "Bootstrap_controller tests" =
                   ~scan_state ~logger ~verifier ~constraint_constants
                   ~snarked_ledger ~snarked_local_state ~expected_merkle_root
                   ~pending_coinbases ~get_state
+                  ~signature_kind:Mina_signature_kind.t_DEPRECATED
                 |> Deferred.Or_error.ok_exn
               in
               let height =

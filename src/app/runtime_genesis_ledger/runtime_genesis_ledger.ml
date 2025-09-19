@@ -15,18 +15,18 @@ end
 
 let logger = Logger.create ()
 
-let load_ledger ~ignore_missing_fields
+let load_ledger ~ignore_missing_fields ~pad_app_state
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     (accounts : Runtime_config.Accounts.t) =
   let accounts =
     List.map accounts ~f:(fun account ->
         ( None
         , Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
-            account ) )
+            ~pad_app_state account ) )
   in
   let packed =
-    Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-      ~depth:constraint_constants.ledger_depth
+    Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts ~logger
+      ~depth:constraint_constants.ledger_depth ~genesis_backing_type:Stable_db
       (lazy accounts)
   in
   Lazy.force (Genesis_ledger.Packed.t packed)
@@ -34,7 +34,7 @@ let load_ledger ~ignore_missing_fields
 let generate_ledger_tarball ~genesis_dir ~ledger_name_prefix ledger =
   let%bind tar_path =
     Deferred.Or_error.ok_exn
-    @@ Genesis_ledger_helper.Ledger.generate_tar ~genesis_dir ~logger
+    @@ Genesis_ledger_helper.Ledger.generate_ledger_tar ~genesis_dir ~logger
          ~ledger_name_prefix ledger
   in
   [%log info] "Generated ledger tar at %s" tar_path ;
@@ -121,21 +121,25 @@ let load_config_exn config_file =
   , Option.map ~f:extract_accounts_exn next_ledger )
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields () =
+    ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
+    ~pad_app_state () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
   let ledger =
-    load_ledger ~ignore_missing_fields ~constraint_constants accounts
+    load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
+      accounts
   in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
-      ~f:(load_ledger ~ignore_missing_fields ~constraint_constants)
+      ~f:
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
       staking_accounts_opt
   in
   let next_ledger =
     Option.value_map ~default:staking_ledger
-      ~f:(load_ledger ~ignore_missing_fields ~constraint_constants)
+      ~f:
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
       next_accounts_opt
   in
   let%bind hash_json =
@@ -176,6 +180,13 @@ let () =
              ~doc:
                "BOOL whether to ignore missing fields in account definition \
                 (and replace with default values)"
+         (* TODO: at later stages replace with a flag to do all
+            ledger transformations necessary for the hardfork *)
+         and pad_app_state =
+           flag "--pad-app-state" no_arg
+             ~doc:
+               "BOOL whether to pad app_state to max allowed size (default: \
+                false)"
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields) )
+           ~ignore_missing_fields ~pad_app_state) )

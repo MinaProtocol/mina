@@ -5,6 +5,7 @@ ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
 ARG deb_repo="http://packages.o1test.net"
+ARG TARGETARCH
 
 ARG psql_version=15
 # Golang version number used to detemine tarball name
@@ -18,6 +19,19 @@ ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 ARG ROSETTA_CLI_VERSION=v0.10.1
 
 ENV DEBIAN_FRONTEND noninteractive
+
+ARG deb_suffix
+
+# if --build-arg deb_suffix is defined, add hypen at beginning.
+ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
+# construct mina debian package name based on network and suffix.
+# possible values:
+# - mina-devnet
+# - mina-devnet-lightnet etc.
+ENV MINA_DEB=mina-${network}${SUFFIX}
+ENV MINA_ARCHIVE_DEB=mina-archive-${network}
+ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
+
 
 # We do not install the below platform-specific dependencies,
 # and instead assume that apt will install the proper deps based on the package definition.
@@ -74,7 +88,7 @@ RUN curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 
 # --- Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
+RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" | tar -xz -C /usr/lib/
 
 # --- Install rosetta-cli
 # The following commands install rosetta-cli with an updated rosetta-sdk-go dependency, which supports delegation transactions.
@@ -109,7 +123,7 @@ RUN mkdir -p ${MINA_CONFIG_DIR}/wallets/store/ \
 RUN echo "Building image with version $deb_version from repo $deb_release $deb_codename for network $network" \
     && echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/sources.list.d/o1.list \
     && apt-get update --quiet --yes \
-    && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "mina-$network=$deb_version" "mina-rosetta-$network=$deb_version" "mina-archive-$network=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
+    && apt-get install --no-install-recommends --quiet --yes --allow-downgrades "${MINA_DEB}=$deb_version" "${MINA_ARCHIVE_DEB}=$deb_version" "${MINA_ROSETTA_DEB}=$deb_version" "mina-zkapp-test-transaction=$deb_version" \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Set up postgres
