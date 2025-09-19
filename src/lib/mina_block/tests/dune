@@ -1,6 +1,8 @@
 (rule
  (alias precomputed_block)
- (target hetzner-itn-1-1795.json)
+ (targets
+  hetzner-itn-1-296991.json
+  hetzner-itn-1-296998.json)
  (deps
   (env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
  (enabled_if
@@ -11,28 +13,36 @@
     curl
     -L
     -o
-    %{target}.gz
-    https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-1795-3NL9Vn7Rg1mz8cS1gVxFkVPsjESG1Zu1XRpMLRQAz3W24hctRoD6.json.gz)
-   (run gzip -d %{target}.gz)
-   ; It seems unreasonable to regenerate the whole json to increment the version number
-   ; Once less trivial changes are added we should regenerate it and fix the version number
-   (run sed -i s/3/4/ %{target})
-   )))
+    hetzner-itn-1-296991.json.gz
+    https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-296991-3NLfjbkNF3AK46qnLwzQj3F6mYikxpnmBbX4HqWhShf84jCdXLT3.json.gz)
+   (run
+    curl
+    -L
+    -o
+    hetzner-itn-1-296998.json.gz
+    https://storage.googleapis.com/o1labs-ci-test-data/precomputed-blocks/hetzner-itn-1-296998-3NLeYDjJNM6Q2eD7HWfbL1t9nQt36BHQYi4WwVLry4HqrKccwqJ6.json.gz)
+   (run gzip -d hetzner-itn-1-296991.json.gz)
+   (run gzip -d hetzner-itn-1-296998.json.gz))))
 
 (rule
  (enabled_if
   (<> %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} n))
- (target hetzner-itn-1-1795.json)
+ (targets
+  hetzner-itn-1-296991.json
+  hetzner-itn-1-296998.json)
  (deps
   (env_var TEST_PRECOMPUTED_BLOCK_JSON_PATH))
  (action
   (progn
-   (copy %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} %{target}))))
+   (copy %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} hetzner-itn-1-296991.json)
+   (copy %{env:TEST_PRECOMPUTED_BLOCK_JSON_PATH=n} hetzner-itn-1-296998.json))))
 
 (test
  (name main)
  (libraries alcotest async core_kernel disk_cache.lmdb mina_block yojson)
- (deps hetzner-itn-1-1795.json)
+ (deps
+  hetzner-itn-1-296991.json
+  hetzner-itn-1-296998.json)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
