@@ -225,19 +225,11 @@ module Make (F : Input_intf) :
       let to_yojson t : Yojson.Safe.t =
         `String (Bigint.to_hex_string (to_bigint t))
 
-      let of_yojson j =
-        match j with
+      let of_yojson = function
         | `String s ->
-            let parsed_bigint =
-              if
-                String.is_prefix ~prefix:"0x" s
-                || String.is_prefix ~prefix:"0X" s
-              then Bigint.of_hex_string s
-              else Bigint.of_decimal_string s
-            in
-            Ok (of_bigint parsed_bigint)
+            Ok (of_bigint (Bigint.of_hex_string s))
         | _ ->
-            Error "Expected a hex string or a decimal string"
+            Error "expected hex string"
     end
   end]
 
