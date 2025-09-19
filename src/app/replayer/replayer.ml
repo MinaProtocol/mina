@@ -4,7 +4,7 @@ open Core
 open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
-module Processor = Archive_lib.Processor
+module Models = Archive_lib.Models
 module Load_data = Archive_lib.Load_data
 module Account_comparables = Comparable.Make_binable (Account.Stable.Latest)
 module Account_set = Account_comparables.Set
@@ -436,7 +436,7 @@ let get_parent_state_view ~pool block_id =
       query_db ~f:(fun db -> Sql.Block.get_parent_id db block_id)
     in
     let%bind parent_block =
-      query_db ~f:(fun db -> Processor.Block.load db ~id:parent_id)
+      query_db ~f:(fun db -> Models.Block.load db ~id:parent_id)
     in
     let%bind snarked_ledger_hash_str =
       query_db ~f:(fun db ->
@@ -460,7 +460,7 @@ let get_parent_state_view ~pool block_id =
       parent_block.global_slot_since_genesis |> Unsigned.UInt32.of_int64
       |> Mina_numbers.Global_slot_since_genesis.of_uint32
     in
-    let epoch_data_of_raw_epoch_data (raw_epoch_data : Processor.Epoch_data.t) :
+    let epoch_data_of_raw_epoch_data (raw_epoch_data : Models.Epoch_data.t) :
         Mina_base.Epoch_data.Value.t Deferred.t =
       let%bind hash_str =
         query_db ~f:(fun db ->
@@ -492,14 +492,14 @@ let get_parent_state_view ~pool block_id =
     in
     let%bind staking_epoch_raw =
       query_db ~f:(fun db ->
-          Processor.Epoch_data.load db parent_block.staking_epoch_data_id )
+          Models.Epoch_data.load db parent_block.staking_epoch_data_id )
     in
     let%bind (staking_epoch_data : Mina_base.Epoch_data.Value.t) =
       epoch_data_of_raw_epoch_data staking_epoch_raw
     in
     let%bind next_epoch_raw =
       query_db ~f:(fun db ->
-          Processor.Epoch_data.load db parent_block.staking_epoch_data_id )
+          Models.Epoch_data.load db parent_block.staking_epoch_data_id )
     in
     let%bind next_epoch_data = epoch_data_of_raw_epoch_data next_epoch_raw in
     return
@@ -534,7 +534,7 @@ let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
     Deferred.List.map (Array.to_list cmd.zkapp_account_updates_ids)
       ~f:(fun id ->
         let%bind { body_id } =
-          query_db ~f:(fun db -> Processor.Zkapp_account_update.load db id)
+          query_db ~f:(fun db -> Models.Zkapp_account_update.load db id)
         in
         let%map body =
           Archive_lib.Load_data.get_account_update_body ~pool body_id
@@ -773,9 +773,9 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         in
         let%bind { staking_epoch_data_id; next_epoch_data_id; _ } =
           let%bind block_id =
-            query_db ~f:(fun db -> Processor.Block.find db ~state_hash)
+            query_db ~f:(fun db -> Models.Block.find db ~state_hash)
           in
-          query_db ~f:(fun db -> Processor.Block.load db ~id:block_id)
+          query_db ~f:(fun db -> Models.Block.load db ~id:block_id)
         in
         let%bind { epoch_data_seed = staking_seed; _ } =
           query_db ~f:(fun db ->
@@ -1102,11 +1102,11 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
               ] ;
           let%bind accounts_accessed_db =
             query_db ~f:(fun db ->
-                Processor.Accounts_accessed.all_from_block db last_block_id )
+                Models.Accounts_accessed.all_from_block db last_block_id )
           in
           let%bind accounts_created_db =
             query_db ~f:(fun db ->
-                Processor.Accounts_created.all_from_block db last_block_id )
+                Models.Accounts_created.all_from_block db last_block_id )
           in
           [%log spam]
             "Verifying that accounts created are also deemed accessed in block \
