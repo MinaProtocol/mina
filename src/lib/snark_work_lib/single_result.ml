@@ -7,6 +7,7 @@ module Poly = struct
       type ('single_spec, 'proof) t =
         { spec : 'single_spec
         ; proof : 'proof
+              (* This elapsed time is the work time taken to prove everything in the spec, assuming we have only a single CPU. *)
         ; elapsed : Mina_stdlib.Time.Span.Stable.V1.t
         }
       [@@deriving to_yojson]
