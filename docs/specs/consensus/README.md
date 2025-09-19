@@ -175,7 +175,7 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `epoch_count`                            | `Length.Stable.V1.t` | Epoch number |
 | `min_window_density`                     | `Length.Stable.V1.t` | Minimum windows density observed on this chain (see [Section 5.2.2](#522-long-range-fork-rule)) |
 | `sub_window_densities`                   | `Length.Stable.V1.t list` | Current sliding window of densities (see [Section 5.4](#54-sliding-window-density)) |
-| `last_vrf_output`                        | `Vrf.Output.Truncated.Stable.V1.t` | Additional VRS output from leader (for seeding Random Oracle) |
+| `last_vrf_output`                        | `Vrf.Output.Truncated.Stable.V1.t` | Additional VRF output from leader (for seeding Random Oracle) |
 | `total_currency`                         | `Amount.Stable.V1.t` | Total supply of currency |
 | `curr_global_slot`                       | `Global_slot.Stable.V1.t` | Current global slot number relative to the current hard fork  |
 | `global_slot_since_genesis`              | `Mina_numbers.Global_slot.Stable.V1.t` | Absolute global slot number since genesis |
