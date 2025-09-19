@@ -20,6 +20,8 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bookworm
             ]
           , network = Network.Type.DevnetLegacy
           , debVersion = DebianVersions.DebVersion.Bookworm

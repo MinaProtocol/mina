@@ -24,6 +24,9 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Rosetta
+            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Bullseye
             ]
           }
       )
