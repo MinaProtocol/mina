@@ -1,5 +1,3 @@
-let ContainerImages = ../../Constants/ContainerImages.dhall
-
 let Cmd = ../../Lib/Cmds.dhall
 
 let S = ../../Lib/SelectFiles.dhall
@@ -19,6 +17,8 @@ let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
 let B = ../../External/Buildkite.dhall
+
+let ContainterImages = ../../Constants/ContainerImages.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
@@ -41,19 +41,15 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Hardfork
           ]
         }
       , steps =
         [ Command.build
             Command.Config::{
             , commands =
-              [ Cmd.runInDocker
-                  Cmd.Docker::{
-                  , image = ContainerImages.nixos
-                  , privileged = True
-                  , useBash = False
-                  }
-                  "./scripts/hardfork/build-and-test.sh \$BUILDKITE_BRANCH"
+              [ Cmd.run
+                  "MINA_DEB_CODENAME=focal ./scripts/hardfork/build-and-test.sh --mode docker --context ci --fork-branch \$BUILDKITE_BRANCH --toolchain ${ContainterImages.minaToolchain}"
               ]
             , label = "hard fork test"
             , key = "hard-fork-test"

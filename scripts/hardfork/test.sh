@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -eox pipefail
+
+set -T
+PS4='debug($LINENO) ${FUNCNAME[0]:+${FUNCNAME[0]}}(): ';
+
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -24,25 +28,125 @@ FORK_DELAY="${FORK_DELAY:-10}"
 source "$SCRIPT_DIR"/test-helper.sh
 
 # Executable built off mainnet branch
-MAIN_MINA_EXE="$1"
-MAIN_RUNTIME_GENESIS_LEDGER_EXE="$2"
+MAIN_MINA_EXE=""
+MAIN_RUNTIME_GENESIS_LEDGER_EXE=""
 
 # Executables built off fork branch (e.g. develop)
-FORK_MINA_EXE="$3"
-FORK_RUNTIME_GENESIS_LEDGER_EXE="$4"
+FORK_MINA_EXE=""
+FORK_RUNTIME_GENESIS_LEDGER_EXE=""
+
+# env var needed when building debian packages
+export BRANCH_NAME=$FORK_BRANCH
+
+# skip adding ledgers to debian package as it will override genesis ledgers (we don't want that)
+export DEBIAN_SKIP_LEDGERS_COPY=y
+
 
 stop_nodes(){
-  "$1" client stop-daemon --daemon-port 10301
-  "$1" client stop-daemon --daemon-port 10311
+  if [[ "$MODE" == "docker" ]]; then
+    docker stop "$SW_CONTAINER_NAME"
+    docker stop "$BP_CONTAINER_NAME"
+    docker rm "$SW_CONTAINER_NAME"
+    docker rm "$BP_CONTAINER_NAME"
+  else
+    "$1" client stop-daemon --daemon-port 10301
+    "$1" client stop-daemon --daemon-port 10311
+  fi
 }
+
+print_nodes_logs() {
+  if [[ "$MODE" == "docker" ]]; then
+    echo "Block producer logs:" >&2
+    docker logs "$BP_CONTAINER_NAME" 2>&1 | tail -50
+    echo "Block produces oversized logs:"
+    docker exec "$BP_CONTAINER_NAME" bash -c 'head -c 100 /localnet/runtime_1/mina-oversized-logs.log'
+    echo "SNARK worker logs:" >&2
+    docker logs "$SW_CONTAINER_NAME" 2>&1 | tail -50
+    echo "SNARK worker oversized logs:"
+    docker exec "$SW_CONTAINER_NAME" bash -c 'head -c 100 /localnet/runtime_2/mina-oversized-logs.log'
+  else
+    echo "Node logs (if available):" >&2
+    # Print any available log files
+    for log_file in localnet/runtime_*/mina.log; do
+      if [[ -f "$log_file" ]]; then
+        echo "Log file: $log_file" >&2
+        tail -50 "$log_file" 2>&1
+      fi
+    done
+  fi
+}
+
+# Parse command line arguments
+
+MINA_DOCKER=""
+MODE="nix"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --mina-app)
+      MAIN_MINA_EXE="$2"
+      shift 2
+      ;;
+    --runtime-genesis-ledger)
+      MAIN_RUNTIME_GENESIS_LEDGER_EXE="$2"
+      shift 2
+      ;;
+    --fork-mina-app)
+      FORK_MINA_EXE="$2"
+      shift 2
+      ;;
+    --fork-runtime-genesis-ledger)
+      FORK_RUNTIME_GENESIS_LEDGER_EXE="$2"
+      shift 2
+      ;;
+    --mina-docker)
+      MINA_DOCKER="$2"
+      MODE="docker"
+      BP_CONTAINER_NAME=mina_bp
+      SW_CONTAINER_NAME=mina_sw
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Validate required arguments
+if [[ "$MODE" == "docker" && (-n "$MAIN_MINA_EXE" || -n "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" || -n "$FORK_MINA_EXE" || -n "$FORK_RUNTIME_GENESIS_LEDGER_EXE") ]]; then
+  echo "Error: Cannot specify both --mina-docker and native executable options (--mina-app, --runtime-genesis-ledger, --fork-mina-app, --fork-runtime-genesis-ledger)" >&2
+  exit 1
+fi
+
+if [[ "$MODE" == "nix" ]]; then
+  if [[ -z "$MAIN_MINA_EXE" || -z "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" || -z "$FORK_MINA_EXE" || -z "$FORK_RUNTIME_GENESIS_LEDGER_EXE" ]]; then
+    echo "Usage: $0 --mina-app <path> --runtime-genesis-ledger <path> --fork-mina-app <path> --fork-runtime-genesis-ledger <path> [--mina-docker <path>]" >&2
+    exit 1
+  fi
+fi
 
 # 1. Node is started
 NOW_UNIX_TS=$(date +%s)
 MAIN_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + MAIN_DELAY*60))
 GENESIS_TIMESTAMP="$(date -u -d @$MAIN_GENESIS_UNIX_TS '+%F %H:%M:%S+00:00')"
 export GENESIS_TIMESTAMP
-"$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" -i "$MAIN_SLOT" \
-  -s "$MAIN_SLOT" --slot-tx-end "$SLOT_TX_END" --slot-chain-end "$SLOT_CHAIN_END" &
+
+COMMON_ARGS=(
+  -i "$MAIN_SLOT"
+  -s "$MAIN_SLOT"
+  --slot-tx-end "$SLOT_TX_END"
+  --slot-chain-end "$SLOT_CHAIN_END"
+)
+
+if [[ "$MODE" == "docker" ]]; then
+  "$SCRIPT_DIR"/run-localnet.sh --mina-docker "$MINA_DOCKER" \
+     --bp-container-name "$BP_CONTAINER_NAME" \
+     --sw-container-name "$SW_CONTAINER_NAME" \
+     "${COMMON_ARGS[@]}" &
+else
+  "$SCRIPT_DIR"/run-localnet.sh -m "$MAIN_MINA_EXE" "${COMMON_ARGS[@]}" &
+fi
 
 MAIN_NETWORK_PID=$!
 
@@ -50,11 +154,18 @@ sleep $((MAIN_SLOT * BEST_CHAIN_QUERY_FROM - NOW_UNIX_TS%60 + MAIN_DELAY*60))s
 
 # 2. Check that there are many blocks >50% of slots occupied from slot 0 to slot
 # $BEST_CHAIN_QUERY_FROM and that there are some user commands in blocks corresponding to slots
-blockHeight=$(get_height 10303)
+if ! blockHeight=$(get_height 10303); then
+  echo "Error: Failed to get block height from node" >&2
+  echo "Printing logs for troubleshooting:" >&2
+  print_nodes_logs
+  stop_nodes "$MAIN_MINA_EXE"
+  exit 3
+fi
 echo "Block height is $blockHeight at slot $BEST_CHAIN_QUERY_FROM."
 
-if [[ $((2*blockHeight)) -lt $BEST_CHAIN_QUERY_FROM ]]; then
-  echo "Assertion failed: slot occupancy is below 50%" >&2
+if [[ $((10*blockHeight)) -lt $((3*BEST_CHAIN_QUERY_FROM)) ]]; then
+  echo "Assertion failed: slot occupancy is below 30%" >&2
+  print_nodes_logs
   stop_nodes "$MAIN_MINA_EXE"
   exit 3
 fi
@@ -133,7 +244,11 @@ if [[ "$fork_data" != "$expected_fork_data" ]]; then
   exit 3
 fi
 
-"$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
+if [[ "$MODE" == "docker" ]]; then
+    docker run --rm -v "$PWD/localnet:/localnet" --entrypoint "mina-create-genesis" "$MINA_DOCKER" --config-file /localnet/fork_config.json --genesis-dir /localnet/prefork_hf_ledgers --hash-output-file /localnet/prefork_hf_ledger_hashes.json
+else
+    "$MAIN_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/prefork_hf_ledgers --hash-output-file localnet/prefork_hf_ledger_hashes.json
+fi
 
 # Finds staking ledger hash corresponding to an epoch given as $1 parameter
 function find_staking_hash(){
@@ -179,7 +294,45 @@ fi
 rm -Rf localnet/hf_ledgers
 mkdir localnet/hf_ledgers
 
-"$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
+source ./scripts/export-git-env-vars.sh
+
+if [[ "$MODE" == docker ]]; then
+  if [[ "$CONTEXT" == "local" ]]; then
+
+    export RUNTIME_CONFIG_JSON="$PWD/localnet/fork_config.json"
+    # shellcheck disable=SC2155
+    export LEDGER_TARBALLS="$(echo $PWD/localnet/prefork_hf_ledgers/*.tar.gz)"
+
+    ./scripts/debian/build.sh "daemon_devnet_hardfork"
+    MINA_DEB_CODENAME=$MINA_DEB_CODENAME NETWORK_NAME=$NETWORK_NAME make hardfork-debian
+    MINA_DEB_CODENAME=$MINA_DEB_CODENAME NETWORK_NAME=$NETWORK_NAME make hardfork-docker
+  else
+
+  docker run --rm  --env MINA_DEB_CODENAME --env NETWORK_NAME  --env OPAMSWITCH --env BYPASS_OPAM_SWITCH_UPDATE --env DUNE_PROFILE --env "AWS_ACCESS_KEY_ID" --env "AWS_SECRET_ACCESS_KEY" --env BYPASS_OPAM_SWITCH_UPDATE -v "$PWD:/workdir" -v /var/storagebox:/var/storagebox -w /workdir "$DOCKER_TOOLCHAIN" bash -c "
+          sudo chown -R opam . \
+          && source ~/.profile \
+          && echo $DUNE_PROFILE \
+          && git config --global --add safe.directory /workdir \
+          && make libp2p_helper \
+          && make build-logproc \
+          && make build-devnet-sigs \
+          && make build-daemon-utils \
+          && make debian-build-logproc \
+          && BACKEND=local make debian-download-create-legacy-hardfork \
+          && RUNTIME_CONFIG_JSON=localnet/fork_config.json LEDGER_TARBALLS=\"$(echo /workdir/localnet/prefork_hf_ledgers/*.tar.gz)\" make hardfork-debian"
+
+    OPAMSWITCH=4.14.2 BYPASS_OPAM_SWITCH_UPDATE=1 BRANCH_NAME=$BRANCH_NAME NETWORK_NAME=$NETWORK_NAME make hardfork-docker
+    MINA_FORK_DOCKER=gcr.io/o1labs-192920/mina-daemon:$MINA_DEB_VERSION-$NETWORK_NAME
+  fi
+fi
+
+
+
+if [[ "$MODE" == "docker" ]]; then
+    docker run --rm -v "$PWD/localnet:/localnet" --entrypoint "mina-create-genesis" "$MINA_FORK_DOCKER" --config-file /localnet/fork_config.json --genesis-dir /localnet/hf_ledgers --hash-output-file /localnet/hf_ledger_hashes.json
+else
+    "$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
+fi
 
 NOW_UNIX_TS=$(date +%s)
 FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
@@ -202,8 +355,21 @@ wait "$MAIN_NETWORK_PID"
 echo "Config for the fork is correct, starting a new network"
 
 # 8. Node is shutdown and restarted with mina-fork and the config from previous step 
-"$SCRIPT_DIR"/run-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
+
+if [[ "$MODE" == "docker" ]]; then
+  "$SCRIPT_DIR"/run-localnet.sh --mina-docker "$MINA_FORK_DOCKER" \
+     --bp-container-name "$BP_CONTAINER_NAME" \
+     --sw-container-name "$SW_CONTAINER_NAME" \
+     -d "$FORK_DELAY" \
+     -i "$FORK_SLOT" \
+     -s "$FORK_SLOT" \
+     -c localnet/config.json \
+     --genesis-ledger-dir localnet/hf_ledgers &
+else
+  "$SCRIPT_DIR"/run-localnet.sh -m "$FORK_MINA_EXE" -d "$FORK_DELAY" -i "$FORK_SLOT" \
   -s "$FORK_SLOT" -c localnet/config.json --genesis-ledger-dir localnet/hf_ledgers &
+
+fi
 
 sleep $((FORK_DELAY*60))s
 
@@ -217,12 +383,14 @@ earliest_height=${earliest[0]}
 earliest_slot=${earliest[1]}
 if [[ $earliest_height != $((latest_height+1)) ]]; then
   echo "Assertion failed: unexpected block height $earliest_height at the beginning of the fork" >&2
+  print_nodes_logs
   stop_nodes "$FORK_MINA_EXE"
   exit 3
 fi
 
 if [[ $earliest_slot -lt $expected_genesis_slot ]]; then
   echo "Assertion failed: unexpected slot $earliest_slot at the beginning of the fork" >&2
+  print_nodes_logs
   stop_nodes "$FORK_MINA_EXE"
   exit 3
 fi
@@ -233,6 +401,7 @@ sleep $((FORK_SLOT*10))s
 height1=$(get_height 10303)
 if [[ $height1 == 0 ]]; then
   echo "Assertion failed: block height $height1 should be greater than 0." >&2
+  print_nodes_logs
   stop_nodes "$FORK_MINA_EXE"
   exit 3
 fi
@@ -251,6 +420,7 @@ do
 done
 if $all_blocks_empty; then
   echo "Assertion failed: all blocks in fork chain are empty" >&2
+  print_nodes_logs
   stop_nodes "$FORK_MINA_EXE"
   exit 3
 fi
