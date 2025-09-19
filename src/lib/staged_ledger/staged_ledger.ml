@@ -5210,7 +5210,7 @@ let%test_module "staged ledger tests" =
                   in
                   let%bind zkapp_command =
                     single_account_update ~zkapp_prover_and_vk
-                      ~constraint_constants spec
+                      ~constraint_constants ~signature_kind spec
                   in
                   Mina_transaction_logic.For_tests.Init_ledger.init
                     (module Ledger.Ledger_inner)

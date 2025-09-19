@@ -178,7 +178,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Malleable_error.lift
       @@ Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-           zkapp_command_spec
+           ~signature_kind zkapp_command_spec
     in
     let%bind.Deferred zkapp_command_update_permissions, permissions_updated =
       (* construct a Zkapp_command.t, similar to zkapp_test_transaction
@@ -347,7 +347,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           }
         in
         Transaction_snark.For_tests.single_account_update ~constraint_constants
-          spec
+          ~signature_kind spec
       in
       ( snapp_update
       , zkapp_command_update_all

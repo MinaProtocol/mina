@@ -368,7 +368,8 @@ let create_zkapp_account ~debug ~sender ~sender_nonce ~fee ~fee_payer
   in
   let%bind zkapp_command =
     Transaction_snark.For_tests.deploy_snapp
-      ~permissions:Permissions.user_default ~constraint_constants spec
+      ~permissions:Permissions.user_default ~constraint_constants
+      ~signature_kind:Testnet spec
   in
   let%map () =
     if debug then

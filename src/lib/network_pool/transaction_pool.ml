@@ -2016,7 +2016,7 @@ let%test_module _ =
       in
       let%map zkapp_command =
         Transaction_snark.For_tests.single_account_update ~constraint_constants
-          spec
+          ~signature_kind spec
       in
       Or_error.ok_exn
         (Zkapp_command.Verifiable.create ~failed:false
