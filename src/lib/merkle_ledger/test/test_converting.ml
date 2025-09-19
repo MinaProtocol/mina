@@ -208,6 +208,59 @@ struct
                       (Db_converting.convert primary_account) ) ) ) )
 
   let () =
+    add_test
+      "sync detection fails without crashing after accounts are added at high \
+       addresses" (fun () ->
+        with_primary ~f:(fun primary ->
+            let depth = Db.depth primary in
+            let max_height = Int.min 5 depth - 1 in
+            populate_primary_db primary max_height ;
+            with_migrated ~f:(fun migrated ->
+                let _converting =
+                  Db_converting.of_ledgers_with_migration primary migrated
+                in
+                let additional_account = Quickcheck.random_value Account.gen in
+                let high_index = (1 lsl Int.min 5 depth) - 1 in
+                let additional_account_addr =
+                  Db.Addr.of_int_exn ~ledger_depth:depth high_index
+                in
+                (* Using set_batch_accounts with a high address like this leaves
+                   the databases in an inconsistent state, because it updates
+                   the last added account in the databases but doesn't fill in
+                   the accounts at lower addresses. This state is similar to
+                   what you might get after an incomplete ledger sync. *)
+                Db.set_batch_accounts primary
+                  [ (additional_account_addr, additional_account) ] ;
+                Db_migrated.set_batch_accounts migrated
+                  [ ( additional_account_addr
+                    , Db_converting.convert additional_account )
+                  ] ;
+                assert (Db_converting.dbs_synced primary migrated) ) ) )
+
+  let () =
+    add_test "sync detection fails after converting ledger account is mutated"
+      (fun () ->
+        with_primary ~f:(fun primary ->
+            let depth = Db.depth primary in
+            let max_height = Int.min 5 depth in
+            populate_primary_db primary max_height ;
+            let account_to_mutate = Db.get_at_index_exn primary 0 in
+            let new_balance, _overflow_flag =
+              Balance.add_amount_flagged account_to_mutate.balance
+                Currency.Amount.one
+            in
+            let mutated_account =
+              Db_converting.convert
+                { account_to_mutate with balance = new_balance }
+            in
+            with_migrated ~f:(fun migrated ->
+                let _converting =
+                  Db_converting.of_ledgers_with_migration primary migrated
+                in
+                Db_migrated.set_at_index_exn migrated 0 mutated_account ;
+                assert (not (Db_converting.dbs_synced primary migrated)) ) ) )
+
+  let () =
     add_test "create converting ledger, populate randomly, test iteration order"
       (fun () ->
         with_primary ~f:(fun primary ->
