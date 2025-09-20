@@ -115,7 +115,7 @@ module type Lib_intf = sig
     include
       State_intf with type transition_frontier := Inputs.Transition_frontier.t
 
-    (**Jobs that have not been assigned yet*)
+    (** [mark_scheduled t work] Mark [work] as scheduled in [t] *)
     val mark_scheduled :
          t
       -> ( Transaction_witness.t
