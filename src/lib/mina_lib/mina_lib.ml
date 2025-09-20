@@ -920,7 +920,7 @@ let add_complete_work ~logger ~fee ~prover
   Or_error.try_with update_metrics
   |> Result.iter_error ~f:(fun err ->
          [%log warn] "Failed to update metrics on adding work"
-           ~metadata:[ ("error", `String (Error.to_string_hum err)) ] ) ;
+           ~metadata:[ ("error", Error_json.error_to_yojson err) ] ) ;
   Network_pool.Snark_pool.(
     Local_sink.push t.pipes.snark_local_sink
       ( Add_solved_work
@@ -938,7 +938,7 @@ let add_complete_work ~logger ~fee ~prover
               ~metadata:
                 [ ( "work_ids"
                   , Transaction_snark_work.Statement.compact_json stmts )
-                ; ("error", `String (Error.to_string_hum err))
+                ; ("error", Error_json.error_to_yojson err)
                 ] ) ))
   |> Deferred.don't_wait_for
 
@@ -1768,9 +1768,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           | Ok () ->
               ()
           | Error err ->
-              [%log' warn config.logger]
-                "Error when setting ITN logger data: %s"
-                (Error.to_string_hum err)
+              [%log' warn config.logger] "Error when setting ITN logger data"
+                ~metadata:[ ("error", Error_json.error_to_yojson err) ]
         else Deferred.unit
       in
       O1trace.thread "mina_lib" (fun () ->
@@ -1856,13 +1855,13 @@ let create ~commit_id ?wallets (config : Config.t) =
               Or_error.iter_error result ~f:(fun error ->
                   [%log' warn config.logger]
                     "Failed to toggle verifier internal tracing: $error"
-                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
+                    ~metadata:[ ("error", Error_json.error_to_yojson error) ] ) ) ;
           Internal_tracing.register_toggle_callback (fun enabled ->
               let%map result = Prover.toggle_internal_tracing prover enabled in
               Or_error.iter_error result ~f:(fun error ->
                   [%log' warn config.logger]
                     "Failed to toggle prover internal tracing: $error"
-                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
+                    ~metadata:[ ("error", Error_json.error_to_yojson error) ] ) ) ;
           let%bind vrf_evaluator =
             Monitor.try_with ~here:[%here]
               ~rest:
