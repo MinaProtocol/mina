@@ -2,9 +2,14 @@
 var plonk_wasm = require('./plonk_wasm.js');
 var native = null;
 try { 
-    native = require('../native/plonk_neon.node'); 
+    native = require('../neon/plonk_neon.node'); 
 } catch (e) {
-    // native not available, keep WASM
+    // neon not available, try napi
+    try {
+      native = require('../napi/plonk_napi.neon');
+    } catch (e) {
+      // native not available, use wasm
+    }
 }
 
 // Overwrite only the functions that are already available in native

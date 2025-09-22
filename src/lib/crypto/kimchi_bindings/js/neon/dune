@@ -1,10 +1,10 @@
 (library
- (name native_backend)
- (public_name bindings_js.native_backend)
- ;(enabled_if (= %{env:KIMCHI_NODE_BACKEND} "native"))
+ (name node_backend)
+ (public_name bindings_js.node_backend)
+ ;(enabled_if (= %{env:KIMCHI_NODE_BACKEND} "neon"))
  (js_of_ocaml
   (flags (:include flags.sexp))
-  (javascript_files native_backend.js))
+  (javascript_files neon_backend.js))
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version js_of_ocaml-ppx)))
 
@@ -19,6 +19,6 @@
  (locks /cargo-lock)
  (action
   (progn
-    (setenv CARGO_TARGET_DIR "%{read:../../dune-build-root}/cargo_kimchi_native"
+    (setenv CARGO_TARGET_DIR "%{read:../../dune-build-root}/cargo_kimchi_neon"
       (run bash build.sh))
     (write-file flags.sexp "()"))))
