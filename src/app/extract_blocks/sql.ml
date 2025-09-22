@@ -1,13 +1,15 @@
 (* sql.ml -- (Postgresql) SQL queries for extract_blocks app *)
 
+module Models = Archive_lib.Models
+
 module Subchain = struct
   let make_sql ~join_condition =
     let insert_commas s = Core_kernel.String.concat ~sep:"," s in
-    let fields = insert_commas Archive_lib.Processor.Block.Fields.names in
+    let fields = insert_commas Models.Block.Fields.names in
     let b_fields =
       insert_commas
-      @@ Core_kernel.List.map Archive_lib.Processor.Block.Fields.names
-           ~f:(fun field -> "b." ^ field)
+      @@ Core_kernel.List.map Models.Block.Fields.names ~f:(fun field ->
+             "b." ^ field )
     in
     Core_kernel.sprintf
       {sql| WITH RECURSIVE chain AS (
@@ -31,13 +33,13 @@ module Subchain = struct
       fields b_fields join_condition fields
 
   let query_unparented =
-    Mina_caqti.collect_req Caqti_type.string Archive_lib.Processor.Block.typ
+    Mina_caqti.collect_req Caqti_type.string Models.Block.typ
       (make_sql ~join_condition:"b.id = chain.parent_id")
 
   let query_from_start =
     Mina_caqti.collect_req
       Caqti_type.(t2 string string)
-      Archive_lib.Processor.Block.typ
+      Models.Block.typ
       (make_sql
          ~join_condition:
            "b.id = chain.parent_id AND (chain.state_hash <> $2 OR b.state_hash \
@@ -53,17 +55,15 @@ module Subchain = struct
 
   let query_all =
     let open Core_kernel in
-    let comma_fields =
-      String.concat Archive_lib.Processor.Block.Fields.names ~sep:","
-    in
-    Mina_caqti.collect_req Caqti_type.unit Archive_lib.Processor.Block.typ
+    let comma_fields = String.concat Models.Block.Fields.names ~sep:"," in
+    Mina_caqti.collect_req Caqti_type.unit Models.Block.typ
       (sprintf "SELECT %s FROM blocks" comma_fields)
 
   let all_blocks (module Conn : Mina_caqti.CONNECTION) =
     Conn.collect_list query_all ()
 end
 
-(* Archive_lib.Processor does not have the queries given here *)
+(* Models does not have the queries given here *)
 
 module Blocks_and_user_commands = struct
   let query =
@@ -79,7 +79,7 @@ module Blocks_and_user_commands = struct
 end
 
 module Block_user_command_tokens = struct
-  type t = Archive_lib.Processor.Token.t =
+  type t = Models.Token.t =
     { value : string
     ; owner_public_key_id : int option
     ; owner_token_id : int option
@@ -135,7 +135,7 @@ module Blocks_and_internal_commands = struct
 end
 
 module Block_internal_command_tokens = struct
-  type t = Archive_lib.Processor.Token.t =
+  type t = Models.Token.t =
     { value : string
     ; owner_public_key_id : int option
     ; owner_token_id : int option
@@ -179,7 +179,7 @@ module Blocks_and_zkapp_commands = struct
 end
 
 module Block_zkapp_command_tokens = struct
-  type t = Archive_lib.Processor.Token.t =
+  type t = Models.Token.t =
     { value : string
     ; owner_public_key_id : int option
     ; owner_token_id : int option

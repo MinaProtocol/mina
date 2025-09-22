@@ -117,8 +117,7 @@ module Sql = struct
   end
 
   let compute_incremental_balance
-      (timing_info : Archive_lib.Processor.Timing_info.t) ~start_slot ~end_slot
-      =
+      (timing_info : Archive_lib.Models.Timing_info.t) ~start_slot ~end_slot =
     let cliff_time =
       Mina_numbers.Global_slot_since_genesis.of_int
         (Int.of_int64_exn timing_info.cliff_time)
@@ -152,7 +151,7 @@ module Sql = struct
     let%bind timing_info_opt =
       match timing_id with
       | Some timing_id ->
-          Archive_lib.Processor.Timing_info.load_opt (module Conn) timing_id
+          Archive_lib.Models.Timing_info.load_opt (module Conn) timing_id
           |> Errors.Lift.sql ~context:"Finding timing info"
       | None ->
           return None

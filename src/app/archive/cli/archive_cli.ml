@@ -106,8 +106,8 @@ let command_prune =
          let%bind () = Conn.start () in
          match%bind.Deferred
            let%bind () =
-             Archive_lib.Processor.Block.delete_if_older_than ?height
-               ?num_blocks ?timestamp conn
+             Archive_lib.Models.Block.delete_if_older_than ?height ?num_blocks
+               ?timestamp conn
            in
            Conn.commit ()
          with
