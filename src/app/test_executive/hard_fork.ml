@@ -303,7 +303,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         }
       in
       Transaction_snark.For_tests.deploy_snapp ~constraint_constants
-        zkapp_command_spec
+        ~signature_kind zkapp_command_spec
     in
     let%bind zkapp_command_update_vk_proof, zkapp_command_update_vk_impossible =
       let snapp_update =
