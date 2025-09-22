@@ -150,7 +150,7 @@ A number of C libraries are expected to be available in the system and are also 
 If you use vim, add this snippet in your `.vimrc` file to use Merlin. (Note:Be sure to change the HOME directory to match yours.)
 
 ```bash
-let s:ocamlmerlin="/Users/USERNAME/.opam/4.14.0/share/merlin"
+let s:ocamlmerlin="/Users/USERNAME/.opam/4.14.2/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
@@ -301,10 +301,10 @@ We use the [Dune](https://github.com/ocaml/dune/) build system for OCaml code.
 
 OCaml dependencies live in the [`opam.export`](./opam.export) file. This file is machine generated and must not be modified.
 
-To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). The following commands assume that the version of the OCaml compiler used in the codebase is 4.14.0:
+To add a new dependency, you most likely will need to create a new fresh switch to avoid pushing in any local dependency (like `ocaml-lsp`). The following commands assume that the version of the OCaml compiler used in the codebase is 4.14.2:
 
 ```shell
-opam switch create mina_fresh 4.14.0
+opam switch create mina_fresh 4.14.2
 opam switch import opam.export
 ```
 
