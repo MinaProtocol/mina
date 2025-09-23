@@ -21,8 +21,8 @@ type t = Mina_automation_fixture.Archive.before_bootstrap
 
 let postgres_user_name = "postgres"
 
+(* val test_case : t -> test_result Deferred.Or_error.t *)
 let test_case (test_data : t) =
-  let open Deferred.Let_syntax in
   let config =
     { test_data.config with config_file = "genesis_ledgers/mainnet.json" }
   in
@@ -43,7 +43,7 @@ let test_case (test_data : t) =
     (Float.to_string max_postgres_memory) ;
   [%log info] "Sleep Duration: %s" (Time.Span.to_string sleep_duration) ;
 
-  let%bind result =
+  let%map result =
     let end_time = Time.add (Time.now ()) duration in
     let rec loop () =
       if Time.is_later (Time.now ()) ~than:end_time then Deferred.return ()
@@ -68,14 +68,11 @@ let test_case (test_data : t) =
         let%bind () = Clock.after sleep_duration in
         loop ()
     in
-    Monitor.try_with (fun () -> loop ())
-    >>= function
+    match%map Monitor.try_with loop with
     | Ok () ->
-        Deferred.return Mina_automation_fixture.Intf.Passed
+        Mina_automation_fixture.Intf.Passed
     | Error exn ->
         [%log error] "Test failed: %s" (Exn.to_string exn) ;
-        Deferred.return
-        @@ Mina_automation_fixture.Intf.Failed (Exn.to_string exn)
+        Failed (Exn.to_string exn)
   in
-
-  Deferred.Or_error.return result
+  Ok result
