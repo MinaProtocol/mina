@@ -49,4 +49,4 @@ let test_case (test_data : t) =
       archive_uri temp_dir
   in
 
-  Ok Mina_automation_fixture.Intf.Passed
+  Mina_automation_fixture.Intf.Passed
