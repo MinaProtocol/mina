@@ -43,36 +43,32 @@ let test_case (test_data : t) =
     (Float.to_string max_postgres_memory) ;
   [%log info] "Sleep Duration: %s" (Time.Span.to_string sleep_duration) ;
 
-  let%map result =
-    let end_time = Time.add (Time.now ()) duration in
-    let rec loop () =
-      if Time.is_later (Time.now ()) ~than:end_time then Deferred.return ()
-      else
-        let memory = Archive.Process.get_memory_usage_mib process in
-        let%bind () =
-          match memory with
-          | Some mem ->
-              [%log info] "Archive Memory usage: %s MiB" (Float.to_string mem) ;
-              if Float.( > ) mem max_archive_memory then
-                failwith "Archive process memory exceeds 1GB"
-              else Deferred.return ()
-          | None ->
-              failwith "Error getting memory usage for archive process"
-        in
-        let%bind memory =
-          Utils.get_memory_usage_mib_of_user_process postgres_user_name
-        in
-        [%log info] "Postgres Memory usage: %s MiB" (Float.to_string memory) ;
-        if Float.( > ) memory max_postgres_memory then
-          failwith "Postgres memory exceeds 4GB" ;
-        let%bind () = Clock.after sleep_duration in
-        loop ()
-    in
-    match%map Monitor.try_with loop with
-    | Ok () ->
-        Mina_automation_fixture.Intf.Passed
-    | Error exn ->
-        [%log error] "Test failed: %s" (Exn.to_string exn) ;
-        Failed (Exn.to_string exn)
+  let end_time = Time.add (Time.now ()) duration in
+  let rec loop () =
+    if Time.is_later (Time.now ()) ~than:end_time then Deferred.return ()
+    else
+      let memory = Archive.Process.get_memory_usage_mib process in
+      let%bind () =
+        match memory with
+        | Some mem ->
+            [%log info] "Archive Memory usage: %s MiB" (Float.to_string mem) ;
+            if Float.( > ) mem max_archive_memory then
+              failwith "Archive process memory exceeds 1GB"
+            else Deferred.return ()
+        | None ->
+            failwith "Error getting memory usage for archive process"
+      in
+      let%bind memory =
+        Utils.get_memory_usage_mib_of_user_process postgres_user_name
+      in
+      [%log info] "Postgres Memory usage: %s MiB" (Float.to_string memory) ;
+      if Float.( > ) memory max_postgres_memory then
+        failwith "Postgres memory exceeds 4GB" ;
+      let%bind () = Clock.after sleep_duration in
+      loop ()
   in
-  Ok result
+  match%map Monitor.try_with loop with
+  | Ok () ->
+      Mina_automation_fixture.Intf.Passed
+  | Error exn ->
+      Failed (Error.of_exn exn)

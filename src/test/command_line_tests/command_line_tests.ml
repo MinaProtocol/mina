@@ -25,31 +25,33 @@ module BackgroundMode = struct
           let () = printf "Daemon logs:\n%s\n" logs in
           Writer.flushed (Lazy.force Writer.stdout)
     in
-    let%bind () = Daemon.Client.stop_daemon process.client in
-    Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+    let%map () = Daemon.Client.stop_daemon process.client in
+    Mina_automation_fixture.Intf.Passed
 end
 
 module DaemonRecover = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
 
   let test_case (test : t) =
-    let daemon = Daemon.of_config test.config in
-    let%bind () = Daemon.Config.generate_keys test.config in
-    let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
-    let%bind () =
-      Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
-    in
-    let%bind process = Daemon.start daemon in
-    let%bind.Deferred.Result () =
-      Daemon.Client.wait_for_bootstrap process.client ()
-    in
-    let%bind.Deferred.Result _ = Daemon.Process.force_kill process in
-    let%bind process = Daemon.start daemon in
-    let%bind.Deferred.Result () =
-      Daemon.Client.wait_for_bootstrap process.client ()
-    in
-    let%bind () = Daemon.Client.stop_daemon process.client in
-    Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+    (let daemon = Daemon.of_config test.config in
+     let%bind () = Daemon.Config.generate_keys test.config in
+     let ledger_file = test.config.dirs.conf ^/ "daemon.json" in
+     let%bind () =
+       Mina_automation_fixture.Daemon.generate_random_config daemon ledger_file
+     in
+     let%bind process = Daemon.start daemon in
+     let%bind.Deferred.Result () =
+       Daemon.Client.wait_for_bootstrap process.client ()
+     in
+     let%bind.Deferred.Result _ = Daemon.Process.force_kill process in
+     let%bind process = Daemon.start daemon in
+     let%bind.Deferred.Result () =
+       Daemon.Client.wait_for_bootstrap process.client ()
+     in
+     let%map () = Daemon.Client.stop_daemon process.client in
+     Ok () )
+    >>| function
+    | Ok () -> Mina_automation_fixture.Intf.Passed | Error err -> Failed err
 end
 
 let contain_log_output output =
@@ -65,16 +67,16 @@ module LedgerHash = struct
     let%bind _ =
       Mina_automation_fixture.Daemon.generate_random_accounts daemon ledger_file
     in
-    let%bind hash = Daemon.Client.ledger_hash client ~ledger_file in
-    Deferred.Or_error.return
-      ( if contain_log_output hash then
-        Mina_automation_fixture.Intf.Failed "output contains log"
-      else if not (String.is_prefix ~prefix:"j" hash) then
-        Failed "invalid ledger hash prefix"
-      else if Int.( <> ) (String.length hash) 52 then
-        Failed
-          (Printf.sprintf "invalid ledger hash length (%d)" (String.length hash))
-      else Passed )
+    let%map hash = Daemon.Client.ledger_hash client ~ledger_file in
+    if contain_log_output hash then
+      Mina_automation_fixture.Intf.Failed
+        (Error.of_string "output contains log")
+    else if not (String.is_prefix ~prefix:"j" hash) then
+      Failed (Error.of_string "invalid ledger hash prefix")
+    else if Int.( <> ) (String.length hash) 52 then
+      Failed
+        (Error.createf "invalid ledger hash length (%d)" (String.length hash))
+    else Passed
 end
 
 module LedgerCurrency = struct
@@ -92,17 +94,16 @@ module LedgerCurrency = struct
           Currency.Balance.to_nanomina_int account.balance )
       |> List.sum (module Int) ~f:Fn.id
     in
-    let%bind output = Daemon.Client.ledger_currency client ~ledger_file in
+    let%map output = Daemon.Client.ledger_currency client ~ledger_file in
     let actual = Scanf.sscanf output "MINA : %f" Fn.id in
     let total_currency_float = float_of_int total_currency /. 1000000000.0 in
 
-    Deferred.Or_error.return
-    @@
     if contain_log_output output then
-      Mina_automation_fixture.Intf.Failed "output contains log"
+      Mina_automation_fixture.Intf.Failed
+        (Error.of_string "output contains log")
     else if not Float.(abs (total_currency_float - actual) < 0.001) then
       Failed
-        (Printf.sprintf "invalid mina total count %f vs %f" total_currency_float
+        (Error.createf "invalid mina total count %f vs %f" total_currency_float
            actual )
     else Passed
 end
@@ -113,15 +114,14 @@ module AdvancedPrintSignatureKind = struct
   let test_case (test : t) =
     let daemon = Daemon.of_config test.config in
     let client = Daemon.client daemon in
-    let%bind output = Daemon.Client.advanced_print_signature_kind client in
+    let%map output = Daemon.Client.advanced_print_signature_kind client in
     let expected = "testnet" in
 
-    Deferred.Or_error.return
-    @@
     if contain_log_output output then
-      Mina_automation_fixture.Intf.Failed "output contains log"
+      Mina_automation_fixture.Intf.Failed
+        (Error.of_string "output contains log")
     else if not (String.equal expected (String.strip output)) then
-      Failed (Printf.sprintf "invalid signature kind %s vs %s" expected output)
+      Failed (Error.createf "invalid signature kind %s vs %s" expected output)
     else Passed
 end
 
@@ -137,15 +137,14 @@ module AdvancedCompileTimeConstants = struct
     in
     let temp_file = Filename.temp_file "commandline" "ledger.json" in
     Yojson.Safe.from_string config_content |> Yojson.Safe.to_file temp_file ;
-    let%bind output =
+    let%map output =
       Daemon.Client.advanced_compile_time_constants client
         ~config_file:temp_file
     in
 
-    Deferred.Or_error.return
-    @@
     if contain_log_output output then
-      Mina_automation_fixture.Intf.Failed "output contains log"
+      Mina_automation_fixture.Intf.Failed
+        (Error.of_string "output contains log")
     else Passed
 end
 
@@ -155,12 +154,11 @@ module AdvancedConstraintSystemDigests = struct
   let test_case (test : t) =
     let daemon = Daemon.of_config test.config in
     let client = Daemon.client daemon in
-    let%bind output = Daemon.Client.advanced_constraint_system_digests client in
+    let%map output = Daemon.Client.advanced_constraint_system_digests client in
 
-    Deferred.Or_error.return
-    @@
     if contain_log_output output then
-      Mina_automation_fixture.Intf.Failed "output contains log"
+      Mina_automation_fixture.Intf.Failed
+        (Error.of_string "output contains log")
     else Passed
 end
 

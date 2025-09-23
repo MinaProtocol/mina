@@ -144,4 +144,4 @@ let test_case (test_data : t) =
   let%map perf_data = extract_perf_metrics log_file in
   perf_metrics_to_yojson perf_data |> Yojson.to_file "archive.perf" ;
 
-  Ok Mina_automation_fixture.Intf.Passed
+  Mina_automation_fixture.Intf.Passed
