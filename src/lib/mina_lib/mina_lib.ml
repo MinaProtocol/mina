@@ -527,6 +527,13 @@ let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
                   [%str_log info] Bootstrapping ;
                   `Bootstrap
               | Some ((frontier : Transition_frontier.t), catchup_jobs) ->
+                  (* HACK: this comparison is needed because sometimes daemon
+                     assume it's synced by looking at its frontier, only to
+                     realize the data it has locally is out of date. We mark a
+                     node as not-synced as long as its best tip is too old.
+                     For more see: https://o1-labs.slack.com/archives/C07EYM9GR1U/p1758639894706489
+                  *)
+                  (* TODO: make it so this age of 2 hours configurable. *)
                   let best_tip_no_older_than_2_hours () =
                     let best_tip_timestamp =
                       Transition_frontier.(
