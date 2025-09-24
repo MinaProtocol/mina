@@ -193,7 +193,6 @@ type t = { config : Config.t; executor : Executor.t }
 let archive_blocks_from_files t ~archive_address ~format ?(sleep = 5) blocks =
   Deferred.List.iter blocks ~f:(fun block ->
       let%bind _ = archive_blocks t ~archive_address ~format [ block ] () in
-      (* WARN: live upgrade test expect this sleep to be present so we can emulate a race condition *)
       after (Time.Span.of_sec (Float.of_int sleep)) )
 
 let of_config config = { config; executor = Executor.AutoDetect }

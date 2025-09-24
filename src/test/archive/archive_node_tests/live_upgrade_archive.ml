@@ -48,7 +48,7 @@ let test_case (test_data : t) =
   let%bind () =
     Daemon.archive_blocks_from_files daemon.executor
       ~archive_address:test_data.archive.config.server_port ~format:`Precomputed
-      precomputed_blocks
+      ~sleep:5 precomputed_blocks
   in
   [%log info] "Loaded all precomputed blocks" ;
   let%bind () = Ivar.read upgrade_script_finished in
