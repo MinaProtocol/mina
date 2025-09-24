@@ -524,11 +524,9 @@ let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
               offline_shutdown := None ;
               match active_status with
               | None ->
-                  let logger = Logger.create () in
                   [%str_log info] Bootstrapping ;
                   `Bootstrap
               | Some (_, catchup_jobs) ->
-                  let logger = Logger.create () in
                   if catchup_jobs > 0 then (
                     [%str_log info] Ledger_catchup ;
                     `Catchup )
