@@ -69,7 +69,6 @@ let perf_metrics_to_yojson metrics =
   @raises Failure if a log line cannot be parsed as valid JSON
   @raises exn if required metadata fields ("elapsed" or "label") are missing *)
 let extract_perf_metrics log_file =
-  let open Deferred.Let_syntax in
   let%bind lines = Reader.file_lines log_file in
   let perf_metrics =
     List.filter_map lines ~f:(fun line ->
@@ -122,7 +121,7 @@ let test_case (test_data : t) =
     unpack_precomputed_blocks test_data.network_data
       ~temp_dir:test_data.temp_dir
   in
-  let log_file = output ^ "/precomputed_blocks_test.log" in
+  let log_file = output ^/ "precomputed_blocks_test.log" in
   Archive.Process.start_logging test_data.archive ~log_file ;
   let%bind () =
     Daemon.archive_blocks_from_files daemon.executor
@@ -142,7 +141,7 @@ let test_case (test_data : t) =
       archive_uri test_data.temp_dir
   in
 
-  let%bind perf_data = extract_perf_metrics log_file in
+  let%map perf_data = extract_perf_metrics log_file in
   perf_metrics_to_yojson perf_data |> Yojson.to_file "archive.perf" ;
 
-  Deferred.Or_error.return Mina_automation_fixture.Intf.Passed
+  Mina_automation_fixture.Intf.Passed
