@@ -38,7 +38,8 @@
 #
 # NOTES:
 #   - The script sets up error trapping to ensure Docker cleanup
-#   - Container runs on port 3087 and mounts current directory as /workdir
+#   - Container runs on a port picked at random from range 3090:3150 and mounts current directory as /workdir. 
+#     This is to avoid colliding with other local rosetta instances.
 #   - Load test duration is fixed at 600 seconds when enabled
 
 CLEAR='\033[0m'
@@ -47,6 +48,8 @@ GREEN='\033[0;32m'
 
 NETWORK=devnet
 TIMEOUT=900
+LOCAL_ROSETTA_PORT_RANGE_START=${LOCAL_ROSETTA_PORT_RANGE_START:-3090}
+LOCAL_ROSETTA_PORT_RANGE_END=${LOCAL_ROSETTA_PORT_RANGE_END:-3290}
 DB_CONN_STR="postgres://pguser:pguser@localhost:5432/archive"
 UPGRADE_SCRIPTS_WORKDIR="src/app/archive"
 
@@ -59,11 +62,16 @@ USAGE="Usage: $0 [-t docker-tag] [-n network]
   --timeout                 The timeout duration in seconds. Default=$TIMEOUT
   --run-compatibility-test  Enable compatibility testing with specified branch
   --upgrade-scripts-workdir Working directory for upgrade/downgrade scripts. Default=$UPGRADE_SCRIPTS_WORKDIR
+  --port-range-start        Start of local Rosetta port range. Default=$LOCAL_ROSETTA_PORT_RANGE_START
+  --port-range-end          End of local Rosetta port range. Default=$LOCAL_ROSETTA_PORT_RANGE_END
+  --port                    Specific local Rosetta port (overrides random selection)
   -h, --help                Show help
 
 Example: $0 --network devnet --tag 3.0.3-bullseye-berkeley
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop
 Example: $0 --network devnet --tag 3.0.3 --run-compatibility-test develop --upgrade-scripts-workdir /custom/path
+Example: $0 --network devnet --tag 3.0.3 --port-range-start 4000 --port-range-end 4100
+Example: $0 --network devnet --tag 3.0.3 --port 3095
 
 Warning:
 Please execute this script from the root of the mina repository.
@@ -83,6 +91,9 @@ while [[ "$#" -gt 0 ]]; do case $1 in
     -t|--tag) TAG="$2"; shift;;
     --timeout) TIMEOUT="$2"; shift;;
     --upgrade-scripts-workdir) UPGRADE_SCRIPTS_WORKDIR="$2"; shift;;
+    --port-range-start) LOCAL_ROSETTA_PORT_RANGE_START="$2"; shift;;
+    --port-range-end) LOCAL_ROSETTA_PORT_RANGE_END="$2"; shift;;
+    --port) LOCAL_ROSETTA_PORT="$2"; shift;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown parameter passed: $1"; usage; exit 1;;
 esac; shift; done
@@ -96,9 +107,14 @@ fi
 
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
+# Calculate port after argument parsing if not explicitly set
+if [[ -z "${LOCAL_ROSETTA_PORT:-}" ]]; then
+    LOCAL_ROSETTA_PORT=$((RANDOM % (LOCAL_ROSETTA_PORT_RANGE_END - LOCAL_ROSETTA_PORT_RANGE_START + 1) + LOCAL_ROSETTA_PORT_RANGE_START))
+fi
+
 set -x
 
-container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
+container_id=$(docker run -v .:/workdir -p $LOCAL_ROSETTA_PORT:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
 
 stop_docker() {
         { docker stop "$container_id" ; docker rm "$container_id" ; } || true
@@ -148,12 +164,12 @@ execute_script() {
 # Wait for the container to start
 sleep 5
 #run sanity test
-./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
+./scripts/tests/rosetta-sanity.sh --address "http://localhost:$LOCAL_ROSETTA_PORT" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
 
 # Run load test
 if [[ "$RUN_LOAD_TEST" == true ]]; then
         echo "Running load test for $LOAD_TEST_DURATION seconds..."
-        if docker exec $container_id bash -c "/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:3087\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK "; then
+        if docker exec $container_id bash -c "/workdir/scripts/tests/rosetta-load.sh --address \"http://localhost:$LOCAL_ROSETTA_PORT\" --db-conn-str $DB_CONN_STR --duration $LOAD_TEST_DURATION --network $NETWORK "; then
                 echo -e "${GREEN}Load test completed successfully.${CLEAR}"
         else
                 echo -e "${RED}Load test failed.${CLEAR}"
