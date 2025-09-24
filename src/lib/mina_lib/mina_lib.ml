@@ -526,13 +526,26 @@ let create_sync_status_observer ~logger ~genesis_timestamp ~is_seed ~demo_mode
               | None ->
                   [%str_log info] Bootstrapping ;
                   `Bootstrap
-              | Some (_, catchup_jobs) ->
-                  if catchup_jobs > 0 then (
-                    [%str_log info] Ledger_catchup ;
-                    `Catchup )
-                  else (
+              | Some ((frontier : Transition_frontier.t), catchup_jobs) ->
+                  let best_tip_no_older_than_2_hours () =
+                    let best_tip_timestamp =
+                      Transition_frontier.(
+                        best_tip frontier |> Breadcrumb.protocol_state)
+                      |> Mina_state.Protocol_state.blockchain_state
+                      |> Mina_state.Blockchain_state.timestamp
+                      |> Block_time.to_time_exn
+                    in
+                    let best_tip_age =
+                      Time.(diff (now ()) best_tip_timestamp)
+                    in
+                    Time.Span.(compare best_tip_age (of_hr 2.)) < 0
+                  in
+                  if catchup_jobs = 0 && best_tip_no_older_than_2_hours () then (
                     [%str_log info] Synced ;
-                    `Synced ) ) )
+                    `Synced )
+                  else (
+                    [%str_log info] Ledger_catchup ;
+                    `Catchup ) ) )
   in
   let observer = observe incremental_status in
   (* monitor Mina status, issue a warning if offline for too long (unless we are a seed node) *)
