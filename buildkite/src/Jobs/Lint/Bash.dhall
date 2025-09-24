@@ -14,8 +14,6 @@ let Size = ../../Command/Size.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
-let shellcheckVersion = "v0.10.0"
-
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
@@ -36,13 +34,7 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-                RunInToolchain.runInToolchain
-                  ([] : List Text)
-                  (     " wget https://github.com/koalaman/shellcheck/releases/download/${shellcheckVersion}/shellcheck-${shellcheckVersion}.linux.x86_64.tar.xz"
-                    ++  " && tar xvf shellcheck-${shellcheckVersion}.linux.x86_64.tar.xz"
-                    ++  " && sudo cp shellcheck-${shellcheckVersion}/shellcheck /usr/local/bin/"
-                    ++  " && make check-bash"
-                  )
+                RunInToolchain.runInToolchain ([] : List Text) "make check-bash"
             , label = "Bash: shellcheck"
             , key = "check-bash"
             , target = Size.Multi
