@@ -65,7 +65,7 @@ installed: [
   "async.v0.14.0"
   "async_kernel.v0.14.0"
   "async_rpc_kernel.v0.14.0"
-  "async_ssl.v0.14.0"
+  "async_ssl.v0.14.0-o1labs"
   "async_unix.v0.14.0"
   "base.v0.14.3"
   "base-bigarray.base"
