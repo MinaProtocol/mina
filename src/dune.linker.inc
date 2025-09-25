@@ -7,7 +7,10 @@
 
 (rule
   (target dune-linker)
-  (enabled_if %{bin-available:lld})
+  (enabled_if 
+    (and
+      (= %{env:DUNE_USE_DEFAULT_LINKER=n} n)
+      %{bin-available:lld}))
   (action (with-stdout-to dune-linker (echo "-fuse-ld=lld"))))
 
 (rule
