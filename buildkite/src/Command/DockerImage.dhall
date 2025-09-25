@@ -30,8 +30,6 @@ let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
 let Extensions = ../Lib/Extensions.dhall
 
-let Arch = ../Constants/Arch.dhall
-
 let ReleaseSpec =
       { Type =
           { deps : List Command.TaggedKey.Type
@@ -40,7 +38,6 @@ let ReleaseSpec =
           , version : Text
           , branch : Text
           , repo : Text
-          , arch : Arch.Type
           , no_cache : Bool
           , no_debian : Bool
           , deb_codename : DebianVersions.DebVersion
@@ -59,7 +56,6 @@ let ReleaseSpec =
       , default =
           { deps = [] : List Command.TaggedKey.Type
           , network = Network.Type.Berkeley
-          , arch = Arch.Type.Amd64
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
@@ -92,15 +88,11 @@ let stepLabel =
                                          spec.network} ${DebianVersions.capitalName
                                                            spec.deb_codename} ${Profiles.toSuffixUppercase
                                                                                   spec.deb_profile} ${BuildFlags.toSuffixUppercase
-                                                                                                        spec.build_flags} ${Arch.capitalName
-                                                                                                                              spec.arch}"
+                                                                                                        spec.build_flags}"
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->  let installBuildx = "./scripts/docker/setup_buildx.sh"
-
-          let exportMinaDebCmd =
-                "export MINA_DEB_CODENAME=${DebianVersions.lowerName
+      ->  "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                               spec.deb_codename}"
 
           let maybeCacheOption = if spec.no_cache then "--no-cache" else ""
@@ -159,7 +151,6 @@ let generateStep =
                             , version = spec.deb_version
                             , codenames = [ spec.deb_codename ]
                             , suffix = suffix
-                            , arch = spec.arch
                             }
 
                 else  ""
@@ -185,7 +176,6 @@ let generateStep =
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
                 ++  debSuffix
                 ++  " --repo ${spec.repo}"
-                ++  " --platform ${Arch.platform spec.arch}"
 
           let releaseDockerCmd =
                       if DockerPublish.shouldPublish
@@ -203,7 +193,6 @@ let generateStep =
                                               spec.deb_profile}"
                       ++  " --deb-build-flags ${BuildFlags.lowerName
                                                   spec.build_flags}"
-                      ++  " --platform ${Arch.platform spec.arch}"
 
                 else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
                                                                                                                                                                                                 spec.docker_publish}."
@@ -227,9 +216,7 @@ let generateStep =
                   , Stable = remoteRepoCmds
                   , Local =
                     [ Cmd.run
-                        (     installBuildx
-                          ++  " && "
-                          ++  exportMinaDebCmd
+                        (     exportMinaDebCmd
                           ++  " && "
                           ++  pruneDockerImages
                           ++  maybeStartDebianRepo

@@ -10,8 +10,6 @@ let DockerImage = ../Command/DockerImage.dhall
 
 let DebianVersions = ../Constants/DebianVersions.dhall
 
-let Arch = ../Constants/Arch.dhall
-
 let toolchainPipeline =
           \(spec : DockerImage.ReleaseSpec.Type)
       ->  Pipeline.build
@@ -31,8 +29,7 @@ let toolchainPipeline =
               , path = "Release"
               , name =
                   "MinaToolchainArtifact${DebianVersions.capitalName
-                                            spec.deb_codename}${Arch.nameSuffix
-                                                                  spec.arch}"
+                                            spec.deb_codename}"
               , tags = [ PipelineTag.Type.Toolchain ]
               }
             , steps = [ DockerImage.generateStep spec ]

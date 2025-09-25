@@ -24,7 +24,6 @@ function usage() {
   echo "      --deb-version         The version string for the debian package to install"
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
-  echo "      --platform            The architecture to build the docker image for (linux/amd64, linux/arm64). Default=linux/amd64"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -38,7 +37,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --deb-version) export DEB_VERSION="--build-arg deb_version=$2"; shift;;
   --deb-profile) export DEB_PROFILE="$2"; shift;;
   --deb-build-flags) export DEB_BUILD_FLAGS="$2"; shift;;
-  --platform) export INPUT_PLATFORM="$2"; shift;;
   --help) usage "$@"; exit 0;;
   *) echo "Unknown parameter passed: $1"; usage "$@"; exit 1;;
 esac; shift; done

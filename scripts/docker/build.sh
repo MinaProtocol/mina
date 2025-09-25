@@ -32,7 +32,6 @@ function usage() {
   echo "      --deb-profile         The profile string for the debian package to install"
   echo "      --deb-build-flags     The build-flags string for the debian package to install"
   echo "      --deb-suffix          The debian suffix to use for the docker image"
-  echo "  -p, --platform            The target platform for the docker build (e.g. linux/amd64). Default=linux/amd64"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -46,7 +45,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -b|--branch) INPUT_BRANCH="$2"; shift;;
   -c|--cache-from) INPUT_CACHE="$2"; shift;;
   -r|--repo) MINA_REPO="$2"; shift;;
-  -p|--platform) INPUT_PLATFORM="$2"; shift;;
   --no-cache) NO_CACHE="--no-cache"; ;;
   --deb-codename) INPUT_CODENAME="$2"; shift;;
   --deb-release) INPUT_RELEASE="$2"; shift;;
@@ -98,9 +96,7 @@ if [[ -z "$INPUT_CODENAME" ]]; then
   DEB_CODENAME="--build-arg deb_codename=bullseye"
 fi
 
-if [[ -z "$INPUT_PLATFORM" ]]; then
-  INPUT_PLATFORM="linux/amd64"
-fi
+INPUT_PLATFORM="linux/amd64"
 
 PLATFORM="--platform ${INPUT_PLATFORM}"
 
@@ -114,10 +110,6 @@ case "${INPUT_PLATFORM}" in
       linux/amd64)
         CANONICAL_ARCH="x86_64"
         DEBIAN_ARCH="x86_64"
-        ;;
-      linux/arm64)
-        CANONICAL_ARCH="aarch64"
-        DEBIAN_ARCH="arm64"
         ;;
       *)
         echo "unsupported platform"; exit 1

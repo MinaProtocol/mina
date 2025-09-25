@@ -4,8 +4,6 @@ let Mina = ../Command/Mina.dhall
 
 let ContainerImages = ../Constants/ContainerImages.dhall
 
-let Arch = ../Constants/Arch.dhall
-
 let runInToolchainImage
     : Text -> List Text -> Text -> List Cmd.Type
     =     \(image : Text)
@@ -18,46 +16,35 @@ let runInToolchainImage
             ]
 
 let runInToolchainNoble
-    : Arch.Type -> List Text -> Text -> List Cmd.Type
-    =     \(arch : Arch.Type)
-      ->  \(environment : List Text)
+    : List Text -> Text -> List Cmd.Type
+    =     \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  let image =
-                merge
-                  { Amd64 = ContainerImages.minaToolchainNoble.amd64
-                  , Arm64 = ContainerImages.minaToolchainNoble.arm64
-                  }
-                  arch
-
-          in  runInToolchainImage image environment innerScript
+      ->  runInToolchainImage
+            ContainerImages.minaToolchainNoble
+            environment
+            innerScript
 
 let runInToolchainJammy
     : List Text -> Text -> List Cmd.Type
     =     \(environment : List Text)
       ->  \(innerScript : Text)
       ->  runInToolchainImage
-            ContainerImages.minaToolchainJammy.amd64
+            ContainerImages.minaToolchainJammy
             environment
             innerScript
 
 let runInToolchainBookworm
-    : Arch.Type -> List Text -> Text -> List Cmd.Type
-    =     \(arch : Arch.Type)
-      ->  \(environment : List Text)
+    : List Text -> Text -> List Cmd.Type
+    =     \(environment : List Text)
       ->  \(innerScript : Text)
-      ->  let image =
-                merge
-                  { Amd64 = ContainerImages.minaToolchainBookworm.amd64
-                  , Arm64 = ContainerImages.minaToolchainBookworm.arm64
-                  }
-                  arch
-
-          in  runInToolchainImage image environment innerScript
+      ->  runInToolchainImage
+            ContainerImages.minaToolchainBookworm
+            environment
+            innerScript
 
 let runInToolchainBullseye
-    : Arch.Type -> List Text -> Text -> List Cmd.Type
-    =     \(arch : Arch.Type)
-      ->  \(environment : List Text)
+    : List Text -> Text -> List Cmd.Type
+    =     \(environment : List Text)
       ->  \(innerScript : Text)
       ->  runInToolchainImage
             ContainerImages.minaToolchainBullseye.amd64
