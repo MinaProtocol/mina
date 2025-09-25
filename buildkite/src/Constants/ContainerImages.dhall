@@ -5,22 +5,22 @@
 { toolchainBase = "codaprotocol/ci-toolchain-base:v3"
 , minaToolchainBookworm =
     { amd64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:c63dda05f4e546e5b49a992cd2a4ea223dbe6fcf2d2dcf902e46befc7f3538b1"
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:0c2764790ae18788b97a9c6361d7c4b0a96c515d176226868d929415e24f8251"
     , arm64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:0e25355e6ee9d56abee80ec37676445b132a1df85c4d14ff2ea85a35b29d8c7a"
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:deb63964399029d681e39ac4ff529616b179c72fff3a0ab350e11a7099f6f23d"
     }
 , minaToolchainBullseye.amd64 =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:532b80e8811e7054ab89426ba8b476de6ada8ba0702e093473f1fcba7a1e4d24"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:db00940ea2c778592a520da755388014231db52aa2d89e0c853abfafc4fa5846"
 , minaToolchainNoble =
     { amd64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:f8c910c1d2dbb2cf76e992ef9f356293087e1e94f95371e06f579964d5eb8056"
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:669c4053d2f3b7ecf5787b9dc0d908b7061c8a8908dcc766c4de57bcd1c67fa1"
     , arm64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:11176d7f30fe68496ab0d19a3cb1a0c44bad8f3acecdd74ceb84e6e4212acdc2"
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:2a71e234ca0cc42a663e42daabef3736207fd91bac414b2d511b30b336529b74"
     }
 , minaToolchainJammy.amd64 =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:d51c024ee79a742b2821ef15436e285b0f5788f64764b10f5d27fa609e0d040f"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:b16023b65bb90fc2242c83b7c9f3f3c62aca521f316a16a45f5f7cb115e95f15"
 , minaToolchain =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:532b80e8811e7054ab89426ba8b476de6ada8ba0702e093473f1fcba7a1e4d24"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:db00940ea2c778592a520da755388014231db52aa2d89e0c853abfafc4fa5846"
 , postgres = "postgres:12.4-alpine"
 , xrefcheck =
     "dkhamsing/awesome_bot@sha256:a8adaeb3b3bd5745304743e4d8a6d512127646e420544a6d22d9f58a07f35884"
