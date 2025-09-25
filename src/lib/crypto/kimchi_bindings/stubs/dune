@@ -18,7 +18,9 @@
 
 (rule
  (enabled_if
-  (<> %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
+  (and
+   (<> %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n)
+   (<> %{architecture} arm64)))
  (targets rustflags.sexp)
  (action
   (with-stdout-to
@@ -27,12 +29,23 @@
 
 (rule
  (enabled_if
-  (= %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n))
+  (and
+   (= %{env:RUST_TARGET_FEATURE_OPTIMISATIONS=y} n)
+   (<> %{architecture} arm64)))
  (targets rustflags.sexp)
  (action
   (with-stdout-to
    rustflags.sexp
    (echo "-C target-feature=-bmi2,-adx"))))
+
+(rule
+ (enabled_if
+  (= %{architecture} arm64))
+ (targets rustflags.sexp)
+ (action
+  (with-stdout-to
+   rustflags.sexp
+   (echo ""))))
 
 ;;
 ;; rules to build the static library for kimchi
