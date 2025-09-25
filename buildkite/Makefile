@@ -5,9 +5,11 @@ check_syntax:
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" &&  dhall --file {} > /dev/null || exit 255'
 
 check_lint:
+	@echo "Dhall version: $$(dhall --version)"
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" && dhall --ascii lint --check --inplace {} || exit 255'
 
 check_format:
+	@echo "Dhall version: $$(dhall --version)"
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{} format" && dhall --ascii format --check --inplace {} || exit 255'
 
 lint:
