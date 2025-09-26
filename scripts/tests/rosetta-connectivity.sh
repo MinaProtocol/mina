@@ -98,7 +98,8 @@ if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
 set -x
 
-container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
+container_id=$(docker run -v .:/workdir -p 0:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
+host_address=$(docker port $container_id 3087 | head -n1)
 
 stop_docker() {
         { docker stop "$container_id" ; docker rm "$container_id" ; } || true
@@ -148,7 +149,7 @@ execute_script() {
 # Wait for the container to start
 sleep 5
 #run sanity test
-./scripts/tests/rosetta-sanity.sh --address "http://localhost:3087" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
+./scripts/tests/rosetta-sanity.sh --address "http://$host_address" --network $NETWORK --wait-for-sync --timeout $TIMEOUT
 
 # Run load test
 if [[ "$RUN_LOAD_TEST" == true ]]; then

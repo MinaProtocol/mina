@@ -11,15 +11,30 @@ function assert() {
     local __query=$2
     local __success_message=$3
     local __error_message=$4
+    local __attempts_left="${5:-1}"
+    local __retry_sleep="${6:-5}"
 
-    if echo $__response | jq "if ($__query) then true else false end" | grep -q true; then
-        echo "$__success_message"
-    else
-        echo "$__error_message"
-        echo "   Response:"
-        echo "      $( echo $__response | jq)"
-        exit 1
-    fi
+
+    local attempt=1
+    while (( attempt <= __attempts_left )); do
+        if echo "$__response" | jq "if ($__query) then true else false end" | grep -q true; then
+            echo "$__success_message"
+            return 0
+        else
+            echo "$__error_message (attempt $attempt of $__attempts_left)"
+            echo "   Response:"
+            echo "      $( echo "$__response" | jq )"
+
+            if (( attempt < __attempts_left )); then
+                echo "Retrying in $__retry_sleep seconds..."
+                sleep "$__retry_sleep"
+            fi
+        fi
+        ((attempt++))
+    done
+
+    echo "Failed after $__attempts_left attempts."
+    exit 1
 }
 
 function wait_for_sync() {
@@ -83,7 +98,9 @@ function test_account_balance() {
     assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/account/balance" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"},\"account_identifier\":{\"address\":\"${__test_data[account]}\"}}" | jq)" \
         '.balances[0].currency.symbol == "MINA"' \
         "   ✅  Account: Balance ok" \
-        "   ❌  Account: Invalid balance structure or balance not found"
+        "   ❌  Account: Invalid balance structure or balance not found" \
+        5 \
+        30
 }
 
 function test_payment_transaction() {
