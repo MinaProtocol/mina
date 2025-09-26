@@ -49,7 +49,7 @@ module Scripts = struct
     | `Upgrade ->
         "upgrade-to-mesa.sql"
     | `Rollback ->
-        "rollback_to-berkeley.sql"
+        "downgrade-to-berkeley.sql"
 
   let filepath t =
     let file = file t in
