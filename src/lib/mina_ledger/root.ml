@@ -215,6 +215,25 @@ struct
              ; backing_2 = Config.backing_of_config config
              } )
 
+  let create_stable_checkpoint t ~directory_name =
+    match t with
+    | Stable_db db ->
+        Stable_db.create_checkpoint db ~directory_name ()
+    | Converting_db db ->
+        Stable_db.create_checkpoint
+          (Converting_ledger.primary_ledger db)
+          ~directory_name ()
+
+  let create_migrated_checkpoint t ~directory_name =
+    match t with
+    | Stable_db _db ->
+        None
+    | Converting_db db ->
+        Some
+          (Migrated_db.create_checkpoint
+             (Converting_ledger.converting_ledger db)
+             ~directory_name () )
+
   let as_unmasked t =
     match t with
     | Stable_db db ->

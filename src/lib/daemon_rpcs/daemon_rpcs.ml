@@ -346,3 +346,13 @@ module Get_object_lifetime_statistics = struct
     Rpc.Rpc.create ~name:"Get_object_lifetime_statistics" ~version:0 ~bin_query
       ~bin_response
 end
+
+module Generate_hardfork_config = struct
+  type query = string [@@deriving bin_io_unversioned]
+
+  type response = unit Or_error.t [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Generate_hardfork_config" ~version:0 ~bin_query
+      ~bin_response
+end
