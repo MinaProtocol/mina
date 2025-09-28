@@ -1,0 +1,31 @@
+# Builder stage
+FROM ubuntu:noble AS builder
+
+WORKDIR /tmp/dhall_tools
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    bzip2 \
+    curl
+
+ARG DHALL_VERSION=1.30.0
+
+RUN curl -L "https://github.com/dhall-lang/dhall-haskell/releases/download/${DHALL_VERSION}/dhall-${DHALL_VERSION}-x86_64-linux.tar.bz2" \
+  | tar xj
+
+ARG DHALL_YAML_VERSION=1.0.2
+
+RUN curl -L "https://github.com/dhall-lang/dhall-haskell/releases/download/${DHALL_VERSION}/dhall-yaml-${DHALL_YAML_VERSION}-x86_64-linux.tar.bz2" \
+  | tar xj
+
+# Target stage
+
+FROM ubuntu:noble
+
+COPY --from=builder /tmp/dhall_tools/bin/dhall /usr/local/bin/dhall
+COPY --from=builder /tmp/dhall_tools/bin/dhall-to-yaml-ng /usr/local/bin/dhall-to-yaml-ng
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    make \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/log/apt/*
