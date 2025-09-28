@@ -46,6 +46,7 @@ RUN apt-get update --yes \
     python3-sexpdata \
     rubygems \
     wget \
+    rakudo \
   && rm -rf /var/lib/apt/lists/*
 
 # --- deb-s3 tool
