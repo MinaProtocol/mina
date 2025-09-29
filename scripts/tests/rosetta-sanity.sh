@@ -11,14 +11,13 @@
 #
 # OPTIONS:
 #   --network <mainnet|devnet>    Specify the network to test (default: mainnet)
-#   --wait-for-sync               Wait for Rosetta node to sync before running tests
 #   --timeout <seconds>           Timeout for sync wait in seconds (default: 900)
 #   --address <url>               Override the default Rosetta endpoint address
 #   -h, --help                    Display this help message
 #
 # EXAMPLES:
 #   ./rosetta-sanity.sh --network mainnet
-#   ./rosetta-sanity.sh --network devnet --wait-for-sync --timeout 1200
+#   ./rosetta-sanity.sh --network devnet --timeout 1200
 #   ./rosetta-sanity.sh --address http://localhost:3087 --network mainnet
 #
 # TEST COVERAGE:
@@ -42,7 +41,6 @@
 # VERSION: 1.0
 
 NETWORK="mainnet"
-WAIT_FOR_SYNC=false
 TIMEOUT=900
 
 declare -A mainnet
@@ -72,7 +70,6 @@ while [[ "$#" -gt 0 ]]; do
             fi
             shift
             ;;
-        --wait-for-sync) WAIT_FOR_SYNC=true ;;
         --timeout) TIMEOUT="$2"; shift ;;
         --address) 
                    
@@ -118,11 +115,9 @@ function run_tests_with_test_data() {
     echo "🎉  All tests passed successfully!"
 }
 
-if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-    echo "⏳  Waiting for Rosetta to sync on $NETWORK..."
-    if ! wait_for_sync "$NETWORK" "$TIMEOUT"; then
-        echo "❌  Failed to sync with $NETWORK within timeout period"
-        exit 1
-    fi
+echo "⏳  Waiting for Rosetta to sync on $NETWORK..."
+if ! wait_for_sync "$NETWORK" "$TIMEOUT"; then
+    echo "❌  Failed to sync with $NETWORK within timeout period"
+    exit 1
 fi
 run_tests_with_test_data "$NETWORK"
