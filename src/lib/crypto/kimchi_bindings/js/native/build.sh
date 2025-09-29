@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CURRENT_DIRECTORY=$(pwd)
-PROOF_SYSTEMS_ROOT=$(cd ../../../proof-systems && pwd)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+CURRENT_DIRECTORY="${SCRIPT_DIR}"
+PROOF_SYSTEMS_ROOT=$(cd "${SCRIPT_DIR}/../../../proof-systems" && pwd)
+PLONK_NAPI_ROOT="${PROOF_SYSTEMS_ROOT}/plonk-napi"
+
+TARGET_ROOT="${CARGO_TARGET_DIR:-"${PROOF_SYSTEMS_ROOT}/target"}"
+export CARGO_TARGET_DIR="${TARGET_ROOT}"
 
 cargo build \
-    --manifest-path "${PROOF_SYSTEMS_ROOT}/Cargo.toml" \
-    --release \
-    -p plonk-napi
-
-TARGET_ROOT=${CARGO_TARGET_DIR:-"${PROOF_SYSTEMS_ROOT}/target"}
+    --manifest-path "${PLONK_NAPI_ROOT}/Cargo.toml" \
+    --release
 
 case "$(uname -s)" in
     Darwin*) LIB_NAME="libplonk_napi.dylib" ;;
