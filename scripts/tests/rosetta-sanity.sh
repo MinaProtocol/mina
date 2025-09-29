@@ -64,7 +64,14 @@ devnet[zkapp_transaction]="5JuJuyKtrMvxGroWyNE3sxwpuVsupvj7SA8CDX4mqWms4ZZT4Arz"
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --network) NETWORK="$2"; shift ;;
+        --network) 
+            NETWORK="$2"; 
+            if [[ "$NETWORK" != "mainnet" && "$NETWORK" != "devnet" ]]; then
+                echo "Unknown network: $NETWORK. Available networks: mainnet, devnet. Exiting..."
+                exit 1
+            fi
+            shift
+            ;;
         --wait-for-sync) WAIT_FOR_SYNC=true ;;
         --timeout) TIMEOUT="$2"; shift ;;
         --address) 
@@ -111,25 +118,11 @@ function run_tests_with_test_data() {
     echo "🎉  All tests passed successfully!"
 }
 
-if [[ "$NETWORK" == "mainnet" ]]; then
-    if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-        echo "⏳  Waiting for Rosetta to sync on mainnet..."
-        if ! wait_for_sync "mainnet" "$TIMEOUT"; then
-            echo "❌  Failed to sync with mainnet within timeout period"
-            exit 1
-        fi
+if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
+    echo "⏳  Waiting for Rosetta to sync on $NETWORK..."
+    if ! wait_for_sync "$NETWORK" "$TIMEOUT"; then
+        echo "❌  Failed to sync with $NETWORK within timeout period"
+        exit 1
     fi
-    run_tests_with_test_data "mainnet"
-elif [[ "$NETWORK" == "devnet" ]]; then
-    if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-        echo "⏳  Waiting for Rosetta to sync on devnet..."
-        if ! wait_for_sync "devnet" "$TIMEOUT"; then
-            echo "❌  Failed to sync with devnet within timeout period"
-            exit 1
-        fi
-    fi
-    run_tests_with_test_data "devnet"
-else
-    echo "Unknown network: $NETWORK. available networks: mainnet, devnet. Exiting..."
-    exit 1
 fi
+run_tests_with_test_data "$NETWORK"
