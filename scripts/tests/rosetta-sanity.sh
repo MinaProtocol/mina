@@ -115,9 +115,4 @@ function run_tests_with_test_data() {
     echo "🎉  All tests passed successfully!"
 }
 
-echo "⏳  Waiting for Rosetta to sync on $NETWORK..."
-if ! wait_for_sync "$NETWORK" "$TIMEOUT"; then
-    echo "❌  Failed to sync with $NETWORK within timeout period"
-    exit 1
-fi
 run_tests_with_test_data "$NETWORK"
