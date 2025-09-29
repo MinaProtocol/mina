@@ -11,13 +11,12 @@
 #
 # OPTIONS:
 #   --network <mainnet|devnet>    Specify the network to test (default: mainnet)
-#   --timeout <seconds>           Timeout for sync wait in seconds (default: 900)
 #   --address <url>               Override the default Rosetta endpoint address
 #   -h, --help                    Display this help message
 #
 # EXAMPLES:
 #   ./rosetta-sanity.sh --network mainnet
-#   ./rosetta-sanity.sh --network devnet --timeout 1200
+#   ./rosetta-sanity.sh --network devnet
 #   ./rosetta-sanity.sh --address http://localhost:3087 --network mainnet
 #
 # TEST COVERAGE:
@@ -41,7 +40,6 @@
 # VERSION: 1.0
 
 NETWORK="mainnet"
-TIMEOUT=900
 
 declare -A mainnet
 mainnet[id]="mainnet"
@@ -70,7 +68,6 @@ while [[ "$#" -gt 0 ]]; do
             fi
             shift
             ;;
-        --timeout) TIMEOUT="$2"; shift ;;
         --address) 
                    
                    # shellcheck disable=SC2034
