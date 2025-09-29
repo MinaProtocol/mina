@@ -329,11 +329,18 @@ let reset_factory_root_exn t ~create_root ~setup =
   with_instance_exn t ~f:setup
 
 let reset_to_genesis_exn t ~precomputed_values =
-  reset_factory_root_exn t
-    ~create_root:(Precomputed_values.create_root precomputed_values)
-    ~setup:(fun instance ->
-      Instance.set_root_identifier instance
-        (genesis_root_identifier
-           ~genesis_state_hash:
-             (Precomputed_values.genesis_state_hashes precomputed_values)
-               .state_hash ) )
+  let open Async.Deferred.Let_syntax in
+  let logger = t.logger in
+  [%log debug] "Resetting snarked_root in $directory to genesis"
+    ~metadata:[ ("directory", `String t.directory) ] ;
+  let%map () =
+    reset_factory_root_exn t
+      ~create_root:(Precomputed_values.create_root precomputed_values)
+      ~setup:(fun instance ->
+        Instance.set_root_identifier instance
+          (genesis_root_identifier
+             ~genesis_state_hash:
+               (Precomputed_values.genesis_state_hashes precomputed_values)
+                 .state_hash ) )
+  in
+  [%log debug] "Finished resetting snarked_root to genesis"
