@@ -125,6 +125,7 @@
 (package (name node_error_service))
 (package (name node_status_service))
 (package (name non_zero_curve_point))
+(package (name o1js_bindings))
 (package (name o1trace))
 (package (name o1trace_webkit_event))
 (package (name one_or_two))

@@ -1,0 +1,107 @@
+(env
+ (_
+  (js_of_ocaml
+   (compilation_mode whole_program))))
+
+(rule
+ (enabled_if
+  (= %{env:PREBUILT_KIMCHI_BINDINGS_JS_NODE_JS=n} n))
+ (targets node_js_plonk_wasm.js node_js_plonk_wasm_bg.wasm)
+ (deps
+  (:d1 ../../crypto/kimchi_bindings/js/node_js/plonk_wasm.js)
+  (:d2 ../../crypto/kimchi_bindings/js/node_js/plonk_wasm_bg.wasm))
+ (mode
+  (promote
+   (into ../artifacts)))
+ (action
+  (progn
+   (run cp %{d1} node_js_plonk_wasm.js)
+   (run cp %{d2} node_js_plonk_wasm_bg.wasm))))
+
+(rule
+ (enabled_if
+  (= %{env:PREBUILT_KIMCHI_BINDINGS_JS_WEB=n} n))
+ (targets web_plonk_wasm.js web_plonk_wasm_bg.wasm)
+ (deps
+  (:d1 ../../crypto/kimchi_bindings/js/web/plonk_wasm.js)
+  (:d2 ../../crypto/kimchi_bindings/js/web/plonk_wasm_bg.wasm))
+ (mode
+  (promote
+   (into ../artifacts)))
+ (action
+  (progn
+   (run cp %{d1} web_plonk_wasm.js)
+   (run cp %{d2} web_plonk_wasm_bg.wasm))))
+
+(rule
+ (enabled_if
+  (<> %{env:PREBUILT_KIMCHI_BINDINGS_JS_NODE_JS=n} n))
+ (targets node_js_plonk_wasm.js node_js_plonk_wasm_bg.wasm)
+ (mode
+  (promote
+   (into ../artifacts)))
+ (action
+  (progn
+   (run
+    cp
+    %{env:PREBUILT_KIMCHI_BINDINGS_JS_NODE_JS=n}/plonk_wasm.js
+    node_js_plonk_wasm.js)
+   (run
+    cp
+    %{env:PREBUILT_KIMCHI_BINDINGS_JS_NODE_JS=n}/plonk_wasm_bg.wasm
+    node_js_plonk_wasm_bg.wasm))))
+
+(rule
+ (enabled_if
+  (<> %{env:PREBUILT_KIMCHI_BINDINGS_JS_WEB=n} n))
+ (targets web_plonk_wasm.js web_plonk_wasm_bg.wasm)
+ (mode
+  (promote
+   (into ../artifacts)))
+ (action
+  (progn
+   (run
+    cp
+    %{env:PREBUILT_KIMCHI_BINDINGS_JS_WEB=n}/plonk_wasm.js
+    web_plonk_wasm.js)
+   (run
+    cp
+    %{env:PREBUILT_KIMCHI_BINDINGS_JS_WEB=n}/plonk_wasm_bg.wasm
+    web_plonk_wasm_bg.wasm))))
+
+(executable
+ (name o1js_node)
+ (modules o1js_node)
+ (modes js)
+ (promote
+  (into ../artifacts))
+ (link_flags :standard -noautolink -g)
+ (js_of_ocaml
+  (flags :standard +toplevel.js +dynlink.js --source-map)
+  (link_flags :standard --source-map)
+  (javascript_files overrides.js))
+ (libraries o1js_bindings.lib bindings_js.node_backend)
+ (link_deps node_js_plonk_wasm.js node_js_plonk_wasm_bg.wasm)
+ (instrumentation
+  (backend bisect_ppx))
+ (forbidden_libraries async core re2 ctypes)
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))
+
+(executable
+ (name o1js_web)
+ (modules o1js_web)
+ (modes js)
+ (promote
+  (into ../artifacts))
+ (link_flags :standard -noautolink)
+ (js_of_ocaml
+  (flags :standard +toplevel.js +dynlink.js)
+  (javascript_files overrides.js))
+ (libraries o1js_bindings.lib bindings_js.web_backend)
+ (link_deps web_plonk_wasm.js web_plonk_wasm_bg.wasm)
+ (instrumentation
+  (backend bisect_ppx))
+ (forbidden_libraries async core re2 ctypes)
+ (preprocess
+  (pps ppx_version js_of_ocaml-ppx)))
