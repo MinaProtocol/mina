@@ -152,8 +152,10 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?populate_root_and_accounts:
-         (   Mina_ledger.Ledger.Root.t
+    -> ?create_root_and_accounts:
+         (   config:Mina_ledger.Ledger.Root.Config.t
+          -> depth:int
+          -> unit
           -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
          * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
@@ -173,8 +175,10 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?populate_root_and_accounts:
-         (   Mina_ledger.Ledger.Root.t
+    -> ?create_root_and_accounts:
+         (   config:Mina_ledger.Ledger.Root.Config.t
+          -> depth:int
+          -> unit
           -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
          * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:

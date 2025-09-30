@@ -283,7 +283,9 @@ let rec load_with_max_length :
           (State_hash.With_state_hashes.state_hash
              precomputed_values.protocol_state_with_hashes )
     in
-    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    let%bind () =
+      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
+    in
     let genesis_ledger_hash =
       Precomputed_values.genesis_ledger precomputed_values
       |> Lazy.force |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
@@ -684,8 +686,8 @@ module For_tests = struct
 
   let gen ?(logger = Logger.null ()) ~verifier ?trust_system
       ?consensus_local_state ~precomputed_values
-      ?(populate_root_and_accounts =
-        ( Precomputed_values.populate_root precomputed_values
+      ?(create_root_and_accounts =
+        ( Precomputed_values.create_root precomputed_values
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb_with_protocol_states ~logger ~verifier
@@ -724,7 +726,7 @@ module For_tests = struct
                   precomputed_values.protocol_state_with_hashes )
              ~epoch_ledger_backing_type:Stable_db )
     in
-    let populate_root, root_ledger_accounts = populate_root_and_accounts in
+    let create_root, root_ledger_accounts = create_root_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
     let%bind root, branches, protocol_states =
       let%bind root, protocol_states = gen_root_breadcrumb in
@@ -755,12 +757,12 @@ module For_tests = struct
           ~genesis_state_hash:
             (State_hash.With_state_hashes.state_hash
                precomputed_values.protocol_state_with_hashes ) ) ;
-    Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
-        let transition = Root_data.Limited.transition root_data in
-        Persistent_root.Instance.set_root_state_hash instance
-          (Mina_block.Validated.state_hash transition) ;
-        ignore
-        @@ populate_root (Persistent_root.Instance.snarked_ledger instance) ) ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Persistent_root.reset_factory_root_exn persistent_root ~create_root
+          ~setup:(fun instance ->
+            let transition = Root_data.Limited.transition root_data in
+            Persistent_root.Instance.set_root_state_hash instance
+              (Mina_block.Validated.state_hash transition) ) ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false
@@ -797,21 +799,21 @@ module For_tests = struct
 
   let gen_with_branch ?logger ~verifier ?trust_system ?consensus_local_state
       ~precomputed_values
-      ?(populate_root_and_accounts =
-        ( Precomputed_values.populate_root precomputed_values
+      ?(create_root_and_accounts =
+        ( Precomputed_values.create_root precomputed_values
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
       gen ?logger ~verifier ?trust_system ?consensus_local_state
-        ~precomputed_values ?gen_root_breadcrumb ~populate_root_and_accounts
+        ~precomputed_values ?gen_root_breadcrumb ~create_root_and_accounts
         ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ~precomputed_values ~verifier
         ?trust_system
-        ~accounts_with_secret_keys:(snd populate_root_and_accounts)
+        ~accounts_with_secret_keys:(snd create_root_and_accounts)
         branch_size
     in
     let branch =
