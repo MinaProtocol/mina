@@ -332,3 +332,5 @@ end
 val zkapp_cmd_limit : t -> int option ref
 
 val proof_cache_db : t -> Proof_cache_tag.cache_db
+
+val signature_kind : t -> Mina_signature_kind.t
