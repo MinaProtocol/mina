@@ -178,30 +178,6 @@ build-logproc: ocaml_checks reformat-diff libp2p_helper ## Build the logproc exe
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
-.PHONY: build-mainnet-sigs
-build-mainnet-sigs: ocaml_checks reformat-diff libp2p_helper build ## Build mainnet signature variants of the daemon
-	$(info 🏗️  Building mainnet signature variants with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
-	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
-	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
-	dune build \
-		src/app/cli/src/mina_mainnet_signatures.exe \
-		src/app/rosetta/rosetta_mainnet_signatures.exe \
-		src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe \
-		--profile=mainnet \
-		&& echo "✅ Build complete"
-
-.PHONY: build-devnet-sigs
-build-devnet-sigs: ocaml_checks reformat-diff libp2p_helper build ## Build devnet signature variants of the daemon
-	$(info 🏗️  Building devnet signature variants with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
-	@(ulimit -s 65532 || true) && (ulimit -n 10240 || true) && \
-	env MINA_COMMIT_SHA1=$(GITLONGHASH) \
-	dune build \
-		src/app/cli/src/mina_testnet_signatures.exe \
-		src/app/rosetta/rosetta_testnet_signatures.exe \
-		src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe \
-		--profile=devnet \
-		&& echo "✅ Build complete"
-
 .PHONY: build-archive
 build-archive: ocaml_checks reformat-diff ## Build the archive node
 	$(info 🏗️  Building archive with profile $(DUNE_PROFILE) and commit $(GITLONGHASH))
