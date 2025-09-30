@@ -182,7 +182,8 @@ let%test_module "Block storage tests" =
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:1
         ~f:(fun make_breadcrumb ->
           let frontier =
-            create_frontier ~epoch_ledger_backing_type:Stable_db ()
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                create_frontier ~epoch_ledger_backing_type:Stable_db () )
           in
           let root = Full_frontier.root frontier in
           let reader, writer = Pipe.create () in
@@ -211,7 +212,8 @@ let%test_module "Block storage tests" =
       Quickcheck.test (gen_breadcrumb ~verifier ()) ~trials:4
         ~f:(fun make_breadcrumb ->
           let frontier =
-            create_frontier ~epoch_ledger_backing_type:Stable_db ()
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                create_frontier ~epoch_ledger_backing_type:Stable_db () )
           in
           let root = Full_frontier.root frontier in
           let reader, writer = Pipe.create () in

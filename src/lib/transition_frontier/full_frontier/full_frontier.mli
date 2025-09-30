@@ -89,7 +89,7 @@ module For_tests : sig
   val create_frontier :
        epoch_ledger_backing_type:Mina_ledger.Ledger.Root.Config.backing_type
     -> unit
-    -> t
+    -> t Async_kernel.Deferred.t
 
   val clean_up_persistent_root : frontier:t -> unit
 

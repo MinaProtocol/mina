@@ -105,4 +105,11 @@ val load_from_disk_exn :
 
 val with_instance_exn : t -> f:(Instance_type.t -> 'a) -> 'a
 
-val reset_to_genesis_exn : t -> precomputed_values:Genesis_proof.t -> unit
+val reset_factory_root_exn :
+     t
+  -> create_root:(config:Root.Config.t -> depth:int -> unit -> Root.t Or_error.t)
+  -> setup:(Instance_type.t -> 'a)
+  -> 'a Async.Deferred.t
+
+val reset_to_genesis_exn :
+  t -> precomputed_values:Genesis_proof.t -> unit Async.Deferred.t
