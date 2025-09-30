@@ -26,6 +26,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 let max_catchup_chunk_length = 20
@@ -702,6 +704,8 @@ module For_tests = struct
       let consensus_constants = precomputed_values.consensus_constants
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in

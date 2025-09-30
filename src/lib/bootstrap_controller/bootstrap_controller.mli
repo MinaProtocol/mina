@@ -15,6 +15,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 type Structured_log_events.t += Bootstrap_complete [@@deriving register_event]
@@ -52,5 +54,4 @@ val run :
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:Mina_block.Validated.t
   -> catchup_mode:[ `Super ]
-  -> signature_kind:Mina_signature_kind.t
   -> (Transition_frontier.t * Transition_cache.element list) Deferred.t

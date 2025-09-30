@@ -3245,9 +3245,10 @@ module Block = struct
 
   let add_from_precomputed conn ~proof_cache_db ~constraint_constants
       (t : Precomputed.t) =
+    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     let staged_ledger_diff =
-      Staged_ledger_diff.write_all_proofs_to_disk ~proof_cache_db
-        t.staged_ledger_diff
+      Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+        ~proof_cache_db t.staged_ledger_diff
     in
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff
@@ -4649,9 +4650,12 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
           Block.add_if_doesn't_exist ~logger ~constraint_constants
         in
         let hash = State_hash.With_state_hashes.state_hash in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let block =
           With_hash.map
-            ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+            ~f:
+              (Mina_block.write_all_proofs_to_disk ~signature_kind
+                 ~proof_cache_db )
             block
         in
         match%bind
