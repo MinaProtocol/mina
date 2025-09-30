@@ -1,16 +1,27 @@
 // Provides: plonk_wasm
 var plonk_wasm = require('./plonk_wasm.js');
 var native = null;
-try { 
-    native = require('../native/plonk_napi.node'); 
+try {
+  native = require('../native/plonk_napi.node');
 } catch (e) {
-    // native not available, keep WASM
+  // native not available, keep WASM
+}
+
+function snakeToCamel(name) {
+  return name.replace(/_([a-z])/g, function (_match, ch) {
+    return ch.toUpperCase();
+  });
+}
+
+function override(functionName) {
+  if (!native) return;
+  var camel = snakeToCamel(functionName);
+  var impl = native[functionName] || native[camel];
+  if (typeof impl === 'function') {
+    plonk_wasm[functionName] = impl;
+  }
 }
 
 // Overwrite only the functions that are already available in native
-if (native && native.caml_pasta_fp_poseidon_block_cipher) {
-  plonk_wasm.caml_pasta_fp_poseidon_block_cipher = native.caml_pasta_fp_poseidon_block_cipher;
-}
-if (native && native.caml_pasta_fq_poseidon_block_cipher) {
-  plonk_wasm.caml_pasta_fq_poseidon_block_cipher = native.caml_pasta_fq_poseidon_block_cipher;
-}
+override('caml_pasta_fp_poseidon_block_cipher');
+override('caml_pasta_fq_poseidon_block_cipher');
