@@ -886,7 +886,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let get_at_index_exn t index =
       assert_is_attached t ;
-      get_at_index t index |> Option.value_exn
+      get_at_index t index
+      |> Option.value_exn ~message:"Expected account at index" ~here:[%here]
 
     let set_at_index_exn t index account =
       assert_is_attached t ;
@@ -918,7 +919,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let iteri t ~f =
       iteri_untrusted t ~f:(fun index account_opt ->
-          f index (Option.value_exn account_opt) )
+          f index
+            (Option.value_exn ~message:"Expected account at index" ~here:[%here]
+               account_opt ) )
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;

@@ -282,7 +282,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     get mdb (Location.Account addr)
 
-  let get_at_index_exn mdb index = get_at_index mdb index |> Option.value_exn
+  let get_at_index_exn mdb index =
+    get_at_index mdb index
+    |> Option.value_exn ~message:"Expected account at index" ~here:[%here]
 
   let all_accounts (t : t) =
     match Account_location.last_location_address t with
@@ -584,7 +586,9 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
 
   let iteri t ~f =
     iteri_untrusted t ~f:(fun index account_opt ->
-        f index (Option.value_exn account_opt) )
+        f index
+          (Option.value_exn ~message:"Expected account at index" ~here:[%here]
+             account_opt ) )
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue
