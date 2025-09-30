@@ -2,7 +2,8 @@ open Core_kernel
 open Async
 open Rosetta_lib
 
-let router ~graphql_uri ~minimum_user_command_fee ~account_creation_fee
+let router ~signature_kind ~graphql_uri ~minimum_user_command_fee
+    ~account_creation_fee
     ~(pool :
        ( (Caqti_async.connection, [> Caqti_error.connect ]) Mina_caqti.Pool.t
        , [ `App of Errors.t ] )
@@ -54,8 +55,9 @@ let router ~graphql_uri ~minimum_user_command_fee ~account_creation_fee
         Block.router tl body ~graphql_uri ~logger ~with_db:with_db'
           ~minimum_user_command_fee
     | "construction" :: tl ->
-        Construction.router tl body ~get_graphql_uri_or_error ~logger
-          ~with_db:with_db' ~minimum_user_command_fee ~account_creation_fee
+        Construction.router tl body ~signature_kind ~get_graphql_uri_or_error
+          ~logger ~with_db:with_db' ~minimum_user_command_fee
+          ~account_creation_fee
     | "search" :: tl ->
         let%bind graphql_uri = get_graphql_uri_or_error () in
         Search.router tl body ~graphql_uri ~logger ~with_db:with_db'
@@ -105,19 +107,19 @@ let pg_log_data ~logger ~pool : unit Deferred.t =
         ~metadata:[ ("error", `String (Errors.show err)) ] ;
       Deferred.unit
 
-let server_handler ~pool ~graphql_uri ~logger ~minimum_user_command_fee
-    ~account_creation_fee ~body _sock req =
+let server_handler ~signature_kind ~pool ~graphql_uri ~logger
+    ~minimum_user_command_fee ~account_creation_fee ~body _sock req =
   let uri = Cohttp_async.Request.uri req in
   let%bind body = Cohttp_async.Body.to_string body in
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
   let%bind result =
     match Yojson.Safe.from_string body with
     | body ->
-        router route body ~pool ~graphql_uri ~logger ~minimum_user_command_fee
-          ~account_creation_fee
+        router route body ~signature_kind ~pool ~graphql_uri ~logger
+          ~minimum_user_command_fee ~account_creation_fee
     | exception Yojson.Json_error "Blank input data" ->
-        router route `Null ~pool ~graphql_uri ~logger ~minimum_user_command_fee
-          ~account_creation_fee
+        router route `Null ~signature_kind ~pool ~graphql_uri ~logger
+          ~minimum_user_command_fee ~account_creation_fee
     | exception Yojson.Json_error err ->
         Errors.create ~context:"JSON in request malformed"
           (`Json_parse (Some err))
@@ -153,7 +155,7 @@ let server_handler ~pool ~graphql_uri ~logger ~minimum_user_command_fee
       [%log warn] ~metadata "Error response: $error" ;
       respond_500 error
 
-let command ~minimum_user_command_fee ~account_creation_fee =
+let command ~signature_kind ~minimum_user_command_fee ~account_creation_fee =
   let open Command.Let_syntax in
   let%map_open archive_uri =
     flag "--archive-uri" ~aliases:[ "archive-uri" ]
@@ -229,8 +231,8 @@ let command ~minimum_user_command_fee ~account_creation_fee =
                     env_var ~metadata ;
                   ignore (exit 1) ) )
         (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
-        (server_handler ~pool ~graphql_uri ~logger ~minimum_user_command_fee
-           ~account_creation_fee )
+        (server_handler ~signature_kind ~pool ~graphql_uri ~logger
+           ~minimum_user_command_fee ~account_creation_fee )
     in
     [%log info]
       ~metadata:[ ("port", `Int port) ]

@@ -6,7 +6,7 @@ open Rosetta_lib
 open Signature_lib
 open Lib
 
-let sign_command =
+let sign_command ~signature_kind =
   let open Command.Let_syntax in
   let%map_open unsigned_transaction =
     flag "--unsigned-transaction" ~aliases:[ "unsigned-transaction" ]
@@ -22,7 +22,8 @@ let sign_command =
       with _ -> Signer.Keys.of_private_key_box private_key
     in
     match
-      Signer.sign ~keys ~unsigned_transaction_string:unsigned_transaction
+      Signer.sign ~signature_kind ~keys
+        ~unsigned_transaction_string:unsigned_transaction
     with
     | Ok signature ->
         printf "%s\n" signature ; return ()
@@ -30,7 +31,7 @@ let sign_command =
         eprintf "Failed to sign transaction %s" (Errors.show e) ;
         exit 1
 
-let verify_message_command =
+let verify_message_command ~signature_kind =
   let open Command.Let_syntax in
   let%map_open signature =
     flag "--signature" ~doc:"Rosetta signature" (required string)
@@ -46,14 +47,14 @@ let verify_message_command =
       Option.value_exn (Mina_base.Signature.Raw.decode signature)
     in
     let pk = Rosetta_coding.Coding.to_public_key public_key in
-    match String_sign.verify signature pk message with
+    match String_sign.verify ~signature_kind signature pk message with
     | true ->
         return ()
     | false ->
         eprintf "Signature does not verify against this public key" ;
         exit 1
 
-let verify_command =
+let verify_command ~signature_kind =
   let open Command.Let_syntax in
   let%map_open signed_transaction =
     flag "--signed-transaction" ~aliases:[ "signed-transaction" ]
@@ -65,7 +66,7 @@ let verify_command =
   let open Deferred.Let_syntax in
   fun () ->
     match
-      Signer.verify ~public_key_hex_bytes:public_key
+      Signer.verify ~signature_kind ~public_key_hex_bytes:public_key
         ~signed_transaction_string:signed_transaction
     with
     | Ok b when b ->
@@ -153,14 +154,16 @@ let convert_signature_command =
     printf "%s\n" (Mina_base.Signature.Raw.encode (field, scalar)) ;
     return ()
 
-let commands =
-  [ ("sign", Command.async ~summary:"Sign an unsigned transaction" sign_command)
+let commands ~signature_kind =
+  [ ( "sign"
+    , Command.async ~summary:"Sign an unsigned transaction"
+      @@ sign_command ~signature_kind )
   ; ( "verify"
     , Command.async
         ~summary:
           "Verify the signature of a signed transaction. Exits 0 if the \
            signature verifies."
-        verify_command )
+      @@ verify_command ~signature_kind )
   ; ( "derive-public-key"
     , Command.async ~summary:"Import a private key, returns a public-key"
         derive_command )
@@ -174,7 +177,7 @@ let commands =
         convert_signature_command )
   ; ( "verify-message"
     , Command.async ~summary:"Verify a string message was signed properly"
-        verify_message_command )
+      @@ verify_message_command ~signature_kind )
   ; ( "hex-of-private-key-file"
     , Command.async
         ~summary:"Read a private key file and display it as hexadecimal"
