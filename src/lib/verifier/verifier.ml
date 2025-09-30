@@ -22,7 +22,7 @@ include (val m)
 module For_tests = struct
   let get_verification_keys_eagerly ~constraint_constants ~proof_level =
     let module T = Transaction_snark.Make (struct
-      let signature_kind = Mina_signature_kind.t_DEPRECATED
+      let signature_kind = Mina_signature_kind.Testnet
 
       let constraint_constants = constraint_constants
 

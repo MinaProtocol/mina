@@ -893,8 +893,7 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~network_transition_pipe ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Super ~initial_root_transition
-           ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+           ~catchup_mode:`Super ~initial_root_transition ~signature_kind:Testnet )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
@@ -1012,8 +1011,7 @@ let%test_module "Bootstrap_controller tests" =
                 Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
                   ~scan_state ~logger ~verifier ~constraint_constants
                   ~snarked_ledger ~snarked_local_state ~expected_merkle_root
-                  ~pending_coinbases ~get_state
-                  ~signature_kind:Mina_signature_kind.t_DEPRECATED
+                  ~pending_coinbases ~get_state ~signature_kind:Testnet
                 |> Deferred.Or_error.ok_exn
               in
               let height =

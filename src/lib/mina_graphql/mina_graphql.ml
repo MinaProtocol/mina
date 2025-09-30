@@ -2538,6 +2538,7 @@ module Queries = struct
                     (from, to_, amount, fee, valid_until, memo, nonce_opt)
                     signature ->
         let open Deferred.Result.Let_syntax in
+        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let genesis_constants =
           (Mina_lib.config mina).precomputed_values.genesis_constants
         in
@@ -2564,10 +2565,9 @@ module Queries = struct
             ~constraint_constants:
               (Mina_lib.config mina).precomputed_values.constraint_constants
             ~logger:(Mina_lib.top_level_logger mina)
-            ~signature_kind:Mina_signature_kind.t_DEPRECATED user_command_input
+            ~signature_kind user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         Signed_command.check_signature ~signature_kind user_command )
 
   let runtime_config =
