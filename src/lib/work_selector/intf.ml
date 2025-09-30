@@ -117,7 +117,8 @@ module type Lib_intf = sig
 
     (** [mark_scheduled t work] Mark [work] as scheduled in [t] *)
     val mark_scheduled :
-         t
+         logger:Logger.t
+      -> t
       -> ( Transaction_witness.t
          , Ledger_proof.Cached.t )
          Snark_work_lib.Work.Single.Spec.t

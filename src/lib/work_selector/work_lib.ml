@@ -76,6 +76,14 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                         List.map ~f:Job_key.of_job t.available_jobs
                         |> Job_key.Set.of_list
                       in
+                      (* Log to internal trace all of the newly available jobs. *)
+                      Job_key.Set.iter new_job_keys ~f:(fun job_key ->
+                          [%log internal] "Snark_work_requested"
+                            ~metadata:
+                              [ ( "work_ids"
+                                , Transaction_snark_work.Statement.compact_json
+                                    job_key )
+                              ] ) ;
                       t.jobs_scheduled <-
                         Job_key.Set.inter t.jobs_scheduled new_job_keys ) ;
                   Deferred.unit )
@@ -84,10 +92,14 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       |> Deferred.don't_wait_for ;
       t
 
-    let mark_scheduled t x =
-      t.jobs_scheduled <-
-        Job_key.Set.add t.jobs_scheduled
-          (One_or_two.map ~f:Work_spec.statement x)
+    let mark_scheduled ~logger t job =
+      let statement = One_or_two.map ~f:Work_spec.statement job in
+      (* Log to internal trace all of the newly available jobs. *)
+      [%log internal] "Snark_work_scheduled"
+        ~metadata:
+          [ ("work_ids", Transaction_snark_work.Statement.compact_json statement)
+          ] ;
+      t.jobs_scheduled <- Job_key.Set.add t.jobs_scheduled statement
 
     let does_not_have_better_fee ~snark_pool ~fee
         (statements : Inputs.Transaction_snark_work.Statement.t) : bool =
