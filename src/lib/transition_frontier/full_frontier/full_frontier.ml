@@ -987,6 +987,7 @@ module For_tests = struct
 
   let create_frontier ~epoch_ledger_backing_type () =
     let open Core in
+    let open Async.Deferred.Let_syntax in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
@@ -1025,7 +1026,9 @@ module For_tests = struct
         ~directory:(Filename.temp_file "snarked_ledger" "")
         ~ledger_depth
     in
-    Persistent_root.reset_to_genesis_exn ~precomputed_values persistent_root ;
+    let%map () =
+      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
+    in
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in
