@@ -20,10 +20,14 @@ module type Inputs_intf = sig
 
   module Transaction : sig
     type t
+
+    val yojson_summary : t -> Yojson.Safe.t
   end
 
   module Transaction_witness : sig
     type t
+
+    val transaction : t -> Transaction.t
   end
 
   module Ledger_proof : sig
