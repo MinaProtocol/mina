@@ -107,7 +107,7 @@ module Zkapp_command_segment_witness = struct
     ; block_global_slot
     }
 
-  let write_all_proofs_to_disk ~proof_cache_db
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
       ({ global_first_pass_ledger
        ; global_second_pass_ledger
        ; local_state_init
@@ -117,7 +117,6 @@ module Zkapp_command_segment_witness = struct
        ; block_global_slot
        } :
         Stable.V1.t ) : t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { global_first_pass_ledger
     ; global_second_pass_ledger
     ; local_state_init =

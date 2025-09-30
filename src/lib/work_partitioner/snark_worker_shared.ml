@@ -28,7 +28,8 @@ module Zkapp_command_inputs = struct
 
   let write_all_proofs_to_disk ~proof_cache_db : Stable.V1.t -> t =
     Nonempty_list.map ~f:(fun (witness, segment, stmt) ->
-        ( Zkapp_command_segment.Witness.write_all_proofs_to_disk ~proof_cache_db
+        ( Zkapp_command_segment.Witness.write_all_proofs_to_disk
+            ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_cache_db
             witness
         , segment
         , stmt ) )

@@ -67,7 +67,9 @@ let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
         { statement
         ; witness =
             Transaction_snark.Zkapp_command_segment.Witness
-            .write_all_proofs_to_disk ~proof_cache_db witness
+            .write_all_proofs_to_disk
+              ~signature_kind:Mina_signature_kind.t_DEPRECATED ~proof_cache_db
+              witness
         ; spec
         }
   | Merge { proof1; proof2 } ->
