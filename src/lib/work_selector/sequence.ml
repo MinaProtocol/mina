@@ -1,10 +1,10 @@
 module Make (Lib : Intf.Lib_intf) = struct
-  let work ~snark_pool ~fee ~logger:_ (state : Lib.State.t) =
+  let work ~snark_pool ~fee ~logger (state : Lib.State.t) =
     match Lib.State.all_unscheduled_expensive_works ~snark_pool ~fee state with
     | [] ->
         None
     | x :: _ ->
-        Lib.State.mark_scheduled state x ;
+        Lib.State.mark_scheduled ~logger state x ;
         Some x
 end
 

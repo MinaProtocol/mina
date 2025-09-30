@@ -6,6 +6,16 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Inputs = Inputs
   module Work_spec = Snark_work_lib.Work.Single.Spec
 
+  let yojson_summary t =
+    let f = function
+      | Work_spec.Merge _ ->
+          `String "merge"
+      | Transition (_, witness) ->
+          Inputs.Transaction.yojson_summary
+            (Inputs.Transaction_witness.transaction witness)
+    in
+    `List (One_or_two.map ~f t |> One_or_two.to_list)
+
   module State = struct
     module Job_key = struct
       module T = struct
@@ -71,11 +81,44 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                                 ( Time.diff end_time start_time
                                 |> Time.Span.to_ms ) )
                           ] ;
-                      t.available_jobs <- new_available_jobs ;
-                      let new_job_keys =
-                        List.map ~f:Job_key.of_job t.available_jobs
+                      let old_available_jobs = t.available_jobs in
+                      let old_job_keys =
+                        List.map ~f:Job_key.of_job old_available_jobs
                         |> Job_key.Set.of_list
                       in
+                      t.available_jobs <- new_available_jobs ;
+                      let new_job_keys =
+                        List.map ~f:Job_key.of_job new_available_jobs
+                        |> Job_key.Set.of_list
+                      in
+                      let removed_job_keys =
+                        Job_key.Set.diff old_job_keys new_job_keys
+                      in
+                      let added_job_keys =
+                        Job_key.Set.diff new_job_keys old_job_keys
+                      in
+                      List.iter old_available_jobs ~f:(fun job ->
+                          if
+                            Job_key.Set.mem removed_job_keys
+                              (Job_key.of_job job)
+                          then
+                            [%log internal] "Snark_work_removed"
+                              ~metadata:
+                                [ ( "work_ids"
+                                  , Transaction_snark_work.Statement
+                                    .compact_json @@ Job_key.of_job job )
+                                ; ("txs", yojson_summary job)
+                                ] ) ;
+                      List.iter new_available_jobs ~f:(fun job ->
+                          if Job_key.Set.mem added_job_keys (Job_key.of_job job)
+                          then
+                            [%log internal] "Snark_work_added"
+                              ~metadata:
+                                [ ( "work_ids"
+                                  , Transaction_snark_work.Statement
+                                    .compact_json @@ Job_key.of_job job )
+                                ; ("txs", yojson_summary job)
+                                ] ) ;
                       t.jobs_scheduled <-
                         Job_key.Set.inter t.jobs_scheduled new_job_keys ) ;
                   Deferred.unit )
@@ -84,10 +127,15 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       |> Deferred.don't_wait_for ;
       t
 
-    let mark_scheduled t x =
-      t.jobs_scheduled <-
-        Job_key.Set.add t.jobs_scheduled
-          (One_or_two.map ~f:Work_spec.statement x)
+    let mark_scheduled ~logger t job =
+      let statement = One_or_two.map ~f:Work_spec.statement job in
+      (* Log to internal trace all of the newly available jobs. *)
+      [%log internal] "Snark_work_scheduled"
+        ~metadata:
+          [ ("work_ids", Transaction_snark_work.Statement.compact_json statement)
+          ; ("txs", yojson_summary job)
+          ] ;
+      t.jobs_scheduled <- Job_key.Set.add t.jobs_scheduled statement
 
     let does_not_have_better_fee ~snark_pool ~fee
         (statements : Inputs.Transaction_snark_work.Statement.t) : bool =
