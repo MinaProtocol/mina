@@ -15,7 +15,6 @@
   inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11-small";
   inputs.nixpkgs-old.url = "github:nixos/nixpkgs/nixos-23.05-small";
 
-  inputs.mix-to-nix.url = "github:serokell/mix-to-nix";
   inputs.nix-npm-buildPackage.url = "github:serokell/nix-npm-buildpackage";
   inputs.nix-npm-buildPackage.inputs.nixpkgs.follows = "nixpkgs";
   inputs.opam-nix.url = "github:tweag/opam-nix";
@@ -58,7 +57,7 @@
 
   inputs.flockenzeit.url = "github:balsoft/Flockenzeit";
 
-  outputs = inputs@{ self, nixpkgs, utils, mix-to-nix, nix-npm-buildPackage
+  outputs = inputs@{ self, nixpkgs, utils, nix-npm-buildPackage
     , opam-nix, opam-repository, nixpkgs-mozilla, flake-buildkite-pipeline
     , nix-utils, flockenzeit, nixpkgs-old, ... }:
     let
@@ -291,7 +290,6 @@
             nix-npm-buildPackage.overlays.default
             (final: prev: {
               rpmDebUtils = final.callPackage "${nix-utils}/utils/rpm-deb" { };
-              mix-to-nix = pkgs.callPackage inputs.mix-to-nix { };
               nix-npm-buildPackage =
                 pkgs.callPackage inputs.nix-npm-buildPackage {
                   nodejs = pkgs.nodejs-16_x;
