@@ -23,5 +23,14 @@ function override(functionName) {
 }
 
 // Overwrite only the functions that are already available in native
-override('caml_pasta_fp_poseidon_block_cipher');
-override('caml_pasta_fq_poseidon_block_cipher');
+[
+  'caml_pasta_fp_poseidon_block_cipher', // Poseidon
+  'caml_pasta_fq_poseidon_block_cipher', // Poseidon 
+  'WasmFpPolyComm', // PolyComm
+  'WasmFqPolyComm', // PolyComm
+  'WasmGPallas', // Group
+  'WasmGVesta', // Group
+  'WasmVecVecFp', // Vector
+  'WasmVecVecFq', // Vector
+].forEach(override);
+
