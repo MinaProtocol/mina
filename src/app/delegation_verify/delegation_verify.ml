@@ -148,7 +148,7 @@ module Make_verifier (Source : Submission.Data_source) = struct
     |> Deferred.Or_error.all_unit
 end
 
-let filesystem_command =
+let filesystem_command ~signature_kind =
   Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
       let%map_open block_dir = block_dir_flag
@@ -162,7 +162,6 @@ let filesystem_command =
           Genesis_constants.Compiled.constraint_constants
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -186,7 +185,7 @@ let filesystem_command =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let cassandra_command =
+let cassandra_command ~signature_kind =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
     Command.Let_syntax.(
       let%map_open cqlsh = cassandra_executable_flag
@@ -203,8 +202,6 @@ let cassandra_command =
           Genesis_constants.Compiled.constraint_constants
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
-
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -231,7 +228,7 @@ let cassandra_command =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let stdin_command =
+let stdin_command ~signature_kind =
   Command.async
     ~summary:"Verify submissions and blocks read from standard input"
     Command.Let_syntax.(
@@ -244,7 +241,6 @@ let stdin_command =
           Genesis_constants.Compiled.constraint_constants
         in
         let proof_level = Genesis_constants.Compiled.proof_level in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
@@ -265,11 +261,12 @@ let stdin_command =
             exit 1)
 
 let command =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Command.group
     ~summary:"A tool for verifying JSON payload submitted by the uptime service"
-    [ ("fs", filesystem_command)
-    ; ("cassandra", cassandra_command)
-    ; ("stdin", stdin_command)
+    [ ("fs", filesystem_command ~signature_kind)
+    ; ("cassandra", cassandra_command ~signature_kind)
+    ; ("stdin", stdin_command ~signature_kind)
     ]
 
 let () = Async.Command.run command
