@@ -345,7 +345,8 @@ let%test_module "account timing check" =
       let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
       let sparse_ledger_after, txns_applied =
         Mina_ledger.Sparse_ledger.apply_transactions ~constraint_constants
-          ~global_slot:txn_global_slot ~txn_state_view sparse_ledger_before
+          ~global_slot:txn_global_slot ~txn_state_view
+          ~signature_kind:Mina_signature_kind.Testnet sparse_ledger_before
           [ transaction ]
         |> Or_error.ok_exn
       in

@@ -258,9 +258,9 @@ module T = struct
   let pending_coinbase_collection { pending_coinbase_collection; _ } =
     pending_coinbase_collection
 
-  let verify_scan_state_after_apply ~constraint_constants
-      ~pending_coinbase_stack ~first_pass_ledger_end ~second_pass_ledger_end
-      (scan_state : Scan_state.t) =
+  let verify_scan_state_after_apply ~constraint_constants ~signature_kind
+      ~logger ~pending_coinbase_stack ~first_pass_ledger_end
+      ~second_pass_ledger_end (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
@@ -277,9 +277,9 @@ module T = struct
         ~f:(fun ((p, _), _) -> Ledger_proof.Cached.statement p)
         (Scan_state.latest_ledger_proof scan_state)
     in
-    Statement_scanner.check_invariants ~constraint_constants scan_state
-      ~statement_check ~verifier:() ~error_prefix ~registers_end
-      ~last_proof_statement
+    Statement_scanner.check_invariants ~constraint_constants ~signature_kind
+      ~logger scan_state ~statement_check ~verifier:() ~error_prefix
+      ~registers_end ~last_proof_statement
 
   let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
       ~constraint_constants ~pending_coinbase_collection =
@@ -287,7 +287,7 @@ module T = struct
 
   let of_scan_state_and_ledger ~logger
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~verifier ~last_proof_statement ~ledger ~scan_state
+      ~signature_kind ~verifier ~last_proof_statement ~ledger ~scan_state
       ~pending_coinbase_collection ~get_state ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
     let t =
@@ -301,7 +301,7 @@ module T = struct
     in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants ~constraint_constants
-        ~logger scan_state ~statement_check:(`Full get_state)
+        ~signature_kind ~logger scan_state ~statement_check:(`Full get_state)
         ~verifier:{ Statement_scanner_proof_verifier.logger; verifier }
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~last_proof_statement
@@ -316,9 +316,9 @@ module T = struct
     return t
 
   let of_scan_state_and_ledger_unchecked
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
-      ~last_proof_statement ~ledger ~scan_state ~pending_coinbase_collection
-      ~first_pass_ledger_target =
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~signature_kind ~logger ~last_proof_statement ~ledger ~scan_state
+      ~pending_coinbase_collection ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
@@ -326,8 +326,8 @@ module T = struct
       |> Deferred.return
     in
     let%bind () =
-      Statement_scanner.check_invariants ~constraint_constants ~logger
-        scan_state ~statement_check:`Partial ~verifier:()
+      Statement_scanner.check_invariants ~constraint_constants ~signature_kind
+        ~logger scan_state ~statement_check:`Partial ~verifier:()
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~last_proof_statement
         ~registers_end:
@@ -354,7 +354,8 @@ module T = struct
       let open Or_error.Let_syntax in
       let%map _ledger, partial_txn =
         Mina_ledger.Sparse_ledger.apply_transaction_first_pass
-          ~constraint_constants ~global_slot ~txn_state_view sparse_ledger txn
+          ~constraint_constants ~global_slot ~txn_state_view ~signature_kind
+          sparse_ledger txn
       in
       partial_txn
     in
@@ -380,9 +381,9 @@ module T = struct
       Scan_state.latest_ledger_proof scan_state
       |> Option.map ~f:(fun ((p, _), _) -> Ledger_proof.Cached.statement p)
     in
-    f ~constraint_constants ~last_proof_statement ~ledger:snarked_ledger
-      ~scan_state ~pending_coinbase_collection:pending_coinbases
-      ~first_pass_ledger_target
+    f ~constraint_constants ~signature_kind ~last_proof_statement
+      ~ledger:snarked_ledger ~scan_state
+      ~pending_coinbase_collection:pending_coinbases ~first_pass_ledger_target
 
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger
       ~constraint_constants ~verifier ~scan_state ~snarked_ledger
@@ -1147,8 +1148,8 @@ module T = struct
         [%log internal] "Verify_scan_state_after_apply" ;
         O1trace.thread "verify_scan_state_after_apply" (fun () ->
             Deferred.(
-              verify_scan_state_after_apply ~constraint_constants ~logger
-                ~first_pass_ledger_end
+              verify_scan_state_after_apply ~constraint_constants
+                ~signature_kind ~logger ~first_pass_ledger_end
                 ~second_pass_ledger_end:
                   (Frozen_ledger_hash.of_ledger_hash
                      (Ledger.merkle_root new_ledger) )
@@ -2095,7 +2096,7 @@ module T = struct
 
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~(global_slot : Mina_numbers.Global_slot_since_genesis.t)
+      ~signature_kind ~(global_slot : Mina_numbers.Global_slot_since_genesis.t)
       ?(log_block_creation = false) t ~coinbase_receiver ~logger
       ~current_state_view ~zkapp_cmd_limit
       ~(transactions_by_fee : User_command.Valid.t Sequence.t)
@@ -2203,8 +2204,7 @@ module T = struct
             let apply =
               Transaction_validator.apply_transaction_first_pass
                 ~constraint_constants ~global_slot validating_ledger
-                ~txn_state_view:current_state_view
-                ~signature_kind:Mina_signature_kind.t_DEPRECATED
+                ~txn_state_view:current_state_view ~signature_kind
             in
             (* Transactions in reverse order for faster removal if there is no
                space when creating the diff *)
@@ -2235,7 +2235,8 @@ module T = struct
             let%map diff =
               (* Fill in the statuses for commands. *)
               with_ledger_mask t.ledger ~f:(fun status_ledger ->
-                  Pre_diff_info.compute_statuses ~constraint_constants ~diff
+                  Pre_diff_info.compute_statuses ~constraint_constants
+                    ~signature_kind ~diff
                     ~coinbase_amount:
                       (Option.value_exn
                          (coinbase_amount ~constraint_constants
@@ -2395,6 +2396,8 @@ let%test_module "staged ledger tests" =
     let constraint_constants =
       Genesis_constants.For_unit_tests.Constraint_constants.t
 
+    let signature_kind = Mina_signature_kind.Testnet
+
     let zkapp_cmd_limit_hardcap = 200
 
     let logger = Logger.null ()
@@ -2433,8 +2436,8 @@ let%test_module "staged ledger tests" =
         supercharge_coinbase ~ledger:(Sl.ledger !sl) ~winner ~global_slot
       in
       let diff =
-        Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
-          ~current_state_view ~transactions_by_fee:txns
+        Sl.create_diff ~constraint_constants ~signature_kind ~global_slot !sl
+          ~logger ~current_state_view ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work ~supercharge_coinbase
           ~coinbase_receiver ~zkapp_cmd_limit
       in
@@ -2820,7 +2823,7 @@ let%test_module "staged ledger tests" =
                 let%map.Or_error _ledger, partial_txn =
                   Mina_ledger.Sparse_ledger.apply_transaction_first_pass
                     ~constraint_constants ~global_slot ~txn_state_view
-                    sparse_ledger txn
+                    ~signature_kind sparse_ledger txn
                 in
                 partial_txn
               in
@@ -3318,11 +3321,12 @@ let%test_module "staged ledger tests" =
                      (Account_id.create snark_worker_pk Token_id.default) ) ) )
           )
 
-    let compute_statuses ~ledger ~coinbase_amount ~global_slot diff =
+    let compute_statuses ~ledger ~coinbase_amount ~global_slot ~signature_kind
+        diff =
       with_ledger_mask ledger ~f:(fun status_ledger ->
           let diff =
-            Pre_diff_info.compute_statuses ~constraint_constants ~diff
-              ~coinbase_amount ~coinbase_receiver ~ledger:status_ledger
+            Pre_diff_info.compute_statuses ~constraint_constants ~signature_kind
+              ~diff ~coinbase_amount ~coinbase_receiver ~ledger:status_ledger
               ~global_slot
               ~txn_state_view:(dummy_state_view ~global_slot ())
             |> Result.map_error ~f:Pre_diff_info.Error.to_error
@@ -3340,6 +3344,7 @@ let%test_module "staged ledger tests" =
         match partition.second with
         | None ->
             compute_statuses ~ledger ~coinbase_amount ~global_slot
+              ~signature_kind
             @@ ( { completed_works = List.take completed_works job_count1
                  ; commands = List.take txns slots
                  ; coinbase = Zero
@@ -3349,6 +3354,7 @@ let%test_module "staged ledger tests" =
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             compute_statuses ~ledger ~coinbase_amount ~global_slot
+              ~signature_kind
               ( { completed_works = List.take completed_works job_count1
                 ; commands = List.take txns slots
                 ; coinbase = Zero
@@ -3489,8 +3495,8 @@ let%test_module "staged ledger tests" =
                     in
                     let current_state_view = dummy_state_view ~global_slot () in
                     let diff_result =
-                      Sl.create_diff ~constraint_constants ~global_slot !sl
-                        ~logger ~current_state_view
+                      Sl.create_diff ~constraint_constants ~signature_kind
+                        ~global_slot !sl ~logger ~current_state_view
                         ~transactions_by_fee:cmds_this_iter
                         ~get_completed_work:stmt_to_work ~coinbase_receiver
                         ~supercharge_coinbase:true ~zkapp_cmd_limit:None
@@ -4337,8 +4343,8 @@ let%test_module "staged ledger tests" =
               in
               let current_state_view = dummy_state_view ~global_slot () in
               let diff_result =
-                Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
-                  ~current_state_view
+                Sl.create_diff ~constraint_constants ~signature_kind
+                  ~global_slot !sl ~logger ~current_state_view
                   ~transactions_by_fee:(Sequence.of_list [ invalid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
@@ -4429,8 +4435,8 @@ let%test_module "staged ledger tests" =
                 , state_hashes.state_body_hash |> Option.value_exn )
               in
               let diff_result =
-                Sl.create_diff ~constraint_constants ~global_slot !sl ~logger
-                  ~current_state_view
+                Sl.create_diff ~constraint_constants ~signature_kind
+                  ~global_slot !sl ~logger ~current_state_view
                   ~transactions_by_fee:(Sequence.of_list [ valid_command ])
                   ~get_completed_work:(stmt_to_work_zero_fee ~prover:self_pk)
                   ~coinbase_receiver ~supercharge_coinbase:false
@@ -4640,8 +4646,8 @@ let%test_module "staged ledger tests" =
             , state_hashes.state_body_hash |> Option.value_exn )
           in
           match
-            Sl.create_diff ~constraint_constants ~global_slot sl ~logger
-              ~current_state_view
+            Sl.create_diff ~constraint_constants ~signature_kind ~global_slot sl
+              ~logger ~current_state_view
               ~transactions_by_fee:
                 (Sequence.of_list
                    [ valid_command_1
@@ -5239,8 +5245,8 @@ let%test_module "staged ledger tests" =
                     , state_hashes.state_body_hash |> Option.value_exn )
                   in
                   match
-                    Sl.create_diff ~constraint_constants ~global_slot !sl
-                      ~logger ~current_state_view
+                    Sl.create_diff ~constraint_constants ~signature_kind
+                      ~global_slot !sl ~logger ~current_state_view
                       ~transactions_by_fee:
                         (Sequence.singleton
                            (User_command.Zkapp_command invalid_zkapp_command) )

@@ -237,11 +237,11 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     (* TODO: handle transaction inclusion failures here *)
                     let diff_result =
                       Staged_ledger.create_diff ~constraint_constants
-                        ~global_slot staged_ledger ~coinbase_receiver ~logger
+                        ~signature_kind ~global_slot ~log_block_creation
+                        staged_ledger ~coinbase_receiver ~logger
                         ~current_state_view:previous_state_view
                         ~transactions_by_fee:transactions ~get_completed_work
-                        ~log_block_creation ~supercharge_coinbase
-                        ~zkapp_cmd_limit
+                        ~supercharge_coinbase ~zkapp_cmd_limit
                       |> Result.map ~f:(fun (diff, failed_txns) ->
                              if not (List.is_empty failed_txns) then
                                don't_wait_for

@@ -58,6 +58,7 @@ end) : sig
        t
     -> verifier:Verifier.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
+    -> signature_kind:Mina_signature_kind.t
     -> logger:Logger.t
     -> statement_check:
          [ `Full of State_hash.t -> Mina_state.Protocol_state.value Or_error.t

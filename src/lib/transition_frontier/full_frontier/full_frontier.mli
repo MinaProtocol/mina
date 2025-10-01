@@ -21,6 +21,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 include Frontier_intf.S

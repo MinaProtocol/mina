@@ -722,7 +722,8 @@ let get_snarked_ledger_full t state_hash_opt =
                   Mina_ledger.Sparse_ledger.apply_transaction_first_pass
                     ~constraint_constants:
                       t.config.precomputed_values.constraint_constants
-                    ~global_slot ~txn_state_view sparse_ledger txn
+                    ~global_slot ~txn_state_view ~signature_kind sparse_ledger
+                    txn
                 in
                 partial_txn
               in

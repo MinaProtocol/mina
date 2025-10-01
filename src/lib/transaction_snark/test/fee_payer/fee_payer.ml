@@ -197,7 +197,8 @@ let%test_module "Fee payer tests" =
                              Token_id.default ) )
                 in
                 Sparse_ledger.apply_transaction_first_pass ~constraint_constants
-                  ~global_slot ~txn_state_view sparse_ledger
+                  ~global_slot ~txn_state_view
+                  ~signature_kind:Mina_signature_kind.Testnet sparse_ledger
                   (Mina_transaction.Transaction.Command
                      (Zkapp_command zkapp_command) )
               with

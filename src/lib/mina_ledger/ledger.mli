@@ -184,6 +184,7 @@ val merkle_root_after_zkapp_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> txn_state_view:Zkapp_precondition.Protocol_state.View.t
+  -> signature_kind:Mina_signature_kind.t
   -> t
   -> Zkapp_command.Valid.t
   -> Ledger_hash.t

@@ -402,10 +402,11 @@ module For_tests = struct
       in
       let coinbase_receiver = largest_account_public_key in
       let staged_ledger_diff, _invalid_txns =
-        Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~global_slot:current_global_slot
+        Staged_ledger.create_diff
           ~constraint_constants:precomputed_values.constraint_constants
-          ~coinbase_receiver ~current_state_view ~supercharge_coinbase
+          ~signature_kind:precomputed_values.signature_kind
+          ~global_slot:current_global_slot parent_staged_ledger
+          ~coinbase_receiver ~logger ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work ~zkapp_cmd_limit
         |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
         |> Or_error.ok_exn

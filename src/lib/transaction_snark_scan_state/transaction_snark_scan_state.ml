@@ -253,7 +253,7 @@ type t =
 
 (**********Helpers*************)
 
-let create_expected_statement ~constraint_constants
+let create_expected_statement ~constraint_constants ~signature_kind
     ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
     ~connecting_merkle_root
     { Transaction_with_witness.transaction_with_info
@@ -285,7 +285,7 @@ let create_expected_statement ~constraint_constants
     let%bind first_pass_ledger_after_apply, partially_applied_transaction =
       Sparse_ledger.apply_transaction_first_pass ~constraint_constants
         ~global_slot:block_global_slot ~txn_state_view:state_view
-        first_pass_ledger_witness transaction
+        ~signature_kind first_pass_ledger_witness transaction
     in
     let%bind second_pass_ledger_after_apply, applied_transaction =
       Sparse_ledger.apply_transaction_second_pass second_pass_ledger_witness
@@ -414,7 +414,7 @@ struct
   end
 
   (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement (type merge) ~constraint_constants ~logger
+  let scan_statement (type merge) ~constraint_constants ~signature_kind ~logger
       ~merge_to_statement tree ~statement_check ~verify =
     let open Deferred.Or_error.Let_syntax in
     let timer = Timer.create ~logger () in
@@ -505,7 +505,7 @@ struct
                     (sprintf "create_expected_statement:%s" __LOC__) (fun () ->
                       Deferred.return
                         (create_expected_statement ~constraint_constants
-                           ~get_state
+                           ~signature_kind ~get_state
                            ~connecting_merkle_root:
                              transaction.statement.connecting_ledger_left
                            transaction ) )
@@ -585,7 +585,8 @@ struct
         Deferred.return (Error (`Error e))
 
   let check_invariants_impl parallel_scan_state ~merge_to_statement
-      ~constraint_constants ~logger ~statement_check ~verify ~error_prefix
+      ~constraint_constants ~signature_kind ~logger ~statement_check ~verify
+      ~error_prefix
       ~(last_proof_statement : Transaction_snark.Statement.t option)
       ~(registers_end :
          ( Frozen_ledger_hash.t
@@ -623,8 +624,8 @@ struct
     in
     match%map
       O1trace.sync_thread "validate_transaction_snark_scan_state" (fun () ->
-          scan_statement parallel_scan_state ~constraint_constants ~logger
-            ~statement_check ~verify ~merge_to_statement )
+          scan_statement parallel_scan_state ~constraint_constants
+            ~signature_kind ~logger ~statement_check ~verify ~merge_to_statement )
     with
     | Error (`Error e) ->
         Error e
