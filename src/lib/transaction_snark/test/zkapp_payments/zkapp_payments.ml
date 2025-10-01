@@ -29,7 +29,7 @@ let%test_module "Zkapp payments tests" =
       let hash =
         Ledger.merkle_root_after_zkapp_command_exn
           ~constraint_constants:U.constraint_constants ~global_slot
-          ~txn_state_view ~signature_kind:Mina_signature_kind.Testnet t txn
+          ~txn_state_view ~signature_kind:Testnet t txn
       in
       Frozen_ledger_hash.of_ledger_hash hash
 

@@ -524,7 +524,7 @@ let apply_transactions_and_keep_intermediate_ledgers
           Transaction.forget txn
           |> Sparse_ledger.apply_transaction_first_pass ~constraint_constants
                ~global_slot:txn_state_view.global_slot_since_genesis
-               ~txn_state_view ~signature_kind:Mina_signature_kind.Testnet l
+               ~txn_state_view ~signature_kind:Testnet l
           |> Or_error.ok_exn
         in
         (l', (l', txn')) )

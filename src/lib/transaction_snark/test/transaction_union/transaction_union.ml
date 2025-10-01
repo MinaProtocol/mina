@@ -137,8 +137,7 @@ let%test_module "Transaction union tests" =
                  ~txn_state_view:
                    ( txn_in_block.block_data
                    |> Mina_state.Protocol_state.Body.view )
-                 ~signature_kind:Mina_signature_kind.Testnet sparse_ledger
-                 txn_in_block.transaction )
+                 ~signature_kind:Testnet sparse_ledger txn_in_block.transaction )
               (fun (sparse_ledger, partially_applied) ->
                 Sparse_ledger.apply_transaction_second_pass sparse_ledger
                   partially_applied )

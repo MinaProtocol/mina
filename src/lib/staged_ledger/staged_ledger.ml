@@ -3180,9 +3180,8 @@ let%test_module "staged ledger tests" =
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
               let account_ids = ledger_account_ids ledger in
-              test_simple ~global_slot
-                ~signature_kind:Mina_signature_kind.Testnet account_ids zkapps
-                iters sl test_mask ~snarked_ledger `Many_provers
+              test_simple ~global_slot ~signature_kind:Testnet account_ids
+                zkapps iters sl test_mask ~snarked_ledger `Many_provers
                 stmt_to_work_random_prover ) )
 
     let%test_unit "Max_throughput with zkApp transactions that may fail" =
@@ -3193,9 +3192,8 @@ let%test_module "staged ledger tests" =
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
               let account_ids = ledger_account_ids ledger in
-              test_simple ~global_slot
-                ~signature_kind:Mina_signature_kind.Testnet account_ids zkapps
-                iters ~allow_failures:true sl test_mask ~snarked_ledger
+              test_simple ~global_slot ~signature_kind:Testnet account_ids
+                zkapps iters ~allow_failures:true sl test_mask ~snarked_ledger
                 `Many_provers stmt_to_work_random_prover ) )
 
     let%test_unit "Max throughput-ledger proof count-fixed blocks (zkApps)" =
@@ -3209,9 +3207,9 @@ let%test_module "staged ledger tests" =
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
               let account_ids = ledger_account_ids ledger in
-              test_simple ~global_slot
-                ~signature_kind:Mina_signature_kind.Testnet account_ids zkapps
-                iters sl ~expected_proof_count:(Some expected_proof_count)
+              test_simple ~global_slot ~signature_kind:Testnet account_ids
+                zkapps iters sl
+                ~expected_proof_count:(Some expected_proof_count)
                 ~check_snarked_ledger_transition:true test_mask ~snarked_ledger
                 `Many_provers stmt_to_work_random_prover ) )
 
@@ -3252,9 +3250,8 @@ let%test_module "staged ledger tests" =
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
               let account_ids = ledger_account_ids ledger in
-              test_simple ~global_slot
-                ~signature_kind:Mina_signature_kind.Testnet account_ids zkapps
-                iters sl test_mask ~snarked_ledger `Many_provers
+              test_simple ~global_slot ~signature_kind:Testnet account_ids
+                zkapps iters sl test_mask ~snarked_ledger `Many_provers
                 stmt_to_work_random_prover ) )
 
     let%test_unit "Be able to include random number of commands (One prover)" =
@@ -3282,9 +3279,8 @@ let%test_module "staged ledger tests" =
         ~f:(fun ((ledger, zkapps, iters), global_slot) ->
           async_with_given_ledger ledger (fun ~snarked_ledger sl test_mask ->
               let account_ids = ledger_account_ids ledger in
-              test_simple ~global_slot
-                ~signature_kind:Mina_signature_kind.Testnet account_ids zkapps
-                iters sl test_mask ~snarked_ledger
+              test_simple ~global_slot ~signature_kind:Testnet account_ids
+                zkapps iters sl test_mask ~snarked_ledger
                 ~check_snarked_ledger_transition:true `One_prover
                 stmt_to_work_one_prover ) )
 
@@ -4051,13 +4047,11 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Validate pending coinbase for random number of \
                    commands-random number of proofs-one prover)" =
-      pending_coinbase_test ~signature_kind:Mina_signature_kind.Testnet
-        `One_prover
+      pending_coinbase_test ~signature_kind:Testnet `One_prover
 
     let%test_unit "Validate pending coinbase for random number of \
                    commands-random number of proofs-many provers)" =
-      pending_coinbase_test ~signature_kind:Mina_signature_kind.Testnet
-        `Many_provers
+      pending_coinbase_test ~signature_kind:Testnet `Many_provers
 
     let timed_account n =
       let keypair =
@@ -4333,8 +4327,7 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Commands with Insufficient funds are not included" =
       let logger = Logger.null () in
-      Quickcheck.test
-        (command_insufficient_funds ~signature_kind:Mina_signature_kind.Testnet)
+      Quickcheck.test (command_insufficient_funds ~signature_kind:Testnet)
         ~trials:1 ~f:(fun (ledger_init_state, invalid_command, global_slot) ->
           async_with_ledgers ledger_init_state
             (fun ~snarked_ledger:_ sl _test_mask ->
@@ -4874,8 +4867,8 @@ let%test_module "staged ledger tests" =
       |> replace_authorizations ?prover ~keymap
 
     let%test_unit "Setting verification keys across differing accounts" =
-      test_staged_ledger_diff_validity
-        ~signature_kind:Mina_signature_kind.Testnet ~expectation:`Accept
+      test_staged_ledger_diff_validity ~signature_kind:Testnet
+        ~expectation:`Accept
         ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (b, privkey_b, _loc_b)
                     ->
           let `VK vk_a, `Prover prover_a =
@@ -4945,8 +4938,8 @@ let%test_module "staged ledger tests" =
 
     let%test_unit "Verification keys set in failed commands should not be \
                    usable later" =
-      test_staged_ledger_diff_validity
-        ~signature_kind:Mina_signature_kind.Testnet ~expectation:`Accept
+      test_staged_ledger_diff_validity ~signature_kind:Testnet
+        ~expectation:`Accept
         ~setup_test:(fun _ledger (a, privkey_a, _loc_a) (_b, _privkey_b, _loc_b)
                     ->
           let `VK vk_a, `Prover prover_a =
