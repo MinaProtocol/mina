@@ -45,7 +45,7 @@ let command_run =
             Postgres Out of Memory errors when handling very big genesis file. \
             Default is 100."
          (optional_with_default 100 int)
-     in
+     and signature_kind = Cli_lib.Flag.signature_kind in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
            Yojson.Safe.from_file file |> Runtime_config.of_yojson
@@ -67,7 +67,7 @@ let command_run =
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
          ~delete_older_than ~runtime_config_opt ~missing_blocks_width
-         ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+         ~signature_kind )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

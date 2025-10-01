@@ -3244,8 +3244,7 @@ module Block = struct
       ~hash ~v1_transaction_hash:false
 
   let add_from_precomputed conn ~proof_cache_db ~constraint_constants
-      (t : Precomputed.t) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      ~signature_kind (t : Precomputed.t) =
     let staged_ledger_diff =
       Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
         ~proof_cache_db t.staged_ledger_diff
@@ -4617,10 +4616,11 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
 
 (* used by `archive_blocks` app *)
 let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
-    ?retries ~pool ~delete_older_than block =
+    ~signature_kind ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:
-      (Block.add_from_precomputed ~logger ~proof_cache_db ~constraint_constants)
+      (Block.add_from_precomputed ~logger ~proof_cache_db ~constraint_constants
+         ~signature_kind )
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~accounts_accessed:block.Precomputed.accounts_accessed
@@ -4641,7 +4641,7 @@ let add_block_aux_extensional ~proof_cache_db ~logger ~signature_kind ?retries
 
 (* receive blocks from a daemon, write them to the database *)
 let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
-    ~logger ~delete_older_than : unit Deferred.t =
+    ~logger ~signature_kind ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
@@ -4650,7 +4650,6 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
           Block.add_if_doesn't_exist ~logger ~constraint_constants
         in
         let hash = State_hash.With_state_hashes.state_hash in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let block =
           With_hash.map
             ~f:
@@ -4871,14 +4870,14 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
           ~constraint_constants ~runtime_config_opt ~chunks_length
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
-        ~logger ~delete_older_than
+        ~logger ~signature_kind ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
             add_block_aux_precomputed ~proof_cache_db ~logger ~pool
-              ~genesis_constants ~constraint_constants ~delete_older_than
-              precomputed_block
+              ~genesis_constants ~constraint_constants ~signature_kind
+              ~delete_older_than precomputed_block
           with
           | Error e ->
               [%log warn]

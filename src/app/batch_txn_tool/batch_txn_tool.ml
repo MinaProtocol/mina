@@ -401,13 +401,12 @@ let output_there_and_back_cmds =
        Cli_lib.Flag.fee_common
          ~minimum_user_command_fee:genesis_constants.minimum_user_command_fee
          ~default_transaction_fee:default
-     in
+     and signature_kind = Cli_lib.Flag.signature_kind in
      there_and_back_again ~num_txn_per_acct ~txns_per_block ~txn_fee_option
        ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_secret_key_path ~origin_sender_secret_key_pw_option
        ~returner_secret_key_path ~returner_secret_key_pw_option
-       ~graphql_target_node_option ~minimum_user_command_fee
-       ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+       ~graphql_target_node_option ~minimum_user_command_fee ~signature_kind )
 
 let () =
   Command.run
