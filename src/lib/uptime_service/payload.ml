@@ -22,9 +22,9 @@ type request =
   }
 [@@deriving to_yojson]
 
-let sign_blake2_hash ~private_key s =
+let sign_blake2_hash ~private_key ~signature_kind block_data_string =
   let module Field = Snark_params.Tick.Field in
-  let blake2 = Blake2.digest_string s in
+  let blake2 = Blake2.digest_string block_data_string in
   let field_elements = [||] in
   let bitstrings =
     [| Blake2.to_raw_string blake2 |> Blake2.string_to_bits |> Array.to_list |]
@@ -32,15 +32,14 @@ let sign_blake2_hash ~private_key s =
   let input : (Field.t, bool) Random_oracle.Legacy.Input.t =
     { field_elements; bitstrings }
   in
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Schnorr.Legacy.sign ~signature_kind private_key input
 
-let create_request block_data submitter_keypair =
+let create_request ~signature_kind block_data submitter_keypair =
   let block_data_json = block_data_to_yojson block_data in
   let block_data_string = Yojson.Safe.to_string block_data_json in
   let signature =
     sign_blake2_hash ~private_key:submitter_keypair.Keypair.private_key
-      block_data_string
+      ~signature_kind block_data_string
   in
   { version
   ; data = block_data

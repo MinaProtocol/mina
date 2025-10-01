@@ -23,10 +23,12 @@ module Proof_data = struct
 end
 
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
-    ~state_hash ~produced block_data =
+    ~state_hash ~produced ~signature_kind block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let request = Payload.create_request block_data submitter_keypair in
+  let request =
+    Payload.create_request ~signature_kind block_data submitter_keypair
+  in
   let json = Payload.request_to_yojson request in
   let headers =
     Cohttp.Header.of_list [ ("Content-Type", "application/json") ]
@@ -163,7 +165,7 @@ let block_base64_of_breadcrumb breadcrumb =
 
 let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~graphql_control_port ~block_produced_bvar
-    ~built_with_commit_sha tm =
+    ~built_with_commit_sha ~signature_kind tm =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
   let timeout_min = 3.0 in
@@ -193,7 +195,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
         }
       in
       send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
-        ~produced:true block_data
+        ~produced:true ~signature_kind block_data
 
 let read_all_proofs_for_work_single_spec =
   Snark_work_lib.Work.Single.Spec.map
@@ -203,7 +205,7 @@ let read_all_proofs_for_work_single_spec =
 let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
     ~url ~snark_worker ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) ~snark_work_fee ~graphql_control_port
-    ~built_with_commit_sha =
+    ~built_with_commit_sha ~signature_kind =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       (* expected during daemon boot, so not logging as error *)
@@ -239,7 +241,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
           }
         in
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-          ~state_hash ~produced:false block_data )
+          ~state_hash ~produced:false ~signature_kind block_data )
       else
         let best_tip_staged_ledger =
           Transition_frontier.Breadcrumb.staged_ledger best_tip
@@ -280,7 +282,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
               }
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-              ~state_hash ~produced:false block_data
+              ~state_hash ~produced:false ~signature_kind block_data
         | Ok job_one_or_twos -> (
             let transitions =
               List.concat_map job_one_or_twos ~f:One_or_two.to_list
@@ -325,7 +327,7 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                   }
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-                  ~state_hash ~produced:false block_data
+                  ~state_hash ~produced:false ~signature_kind block_data
             | Some single_spec -> (
                 match%bind
                   make_interruptible
@@ -368,12 +370,14 @@ let send_block_and_transaction_snark ~logger ~constraint_constants ~interruptor
                       }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
-                      ~url ~state_hash ~produced:false block_data ) ) )
+                      ~url ~state_hash ~produced:false ~signature_kind
+                      block_data ) ) )
 
 let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
     ~protocol_constants ~transition_frontier ~time_controller
     ~block_produced_bvar ~uptime_submitter_keypair ~get_next_producer_timing
-    ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha =
+    ~get_snark_work_fee ~get_peer ~graphql_control_port ~built_with_commit_sha
+    ~signature_kind =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -465,7 +469,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                      block" ;
                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
                     ~submitter_keypair ~graphql_control_port
-                    ~built_with_commit_sha ~block_produced_bvar
+                    ~block_produced_bvar ~built_with_commit_sha ~signature_kind
                     next_producer_time
                 in
                 let send_block_and_snark_work () =
@@ -475,7 +479,7 @@ let start ~logger ~uptime_url ~snark_worker_opt ~constraint_constants
                   send_block_and_transaction_snark ~logger ~interruptor ~url
                     ~constraint_constants ~snark_worker ~transition_frontier
                     ~peer_id ~submitter_keypair ~snark_work_fee
-                    ~graphql_control_port ~built_with_commit_sha
+                    ~graphql_control_port ~built_with_commit_sha ~signature_kind
                 in
                 match get_next_producer_time_opt () with
                 | None ->
