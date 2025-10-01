@@ -967,7 +967,7 @@ module For_tests = struct
 
     let consensus_constants = precomputed_values.consensus_constants
 
-    let signature_kind = Mina_signature_kind.t_DEPRECATED
+    let signature_kind = Mina_signature_kind.Testnet
   end
 
   let verifier () =
