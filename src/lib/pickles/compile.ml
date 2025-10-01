@@ -383,6 +383,7 @@ struct
        ?(num_chunks = Plonk_checks.num_chunks_by_default) ?(lazy_mode = false)
        ~branches ~prev_varss_length ~max_proofs_verified ~name
        ?constraint_constants ~public_input ~auxiliary_typ ~choices () ->
+    print_endline "M is compiling (inside)";
     let snark_keys_header kind constraint_system_hash =
       let constraint_constants : Snark_keys_header.Constraint_constants.t =
         match constraint_constants with
@@ -469,6 +470,7 @@ struct
           Common.wrap_domains
             ~proofs_verified:(Pickles_base.Proofs_verified.to_int override)
     in
+    print_endline "domains wrapped";
     Timer.clock __LOC__ ;
     let module Branch_data = struct
       type ('vars, 'vals, 'n, 'm) t =
@@ -501,6 +503,7 @@ struct
       let module V = H4.To_vector (Int) in
       V.f prev_varss_length (M.f choices)
     in
+    print_endline "proofs verified";
     let step_data =
       let i = ref 0 in
       Timer.clock __LOC__ ;
@@ -529,6 +532,7 @@ struct
       in
       f (choices, Promise.return ())
     in
+    print_endline "data stepped";
     Timer.clock __LOC__ ;
     let step_domains =
       let module Domains_promise = struct
@@ -543,12 +547,12 @@ struct
       let module V = H4.To_vector (Domains_promise) in
       V.f prev_varss_length (M.f step_data)
     in
-
     let all_step_domains = promise_all step_domains in
     let run_in_sequence = create_lock () in
 
     let cache_handle = ref (Lazy.return (Promise.return `Cache_hit)) in
     let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
+    print_endline "preparing to step keypairs";
     Timer.clock __LOC__ ;
     let step_keypairs =
       let disk_keys =
@@ -642,6 +646,7 @@ struct
              Tick.Keypair.full_vk_commitments
                (fst (Option.value_exn @@ Promise.peek @@ Lazy.force vk)) ) )
     in
+    print_endline "vks stepped";
     Timer.clock __LOC__ ;
     let wrap_requests, wrap_main =
       match override_wrap_main with
@@ -662,6 +667,7 @@ struct
           wrap_main wrap_domains full_signature prev_varss_length step_vks
             proofs_verifieds all_step_domains max_proofs_verified
     in
+    print_endline "wrap requests finished";
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
@@ -704,6 +710,7 @@ struct
       in
       (r, disk_key_verifier)
     in
+    print_endline "disk keys verified";
     Timer.clock __LOC__ ;
     let wrap_vk =
       Lazy.map wrap_vk
@@ -851,6 +858,7 @@ struct
       in
       go step_data step_keypairs
     in
+    print_endline "provers manufactured";
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
       { max_proofs_verified
@@ -875,6 +883,7 @@ struct
               ((2 * (permuts + 1) * num_chunks) - 2 + permuts) / permuts )
       }
     in
+    print_endline "data!";
     Timer.clock __LOC__ ;
     Types_map.add_exn self data ;
     (provers, wrap_vk, disk_key, !cache_handle)
@@ -1046,6 +1055,7 @@ let compile_with_wrap_main_override_promise :
     | Some self ->
         self
   in
+  print_endline "compile promise begins";
   (* Extract to_fields methods from the public input declaration. *)
   let (a_var_to_fields : a_var -> _), (a_value_to_fields : a_value -> _) =
     match public_input with
@@ -1109,12 +1119,14 @@ let compile_with_wrap_main_override_promise :
     let module IR_hlist = H4_6_with_length.T (Inductive_rule.Promise) in
     IR_hlist.length choices
   in
+  print_endline "M is compiling, watch out";
   let provers, wrap_vk, wrap_disk_key, cache_handle =
     M.compile ~self ~proof_cache ~cache ~storables ?disk_keys
       ?override_wrap_domain ?override_wrap_main ?num_chunks ?lazy_mode ~branches
       ~prev_varss_length ~max_proofs_verified ~name ~public_input ~auxiliary_typ
       ?constraint_constants ~choices:(conv_irs choices) ()
   in
+  print_endline "provers created";
   let (module Max_proofs_verified) = max_proofs_verified in
   let T = Max_proofs_verified.eq in
   let module Value = struct
