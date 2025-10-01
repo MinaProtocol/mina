@@ -6,7 +6,7 @@ open Rosetta_lib
 open Signature_lib
 open Lib
 
-let sign_command ~signature_kind =
+let sign_command ?signature_kind () =
   let open Command.Let_syntax in
   let%map_open unsigned_transaction =
     flag "--unsigned-transaction" ~aliases:[ "unsigned-transaction" ]
@@ -14,6 +14,9 @@ let sign_command ~signature_kind =
   and private_key =
     flag "--private-key" ~aliases:[ "private-key" ] ~doc:"Private key hex bytes"
       (required string)
+  and signature_kind =
+    Option.value_map signature_kind ~default:Cli_lib.Flag.signature_kind
+      ~f:Command.Param.return
   in
   let open Deferred.Let_syntax in
   fun () ->
@@ -31,7 +34,7 @@ let sign_command ~signature_kind =
         eprintf "Failed to sign transaction %s" (Errors.show e) ;
         exit 1
 
-let verify_message_command ~signature_kind =
+let verify_message_command ?signature_kind () =
   let open Command.Let_syntax in
   let%map_open signature =
     flag "--signature" ~doc:"Rosetta signature" (required string)
@@ -40,6 +43,9 @@ let verify_message_command ~signature_kind =
   and public_key =
     flag "--public-key" ~aliases:[ "public-key" ] ~doc:"Public key hex bytes"
       (required string)
+  and signature_kind =
+    Option.value_map signature_kind ~default:Cli_lib.Flag.signature_kind
+      ~f:Command.Param.return
   in
   let open Deferred.Let_syntax in
   fun () ->
@@ -54,7 +60,7 @@ let verify_message_command ~signature_kind =
         eprintf "Signature does not verify against this public key" ;
         exit 1
 
-let verify_command ~signature_kind =
+let verify_command ?signature_kind () =
   let open Command.Let_syntax in
   let%map_open signed_transaction =
     flag "--signed-transaction" ~aliases:[ "signed-transaction" ]
@@ -62,6 +68,9 @@ let verify_command ~signature_kind =
   and public_key =
     flag "--public-key" ~aliases:[ "public-key" ] ~doc:"Public key hex bytes"
       (required string)
+  and signature_kind =
+    Option.value_map signature_kind ~default:Cli_lib.Flag.signature_kind
+      ~f:Command.Param.return
   in
   let open Deferred.Let_syntax in
   fun () ->
@@ -154,16 +163,16 @@ let convert_signature_command =
     printf "%s\n" (Mina_base.Signature.Raw.encode (field, scalar)) ;
     return ()
 
-let commands ~signature_kind =
+let commands ?signature_kind () =
   [ ( "sign"
     , Command.async ~summary:"Sign an unsigned transaction"
-      @@ sign_command ~signature_kind )
+      @@ sign_command ?signature_kind () )
   ; ( "verify"
     , Command.async
         ~summary:
           "Verify the signature of a signed transaction. Exits 0 if the \
            signature verifies."
-      @@ verify_command ~signature_kind )
+      @@ verify_command ?signature_kind () )
   ; ( "derive-public-key"
     , Command.async ~summary:"Import a private key, returns a public-key"
         derive_command )
@@ -177,7 +186,7 @@ let commands ~signature_kind =
         convert_signature_command )
   ; ( "verify-message"
     , Command.async ~summary:"Verify a string message was signed properly"
-      @@ verify_message_command ~signature_kind )
+      @@ verify_message_command ?signature_kind () )
   ; ( "hex-of-private-key-file"
     , Command.async
         ~summary:"Read a private key file and display it as hexadecimal"
