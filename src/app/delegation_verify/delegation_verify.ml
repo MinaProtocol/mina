@@ -148,13 +148,14 @@ module Make_verifier (Source : Submission.Data_source) = struct
     |> Deferred.Or_error.all_unit
 end
 
-let filesystem_command ~signature_kind =
+let filesystem_command =
   Command.async ~summary:"Verify submissions and block read from the filesystem"
     Command.Let_syntax.(
       let%map_open block_dir = block_dir_flag
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
-      and config_file = config_flag in
+      and config_file = config_flag
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let logger = Logger.create () in
         let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -185,7 +186,7 @@ let filesystem_command ~signature_kind =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let cassandra_command ~signature_kind =
+let cassandra_command =
   Command.async ~summary:"Verify submissions and block read from Cassandra"
     Command.Let_syntax.(
       let%map_open cqlsh = cassandra_executable_flag
@@ -193,7 +194,8 @@ let cassandra_command ~signature_kind =
       and config_file = config_flag
       and keyspace = keyspace_flag
       and period_start = timestamp
-      and period_end = timestamp in
+      and period_end = timestamp
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
@@ -228,11 +230,13 @@ let cassandra_command ~signature_kind =
             Output.display_error @@ Error.to_string_hum e ;
             exit 1)
 
-let stdin_command ~signature_kind =
+let stdin_command =
   Command.async
     ~summary:"Verify submissions and blocks read from standard input"
     Command.Let_syntax.(
-      let%map_open config_file = config_flag and no_checks = no_checks_flag in
+      let%map_open config_file = config_flag
+      and no_checks = no_checks_flag
+      and signature_kind = Cli_lib.Flag.signature_kind in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
@@ -261,12 +265,11 @@ let stdin_command ~signature_kind =
             exit 1)
 
 let command =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   Command.group
     ~summary:"A tool for verifying JSON payload submitted by the uptime service"
-    [ ("fs", filesystem_command ~signature_kind)
-    ; ("cassandra", cassandra_command ~signature_kind)
-    ; ("stdin", stdin_command ~signature_kind)
+    [ ("fs", filesystem_command)
+    ; ("cassandra", cassandra_command)
+    ; ("stdin", stdin_command)
     ]
 
 let () = Async.Command.run command

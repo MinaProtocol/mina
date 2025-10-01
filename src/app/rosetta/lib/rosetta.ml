@@ -155,7 +155,7 @@ let server_handler ~signature_kind ~pool ~graphql_uri ~logger
       [%log warn] ~metadata "Error response: $error" ;
       respond_500 error
 
-let command ~signature_kind ~minimum_user_command_fee ~account_creation_fee =
+let command ?signature_kind ~minimum_user_command_fee ~account_creation_fee () =
   let open Command.Let_syntax in
   let%map_open archive_uri =
     flag "--archive-uri" ~aliases:[ "archive-uri" ]
@@ -173,6 +173,9 @@ let command ~signature_kind ~minimum_user_command_fee ~account_creation_fee =
   and port =
     flag "--port" ~aliases:[ "port" ] ~doc:"Port to expose Rosetta server"
       (required int)
+  and signature_kind =
+    Option.value_map signature_kind ~default:Cli_lib.Flag.signature_kind
+      ~f:Command.Param.return
   in
   let open Deferred.Let_syntax in
   fun () ->
