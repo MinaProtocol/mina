@@ -729,7 +729,6 @@ module Genesis_proof = struct
     ; constraint_system_digests = None
     ; genesis_constants
     ; genesis_body_reference
-    ; signature_kind = Mina_signature_kind.t_DEPRECATED
     }
 
   let generate (inputs : Genesis_proof.Inputs.t) =
@@ -748,7 +747,6 @@ module Genesis_proof = struct
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
              ; genesis_body_reference = inputs.genesis_body_reference
-             ; signature_kind = Mina_signature_kind.t_DEPRECATED
              }
     | _ ->
         Deferred.return (Genesis_proof.create_values_no_proof inputs)
