@@ -1852,7 +1852,11 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
-         let%map ({ consensus_constants; _ } as precomputed_values), _ =
+         let%map { consensus_constants; constraint_constants; _ }, _ =
+           (* Signature kind Testnet is used here as a stub
+              Neither constraint_constants nor consensus_constants are dependent
+              on signature kind.
+           *)
            config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
            >>| Option.value
                  ~default:
@@ -1862,8 +1866,7 @@ let compile_time_constants =
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
                  ~cli_proof_level:None ~genesis_dir
-                 ~genesis_backing_type:Stable_db
-                 ~signature_kind:Mina_signature_kind.t_DEPRECATED
+                 ~genesis_backing_type:Stable_db ~signature_kind:Testnet
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -1878,12 +1881,9 @@ let compile_time_constants =
              ; ( "coinbase"
                , `String
                    (Currency.Amount.to_mina_string
-                      precomputed_values.constraint_constants.coinbase_amount )
-               )
+                      constraint_constants.coinbase_amount ) )
              ; ( "block_window_duration_ms"
-               , `Int
-                   precomputed_values.constraint_constants
-                     .block_window_duration_ms )
+               , `Int constraint_constants.block_window_duration_ms )
              ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
              ; ( "sub_windows_per_window"
                , `Int
