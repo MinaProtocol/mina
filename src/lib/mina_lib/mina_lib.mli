@@ -224,7 +224,11 @@ val start_with_precomputed_blocks :
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
 val create :
-  commit_id:string -> ?wallets:Secrets.Wallets.t -> Config.t -> t Deferred.t
+     signature_kind:Mina_signature_kind.t
+  -> commit_id:string
+  -> ?wallets:Secrets.Wallets.t
+  -> Config.t
+  -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.Cached.t option
 

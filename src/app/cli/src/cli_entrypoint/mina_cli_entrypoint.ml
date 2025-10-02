@@ -1393,7 +1393,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
           let start_time = Time.now () in
           let%map mina =
-            Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
+            Mina_lib.create ~signature_kind ~commit_id:Mina_version.commit_id
+              ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config

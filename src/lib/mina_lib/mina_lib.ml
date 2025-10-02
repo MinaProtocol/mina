@@ -1759,8 +1759,7 @@ let initialize_zkapp_vk_cache_db (config : Config.t) =
     (config.conf_dir ^/ "zkapp_vk_cache")
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
-let create ~commit_id ?wallets (config : Config.t) =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let create ~signature_kind ~commit_id ?wallets (config : Config.t) =
   [%log' info config.logger] "Creating daemon with commit id: %s" commit_id ;
   let commit_id_short = shorten_commit_id commit_id in
   let constraint_constants = config.precomputed_values.constraint_constants in
