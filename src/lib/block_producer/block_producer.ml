@@ -1451,9 +1451,12 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               ~delta_block_chain_proof ()
           in
           let body =
+            (* We purposefully ignore some hashes that are already stored in legacy format *)
             Body.create
-              (Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
-                 ~proof_cache_db staged_ledger_diff )
+              ( Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+                  ~proof_cache_db
+              @@ Mina_block.Legacy_format.Staged_ledger_diff
+                 .to_stable_staged_ledger_diff staged_ledger_diff )
           in
           let%bind transition =
             let open Result.Let_syntax in
@@ -1496,7 +1499,10 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   ~signature_kind:Context.signature_kind ()
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
-                         `Invalid_staged_ledger_diff (e, staged_ledger_diff)
+                         `Invalid_staged_ledger_diff
+                           ( e
+                           , Mina_block.Legacy_format.Staged_ledger_diff
+                             .to_stable_staged_ledger_diff staged_ledger_diff )
                      | ( `Fatal_error _
                        | `Invalid_genesis_protocol_state
                        | `Invalid_staged_ledger_hash _

@@ -22,7 +22,7 @@ module Stable : sig
       { scheduled_time : Block_time.Stable.V1.t
       ; protocol_state : Protocol_state.Value.Stable.V2.t
       ; protocol_state_proof : Mina_base.Proof.Stable.V2.t
-      ; staged_ledger_diff : Staged_ledger_diff.Stable.V2.t
+      ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.V1.t
       ; delta_transition_chain_proof :
           Frozen_ledger_hash.Stable.V1.t * Frozen_ledger_hash.Stable.V1.t list
       ; protocol_version : Protocol_version.Stable.V2.t
@@ -40,7 +40,7 @@ type t = Stable.Latest.t =
   { scheduled_time : Block_time.Time.t
   ; protocol_state : Protocol_state.value
   ; protocol_state_proof : Proof.t
-  ; staged_ledger_diff : Staged_ledger_diff.Stable.Latest.t
+  ; staged_ledger_diff : Legacy_format.Staged_ledger_diff.Stable.Latest.t
   ; delta_transition_chain_proof :
       Frozen_ledger_hash.t * Frozen_ledger_hash.t list
   ; protocol_version : Protocol_version.t
@@ -52,7 +52,8 @@ type t = Stable.Latest.t =
 [@@deriving sexp, yojson]
 
 val of_block :
-     logger:Logger.t
+     signature_kind:Mina_signature_kind.t
+  -> logger:Logger.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> scheduled_time:Block_time.Time.t
   -> staged_ledger:Staged_ledger.t

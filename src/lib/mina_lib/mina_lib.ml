@@ -2431,6 +2431,7 @@ let create ~signature_kind ~commit_id ?wallets (config : Config.t) =
               ~is_storing_all:config.is_archive_rocksdb
               ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
               ~time_controller:config.time_controller ~precomputed_block_writer
+              ~signature_kind
           in
           let open Mina_incremental.Status in
           let transition_frontier_incr =

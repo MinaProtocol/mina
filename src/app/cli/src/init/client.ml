@@ -328,14 +328,21 @@ let verify_receipt =
            let of_payment_json =
              if use_legacy_json then
                Fn.compose
-                 (Result.map ~f:User_command.read_all_proofs_from_disk)
+                 (Result.map
+                    ~f:
+                      Mina_block.Legacy_format.User_command
+                      .to_stable_user_command )
                  Mina_block.Legacy_format.User_command.of_yojson
              else User_command.Stable.Latest.of_yojson
            in
            let of_proof_json =
              let unwrap_proof =
                Tuple2.map_snd
-                 ~f:(List.map ~f:User_command.read_all_proofs_from_disk)
+                 ~f:
+                   (List.map
+                      ~f:
+                        Mina_block.Legacy_format.User_command
+                        .to_stable_user_command )
              in
              if use_legacy_json then
                Fn.compose

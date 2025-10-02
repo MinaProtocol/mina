@@ -53,6 +53,18 @@ let test_do ledger_proofs tmp_dir =
   printf "Growth with cache: %d\n" growth_cached ;
   assert (growth_cached * 50 < growth)
 
+let completed_works
+    (diff :
+      ( Transaction_snark_work.Stable.Latest.t
+      , _ )
+      Staged_ledger_diff.Pre_diff_two.t
+      * ( Transaction_snark_work.Stable.Latest.t
+        , _ )
+        Staged_ledger_diff.Pre_diff_one.t
+        option ) =
+  (fst diff).completed_works
+  @ Option.value_map (snd diff) ~default:[] ~f:(fun d -> d.completed_works)
+
 (** Test reads precomputed json file, extracts ledger proofs and writes them to disk.
   Then it repeatedly reads the file 10x times and measures memory growth with both using memory caching and not.
   Test asserts that memory used for storing proofs is 50x smaller than when not using memory caching.
@@ -69,8 +81,7 @@ let test large_precomputed_json_file : unit =
         failwith err
   in
   let ledger_proofs =
-    Staged_ledger_diff.Stable.Latest.completed_works
-      precomputed.staged_ledger_diff
+    completed_works precomputed.staged_ledger_diff.diff
     |> List.concat_map
          ~f:
            (Fn.compose One_or_two.to_list

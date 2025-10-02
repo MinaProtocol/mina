@@ -3246,8 +3246,11 @@ module Block = struct
   let add_from_precomputed conn ~proof_cache_db ~constraint_constants
       ~signature_kind (t : Precomputed.t) =
     let staged_ledger_diff =
-      Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
-        ~proof_cache_db t.staged_ledger_diff
+      (* We purposefully ignore some hashes that are already stored in legacy format *)
+      Mina_block.Legacy_format.Staged_ledger_diff.to_stable_staged_ledger_diff
+        t.staged_ledger_diff
+      |> Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+           ~proof_cache_db
     in
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff
