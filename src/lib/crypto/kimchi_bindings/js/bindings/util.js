@@ -6,9 +6,35 @@
 // Provides: tsBindings
 var tsBindings = globalThis.__snarkyTsBindings;
 
+// Provides: usingNativeBackend
+// Requires: plonk_wasm, globalThis
+var usingNativeBackend = Boolean(
+  (typeof plonk_wasm === 'object' && plonk_wasm && plonk_wasm.__native_backend) ||
+    (typeof globalThis !== 'undefined' && globalThis.__native_backend)
+);
+
+// Provides: nativeConversionFactory
+// Requires: tsBindings
+var nativeConversionFactory =
+  typeof tsBindings.nativeRustConversion === 'function'
+    ? tsBindings.nativeRustConversion
+    : undefined;
+
+// Provides: nativeConversion
+// Requires: tsBindings, plonk_wasm
+var nativeConversion = nativeConversionFactory
+  ? nativeConversionFactory(plonk_wasm)
+  : undefined;
+
 // Provides: tsRustConversion
 // Requires: tsBindings, plonk_wasm
-var tsRustConversion = tsBindings.rustConversion(plonk_wasm);
+var tsRustConversion = usingNativeBackend && nativeConversion
+  ? nativeConversion
+  : tsBindings.rustConversion(plonk_wasm);
+
+// Provides: tsNativeRustConversion
+// Requires: tsBindings, plonk_wasm
+var tsNativeRustConversion = nativeConversion || tsRustConversion;
 
 // Provides: getTsBindings
 // Requires: tsBindings
