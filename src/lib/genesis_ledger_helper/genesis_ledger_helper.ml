@@ -731,11 +731,11 @@ module Genesis_proof = struct
     ; genesis_body_reference
     }
 
-  let generate (inputs : Genesis_proof.Inputs.t) =
+  let generate ~signature_kind (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
         Deferred.return
-        @@ Genesis_proof.create_values_no_proof
+          (Genesis_proof.create_values_no_proof ~signature_kind
              { genesis_ledger = inputs.genesis_ledger
              ; genesis_epoch_data = inputs.genesis_epoch_data
              ; runtime_config = inputs.runtime_config
@@ -747,9 +747,10 @@ module Genesis_proof = struct
              ; consensus_constants = inputs.consensus_constants
              ; constraint_constants = inputs.constraint_constants
              ; genesis_body_reference = inputs.genesis_body_reference
-             }
+             } )
     | _ ->
-        Deferred.return (Genesis_proof.create_values_no_proof inputs)
+        Deferred.return
+          (Genesis_proof.create_values_no_proof ~signature_kind inputs)
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -907,15 +908,15 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~genesis_backing_type
-    ?overwrite_version ?genesis_dir (config : Runtime_config.t) :
-    (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
+    ~signature_kind ?overwrite_version ?genesis_dir (config : Runtime_config.t)
+    : (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
   let open Deferred.Or_error.Let_syntax in
   let%map inputs, config =
     inputs_from_config_file ~cli_proof_level ~genesis_constants
       ~constraint_constants ~logger ~proof_level ~genesis_backing_type
       ?overwrite_version ?genesis_dir config
   in
-  let values = Genesis_proof.create_values_no_proof inputs in
+  let values = Genesis_proof.create_values_no_proof ~signature_kind inputs in
   (values, config)
 
 let upgrade_old_config ~logger filename json =

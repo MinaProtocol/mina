@@ -449,9 +449,9 @@ let signature_kind =
         | "mainnet" ->
             Mina_signature_kind.Mainnet
         | "testnet" ->
-            Mina_signature_kind.Testnet
+            Testnet
         | other ->
-            Mina_signature_kind.Other_network other )
+            Other_network other )
   in
   flag "--signature-kind"
     ~doc:

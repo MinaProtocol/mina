@@ -23,6 +23,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -250,7 +252,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               ~verifier ~get_completed_work ~trust_system
               ~transition_receipt_time ~sender:(Some sender)
               ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-              ?transaction_pool_proxy (* TODO: Can we skip here? *) () )
+              ~signature_kind:Context.signature_kind ?transaction_pool_proxy
+              (* TODO: Can we skip here? *) () )
           ~transform_result:(function
             | Error (`Invalid_staged_ledger_hash error)
             | Error (`Invalid_staged_ledger_diff error) ->
@@ -320,7 +323,8 @@ let run ~context:(module Context : CONTEXT) ~verifier ~trust_system
   let open Context in
   let catchup_scheduler =
     Catchup_scheduler.create ~logger ~precomputed_values ~verifier ~trust_system
-      ~frontier ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
+      ~frontier ~time_controller ~catchup_job_writer
+      ~signature_kind:Context.signature_kind ~catchup_breadcrumbs_writer
       ~clean_up_signal:clean_up_catchup_scheduler
   in
   let add_and_finalize =
@@ -511,6 +515,8 @@ let%test_module "Transition_handler.Processor tests" =
       let constraint_constants = constraint_constants
 
       let consensus_constants = precomputed_values.consensus_constants
+
+      let signature_kind = Mina_signature_kind.Testnet
     end
 
     let downcast_breadcrumb breadcrumb =

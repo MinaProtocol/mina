@@ -797,6 +797,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
        -> transition:Mina_block.almost_valid_block
        -> sender:Envelope.Sender.t option
        -> transition_receipt_time:Time.t option
+       -> signature_kind:Mina_signature_kind.t
        -> unit
        -> ( Breadcrumb.t
           , [> `Invalid_staged_ledger_diff of Error.t
@@ -1027,7 +1028,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
             build_func ~logger ~skip_staged_ledger_verification:`Proofs
               ~precomputed_values ~verifier ~trust_system ~parent
               ~transition:av.data ~sender:(Some av.sender)
-              ~transition_receipt_time ()
+              ~transition_receipt_time ~signature_kind:Context.signature_kind ()
           in
           step (Deferred.map ~f:Result.return s)
         with

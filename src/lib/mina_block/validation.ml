@@ -476,8 +476,9 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
       failwith "why can't this be refuted?"
 
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
-    ~get_completed_work ~precomputed_values ~verifier ~parent_staged_ledger
-    ~parent_protocol_state ?transaction_pool_proxy (t, validation) =
+    ~get_completed_work ~(precomputed_values : Precomputed_values.t) ~verifier
+    ~parent_staged_ledger ~parent_protocol_state ~signature_kind
+    ?transaction_pool_proxy (t, validation) =
   [%log internal] "Validate_staged_ledger_diff" ;
   let block = With_hash.data t in
   let header = Block.header block in
@@ -504,8 +505,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
                            , `Pending_coinbase_update _ ) =
     Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
       ~get_completed_work
-      ~constraint_constants:
-        precomputed_values.Precomputed_values.constraint_constants ~global_slot
+      ~constraint_constants:precomputed_values.constraint_constants ~global_slot
       ~logger ~verifier parent_staged_ledger
       (Staged_ledger_diff.Body.staged_ledger_diff body)
       ~current_state_view:
@@ -521,9 +521,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       ~supercharge_coinbase:
         (Consensus_state.supercharge_coinbase consensus_state)
       ~zkapp_cmd_limit_hardcap:
-        precomputed_values.Precomputed_values.genesis_constants
-          .zkapp_cmd_limit_hardcap
-      ~signature_kind:precomputed_values.signature_kind ?transaction_pool_proxy
+        precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
+      ~signature_kind ?transaction_pool_proxy
     |> Deferred.Result.map_error ~f:(fun e ->
            `Staged_ledger_application_failed e )
   in

@@ -918,6 +918,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
                       ~transition_receipt_time
+                      ~signature_kind:Context.signature_kind
                       ~transaction_pool_proxy:
                         { find_by_hash =
                             Network_pool.Transaction_pool.Resource_pool
@@ -1491,7 +1492,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   ~get_completed_work:(Fn.const None) ~trust_system
                   ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
-                  ~transition_receipt_time ()
+                  ~transition_receipt_time
+                  ~signature_kind:Context.signature_kind ()
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
                          `Invalid_staged_ledger_diff (e, staged_ledger_diff)

@@ -106,7 +106,7 @@ let compute_block_trace_metadata transition_with_validation =
 let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
     ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
-    ~get_completed_work ~sender ~transition_receipt_time () =
+    ~get_completed_work ~sender ~transition_receipt_time ~signature_kind () =
   let state_hash =
     ( With_hash.hash
     @@ Mina_block.Validation.block_with_hash transition_with_validation )
@@ -126,7 +126,7 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header
             |> Mina_block.Header.protocol_state )
-          ?transaction_pool_proxy transition_with_validation
+          ~signature_kind ?transaction_pool_proxy transition_with_validation
       with
       | Ok
           ( `Just_emitted_a_proof just_emitted_a_proof
@@ -404,10 +404,10 @@ module For_tests = struct
       let staged_ledger_diff, _invalid_txns =
         Staged_ledger.create_diff
           ~constraint_constants:precomputed_values.constraint_constants
-          ~signature_kind:precomputed_values.signature_kind
-          ~global_slot:current_global_slot parent_staged_ledger
-          ~coinbase_receiver ~logger ~current_state_view ~supercharge_coinbase
-          ~transactions_by_fee:transactions ~get_completed_work ~zkapp_cmd_limit
+          ~signature_kind:Testnet ~global_slot:current_global_slot
+          parent_staged_ledger ~coinbase_receiver ~logger ~current_state_view
+          ~supercharge_coinbase ~transactions_by_fee:transactions
+          ~get_completed_work ~zkapp_cmd_limit
         |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
         |> Or_error.ok_exn
       in
@@ -509,7 +509,7 @@ module For_tests = struct
             ( next_block |> Mina_block.Validated.remember
             |> Validation.reset_staged_ledger_diff_validation )
           ~sender:None ~skip_staged_ledger_verification:`All
-          ~transition_receipt_time ()
+          ~transition_receipt_time ~signature_kind:Testnet ()
       with
       | Ok new_breadcrumb ->
           [%log info]
@@ -555,7 +555,7 @@ module For_tests = struct
 
   let build_fail ?skip_staged_ledger_verification:_ ~logger:_
       ~precomputed_values:_ ~verifier:_ ~trust_system:_ ~parent:_ ~transition:_
-      ~sender:_ ~transition_receipt_time:_ () :
+      ~sender:_ ~transition_receipt_time:_ ~signature_kind:_ () :
       ( t
       , [> `Fatal_error of exn
         | `Invalid_staged_ledger_diff of Core_kernel.Error.t

@@ -4679,7 +4679,8 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     ~(genesis_constants : Genesis_constants.t) ~chunks_length
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~signature_kind pool =
   match runtime_config_opt with
   | None ->
       Deferred.unit
@@ -4690,6 +4691,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             ~proof_level:Genesis_constants.Compiled.proof_level
             ~genesis_constants ~constraint_constants runtime_config
             ~cli_proof_level:None ~genesis_backing_type:Stable_db
+            ~signature_kind
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -4868,6 +4870,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       let%bind () =
         add_genesis_accounts pool ~logger ~genesis_constants
           ~constraint_constants ~runtime_config_opt ~chunks_length
+          ~signature_kind
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~signature_kind ~delete_older_than
