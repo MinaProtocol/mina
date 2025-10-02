@@ -1,3 +1,12 @@
+(** Testing
+    -------
+
+    Component: Zkapps_examples
+    Subject: Test zkapp with optional custom gates
+    Invocation: \
+     dune exec src/app/zkapps_examples/test/optional_custom_gates/zkapp_optional_custom_gates_tests.exe
+*)
+
 open Core_kernel
 open Mina_base
 
