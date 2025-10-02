@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 
-module Account_info () = struct
+module Make_account_info () = struct
   let keypair = Quickcheck.random_value Signature_lib.Keypair.gen
 
   let public_key = Signature_lib.Public_key.compress keypair.public_key
@@ -11,7 +11,7 @@ module Account_info () = struct
   let account_id = Account_id.create public_key token_id
 end
 
-module Circuits (Account_info : sig
+module Make_circuits (Account_info : sig
   val public_key : Signature_lib.Public_key.Compressed.t
 end) =
 struct
@@ -51,58 +51,62 @@ struct
   module Proof = (val proof)
 end
 
-let%test_module "Zkapp with optional custom gates" =
-  ( module struct
-    let () = Backtrace.elide := false
+module Account_info = Make_account_info ()
 
-    module Account_info = Account_info ()
+module Circuits = Make_circuits (Account_info)
 
-    module Circuits = Circuits (Account_info)
+let account_update =
+  lazy
+    (fst (Async.Thread_safe.block_on_async_exn (fun () -> Circuits.prove ())))
 
-    let account_update =
-      lazy
-        (fst
-           (Async.Thread_safe.block_on_async_exn (fun () -> Circuits.prove ())) )
+open Transaction_snark_tests.Util
 
-    open Transaction_snark_tests.Util
+let initialize_ledger ledger =
+  let balance =
+    let open Currency.Balance in
+    let add_amount x y = add_amount y x in
+    zero
+    |> add_amount (Currency.Amount.of_nanomina_int_exn 500)
+    |> Option.value_exn
+  in
+  let account = Account.create Account_info.account_id balance in
+  let _, loc =
+    Ledger.get_or_create_account ledger Account_info.account_id account
+    |> Or_error.ok_exn
+  in
+  loc
 
-    let initialize_ledger ledger =
-      let balance =
-        let open Currency.Balance in
-        let add_amount x y = add_amount y x in
-        zero
-        |> add_amount (Currency.Amount.of_nanomina_int_exn 500)
-        |> Option.value_exn
-      in
-      let account = Account.create Account_info.account_id balance in
-      let _, loc =
-        Ledger.get_or_create_account ledger Account_info.account_id account
-        |> Or_error.ok_exn
-      in
-      loc
+let test_generate_zkapp_with_optional_custom_gates () =
+  ignore (Lazy.force account_update : _ Zkapp_command.Call_forest.Tree.t)
 
-    let%test_unit "Generate a zkapp using a combination of optional custom \
-                   gates" =
-      ignore (Lazy.force account_update : _ Zkapp_command.Call_forest.Tree.t)
+let test_zkapp_with_optional_custom_gates_verifies () =
+  Async.Thread_safe.block_on_async_exn
+  @@ fun () ->
+  let%map.Async_kernel.Deferred vk =
+    Pickles.Side_loaded.Verification_key.of_compiled Circuits.tag
+  in
+  let account_update = Lazy.force account_update in
+  let account_updates =
+    []
+    |> Zkapp_command.Call_forest.cons_tree account_update
+    |> Zkapp_command.Call_forest.cons ~signature_kind
+         (Zkapps_examples.Deploy_account_update.full ~access:Either
+            Account_info.public_key Account_info.token_id vk )
+  in
+  test_zkapp_command account_updates ~fee_payer_pk:Account_info.public_key
+    ~signers:[| (Account_info.public_key, Account_info.keypair.private_key) |]
+    ~initialize_ledger
+    ~finalize_ledger:(fun _ _ -> ())
 
-    let%test_unit "Zkapp using a combination of optional custom gates verifies"
-        =
-      Async.Thread_safe.block_on_async_exn
-      @@ fun () ->
-      let%map.Async_kernel.Deferred vk =
-        Pickles.Side_loaded.Verification_key.of_compiled Circuits.tag
-      in
-      let account_update = Lazy.force account_update in
-      let account_updates =
-        []
-        |> Zkapp_command.Call_forest.cons_tree account_update
-        |> Zkapp_command.Call_forest.cons ~signature_kind
-             (Zkapps_examples.Deploy_account_update.full ~access:Either
-                Account_info.public_key Account_info.token_id vk )
-      in
-      test_zkapp_command account_updates ~fee_payer_pk:Account_info.public_key
-        ~signers:
-          [| (Account_info.public_key, Account_info.keypair.private_key) |]
-        ~initialize_ledger
-        ~finalize_ledger:(fun _ _ -> ())
-  end )
+let () =
+  let open Alcotest in
+  run "Zkapp with optional custom gates"
+    [ ( "optional custom gates"
+      , [ test_case
+            "Generate a zkapp using a combination of optional custom gates"
+            `Quick test_generate_zkapp_with_optional_custom_gates
+        ; test_case
+            "Zkapp using a combination of optional custom gates verifies" `Quick
+            test_zkapp_with_optional_custom_gates_verifies
+        ] )
+    ]
