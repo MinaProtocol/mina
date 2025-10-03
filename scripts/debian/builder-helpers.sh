@@ -154,8 +154,7 @@ copy_common_daemon_configs() {
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
   echo "Network Name: ${1} (like mainnet, devnet, berkeley)"
-  echo "Signature Type: ${2} (mainnet or testnet)"
-  echo "Seed List URL path: ${3} (like seed-lists/berkeley_seeds.txt)"
+  echo "Seed List URL path: ${2} (like seed-lists/berkeley_seeds.txt)"
 
   # Copy shared binaries
   cp ../src/app/libp2p_helper/result/bin/libp2p_helper \
@@ -168,15 +167,12 @@ copy_common_daemon_configs() {
     "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
   cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
     "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
-  # Copy signature-based Binaries (based on signature type $2 passed into the \
-  # function)
-  cp ./default/src/app/cli/src/mina.exe \
-    "${BUILDDIR}/usr/local/bin/mina"
+  cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/mina"
 
-  # Copy over Build Configs (based on $2)
+  # Copy over Build Configs
   mkdir -p "${BUILDDIR}/etc/coda/build_config"
   # Use parameter expansion to either return "mainnet.mlh" or "devnet.mlh"
-  cp "../src/config/${2//test/dev}.mlh" \
+  cp "../src/config/public_network.mlh" \
     "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
   rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
@@ -194,9 +190,9 @@ copy_common_daemon_configs() {
   cp ../scripts/hardfork/mina-verify-packaged-fork-config \
     "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
   # Update the mina.service with a new default PEERS_URL based on Seed List \
-  # URL $3
+  # URL $2
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
-  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${3}%" \
+  sed "s%PEERS_LIST_URL_PLACEHOLDER%https://storage.googleapis.com/${2}%" \
     ../scripts/mina.service > "${BUILDDIR}/usr/lib/systemd/user/mina.service"
 
   # Copy the genesis ledgers and proofs as these are fairly small and very \
@@ -370,7 +366,7 @@ build_daemon_mainnet_deb() {
   create_control_file mina-mainnet "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs mainnet mainnet 'mina-seed-lists/mainnet_seeds.txt'
+  copy_common_daemon_configs mainnet 'mina-seed-lists/mainnet_seeds.txt'
 
   build_deb mina-mainnet
 }
@@ -385,7 +381,7 @@ build_daemon_devnet_deb() {
   create_control_file mina-devnet "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
+  copy_common_daemon_configs devnet 'seed-lists/devnet_seeds.txt'
 
   build_deb mina-devnet
 }
@@ -435,7 +431,7 @@ build_daemon_berkeley_deb() {
     'Mina Protocol Client and Daemon for the Berkeley Network' \
     "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+  copy_common_daemon_configs berkeley 'seed-lists/berkeley_seeds.txt'
 
   build_deb "${MINA_DEB_NAME}"
 
@@ -475,7 +471,7 @@ build_daemon_devnet_hardfork_deb() {
   create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
+  copy_common_daemon_configs devnet 'seed-lists/devnet_seeds.txt'
 
   replace_runtime_config_and_ledgers_with_hardforked_ones devnet
 
@@ -495,7 +491,7 @@ build_daemon_berkeley_hardfork_deb() {
   create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs berkeley testnet 'seed-lists/berkeley_seeds.txt'
+  copy_common_daemon_configs berkeley 'seed-lists/berkeley_seeds.txt'
 
   replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
 
@@ -515,7 +511,7 @@ build_daemon_mainnet_hardfork_deb() {
   create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Mainnet Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs mainnet testnet 'seed-lists/mainnet_seeds.txt'
+  copy_common_daemon_configs mainnet 'seed-lists/mainnet_seeds.txt'
 
   replace_runtime_config_and_ledgers_with_hardforked_ones mainnet
 
