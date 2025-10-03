@@ -50,7 +50,6 @@ case "${MINA_DEB_CODENAME}" in
     ;;
 esac
 
-MINA_DEB_NAME="mina-berkeley"
 DUNE_PROFILE="${DUNE_PROFILE}"
 DEB_SUFFIX=""
 
@@ -62,7 +61,6 @@ case "${DUNE_PROFILE}" in
     # builder won't complain
     _SUFFIX=${DUNE_PROFILE//_/-}
     DEB_SUFFIX="${_SUFFIX}"
-    MINA_DEB_NAME="${MINA_DEB_NAME}-${DEB_SUFFIX}"
     ;;
 esac
 
@@ -70,7 +68,6 @@ esac
 #Add suffix to debian to distinguish instrumented packages
 if [[ -v DUNE_INSTRUMENT_WITH ]]; then
     INSTRUMENTED_SUFFIX=instrumented
-    MINA_DEB_NAME="${MINA_DEB_NAME}-${INSTRUMENTED_SUFFIX}"
     DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
 fi
 
@@ -342,21 +339,6 @@ build_rosetta_devnet_deb() {
 }
 ## END ROSETTA DEVNET PACKAGE ##
 
-## ROSETTA BERKELEY PACKAGE ##
-build_rosetta_berkeley_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building berkeley rosetta deb"
-
-  create_control_file mina-rosetta-berkeley "${SHARED_DEPS}" \
-    'Mina Protocol Rosetta Client' "${SUGGESTED_DEPS}"
-
-  copy_common_rosetta_configs "testnet"
-
-  build_deb mina-rosetta-berkeley
-}
-## END BERKELEY PACKAGE ##
-
 ## MAINNET PACKAGE ##
 build_daemon_mainnet_deb() {
 
@@ -421,23 +403,6 @@ build_daemon_devnet_legacy_deb() {
 }
 ## END DEVNET LEGACY PACKAGE ##
 
-## BERKELEY PACKAGE ##
-build_daemon_berkeley_deb() {
-
-  echo "------------------------------------------------------------"
-  echo "--- Building Mina Berkeley testnet signatures deb without keys:"
-
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Berkeley Network' \
-    "${SUGGESTED_DEPS}"
-
-  copy_common_daemon_configs berkeley 'seed-lists/berkeley_seeds.txt'
-
-  build_deb "${MINA_DEB_NAME}"
-
-}
-## END BERKELEY PACKAGE ##
-
 replace_runtime_config_and_ledgers_with_hardforked_ones() {
   local NETWORK_NAME="${1}"
 
@@ -480,26 +445,6 @@ build_daemon_devnet_hardfork_deb() {
 }
 
 ## END DEVNET HARDFORK PACKAGE ##
-
-## BERKELEY HARDFORK PACKAGE ##
-build_daemon_berkeley_hardfork_deb() {
-  local __deb_name=mina-berkeley-hardfork
-
-  echo "------------------------------------------------------------"
-  echo "--- Building hardfork berkeley signatures deb without keys:"
-
-  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
-    'Mina Protocol Client and Daemon for the Berkeley Network' "${SUGGESTED_DEPS}"
-
-  copy_common_daemon_configs berkeley 'seed-lists/berkeley_seeds.txt'
-
-  replace_runtime_config_and_ledgers_with_hardforked_ones berkeley
-
-  build_deb "${__deb_name}"
-
-}
-
-## END BERKELEY HARDFORK PACKAGE ##
 
 ## MAINNET HARDFORK PACKAGE ##
 build_daemon_mainnet_hardfork_deb() {
@@ -559,22 +504,6 @@ build_archive_devnet_deb () {
 
 }
 ## END ARCHIVE DEVNET PACKAGE ##
-
-## ARCHIVE BERKELEY PACKAGE ##
-build_archive_berkeley_deb () {
-  ARCHIVE_DEB=mina-archive-berkeley${DEB_SUFFIX}
-
-  echo "------------------------------------------------------------"
-  echo "--- Building archive berkeley deb"
-
-
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
- Compatible with Mina Daemon'
-
-  copy_common_archive_configs "$ARCHIVE_DEB"
-
-}
-## END ARCHIVE PACKAGE ##
 
 ## ARCHIVE MAINNET PACKAGE ##
 build_archive_mainnet_deb () {
