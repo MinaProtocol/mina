@@ -84,8 +84,6 @@ module type S = sig
 
   val vrf_poll_interval : int
 
-  val network : string
-
   val zkapp_cmd_limit : int option
 
   val scan_state_tps_goal_x10 : int option

@@ -82,8 +82,6 @@ let compaction_interval = Some compaction_interval
 
 [%%endif]
 
-[%%inject "network", network]
-
 [%%inject "vrf_poll_interval", vrf_poll_interval]
 
 [%%ifndef zkapp_cmd_limit]

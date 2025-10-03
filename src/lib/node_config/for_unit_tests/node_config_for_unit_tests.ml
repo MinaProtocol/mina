@@ -55,8 +55,6 @@ let (block_window_duration : int) = (2000 : int)
 
 let compaction_interval = None
 
-let (network : string) = ("testnet" : string)
-
 let (vrf_poll_interval : int) = (0 : int)
 
 let zkapp_cmd_limit = None
