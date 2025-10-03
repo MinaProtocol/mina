@@ -1,7 +1,17 @@
 open Core_kernel
 
-type t = Testnet | Mainnet | Other_network of string
-[@@deriving bin_io_unversioned, equal]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      | Testnet
+      | Mainnet
+      | Other_network of Mina_stdlib.Bounded_types.String.Stable.V1.t
+    [@@deriving equal]
+
+    let to_latest = Fn.id
+  end
+end]
 
 let to_string = function
   | Testnet ->

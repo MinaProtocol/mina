@@ -72,7 +72,7 @@ module Worker_state = struct
     ; commit_id : string
     ; blockchain_verification_key : Pickles.Verification_key.Stable.Latest.t
     ; transaction_verification_key : Pickles.Verification_key.Stable.Latest.t
-    ; signature_kind : Mina_signature_kind.t
+    ; signature_kind : Mina_signature_kind.Stable.Latest.t
     }
   [@@deriving bin_io_unversioned]
 

@@ -1058,7 +1058,7 @@ module Proof_keys = struct
     ; supercharged_coinbase_factor : int option
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
     ; fork : Fork_config.t option
-    ; signature_kind : Mina_signature_kind.t option
+    ; signature_kind : Mina_signature_kind.Stable.Latest.t option
     }
   [@@deriving bin_io_unversioned]
 

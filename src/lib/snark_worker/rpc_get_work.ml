@@ -13,7 +13,9 @@ module Master = struct
   module T = struct
     type query = unit
 
-    type response = Spec.Partitioned.Stable.Latest.t option
+    type response =
+      (Spec.Partitioned.Stable.Latest.t * Mina_signature_kind.Stable.Latest.t)
+      option
   end
 
   module Caller = T
@@ -28,7 +30,8 @@ module Stable = struct
     module T = struct
       type query = unit
 
-      type response = Spec.Partitioned.Stable.V1.t option
+      type response =
+        (Spec.Partitioned.Stable.V1.t * Mina_signature_kind.Stable.V1.t) option
 
       let query_of_caller_model = Fn.id
 

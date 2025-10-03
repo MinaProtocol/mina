@@ -36,11 +36,10 @@ let dispatch rpc shutdown_on_disconnect query address =
   | Ok res ->
       res
 
-let main ~logger ~proof_level ~constraint_constants ~signature_kind
-    daemon_address shutdown_on_disconnect =
+let main ~logger ~proof_level ~constraint_constants daemon_address
+    shutdown_on_disconnect =
   let%bind state =
-    Prod.Impl.Worker_state.create ~constraint_constants ~proof_level
-      ~signature_kind ()
+    Prod.Impl.Worker_state.create ~constraint_constants ~proof_level ()
   in
   let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
   (* retry interval with jitter *)
@@ -95,7 +94,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
           ~metadata:[ ("time", `Float random_delay) ] ;
         let%bind () = wait ~sec:random_delay () in
         go ()
-    | Ok (Some partitioned_spec) -> (
+    | Ok (Some (partitioned_spec, signature_kind)) -> (
         let address_json =
           ("address", `String (Host_and_port.to_string daemon_address))
         in
@@ -113,6 +112,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
         let id = Spec.Partitioned.Poly.get_id partitioned_spec in
         match%bind
           Prod.Impl.perform_partitioned ~state ~spec:partitioned_spec
+            ~signature_kind
         with
         | Error e ->
             let%bind () =
@@ -185,8 +185,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
     and log_json = Cli_lib.Flag.Log.json
     and log_level = Cli_lib.Flag.Log.level
     and file_log_level = Cli_lib.Flag.Log.file_log_level
-    and conf_dir = Cli_lib.Flag.conf_dir
-    and signature_kind = Cli_lib.Flag.signature_kind in
+    and conf_dir = Cli_lib.Flag.conf_dir in
     fun () ->
       let logger =
         Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
@@ -208,8 +207,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
           [%log info]
             !"Received signal to terminate. Aborting snark worker process" ;
           Core.exit 0 ) ;
-      main ~logger ~proof_level ~constraint_constants ~signature_kind
-        daemon_port
+      main ~logger ~proof_level ~constraint_constants daemon_port
         (Option.value ~default:true shutdown_on_disconnect))
 
 let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect ~conf_dir

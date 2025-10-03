@@ -14,7 +14,9 @@ module Worker_state = struct
 
   (* bin_io required by rpc_parallel *)
   type init_arg =
-    Logger.t * Genesis_constants.Constraint_constants.t * Mina_signature_kind.t
+    Logger.t
+    * Genesis_constants.Constraint_constants.t
+    * Mina_signature_kind.Stable.Latest.t
   [@@deriving bin_io_unversioned]
 
   type t = (module S)
@@ -24,10 +26,9 @@ module Worker_state = struct
       (let module M = struct
          let perform_single (message, single_spec) =
            let%bind (worker_state : Prod.Worker_state.t) =
-             Prod.Worker_state.create ~constraint_constants ~proof_level:Full
-               ~signature_kind ()
+             Prod.Worker_state.create ~constraint_constants ~proof_level:Full ()
            in
-           Prod.perform_single worker_state ~message single_spec
+           Prod.perform_single worker_state ~message single_spec ~signature_kind
        end in
       (module M : S) )
 

@@ -1757,7 +1757,7 @@ let internal_commands logger ~itn_features =
           | `Ok sexp -> (
               let%bind worker_state =
                 Snark_worker.Inputs.Worker_state.create ~proof_level
-                  ~constraint_constants ~signature_kind ()
+                  ~constraint_constants ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1772,7 +1772,7 @@ let internal_commands logger ~itn_features =
               in
               match%map
                 Snark_worker.Inputs.perform_single worker_state
-                  ~message:sok_message spec
+                  ~message:sok_message spec ~signature_kind
               with
               | Ok _ ->
                   [%log info] "Successfully worked"
