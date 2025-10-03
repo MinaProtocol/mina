@@ -483,8 +483,8 @@ let make_constraint_constants
 
 let runtime_config_of_constraint_constants
     ~(proof_level : Genesis_constants.Proof_level.t)
-    (constraint_constants : Genesis_constants.Constraint_constants.t) :
-    Runtime_config.Proof_keys.t =
+    (constraint_constants : Genesis_constants.Constraint_constants.t)
+    ?signature_kind : Runtime_config.Proof_keys.t =
   { level =
       ( match proof_level with
       | Full ->
@@ -514,6 +514,7 @@ let runtime_config_of_constraint_constants
               Mina_numbers.Global_slot_since_genesis.to_int
                 global_slot_since_genesis
           } )
+  ; signature_kind
   }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)

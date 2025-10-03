@@ -104,6 +104,7 @@ let proof_config_default : Runtime_config.Proof_keys.t =
             "3NKSvjaGSKiQuAt8BP1b1VCpLbJc9RcEFjYCaBYsJJFdrtd6tpaV"
             (*any state hash would do*)
         }
+  ; signature_kind = Some Testnet
   }
 
 let log_filter_of_event_type ev_existential =

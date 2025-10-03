@@ -2297,9 +2297,11 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
+(* TODO: introduce --signature-kind as a config option for Mina node
+ *       and add config file flag to this command *)
 let signature_kind =
   Command.basic
-    ~summary:"Print the signature kind that this binary is compiled with"
+    ~summary:"Print the signature kind that this executable is configured with"
     (let%map.Command () = Command.Param.return () in
      fun () ->
        let signature_kind_string =

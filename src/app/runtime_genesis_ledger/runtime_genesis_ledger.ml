@@ -72,6 +72,7 @@ let is_dirty_proof = function
       ; supercharged_coinbase_factor = None
       ; account_creation_fee = None
       ; fork = _
+      ; signature_kind = _
       } ->
       false
   | _ ->
