@@ -170,7 +170,7 @@ copy_common_daemon_configs() {
     "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
   # Copy signature-based Binaries (based on signature type $2 passed into the \
   # function)
-  cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe \
+  cp ./default/src/app/cli/src/mina.exe \
     "${BUILDDIR}/usr/local/bin/mina"
 
   # Copy over Build Configs (based on $2)
@@ -296,9 +296,9 @@ build_functional_test_suite_deb() {
 function copy_common_rosetta_configs () {
 
   # Copy rosetta-based Binaries
-  cp ./default/src/app/rosetta/rosetta_"${1}"_signatures.exe \
+  cp ./default/src/app/rosetta/rosetta.exe \
     "${BUILDDIR}/usr/local/bin/mina-rosetta"
-  cp ./default/src/app/rosetta/ocaml-signer/signer_"${1}"_signatures.exe \
+  cp ./default/src/app/rosetta/ocaml-signer/signer.exe \
     "${BUILDDIR}/usr/local/bin/mina-ocaml-signer"
 
   mkdir -p "${BUILDDIR}/etc/mina/rosetta"
@@ -401,7 +401,7 @@ build_daemon_mainnet_legacy_deb() {
     'Mina Protocol Client and Daemon' "${SUGGESTED_DEPS}"
 
   # Copy legacy binary
-  cp ./default/src/app/cli/src/mina_mainnet_signatures.exe \
+  cp ./default/src/app/cli/src/mina.exe \
     "${BUILDDIR}/usr/local/bin/mina-legacy"
 
   build_deb mina-mainnet-legacy
@@ -418,7 +418,7 @@ build_daemon_devnet_legacy_deb() {
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   # Copy legacy binary
-  cp ./default/src/app/cli/src/mina_testnet_signatures.exe \
+  cp ./default/src/app/cli/src/mina.exe \
     "${BUILDDIR}/usr/local/bin/mina-legacy"
 
   build_deb mina-devnet-legacy

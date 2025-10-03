@@ -373,11 +373,7 @@ let
             src/app/logproc/logproc.exe \
             src/app/cli/src/mina.exe \
             src/app/batch_txn_tool/batch_txn_tool.exe \
-            src/app/cli/src/mina_testnet_signatures.exe \
-            src/app/cli/src/mina_mainnet_signatures.exe \
             src/app/rosetta/rosetta.exe \
-            src/app/rosetta/rosetta_testnet_signatures.exe \
-            src/app/rosetta/rosetta_mainnet_signatures.exe \
             src/app/generate_keypair/generate_keypair.exe \
             src/app/archive/archive.exe \
             src/app/archive_blocks/archive_blocks.exe \
@@ -413,10 +409,6 @@ let
           cp src/app/batch_txn_tool/batch_txn_tool.exe $batch_txn_tool/bin/batch_txn_tool
           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $genesis/bin/runtime_genesis_ledger
           cp src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe $out/bin/runtime_genesis_ledger
-          cp src/app/cli/src/mina_mainnet_signatures.exe $mainnet/bin/mina_mainnet_signatures
-          cp src/app/rosetta/rosetta_mainnet_signatures.exe $mainnet/bin/rosetta_mainnet_signatures
-          cp src/app/cli/src/mina_testnet_signatures.exe $testnet/bin/mina_testnet_signatures
-          cp src/app/rosetta/rosetta_testnet_signatures.exe $testnet/bin/rosetta_testnet_signatures
           cp src/app/generate_keypair/generate_keypair.exe $generate_keypair/bin/generate_keypair
           cp src/app/archive/archive.exe $archive/bin/mina-archive
           cp src/app/archive_blocks/archive_blocks.exe $archive/bin/mina-archive-blocks
