@@ -86,6 +86,12 @@ struct
       | Converting_db_config { primary_directory; converting_directory } ->
           file_exists primary_directory && file_exists converting_directory
 
+    let exists_any_backing = function
+      | Stable_db_config path ->
+          file_exists path
+      | Converting_db_config { primary_directory; converting_directory = _ } ->
+          file_exists primary_directory
+
     let with_directory ~backing_type ~directory_name =
       match backing_type with
       | Stable_db ->

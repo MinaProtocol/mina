@@ -90,6 +90,10 @@ module Make
     (** Test if a root ledger backing already exists with this config *)
     val exists_backing : t -> bool
 
+    (** Test if a root ledger backing already exists with this config, ignoring
+        the specific backing type of the root *)
+    val exists_any_backing : t -> bool
+
     (** Delete a backing of any type that might exist with this config, if 
         present. this function will try any backing type even if it didn't match
         up with one provided in the config *)
