@@ -143,7 +143,9 @@ module Make
       backed by that checkpoint. *)
   val create_checkpoint_with_directory : t -> directory_name:string -> t
 
-  (** Convert a root backed by a [Config.Stable_db] to *)
+  (** Convert a root backed by a [Config.Stable_db] to one backed by a
+      [Config.Converting_db] by gradually migrating the stable database. Does
+      nothing if the backing is already [Config.Converting_db]. *)
   val make_converting : t -> t Async.Deferred.t
 
   (** View the root ledger as an unmasked [Any_ledger] so it can be used by code

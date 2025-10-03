@@ -2833,6 +2833,7 @@ module Hardfork_config = struct
     ; staking_epoch_seed : Epoch_seed.t
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
+    ; block_timestamp : Block_time.t
     }
 
   let prepare_inputs ~breadcrumb_spec mina =
@@ -2845,6 +2846,7 @@ module Hardfork_config = struct
       |> Consensus.Data.Consensus_state.global_slot_since_genesis
     in
     let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+    let block_timestamp = block |> Mina_block.timestamp in
     let protocol_state =
       Transition_frontier.Breadcrumb.protocol_state breadcrumb
     in
@@ -2864,7 +2866,256 @@ module Hardfork_config = struct
     ; staking_epoch_seed
     ; next_epoch_seed
     ; blockchain_length
+    ; block_timestamp
     }
+
+  (** Copy the roots of the [source_ledgers] and gather the stable ledger
+      diffs from the [source_ledgers] to their roots *)
+  let copy_genesis_roots_and_diffs ~source_ledgers parent_directory =
+    Core.Unix.mkdir_p parent_directory ;
+    let genesis_ledger_data =
+      let directory_name = parent_directory ^/ "genesis_ledger" in
+      let root =
+        Ledger.Root.create_checkpoint_with_directory
+          source_ledgers.root_snarked_ledger ~directory_name
+      in
+      let diff = Ledger.all_accounts_on_masks source_ledgers.staged_ledger in
+      (root, diff)
+    in
+    let genesis_staking_ledger_data =
+      let directory_name = parent_directory ^/ "staking_ledger" in
+      match source_ledgers.staking_ledger with
+      | `Genesis _l ->
+          failwith "TODO!"
+      | `Root l ->
+          let root =
+            Ledger.Root.create_checkpoint_with_directory l ~directory_name
+          in
+          let diff = Ledger.Location.Map.empty in
+          (root, diff)
+    in
+    let genesis_next_epoch_ledger_data =
+      let directory_name = parent_directory ^/ "next_epoch_ledger" in
+      match source_ledgers.next_epoch_ledger with
+      | `Genesis _l ->
+          failwith "TODO!"
+      | `Root l ->
+          let root =
+            Ledger.Root.create_checkpoint_with_directory l ~directory_name
+          in
+          let diff = Ledger.Location.Map.empty in
+          (root, diff)
+      | `Uncommitted l ->
+          let root =
+            Ledger.Root.create_checkpoint_with_directory
+              source_ledgers.root_snarked_ledger ~directory_name
+          in
+          let diff = Ledger.all_accounts_on_masks l in
+          (root, diff)
+    in
+    ( genesis_ledger_data
+    , genesis_staking_ledger_data
+    , genesis_next_epoch_ledger_data )
+
+  (** Generate the tar file and runtime ledger config for the given root
+      database, and close and delete the database *)
+  let generate_tar_and_config ~get_directory ~get_root_hash ~close_root ~logger
+      ~target_dir ~ledger_name_prefix root =
+    let open Deferred.Or_error.Let_syntax in
+    let root_hash = get_root_hash root in
+    let ledger_dirname = get_directory root |> Option.value_exn in
+    let%bind tar_path =
+      Genesis_ledger_helper.Ledger.generate_tar ~logger ~target_dir
+        ~ledger_name_prefix ~root_hash ~ledger_dirname ()
+    in
+    let%map s3_data_hash =
+      Genesis_ledger_helper.sha3_hash tar_path
+      |> Deferred.map ~f:Or_error.return
+    in
+    let config =
+      Runtime_config.ledger_of_hashes
+        ~root_hash:(Mina_base.Ledger_hash.to_base58_check root_hash)
+        ~s3_data_hash ()
+    in
+    close_root root ;
+    Mina_stdlib_unix.File_system.rmrf ledger_dirname ;
+    config
+
+  let generate_tars_and_configs ~get_directory ~get_root_hash ~close_root
+      ~logger ~target_dir genesis_ledger genesis_staking_ledger
+      genesis_next_epoch_ledger =
+    let open Deferred.Or_error.Let_syntax in
+    Core.Unix.mkdir_p target_dir ;
+    let%bind genesis_ledger_config =
+      generate_tar_and_config ~get_directory ~get_root_hash ~close_root ~logger
+        ~target_dir ~ledger_name_prefix:"genesis_ledger" genesis_ledger
+    in
+    let%bind genesis_staking_ledger_config =
+      generate_tar_and_config ~get_directory ~get_root_hash ~close_root ~logger
+        ~target_dir ~ledger_name_prefix:"epoch_ledger" genesis_staking_ledger
+    in
+    let%map genesis_next_epoch_ledger_config =
+      generate_tar_and_config ~get_directory ~get_root_hash ~close_root ~logger
+        ~target_dir ~ledger_name_prefix:"epoch_ledger" genesis_next_epoch_ledger
+    in
+    ( genesis_ledger_config
+    , genesis_staking_ledger_config
+    , genesis_next_epoch_ledger_config )
+
+  let make_full_config ~genesis_state_timestamp ~global_slot_since_genesis
+      ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
+      ( genesis_ledger_config
+      , genesis_staking_ledger_config
+      , genesis_next_epoch_ledger_config ) =
+    Runtime_config.make_automatic_fork_config ~genesis_state_timestamp
+      ~genesis_ledger_config ~global_slot_since_genesis ~state_hash
+      ~blockchain_length ~staking_ledger_config:genesis_staking_ledger_config
+      ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
+      ~next_epoch_ledger_config:(Some genesis_next_epoch_ledger_config)
+      ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
+
+  let write_config_file ~filename daemon_config =
+    Async.Writer.save filename
+      ~contents:(Yojson.Safe.to_string (Runtime_config.to_yojson daemon_config))
+    |> Deferred.map ~f:Or_error.return
+
+  let write_stable_config_directory ~logger ~genesis_state_timestamp
+      ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+      ~next_epoch_seed ~blockchain_length ~config_dir genesis_ledger
+      genesis_staking_ledger genesis_next_epoch_ledger =
+    let open Deferred.Or_error.Let_syntax in
+    [%log debug]
+      "Generating database files and daemon.json for stable hard fork config" ;
+    Core.Unix.mkdir_p config_dir ;
+    let genesis_dir = config_dir ^/ "genesis" in
+    let%bind genesis_config =
+      generate_tars_and_configs ~get_directory:Ledger.Db.get_directory
+        ~get_root_hash:Ledger.Db.merkle_root ~close_root:Ledger.Db.close ~logger
+        ~target_dir:genesis_dir genesis_ledger genesis_staking_ledger
+        genesis_next_epoch_ledger
+    in
+    write_config_file
+      ~filename:(config_dir ^/ "daemon.json")
+      (make_full_config ~genesis_state_timestamp ~global_slot_since_genesis
+         ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
+         genesis_config )
+
+  let write_migrated_config_directory ~logger ~genesis_state_timestamp
+      ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+      ~next_epoch_seed ~blockchain_length ~config_dir genesis_ledger
+      genesis_staking_ledger genesis_next_epoch_ledger =
+    let open Deferred.Or_error.Let_syntax in
+    [%log debug]
+      "Generating database files and daemon.json for migrated hard fork config" ;
+    Core.Unix.mkdir_p config_dir ;
+    let genesis_dir = config_dir ^/ "genesis" in
+    let%bind genesis_config =
+      generate_tars_and_configs ~get_directory:Ledger.Hardfork_db.get_directory
+        ~get_root_hash:Ledger.Hardfork_db.merkle_root
+        ~close_root:Ledger.Hardfork_db.close ~logger ~target_dir:genesis_dir
+        genesis_ledger genesis_staking_ledger genesis_next_epoch_ledger
+    in
+    write_config_file
+      ~filename:(config_dir ^/ "daemon.json")
+      (make_full_config ~genesis_state_timestamp ~global_slot_since_genesis
+         ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
+         genesis_config )
+
+  let genesis_timestamp_str ~hardfork_genesis_timestamp_offset block_timestamp =
+    block_timestamp |> Block_time.to_time_exn
+    |> Fn.flip Time.add hardfork_genesis_timestamp_offset
+    |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+
+  let generate_hardfork_configs ~logger
+      ~inputs:
+        { source_ledgers
+        ; global_slot_since_genesis
+        ; state_hash
+        ; staking_epoch_seed
+        ; next_epoch_seed
+        ; blockchain_length
+        ; block_timestamp
+        } ~build_dir directory_name =
+    let open Deferred.Or_error.Let_syntax in
+    let migrate_and_apply (root, diff) =
+      let%map.Deferred root = Ledger.Root.make_converting root in
+      Ledger.Any_ledger.M.set_batch
+        (Ledger.Root.as_unmasked root)
+        (Map.to_alist diff) ;
+      let stable_db, migrated_db_opt =
+        Ledger.Root.unsafely_decompose_root root
+      in
+      let migrated_db =
+        migrated_db_opt
+        |> Option.value_exn
+             ~message:"Invariant: root was already made converting"
+      in
+      (stable_db, migrated_db)
+    in
+    [%log debug] "Copying hard fork genesis ledger inputs" ;
+    let ( genesis_ledger_data
+        , genesis_staking_ledger_data
+        , genesis_next_epoch_ledger_data ) =
+      copy_genesis_roots_and_diffs ~source_ledgers build_dir
+    in
+    let%bind.Deferred genesis_ledger_legacy, genesis_ledger_migrated =
+      migrate_and_apply genesis_ledger_data
+    in
+    let%bind.Deferred ( genesis_staking_ledger_legacy
+                      , genesis_staking_ledger_migrated ) =
+      migrate_and_apply genesis_staking_ledger_data
+    in
+    let%bind.Deferred ( genesis_next_epoch_ledger_legacy
+                      , genesis_next_epoch_ledger_migrated ) =
+      migrate_and_apply genesis_next_epoch_ledger_data
+    in
+    (* TODO: the correct timestamp is actually the timestamp of the slot_tx_end plus the hardfork genesis offset *)
+    let genesis_state_timestamp =
+      genesis_timestamp_str
+        ~hardfork_genesis_timestamp_offset:(Time.Span.of_int_sec 0)
+        block_timestamp
+    in
+    [%log debug] "Writing hard fork config directories" ;
+    let%bind () =
+      write_stable_config_directory ~logger ~genesis_state_timestamp
+        ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+        ~next_epoch_seed ~blockchain_length
+        ~config_dir:(directory_name ^/ "fork_validation" ^/ "legacy")
+        genesis_ledger_legacy genesis_staking_ledger_legacy
+        genesis_next_epoch_ledger_legacy
+    in
+    let%bind () =
+      write_migrated_config_directory ~logger ~genesis_state_timestamp
+        ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+        ~next_epoch_seed ~blockchain_length ~config_dir:directory_name
+        genesis_ledger_migrated genesis_staking_ledger_migrated
+        genesis_next_epoch_ledger_migrated
+    in
+    return ()
+
+  let dump_reference_config ~breadcrumb_spec ~directory_name mina =
+    let open Deferred.Or_error.Let_syntax in
+    let logger = mina.config.logger in
+    Deferred.Or_error.try_with_join ~here:[%here]
+    @@ fun () ->
+    let%bind.Deferred dir_exists =
+      Mina_stdlib_unix.File_system.dir_exists directory_name
+    in
+    let%bind () =
+      if dir_exists then
+        Deferred.Or_error.error_string
+          "Requested config directory already exists"
+      else return ()
+    in
+    [%log debug] "Creating reference hard fork config in $directory_name"
+      ~metadata:[ ("directory_name", `String directory_name) ] ;
+    let%bind.Deferred () =
+      Mina_stdlib_unix.File_system.create_dir directory_name
+    in
+    let%bind inputs = prepare_inputs ~breadcrumb_spec mina in
+    Mina_stdlib_unix.File_system.with_temp_dir (directory_name ^/ "_build")
+      ~f:(fun build_dir ->
+        generate_hardfork_configs ~logger ~inputs ~build_dir directory_name )
 end
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
