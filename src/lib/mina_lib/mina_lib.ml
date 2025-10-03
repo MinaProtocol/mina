@@ -122,6 +122,7 @@ type t =
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
   ; commit_id : string
   ; proof_cache_db : Proof_cache_tag.cache_db
+  ; signature_kind : Mina_signature_kind.t
   }
 [@@deriving fields]
 
@@ -1840,7 +1841,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~proof_level:config.precomputed_values.proof_level
                         ~pids:config.pids ~conf_dir:(Some config.conf_dir)
                         ~blockchain_verification_key
-                        ~transaction_verification_key ()
+                        ~transaction_verification_key ~signature_kind ()
                     in
                     let%map () = set_itn_data (module Verifier) verifier in
                     verifier ) )
@@ -2579,6 +2580,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           ; vrf_evaluation_state = Block_producer.Vrf_evaluation_state.create ()
           ; commit_id
           ; proof_cache_db
+          ; signature_kind
           } ) )
 
 let net { components = { net; _ }; _ } = net
