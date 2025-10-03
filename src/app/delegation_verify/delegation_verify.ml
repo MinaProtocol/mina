@@ -162,7 +162,7 @@ let filesystem_command =
       and inputs = anon (sequence ("filename" %: Filename.arg_type))
       and no_checks = no_checks_flag
       and config_file = config_flag
-      and cli_signature_kind = Cli_lib.Flag.signature_kind in
+      and cli_signature_kind = Cli_lib.Flag.signature_kind_opt in
       fun () ->
         let logger = Logger.create () in
         let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -173,7 +173,7 @@ let filesystem_command =
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
-            ~cli_signature_kind:(Some cli_signature_kind)
+            ~cli_signature_kind
         in
         let submission_paths = get_filenames inputs in
         let module V = Make_verifier (struct
@@ -202,7 +202,7 @@ let cassandra_command =
       and keyspace = keyspace_flag
       and period_start = timestamp
       and period_end = timestamp
-      and cli_signature_kind = Cli_lib.Flag.signature_kind in
+      and cli_signature_kind = Cli_lib.Flag.signature_kind_opt in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
@@ -214,7 +214,7 @@ let cassandra_command =
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
-            ~cli_signature_kind:(Some cli_signature_kind)
+            ~cli_signature_kind
         in
         let module V = Make_verifier (struct
           include Submission.Cassandra
@@ -243,7 +243,7 @@ let stdin_command =
     Command.Let_syntax.(
       let%map_open config_file = config_flag
       and no_checks = no_checks_flag
-      and cli_signature_kind = Cli_lib.Flag.signature_kind in
+      and cli_signature_kind = Cli_lib.Flag.signature_kind_opt in
       fun () ->
         let open Deferred.Let_syntax in
         let logger = Logger.create () in
@@ -255,7 +255,7 @@ let stdin_command =
         let%bind.Deferred verify_blockchain_snarks, verify_transaction_snarks =
           instantiate_verify_functions ~logger config_file ~genesis_constants
             ~constraint_constants ~proof_level ~cli_proof_level:None
-            ~cli_signature_kind:(Some cli_signature_kind)
+            ~cli_signature_kind
         in
         let module V = Make_verifier (struct
           include Submission.Stdin

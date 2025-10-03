@@ -3,6 +3,14 @@ open Core_kernel
 type t = Testnet | Mainnet | Other_network of string
 [@@deriving bin_io_unversioned, equal]
 
+let to_string = function
+  | Testnet ->
+      "testnet"
+  | Mainnet ->
+      "mainnet"
+  | Other_network name ->
+      String.lowercase name
+
 (* Custom JSON serializers to serialize variants as lowercase strings *)
 let to_yojson = function
   | Testnet ->
@@ -12,13 +20,18 @@ let to_yojson = function
   | Other_network name ->
       `String name
 
+let of_string s =
+  match String.lowercase s with
+  | "mainnet" ->
+      Mainnet
+  | "testnet" ->
+      Testnet
+  | other ->
+      Other_network other
+
 let of_yojson = function
-  | `String "testnet" ->
-      Ok Testnet
-  | `String "mainnet" ->
-      Ok Mainnet
-  | `String name ->
-      Ok (Other_network name)
+  | `String s ->
+      Ok (of_string s)
   | _ ->
       Error "Signature_kind must be a string"
 

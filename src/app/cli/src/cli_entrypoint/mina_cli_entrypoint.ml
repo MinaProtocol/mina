@@ -582,7 +582,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
          legacy mode, all databased backed ledgers are backed by one database. \
          THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
       (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
-  and cli_signature_kind = Cli_lib.Flag.signature_kind in
+  and cli_signature_kind = Cli_lib.Flag.signature_kind_opt in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
     function
@@ -797,8 +797,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
-              ~genesis_backing_type:ledger_backing_type
-              ~cli_signature_kind:(Some cli_signature_kind)
+              ~genesis_backing_type:ledger_backing_type ~cli_signature_kind
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
@@ -1958,7 +1957,7 @@ let internal_commands logger ~itn_features =
               "DIR Directory that contains the genesis ledger and the genesis \
                blockchain proof (default: <config-dir>)"
             (optional string)
-        and cli_signature_kind = Cli_lib.Flag.signature_kind in
+        and cli_signature_kind = Cli_lib.Flag.signature_kind_opt in
         fun () ->
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
@@ -1979,8 +1978,7 @@ let internal_commands logger ~itn_features =
               =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
-              ~genesis_backing_type:Stable_db
-              ~cli_signature_kind:(Some cli_signature_kind) config_files
+              ~genesis_backing_type:Stable_db ~cli_signature_kind config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =
