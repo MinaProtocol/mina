@@ -2,6 +2,9 @@
   "genesis": {
     "genesis_state_timestamp": "2021-03-09T05:09:07Z"
   },
+  "proof": {
+    "signature_kind": "testnet"
+  },
   "ledger": {
     "name": "devnet",
     "accounts": [

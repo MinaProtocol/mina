@@ -2,6 +2,9 @@
   "genesis": {
      "genesis_state_timestamp": "2020-12-16T12:00:00Z"
   },
+  "proof": {
+    "signature_kind": "testnet"
+  },
   "ledger": {
      "name": "testnet_postake"
   }
