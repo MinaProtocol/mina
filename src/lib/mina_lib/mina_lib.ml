@@ -3091,7 +3091,13 @@ module Hardfork_config = struct
         genesis_ledger_migrated genesis_staking_ledger_migrated
         genesis_next_epoch_ledger_migrated
     in
-    return ()
+    let activated_file_name = directory_name ^/ "activated" in
+    let%map () =
+      Async.Writer.with_file ~exclusive:true activated_file_name
+        ~f:(fun writer -> return (Async.Writer.writef writer ""))
+    in
+    [%log debug]
+      "Successfully generated and activated reference hard fork config"
 
   let dump_reference_config ~breadcrumb_spec ~directory_name mina =
     let open Deferred.Or_error.Let_syntax in
