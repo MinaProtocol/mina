@@ -28,37 +28,7 @@ let lowerName =
             }
             network
 
-let requiresMainnetBuild =
-          \(network : Network)
-      ->  merge
-            { Devnet = True
-            , Mainnet = True
-            , Berkeley = False
-            , DevnetLegacy = True
-            , MainnetLegacy = True
-            }
-            network
-
-let buildMainnetEnv =
-          \(network : Network)
-      ->        if requiresMainnetBuild network
-
-          then  "MINA_BUILD_MAINNET=true"
-
-          else  "MINA_BUILD_MAINNET=false"
-
-let foldMinaBuildMainnetEnv =
-          \(networks : List Network)
-      ->        if List/any Network requiresMainnetBuild networks
-
-          then  "MINA_BUILD_MAINNET=true"
-
-          else  "MINA_BUILD_MAINNET=false"
-
 in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
-    , requiresMainnetBuild = requiresMainnetBuild
-    , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
-    , buildMainnetEnv = buildMainnetEnv
     }

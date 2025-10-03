@@ -125,7 +125,6 @@ let build_artifacts
                         , "MINA_DEB_CODENAME=${DebianVersions.lowerName
                                                  spec.debVersion}"
                         , "ARCHITECTURE=${Arch.lowerName spec.arch}"
-                        , Network.buildMainnetEnv spec.network
                         ]
                       # BuildFlags.buildEnvs spec.buildFlags
                       # spec.extraBuildEnvs
