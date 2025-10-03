@@ -77,8 +77,8 @@ if [[ ! -L compatible-devnet ]]; then
   fi
   git submodule sync --recursive
   git submodule update --init --recursive
-  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet" --out-link "$INIT_DIR/compatible-devnet"
-  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet.genesis" --out-link "$INIT_DIR/compatible-devnet"
+  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#mina" --out-link "$INIT_DIR/compatible-devnet"
+  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#mina.genesis" --out-link "$INIT_DIR/compatible-devnet"
   if [[ $# == 0 ]]; then
     cd -
     rm -Rf "$compatible_build"
@@ -91,8 +91,8 @@ if [[ $# -gt 0 ]]; then
   git submodule sync --recursive
   git submodule update --init --recursive
 fi
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
+nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#mina" --out-link "$INIT_DIR/fork-devnet"
+nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#mina.genesis" --out-link "$INIT_DIR/fork-devnet"
 
 if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws

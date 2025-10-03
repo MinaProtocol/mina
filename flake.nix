@@ -335,7 +335,7 @@
         # Main user-facing binaries.
         packages = (rec {
           inherit (ocamlPackages)
-            mina devnet mainnet mina_tests mina-ocaml-format mina_client_sdk
+            mina mina_tests mina-ocaml-format mina_client_sdk
             test_executive with-instrumentation;
           # Granular nix
           inherit (ocamlPackages)

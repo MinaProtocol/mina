@@ -325,7 +325,7 @@ let
         MINA_COMMIT_DATE = "<unknown>";
         MINA_BRANCH = "<unknown>";
 
-        DUNE_PROFILE = "dev";
+        DUNE_PROFILE = "public_network";
 
         NIX_LDFLAGS =
           optionalString (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64)
@@ -391,15 +391,13 @@ let
           "out"
           "archive"
           "generate_keypair"
-          "mainnet"
-          "testnet"
           "genesis"
           "sample"
           "batch_txn_tool"
         ];
 
         installPhase = ''
-          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $mainnet/bin $testnet/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
+          mkdir -p $out/bin $archive/bin $sample/share/mina $out/share/doc $generate_keypair/bin $genesis/bin $genesis/var/lib/coda $batch_txn_tool/bin
           # TODO uncomment when genesis is generated above
           # mv _build/coda_cache_dir/genesis* $genesis/var/lib/coda
           pushd _build/default
@@ -417,7 +415,7 @@ let
           cp -R _doc/_html $out/share/doc/html
           # cp src/lib/mina_base/sample_keypairs.json $sample/share/mina
           popd
-          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$mainnet/bin/*,$testnet/bin*,$genesis/bin/*,$generate_keypair/bin/*}
+          remove-references-to -t $(dirname $(dirname $(command -v ocaml))) {$out/bin/*,$genesis/bin/*,$generate_keypair/bin/*}
         '';
         shellHook =
           "export MINA_LIBP2P_HELPER_PATH=${pkgs.libp2p_helper}/bin/mina-libp2p_helper";
@@ -443,24 +441,6 @@ let
       });
 
       with-instrumentation = wrapMina self.with-instrumentation-dev { };
-
-      mainnet-pkg = self.mina-dev.overrideAttrs (s: {
-        version = "mainnet";
-        DUNE_PROFILE = "mainnet";
-        # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
-      });
-
-      mainnet = wrapMina self.mainnet-pkg { };
-
-      devnet-pkg = self.mina-dev.overrideAttrs (s: {
-        version = "devnet";
-        DUNE_PROFILE = "devnet";
-        # For compatibility with Docker build
-        MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
-      });
-
-      devnet = wrapMina self.devnet-pkg { };
 
       # Unit tests
       mina_tests = runMinaCheck {
