@@ -215,6 +215,63 @@ struct
              ; backing_2 = Config.backing_of_config config
              } )
 
+  let create_checkpoint_with_directory t ~directory_name =
+    let backing_type =
+      match t with
+      | Stable_db _db ->
+          Config.Stable_db
+      | Converting_db _db ->
+          Config.Converting_db
+    in
+    let config = Config.with_directory ~backing_type ~directory_name in
+    create_checkpoint t ~config ()
+
+  (** Migrate the accounts in the ledger database [stable_db] and store them in
+      [empty_hardfork_db]. The accounts are set in the target database in chunks
+      so the daemon is still responsive during this operation; the daemon would
+      otherwise stop everything as it hashed every account in the list. *)
+  let chunked_migration ?(chunk_size = 1 lsl 6) stable_locations_and_accounts empty_migrated_db =
+    let open Async.Deferred.Let_syntax in
+    let ledger_depth = Migrated_db.depth empty_migrated_db in
+    let addrs_and_accounts =
+      List.mapi stable_locations_and_accounts ~f:(fun i acct ->
+          ( Migrated_db.Addr.of_int_exn ~ledger_depth i
+          , Account.Hardfork.of_stable acct ) )
+    in
+    let rec set_chunks accounts =
+      let%bind () = Async_unix.Scheduler.yield () in
+      let chunk, accounts' = List.split_n accounts chunk_size in
+      if List.is_empty chunk then return empty_migrated_db
+      else (
+        Migrated_db.set_batch_accounts empty_migrated_db chunk ;
+        set_chunks accounts' )
+    in
+    set_chunks addrs_and_accounts
+
+  let make_converting t =
+    let open Async.Deferred.Let_syntax in
+    match t with
+    | Converting_db _db ->
+        return t
+    | Stable_db db ->
+        let directory_name =
+          Stable_db.get_directory db
+          |> Option.value_exn
+               ~message:"Invariant: database must be in a directory"
+        in
+        let converting_config =
+          Converting_ledger.Config.with_primary ~directory_name
+        in
+        let migrated_db =
+          Migrated_db.create
+            ~directory_name:converting_config.converting_directory
+            ~depth:(Stable_db.depth db) ()
+        in
+        let%map migrated_db =
+          chunked_migration (Stable_db.to_list_sequential db) migrated_db
+        in
+        Converting_db (Converting_ledger.of_ledgers db migrated_db)
+
   let as_unmasked t =
     match t with
     | Stable_db db ->
@@ -270,4 +327,12 @@ struct
         Stable_db.get_all_accounts_rooted_at_exn db
     | Converting_db db ->
         Converting_ledger.get_all_accounts_rooted_at_exn db
+
+  let unsafely_decompose_root t =
+    match t with
+    | Stable_db db ->
+        (db, None)
+    | Converting_db db ->
+        ( Converting_ledger.primary_ledger db
+        , Some (Converting_ledger.converting_ledger db) )
 end

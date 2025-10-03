@@ -124,11 +124,22 @@ module Make
     -> t
 
   (** Make a checkpoint of the root ledger and return a new root ledger backed
-      by that checkpoint *)
+      by that checkpoint. Throws an exception if the config does not match the
+      backing type of the root.  *)
   val create_checkpoint : t -> config:Config.t -> unit -> t
 
-  (** Make a checkpoint of the root ledger *)
+  (** Make a checkpoint of the root ledger. Throws an exception if the config
+      does not match the backing type of the root. *)
   val make_checkpoint : t -> config:Config.t -> unit
+
+  (** Make a checkpoint of the root ledger [t] of the same backing type using
+      [directory_name] as a template for its location. Return a new root ledger
+      backed by that checkpoint. *)
+  val create_checkpoint_with_directory :
+    t -> directory_name:string -> t
+
+  (** Convert a root backed by a [Config.Stable_db] to *)
+  val make_converting : t -> t Async.Deferred.t
 
   (** View the root ledger as an unmasked [Any_ledger] so it can be used by code
       that does not need to know how the root is implemented *)
@@ -160,4 +171,10 @@ module Make
   (** Get all of the accounts that are in a subtree of the underlying Merkle
     tree rooted at `address`. The accounts are ordered by their addresses. *)
   val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
+
+  (** Decompose a root into its components parts. Users of this method must be
+      careful to ensure that either the underlying databases remain in sync, or
+      that they are not later used to back a root ledger. Use this on temporary
+      copies of root ledgers if possible. *)
+  val unsafely_decompose_root : t -> Stable_db.t * Migrated_db.t option
 end
