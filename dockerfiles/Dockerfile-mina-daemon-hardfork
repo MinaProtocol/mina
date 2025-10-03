@@ -1,6 +1,7 @@
 ARG deb_version=latest
 ARG deb_codename=bullseye
 ARG network=mainnet
+ARG signature_kind=mainnet
 ARG docker_repo="gcr.io/o1labs-192920"
 ARG deb_release=unstable
 ARG deb_legacy_version
@@ -18,6 +19,9 @@ ARG network
 ARG deb_release
 ARG deb_legacy_version
 ARG deb_repo
+ARG signature_kind
+
+ENV MINA_SIGNATURE_KIND=${signature_kind}
 
 RUN echo "Installing legacy package with version $deb_version from repo $deb_release $deb_codename for network $network" \
   && echo "deb [trusted=yes] ${deb_repo} ${deb_codename} ${deb_release}" > /etc/apt/sources.list.d/o1.list \

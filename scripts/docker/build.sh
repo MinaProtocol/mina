@@ -74,6 +74,12 @@ if [[ -z "$INPUT_NETWORK" ]]; then
   NETWORK="--build-arg network=devnet"
 fi
 
+if [[ "$INPUT_NETWORK" == "mainnet" ]]; then
+  SIGKIND="--build-arg signature_kind=mainnet"
+else
+  SIGKIND="--build-arg signature_kind=testnet"
+fi
+
 LEGACY_VERSION="--build-arg deb_legacy_version=$INPUT_LEGACY_VERSION"
 
 if [[ -z "$INPUT_LEGACY_VERSION" ]]; then
@@ -252,9 +258,9 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
+  --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $SIGKIND $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
-  docker buildx build --load --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx build --load --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $SIGKIND $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."

@@ -5,10 +5,12 @@ ARG deb_version
 ARG deb_release=unstable
 ARG deb_repo="http://packages.o1test.net"
 ARG network=mainnet
+ARG signature_kind=mainnet
 
 ARG psql_version=13
 
 ENV DEBIAN_FRONTEND noninteractive
+ENV MINA_SIGNATURE_KIND=${signature_kind}
 
 # We do not install the below platform-specific dependencies,
 # and instead assume that apt will install the proper deps based on the package definition.

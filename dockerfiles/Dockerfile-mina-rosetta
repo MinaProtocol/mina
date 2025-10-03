@@ -4,6 +4,7 @@ ARG deb_codename=focal
 ARG deb_version
 ARG deb_release=unstable
 ARG network=mainnet
+ARG signature_kind=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG TARGETARCH
 
@@ -31,7 +32,7 @@ ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 ENV MINA_DEB=mina-${network}${SUFFIX}
 ENV MINA_ARCHIVE_DEB=mina-archive-${network}
 ENV MINA_ROSETTA_DEB=mina-rosetta-${network}
-
+ENV MINA_SIGNATURE_KIND=${signature_kind}
 
 # We do not install the below platform-specific dependencies,
 # and instead assume that apt will install the proper deps based on the package definition.
