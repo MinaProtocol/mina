@@ -82,9 +82,9 @@ let%test_module "Epoch ledger sync tests" =
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger
             ~proof_level:No_check runtime_config ~cli_proof_level:None
-            ~genesis_backing_type:Stable_db ~signature_kind:Testnet
+            ~genesis_backing_type:Stable_db ~cli_signature_kind:(Some Testnet)
         with
-        | Ok (precomputed_values, _) ->
+        | Ok (precomputed_values, _, _) ->
             precomputed_values
         | Error err ->
             failwithf "Could not create precomputed values: %s"

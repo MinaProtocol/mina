@@ -51,7 +51,7 @@ let plugin_flag =
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
-    ~signature_kind config_files =
+    ~cli_signature_kind config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -103,10 +103,10 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
         ~logger ~genesis_constants ~constraint_constants ~proof_level
-        ~genesis_backing_type ~signature_kind config
+        ~genesis_backing_type ~cli_signature_kind config
     with
-    | Ok (precomputed_values, _) ->
-        precomputed_values
+    | Ok (precomputed_values, _, signature_kind) ->
+        (precomputed_values, signature_kind)
     | Error err ->
         let ( json_config
             , `Accounts_omitted
@@ -582,7 +582,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
          legacy mode, all databased backed ledgers are backed by one database. \
          THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
       (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
-  and signature_kind = Cli_lib.Flag.signature_kind in
+  and cli_signature_kind = Cli_lib.Flag.signature_kind in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
     function
@@ -793,11 +793,12 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let ledger_backing_type =
             Mina_lib.Config.ledger_backing ~hardfork_mode
           in
-          let%bind precomputed_values, config_jsons, config =
+          let%bind (precomputed_values, signature_kind), config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
-              ~genesis_backing_type:ledger_backing_type ~signature_kind
+              ~genesis_backing_type:ledger_backing_type
+              ~cli_signature_kind:(Some cli_signature_kind)
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
@@ -1957,7 +1958,7 @@ let internal_commands logger ~itn_features =
               "DIR Directory that contains the genesis ledger and the genesis \
                blockchain proof (default: <config-dir>)"
             (optional string)
-        and signature_kind = Cli_lib.Flag.signature_kind in
+        and cli_signature_kind = Cli_lib.Flag.signature_kind in
         fun () ->
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
@@ -1974,10 +1975,12 @@ let internal_commands logger ~itn_features =
             List.map config_files ~f:(fun config_file ->
                 (config_file, `Must_exist) )
           in
-          let%bind precomputed_values, _config_jsons, _config =
+          let%bind (precomputed_values, signature_kind), _config_jsons, _config
+              =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
-              ~genesis_backing_type:Stable_db ~signature_kind config_files
+              ~genesis_backing_type:Stable_db
+              ~cli_signature_kind:(Some cli_signature_kind) config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =

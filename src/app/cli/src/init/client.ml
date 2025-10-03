@@ -1852,7 +1852,7 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
-         let%map { consensus_constants; constraint_constants; _ }, _ =
+         let%map { consensus_constants; constraint_constants; _ }, _, _ =
            (* Signature kind Testnet is used here as a stub
               Neither constraint_constants nor consensus_constants are dependent
               on signature kind.
@@ -1866,7 +1866,8 @@ let compile_time_constants =
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_constants
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
                  ~cli_proof_level:None ~genesis_dir
-                 ~genesis_backing_type:Stable_db ~signature_kind:Testnet
+                 ~genesis_backing_type:Stable_db
+                 ~cli_signature_kind:(Some Testnet)
            >>| Or_error.ok_exn
          in
          let all_constants =

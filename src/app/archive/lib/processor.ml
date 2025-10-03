@@ -4683,21 +4683,24 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     ~(genesis_constants : Genesis_constants.t) ~chunks_length
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~signature_kind pool =
-  match runtime_config_opt with
-  | None ->
-      Deferred.unit
-  | Some runtime_config -> (
-      let%bind precomputed_values =
+    ~cli_signature_kind pool : Mina_signature_kind.t Deferred.t =
+  match (runtime_config_opt, cli_signature_kind) with
+  | None, None ->
+      [%log warn] "signature kind not specified" ;
+      failwith "signature kind not specified"
+  | None, Some signature_kind ->
+      return signature_kind
+  | Some runtime_config, _ -> (
+      let%bind precomputed_values, signature_kind =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
             ~proof_level:Genesis_constants.Compiled.proof_level
             ~genesis_constants ~constraint_constants runtime_config
             ~cli_proof_level:None ~genesis_backing_type:Stable_db
-            ~signature_kind
+            ~cli_signature_kind
         with
-        | Ok (precomputed_values, _) ->
-            precomputed_values
+        | Ok (precomputed_values, _, signature_kind) ->
+            (precomputed_values, signature_kind)
         | Error err ->
             failwithf "Could not get precomputed values, error: %s"
               (Error.to_string_hum err) ()
@@ -4810,7 +4813,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
           failwith "Failed to add genesis accounts"
       | Ok () ->
-          () )
+          signature_kind )
 
 let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
     ~block_window_duration_ms pool =
@@ -4840,8 +4843,8 @@ let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
-    ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    =
+    ~delete_older_than ~runtime_config_opt ~missing_blocks_width
+    ~cli_signature_kind =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4870,10 +4873,10 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let%bind () =
+      let%bind signature_kind =
         add_genesis_accounts pool ~logger ~genesis_constants
           ~constraint_constants ~runtime_config_opt ~chunks_length
-          ~signature_kind
+          ~cli_signature_kind
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~signature_kind ~delete_older_than

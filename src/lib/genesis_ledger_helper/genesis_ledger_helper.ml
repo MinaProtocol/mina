@@ -908,16 +908,23 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
     ~constraint_constants ~logger ~proof_level ~genesis_backing_type
-    ~signature_kind ?overwrite_version ?genesis_dir (config : Runtime_config.t)
-    : (Precomputed_values.t * Runtime_config.t) Deferred.Or_error.t =
-  let open Deferred.Or_error.Let_syntax in
-  let%map inputs, config =
+    ~cli_signature_kind ?overwrite_version ?genesis_dir
+    (config : Runtime_config.t) :
+    (Precomputed_values.t * Runtime_config.t * Mina_signature_kind.t)
+    Deferred.Or_error.t =
+  let%bind.Deferred.Or_error inputs, config =
     inputs_from_config_file ~cli_proof_level ~genesis_constants
       ~constraint_constants ~logger ~proof_level ~genesis_backing_type
       ?overwrite_version ?genesis_dir config
   in
+  let%map.Deferred.Or_error signature_kind =
+    Option.(
+      first_some cli_signature_kind (config.proof >>= fun p -> p.signature_kind)
+      |> value_map ~f:Deferred.Or_error.return
+           ~default:(Deferred.Or_error.errorf "signature kind not defined"))
+  in
   let values = Genesis_proof.create_values_no_proof ~signature_kind inputs in
-  (values, config)
+  (values, config, signature_kind)
 
 let upgrade_old_config ~logger filename json =
   match json with
