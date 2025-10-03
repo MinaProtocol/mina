@@ -25,7 +25,7 @@ in  Pipeline.build
             ]
           , debVersion = DebianVersions.DebVersion.Bookworm
           , network = Network.Type.MainnetLegacy
-          , profile = Profiles.Type.Mainnet
+          , profile = Profiles.Type.PublicNetwork
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

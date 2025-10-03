@@ -31,7 +31,6 @@ in  Pipeline.build
             , PipelineTag.Type.Stable
             , PipelineTag.Type.Rosetta
             ]
-          , profile = Profiles.Type.Mainnet
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

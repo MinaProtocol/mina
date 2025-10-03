@@ -33,7 +33,6 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
             ]
-          , profile = Profiles.Type.Mainnet
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

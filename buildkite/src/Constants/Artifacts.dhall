@@ -107,26 +107,6 @@ let dockerNames =
             (\(a : Artifact) -> dockerName a)
             artifacts
 
-let toDebianName =
-          \(artifact : Artifact)
-      ->  \(network : Network.Type)
-      ->  merge
-            { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonLegacyHardfork =
-                "daemon_${Network.lowerName network}_hardfork"
-            , DaemonAutoHardfork = ""
-            , LogProc = "logproc"
-            , Archive = "archive_${Network.lowerName network}"
-            , TestExecutive = "test_executive"
-            , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta_${Network.lowerName network}"
-            , ZkappTestTransaction = "zkapp_test_transaction"
-            , FunctionalTestSuite = "functional_test_suite"
-            , Toolchain = ""
-            , CreateLegacyGenesis = "create_legacy_genesis"
-            }
-            artifact
-
 let toDebianNames =
           \(artifacts : List Artifact)
       ->  \(network : Network.Type)
@@ -136,14 +116,14 @@ let toDebianNames =
                   (List Text)
                   (     \(a : Artifact)
                     ->  merge
-                          { Daemon = [ toDebianName a network ]
-                          , DaemonLegacyHardfork = [ toDebianName a network ]
-                          , DaemonAutoHardfork = [ toDebianName a network ]
-                          , Archive = [ toDebianName a network ]
+                          { Daemon = [ "daemon_${Network.lowerName network}" ]
+                          , DaemonLegacyHardfork = [ "daemon_${Network.lowerName network}_hardfork" ]
+                          , DaemonAutoHardfork = [ "" ]
+                          , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ toDebianName a network ]
+                          , Rosetta = [ "rosetta" ]
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreateLegacyGenesis = [ "create_legacy_genesis" ]
@@ -175,7 +155,7 @@ let Tag =
       , default =
           { artifact = Artifact.Daemon
           , version = "\\\${MINA_DOCKER_TAG}"
-          , profile = Profiles.Type.Devnet
+          , profile = Profiles.Type.PublicNetwork
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Berkeley
           , remove_profile_from_name = False
@@ -230,7 +210,6 @@ in  { Type = Artifact
     , Tag = Tag
     , capitalName = capitalName
     , lowerName = lowerName
-    , toDebianName = toDebianName
     , toDebianNames = toDebianNames
     , dockerName = dockerName
     , dockerNames = dockerNames

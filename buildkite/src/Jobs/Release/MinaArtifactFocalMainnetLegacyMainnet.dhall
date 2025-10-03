@@ -25,7 +25,6 @@ in  Pipeline.build
             ]
           , debVersion = DebianVersions.DebVersion.Focal
           , network = Network.Type.MainnetLegacy
-          , profile = Profiles.Type.Mainnet
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

@@ -68,7 +68,7 @@ let ReleaseSpec =
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
-          , deb_profile = Profiles.Type.Devnet
+          , deb_profile = Profiles.Type.PublicNetwork
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
@@ -124,8 +124,7 @@ let generateStep =
                 Extensions.joinOptionals
                   "-"
                   [ merge
-                      { Mainnet = None Text
-                      , Devnet = None Text
+                      { PublicNetwork = None Text
                       , Dev = None Text
                       , Lightnet = Some
                           "${Profiles.toSuffixLowercase spec.deb_profile}"

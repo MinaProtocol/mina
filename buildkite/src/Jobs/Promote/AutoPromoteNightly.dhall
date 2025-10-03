@@ -61,7 +61,7 @@ let specs_for_branch =
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             ]
-          , profile = Profiles.Type.Devnet
+          , profile = Profiles.Type.PublicNetwork
           , networks = [ Network.Type.Devnet ]
           , codenames =
             [ DebianVersions.DebVersion.Noble
