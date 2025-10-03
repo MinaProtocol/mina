@@ -1,14 +1,11 @@
 #!/bin/bash
 
-BRANCH=$1
-echo "Checking conflicts: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH} <--> ${BRANCH}"
+PR_BRANCH=${BUILDKITE_BRANCH}
+BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+SYNC_BRANCH=$1
+echo "Checking conflicts: (${PR_BRANCH} -> ${BASE_BRANCH}) -> ${SYNC_BRANCH}"
 
-
-# Adapted from this stackoverflow answer: https://stackoverflow.com/a/10856937
-# The git merge-tree command shows the content of a 3-way merge without
-# touching the index, which we can then search for conflict markers.
-
-# Only execute in the CI. If the script is run locally, it messes us the user
+# Only execute in the CI. If the script is run locally, it'll mess up user's git
 # config
 if [ "${BUILDKITE:-false}" == true ]
 then
@@ -18,29 +15,25 @@ then
     git config --global user.name "It's me, CI"
 fi
 
-# Fetch a fresh copy of the target branch
-source buildkite/scripts/refresh_code.sh
+git fetch origin
+git checkout ${BASE_BRANCH}
+git reset --hard origin/${BASE_BRANCH}
 
-# Check mergeability. We use flags so that
-# * `--no-commit` stops us from updating the index with a merge commit,
-# * `--no-ff` stops us from updating the index to the HEAD, if the merge is a
-#   straightforward fast-forward
-git merge --no-commit --no-ff origin/"${BRANCH}"
+if ! git merge origin/${PR_BRANCH}; then
+    ret=$?
+    echo "Merging from ${PR_BRANCH} -> ${BASE_BRANCH} failed (exit $ret)"
+    exit $ret
+fi
 
-RET=$?
+git checkout ${SYNC_BRANCH}
+git reset --hard origin/${SYNC_BRANCH}
 
-if [ $RET -eq 0 ]; then
-  echo "No conflicts found against upstream branch ${BRANCH}"
-  exit 0
+if ! git merge --no-ff --no-commit ${BASE_BRANCH}; then
+  ret=$?
+  echo "[ERROR] This pull request has merge conflicts, please open a new pull request against $SYNC_BRANCH at this link:"
+  echo "https://github.com/MinaProtocol/mina/compare/${SYNC_BRANCH}...${PR_BRANCH}"
+  exit $ret
 else
-  # exclude branches for which merging cleanly is not a hard requirement
-  if [ "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}" == "o1js-main" ]; then
-    echo "Conflicts were found, but the current branch ($CURRENT) does not have to merge cleanly. Exiting with code 0."
-    exit 0
-  fi
-
-  # Found a conflict
-  echo "[ERROR] This pull request conflicts with $BRANCH, please open a new pull request against $BRANCH at this link:"
-  echo "https://github.com/MinaProtocol/mina/compare/${BRANCH}...${BUILDKITE_BRANCH}"
-  exit 1
+  echo "No conflicts found"
+  exit 0
 fi
