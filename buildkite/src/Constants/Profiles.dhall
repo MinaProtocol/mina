@@ -34,7 +34,7 @@ let duneProfile =
 let toSuffixUppercase =
           \(profile : Profile)
       ->  merge
-            { PublicNetwork = "PublicNetwork"
+            { PublicNetwork = ""
             , Lightnet = "Lightnet"
             , Dev = "Dev"
             }
@@ -43,7 +43,7 @@ let toSuffixUppercase =
 let toSuffixLowercase =
           \(profile : Profile)
       ->  merge
-            { PublicNetwork = "publicnetwork"
+            { PublicNetwork = ""
             , Lightnet = "lightnet"
             , Dev = "dev"
             }
@@ -52,7 +52,7 @@ let toSuffixLowercase =
 let toLabelSegment =
           \(profile : Profile)
       ->  merge
-            { PublicNetwork = "pn"
+            { PublicNetwork = ""
             , Lightnet = "lightnet"
             , Dev = "dev"
             }

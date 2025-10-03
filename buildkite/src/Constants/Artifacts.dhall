@@ -157,7 +157,7 @@ let Tag =
           , version = "\\\${MINA_DOCKER_TAG}"
           , profile = Profiles.Type.PublicNetwork
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Berkeley
+          , network = Network.Type.Base
           , remove_profile_from_name = False
           }
       }

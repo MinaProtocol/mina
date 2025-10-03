@@ -21,8 +21,8 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             ]
-          , network = Network.Type.DevnetLegacy
-          , debVersion = DebianVersions.DebVersion.Focal
+          , network = Network.Type.Legacy
+          , debVersion = DebianVersions.DebVersion.Noble
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }
