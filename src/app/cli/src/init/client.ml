@@ -2298,24 +2298,22 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
-(* TODO: introduce --signature-kind as a config option for Mina node
- *       and add config file flag to this command *)
 let signature_kind =
-  Command.basic
+  Command.async
     ~summary:"Print the signature kind that this executable is configured with"
     (let%map.Command () = Command.Param.return () in
      fun () ->
-       let signature_kind_string =
-         match Mina_signature_kind.t_DEPRECATED with
-         | Mainnet ->
-             "mainnet"
-         | Testnet ->
-             "testnet"
-         | Other_network s ->
-             (* Prefix string to disambiguate *)
-             "other network: " ^ s
+       let env_val =
+         Option.map ~f:Mina_signature_kind.of_string
+         @@ Sys.getenv "MINA_SIGNATURE_KIND"
        in
-       Core.print_endline signature_kind_string )
+       match env_val with
+       | Some v ->
+           Core.print_endline @@ Mina_signature_kind.to_string v ;
+           Deferred.unit
+       | None ->
+           Format.eprintf "Signature kind not specified\n" ;
+           exit 1 )
 
 let test_genesis_creation =
   Command.async ~summary:"Test genesis creation"

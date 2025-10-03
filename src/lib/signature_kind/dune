@@ -1,10 +1,8 @@
 (library
  (name mina_signature_kind)
  (public_name mina_signature_kind)
- (libraries mina_signature_kind.type)
+ (libraries core_kernel)
  (preprocess
-  (pps ppx_bin_prot ppx_version ppx_deriving_yojson))
+  (pps ppx_deriving_yojson ppx_jane ppx_version))
  (instrumentation
-  (backend bisect_ppx))
- (virtual_modules mina_signature_kind)
- (default_implementation mina_signature_kind_config))
+  (backend bisect_ppx)))

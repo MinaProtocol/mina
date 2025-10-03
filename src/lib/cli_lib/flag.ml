@@ -445,11 +445,8 @@ let signature_kind_impl ~when_default_specified ~no_default_modifier =
   let open Command.Param in
   let arg_type = Command.Arg_type.create Mina_signature_kind.of_string in
   let env_val =
-    (* TODO remove usage of t_DEPRECATED *)
-    Option.first_some
-      ( Option.map ~f:Mina_signature_kind.of_string
-      @@ Sys.getenv "MINA_SIGNATURE_KIND" )
-      (Some Mina_signature_kind.t_DEPRECATED)
+    Option.map ~f:Mina_signature_kind.of_string
+    @@ Sys.getenv "MINA_SIGNATURE_KIND"
   in
   match env_val with
   | Some v ->
