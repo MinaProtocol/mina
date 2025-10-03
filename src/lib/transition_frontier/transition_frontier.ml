@@ -619,7 +619,7 @@ module For_tests = struct
                    ~snarked_ledger:genesis_ledger
                    ~snarked_local_state:(Mina_state.Local_state.empty ())
                    ~expected_merkle_root:(Ledger.merkle_root genesis_ledger)
-                   ~signature_kind:Mina_signature_kind.t_DEPRECATED ) )
+                   ~signature_kind:Testnet ) )
         in
         Breadcrumb.create ~validated_transition:genesis_transition
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
@@ -660,8 +660,7 @@ module For_tests = struct
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
             ~time_controller:(Block_time.Controller.basic ~logger)
-            ~directory:frontier_dir
-            ~signature_kind:Mina_signature_kind.t_DEPRECATED
+            ~directory:frontier_dir ~signature_kind:Testnet
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->
