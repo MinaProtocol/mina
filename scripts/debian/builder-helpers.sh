@@ -22,7 +22,17 @@ GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 SUGGESTED_DEPS="jq, curl, wget"
 
-TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce "
+# Add suffix to debian to distinguish different profiles and instrumented packages
+DEB_SUFFIX=""
+if [[ "${DUNE_PROFILE}" != "public_network" ]] && [[ -n "${DUNE_PROFILE}" ]]; then
+    DEB_SUFFIX="-${DUNE_PROFILE}"
+fi
+
+if [[ -v DUNE_INSTRUMENT_WITH ]]; then
+    DEB_SUFFIX="${DEB_SUFFIX}-instrumented"
+fi
+
+TEST_EXECUTIVE_DEPS=", mina-logproc${DEB_SUFFIX}, python3, docker-ce "
 
 case "${MINA_DEB_CODENAME}" in
   noble)
@@ -49,18 +59,7 @@ case "${MINA_DEB_CODENAME}" in
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
     ;;
 esac
-DAEMON_INTERNAL_DEPS=", mina-base, mina-logproc"
-
-DEB_SUFFIX=""
-
-# Add suffix to debian to distinguish different profiles and instrumented packages
-if [[ "${DUNE_PROFILE}" == "lightnet" ]] && [[ -v DUNE_INSTRUMENT_WITH ]]; then
-  DEB_SUFFIX="-lightnet-instrumented"
-elif [[ "${DUNE_PROFILE}" == "lightnet" ]]; then
-  DEB_SUFFIX="-lightnet"
-elif [[ -v DUNE_INSTRUMENT_WITH ]]; then
-  DEB_SUFFIX="-instrumented"
-fi
+DAEMON_INTERNAL_DEPS=", mina-base${DEB_SUFFIX}, mina-logproc${DEB_SUFFIX}"
 
 BUILDDIR="deb_build"
 

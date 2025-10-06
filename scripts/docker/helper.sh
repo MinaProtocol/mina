@@ -35,44 +35,27 @@ function export_suffixes () {
     # - hardfork
     # - lightnet
     # - hardfork-instrumented
-    case "${DEB_PROFILE}" in
-        devnet|mainnet)
-        case "${DEB_BUILD_FLAGS}" in 
-            *instrumented)
-            export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=instrumented"
-            export BUILD_FLAG_SUFFIX="-instrumented"
-            ;;
-            *)
-            export DOCKER_DEB_SUFFIX="${DOCKER_DEB_SUFFIX:-}"
-            export BUILD_FLAG_SUFFIX=""
-            ;;
-        esac
-        ;;
-        lightnet)
-        case "${DEB_BUILD_FLAGS}" in
-            *instrumented)
-            export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=lightnet-instrumented"
-            export BUILD_FLAG_SUFFIX="lightnet-instrumented"
-            ;;
-            *)
-            export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=lightnet"
-            export BUILD_FLAG_SUFFIX="-lightnet"
-            ;;
-        esac
-        ;;
-        *)
-        case "${DEB_BUILD_FLAGS}" in 
-            *instrumented)
-            export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}-instrumented"
-            export BUILD_FLAG_SUFFIX="-instrumented"
-            ;;
-            *)
-            export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${DEB_PROFILE}"
-            export BUILD_FLAG_SUFFIX=""
-            ;;
-        esac
-        ;;
-    esac
+    local suffix=""
+
+    if [[ "${DEB_PROFILE}" != "public_network" ]] && [[ -n "${DEB_PROFILE}" ]]; then
+        suffix="${DEB_PROFILE}"
+    fi
+
+    if [[ "${DEB_BUILD_FLAGS}" == *instrumented* ]]; then
+        if [[ -n "${suffix}" ]]; then
+            suffix="${suffix}-instrumented"
+        else
+            suffix="instrumented"
+        fi
+    fi
+
+    if [[ -n "${suffix}" ]]; then
+        export DOCKER_DEB_SUFFIX="--build-arg deb_suffix=${suffix}"
+        export BUILD_FLAG_SUFFIX="-${suffix}"
+    else
+        export DOCKER_DEB_SUFFIX=""
+        export BUILD_FLAG_SUFFIX=""
+    fi
 }
 
 function get_platform_suffix() {
