@@ -51,25 +51,15 @@ case "${MINA_DEB_CODENAME}" in
 esac
 DAEMON_INTERNAL_DEPS=", mina-base, mina-logproc"
 
-DUNE_PROFILE="${DUNE_PROFILE}"
 DEB_SUFFIX=""
 
-# Add suffix to debian to distinguish different profiles
-# (mainnet/devnet/lightnet)
-case "${DUNE_PROFILE}" in
-  lightnet)
-    # use dune profile as suffix but replace underscore to dashes so deb
-    # builder won't complain
-    _SUFFIX=${DUNE_PROFILE//_/-}
-    DEB_SUFFIX="${_SUFFIX}"
-    ;;
-esac
-
-
-#Add suffix to debian to distinguish instrumented packages
-if [[ -v DUNE_INSTRUMENT_WITH ]]; then
-    INSTRUMENTED_SUFFIX=instrumented
-    DEB_SUFFIX="${DEB_SUFFIX}-${INSTRUMENTED_SUFFIX}"
+# Add suffix to debian to distinguish different profiles and instrumented packages
+if [[ "${DUNE_PROFILE}" == "lightnet" ]] && [[ -v DUNE_INSTRUMENT_WITH ]]; then
+  DEB_SUFFIX="-lightnet-instrumented"
+elif [[ "${DUNE_PROFILE}" == "lightnet" ]]; then
+  DEB_SUFFIX="-lightnet"
+elif [[ -v DUNE_INSTRUMENT_WITH ]]; then
+  DEB_SUFFIX="-instrumented"
 fi
 
 BUILDDIR="deb_build"
@@ -77,9 +67,11 @@ BUILDDIR="deb_build"
 # Function to ease creation of Debian package control files
 create_control_file() {
 
+  local suffixed_name="${1}${DEB_SUFFIX}"
+
   echo "------------------------------------------------------------"
   echo "create_control_file inputs:"
-  echo "Package Name: ${1}"
+  echo "Package Name: ${suffixed_name}"
   echo "Dependencies: ${2}"
   echo "Description: ${3}"
 
@@ -92,7 +84,7 @@ create_control_file() {
 
   # Create the control file itself
   cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: ${1}
+Package: ${suffixed_name}
 Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Origin: MinaProtocol
@@ -120,10 +112,11 @@ EOF
 
 # Function to ease package build
 build_deb() {
+  local suffixed_name="${1}${DEB_SUFFIX}"
 
   echo "------------------------------------------------------------"
   echo "build_deb inputs:"
-  echo "Package Name: ${1}"
+  echo "Package Name: ${suffixed_name}"
 
   # echo contents of deb
   echo "------------------------------------------------------------"
@@ -137,13 +130,13 @@ build_deb() {
   # Docker image, we're examining those packages in buildkite's agent, where
   # `zstd` might not be available.
   fakeroot dpkg-deb -Zgzip --build "${BUILDDIR}" \
-    "${1}"_"${MINA_DEB_VERSION}"_"${ARCHITECTURE}".deb
+    "${suffixed_name}"_"${MINA_DEB_VERSION}"_"${ARCHITECTURE}".deb
   echo "build_deb outputs:"
-  ls -lh "${1}"_*.deb
+  ls -lh "${suffixed_name}"_*.deb
   echo "deleting BUILDDIR ${BUILDDIR}"
   rm -rf "${BUILDDIR}"
 
-  echo "--- Built ${1}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
+  echo "--- Built ${suffixed_name}_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb"
 }
 
 # Function to DRY copying config files into daemon packages
@@ -255,7 +248,7 @@ build_functional_test_suite_deb() {
 ## END TEST SUITE PACKAGE ##
 
 ## ROSETTA PACKAGE ##
-build_rosetta_devnet_deb() {
+build_rosetta_deb() {
 
   echo "------------------------------------------------------------"
   echo "--- Building rosetta deb"
