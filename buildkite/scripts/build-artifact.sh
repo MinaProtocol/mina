@@ -28,4 +28,6 @@ make build-daemon-utils
 
 make build-archive-utils
 
+make build-rosetta
+
 make build-test-utils
