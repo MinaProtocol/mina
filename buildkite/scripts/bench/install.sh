@@ -10,6 +10,6 @@ source buildkite/scripts/export-git-env-vars.sh
 
 source buildkite/scripts/debian/update.sh --verbose
 
-source buildkite/scripts/debian/install.sh "mina-test-suite,mina-base" 1
+source buildkite/scripts/debian/install.sh "mina-test-suite-instrumented,mina-base-instrumented" 1
 
 pip3 install -r scripts/benchmarks/requirements.txt
