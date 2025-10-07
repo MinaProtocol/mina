@@ -168,25 +168,7 @@ let docker_step
 
           let docker_publish = DockerPublish.Type.Essential
 
-          in  merge
-                { DaemonBase =
-                  [ DockerImage.ReleaseSpec::{
-                    , deps = deps
-                    , service = Artifacts.Type.DaemonBase
-                    , network = Network.Type.Base
-                    , deb_codename = spec.debVersion
-                    , deb_profile = spec.profile
-                    , build_flags = spec.buildFlags
-                    , docker_publish = docker_publish
-                    , deb_repo = DebianRepo.Type.Local
-                    , deb_legacy_version = spec.deb_legacy_version
-                    , verify = True
-                    , arch = spec.arch
-                    , if_ = spec.if_
-                    }
-                  ]
-                , Daemon =
-                  [ DockerImage.ReleaseSpec::{
+          let daemonSpec = DockerImage.ReleaseSpec::{
                     , deps = deps
                         # DockerVersion.dependsOn
                             DockerVersion.DepsSpec::{
@@ -207,7 +189,32 @@ let docker_step
                     , arch = spec.arch
                     , if_ = spec.if_
                     }
+
+          in  merge
+                { DaemonBase =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps = deps
+                    , service = Artifacts.Type.DaemonBase
+                    , network = Network.Type.Base
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    , verify = True
+                    , arch = spec.arch
+                    , if_ = spec.if_
+                    }
                   ]
+                , Daemon =
+                    merge
+                      { Base = [] : List DockerImage.ReleaseSpec.Type
+                      , Devnet = [ daemonSpec ]
+                      , Mainnet = [ daemonSpec ]
+                      , Legacy = [ daemonSpec ]
+                      }
+                      spec.network
                 , DaemonAutoHardfork =
                   [ DockerImage.ReleaseSpec::{
                     , deps =
