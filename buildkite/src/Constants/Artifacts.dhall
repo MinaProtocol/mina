@@ -158,7 +158,6 @@ let Tag =
           , profile : Profiles.Type
           , network : Network.Type
           , buildFlags : BuildFlags.Type
-          , remove_profile_from_name : Bool
           }
       , default =
           { artifact = Artifact.Daemon
@@ -166,20 +165,12 @@ let Tag =
           , profile = Profiles.Type.PublicNetwork
           , buildFlags = BuildFlags.Type.None
           , network = Network.Type.Base
-          , remove_profile_from_name = False
           }
       }
 
 let dockerTag =
           \(spec : Tag.Type)
-      ->  let profile_part =
-                      if spec.remove_profile_from_name
-
-                then  ""
-
-                else  "${Profiles.toLabelSegment spec.profile}"
-
-          let build_flags_part =
+      ->  let build_flags_part =
                 merge
                   { None = ""
                   , Instrumented =
@@ -190,13 +181,13 @@ let dockerTag =
           in  merge
                 { Daemon =
                     "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}${build_flags_part}"
+                                         spec.network}${build_flags_part}"
                 , DaemonLegacyHardfork =
                     "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}"
+                                         spec.network}"
                 , DaemonAutoHardfork =
                     "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}"
+                                         spec.network}"
                 , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
