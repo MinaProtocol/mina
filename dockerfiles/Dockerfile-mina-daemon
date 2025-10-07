@@ -9,7 +9,7 @@ ARG deb_profile
 ARG deb_suffix
 ARG docker_repo="gcr.io/o1labs-192920"
 
-FROM ${docker_repo}/mina-daemon-base:${deb_version}-${deb_codename}-${network} AS mina_daemon_hardfork
+FROM ${docker_repo}/mina-daemon:${deb_version}-${deb_codename}-base AS mina_daemon_hardfork
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
