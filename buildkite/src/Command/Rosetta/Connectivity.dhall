@@ -47,7 +47,8 @@ let Spec =
           , timeout = 1000
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
-          , if = "build.pull_request.base_branch != \"develop\""
+          , if =
+              "build.pull_request.base_branch != \"develop\" || build.branch == \"develop\""
           }
       }
 
