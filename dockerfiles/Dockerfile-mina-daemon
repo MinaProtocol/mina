@@ -1,7 +1,12 @@
+# Run with `docker build --build-arg deb_version=<version>`
+
+ARG deb_version=3.3.0-alpha1-georgeee-sigkind-mix-518b28c
+# TODO: replace value above ^ with version of some release
+# default version is needed to ensure Docker issues no warning
+# InvalidDefaultArgInFrom
+ARG deb_codename=bullseye
 ARG docker_repo="gcr.io/o1labs-192920"
 ARG deb_artifact=mina-daemon
-ARG deb_version
-ARG deb_codename=bullseye
 
 FROM ${docker_repo}/${deb_artifact}:${deb_version}-${deb_codename}-base
 

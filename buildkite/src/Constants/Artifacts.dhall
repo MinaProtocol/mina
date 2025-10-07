@@ -110,22 +110,22 @@ let dockerNames =
 let toDebianNames =
           \(artifacts : List Artifact)
       ->  \(network : Network.Type)
+      ->  \(profile : Profiles.Type)
       ->  let list_of_list_of_debians =
                 Prelude.List.map
                   Artifact
                   (List Text)
                   (     \(a : Artifact)
-                    ->  let daemon_network = "daemon_${Network.lowerName network}" in
+                    ->  let pubnet_daemon_debs = [ "daemon_mainnet", "daemon_devnet", "daemon_base" ] in
                         merge
                           { Daemon =
                               merge
-                                { Base = [ "daemon_base" ]
-                                , Devnet = [ daemon_network, "daemon_base" ]
-                                , Mainnet = [ daemon_network, "daemon_base" ]
-                                , Legacy = [ daemon_network, "daemon_base" ]
+                                { Dev = [ "daemon_base" ]
+                                , Lightnet = [ "daemon_base" ]
+                                , PublicNetwork = pubnet_daemon_debs
                                 }
-                                network
-                          , DaemonLegacyHardfork = [ "${daemon_network}_hardfork" ]
+                                profile
+                          , DaemonLegacyHardfork = [ "daemon_${Network.lowerName network}" ]
                           , DaemonAutoHardfork = [ "" ]
                           , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
@@ -133,10 +133,10 @@ let toDebianNames =
                           , BatchTxn = [ "batch_txn" ]
                           , Rosetta =
                               merge
-                                { Base = [ "rosetta" ]
-                                , Devnet = [ daemon_network, "rosetta" ]
-                                , Mainnet = [ daemon_network, "rosetta" ]
-                                , Legacy = [ daemon_network, "rosetta" ]
+                                { Base = [ "rosetta", "daemon_base" ]
+                                , Devnet = [ "rosetta" ] # pubnet_daemon_debs
+                                , Mainnet = [ "rosetta" ] # pubnet_daemon_debs
+                                , Legacy = [ "rosetta" ] # pubnet_daemon_debs
                                 }
                                 network
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]

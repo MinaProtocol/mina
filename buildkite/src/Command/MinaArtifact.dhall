@@ -130,7 +130,8 @@ let buildDebian
                     )
                     "${spec.buildScript} ${Artifacts.toDebianNames
                                              spec.artifacts
-                                             spec.network}"
+                                             spec.network
+                                             spec.profile}"
                 # [ Cmd.run
                       "./buildkite/scripts/debian/write_to_cache.sh ${DebianVersions.lowerName
                                                                         spec.debVersion}"
@@ -178,9 +179,9 @@ let docker_step
           let deps_or_base = \(artifact_param: Artifacts.Type) ->
                     merge
                       { Base = deps
-                      , Devnet = base_dep Artifacts.Type.Daemon
-                      , Mainnet = base_dep Artifacts.Type.Daemon
-                      , Legacy = base_dep Artifacts.Type.Daemon
+                      , Devnet = base_dep artifact_param
+                      , Mainnet = base_dep artifact_param
+                      , Legacy = base_dep artifact_param
                       }
                       spec.network
                       
