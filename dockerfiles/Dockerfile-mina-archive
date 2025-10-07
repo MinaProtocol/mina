@@ -15,9 +15,9 @@ ARG deb_suffix
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 # construct mina debian package name based on network and suffix.
 # possible values:
-# - mina-archive-mainnet
-# - mina-archive-devnet-lightnet etc.
-ENV MINA_DEB=mina-archive-${network}${SUFFIX}
+# - mina-archive
+# - mina-archive-lightnet etc.
+ENV MINA_DEB=mina-archive${SUFFIX}
 ENV MINA_SIGNATURE_KIND=${signature_kind}
 
 ENV DEBIAN_FRONTEND noninteractive
