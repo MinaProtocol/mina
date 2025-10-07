@@ -3,7 +3,7 @@
 set -eox pipefail
 
 # Array of valid service names
-export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
+export VALID_SERVICES=('mina-archive' 'mina-daemon' 'mina-daemon-base' 'mina-daemon-legacy-hardfork' 'mina-daemon-auto-hardfork' 'mina-rosetta' 'mina-test-suite' 'mina-batch-txn' 'mina-zkapp-test-transaction' 'mina-toolchain' 'leaderboard' 'delegation-backend' 'delegation-backend-toolchain')
 
 function export_base_image () {
     # Determine the proper image for ubuntu or debian
@@ -23,7 +23,7 @@ function export_base_image () {
 
 function export_version () {
     case "${SERVICE}" in
-        mina-daemon|mina-archive|mina-batch-txn|mina-rosetta|mina-daemon-legacy-hardfork|mina-daemon-auto-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
+        mina-daemon|mina-daemon-base|mina-archive|mina-batch-txn|mina-rosetta|mina-daemon-legacy-hardfork|mina-daemon-auto-hardfork) export VERSION="${VERSION}-${NETWORK##*=}" ;;
         *)  ;;
 esac
 }

@@ -15,7 +15,7 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
           ArtifactPipelines.MinaBuildSpec::{
-          , artifacts = [ Artifacts.Type.Daemon ]
+          , artifacts = [ Artifacts.Type.DaemonBase, Artifacts.Type.Daemon ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release

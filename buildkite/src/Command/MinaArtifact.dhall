@@ -169,9 +169,32 @@ let docker_step
           let docker_publish = DockerPublish.Type.Essential
 
           in  merge
-                { Daemon =
+                { DaemonBase =
                   [ DockerImage.ReleaseSpec::{
                     , deps = deps
+                    , service = Artifacts.Type.DaemonBase
+                    , network = Network.Type.Base
+                    , deb_codename = spec.debVersion
+                    , deb_profile = spec.profile
+                    , build_flags = spec.buildFlags
+                    , docker_publish = docker_publish
+                    , deb_repo = DebianRepo.Type.Local
+                    , deb_legacy_version = spec.deb_legacy_version
+                    , verify = True
+                    , arch = spec.arch
+                    , if_ = spec.if_
+                    }
+                  ]
+                , Daemon =
+                  [ DockerImage.ReleaseSpec::{
+                    , deps = deps
+                        # DockerVersion.dependsOn
+                            DockerVersion.DepsSpec::{
+                            , codename = DockerVersion.ofDebian spec.debVersion
+                            , network = Network.Type.Base
+                            , profile = spec.profile
+                            , artifact = Artifacts.Type.DaemonBase
+                            }
                     , service = Artifacts.Type.Daemon
                     , network = spec.network
                     , deb_codename = spec.debVersion

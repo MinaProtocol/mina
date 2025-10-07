@@ -18,7 +18,7 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.Daemon
+            [ Artifacts.Type.DaemonBase, Artifacts.Type.Daemon
             , Artifacts.Type.DaemonAutoHardfork
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
