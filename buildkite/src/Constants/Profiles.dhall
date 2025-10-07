@@ -16,7 +16,7 @@ let capitalName =
 let lowerName =
           \(profile : Profile)
       ->  merge
-            { PublicNetwork = "publicnetwork"
+            { PublicNetwork = "public_network"
             , Lightnet = "lightnet"
             , Dev = "dev"
             }

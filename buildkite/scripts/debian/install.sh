@@ -37,7 +37,7 @@ else
   debs=(${DEBS//,/ })
   for i in "${debs[@]}"; do
     case $i in
-      mina-berkeley*|mina-devnet|mina-mainnet)
+      mina-base*|mina-devnet|mina-mainnet)
         # Downaload mina-logproc too
         ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
@@ -45,7 +45,7 @@ else
         # Download mina-logproc legacy too
         ./buildkite/scripts/cache/manager.sh read --root "legacy" "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
     esac
-    ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}_*" $LOCAL_DEB_FOLDER
+    ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/${i}*" $LOCAL_DEB_FOLDER
   done
 fi
 
