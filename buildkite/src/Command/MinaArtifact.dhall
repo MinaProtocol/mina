@@ -106,7 +106,7 @@ let nameSuffix
                                                                      spec.buildFlags}${Arch.nameSuffix
                                                                                          spec.arch}"
 
-let build_artifacts
+let buildDebian
     : MinaBuildSpec.Type -> Command.Type
     =     \(spec : MinaBuildSpec.Type)
       ->  Command.build
@@ -366,18 +366,28 @@ let pipelineBuilder
           , steps = steps
           }
 
+let buildDebians : MinaBuildSpec.Type -> List Command.Type
+    =     \(spec : MinaBuildSpec.Type)
+      ->  merge
+            { Base = [ buildDebian spec ]
+            , Devnet = [] : List Command.Type
+            , Mainnet = [] : List Command.Type
+            , Legacy = [] : List Command.Type
+            }
+            spec.network
+
 let onlyDebianPipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  pipelineBuilder spec [ build_artifacts spec ]
+      ->  pipelineBuilder spec (buildDebians spec)
 
 let pipeline
     : MinaBuildSpec.Type -> Pipeline.Config.Type
     =     \(spec : MinaBuildSpec.Type)
-      ->  pipelineBuilder spec ([ build_artifacts spec ] # docker_commands spec)
+      ->  pipelineBuilder spec (buildDebians spec # docker_commands spec)
 
 in  { pipeline = pipeline
     , onlyDebianPipeline = onlyDebianPipeline
     , MinaBuildSpec = MinaBuildSpec
-    , buildArtifacts = build_artifacts
+    , buildDebian = buildDebian
     }

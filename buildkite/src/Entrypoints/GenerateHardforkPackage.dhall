@@ -82,7 +82,7 @@ let generateDockerForCodename =
           let dependsOnTest =
                 [ { name = pipelineName, key = dockerDaemonStep } ]
 
-          in  [ MinaArtifact.buildArtifacts
+          in  [ MinaArtifact.buildDebian
                   MinaArtifact.MinaBuildSpec::{
                   , artifacts =
                     [ Artifacts.Type.LogProc
