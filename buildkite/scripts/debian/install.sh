@@ -38,8 +38,8 @@ else
   for i in "${debs[@]}"; do
     case $i in
       mina-base*|mina-devnet|mina-mainnet)
-        # Downaload mina-logproc too
-        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
+        # Download mina-logproc, mina-base too
+        ./buildkite/scripts/cache/manager.sh read "debians/$MINA_DEB_CODENAME/mina-base*" "debians/$MINA_DEB_CODENAME/mina-logproc*" $LOCAL_DEB_FOLDER
       ;;
       mina-devnet-legacy|mina-mainnet-legacy)
         # Download mina-logproc legacy too
@@ -65,8 +65,6 @@ echo "deb [trusted=yes] http://localhost:8080 $MINA_DEB_CODENAME unstable" | $SU
 $SUDO apt-get update --yes -o Dir::Etc::sourcelist="sources.list.d/mina.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
 $SUDO apt-get remove --yes "${debs[@]}"
 $SUDO apt-get install --yes --allow-downgrades "${debs_with_version[@]}"
-
-
 
 # Cleaning up
 source ./scripts/debian/aptly.sh stop  --clean

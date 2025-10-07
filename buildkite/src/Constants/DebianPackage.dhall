@@ -61,7 +61,7 @@ let debianName =
                 "mina-${Network.lowerName network}${Profile.toLabelSegment
                                                       profile}"
             , Rosetta =
-                "mina--rosetta-${Network.lowerName
+                "mina-rosetta-${Network.lowerName
                                    network}${Profile.toLabelSegment profile}"
             , Archive = "mina-archive"
             , TestExecutive = "mina-test-executive"

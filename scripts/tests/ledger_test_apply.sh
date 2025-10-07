@@ -10,6 +10,7 @@
 set -exo pipefail
 
 export MINA_PRIVKEY_PASS='naughty blue worm'
+export MINA_SIGNATURE_KIND='testnet'
 
 MINA_APP=_build/default/src/app/cli/src/mina.exe
 RUNTIME_LEDGER_APP=_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe

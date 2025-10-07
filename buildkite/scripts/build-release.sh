@@ -9,7 +9,6 @@ set -eo pipefail
 echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta"
 
-
 echo "--- Prepare debian packages"
 BRANCH_NAME="$BUILDKITE_BRANCH" ./scripts/debian/build.sh "$@"
 

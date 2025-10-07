@@ -11,9 +11,10 @@ source buildkite/scripts/export-git-env-vars.sh
 
 source buildkite/scripts/debian/update.sh --verbose
 
-source buildkite/scripts/debian/install.sh "mina-test-suite-instrumented" 1
+source buildkite/scripts/debian/install.sh "mina-test-suite-instrumented,mina-base-instrumented" 1
 
 export MINA_LIBP2P_PASS="naughty blue worm"
 export MINA_PRIVKEY_PASS="naughty blue worm"
+export MINA_SIGNATURE_KIND="testnet"
 
 mina-command-line-tests test -v

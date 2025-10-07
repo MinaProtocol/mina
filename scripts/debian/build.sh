@@ -37,6 +37,7 @@ if [ $# -eq 0 ]
     build_logproc_deb
     build_archive_deb
     build_batch_txn_deb
+    build_daemon_base_deb
     build_daemon_mainnet_deb
     build_daemon_devnet_deb
     build_rosetta_deb

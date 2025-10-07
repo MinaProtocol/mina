@@ -7,8 +7,6 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-TESTNET_NAME="${TESTNET_NAME:-berkeley}"
-
 git config --global --add safe.directory /workdir
 
 source buildkite/scripts/debian/update.sh --verbose
@@ -30,7 +28,7 @@ echo "--- Run Python version linter with branches: ${pr_branch} ${base_branch} $
 echo "--- Install Mina"
 source buildkite/scripts/export-git-env-vars.sh
 
-source buildkite/scripts/debian/install.sh "mina-${TESTNET_NAME}" 1
+source buildkite/scripts/debian/install.sh "mina-base" 1
 
 echo "--- Audit type shapes"
 mina internal audit-type-shapes

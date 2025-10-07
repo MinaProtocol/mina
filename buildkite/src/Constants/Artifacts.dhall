@@ -115,9 +115,17 @@ let toDebianNames =
                   Artifact
                   (List Text)
                   (     \(a : Artifact)
-                    ->  merge
-                          { Daemon = [ "daemon_${Network.lowerName network}" ]
-                          , DaemonLegacyHardfork = [ "daemon_${Network.lowerName network}_hardfork" ]
+                    ->  let daemon_network = "daemon_${Network.lowerName network}" in
+                        merge
+                          { Daemon =
+                              merge
+                                { Base = [ "daemon_base" ]
+                                , Devnet = [ "daemon_base", daemon_network ]
+                                , Mainnet = [ "daemon_base", daemon_network ]
+                                , Legacy = [ "daemon_base", daemon_network ]
+                                }
+                                network
+                          , DaemonLegacyHardfork = [ "${daemon_network}_hardfork" ]
                           , DaemonAutoHardfork = [ "" ]
                           , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
