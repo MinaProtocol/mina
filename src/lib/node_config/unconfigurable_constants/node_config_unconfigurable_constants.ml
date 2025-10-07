@@ -41,4 +41,4 @@ let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
    with the actual genesis state timestamp from runtime config.
 
    TODO: remove this when we have a better way to handle this. *)
-let stub_genesis_state_timestamp = "2021-09-24T00:00:00Z"
+let stub_genesis_state_timestamp = "2019-01-30 12:00:00-08:00"
