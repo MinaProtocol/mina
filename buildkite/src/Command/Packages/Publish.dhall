@@ -72,7 +72,7 @@ let Spec =
           , depends_on : List Command.TaggedKey.Type
           , branch : Text
           , architectures : List Architecture.Type
-          , if : Optional Text
+          , if_ : Optional Text
           }
       , default =
           { artifacts = [] : List Package.Type
@@ -89,7 +89,7 @@ let Spec =
           , verify = True
           , branch = ""
           , architectures = [ Architecture.Type.Amd64, Architecture.Type.Arm64 ]
-          , if = None Text
+          , if_ = None Text
           }
       }
 
@@ -224,7 +224,7 @@ let publish
                                              spec.channel}"
                     , target = Size.Small
                     , depends_on = spec.depends_on
-                    , if = spec.if
+                    , if_ = spec.if_
                     }
                 ]
               # Prelude.List.map
@@ -258,7 +258,7 @@ let publish
                                                                      r.index}"
                           , target = Size.Small
                           , depends_on = spec.depends_on
-                          , if = spec.if
+                          , if_ = spec.if_
                           }
                   )
                   indexedAdditionalTags

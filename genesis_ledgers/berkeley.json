@@ -2,6 +2,9 @@
   "genesis": {
     "genesis_state_timestamp": "2024-02-02T14:01:01Z"
   },
+  "proof": {
+    "signature_kind": "testnet"
+  },
   "ledger": {
     "name": "berkeley",
     "accounts": [

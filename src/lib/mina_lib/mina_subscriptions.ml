@@ -42,7 +42,7 @@ let add_new_subscription (t : t) ~pk =
 
 let create ~logger ~constraint_constants ~wallets ~new_blocks
     ~transition_frontier ~is_storing_all ~time_controller
-    ~upload_blocks_to_gcloud ~precomputed_block_writer =
+    ~upload_blocks_to_gcloud ~precomputed_block_writer ~signature_kind =
   let subscribed_block_users =
     Optional_public_key.Table.of_alist_multi
     @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -144,7 +144,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                           in
                           Mina_block.Precomputed.of_block ~logger
                             ~constraint_constants ~staged_ledger ~scheduled_time
-                            new_block
+                            ~signature_kind new_block
                         in
                         [%log debug] "Precomputed block generated in $time ms"
                           ~metadata:

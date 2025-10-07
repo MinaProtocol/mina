@@ -98,7 +98,7 @@ end]
 (* functions for the versioned json, not the unversioned ones provided by `T` *)
 [%%define_locally Stable.Latest.(to_yojson, of_yojson)]
 
-let of_block ~logger
+let of_block ~signature_kind ~logger
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~scheduled_time ~staged_ledger block_with_hash =
   let ledger = Staged_ledger.ledger staged_ledger in
@@ -182,6 +182,8 @@ let of_block ~logger
   ; staged_ledger_diff =
       Staged_ledger_diff.Body.staged_ledger_diff (Block.body block)
       |> Staged_ledger_diff.read_all_proofs_from_disk
+      |> Legacy_format.Staged_ledger_diff.of_stable_staged_ledger_diff
+           ~signature_kind
   ; delta_transition_chain_proof = Header.delta_block_chain_proof header
   ; protocol_version
   ; proposed_protocol_version

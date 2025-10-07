@@ -8,11 +8,60 @@ open struct
   module Work = Snark_work_lib
 end
 
+module Transaction_snark_cache = struct
+  type t =
+    { mainnet : (module Transaction_snark.S)
+    ; testnet : (module Transaction_snark.S)
+    ; mutable others : (module Transaction_snark.S) String.Map.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    }
+
+  let init_module ~constraint_constants ~proof_level signature_kind =
+    ( module Transaction_snark.Make (struct
+      let signature_kind = signature_kind
+
+      let constraint_constants = constraint_constants
+
+      let proof_level = proof_level
+    end) : Transaction_snark.S )
+
+  let create ~constraint_constants ~proof_level () =
+    { mainnet = init_module ~constraint_constants ~proof_level Mainnet
+    ; testnet = init_module ~constraint_constants ~proof_level Testnet
+    ; others = String.Map.empty
+    ; constraint_constants
+    ; proof_level
+    }
+
+  let transaction_snark cache signature_kind =
+    match signature_kind with
+    | Mina_signature_kind.Mainnet ->
+        cache.mainnet
+    | Testnet ->
+        cache.testnet
+    | Other_network name -> (
+        match String.Map.find cache.others name with
+        | Some module_ ->
+            module_
+        | None ->
+            let snark =
+              init_module ~constraint_constants:cache.constraint_constants
+                ~proof_level:cache.proof_level (Other_network name)
+            in
+            cache.others <-
+              String.Map.add_exn cache.others ~key:name ~data:snark ;
+            snark )
+end
+
 module Impl = struct
   module Worker_state = struct
     module type S = Transaction_snark.S
 
-    type proof_level_snark = Full of (module S) | Check | No_check
+    type proof_level_snark =
+      | Full of Transaction_snark_cache.t
+      | Check
+      | No_check
 
     (* TODO: Make it so that snark worker is configurationless, i.e. coordinater
        tell the worker through RPC which sig kind should it use. *)
@@ -20,33 +69,23 @@ module Impl = struct
       { proof_level_snark : proof_level_snark
       ; proof_cache_db : Proof_cache_tag.cache_db
       ; logger : Logger.t
-      ; signature_kind : Mina_signature_kind.t
       }
 
-    let create ~constraint_constants ~proof_level ~signature_kind () =
+    let create ~constraint_constants ~proof_level () =
       let proof_cache_db = Proof_cache_tag.create_identity_db () in
       let proof_level_snark =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
             Full
-              ( module Transaction_snark.Make (struct
-                let signature_kind = signature_kind
-
-                let constraint_constants = constraint_constants
-
-                let proof_level = proof_level
-              end) : S )
+              (Transaction_snark_cache.create ~constraint_constants ~proof_level
+                 () )
         | Check ->
             Check
         | No_check ->
             No_check
       in
       Deferred.return
-        { proof_level_snark
-        ; proof_cache_db
-        ; logger = Logger.create ()
-        ; signature_kind
-        }
+        { proof_level_snark; proof_cache_db; logger = Logger.create () }
 
     let worker_wait_time = 5.
   end
@@ -231,12 +270,15 @@ module Impl = struct
         M.merge ~sok_digest proof1 proof2
 
   let perform_single
-      ({ proof_level_snark; proof_cache_db; logger; signature_kind } :
-        Worker_state.t ) ~message
-      (single_spec : Work.Selector.Single.Spec.Stable.Latest.t) =
+      ({ proof_level_snark; proof_cache_db; logger } : Worker_state.t) ~message
+      ~signature_kind (single_spec : Work.Selector.Single.Spec.Stable.Latest.t)
+      =
     let sok_digest = Mina_base.Sok_message.digest message in
     match proof_level_snark with
-    | Full ((module M) as m) ->
+    | Full cache ->
+        let m =
+          Transaction_snark_cache.transaction_snark cache signature_kind
+        in
         measure_runtime ~logger
           ~spec_json:
             ( lazy
@@ -258,45 +300,20 @@ module Impl = struct
                ~proof:(Lazy.force Proof.transaction_dummy)
            , Time.Span.zero )
 
-  (* TODO: remove this after whole snark worker PR series had been merged *)
-  let perform (s : Worker_state.t) public_key
-      ({ instances; fee } as spec : Work.Selector.Spec.Stable.Latest.t) =
-    One_or_two.Deferred_result.map instances ~f:(fun w ->
-        let open Deferred.Or_error.Let_syntax in
-        let%map proof, time =
-          perform_single s
-            ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
-            w
-        in
-        ( proof
-        , (time, match w with Transition _ -> `Transition | Merge _ -> `Merge)
-        ) )
-    |> Deferred.Or_error.map ~f:(function
-         | `One (proof1, metrics1) ->
-             { Work.Work.Result.proofs = `One proof1
-             ; metrics = `One metrics1
-             ; spec
-             ; prover = public_key
-             }
-         | `Two ((proof1, metrics1), (proof2, metrics2)) ->
-             { Work.Work.Result.proofs = `Two (proof1, proof2)
-             ; metrics = `Two (metrics1, metrics2)
-             ; spec
-             ; prover = public_key
-             } )
-
   let perform_partitioned
-      ~state:
-        ({ proof_level_snark; proof_cache_db; logger; signature_kind } :
-          Worker_state.t )
-      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t) =
+      ~state:({ proof_level_snark; proof_cache_db; logger } : Worker_state.t)
+      ~spec:(partitioned_spec : Work.Spec.Partitioned.Stable.Latest.t)
+      ~signature_kind =
     let open Deferred.Or_error.Let_syntax in
     let sok_digest =
       Work.Spec.Partitioned.Poly.sok_message partitioned_spec
       |> Sok_message.digest
     in
     match proof_level_snark with
-    | Worker_state.Full ((module M) as m) -> (
+    | Worker_state.Full cache -> (
+        let m =
+          Transaction_snark_cache.transaction_snark cache signature_kind
+        in
         match partitioned_spec with
         | Work.Spec.Partitioned.Poly.Single { spec = single_spec; _ } ->
             let%map proof, elapsed =
@@ -320,7 +337,7 @@ module Impl = struct
               Transaction_witness.Zkapp_command_segment_witness
               .write_all_proofs_to_disk ~signature_kind ~proof_cache_db witness
             in
-
+            let (module M) = m in
             let%map proof, elapsed =
               log_subzkapp_base_snark ~logger ~statement ~spec:segment_spec
                 ~sok_digest

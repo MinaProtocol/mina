@@ -8,9 +8,9 @@ let PipelineTag = ../../Pipeline/Tag.dhall
 
 let PipelineScope = ../../Pipeline/Scope.dhall
 
-let Network = ../../Constants/Network.dhall
-
 let DebianVersions = ../../Constants/DebianVersions.dhall
+
+let Network = ../../Constants/Network.dhall
 
 in  Pipeline.build
       ( ArtifactPipelines.onlyDebianPipeline
@@ -21,8 +21,8 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             ]
-          , network = Network.Type.DevnetLegacy
-          , debVersion = DebianVersions.DebVersion.Bookworm
+          , debVersion = DebianVersions.DebVersion.Focal
+          , network = Network.Type.Legacy
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

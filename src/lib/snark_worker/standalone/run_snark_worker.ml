@@ -27,7 +27,7 @@ let submit_graphql input graphql_endpoint =
       Format.printf "Graphql error: %s\n" s ;
       exit 1
 
-let perform (s : Prod.Worker_state.t) ~fee ~public_key
+let perform (s : Prod.Worker_state.t) ~fee ~public_key ~signature_kind
     (spec :
       ( Transaction_witness.Stable.Latest.t
       , Ledger_proof.t )
@@ -36,7 +36,7 @@ let perform (s : Prod.Worker_state.t) ~fee ~public_key
   One_or_two.Deferred_result.map spec ~f:(fun w ->
       let open Deferred.Or_error.Let_syntax in
       let%map proof, time =
-        Prod.perform_single s
+        Prod.perform_single s ~signature_kind
           ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
           w
       in
@@ -97,17 +97,14 @@ let command =
      and proof_submission_graphql_endpoint =
        flag "--graphql-uri" ~doc:"Graphql endpoint to submit proofs"
          (optional Cli_lib.Arg_type.uri)
-     in
+     and signature_kind = Cli_lib.Flag.signature_kind in
      fun () ->
        let open Async in
        let constraint_constants =
          Genesis_constants.Compiled.constraint_constants
        in
-
-       let signature_kind = Mina_signature_kind.t_DEPRECATED in
        let%bind worker_state =
-         Prod.Worker_state.create ~constraint_constants ~proof_level
-           ~signature_kind ()
+         Prod.Worker_state.create ~constraint_constants ~proof_level ()
        in
        let%bind spec =
          let spec_of_json json =
@@ -154,7 +151,9 @@ let command =
            ~default:(Currency.Fee.of_nanomina_int_exn 10)
            snark_work_fee
        in
-       match%bind perform worker_state ~fee ~public_key spec with
+       match%bind
+         perform worker_state ~fee ~public_key ~signature_kind spec
+       with
        | Ok result -> (
            Caml.Format.printf
              !"@[<v>Successfully proved. Result: \n\

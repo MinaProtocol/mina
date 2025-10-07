@@ -315,7 +315,7 @@ let%test_module "Archive node unit tests" =
             Processor.run ~proof_cache_db
               ~genesis_constants:precomputed_values.genesis_constants
               ~constraint_constants:precomputed_values.constraint_constants pool
-              reader ~logger ~delete_older_than:None
+              reader ~logger ~signature_kind:Testnet ~delete_older_than:None
           in
           match%map
             Mina_caqti.deferred_result_list_fold breadcrumbs ~init:()

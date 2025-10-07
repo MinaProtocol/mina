@@ -7,7 +7,8 @@
       "state_hash": "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15",
       "blockchain_length": 359604,
       "global_slot_since_genesis": 564480
-    }
+    },
+    "signature_kind": "mainnet"
   },
   "ledger": {
     "add_genesis_winner": false,

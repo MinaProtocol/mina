@@ -12,6 +12,8 @@ module type CONTEXT = sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val consensus_constants : Consensus.Constants.t
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 module Node = struct
@@ -481,11 +483,11 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         Ledger.Maskable.register_mask s
           (Ledger.Mask.create ~depth:(Ledger.Any_ledger.M.depth s) ())
       in
-      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       (* STEP 5 *)
       (*Validate transactions against the protocol state associated with the transaction*)
       let apply_first_pass =
-        Ledger.apply_transaction_first_pass ~signature_kind
+        Ledger.apply_transaction_first_pass
+          ~signature_kind:Context.signature_kind
           ~constraint_constants:Context.constraint_constants
       in
       let apply_second_pass = Ledger.apply_transaction_second_pass in
@@ -495,7 +497,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         let%map _ledger, partial_txn =
           Mina_ledger.Sparse_ledger.apply_transaction_first_pass
             ~constraint_constants:Context.constraint_constants ~txn_state_view
-            ~global_slot sparse_ledger txn
+            ~global_slot ~signature_kind:Context.signature_kind sparse_ledger
+            txn
         in
         partial_txn
       in
@@ -510,7 +513,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
       Or_error.ok_exn
         (Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
            ~get_protocol_state ~apply_first_pass ~apply_second_pass
-           ~apply_first_pass_sparse_ledger ~signature_kind
+           ~apply_first_pass_sparse_ledger
+           ~signature_kind:Context.signature_kind
            (Staged_ledger.scan_state
               (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) ) ;
       (*Check that the new snarked ledger is as expected*)
@@ -962,6 +966,8 @@ module For_tests = struct
     let precomputed_values = precomputed_values
 
     let consensus_constants = precomputed_values.consensus_constants
+
+    let signature_kind = Mina_signature_kind.Testnet
   end
 
   let verifier () =

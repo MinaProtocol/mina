@@ -99,7 +99,7 @@ module Sexp_precomputed : S with type t = Mina_block.Precomputed.t = struct
 
   let name = "sexp"
 
-  let of_breadcrumb = precomputed_of_breadcrumb
+  let of_breadcrumb = precomputed_of_breadcrumb ~signature_kind:Testnet
 
   let to_string b =
     Mina_block.Precomputed.sexp_of_t b |> Sexp.to_string |> append_newline
@@ -112,7 +112,7 @@ module Json_precomputed : S with type t = Mina_block.Precomputed.t = struct
 
   let name = "json"
 
-  let of_breadcrumb = precomputed_of_breadcrumb
+  let of_breadcrumb = precomputed_of_breadcrumb ~signature_kind:Testnet
 
   let to_string b =
     Mina_block.Precomputed.to_yojson b
@@ -128,7 +128,7 @@ module Binary_precomputed : S with type t = Mina_block.Precomputed.t = struct
 
   let name = "binary"
 
-  let of_breadcrumb = precomputed_of_breadcrumb
+  let of_breadcrumb = precomputed_of_breadcrumb ~signature_kind:Testnet
 
   let to_string = Binable.to_string (module Mina_block.Precomputed.Stable.Latest)
 

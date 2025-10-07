@@ -6,7 +6,7 @@ open Common
 
 (* NOTE:
    To run this test, several preparation is needed
-   - ensure we have this test, replayer & archive node build with devnet profile
+   - ensure we have this test, replayer & archive node build with public_network profile
    - ensure we have a data base instance up
    - Run the following:
      ```

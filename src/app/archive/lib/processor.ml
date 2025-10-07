@@ -3244,11 +3244,13 @@ module Block = struct
       ~hash ~v1_transaction_hash:false
 
   let add_from_precomputed conn ~proof_cache_db ~constraint_constants
-      (t : Precomputed.t) =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+      ~signature_kind (t : Precomputed.t) =
     let staged_ledger_diff =
-      Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
-        ~proof_cache_db t.staged_ledger_diff
+      (* We purposefully ignore some hashes that are already stored in legacy format *)
+      Mina_block.Legacy_format.Staged_ledger_diff.to_stable_staged_ledger_diff
+        t.staged_ledger_diff
+      |> Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+           ~proof_cache_db
     in
     add_parts_if_doesn't_exist conn ~constraint_constants
       ~protocol_state:t.protocol_state ~staged_ledger_diff
@@ -4617,10 +4619,11 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
 
 (* used by `archive_blocks` app *)
 let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
-    ?retries ~pool ~delete_older_than block =
+    ~signature_kind ?retries ~pool ~delete_older_than block =
   add_block_aux ~logger ?retries ~pool ~delete_older_than
     ~add_block:
-      (Block.add_from_precomputed ~logger ~proof_cache_db ~constraint_constants)
+      (Block.add_from_precomputed ~logger ~proof_cache_db ~constraint_constants
+         ~signature_kind )
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~accounts_accessed:block.Precomputed.accounts_accessed
@@ -4641,7 +4644,7 @@ let add_block_aux_extensional ~proof_cache_db ~logger ~signature_kind ?retries
 
 (* receive blocks from a daemon, write them to the database *)
 let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
-    ~logger ~delete_older_than : unit Deferred.t =
+    ~logger ~signature_kind ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
@@ -4650,7 +4653,6 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
           Block.add_if_doesn't_exist ~logger ~constraint_constants
         in
         let hash = State_hash.With_state_hashes.state_hash in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         let block =
           With_hash.map
             ~f:
@@ -4680,20 +4682,25 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
 (* [add_genesis_accounts] is called when starting the archive process *)
 let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
     ~(genesis_constants : Genesis_constants.t) ~chunks_length
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t) pool =
-  match runtime_config_opt with
-  | None ->
-      Deferred.unit
-  | Some runtime_config -> (
-      let%bind precomputed_values =
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    ~cli_signature_kind pool : Mina_signature_kind.t Deferred.t =
+  match (runtime_config_opt, cli_signature_kind) with
+  | None, None ->
+      [%log warn] "signature kind not specified" ;
+      failwith "signature kind not specified"
+  | None, Some signature_kind ->
+      return signature_kind
+  | Some runtime_config, _ -> (
+      let%bind precomputed_values, signature_kind =
         match%map
           Genesis_ledger_helper.init_from_config_file ~logger
             ~proof_level:Genesis_constants.Compiled.proof_level
             ~genesis_constants ~constraint_constants runtime_config
             ~cli_proof_level:None ~genesis_backing_type:Stable_db
+            ~cli_signature_kind
         with
-        | Ok (precomputed_values, _) ->
-            precomputed_values
+        | Ok (precomputed_values, _, signature_kind) ->
+            (precomputed_values, signature_kind)
         | Error err ->
             failwithf "Could not get precomputed values, error: %s"
               (Error.to_string_hum err) ()
@@ -4806,7 +4813,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
           failwith "Failed to add genesis accounts"
       | Ok () ->
-          () )
+          signature_kind )
 
 let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
     ~block_window_duration_ms pool =
@@ -4836,8 +4843,8 @@ let serve_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
-    ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    =
+    ~delete_older_than ~runtime_config_opt ~missing_blocks_width
+    ~cli_signature_kind =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4866,19 +4873,20 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
         ~metadata:[ ("error", `String (Caqti_error.show e)) ] ;
       Deferred.unit
   | Ok pool ->
-      let%bind () =
+      let%bind signature_kind =
         add_genesis_accounts pool ~logger ~genesis_constants
           ~constraint_constants ~runtime_config_opt ~chunks_length
+          ~cli_signature_kind
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
-        ~logger ~delete_older_than
+        ~logger ~signature_kind ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
             add_block_aux_precomputed ~proof_cache_db ~logger ~pool
-              ~genesis_constants ~constraint_constants ~delete_older_than
-              precomputed_block
+              ~genesis_constants ~constraint_constants ~signature_kind
+              ~delete_older_than precomputed_block
           with
           | Error e ->
               [%log warn]

@@ -24,7 +24,7 @@ let network = Network.Type.Mainnet
 
 let dependsOn =
       Dockers.dependsOn
-        Dockers.DepsSpec::{ network = network, profile = Profile.Type.Mainnet }
+        Dockers.DepsSpec::{ network = network, profile = Profile.Type.PublicNetwork }
 
 in  Pipeline.build
       Pipeline.Config::{

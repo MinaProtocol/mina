@@ -673,7 +673,7 @@ let get_ledger t state_hash_opt =
 
 let get_snarked_ledger_full t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let signature_kind = t.signature_kind in
   let%bind state_hash =
     Option.value_map state_hash_opt ~f:Deferred.Or_error.return
       ~default:
@@ -722,7 +722,8 @@ let get_snarked_ledger_full t state_hash_opt =
                   Mina_ledger.Sparse_ledger.apply_transaction_first_pass
                     ~constraint_constants:
                       t.config.precomputed_values.constraint_constants
-                    ~global_slot ~txn_state_view sparse_ledger txn
+                    ~global_slot ~txn_state_view ~signature_kind sparse_ledger
+                    txn
                 in
                 partial_txn
               in
@@ -1501,7 +1502,8 @@ let start t =
     ~graphql_control_port:t.config.graphql_control_port ~built_with_commit_sha
     ~get_next_producer_timing:(fun () -> t.next_producer_timing)
     ~get_snark_work_fee:(fun () -> snark_work_fee t)
-    ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer) ;
+    ~get_peer:(fun () -> t.config.gossip_net_params.addrs_and_ports.peer)
+    ~signature_kind:t.signature_kind ;
   stop_long_running_daemon t ;
   Snark_worker.start t
 
@@ -1757,8 +1759,7 @@ let initialize_zkapp_vk_cache_db (config : Config.t) =
     (config.conf_dir ^/ "zkapp_vk_cache")
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
-let create ~commit_id ?wallets (config : Config.t) =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+let create ~signature_kind ~commit_id ?wallets (config : Config.t) =
   [%log' info config.logger] "Creating daemon with commit id: %s" commit_id ;
   let commit_id_short = shorten_commit_id commit_id in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1918,7 +1919,8 @@ let create ~commit_id ?wallets (config : Config.t) =
                         Uptime_service.Uptime_snark_worker.create
                           ~constraint_constants:
                             config.precomputed_values.constraint_constants
-                          ~logger:config.logger ~pids:config.pids ) )
+                          ~signature_kind ~logger:config.logger
+                          ~pids:config.pids ) )
                 >>| Result.ok )
           in
           log_snark_coordinator_warning config snark_worker ;
@@ -2429,6 +2431,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~is_storing_all:config.is_archive_rocksdb
               ~upload_blocks_to_gcloud:config.upload_blocks_to_gcloud
               ~time_controller:config.time_controller ~precomputed_block_writer
+              ~signature_kind
           in
           let open Mina_incremental.Status in
           let transition_frontier_incr =

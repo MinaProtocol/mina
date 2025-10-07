@@ -91,7 +91,7 @@ let main ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     num_transactions repeats preeval use_zkapps () =
   Test_util.with_randomness 123456789 (fun () ->
       let module T = Transaction_snark.Make (struct
-        let signature_kind = Mina_signature_kind.t_DEPRECATED
+        let signature_kind = Mina_signature_kind.Testnet
 
         let constraint_constants = constraint_constants
 

@@ -441,20 +441,30 @@ module Signed_command = struct
       (optional string)
 end
 
-let signature_kind =
+let signature_kind_impl ~when_default_specified ~no_default_modifier =
   let open Command.Param in
-  let arg_type =
-    Command.Arg_type.create (fun s ->
-        match String.lowercase s with
-        | "mainnet" ->
-            Mina_signature_kind.Mainnet
-        | "testnet" ->
-            Mina_signature_kind.Testnet
-        | other ->
-            Mina_signature_kind.Other_network other )
+  let arg_type = Command.Arg_type.create Mina_signature_kind.of_string in
+  let env_val =
+    Option.map ~f:Mina_signature_kind.of_string
+    @@ Sys.getenv "MINA_SIGNATURE_KIND"
   in
-  flag "--signature-kind"
-    ~doc:
-      "mainnet|testnet|<other> Signature kind to use (default: value compiled \
-       into this binary)"
-    (optional_with_default Mina_signature_kind.t_DEPRECATED arg_type)
+  match env_val with
+  | Some v ->
+      flag "--signature-kind"
+        ~doc:
+          (sprintf "Signature kind (default: %s)"
+             (Mina_signature_kind.to_string v) )
+        (optional_with_default v arg_type)
+      |> when_default_specified
+  | None ->
+      flag "--signature-kind" ~doc:"Signature kind"
+        (no_default_modifier arg_type)
+
+let signature_kind_opt =
+  signature_kind_impl
+    ~when_default_specified:(Command.Param.map ~f:Option.some)
+    ~no_default_modifier:Command.Param.optional
+
+let signature_kind =
+  signature_kind_impl ~when_default_specified:ident
+    ~no_default_modifier:Command.Param.required

@@ -39,7 +39,8 @@
   signature_lib
   staged_ledger
   mina_stdlib
-  mina_compile_config)
+  mina_compile_config
+  mina_signature_kind)
  (instrumentation
   (backend bisect_ppx))
  (preprocess

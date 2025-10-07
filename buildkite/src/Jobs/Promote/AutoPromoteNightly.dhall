@@ -61,7 +61,7 @@ let specs_for_branch =
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             ]
-          , profile = Profiles.Type.Devnet
+          , profile = Profiles.Type.PublicNetwork
           , networks = [ Network.Type.Devnet ]
           , codenames =
             [ DebianVersions.DebVersion.Noble
@@ -77,7 +77,7 @@ let specs_for_branch =
           , branch = "\\\${BUILDKITE_BRANCH}"
           , source_version = "\\\${MINA_DEB_VERSION}"
           , build_id = "\\\${BUILDKITE_BUILD_ID}"
-          , if = Some "build.branch == \"${branch}\""
+          , if_ = Some "build.branch == \"${branch}\""
           }
 
 in  Pipeline.build

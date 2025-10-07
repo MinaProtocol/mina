@@ -34,7 +34,7 @@ fi
 echo "✅ AWS CLI is available"
 
 export BYPASS_OPAM_SWITCH_UPDATE=1
-export DUNE_PROFILE=${NETWORK_NAME}
+export DUNE_PROFILE=public_network
 
 make build
 make build-daemon-utils

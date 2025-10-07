@@ -393,7 +393,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   ] ;
 
               Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
-              Deferred.return (Some spec)
+              Deferred.return @@ Some (spec, Mina_lib.signature_kind mina)
           | Some (Error (`Failed_to_generate_inputs (zkapp_cmd, e))) ->
               let open Mina_base.Zkapp_command in
               [%log error]

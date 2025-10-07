@@ -264,8 +264,6 @@ module type S = sig
     val t : t
   end
 
-  val genesis_timestamp_of_string : string -> Time.t
-
   val of_time : Time.t -> int64
 
   val to_time : int64 -> Time.t
@@ -277,8 +275,6 @@ module type S = sig
   module Protocol = Protocol
 
   include module type of T with type t = T.t
-
-  val genesis_state_timestamp_string : string
 
   val k : int
 
@@ -398,8 +394,6 @@ module Make (Node_config : Node_config_intf.S) : S = struct
   module Protocol = Protocol
   include T
 
-  let genesis_state_timestamp_string = Node_config.genesis_state_timestamp
-
   let k = Node_config.k
 
   let slots_per_epoch = Node_config.slots_per_epoch
@@ -420,7 +414,8 @@ module Make (Node_config : Node_config_intf.S) : S = struct
         ; grace_period_slots
         ; delta
         ; genesis_state_timestamp =
-            genesis_timestamp_of_string genesis_state_timestamp_string
+            genesis_timestamp_of_string
+              Node_config_unconfigurable_constants.stub_genesis_state_timestamp
             |> of_time
         }
     ; txpool_max_size = pool_max_size

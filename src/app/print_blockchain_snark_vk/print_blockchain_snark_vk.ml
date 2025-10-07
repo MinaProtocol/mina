@@ -4,7 +4,8 @@ let () =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let () = Format.eprintf "Generating transaction snark circuit..@." in
       let module Transaction_snark_instance = Transaction_snark.Make (struct
-        let signature_kind = Mina_signature_kind.t_DEPRECATED
+        (* This app is only used as a test *)
+        let signature_kind = Mina_signature_kind.Testnet
 
         let constraint_constants =
           Genesis_constants.Compiled.constraint_constants

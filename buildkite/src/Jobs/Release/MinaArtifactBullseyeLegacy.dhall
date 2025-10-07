@@ -19,7 +19,7 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             ]
-          , network = Network.Type.DevnetLegacy
+          , network = Network.Type.Legacy
           , debVersion = DebianVersions.DebVersion.Bullseye
           }
       )

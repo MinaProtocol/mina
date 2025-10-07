@@ -44,3 +44,5 @@ RUN echo "deb [trusted=yes] ${deb_repo} $deb_codename $deb_release" > /etc/apt/s
   || sleep 10s && apt-get -y update \
   && apt-get install -y --no-install-recommends "mina-zkapp-test-transaction=$deb_version" \
   && rm -rf /var/lib/apt/lists/*
+
+ENV MINA_SIGNATURE_KIND=testnet

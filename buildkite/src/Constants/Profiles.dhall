@@ -2,13 +2,12 @@ let Network = ./Network.dhall
 
 let Profile
     : Type
-    = < Devnet | Mainnet | Lightnet | Dev >
+    = < PublicNetwork | Lightnet | Dev >
 
 let capitalName =
           \(profile : Profile)
       ->  merge
-            { Devnet = "Devnet"
-            , Mainnet = "Mainnet"
+            { PublicNetwork = "PublicNetwork"
             , Lightnet = "Lightnet"
             , Dev = "Dev"
             }
@@ -17,8 +16,7 @@ let capitalName =
 let lowerName =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
+            { PublicNetwork = "public_network"
             , Lightnet = "lightnet"
             , Dev = "dev"
             }
@@ -27,29 +25,16 @@ let lowerName =
 let duneProfile =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
+            { PublicNetwork = "public_network"
             , Lightnet = "lightnet"
             , Dev = "dev"
             }
             profile
 
-let fromNetwork =
-          \(network : Network.Type)
-      ->  merge
-            { Devnet = Profile.Devnet
-            , Mainnet = Profile.Mainnet
-            , Berkeley = Profile.Devnet
-            , DevnetLegacy = Profile.Devnet
-            , MainnetLegacy = Profile.Mainnet
-            }
-            network
-
 let toSuffixUppercase =
           \(profile : Profile)
       ->  merge
-            { Devnet = "Devnet"
-            , Mainnet = "Mainnet"
+            { PublicNetwork = ""
             , Lightnet = "Lightnet"
             , Dev = "Dev"
             }
@@ -58,8 +43,7 @@ let toSuffixUppercase =
 let toSuffixLowercase =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "mainnet"
+            { PublicNetwork = ""
             , Lightnet = "lightnet"
             , Dev = "dev"
             }
@@ -68,10 +52,9 @@ let toSuffixLowercase =
 let toLabelSegment =
           \(profile : Profile)
       ->  merge
-            { Devnet = "devnet"
-            , Mainnet = "-mainnet"
-            , Lightnet = "-lightnet"
-            , Dev = "-dev"
+            { PublicNetwork = ""
+            , Lightnet = "lightnet"
+            , Dev = "dev"
             }
             profile
 
@@ -80,7 +63,6 @@ in  { Type = Profile
     , lowerName = lowerName
     , duneProfile = duneProfile
     , toSuffixUppercase = toSuffixUppercase
-    , fromNetwork = fromNetwork
     , toSuffixLowercase = toSuffixLowercase
     , toLabelSegment = toLabelSegment
     }

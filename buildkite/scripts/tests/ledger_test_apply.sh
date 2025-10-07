@@ -11,7 +11,7 @@ source buildkite/scripts/export-git-env-vars.sh
 
 source buildkite/scripts/debian/update.sh --verbose
 
-source buildkite/scripts/debian/install.sh "mina-berkeley-instrumented" 1
+source buildkite/scripts/debian/install.sh "mina-base-instrumented" 1
 
 echo "removing magic config files"
 sudo rm -f /var/lib/coda/config_*

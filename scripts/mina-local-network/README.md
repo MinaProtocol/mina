@@ -30,7 +30,7 @@
 
        ```shell
        MINA_COMMIT_SHA1=$(git rev-parse HEAD) \
-       DUNE_PROFILE="devnet" \
+       DUNE_PROFILE="public_network" \
          dune build \
            src/app/cli/src/mina.exe \
            src/app/archive/archive.exe \

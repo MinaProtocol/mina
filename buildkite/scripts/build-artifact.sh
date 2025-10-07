@@ -14,21 +14,20 @@ if [[ -v DUNE_INSTRUMENT_WITH ]]; then
   export DUNE_INSTRUMENT_WITH="$DUNE_INSTRUMENT_WITH"
 fi
 
-
 echo "--- Build all major targets required for packaging"
 echo "Building from Commit SHA: ${MINA_COMMIT_SHA1}"
 echo "Rust Version: $(rustc --version)"
 
 make libp2p_helper
 
+make build
+
 make build-logproc
-
-[[ ${MINA_BUILD_MAINNET} ]] && make build-mainnet-sigs
-
-make build-devnet-sigs
 
 make build-daemon-utils
 
 make build-archive-utils
+
+make build-rosetta
 
 make build-test-utils

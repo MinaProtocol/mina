@@ -301,6 +301,7 @@ end
 
 val create_diff :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> signature_kind:Mina_signature_kind.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
   -> ?log_block_creation:bool
   -> t

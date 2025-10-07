@@ -36,3 +36,9 @@ let rpc_handshake_timeout_sec = 60.0
 let rpc_heartbeat_timeout_sec = 60.0
 
 let rpc_heartbeat_send_every_sec = 10.0 (*same as the default*)
+
+(* This is a stub value inserted into genesis_constants to be later replaced
+   with the actual genesis state timestamp from runtime config.
+
+   TODO: remove this when we have a better way to handle this. *)
+let stub_genesis_state_timestamp = "2019-01-30 12:00:00-08:00"

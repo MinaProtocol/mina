@@ -328,14 +328,21 @@ let verify_receipt =
            let of_payment_json =
              if use_legacy_json then
                Fn.compose
-                 (Result.map ~f:User_command.read_all_proofs_from_disk)
+                 (Result.map
+                    ~f:
+                      Mina_block.Legacy_format.User_command
+                      .to_stable_user_command )
                  Mina_block.Legacy_format.User_command.of_yojson
              else User_command.Stable.Latest.of_yojson
            in
            let of_proof_json =
              let unwrap_proof =
                Tuple2.map_snd
-                 ~f:(List.map ~f:User_command.read_all_proofs_from_disk)
+                 ~f:
+                   (List.map
+                      ~f:
+                        Mina_block.Legacy_format.User_command
+                        .to_stable_user_command )
              in
              if use_legacy_json then
                Fn.compose
@@ -1845,7 +1852,11 @@ let compile_time_constants =
                conf_dir ^/ "daemon.json"
          in
          let open Async in
-         let%map ({ consensus_constants; _ } as precomputed_values), _ =
+         let%map { consensus_constants; constraint_constants; _ }, _, _ =
+           (* Signature kind Testnet is used here as a stub
+              Neither constraint_constants nor consensus_constants are dependent
+              on signature kind.
+           *)
            config_file |> Genesis_ledger_helper.load_config_json >>| Or_error.ok
            >>| Option.value
                  ~default:
@@ -1856,6 +1867,7 @@ let compile_time_constants =
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
                  ~cli_proof_level:None ~genesis_dir
                  ~genesis_backing_type:Stable_db
+                 ~cli_signature_kind:(Some Testnet)
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -1870,12 +1882,9 @@ let compile_time_constants =
              ; ( "coinbase"
                , `String
                    (Currency.Amount.to_mina_string
-                      precomputed_values.constraint_constants.coinbase_amount )
-               )
+                      constraint_constants.coinbase_amount ) )
              ; ( "block_window_duration_ms"
-               , `Int
-                   precomputed_values.constraint_constants
-                     .block_window_duration_ms )
+               , `Int constraint_constants.block_window_duration_ms )
              ; ("delta", `Int (Unsigned.UInt32.to_int consensus_constants.delta))
              ; ( "sub_windows_per_window"
                , `Int
@@ -2290,21 +2299,21 @@ let thread_graph =
              exit 1 ) )
 
 let signature_kind =
-  Command.basic
-    ~summary:"Print the signature kind that this binary is compiled with"
+  Command.async
+    ~summary:"Print the signature kind that this executable is configured with"
     (let%map.Command () = Command.Param.return () in
      fun () ->
-       let signature_kind_string =
-         match Mina_signature_kind.t_DEPRECATED with
-         | Mainnet ->
-             "mainnet"
-         | Testnet ->
-             "testnet"
-         | Other_network s ->
-             (* Prefix string to disambiguate *)
-             "other network: " ^ s
+       let env_val =
+         Option.map ~f:Mina_signature_kind.of_string
+         @@ Sys.getenv "MINA_SIGNATURE_KIND"
        in
-       Core.print_endline signature_kind_string )
+       match env_val with
+       | Some v ->
+           Core.print_endline @@ Mina_signature_kind.to_string v ;
+           Deferred.unit
+       | None ->
+           Format.eprintf "Signature kind not specified\n" ;
+           exit 1 )
 
 let test_genesis_creation =
   Command.async ~summary:"Test genesis creation"

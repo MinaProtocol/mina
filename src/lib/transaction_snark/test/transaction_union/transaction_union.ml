@@ -134,11 +134,10 @@ let%test_module "Transaction union tests" =
             Result.( >>= )
               (Sparse_ledger.apply_transaction_first_pass
                  ~constraint_constants:U.constraint_constants ~global_slot
-                 sparse_ledger
                  ~txn_state_view:
                    ( txn_in_block.block_data
                    |> Mina_state.Protocol_state.Body.view )
-                 txn_in_block.transaction )
+                 ~signature_kind:Testnet sparse_ledger txn_in_block.transaction )
               (fun (sparse_ledger, partially_applied) ->
                 Sparse_ledger.apply_transaction_second_pass sparse_ledger
                   partially_applied )

@@ -10,4 +10,8 @@ type block_data =
 
 type request [@@deriving to_yojson]
 
-val create_request : block_data -> Signature_lib.Keypair.t -> request
+val create_request :
+     signature_kind:Mina_signature_kind.t
+  -> block_data
+  -> Signature_lib.Keypair.t
+  -> request

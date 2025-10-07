@@ -66,8 +66,6 @@ let scan_state_transaction_capacity_log_2 =
 
 [%%inject "plugins", plugins]
 
-[%%inject "genesis_state_timestamp", genesis_state_timestamp]
-
 [%%inject "block_window_duration", block_window_duration]
 
 [%%ifndef compaction_interval]
@@ -81,8 +79,6 @@ let compaction_interval = None
 let compaction_interval = Some compaction_interval
 
 [%%endif]
-
-[%%inject "network", network]
 
 [%%inject "vrf_poll_interval", vrf_poll_interval]
 

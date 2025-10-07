@@ -41,6 +41,7 @@ val build :
         -> Transaction_snark_work.Checked.t option )
   -> sender:Envelope.Sender.t option
   -> transition_receipt_time:Time.t option
+  -> signature_kind:Mina_signature_kind.t
   -> unit
   -> ( t
      , [> `Invalid_staged_ledger_diff of Error.t
@@ -124,6 +125,7 @@ module For_tests : sig
     -> transition:Mina_block.almost_valid_block
     -> sender:Envelope.Sender.t option
     -> transition_receipt_time:Time.t option
+    -> signature_kind:Mina_signature_kind.t
     -> unit
     -> ( t
        , [> `Invalid_staged_ledger_diff of Error.t

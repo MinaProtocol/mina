@@ -145,7 +145,7 @@ let sign ~signer ~(user_command_payload : Signed_command_payload.t)
       Deferred.Result.return
         (Signed_command.sign ~signature_kind signer_kp user_command_payload)
   | Hd_index hd_index ->
-      Secrets.Hardware_wallets.sign ~hd_index
+      Secrets.Hardware_wallets.sign ~signature_kind ~hd_index
         ~public_key:(Public_key.decompress_exn signer)
         ~user_command_payload
 

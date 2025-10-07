@@ -117,3 +117,5 @@ module Signed_command : sig
 end
 
 val signature_kind : Mina_signature_kind.t Command.Param.t
+
+val signature_kind_opt : Mina_signature_kind.t option Command.Param.t

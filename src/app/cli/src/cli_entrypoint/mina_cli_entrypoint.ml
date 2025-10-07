@@ -51,7 +51,7 @@ let plugin_flag =
 
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
-    config_files =
+    ~cli_signature_kind config_files =
   let%bind config_jsons =
     let config_files_paths =
       List.map config_files ~f:(fun (config_file, _) -> `String config_file)
@@ -103,10 +103,10 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
         ~logger ~genesis_constants ~constraint_constants ~proof_level
-        ~genesis_backing_type config
+        ~genesis_backing_type ~cli_signature_kind config
     with
-    | Ok (precomputed_values, _) ->
-        precomputed_values
+    | Ok (precomputed_values, _, signature_kind) ->
+        (precomputed_values, signature_kind)
     | Error err ->
         let ( json_config
             , `Accounts_omitted
@@ -582,7 +582,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
          legacy mode, all databased backed ledgers are backed by one database. \
          THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
       (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
-  in
+  and cli_signature_kind = Cli_lib.Flag.signature_kind_opt in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
     function
@@ -793,11 +793,11 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let ledger_backing_type =
             Mina_lib.Config.ledger_backing ~hardfork_mode
           in
-          let%bind precomputed_values, config_jsons, config =
+          let%bind (precomputed_values, signature_kind), config_jsons, config =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
-              ~genesis_backing_type:ledger_backing_type
+              ~genesis_backing_type:ledger_backing_type ~cli_signature_kind
           in
 
           constraint_constants.block_window_duration_ms |> Float.of_int
@@ -1393,7 +1393,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             Option.iter itn_max_logs ~f:Itn_logger.set_queue_bound ;
           let start_time = Time.now () in
           let%map mina =
-            Mina_lib.create ~commit_id:Mina_version.commit_id ~wallets
+            Mina_lib.create ~signature_kind ~commit_id:Mina_version.commit_id
+              ~wallets
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~file_log_level ~log_level ~log_json ~chain_id ~is_seed
                  ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
@@ -1756,7 +1757,7 @@ let internal_commands logger ~itn_features =
           | `Ok sexp -> (
               let%bind worker_state =
                 Snark_worker.Inputs.Worker_state.create ~proof_level
-                  ~constraint_constants ~signature_kind ()
+                  ~constraint_constants ()
               in
               let sok_message =
                 { Mina_base.Sok_message.fee = Currency.Fee.of_mina_int_exn 0
@@ -1771,7 +1772,7 @@ let internal_commands logger ~itn_features =
               in
               match%map
                 Snark_worker.Inputs.perform_single worker_state
-                  ~message:sok_message spec
+                  ~message:sok_message spec ~signature_kind
               with
               | Ok _ ->
                   [%log info] "Successfully worked"
@@ -1956,7 +1957,7 @@ let internal_commands logger ~itn_features =
               "DIR Directory that contains the genesis ledger and the genesis \
                blockchain proof (default: <config-dir>)"
             (optional string)
-        and signature_kind = Cli_lib.Flag.signature_kind in
+        and cli_signature_kind = Cli_lib.Flag.signature_kind_opt in
         fun () ->
           let open Deferred.Let_syntax in
           Parallel.init_master () ;
@@ -1973,10 +1974,11 @@ let internal_commands logger ~itn_features =
             List.map config_files ~f:(fun config_file ->
                 (config_file, `Must_exist) )
           in
-          let%bind precomputed_values, _config_jsons, _config =
+          let%bind (precomputed_values, signature_kind), _config_jsons, _config
+              =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
-              ~genesis_backing_type:Stable_db config_files
+              ~genesis_backing_type:Stable_db ~cli_signature_kind config_files
           in
           let pids = Child_processes.Termination.create_pid_table () in
           let%bind prover =

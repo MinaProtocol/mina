@@ -54,11 +54,11 @@ let ReleaseSpec =
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
           , verify : Bool
-          , if : Optional B/If
+          , if_ : Optional B/If
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
-          , network = Network.Type.Berkeley
+          , network = Network.Type.Base
           , arch = Arch.Type.Amd64
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.Type.Daemon
@@ -68,7 +68,7 @@ let ReleaseSpec =
           , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
-          , deb_profile = Profiles.Type.Devnet
+          , deb_profile = Profiles.Type.PublicNetwork
           , build_flags = BuildFlags.Type.None
           , deb_repo = DebianRepo.Type.Local
           , docker_publish = DockerPublish.Type.Essential
@@ -77,7 +77,7 @@ let ReleaseSpec =
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
-          , if = None B/If
+          , if_ = None B/If
           }
       }
 
@@ -124,8 +124,7 @@ let generateStep =
                 Extensions.joinOptionals
                   "-"
                   [ merge
-                      { Mainnet = None Text
-                      , Devnet = None Text
+                      { PublicNetwork = None Text
                       , Dev = None Text
                       , Lightnet = Some
                           "${Profiles.toSuffixLowercase spec.deb_profile}"
@@ -253,7 +252,7 @@ let generateStep =
                 , target = Size.XLarge
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
-                , if = spec.if
+                , if_ = spec.if_
                 }
 
 in  { generateStep = generateStep

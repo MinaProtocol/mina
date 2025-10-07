@@ -73,8 +73,7 @@ let gen_signed ~signature_kind =
   G.payment_with_random_participants ~sign_type ~keys:(Array.of_list keys)
     ~max_amount:10000 ~fee_range:1000 ()
 
-let gen =
-  Gen.to_signed_command (gen_signed ~signature_kind:Mina_signature_kind.Testnet)
+let gen = Gen.to_signed_command (gen_signed ~signature_kind:Testnet)
 
 [%%versioned
 module Stable = struct

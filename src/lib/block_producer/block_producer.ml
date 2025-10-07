@@ -237,11 +237,11 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                     (* TODO: handle transaction inclusion failures here *)
                     let diff_result =
                       Staged_ledger.create_diff ~constraint_constants
-                        ~global_slot staged_ledger ~coinbase_receiver ~logger
+                        ~signature_kind ~global_slot ~log_block_creation
+                        staged_ledger ~coinbase_receiver ~logger
                         ~current_state_view:previous_state_view
                         ~transactions_by_fee:transactions ~get_completed_work
-                        ~log_block_creation ~supercharge_coinbase
-                        ~zkapp_cmd_limit
+                        ~supercharge_coinbase ~zkapp_cmd_limit
                       |> Result.map ~f:(fun (diff, failed_txns) ->
                              if not (List.is_empty failed_txns) then
                                don't_wait_for
@@ -918,6 +918,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
                       ~transition_receipt_time
+                      ~signature_kind:Context.signature_kind
                       ~transaction_pool_proxy:
                         { find_by_hash =
                             Network_pool.Transaction_pool.Resource_pool
@@ -1450,9 +1451,12 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
               ~delta_block_chain_proof ()
           in
           let body =
+            (* We purposefully ignore some hashes that are already stored in legacy format *)
             Body.create
-              (Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
-                 ~proof_cache_db staged_ledger_diff )
+              ( Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+                  ~proof_cache_db
+              @@ Mina_block.Legacy_format.Staged_ledger_diff
+                 .to_stable_staged_ledger_diff staged_ledger_diff )
           in
           let%bind transition =
             let open Result.Let_syntax in
@@ -1491,10 +1495,14 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
                   ~get_completed_work:(Fn.const None) ~trust_system
                   ~parent:crumb ~transition ~sender:None
                   ~skip_staged_ledger_verification:`Proofs
-                  ~transition_receipt_time ()
+                  ~transition_receipt_time
+                  ~signature_kind:Context.signature_kind ()
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
-                         `Invalid_staged_ledger_diff (e, staged_ledger_diff)
+                         `Invalid_staged_ledger_diff
+                           ( e
+                           , Mina_block.Legacy_format.Staged_ledger_diff
+                             .to_stable_staged_ledger_diff staged_ledger_diff )
                      | ( `Fatal_error _
                        | `Invalid_genesis_protocol_state
                        | `Invalid_staged_ledger_hash _

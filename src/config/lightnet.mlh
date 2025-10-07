@@ -56,7 +56,6 @@
 [%%define grace_period_slots 200]
 [%%define plugins false]
 [%%define genesis_ledger "testnet_postake"]
-[%%define genesis_state_timestamp "2020-09-16 03:15:00-07:00"]
 [%%define block_window_duration 20000]
 [%%define itn_features true]
 [%%define print_versioned_types false]
@@ -68,11 +67,6 @@
 [%%undef fork_global_slot_since_genesis]
 [%%undef zkapp_cmd_limit]
 (*END src/config/fork.mlh*)
-
-
-(*BEGIN src/config/features/public_testnet.mlh*)
-[%%define network "testnet"]
-(*END src/config/features/public_testnet.mlh*)
 
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]

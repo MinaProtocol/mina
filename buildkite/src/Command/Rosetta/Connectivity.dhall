@@ -42,7 +42,7 @@ let Spec =
           , additionalDirtyWhen = [] : List S.Type
           , softFail = B/SoftFail.Boolean False
           , timeout = 1000
-          , profile = Profiles.Type.Devnet
+          , profile = Profiles.Type.PublicNetwork
           , scope = PipelineScope.Full
           }
       }

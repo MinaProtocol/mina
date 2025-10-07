@@ -5,7 +5,8 @@ open Async
 open Archive_lib
 
 let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-    ~extensional ~success_file ~failure_file ~log_successes ~files () =
+    ~extensional ~success_file ~failure_file ~log_successes ~signature_kind
+    ~files () =
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let output_file_line path =
     match path with
@@ -60,7 +61,7 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
         in
         make_add_block of_yojson
           (Processor.add_block_aux_precomputed ~proof_cache_db
-             ~genesis_constants ~constraint_constants ~pool
+             ~genesis_constants ~constraint_constants ~signature_kind ~pool
              ~delete_older_than:None ~logger )
       in
       let add_extensional_block =
@@ -77,7 +78,7 @@ let main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
         make_add_block of_yojson
           (Processor.add_block_aux_extensional ~proof_cache_db
              ~genesis_constants ~logger ~pool ~delete_older_than:None
-             ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+             ~signature_kind )
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->
@@ -136,6 +137,8 @@ let () =
                "true/false Whether to log messages for files that were \
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
+         and signature_kind = Cli_lib.Flag.signature_kind
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
          main ~genesis_constants ~constraint_constants ~archive_uri ~precomputed
-           ~extensional ~success_file ~failure_file ~log_successes ~files )))
+           ~extensional ~success_file ~failure_file ~log_successes
+           ~signature_kind ~files )))

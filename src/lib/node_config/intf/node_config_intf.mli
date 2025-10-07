@@ -29,6 +29,8 @@ module type Unconfigurable_constants = sig
   val rpc_heartbeat_timeout_sec : float
 
   val rpc_heartbeat_send_every_sec : float
+
+  val stub_genesis_state_timestamp : string
 end
 
 module type S = sig
@@ -76,15 +78,11 @@ module type S = sig
 
   val plugins : bool
 
-  val genesis_state_timestamp : string
-
   val block_window_duration : int
 
   val compaction_interval : int option
 
   val vrf_poll_interval : int
-
-  val network : string
 
   val zkapp_cmd_limit : int option
 

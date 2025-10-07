@@ -332,7 +332,7 @@ module Instance = struct
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~get_completed_work:(Fn.const None) ~sender:None
-                 ~transition_receipt_time ()
+                 ~transition_receipt_time ~signature_kind ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              [%log internal] "Breadcrumb_integrated" ;

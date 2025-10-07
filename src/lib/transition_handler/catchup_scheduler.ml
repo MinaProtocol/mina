@@ -64,7 +64,7 @@ type t =
   }
 
 let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
-    ~time_controller ~catchup_job_writer
+    ~time_controller ~catchup_job_writer ~signature_kind
     ~(catchup_breadcrumbs_writer :
        ( ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
          * Validation_callback.t option )
@@ -102,7 +102,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                  [ ("catchup_scheduler", `String "Called from catchup scheduler")
                  ] )
             ~precomputed_values ~verifier ~trust_system ~frontier ~initial_hash
-            transition_branches
+            ~signature_kind transition_branches
         with
         | Ok trees_of_breadcrumbs ->
             Writer.write catchup_breadcrumbs_writer
@@ -413,6 +413,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create ~frontier ~precomputed_values ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~signature_kind:Testnet
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -473,6 +474,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~signature_kind:Testnet
           in
           watch scheduler ~timeout_duration ~valid_cb:None
             ~cached_transition:
@@ -550,6 +552,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             create ~precomputed_values ~frontier ~verifier ~catchup_job_writer
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
+              ~signature_kind:Testnet
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =
             List.rev branch

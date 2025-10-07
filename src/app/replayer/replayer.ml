@@ -514,9 +514,8 @@ let get_parent_state_view ~pool block_id =
   in
   return state_view
 
-let zkapp_command_to_transaction ~proof_cache_db ~logger ~pool
+let zkapp_command_to_transaction ~proof_cache_db ~logger ~signature_kind ~pool
     (cmd : Sql.Zkapp_command.t) : Mina_transaction.Transaction.t Deferred.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let query_db = Mina_caqti.query pool in
   (* use dummy authorizations *)
   let%bind (fee_payer : Account_update.Fee_payer.t) =
@@ -633,7 +632,7 @@ let write_replayer_checkpoint ~logger ~ledger ~last_global_slot_since_genesis
 let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
     ~checkpoint_interval ~checkpoint_output_folder_opt ~checkpoint_file_prefix
     ~genesis_dir_opt ~log_json ~log_level ~log_filename ~file_log_level
-    ~constraint_constants ~proof_level () =
+    ~constraint_constants ~proof_level ~signature_kind () =
   Cli_lib.Stdout_log.setup log_json log_level ;
   Option.iter log_filename ~f:(fun log_filename ->
       Logger.Consumer_registry.register ~id:"default"
@@ -641,7 +640,6 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
         ~transport:(Logger_file_system.evergrowing ~log_filename)
         () ) ;
   let proof_cache_db = Proof_cache_tag.create_identity_db () in
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -1485,7 +1483,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                 ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
             in
             let%bind txn =
-              zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
+              zkapp_command_to_transaction ~proof_cache_db ~logger
+                ~signature_kind ~pool zkc
             in
             apply_commands ~block_txns:(txn :: block_txns)
               ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
@@ -1511,7 +1510,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
                 in
                 let%bind txn =
-                  zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
+                  zkapp_command_to_transaction ~proof_cache_db ~logger
+                    ~signature_kind ~pool zkc
                 in
                 apply_commands ~block_txns:(txn :: block_txns)
                   ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
@@ -1544,7 +1544,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
                 in
                 let%bind txn =
-                  zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
+                  zkapp_command_to_transaction ~proof_cache_db ~logger
+                    ~signature_kind ~pool zkc
                 in
                 apply_commands ~block_txns:(txn :: block_txns)
                   ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
@@ -1620,7 +1621,8 @@ let main ~input_file ~output_file_opt ~archive_uri ~continue_on_error
                     ~cmd_global_slot_since_genesis:zkc.global_slot_since_genesis
                 in
                 let%bind txn =
-                  zkapp_command_to_transaction ~proof_cache_db ~logger ~pool zkc
+                  zkapp_command_to_transaction ~proof_cache_db ~logger
+                    ~signature_kind ~pool zkc
                 in
                 apply_commands ~block_txns:(txn :: block_txns)
                   ~last_global_slot_since_genesis:zkc.global_slot_since_genesis
@@ -1738,8 +1740,10 @@ let () =
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and file_log_level = Cli_lib.Flag.Log.file_log_level
-         and log_filename = Cli_lib.Flag.Log.file in
+         and log_filename = Cli_lib.Flag.Log.file
+         and signature_kind = Cli_lib.Flag.signature_kind in
          main ~input_file ~output_file_opt ~archive_uri ~checkpoint_interval
            ~continue_on_error ~checkpoint_output_folder_opt
            ~checkpoint_file_prefix ~genesis_dir_opt ~log_json ~log_level
-           ~file_log_level ~log_filename ~constraint_constants ~proof_level )))
+           ~file_log_level ~log_filename ~constraint_constants ~proof_level
+           ~signature_kind )))

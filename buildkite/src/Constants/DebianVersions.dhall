@@ -35,7 +35,6 @@ let lowerName =
 let DepsSpec =
       { Type =
           { deb_version : DebVersion
-          , network : Network.Type
           , profile : Profiles.Type
           , build_flag : BuildFlags.Type
           , step : Text
@@ -44,8 +43,7 @@ let DepsSpec =
           }
       , default =
           { deb_version = DebVersion.Bullseye
-          , network = Network.Type.Berkeley
-          , profile = Profiles.Type.Devnet
+          , profile = Profiles.Type.PublicNetwork
           , build_flag = BuildFlags.Type.None
           , step = "build"
           , prefix = "MinaArtifact"
@@ -59,8 +57,7 @@ let dependsOn =
 
           let name =
                 "${spec.prefix}${capitalName
-                                   spec.deb_version}${Network.capitalName
-                                                        spec.network}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                   spec.deb_version}Base${profileSuffix}${BuildFlags.toSuffixUppercase
                                                                                          spec.build_flag}${Arch.nameSuffix
                                                                                                              spec.arch}"
 

@@ -1,5 +1,7 @@
 let ArtifactPipelines = ../../Command/MinaArtifact.dhall
 
+let DebianVersions = ../../Constants/DebianVersions.dhall
+
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
@@ -10,19 +12,23 @@ let PipelineScope = ../../Pipeline/Scope.dhall
 
 let Network = ../../Constants/Network.dhall
 
-let DebianVersions = ../../Constants/DebianVersions.dhall
-
 in  Pipeline.build
-      ( ArtifactPipelines.onlyDebianPipeline
+      ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
-          , artifacts = [ Artifacts.Type.Daemon ]
+          , artifacts =
+            [ Artifacts.Type.Daemon
+            , Artifacts.Type.LogProc
+            , Artifacts.Type.Archive
+            , Artifacts.Type.Rosetta
+            , Artifacts.Type.ZkappTestTransaction
+            , Artifacts.Type.CreateLegacyGenesis
+            ]
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             ]
-          , network = Network.Type.DevnetLegacy
-          , debVersion = DebianVersions.DebVersion.Jammy
+          , debVersion = DebianVersions.DebVersion.Noble
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           }

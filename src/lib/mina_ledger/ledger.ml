@@ -501,8 +501,7 @@ include Mina_transaction_logic.Make (Ledger_inner)
 
 (* use mask to restore ledger after application *)
 let merkle_root_after_zkapp_command_exn ~constraint_constants ~global_slot
-    ~txn_state_view ledger zkapp_command =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    ~txn_state_view ~signature_kind ledger zkapp_command =
   let mask = Mask.create ~depth:(depth ledger) () in
   let masked_ledger = register_mask ledger mask in
   let _applied =

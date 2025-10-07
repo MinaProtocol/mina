@@ -107,43 +107,38 @@ let dockerNames =
             (\(a : Artifact) -> dockerName a)
             artifacts
 
-let toDebianName =
-          \(artifact : Artifact)
-      ->  \(network : Network.Type)
-      ->  merge
-            { Daemon = "daemon_${Network.lowerName network}"
-            , DaemonLegacyHardfork =
-                "daemon_${Network.lowerName network}_hardfork"
-            , DaemonAutoHardfork = ""
-            , LogProc = "logproc"
-            , Archive = "archive_${Network.lowerName network}"
-            , TestExecutive = "test_executive"
-            , BatchTxn = "batch_txn"
-            , Rosetta = "rosetta_${Network.lowerName network}"
-            , ZkappTestTransaction = "zkapp_test_transaction"
-            , FunctionalTestSuite = "functional_test_suite"
-            , Toolchain = ""
-            , CreateLegacyGenesis = "create_legacy_genesis"
-            }
-            artifact
-
 let toDebianNames =
           \(artifacts : List Artifact)
       ->  \(network : Network.Type)
+      ->  \(profile : Profiles.Type)
       ->  let list_of_list_of_debians =
                 Prelude.List.map
                   Artifact
                   (List Text)
                   (     \(a : Artifact)
-                    ->  merge
-                          { Daemon = [ toDebianName a network ]
-                          , DaemonLegacyHardfork = [ toDebianName a network ]
-                          , DaemonAutoHardfork = [ toDebianName a network ]
-                          , Archive = [ toDebianName a network ]
+                    ->  let pubnet_daemon_debs = [ "daemon_mainnet", "daemon_devnet", "daemon_base" ] in
+                        merge
+                          { Daemon =
+                              merge
+                                { Dev = [ "daemon_base" ]
+                                , Lightnet = [ "daemon_base" ]
+                                , PublicNetwork = pubnet_daemon_debs
+                                }
+                                profile
+                          , DaemonLegacyHardfork = [ "daemon_${Network.lowerName network}" ]
+                          , DaemonAutoHardfork = [ "" ]
+                          , Archive = [ "archive" ]
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ toDebianName a network ]
+                          , Rosetta =
+                              merge
+                                { Base = [ "rosetta", "daemon_base" ]
+                                , Devnet = [ "rosetta" ] # pubnet_daemon_debs
+                                , Mainnet = [ "rosetta" ] # pubnet_daemon_debs
+                                , Legacy = [ "rosetta" ] # pubnet_daemon_debs
+                                }
+                                network
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreateLegacyGenesis = [ "create_legacy_genesis" ]
@@ -170,28 +165,19 @@ let Tag =
           , profile : Profiles.Type
           , network : Network.Type
           , buildFlags : BuildFlags.Type
-          , remove_profile_from_name : Bool
           }
       , default =
           { artifact = Artifact.Daemon
           , version = "\\\${MINA_DOCKER_TAG}"
-          , profile = Profiles.Type.Devnet
+          , profile = Profiles.Type.PublicNetwork
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Berkeley
-          , remove_profile_from_name = False
+          , network = Network.Type.Base
           }
       }
 
 let dockerTag =
           \(spec : Tag.Type)
-      ->  let profile_part =
-                      if spec.remove_profile_from_name
-
-                then  ""
-
-                else  "${Profiles.toLabelSegment spec.profile}"
-
-          let build_flags_part =
+      ->  let build_flags_part =
                 merge
                   { None = ""
                   , Instrumented =
@@ -202,13 +188,13 @@ let dockerTag =
           in  merge
                 { Daemon =
                     "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}${build_flags_part}"
+                                         spec.network}${build_flags_part}"
                 , DaemonLegacyHardfork =
                     "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}"
+                                         spec.network}"
                 , DaemonAutoHardfork =
                     "${spec.version}-${Network.lowerName
-                                         spec.network}${profile_part}"
+                                         spec.network}"
                 , Archive = "${spec.version}${build_flags_part}"
                 , LogProc = "${spec.version}"
                 , TestExecutive = "${spec.version}"
@@ -230,7 +216,6 @@ in  { Type = Artifact
     , Tag = Tag
     , capitalName = capitalName
     , lowerName = lowerName
-    , toDebianName = toDebianName
     , toDebianNames = toDebianNames
     , dockerName = dockerName
     , dockerNames = dockerNames

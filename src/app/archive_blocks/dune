@@ -20,6 +20,7 @@
   uri
   ;; local libraries
   archive_lib
+  cli_lib
   mina_stdlib
   genesis_constants
   logger

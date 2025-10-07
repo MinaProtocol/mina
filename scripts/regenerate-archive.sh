@@ -9,7 +9,7 @@ cd "$(dirname -- "${BASH_SOURCE[0]}")"/..
 # Prepare the database
 sudo -u postgres dropdb archive || true # fails when db doesn't exist which is fine
 psql -U postgres -c 'CREATE DATABASE archive'
-export DUNE_PROFILE=devnet
+export DUNE_PROFILE=public_network
 dune build src/app/cli/src/mina.exe src/app/archive/archive.exe src/app/zkapp_test_transaction/zkapp_test_transaction.exe src/app/logproc/logproc.exe
 psql -U postgres archive < ./src/app/archive/create_schema.sql
 psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'postgres';"

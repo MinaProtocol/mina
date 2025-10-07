@@ -4,16 +4,15 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | Berkeley | DevnetLegacy | MainnetLegacy >
+    = < Devnet | Mainnet | Base | Legacy >
 
 let capitalName =
           \(network : Network)
       ->  merge
             { Devnet = "Devnet"
             , Mainnet = "Mainnet"
-            , Berkeley = "Berkeley"
-            , DevnetLegacy = "DevnetLegacy"
-            , MainnetLegacy = "MainnetLegacy"
+            , Base = "Base"
+            , Legacy = "Legacy"
             }
             network
 
@@ -22,43 +21,12 @@ let lowerName =
       ->  merge
             { Devnet = "devnet"
             , Mainnet = "mainnet"
-            , Berkeley = "berkeley"
-            , DevnetLegacy = "devnet_legacy"
-            , MainnetLegacy = "mainnet_legacy"
+            , Base = "base"
+            , Legacy = "legacy"
             }
             network
-
-let requiresMainnetBuild =
-          \(network : Network)
-      ->  merge
-            { Devnet = True
-            , Mainnet = True
-            , Berkeley = False
-            , DevnetLegacy = True
-            , MainnetLegacy = True
-            }
-            network
-
-let buildMainnetEnv =
-          \(network : Network)
-      ->        if requiresMainnetBuild network
-
-          then  "MINA_BUILD_MAINNET=true"
-
-          else  "MINA_BUILD_MAINNET=false"
-
-let foldMinaBuildMainnetEnv =
-          \(networks : List Network)
-      ->        if List/any Network requiresMainnetBuild networks
-
-          then  "MINA_BUILD_MAINNET=true"
-
-          else  "MINA_BUILD_MAINNET=false"
 
 in  { Type = Network
     , capitalName = capitalName
     , lowerName = lowerName
-    , requiresMainnetBuild = requiresMainnetBuild
-    , foldMinaBuildMainnetEnv = foldMinaBuildMainnetEnv
-    , buildMainnetEnv = buildMainnetEnv
     }

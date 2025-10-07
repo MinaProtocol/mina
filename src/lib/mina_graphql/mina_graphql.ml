@@ -2721,21 +2721,22 @@ module Queries = struct
         >>| Pickles.Verification_key.to_yojson >>| Yojson.Safe.to_basic )
 
   let network_id =
-    field "networkID"
+    io_field "networkID"
       ~doc:
         "The chain-agnostic identifier of the network this daemon is \
          participating in"
       ~typ:(non_null string)
       ~args:Arg.[]
       ~resolve:(fun { ctx = mina; _ } () ->
-        let cfg = Mina_lib.config mina in
         let runtime_cfg = Mina_lib.runtime_config mina in
         let network_id =
-          Option.value ~default:cfg.compile_config.network_id
-          @@ let%bind.Option daemon = runtime_cfg.daemon in
-             daemon.network_id
+          let%bind.Option daemon = runtime_cfg.daemon in
+          let%map.Option id = daemon.network_id in
+          "mina:" ^ id
         in
-        "mina:" ^ network_id )
+        Option.value_map ~f:Deferred.Result.return
+          ~default:(Deferred.Result.fail "network_id not specified")
+          network_id )
 
   let signature_kind =
     field "signatureKind"
