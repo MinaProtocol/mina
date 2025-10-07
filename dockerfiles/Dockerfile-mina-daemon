@@ -1,5 +1,11 @@
-# Run with `docker build --build-arg deb_version=<version>`
+ARG docker_repo="gcr.io/o1labs-192920"
+ARG deb_artifact=mina-daemon
 ARG deb_version
+ARG deb_codename=bullseye
+
+FROM ${docker_repo}/${deb_artifact}:${deb_version}-${deb_codename}-base
+
+# Run with `docker build --build-arg deb_version=<version>`
 ARG deb_release=unstable
 ARG deb_codename=bullseye
 ARG network=mainnet
@@ -7,10 +13,10 @@ ARG signature_kind=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
-ARG docker_repo="gcr.io/o1labs-192920"
-ARG deb_artifact=mina-daemon
-
-FROM ${docker_repo}/${deb_artifact}:${deb_version}-${deb_codename}-base
+ARG deb_version
+ARG network
+ARG signature_kind
+ARG deb_suffix
 
 # if --build-arg deb_suffix is defined, add hypen at beginning.
 ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
@@ -21,7 +27,7 @@ ENV SUFFIX=${deb_suffix:+-${deb_suffix}}
 ENV MINA_DEB=mina-${network}${SUFFIX}
 ENV MINA_SIGNATURE_KIND=${signature_kind}
 
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Mina daemon package
 # jemalloc is also installed automatically here to match the package dependencies for this $deb_codename

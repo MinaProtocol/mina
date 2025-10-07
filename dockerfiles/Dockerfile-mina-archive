@@ -1,10 +1,11 @@
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
 ARG deb_codename=bullseye
-ARG signature_kind=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG docker_repo="gcr.io/o1labs-192920"
+ARG deb_artifact=mina-archive
 
 FROM ${docker_repo}/${deb_artifact}:${deb_version}-${deb_codename}-base
 
+ARG signature_kind=mainnet
 ENV MINA_SIGNATURE_KIND=${signature_kind}
