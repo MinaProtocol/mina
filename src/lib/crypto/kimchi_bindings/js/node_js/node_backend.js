@@ -7,13 +7,6 @@ try {
   // native not available, keep WASM
 }
 
-if (native) {
-  plonk_wasm.__native_backend = true;
-  if (typeof globalThis !== 'undefined') {
-    globalThis.__native_backend = true;
-  }
-}
-
 function snakeToCamel(name) {
   return name.replace(/_([a-z])/g, function (_match, ch) {
     return ch.toUpperCase();
@@ -33,10 +26,11 @@ function override(functionName) {
 [
   'caml_pasta_fp_poseidon_block_cipher', // Poseidon
   'caml_pasta_fq_poseidon_block_cipher', // Poseidon 
-  //'WasmFpPolyComm', // PolyComm
-  //'WasmFqPolyComm', // PolyComm
- // 'WasmGPallas', // Group
-  //'WasmGVesta', // Group
- // 'WasmVecVecFp', // Vector
-  //'WasmVecVecFq', // Vector
+  'WasmFpPolyComm', // PolyComm
+  'WasmFqPolyComm', // PolyComm
+  'WasmGPallas', // Group
+  'WasmGVesta', // Group
+  'WasmVecVecFp', // Vector
+  'WasmVecVecFq', // Vector
 ].forEach(override);
+
