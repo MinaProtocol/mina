@@ -52,30 +52,9 @@ let lowerName =
             }
             package
 
-let debianName =
-          \(package : Package)
-      ->  \(profile : Profile.Type)
-      ->  \(network : Network.Type)
-      ->  merge
-            { Daemon =
-                "mina-${Network.lowerName network}${Profile.toLabelSegment
-                                                      profile}"
-            , Rosetta =
-                "mina-rosetta-${Network.lowerName
-                                   network}${Profile.toLabelSegment profile}"
-            , Archive = "mina-archive"
-            , TestExecutive = "mina-test-executive"
-            , BatchTxn = "mina-batch-txn"
-            , LogProc = "mina-logproc"
-            , ZkappTestTransaction = "mina-zkapp-test-transaction"
-            , FunctionalTestSuite = "mina-test-suite"
-            }
-            package
-
 in  { Type = Package
     , MainPackages = MainPackages
     , AuxiliaryPackages = AuxiliaryPackages
     , capitalName = capitalName
     , lowerName = lowerName
-    , debianName = debianName
     }
