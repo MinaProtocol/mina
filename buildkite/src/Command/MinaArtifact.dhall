@@ -166,25 +166,28 @@ let docker_step
 
           let docker_publish = DockerPublish.Type.Essential
 
-          let base_dep =
+          let base_dep = \(artifact_param: Artifacts.Type) ->
                 DockerVersion.dependsOn
-                  DockerVersion.DepsSpec::{
-                    , codename = DockerVersion.ofDebian spec.debVersion
+                  DockerVersion.DepsSpec::{,
+                    codename = DockerVersion.ofDebian spec.debVersion
                     , network = Network.Type.Base
                     , profile = spec.profile
-                    , artifact = Artifacts.Type.Daemon
+                    , artifact = artifact_param
                     } 
 
+          let deps_or_base = \(artifact_param: Artifacts.Type) ->
+                    merge
+                      { Base = deps
+                      , Devnet = base_dep Artifacts.Type.Daemon
+                      , Mainnet = base_dep Artifacts.Type.Daemon
+                      , Legacy = base_dep Artifacts.Type.Daemon
+                      }
+                      spec.network
+                      
           in  merge
                 { Daemon =
                   [ DockerImage.ReleaseSpec::{
-                    , deps = merge
-                      { Base = deps
-                      , Devnet = base_dep
-                      , Mainnet = base_dep
-                      , Legacy = base_dep
-                      }
-                      spec.network
+                    , deps = deps_or_base Artifacts.Type.Daemon
                     , service = Artifacts.Type.Daemon
                     , network = spec.network
                     , deb_codename = spec.debVersion
@@ -260,7 +263,7 @@ let docker_step
                   ]
                 , Archive =
                   [ DockerImage.ReleaseSpec::{
-                    , deps = deps
+                    , deps = deps_or_base Artifacts.Type.Archive
                     , service = Artifacts.Type.Archive
                     , network = spec.network
                     , deb_codename = spec.debVersion
@@ -276,7 +279,7 @@ let docker_step
                   ]
                 , Rosetta =
                   [ DockerImage.ReleaseSpec::{
-                    , deps = deps
+                    , deps = deps_or_base Artifacts.Type.Rosetta
                     , service = Artifacts.Type.Rosetta
                     , network = spec.network
                     , deb_codename = spec.debVersion
