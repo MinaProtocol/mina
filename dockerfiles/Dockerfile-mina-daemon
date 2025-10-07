@@ -7,6 +7,7 @@ ARG signature_kind=mainnet
 ARG deb_repo="http://packages.o1test.net"
 ARG deb_profile
 ARG deb_suffix
+ARG docker_repo="gcr.io/o1labs-192920"
 
 FROM ${docker_repo}/mina-daemon-base:${deb_version}-${deb_codename}-${network} AS mina_daemon_hardfork
 
