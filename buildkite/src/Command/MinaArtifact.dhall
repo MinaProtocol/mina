@@ -158,7 +158,6 @@ let docker_step
                 DebianVersions.dependsOn
                   DebianVersions.DepsSpec::{
                   , deb_version = spec.debVersion
-                  , network = spec.network
                   , profile = spec.profile
                   , build_flag = spec.buildFlags
                   , step = step_dep_name
