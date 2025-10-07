@@ -17,7 +17,7 @@ The release manager script (`manager.sh`) provides functionality to:
 
 - **Artifacts**: `mina-daemon`, `mina-archive`, `mina-rosetta`, `mina-logproc`
 - **Networks**: `devnet`, `mainnet`
-- **Platforms**: Debian (bullseye, focal), Docker (GCR, Docker.io)
+- **Platforms**: Debian (bullseye, focal, noble, bookworm, jammy), Docker (GCR, Docker.io)
 - **Channels**: `unstable`, `alpha`, `beta`, `stable`
 - **Storage Backends**: Google Cloud Storage (`gs`), Hetzner (`hetzner`), local filesystem (`local`)
 - **Architectures**: `amd64`, `arm64`
