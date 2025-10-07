@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -1166,7 +1168,9 @@ let run_catchup ~context:(module Context : CONTEXT) ~trust_system ~verifier
         |> Deferred.Or_error.map
              ~f:
                (List.map
-                  ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) ) )
+                  ~f:
+                    (Mina_block.write_all_proofs_to_disk ~signature_kind
+                       ~proof_cache_db ) ) )
       ~peers:(fun () -> Mina_networking.peers network)
       ~knowledge_context:
         (Broadcast_pipe.map best_tip_r
@@ -1482,6 +1486,8 @@ let%test_module "Ledger_catchup tests" =
       let consensus_constants = precomputed_values.consensus_constants
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end
 
     (* let mock_verifier =

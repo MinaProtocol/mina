@@ -57,7 +57,7 @@ module Transaction_with_witness = struct
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
 
-  let write_all_proofs_to_disk ~proof_cache_db
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
       { Stable.Latest.transaction_with_info
       ; state_hash
       ; statement
@@ -66,7 +66,6 @@ module Transaction_with_witness = struct
       ; second_pass_ledger_witness
       ; block_global_slot
       } =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
     { transaction_with_info =
         Mina_transaction_logic.Transaction_applied.write_all_proofs_to_disk
           ~signature_kind ~proof_cache_db transaction_with_info
@@ -1493,7 +1492,7 @@ let check_required_protocol_states t ~protocol_states =
   let%map () = check_length protocol_states_assoc in
   protocol_states_assoc
 
-let write_all_proofs_to_disk ~proof_cache_db
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     { Stable.Latest.scan_state = uncached
     ; previous_incomplete_zkapp_updates = tx_list, border_status
     } =
@@ -1502,10 +1501,14 @@ let write_all_proofs_to_disk ~proof_cache_db
   in
   { scan_state =
       Parallel_scan.State.map uncached ~f1
-        ~f2:(Transaction_with_witness.write_all_proofs_to_disk ~proof_cache_db)
+        ~f2:
+          (Transaction_with_witness.write_all_proofs_to_disk ~signature_kind
+             ~proof_cache_db )
   ; previous_incomplete_zkapp_updates =
       ( List.map
-          ~f:(Transaction_with_witness.write_all_proofs_to_disk ~proof_cache_db)
+          ~f:
+            (Transaction_with_witness.write_all_proofs_to_disk ~signature_kind
+               ~proof_cache_db )
           tx_list
       , border_status )
   }

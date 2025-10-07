@@ -16,6 +16,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 exception Invalid_genesis_state_hash of Mina_block.Validated.t
@@ -60,8 +62,8 @@ let construct_staged_ledger_at_root ~proof_cache_db
     Blockchain_state.staged_ledger_hash blockchain_state
   in
   let scan_state =
-    Staged_ledger.Scan_state.write_all_proofs_to_disk ~proof_cache_db
-      scan_state_unwrapped
+    Staged_ledger.Scan_state.write_all_proofs_to_disk ~signature_kind
+      ~proof_cache_db scan_state_unwrapped
   in
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
@@ -166,10 +168,10 @@ module Instance = struct
 
   let check_database t = Database.check t.db
 
-  let get_root_transition ~proof_cache_db t =
+  let get_root_transition ~signature_kind ~proof_cache_db t =
     let open Result.Let_syntax in
     Database.get_root_hash t.db
-    >>= Database.get_transition t.db ~proof_cache_db
+    >>= Database.get_transition t.db ~signature_kind ~proof_cache_db
     |> Result.map_error ~f:Database.Error.message
 
   let fast_forward t target_root :
@@ -224,7 +226,7 @@ module Instance = struct
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.Stable.Latest.hash root in
       let%bind root_transition =
-        Database.get_transition t.db ~proof_cache_db root_hash
+        Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
       in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
@@ -292,8 +294,9 @@ module Instance = struct
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
-        (Database.crawl_successors ~proof_cache_db t.db root_hash
-           ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
+        (Database.crawl_successors ~signature_kind ~proof_cache_db t.db
+           root_hash ~init:(Full_frontier.root frontier)
+           ~f:(fun parent transition ->
              let%bind transition =
                match
                  downgrade_transition transition root_genesis_state_hash

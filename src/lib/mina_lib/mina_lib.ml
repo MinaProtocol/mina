@@ -1309,9 +1309,12 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
-let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
+let context ~commit_id ~proof_cache_db ~signature_kind (config : Config.t) :
+    (module CONTEXT) =
   ( module struct
     let logger = config.logger
 
@@ -1349,6 +1352,8 @@ let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
         ~max_subtree_depth ~default_subtree_depth ()
 
     let proof_cache_db = proof_cache_db
+
+    let signature_kind = signature_kind
   end )
 
 let shorten_commit_id commit_id =
@@ -1425,7 +1430,7 @@ let start t =
   then
     let module Context =
     ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
-            t.config )
+            ~signature_kind:t.signature_kind t.config )
     in
     Block_producer.run
       ~context:(module Context)
@@ -1502,7 +1507,8 @@ let start t =
 
 let start_with_precomputed_blocks t blocks =
   let module Context =
-  (val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id t.config)
+  ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+          ~signature_kind:t.signature_kind t.config )
   in
   let%bind () =
     Block_producer.run_precomputed
@@ -1787,7 +1793,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let%bind proof_cache_db = initialize_proof_cache_db config in
           let%bind zkapp_vk_cache_db = initialize_zkapp_vk_cache_db config in
           let module Context =
-          (val context ~proof_cache_db ~commit_id config)
+          (val context ~proof_cache_db ~commit_id ~signature_kind config)
           in
           let%bind prover =
             Monitor.try_with ~here:[%here]
@@ -2232,8 +2238,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ~ledger_backing
-              ~signature_kind ()
+              ~notify_online ~transaction_pool_proxy ~ledger_backing ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

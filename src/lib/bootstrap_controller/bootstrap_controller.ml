@@ -22,6 +22,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 type Structured_log_events.t += Bootstrap_complete
@@ -165,11 +167,15 @@ let on_transition ({ context = (module Context); _ } as t) ~sender
         let pcd =
           peer_root_with_proof.data
           |> Proof_carrying_data.map
-               ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db)
+               ~f:
+                 (Mina_block.write_all_proofs_to_disk ~signature_kind
+                    ~proof_cache_db )
           |> Proof_carrying_data.map_proof
                ~f:
                  (Tuple2.map_snd
-                    ~f:(Mina_block.write_all_proofs_to_disk ~proof_cache_db) )
+                    ~f:
+                      (Mina_block.write_all_proofs_to_disk ~signature_kind
+                         ~proof_cache_db ) )
         in
         match%bind
           Mina_block.verify_on_header
@@ -276,7 +282,7 @@ let download_snarked_ledger ~trust_system ~preferred_peers ~transition_graph
 let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
     ~network ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    ~signature_kind previous_cycles =
+    previous_cycles =
   let open Context in
   (* The short-lived pipe allocated here will be closed
      when a follow-up pipe is allocated: in the next cycle of bootstrap
@@ -378,7 +384,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
               in
               let scan_state =
                 Staged_ledger.Scan_state.write_all_proofs_to_disk
-                  ~proof_cache_db scan_state_uncached
+                  ~signature_kind ~proof_cache_db scan_state_uncached
               in
               let%bind protocol_states =
                 Staged_ledger.Scan_state.check_required_protocol_states
@@ -666,7 +672,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
 let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
     ~consensus_local_state ~network_transition_pipe ~preferred_peers
     ~persistent_root ~persistent_frontier ~initial_root_transition ~catchup_mode
-    ~signature_kind =
+    =
   let open Context in
   let run_cycle =
     run_cycle
@@ -674,7 +680,6 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
       ~trust_system ~verifier ~network ~consensus_local_state
       ~network_transition_pipe ~preferred_peers ~persistent_root
       ~persistent_frontier ~initial_root_transition ~catchup_mode
-      ~signature_kind
   in
   O1trace.thread "bootstrap"
   @@ fun () ->
@@ -747,6 +752,8 @@ let%test_module "Bootstrap_controller tests" =
           ~max_subtree_depth:None ~default_subtree_depth:None ()
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end
 
     let verifier =
@@ -893,7 +900,7 @@ let%test_module "Bootstrap_controller tests" =
            ~trust_system ~verifier ~network:my_net.network ~preferred_peers:[]
            ~consensus_local_state:my_net.state.consensus_local_state
            ~network_transition_pipe ~persistent_root ~persistent_frontier
-           ~catchup_mode:`Super ~initial_root_transition ~signature_kind:Testnet )
+           ~catchup_mode:`Super ~initial_root_transition )
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions : Transition_cache.element list) =
