@@ -57,7 +57,7 @@ let dependsOn =
 
           let name =
                 "${spec.prefix}${capitalName
-                                   spec.deb_version}${profileSuffix}${BuildFlags.toSuffixUppercase
+                                   spec.deb_version}Base${profileSuffix}${BuildFlags.toSuffixUppercase
                                                                                          spec.build_flag}${Arch.nameSuffix
                                                                                                              spec.arch}"
 

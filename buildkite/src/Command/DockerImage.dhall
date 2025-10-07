@@ -83,8 +83,7 @@ let ReleaseSpec =
 
 let stepKey =
           \(spec : ReleaseSpec.Type)
-      ->  "${Artifacts.lowerName spec.service}${Network.capitalName
-                                   spec.network}${spec.step_key_suffix}"
+      ->  "${Artifacts.lowerName spec.service}${spec.step_key_suffix}"
 
 let stepLabel =
           \(spec : ReleaseSpec.Type)

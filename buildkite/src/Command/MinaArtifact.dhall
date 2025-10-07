@@ -100,7 +100,8 @@ let nameSuffix
     : MinaBuildSpec.Type -> Text
     =     \(spec : MinaBuildSpec.Type)
       ->  "${DebianVersions.capitalName
-               spec.debVersion}${Profiles.toSuffixUppercase
+               spec.debVersion}${Network.capitalName
+                                  spec.network}${Profiles.toSuffixUppercase
                                                     spec.profile}${BuildFlags.toSuffixUppercase
                                                                      spec.buildFlags}${Arch.nameSuffix
                                                                                          spec.arch}"
