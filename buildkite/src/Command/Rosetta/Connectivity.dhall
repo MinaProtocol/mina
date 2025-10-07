@@ -26,6 +26,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
+let B/If = B.definitions/commandStep/properties/if/Type
+
 let Spec =
       { Type =
           { dockerType : Dockers.Type
@@ -35,6 +37,7 @@ let Spec =
           , timeout : Natural
           , profile : Profiles.Type
           , scope : List PipelineScope.Type
+          , if : B/If
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
@@ -44,6 +47,7 @@ let Spec =
           , timeout = 1000
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
+          , if = "build.pull_request.base_branch != \"develop\""
           }
       }
 
@@ -68,6 +72,7 @@ let command
                 "rosetta-${Network.lowerName spec.network}-connectivity-test"
             , target = Size.XLarge
             , soft_fail = Some spec.softFail
+            , if = Some spec.if
             , depends_on =
                 Dockers.dependsOn
                   Dockers.DepsSpec::{
