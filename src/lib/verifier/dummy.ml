@@ -12,6 +12,7 @@ type t =
   ; verify_transaction_snarks :
          (Ledger_proof.t * Mina_base.Sok_message.t) list
       -> unit Or_error.t Or_error.t Deferred.t
+  ; signature_kind : Mina_signature_kind.t
   }
 
 type invalid = Common.invalid [@@deriving bin_io_unversioned, to_yojson]
@@ -22,7 +23,7 @@ type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
     ~proof_level ~pids:_ ~conf_dir:_ ~commit_id:_ ~blockchain_verification_key
-    ~transaction_verification_key () =
+    ~transaction_verification_key ~signature_kind () =
   let verify_blockchain_snarks chains =
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
@@ -72,6 +73,7 @@ let create ~logger:_ ?enable_internal_tracing:_ ?internal_trace_filename:_
     ; blockchain_verification_key
     ; transaction_verification_key
     ; verify_transaction_snarks
+    ; signature_kind
     }
 
 let verify_blockchain_snarks { verify_blockchain_snarks; _ } chains =
@@ -80,7 +82,7 @@ let verify_blockchain_snarks { verify_blockchain_snarks; _ } chains =
 (* N.B.: Valid_assuming is never returned, in fact; we assert a return type
    containing Valid_assuming to match the expected type
 *)
-let verify_commands { proof_level; _ }
+let verify_commands { proof_level; signature_kind; _ }
     (cs : User_command.Verifiable.t With_status.t list) :
     [ `Valid of Mina_base.User_command.Valid.t
     | `Valid_assuming of
@@ -108,7 +110,7 @@ let verify_commands { proof_level; _ }
         | Ok (`Assuming _) ->
             valid cmd
       in
-      let f cmd = convert_check_res cmd (Common.check cmd) in
+      let f cmd = convert_check_res cmd (Common.check ~signature_kind cmd) in
       List.map cs ~f |> Deferred.Or_error.return
   | Full ->
       let read_proof (vk, stmt, proof) =
@@ -116,7 +118,11 @@ let verify_commands { proof_level; _ }
       in
       let read_proofs (`Assuming ls) = `Assuming (List.map ~f:read_proof ls) in
       let results =
-        List.map cs ~f:(Fn.compose (Result.map ~f:read_proofs) Common.check)
+        List.map cs
+          ~f:
+            (Fn.compose
+               (Result.map ~f:read_proofs)
+               (Common.check ~signature_kind) )
       in
       let to_verify =
         List.concat_map

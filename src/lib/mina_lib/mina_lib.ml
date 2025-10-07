@@ -122,6 +122,7 @@ type t =
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
   ; commit_id : string
   ; proof_cache_db : Proof_cache_tag.cache_db
+  ; signature_kind : Mina_signature_kind.t
   }
 [@@deriving fields]
 
@@ -1751,6 +1752,7 @@ let initialize_zkapp_vk_cache_db (config : Config.t) =
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let create ~commit_id ?wallets (config : Config.t) =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   [%log' info config.logger] "Creating daemon with commit id: %s" commit_id ;
   let commit_id_short = shorten_commit_id commit_id in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1805,8 +1807,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
                         ~constraint_constants ~pids:config.pids
-                        ~conf_dir:config.conf_dir
-                        ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
+                        ~conf_dir:config.conf_dir ~signature_kind ()
                     in
                     let%map () = set_itn_data (module Prover) prover in
                     prover ) )
@@ -1840,7 +1841,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~proof_level:config.precomputed_values.proof_level
                         ~pids:config.pids ~conf_dir:(Some config.conf_dir)
                         ~blockchain_verification_key
-                        ~transaction_verification_key ()
+                        ~transaction_verification_key ~signature_kind ()
                     in
                     let%map () = set_itn_data (module Verifier) verifier in
                     verifier ) )
@@ -2066,7 +2067,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
               ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db ~proof_cache_db
-              ~signature_kind:Mina_signature_kind.t_DEPRECATED
+              ~signature_kind
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -2131,8 +2132,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
           (* NOTE: [reassignment_wait] is interpreted as milliseconds *)
           let work_partitioner =
-            Work_partitioner.create
-              ~signature_kind:Mina_signature_kind.t_DEPRECATED
+            Work_partitioner.create ~signature_kind
               ~reassignment_timeout:
                 (Time.Span.of_ms (Float.of_int config.work_reassignment_wait))
               ~logger:config.logger ~proof_cache_db
@@ -2161,7 +2161,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   match%bind
                     User_command_input.to_user_commands ~get_current_nonce
                       ~get_account ~constraint_constants ~logger:config.logger
-                      ~signature_kind:Mina_signature_kind.t_DEPRECATED uc_inputs
+                      ~signature_kind uc_inputs
                   with
                   | Ok signed_commands ->
                       if List.is_empty signed_commands then (
@@ -2233,7 +2233,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
               ~notify_online ~transaction_pool_proxy ~ledger_backing
-              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
+              ~signature_kind ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2580,6 +2580,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           ; vrf_evaluation_state = Block_producer.Vrf_evaluation_state.create ()
           ; commit_id
           ; proof_cache_db
+          ; signature_kind
           } ) )
 
 let net { components = { net; _ }; _ } = net

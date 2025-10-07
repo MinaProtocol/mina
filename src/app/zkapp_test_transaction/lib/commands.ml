@@ -32,9 +32,8 @@ let get_second_pass_ledger_mask ~ledger ~constraint_constants ~global_slot
     in
     Mina_ledger.Ledger.register_mask ledger new_mask
   in
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let _partial_stmt =
-    Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind
+    Mina_ledger.Ledger.apply_transaction_first_pass ~signature_kind:Testnet
       ~constraint_constants ~global_slot
       ~txn_state_view:(Mina_state.Protocol_state.Body.view state_body)
       second_pass_ledger
