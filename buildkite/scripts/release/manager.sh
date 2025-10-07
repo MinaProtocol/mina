@@ -1472,7 +1472,7 @@ function verify(){
                                 fi
                             done
                         ;;
-                        mina-daemon|mina-daemon-base)
+                        mina-daemon)
                             for network in "${__networks_arr[@]}"; do
                                 local __artifact_full_name
                                 __artifact_full_name=$(get_artifact_with_suffix $artifact $network)

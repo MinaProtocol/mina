@@ -12,8 +12,7 @@ let Repo = ./DockerRepo.dhall
 
 let Artifact
     : Type
-    = < DaemonBase
-      | Daemon
+    = < Daemon
       | DaemonLegacyHardfork
       | DaemonAutoHardfork
       | LogProc
@@ -28,8 +27,7 @@ let Artifact
       >
 
 let AllButTests =
-      [ Artifact.DaemonBase
-      , Artifact.Daemon
+      [ Artifact.Daemon
       , Artifact.DaemonLegacyHardfork
       , Artifact.DaemonAutoHardfork
       , Artifact.LogProc
@@ -50,8 +48,7 @@ let All = AllButTests # [ Artifact.FunctionalTestSuite ]
 let capitalName =
           \(artifact : Artifact)
       ->  merge
-            { DaemonBase = "DaemonBase"
-            , Daemon = "Daemon"
+            { Daemon = "Daemon"
             , DaemonLegacyHardfork = "DaemonLegacyHardfork"
             , DaemonAutoHardfork = "DaemonAutoHardfork"
             , LogProc = "LogProc"
@@ -69,8 +66,7 @@ let capitalName =
 let lowerName =
           \(artifact : Artifact)
       ->  merge
-            { DaemonBase = "daemon_base"
-            , Daemon = "daemon"
+            { Daemon = "daemon"
             , DaemonLegacyHardfork = "daemon_hardfork"
             , DaemonAutoHardfork = "daemon_auto_hardfork"
             , LogProc = "logproc"
@@ -88,8 +84,7 @@ let lowerName =
 let dockerName =
           \(artifact : Artifact)
       ->  merge
-            { DaemonBase = "mina-daemon-base"
-            , Daemon = "mina-daemon"
+            { Daemon = "mina-daemon"
             , DaemonLegacyHardfork = "mina-daemon-hardfork"
             , DaemonAutoHardfork = "mina-daemon-auto-hardfork"
             , Archive = "mina-archive"
@@ -122,8 +117,14 @@ let toDebianNames =
                   (     \(a : Artifact)
                     ->  let daemon_network = "daemon_${Network.lowerName network}" in
                         merge
-                          { DaemonBase = [ "daemon_base" ]
-                          , Daemon = [ daemon_network ]
+                          { Daemon =
+                              merge
+                                { Base = [ "daemon_base" ]
+                                , Devnet = [ daemon_network, "daemon_base" ]
+                                , Mainnet = [ daemon_network, "daemon_base" ]
+                                , Legacy = [ daemon_network, "daemon_base" ]
+                                }
+                                network
                           , DaemonLegacyHardfork = [ "${daemon_network}_hardfork" ]
                           , DaemonAutoHardfork = [ "" ]
                           , Archive = [ "archive" ]
@@ -178,8 +179,7 @@ let dockerTag =
                   spec.buildFlags
 
           in  merge
-                { DaemonBase = "${spec.version}"
-                , Daemon =
+                { Daemon =
                     "${spec.version}-${Network.lowerName
                                          spec.network}${build_flags_part}"
                 , DaemonLegacyHardfork =

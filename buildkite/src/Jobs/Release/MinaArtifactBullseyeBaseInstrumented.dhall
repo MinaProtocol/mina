@@ -12,7 +12,7 @@ in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
           , artifacts =
-            [ Artifacts.Type.DaemonBase, Artifacts.Type.Daemon
+            [ Artifacts.Type.Daemon
             , Artifacts.Type.LogProc
             , Artifacts.Type.Archive
             , Artifacts.Type.FunctionalTestSuite

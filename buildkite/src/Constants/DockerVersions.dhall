@@ -61,7 +61,7 @@ let dependsOn =
 
           let profileSuffix = "${Profiles.toSuffixUppercase spec.profile}"
 
-          let key = "${Artifacts.lowerName spec.artifact}-${spec.suffix}"
+          let key = "${Artifacts.lowerName spec.artifact}${network}-${spec.suffix}"
 
           let buildFlagSuffix =
                 merge
@@ -73,7 +73,7 @@ let dependsOn =
 
           in  [ { name =
                     "${spec.prefix}${capitalName
-                                       spec.codename}${network}${profileSuffix}${buildFlagSuffix}"
+                                       spec.codename}${profileSuffix}${buildFlagSuffix}"
                 , key = key
                 }
               ]

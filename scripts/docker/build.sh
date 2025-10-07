@@ -179,12 +179,12 @@ case "${SERVICE}" in
         DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
         DOCKER_CONTEXT="dockerfiles/"
         ;;
-    mina-daemon-base)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-base"
-        DOCKER_CONTEXT="dockerfiles/"
-        ;;
     mina-daemon)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        if [[ "$INPUT_NETWORK" == "base" ]]; then
+          DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-base"
+        else
+          DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        fi
         DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-daemon-legacy-hardfork)
