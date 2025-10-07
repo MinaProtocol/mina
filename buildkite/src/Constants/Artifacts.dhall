@@ -131,7 +131,14 @@ let toDebianNames =
                           , LogProc = [ "logproc" ]
                           , TestExecutive = [ "test_executive" ]
                           , BatchTxn = [ "batch_txn" ]
-                          , Rosetta = [ "rosetta" ]
+                          , Rosetta =
+                              merge
+                                { Base = [ "rosetta" ]
+                                , Devnet = [ daemon_network, "rosetta" ]
+                                , Mainnet = [ daemon_network, "rosetta" ]
+                                , Legacy = [ daemon_network, "rosetta" ]
+                                }
+                                network
                           , ZkappTestTransaction = [ "zkapp_test_transaction" ]
                           , FunctionalTestSuite = [ "functional_test_suite" ]
                           , CreateLegacyGenesis = [ "create_legacy_genesis" ]

@@ -176,7 +176,11 @@ export_base_image
 
 case "${SERVICE}" in
     mina-archive)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+        if [[ "$INPUT_NETWORK" == "base" ]]; then
+          DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive-base"
+        else
+          DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+        fi
         DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-daemon)
@@ -231,7 +235,11 @@ case "${SERVICE}" in
         DOCKER_CONTEXT="dockerfiles/"
         ;;
     mina-rosetta)
-        DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        if [[ "$INPUT_NETWORK" == "base" ]]; then
+          DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-rosetta"
+        else
+          DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
+        fi
         ;;
     mina-zkapp-test-transaction)
         DOCKERFILE_PATH="dockerfiles/Dockerfile-zkapp-test-transaction"
@@ -262,9 +270,13 @@ BUILD_NETWORK="--allow=network.host"
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 if [[ -z "${DOCKER_CONTEXT}" ]]; then
   cat $DOCKERFILE_PATH | docker buildx build  --network=host \
-  --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $SIGKIND $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
+  --load --progress=plain $PLATFORM $DEBIAN_ARCH_ARG \
+  --build-arg deb_artifact=$SERVICE \
+  $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $SIGKIND $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION -t "$TAG" -
 else
-  docker buildx build --load --network=host --progress=plain $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $SIGKIND $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
+  docker buildx build --load --network=host --progress=plain \
+  --build-arg deb_artifact=$SERVICE \
+  $PLATFORM $DEBIAN_ARCH_ARG $CANONICAL_ARCH_ARG $NO_CACHE $BUILD_NETWORK $CACHE $NETWORK $SIGKIND $IMAGE $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $DOCKER_DEB_SUFFIX $DEB_REPO $BRANCH $REPO $LEGACY_VERSION "$DOCKER_CONTEXT" -t "$TAG" -f $DOCKERFILE_PATH
 fi
 
 echo "✅ Docker image for service ${SERVICE} built successfully."
