@@ -473,6 +473,7 @@ module Json_layout = struct
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
       ; slot_chain_end : int option [@default None]
+      ; hard_fork_genesis_slot_delta : int option [@default None]
       ; minimum_user_command_fee : Currency.Fee.t option [@default None]
       ; network_id : string option [@default None]
       ; sync_ledger_max_subtree_depth : int option [@default None]
@@ -1266,6 +1267,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; hard_fork_genesis_slot_delta : int option [@default None]
     ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
           [@default None]
     ; network_id : string option [@default None]
@@ -1310,6 +1312,9 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; hard_fork_genesis_slot_delta =
+        opt_fallthrough ~default:t1.hard_fork_genesis_slot_delta
+          t2.hard_fork_genesis_slot_delta
     ; minimum_user_command_fee =
         opt_fallthrough ~default:t1.minimum_user_command_fee
           t2.minimum_user_command_fee
@@ -1346,6 +1351,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; hard_fork_genesis_slot_delta = None
     ; minimum_user_command_fee = Some minimum_user_command_fee
     ; network_id = None
     ; sync_ledger_max_subtree_depth = None
