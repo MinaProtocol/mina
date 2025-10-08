@@ -45,6 +45,19 @@ func validateInt64Field(json, path string, expected int64) error {
 	return nil
 }
 
+// validateBoolField validates that a boolean field exists and matches the expected value
+func validateBoolField(json, path string, expected bool) error {
+	result := gjson.Get(json, path)
+	if !result.Exists() {
+		return fmt.Errorf("missing field: %s", path)
+	}
+	actual := result.Bool()
+	if actual != expected {
+		return fmt.Errorf("%s mismatch: expected %v, got %v", path, expected, actual)
+	}
+	return nil
+}
+
 // validateObjectFields validates that an object contains only the expected fields
 func (t *HardforkTest) validateObjectFields(json, path string, expectedFields []string) error {
 	obj := gjson.Get(json, path)

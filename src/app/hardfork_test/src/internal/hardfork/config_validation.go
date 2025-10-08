@@ -97,6 +97,9 @@ func (t *HardforkTest) ValidateForkConfigData(latestNonEmptyBlock graphql.BlockD
 	if err := validateStringField(forkConfigJson, "ledger.hash", latestNonEmptyBlock.StagedHash); err != nil {
 		return err
 	}
+	if err := validateBoolField(forkConfigJson, "ledger.add_genesis_winner", false); err != nil {
+		return err
+	}
 
 	// Validate object structure - ensure only expected fields are present
 	if err := t.validateObjectFields(forkConfigJson, "proof.fork", []string{"blockchain_length", "global_slot_since_genesis", "state_hash"}); err != nil {
@@ -108,7 +111,7 @@ func (t *HardforkTest) ValidateForkConfigData(latestNonEmptyBlock graphql.BlockD
 	if err := t.validateObjectFields(forkConfigJson, "epoch_data.next", []string{"seed", "accounts"}); err != nil {
 		return err
 	}
-	if err := t.validateObjectFields(forkConfigJson, "ledger", []string{"hash", "accounts"}); err != nil {
+	if err := t.validateObjectFields(forkConfigJson, "ledger", []string{"hash", "accounts", "add_genesis_winner"}); err != nil {
 		return err
 	}
 	if err := t.validateObjectFields(forkConfigJson, "epoch_data", []string{"staking", "next"}); err != nil {
