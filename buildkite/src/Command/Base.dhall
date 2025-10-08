@@ -102,7 +102,7 @@ let Config =
           , flake_retry_limit : Optional Natural
           , soft_fail : Optional B/SoftFail
           , skip : Optional B/Skip
-          , if : Optional B/If
+          , if_ : Optional B/If
           , timeout_in_minutes : Optional Integer
           }
       , default =
@@ -116,7 +116,7 @@ let Config =
           , flake_retry_limit = Some 0
           , soft_fail = None B/SoftFail
           , skip = None B/Skip
-          , if = None B/If
+          , if_ = None B/If
           , timeout_in_minutes = None Integer
           }
       }
