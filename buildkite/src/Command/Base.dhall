@@ -244,7 +244,7 @@ let build
               }
           , soft_fail = c.soft_fail
           , skip = c.skip
-          , if = c.if
+          , `if` = c.if_
           , plugins =
               let dockerPart =
                     Optional/toList
