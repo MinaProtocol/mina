@@ -775,6 +775,13 @@ function publish(){
                         ;;
                         mina-archive)
                             for network in "${__networks_arr[@]}"; do
+
+                                if [[ $__strip_network_from_archive == 1 ]]; then
+                                    new_name="mina-archive"
+                                else
+                                    new_name=""
+                                fi
+
                                 if [[ $__only_dockers == 0 ]]; then
                                         publish_debian $artifact \
                                             $__codename \
