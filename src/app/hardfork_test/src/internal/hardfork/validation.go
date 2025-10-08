@@ -49,6 +49,10 @@ func (t *HardforkTest) ValidateLatestNonEmptyBlockSlot(latestNonEmptyBlock graph
 
 // ValidateNoNewBlocks verifies that no new blocks are created after chain end
 func (t *HardforkTest) ValidateNoNewBlocks(port int) error {
+	// Sleep three slots (TODO: consider removing in future,
+	// now it's for extra assurance that other waits were not slightly off)
+	time.Sleep(time.Duration(t.Config.MainSlot) * time.Second * 3)
+
 	t.Logger.Info("Waiting to verify no new blocks are created after chain end...")
 
 	height1, err := t.Client.GetHeight(port)

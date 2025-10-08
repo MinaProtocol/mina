@@ -17,12 +17,16 @@ func (t *HardforkTest) StopNodes(execPath string) error {
 
 	// Stop node on port 10301
 	cmd1 := exec.Command(execPath, "client", "stop-daemon", "--daemon-port", "10301")
+	cmd1.Stdout = os.Stdout
+	cmd1.Stderr = os.Stderr
 	if err := cmd1.Run(); err != nil {
 		return fmt.Errorf("failed to stop daemon on port 10301: %w", err)
 	}
 
 	// Stop node on port 10311
 	cmd2 := exec.Command(execPath, "client", "stop-daemon", "--daemon-port", "10311")
+	cmd2.Stdout = os.Stdout
+	cmd2.Stderr = os.Stderr
 	if err := cmd2.Run(); err != nil {
 		return fmt.Errorf("failed to stop daemon on port 10311: %w", err)
 	}
@@ -111,8 +115,7 @@ func (t *HardforkTest) WaitForBlockHeight(port int, minHeight int, timeout time.
 
 // WaitUntilBestChainQuery calculates and waits until it's time to query the best chain
 func (t *HardforkTest) WaitUntilBestChainQuery(slotDurationSec int, chainStartDelaySec int) {
-	sleepDuration := time.Duration(slotDurationSec*t.Config.BestChainQueryFrom)*time.Second -
-		time.Duration(time.Now().Unix()%60)*time.Second +
+	sleepDuration := time.Duration(slotDurationSec*t.Config.BestChainQueryFrom)*time.Second +
 		time.Duration(chainStartDelaySec*60)*time.Second
 
 	t.Logger.Info("Sleeping for %v until best chain query...", sleepDuration)

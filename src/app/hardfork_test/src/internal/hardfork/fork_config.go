@@ -57,6 +57,9 @@ func (t *HardforkTest) CreateRuntimeConfig(forkGenesisTimestamp, forkConfigPath,
 		"LEDGER_HASHES_JSON="+forkHashesFile,
 	)
 
+	// Redirect stderr to main process stderr
+	cmd.Stderr = os.Stderr
+
 	configOutput, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runtime config: %w", err)

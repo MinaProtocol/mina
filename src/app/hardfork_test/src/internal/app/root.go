@@ -16,8 +16,9 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "hardfork_test",
-	Short: "Test hardfork functionality for Mina Protocol",
+	Use:          "hardfork_test",
+	Short:        "Test hardfork functionality for Mina Protocol",
+	SilenceUsage: true,
 	Long: `A Go application that implements the control flow from scripts/hardfork/test.sh,
 allowing for testing of hardfork functionality in the Mina Protocol.
 
