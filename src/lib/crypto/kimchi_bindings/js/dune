@@ -14,7 +14,10 @@
    bindings/prover-index.js
    bindings/util.js
    bindings/srs.js
-   bindings/verifier-index.js))
+   bindings/verifier-index.js
+   native/native-overrides/oracles.js
+   native/native-overrides/util.js
+   ))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
