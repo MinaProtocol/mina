@@ -22,7 +22,7 @@ type HardforkTest struct {
 func NewHardforkTest(cfg *config.Config) *HardforkTest {
 	return &HardforkTest{
 		Config:    cfg,
-		Client:    graphql.NewClient(cfg.HTTPClientTimeoutSeconds),
+		Client:    graphql.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.GraphQLMaxRetries),
 		Logger:    utils.NewLogger(),
 		ScriptDir: cfg.ScriptDir,
 	}

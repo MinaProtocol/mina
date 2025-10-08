@@ -43,6 +43,7 @@ type Config struct {
 	UserCommandCheckMaxIterations int // Max iterations to check for user commands in blocks
 	ForkEarliestBlockMaxRetries   int // Max retries to wait for earliest block in fork network
 	HTTPClientTimeoutSeconds      int // HTTP client timeout for GraphQL requests
+	GraphQLMaxRetries             int // Max number of retries for GraphQL requests
 }
 
 // DefaultConfig returns the default configuration with values
@@ -64,7 +65,8 @@ func DefaultConfig() *Config {
 		NoNewBlocksWaitSeconds:        300, // 5 minutes
 		UserCommandCheckMaxIterations: 10,
 		ForkEarliestBlockMaxRetries:   10,
-		HTTPClientTimeoutSeconds:      10,
+		HTTPClientTimeoutSeconds:      60,
+		GraphQLMaxRetries:             5,
 	}
 }
 

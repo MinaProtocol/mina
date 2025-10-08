@@ -14,18 +14,20 @@ import (
 // Client represents a GraphQL client for querying Mina nodes
 type Client struct {
 	httpClient *http.Client
+	maxRetries int
 }
 
-// NewClient creates a new GraphQL client with the specified timeout in seconds
-func NewClient(timeoutSeconds int) *Client {
+// NewClient creates a new GraphQL client with the specified timeout in seconds and max retries
+func NewClient(timeoutSeconds int, maxRetries int) *Client {
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: time.Duration(timeoutSeconds) * time.Second,
 		},
+		maxRetries: maxRetries,
 	}
 }
 
-// Query sends a GraphQL query to the specified port
+// Query sends a GraphQL query to the specified port with retry logic
 func (c *Client) Query(port int, query string) (gjson.Result, error) {
 	url := fmt.Sprintf("http://localhost:%d/graphql", port)
 
@@ -40,28 +42,59 @@ func (c *Client) Query(port int, query string) (gjson.Result, error) {
 		return gjson.Result{}, fmt.Errorf("failed to marshal query payload: %w", err)
 	}
 
-	// Create the request
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		return gjson.Result{}, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+	var lastErr error
+	for attempt := 1; attempt <= c.maxRetries; attempt++ {
+		backoff := 10 * time.Duration(1<<uint(attempt-1)) * time.Second
 
-	// Send the request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return gjson.Result{}, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
+		// Create the request
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+		if err != nil {
+			return gjson.Result{}, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	// Read the response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return gjson.Result{}, fmt.Errorf("failed to read response body: %w", err)
+		// Send the request
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt < c.maxRetries {
+				time.Sleep(backoff)
+				continue
+			}
+			return gjson.Result{}, fmt.Errorf("failed to send request after %d attempts: %w", c.maxRetries, err)
+		}
+		defer resp.Body.Close()
+
+		// Read the response
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			lastErr = err
+			if attempt < c.maxRetries {
+				time.Sleep(backoff)
+				continue
+			}
+			return gjson.Result{}, fmt.Errorf("failed to read response body after %d attempts: %w", c.maxRetries, err)
+		}
+
+		// Parse the response
+		result := gjson.ParseBytes(body)
+		
+		// Check for GraphQL errors in response
+		if result.Get("errors").Exists() {
+			lastErr = fmt.Errorf("GraphQL error: %s", result.Get("errors").String())
+			if attempt < c.maxRetries {
+				time.Sleep(backoff)
+				continue
+			}
+			return gjson.Result{}, fmt.Errorf("GraphQL query failed after %d attempts: %w", c.maxRetries, lastErr)
+		}
+
+		// Success
+		return result, nil
 	}
 
-	// Parse the response
-	return gjson.ParseBytes(body), nil
+	// This shouldn't be reached but included for safety
+	return gjson.Result{}, fmt.Errorf("query failed after %d attempts: %w", c.maxRetries, lastErr)
 }
 
 // GetHeight gets the current block height
