@@ -168,7 +168,12 @@ func (t *HardforkTest) ValidateForkRuntimeConfig(latestNonEmptyBlock graphql.Blo
 		return err
 	}
 
-	ledgerFields := []string{"hash", "s3_data_hash"}
+	// Validate ledger.add_genesis_winner is false
+	if err := validateBoolField(configJson, "ledger.add_genesis_winner", false); err != nil {
+		return err
+	}
+
+	ledgerFields := []string{"hash", "s3_data_hash", "add_genesis_winner"}
 	if err := t.validateObjectFields(configJson, "ledger", ledgerFields); err != nil {
 		return err
 	}
