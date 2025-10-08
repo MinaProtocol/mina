@@ -65,8 +65,9 @@ func DefaultConfig() *Config {
 		NoNewBlocksWaitSeconds:        300, // 5 minutes
 		UserCommandCheckMaxIterations: 10,
 		ForkEarliestBlockMaxRetries:   10,
-		HTTPClientTimeoutSeconds:      60,
-		GraphQLMaxRetries:             5,
+		HTTPClientTimeoutSeconds:      600,
+		// ^ fork config take really long time to complete (2-3 minutes)
+		GraphQLMaxRetries: 5,
 	}
 }
 
