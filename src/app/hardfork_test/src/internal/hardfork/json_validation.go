@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/tidwall/gjson"
 )
@@ -54,6 +55,36 @@ func validateBoolField(json, path string, expected bool) error {
 	actual := result.Bool()
 	if actual != expected {
 		return fmt.Errorf("%s mismatch: expected %v, got %v", path, expected, actual)
+	}
+	return nil
+}
+
+// validateUnixTimestampField validates that a timestamp field matches the expected Unix timestamp
+// The field must be stored as an RFC3339 formatted string
+func validateUnixTimestampField(json, path string, expectedUnixTs int64) error {
+	result := gjson.Get(json, path)
+	if !result.Exists() {
+		return fmt.Errorf("missing field: %s", path)
+	}
+
+	if result.Type != gjson.String {
+		return fmt.Errorf("%s must be a string", path)
+	}
+
+	timestampStr := result.String()
+	// Try parsing as RFC3339 timestamp
+	t, err := time.Parse(time.RFC3339, timestampStr)
+	if err != nil {
+		// Also try a common variant with space instead of 'T'
+		t, err = time.Parse("2006-01-02 15:04:05-07:00", timestampStr)
+		if err != nil {
+			return fmt.Errorf("%s is not a valid RFC3339 timestamp: %v", path, err)
+		}
+	}
+
+	actualUnixTs := t.Unix()
+	if actualUnixTs != expectedUnixTs {
+		return fmt.Errorf("%s mismatch: expected %d, got %d", path, expectedUnixTs, actualUnixTs)
 	}
 	return nil
 }

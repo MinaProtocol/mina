@@ -147,6 +147,12 @@ func (t *HardforkTest) ValidateForkRuntimeConfig(latestNonEmptyBlock graphql.Blo
 	if err := validateStringField(configJson, "proof.fork.state_hash", latestNonEmptyBlock.StateHash); err != nil {
 		return err
 	}
+	if err := validateUnixTimestampField(configJson, "genesis.genesis_state_timestamp", forkGenesisTs); err != nil {
+		return err
+	}
+	if err := t.validateObjectFields(configJson, "genesis", []string{"genesis_state_timestamp"}); err != nil {
+		return err
+	}
 
 	// Validate object structure - ensure only expected fields are present
 	if err := t.validateObjectFields(configJson, "proof.fork", []string{"blockchain_length", "global_slot_since_genesis", "state_hash"}); err != nil {
@@ -179,7 +185,7 @@ func (t *HardforkTest) ValidateForkRuntimeConfig(latestNonEmptyBlock graphql.Blo
 	}
 
 	// Validate root object contains only expected top-level fields
-	if err := t.validateRootObjectFields(configJson, []string{"proof", "epoch_data", "ledger"}); err != nil {
+	if err := t.validateRootObjectFields(configJson, []string{"proof", "epoch_data", "ledger", "genesis"}); err != nil {
 		return err
 	}
 	t.Logger.Info("Config for the fork is correct, starting a new network")
