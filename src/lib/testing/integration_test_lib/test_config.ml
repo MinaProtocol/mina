@@ -145,7 +145,7 @@ let default ~(constants : constants) =
   ; network_id = None
   ; block_window_duration_ms = constraint_constants.block_window_duration_ms
   ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2
-  ; signature_kind = Mina_signature_kind.t_DEPRECATED
+  ; signature_kind = Testnet
   }
 
 let transaction_capacity_log_2 (config : t) =

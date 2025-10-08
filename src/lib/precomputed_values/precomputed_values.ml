@@ -2,15 +2,14 @@ open Core
 module T = Genesis_proof.T
 include T
 
-let hashes =
+let hashes_for_unit_tests =
   lazy
-    (let signature_kind = Mina_signature_kind.t_DEPRECATED in
-     let constraint_constants =
+    (let constraint_constants =
        Genesis_constants.For_unit_tests.Constraint_constants.t
      in
      let proof_level = Genesis_constants.Proof_level.Full in
      let ts =
-       Transaction_snark.constraint_system_digests ~signature_kind
+       Transaction_snark.constraint_system_digests ~signature_kind:Testnet
          ~constraint_constants ()
      in
      let bs =
@@ -41,7 +40,7 @@ let for_unit_tests =
     ; genesis_body_reference
     ; consensus_constants = Lazy.force Consensus.Constants.for_unit_tests
     ; protocol_state_with_hashes
-    ; constraint_system_digests = hashes
+    ; constraint_system_digests = hashes_for_unit_tests
     ; proof_data = None
     ; signature_kind = Mina_signature_kind.Testnet
     })

@@ -1704,11 +1704,11 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-        ~commit_id:Mina_version.commit_id
-        ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+        ~commit_id:Mina_version.commit_id ~signature_kind )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
@@ -1727,8 +1727,7 @@ let internal_commands logger ~itn_features =
                  let%bind prover =
                    Prover.create ~commit_id:Mina_version.commit_id ~logger
                      ~proof_level ~constraint_constants
-                     ~pids:(Pid.Table.create ()) ~conf_dir
-                     ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
+                     ~pids:(Pid.Table.create ()) ~conf_dir ~signature_kind ()
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->
@@ -1755,7 +1754,6 @@ let internal_commands logger ~itn_features =
                 Reader.read_sexp reader )
           with
           | `Ok sexp -> (
-              let signature_kind = Mina_signature_kind.t_DEPRECATED in
               let%bind worker_state =
                 Snark_worker.Inputs.Worker_state.create ~proof_level
                   ~constraint_constants ~signature_kind ()
@@ -1988,7 +1986,7 @@ let internal_commands logger ~itn_features =
             Prover.create ~commit_id:Mina_version.commit_id ~logger ~pids
               ~conf_dir ~proof_level
               ~constraint_constants:precomputed_values.constraint_constants
-              ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
+              ~signature_kind ()
           in
           match%bind
             Prover.create_genesis_block prover

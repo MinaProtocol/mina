@@ -397,7 +397,7 @@ module Mutations = struct
       , string )
       result
       Io.t =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+    let signature_kind = Mina_lib.signature_kind mina in
     (* instead of adding the zkapp_command to the transaction pool, as we would for an actual zkapp,
        apply the zkapp using an ephemeral ledger
     *)
@@ -1172,7 +1172,7 @@ module Mutations = struct
                 ~memo:(Signed_command_memo.create_from_string_exn memo)
                 ~body
             in
-            let signature_kind = Mina_signature_kind.t_DEPRECATED in
+            let signature_kind = Mina_lib.signature_kind mina in
             let signature =
               Ok (Signed_command.sign_payload ~signature_kind sender payload)
             in
@@ -1656,9 +1656,8 @@ module Queries = struct
   open Schema
 
   (* helper for pooledUserCommands, pooledZkappCommands *)
-  let get_commands ~proof_cache_db ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
-      =
-    let signature_kind = Mina_signature_kind.t_DEPRECATED in
+  let get_commands ~signature_kind ~proof_cache_db ~resource_pool ~pk_opt
+      ~hashes_opt ~txns_opt =
     match (pk_opt, hashes_opt, txns_opt) with
     | None, None, None ->
         Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
@@ -1766,6 +1765,7 @@ module Queries = struct
         in
         let cmds =
           get_commands
+            ~signature_kind:(Mina_lib.signature_kind mina)
             ~proof_cache_db:(Mina_lib.proof_cache_db mina)
             ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
         in
@@ -1806,6 +1806,7 @@ module Queries = struct
         in
         let cmds =
           get_commands
+            ~signature_kind:(Mina_lib.signature_kind mina)
             ~proof_cache_db:(Mina_lib.proof_cache_db mina)
             ~resource_pool ~pk_opt ~hashes_opt ~txns_opt
         in
@@ -2538,6 +2539,7 @@ module Queries = struct
                     (from, to_, amount, fee, valid_until, memo, nonce_opt)
                     signature ->
         let open Deferred.Result.Let_syntax in
+        let signature_kind = Mina_lib.signature_kind mina in
         let genesis_constants =
           (Mina_lib.config mina).precomputed_values.genesis_constants
         in
@@ -2564,10 +2566,9 @@ module Queries = struct
             ~constraint_constants:
               (Mina_lib.config mina).precomputed_values.constraint_constants
             ~logger:(Mina_lib.top_level_logger mina)
-            ~signature_kind:Mina_signature_kind.t_DEPRECATED user_command_input
+            ~signature_kind user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
         Signed_command.check_signature ~signature_kind user_command )
 
   let runtime_config =
@@ -2741,8 +2742,8 @@ module Queries = struct
       ~doc:"The signature kind that this daemon instance is using"
       ~typ:(non_null string)
       ~args:Arg.[]
-      ~resolve:(fun _ () ->
-        match Mina_signature_kind.t_DEPRECATED with
+      ~resolve:(fun { ctx = mina; _ } () ->
+        match Mina_lib.signature_kind mina with
         | Mainnet ->
             "mainnet"
         | Testnet ->

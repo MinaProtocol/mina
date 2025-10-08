@@ -338,8 +338,7 @@ module For_tests = struct
             ~nonce ~valid_until:None ~memo:Signed_command_memo.dummy
             ~body:(Payment { receiver_pk; amount = send_amount })
         in
-        let signature_kind = Mina_signature_kind.t_DEPRECATED in
-        Signed_command.sign ~signature_kind sender_keypair payload )
+        Signed_command.sign ~signature_kind:Testnet sender_keypair payload )
 
   let gen ?(logger = Logger.null ()) ?(send_to_random_pk = false)
       ~(precomputed_values : Precomputed_values.t) ~verifier
@@ -426,7 +425,7 @@ module For_tests = struct
             ~current_state_view ~state_and_body_hash ~supercharge_coinbase
             ~zkapp_cmd_limit_hardcap:
               precomputed_values.genesis_constants.zkapp_cmd_limit_hardcap
-            ~signature_kind:Mina_signature_kind.t_DEPRECATED
+            ~signature_kind:Testnet
         with
         | Ok r ->
             return r
