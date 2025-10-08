@@ -62,6 +62,9 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 		return nil, fmt.Errorf("failed to start main network: %w", err)
 	}
 
+	// Register command for cleanup on interrupt
+	t.registerCmd(cmd)
+
 	t.Logger.Info("Main network started successfully")
 	return cmd, nil
 }
@@ -86,6 +89,9 @@ func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start fork network: %w", err)
 	}
+
+	// Register command for cleanup on interrupt
+	t.registerCmd(cmd)
 
 	t.Logger.Info("Fork network started successfully")
 	return cmd, nil

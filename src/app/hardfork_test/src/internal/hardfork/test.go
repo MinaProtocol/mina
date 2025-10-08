@@ -1,8 +1,12 @@
 package hardfork
 
 import (
+	"context"
 	"os"
 	"os/exec"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
@@ -12,19 +16,27 @@ import (
 
 // HardforkTest represents the main hardfork test logic
 type HardforkTest struct {
-	Config    *config.Config
-	Client    *graphql.Client
-	Logger    *utils.Logger
-	ScriptDir string
+	Config         *config.Config
+	Client         *graphql.Client
+	Logger         *utils.Logger
+	ScriptDir      string
+	runningCmds    []*exec.Cmd
+	runningCmdsMux sync.Mutex
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 // NewHardforkTest creates a new instance of the hardfork test
 func NewHardforkTest(cfg *config.Config) *HardforkTest {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &HardforkTest{
-		Config:    cfg,
-		Client:    graphql.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.GraphQLMaxRetries),
-		Logger:    utils.NewLogger(),
-		ScriptDir: cfg.ScriptDir,
+		Config:      cfg,
+		Client:      graphql.NewClient(cfg.HTTPClientTimeoutSeconds, cfg.GraphQLMaxRetries),
+		Logger:      utils.NewLogger(),
+		ScriptDir:   cfg.ScriptDir,
+		runningCmds: make([]*exec.Cmd, 0),
+		ctx:         ctx,
+		cancel:      cancel,
 	}
 }
 
@@ -52,8 +64,51 @@ func (t *HardforkTest) gracefulShutdown(cmd *exec.Cmd, processName string) {
 	}
 }
 
+// registerCmd adds a command to the list of running commands
+func (t *HardforkTest) registerCmd(cmd *exec.Cmd) {
+	t.runningCmdsMux.Lock()
+	defer t.runningCmdsMux.Unlock()
+	t.runningCmds = append(t.runningCmds, cmd)
+}
+
+// cleanupAllProcesses kills all running processes
+func (t *HardforkTest) cleanupAllProcesses() {
+	t.runningCmdsMux.Lock()
+	defer t.runningCmdsMux.Unlock()
+
+	if len(t.runningCmds) == 0 {
+		return
+	}
+
+	// Kill all script processes
+	for _, cmd := range t.runningCmds {
+		if cmd != nil && cmd.Process != nil {
+			t.Logger.Info("Killing process PID %d", cmd.Process.Pid)
+			cmd.Process.Kill()
+		}
+	}
+}
+
+// setupSignalHandler sets up signal handling for graceful shutdown
+func (t *HardforkTest) setupSignalHandler() {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		t.Logger.Info("\nReceived interrupt signal, cleaning up...")
+		t.cancel()
+		t.cleanupAllProcesses()
+		os.Exit(130) // Standard exit code for SIGINT
+	}()
+}
+
 // Run executes the hardfork test process with well-defined phases
 func (t *HardforkTest) Run() error {
+	// Set up signal handler for Ctrl+C
+	t.setupSignalHandler()
+	defer t.cleanupAllProcesses()
+
 	t.Logger.Info("===== Starting Hardfork Test =====")
 
 	// Calculate main network genesis timestamp
