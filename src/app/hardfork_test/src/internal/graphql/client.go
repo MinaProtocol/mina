@@ -16,11 +16,11 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// NewClient creates a new GraphQL client
-func NewClient() *Client {
+// NewClient creates a new GraphQL client with the specified timeout in seconds
+func NewClient(timeoutSeconds int) *Client {
 	return &Client{
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: time.Duration(timeoutSeconds) * time.Second,
 		},
 	}
 }

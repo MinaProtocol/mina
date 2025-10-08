@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/hardfork"
@@ -30,12 +31,14 @@ Example:
 			return err
 		}
 
-		// Create absolute paths
-		workDir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
+		// Check if ScriptDir contains $PWD and replace it if needed
+		if cfg.ScriptDir == "$PWD/scripts/hardfork" {
+			workDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+			cfg.ScriptDir = filepath.Join(workDir, "scripts", "hardfork")
 		}
-		cfg.WorkDir = workDir
 
 		// Create and run the hardfork test
 		test := hardfork.NewHardforkTest(cfg)
@@ -68,8 +71,20 @@ func init() {
 	rootCmd.Flags().IntVar(&cfg.MainDelay, "main-delay", cfg.MainDelay, "Delay before genesis slot in minutes for main version")
 	rootCmd.Flags().IntVar(&cfg.ForkDelay, "fork-delay", cfg.ForkDelay, "Delay before genesis slot in minutes for fork version")
 
-	// Timeout
-	rootCmd.Flags().IntVar(&cfg.TimeoutMinutes, "timeout", cfg.TimeoutMinutes, "Timeout for the test in minutes")
+	// Script directory configuration
+	rootCmd.Flags().StringVar(&cfg.ScriptDir, "script-dir", cfg.ScriptDir, "Path to the hardfork script directory")
+
+	// Shutdown timeout configuration
+	rootCmd.Flags().IntVar(&cfg.ShutdownTimeoutMinutes, "shutdown-timeout", cfg.ShutdownTimeoutMinutes, "Timeout in minutes to wait for graceful shutdown before forcing kill")
+
+	// Timing configuration
+	rootCmd.Flags().IntVar(&cfg.PollingIntervalSeconds, "polling-interval", cfg.PollingIntervalSeconds, "Interval in seconds for polling height checks")
+	rootCmd.Flags().IntVar(&cfg.ForkConfigRetryDelaySeconds, "fork-config-retry-delay", cfg.ForkConfigRetryDelaySeconds, "Delay in seconds between fork config fetch retries")
+	rootCmd.Flags().IntVar(&cfg.ForkConfigMaxRetries, "fork-config-max-retries", cfg.ForkConfigMaxRetries, "Maximum number of retries for fork config fetch")
+	rootCmd.Flags().IntVar(&cfg.NoNewBlocksWaitSeconds, "no-new-blocks-wait", cfg.NoNewBlocksWaitSeconds, "Wait time in seconds to verify no new blocks after chain end")
+	rootCmd.Flags().IntVar(&cfg.UserCommandCheckMaxIterations, "user-command-check-max-iterations", cfg.UserCommandCheckMaxIterations, "Max iterations to check for user commands in blocks")
+	rootCmd.Flags().IntVar(&cfg.ForkEarliestBlockMaxRetries, "fork-earliest-block-max-retries", cfg.ForkEarliestBlockMaxRetries, "Maximum number of retries to wait for earliest block in fork network")
+	rootCmd.Flags().IntVar(&cfg.HTTPClientTimeoutSeconds, "http-timeout", cfg.HTTPClientTimeoutSeconds, "HTTP client timeout in seconds for GraphQL requests")
 
 	// Mark required flags
 	rootCmd.MarkFlagRequired("main-mina-exe")
