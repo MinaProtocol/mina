@@ -161,6 +161,7 @@ rm -Rf localnet/runtime_1 localnet/runtime_2
   "${NODE_ARGS_1[@]}" \
   --block-producer-key "$PWD/$CONF_DIR/bp" \
   --config-directory "$PWD/localnet/runtime_1" \
+  --run-snark-worker "$(cat $CONF_DIR/bp.pub)" --work-selection seq \
   --client-port 10301 --external-port 10302 --rest-port 10303 &
 
 bp_pid=$!
