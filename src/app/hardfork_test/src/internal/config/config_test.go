@@ -69,15 +69,15 @@ func TestValidateExecutable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := tc.setup()
 			err := validateExecutable(path)
-			
+
 			if tc.expectError && err == nil {
 				t.Errorf("Expected error but got nil")
 			}
-			
+
 			if !tc.expectError && err != nil {
 				t.Errorf("Expected no error but got: %v", err)
 			}
-			
+
 			if tc.expectedErr != nil && err != tc.expectedErr {
 				t.Errorf("Expected error %v but got %v", tc.expectedErr, err)
 			}

@@ -78,7 +78,7 @@ func (c *Client) Query(port int, query string) (gjson.Result, error) {
 
 		// Parse the response
 		result := gjson.ParseBytes(body)
-		
+
 		// Check for GraphQL errors in response
 		if result.Get("errors").Exists() {
 			lastErr = fmt.Errorf("GraphQL error: %s", result.Get("errors").String())
