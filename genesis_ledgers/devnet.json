@@ -27,6 +27,8 @@
     }
   },
   "daemon": {
-    "network_id": "devnet"
+    "network_id": "devnet",
+    "slot_tx_end": "446450",
+    "slot_chain_end": "446490"
   }
 }
