@@ -38,15 +38,15 @@ type Config struct {
 // matching those in the original shell script
 func DefaultConfig() *Config {
 	return &Config{
-		SlotTxEnd:         30,
-		SlotChainEnd:      38, // SlotTxEnd + 8
+		SlotTxEnd:          30,
+		SlotChainEnd:       38, // SlotTxEnd + 8
 		BestChainQueryFrom: 25,
-		MainSlot:          15,
-		ForkSlot:          15,
-		MainDelay:         20,
-		ForkDelay:         10,
-		WorkDir:           ".",
-		TimeoutMinutes:    30,
+		MainSlot:           15,
+		ForkSlot:           15,
+		MainDelay:          20,
+		ForkDelay:          10,
+		WorkDir:            ".",
+		TimeoutMinutes:     30,
 	}
 }
 
@@ -72,11 +72,11 @@ func (c *Config) CalculateTimestamps() (mainGenesisTs, forkGenesisTs int64) {
 	now := time.Now().Unix()
 	// Round to nearest minute
 	nowRounded := now - (now % 60)
-	
+
 	// Calculate genesis timestamps as in the shell script
 	mainGenesisTs = nowRounded + int64(c.MainDelay*60)
 	forkGenesisTs = nowRounded + int64(c.ForkDelay*60)
-	
+
 	return mainGenesisTs, forkGenesisTs
 }
 

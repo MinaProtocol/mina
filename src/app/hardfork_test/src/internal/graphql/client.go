@@ -28,38 +28,38 @@ func NewClient() *Client {
 // Query sends a GraphQL query to the specified port
 func (c *Client) Query(port int, query string) (gjson.Result, error) {
 	url := fmt.Sprintf("http://localhost:%d/graphql", port)
-	
+
 	// Format the query payload
 	payload := map[string]string{
 		"query": fmt.Sprintf("query Q {%s}", query),
 	}
-	
+
 	// Convert payload to JSON
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return gjson.Result{}, fmt.Errorf("failed to marshal query payload: %w", err)
 	}
-	
+
 	// Create the request
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return gjson.Result{}, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Send the request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return gjson.Result{}, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	// Read the response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return gjson.Result{}, fmt.Errorf("failed to read response body: %w", err)
 	}
-	
+
 	// Parse the response
 	return gjson.ParseBytes(body), nil
 }
@@ -70,7 +70,7 @@ func (c *Client) GetHeight(port int) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	
+
 	height := result.Get("data.bestChain.0.protocolState.consensusState.blockHeight").Int()
 	return int(height), nil
 }
@@ -81,10 +81,10 @@ func (c *Client) GetHeightAndSlotOfEarliest(port int) (height, slot int, err err
 	if err != nil {
 		return 0, 0, err
 	}
-	
+
 	blockHeight := result.Get("data.bestChain.0.protocolState.consensusState.blockHeight").Int()
 	slotSinceGenesis := result.Get("data.bestChain.0.protocolState.consensusState.slotSinceGenesis").Int()
-	
+
 	return int(blockHeight), int(slotSinceGenesis), nil
 }
 
@@ -94,7 +94,7 @@ func (c *Client) GetForkConfig(port int) (gjson.Result, error) {
 	if err != nil {
 		return gjson.Result{}, err
 	}
-	
+
 	return result.Get("data.fork_config"), nil
 }
 
@@ -104,7 +104,7 @@ func (c *Client) BlocksWithUserCommands(port int) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	
+
 	count := 0
 	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
 		if value.Get("commandTransactionCount").Int() > 0 {
@@ -112,7 +112,7 @@ func (c *Client) BlocksWithUserCommands(port int) (int, error) {
 		}
 		return true
 	})
-	
+
 	return count, nil
 }
 
@@ -149,17 +149,17 @@ bestChain {
 
 // BlockData represents the structured block data from GraphQL queries
 type BlockData struct {
-	StateHash       string
-	BlockHeight     int
-	Slot            int
-	NonEmpty        bool
-	CurEpochHash    string
-	CurEpochSeed    string
-	NextEpochHash   string
-	NextEpochSeed   string
-	StagedHash      string
-	SnarkedHash     string
-	Epoch           int
+	StateHash     string
+	BlockHeight   int
+	Slot          int
+	NonEmpty      bool
+	CurEpochHash  string
+	CurEpochSeed  string
+	NextEpochHash string
+	NextEpochSeed string
+	StagedHash    string
+	SnarkedHash   string
+	Epoch         int
 }
 
 // GetBlocks retrieves block data from the node
@@ -168,9 +168,9 @@ func (c *Client) GetBlocks(port int) ([]BlockData, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var blocks []BlockData
-	
+
 	result.Get("data.bestChain").ForEach(func(_, value gjson.Result) bool {
 		block := BlockData{
 			StateHash:     value.Get("stateHash").String(),
@@ -184,17 +184,17 @@ func (c *Client) GetBlocks(port int) ([]BlockData, error) {
 			SnarkedHash:   value.Get("protocolState.blockchainState.snarkedLedgerHash").String(),
 			Epoch:         int(value.Get("protocolState.consensusState.epoch").Int()),
 		}
-		
+
 		// Calculate if the block is non-empty based on transactions
 		cmdCount := value.Get("commandTransactionCount").Int()
 		feeCount := value.Get("transactions.feeTransfer").Array()
 		coinbase := value.Get("transactions.coinbase").String() != "0"
-		
-		block.NonEmpty = (cmdCount + int64(len(feeCount))) > 0 || coinbase
-		
+
+		block.NonEmpty = (cmdCount+int64(len(feeCount))) > 0 || coinbase
+
 		blocks = append(blocks, block)
 		return true
 	})
-	
+
 	return blocks, nil
 }

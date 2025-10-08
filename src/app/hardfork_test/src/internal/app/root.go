@@ -29,14 +29,14 @@ Example:
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
-		
+
 		// Create absolute paths
 		workDir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
 		cfg.WorkDir = workDir
-		
+
 		// Create and run the hardfork test
 		test := hardfork.NewHardforkTest(cfg)
 		return test.Run()
@@ -54,23 +54,23 @@ func init() {
 	rootCmd.Flags().StringVar(&cfg.MainRuntimeGenesisLedger, "main-runtime-genesis-ledger", "", "Path to the main runtime genesis ledger executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkMinaExe, "fork-mina-exe", "", "Path to the fork Mina executable (required)")
 	rootCmd.Flags().StringVar(&cfg.ForkRuntimeGenesisLedger, "fork-runtime-genesis-ledger", "", "Path to the fork runtime genesis ledger executable (required)")
-	
+
 	// Test configuration
 	rootCmd.Flags().IntVar(&cfg.SlotTxEnd, "slot-tx-end", cfg.SlotTxEnd, "Slot at which transactions should end")
 	rootCmd.Flags().IntVar(&cfg.SlotChainEnd, "slot-chain-end", cfg.SlotChainEnd, "Slot at which chain should end")
 	rootCmd.Flags().IntVar(&cfg.BestChainQueryFrom, "best-chain-query-from", cfg.BestChainQueryFrom, "Slot from which to start calling bestchain query")
-	
+
 	// Slot configuration
 	rootCmd.Flags().IntVar(&cfg.MainSlot, "main-slot", cfg.MainSlot, "Slot duration in seconds for main version")
 	rootCmd.Flags().IntVar(&cfg.ForkSlot, "fork-slot", cfg.ForkSlot, "Slot duration in seconds for fork version")
-	
+
 	// Delay configuration
 	rootCmd.Flags().IntVar(&cfg.MainDelay, "main-delay", cfg.MainDelay, "Delay before genesis slot in minutes for main version")
 	rootCmd.Flags().IntVar(&cfg.ForkDelay, "fork-delay", cfg.ForkDelay, "Delay before genesis slot in minutes for fork version")
-	
+
 	// Timeout
 	rootCmd.Flags().IntVar(&cfg.TimeoutMinutes, "timeout", cfg.TimeoutMinutes, "Timeout for the test in minutes")
-	
+
 	// Mark required flags
 	rootCmd.MarkFlagRequired("main-mina-exe")
 	rootCmd.MarkFlagRequired("main-runtime-genesis-ledger")

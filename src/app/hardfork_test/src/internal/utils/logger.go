@@ -17,7 +17,7 @@ type Logger struct {
 // NewLogger creates a new logger
 func NewLogger() *Logger {
 	isDebug := os.Getenv("DEBUG") == "1"
-	
+
 	return &Logger{
 		infoLogger:  log.New(os.Stdout, "INFO: ", log.LstdFlags),
 		errorLogger: log.New(os.Stderr, "ERROR: ", log.LstdFlags),
