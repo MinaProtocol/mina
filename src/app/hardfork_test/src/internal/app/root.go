@@ -3,11 +3,9 @@ package app
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
 
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/internal/config"
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/internal/hardfork"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/hardfork"
 	"github.com/spf13/cobra"
 )
 

@@ -105,9 +105,18 @@ EOF
   nix --experimental-features nix-command copy --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" --stdin </tmp/nix-paths
 fi
 
+
+nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#hardfork_test" --out-link "$INIT_DIR/hardfork_test"
+
 SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}
-export SLOT_TX_END
+SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
 
 echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
 
-"$SCRIPT_DIR"/test.sh compatible-devnet{/bin/mina,-genesis/bin/runtime_genesis_ledger} fork-devnet{/bin/mina,-genesis/bin/runtime_genesis_ledger} && echo "HF test completed successfully"
+"$INIT_DIR/hardfork_test/bin/hardfork_test" \
+  --main-mina-exe "$INIT_DIR/compatible-devnet/bin/mina" \
+  --main-runtime-genesis-ledger "$INIT_DIR/compatible-devnet-genesis/bin/runtime_genesis_ledger" \
+  --fork-mina-exe "$INIT_DIR/fork-devnet/bin/mina" \
+  --fork-runtime-genesis-ledger "$INIT_DIR/fork-devnet-genesis/bin/runtime_genesis_ledger" \
+  --slot-tx-end "$SLOT_TX_END" \
+  --slot-chain-end "$SLOT_CHAIN_END" && echo "HF test completed successfully"

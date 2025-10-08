@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/internal/app"
-	"github.com/MinaProtocol/mina/src/app/hardfork_test/internal/config"
+	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/app"
 )
 
 func main() {
