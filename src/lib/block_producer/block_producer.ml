@@ -22,6 +22,8 @@ module type CONTEXT = sig
   val vrf_poll_interval : Time.Span.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 type Structured_log_events.t += Block_produced
@@ -172,7 +174,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
     ~previous_protocol_state ~time_controller ~staged_ledger ~transactions
     ~get_completed_work ~logger ~(block_data : Consensus.Data.Block_data.t)
     ~winner_pk ~scheduled_time ~log_block_creation ~block_reward_threshold
-    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end =
+    ~zkapp_cmd_limit_hardcap ~slot_tx_end ~slot_chain_end ~signature_kind =
   let open Interruptible.Let_syntax in
   let global_slot_since_hard_fork =
     Consensus.Data.Block_data.global_slot block_data
@@ -284,7 +286,7 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               ~state_and_body_hash:
                 (previous_protocol_state_hash, previous_protocol_state_body_hash)
               ~coinbase_receiver ~supercharge_coinbase ~zkapp_cmd_limit_hardcap
-              ~signature_kind:Mina_signature_kind.t_DEPRECATED
+              ~signature_kind
           with
           | Ok
               ( `Hash_after_applying next_staged_ledger_hash
@@ -782,7 +784,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           ~transactions ~get_completed_work ~logger ~log_block_creation
           ~winner_pk:winner_pubkey ~block_reward_threshold
           ~zkapp_cmd_limit:!zkapp_cmd_limit ~zkapp_cmd_limit_hardcap
-          ~slot_tx_end ~slot_chain_end
+          ~slot_tx_end ~slot_chain_end ~signature_kind
       in
       [%log internal] "Generate_next_state_done" ;
       match next_state_opt with
@@ -1449,8 +1451,8 @@ let run_precomputed ~context:(module Context : CONTEXT) ~verifier ~trust_system
           in
           let body =
             Body.create
-              (Staged_ledger_diff.write_all_proofs_to_disk ~proof_cache_db
-                 staged_ledger_diff )
+              (Staged_ledger_diff.write_all_proofs_to_disk ~signature_kind
+                 ~proof_cache_db staged_ledger_diff )
           in
           let%bind transition =
             let open Result.Let_syntax in

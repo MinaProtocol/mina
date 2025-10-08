@@ -60,14 +60,15 @@ let read_all_proofs_from_disk : t -> Stable.Latest.t = function
         ; proof2 = Ledger_proof.Cached.read_proof_from_disk proof2
         }
 
-let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-    Stable.Latest.t -> t = function
+let write_all_proofs_to_disk ~signature_kind
+    ~(proof_cache_db : Proof_cache_tag.cache_db) : Stable.Latest.t -> t =
+  function
   | Segment { statement; witness; spec } ->
       Segment
         { statement
         ; witness =
             Transaction_snark.Zkapp_command_segment.Witness
-            .write_all_proofs_to_disk ~proof_cache_db witness
+            .write_all_proofs_to_disk ~signature_kind ~proof_cache_db witness
         ; spec
         }
   | Merge { proof1; proof2 } ->

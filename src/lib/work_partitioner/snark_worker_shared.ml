@@ -26,10 +26,11 @@ module Zkapp_command_inputs = struct
     * Statement.With_sok.t )
     Nonempty_list.t
 
-  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+  let write_all_proofs_to_disk ~signature_kind ~proof_cache_db :
+      Stable.Latest.t -> t =
     Nonempty_list.map ~f:(fun (witness, segment, stmt) ->
-        ( Zkapp_command_segment.Witness.write_all_proofs_to_disk ~proof_cache_db
-            witness
+        ( Zkapp_command_segment.Witness.write_all_proofs_to_disk ~signature_kind
+            ~proof_cache_db witness
         , segment
         , stmt ) )
 

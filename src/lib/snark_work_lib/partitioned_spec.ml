@@ -67,15 +67,20 @@ let read_all_proofs_from_disk : t -> Stable.Latest.t = function
       Sub_zkapp_command
         (With_job_meta.map ~f_spec:Sub_zkapp_spec.read_all_proofs_from_disk job)
 
-let write_all_proofs_to_disk ~(proof_cache_db : Proof_cache_tag.cache_db) :
-    Stable.Latest.t -> t = function
+let write_all_proofs_to_disk ~signature_kind
+    ~(proof_cache_db : Proof_cache_tag.cache_db) : Stable.Latest.t -> t =
+  function
   | Single job ->
       Single
         (With_job_meta.map
-           ~f_spec:(Single_spec.write_all_proofs_to_disk ~proof_cache_db)
+           ~f_spec:
+             (Single_spec.write_all_proofs_to_disk ~signature_kind
+                ~proof_cache_db )
            job )
   | Sub_zkapp_command job ->
       Sub_zkapp_command
         (With_job_meta.map
-           ~f_spec:(Sub_zkapp_spec.write_all_proofs_to_disk ~proof_cache_db)
+           ~f_spec:
+             (Sub_zkapp_spec.write_all_proofs_to_disk ~signature_kind
+                ~proof_cache_db )
            job )
