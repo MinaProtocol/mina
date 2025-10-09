@@ -13,6 +13,8 @@
 (rule
  (targets
   plonk_napi.node
+  napi.js
+  napi.d.ts
   flags.sexp)
  (deps
   build.sh

@@ -1,0 +1,7 @@
+{
+  "name": "native",
+  "version": "0.0.1",
+  "napi": {
+    "name": "plonk_napi"
+  }
+}
