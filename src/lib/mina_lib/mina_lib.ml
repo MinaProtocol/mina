@@ -1748,13 +1748,12 @@ let raise_on_initialization_error (`Initialization_error e) =
   Error.raise @@ Error.tag ~tag:"proof cache initialization error" e
 
 let initialize_proof_cache_db (config : Config.t) =
-  Proof_cache_tag.create_db ~logger:config.logger
-    (config.conf_dir ^/ "proof_cache")
+  Proof_cache_tag.create_db ~logger:config.logger config.proof_cache_location
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let initialize_zkapp_vk_cache_db (config : Config.t) =
   Zkapp_vk_cache_tag.create_db ~logger:config.logger
-    (config.conf_dir ^/ "zkapp_vk_cache")
+    config.zkapp_vk_cache_location
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let create ~commit_id ?wallets (config : Config.t) =
