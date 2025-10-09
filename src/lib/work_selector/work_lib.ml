@@ -9,7 +9,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   let yojson_summary t =
     let f = function
       | Work_spec.Merge _ ->
-          `String "merge"
+          `List [ `String "merge" ]
       | Transition (_, witness) ->
           Inputs.Transaction.yojson_summary
             (Inputs.Transaction_witness.transaction witness)
