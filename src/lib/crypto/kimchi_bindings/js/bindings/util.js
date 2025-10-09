@@ -1,6 +1,6 @@
 /* global UInt64, caml_int64_of_int32, caml_create_bytes,
     caml_bytes_unsafe_set, caml_bytes_unsafe_get, caml_ml_bytes_length,
-    plonk_wasm
+    plonk_wasm, getTsBindings
  */
 
 // Provides: tsBindings
