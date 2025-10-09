@@ -17,6 +17,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 module type Transition_handler_validator_intf = sig
@@ -341,7 +343,6 @@ module type Transition_router_intf = sig
     -> catchup_mode:[ `Super ]
     -> notify_online:(unit -> unit Deferred.t)
     -> ledger_backing:Mina_ledger.Ledger.Root.Config.backing_type
-    -> signature_kind:Mina_signature_kind.t
     -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]

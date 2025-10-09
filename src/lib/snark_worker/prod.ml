@@ -318,7 +318,7 @@ module Impl = struct
             } ->
             let witness =
               Transaction_witness.Zkapp_command_segment_witness
-              .write_all_proofs_to_disk ~proof_cache_db witness
+              .write_all_proofs_to_disk ~signature_kind ~proof_cache_db witness
             in
 
             let%map proof, elapsed =
