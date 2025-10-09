@@ -19,8 +19,17 @@ var rootCmd = &cobra.Command{
 	Use:          "hardfork_test",
 	Short:        "Test hardfork functionality for Mina Protocol",
 	SilenceUsage: true,
-	Long: `A Go application that implements the control flow from scripts/hardfork/test.sh,
-allowing for testing of hardfork functionality in the Mina Protocol.
+	Long: `A Go application for testing hardfork functionality in the Mina Protocol.
+
+This test validates that a network can successfully transition from one protocol version 
+to another through a hardfork mechanism by:
+
+  1. Running a pre-fork network with the main executable
+  2. Producing blocks and transactions to ensure network functionality
+  3. Extracting the ledger state at a specified slot
+  4. Generating hardfork-compatible genesis ledgers
+  5. Starting a post-fork network with the fork executable
+  6. Verifying the new network continues from the forked state
 
 Example:
   hardfork_test --main-mina-exe /path/to/mina --main-runtime-genesis-ledger /path/to/runtime_genesis_ledger \
