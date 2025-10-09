@@ -77,7 +77,7 @@ let specs_for_branch =
           , branch = "\\\${BUILDKITE_BRANCH}"
           , source_version = "\\\${MINA_DEB_VERSION}"
           , build_id = "\\\${BUILDKITE_BUILD_ID}"
-          , if = Some "build.branch == \"${branch}\""
+          , if_ = Some "build.branch == \"${branch}\""
           }
 
 in  Pipeline.build

@@ -54,7 +54,7 @@ let ReleaseSpec =
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
           , verify : Bool
-          , if : Optional B/If
+          , if_ : Optional B/If
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
@@ -77,7 +77,7 @@ let ReleaseSpec =
           , step_key_suffix = "-docker-image"
           , verify = False
           , deb_suffix = None Text
-          , if = None B/If
+          , if_ = None B/If
           }
       }
 
@@ -253,7 +253,7 @@ let generateStep =
                 , target = Size.XLarge
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
-                , if = spec.if
+                , if_ = spec.if_
                 }
 
 in  { generateStep = generateStep
