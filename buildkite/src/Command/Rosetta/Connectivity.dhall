@@ -48,7 +48,7 @@ let Spec =
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
           , if_ =
-              "build.pull_request.base_branch != \"develop\" || build.branch == \"develop\""
+              "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }
       }
 
