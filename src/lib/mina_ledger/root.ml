@@ -172,14 +172,14 @@ struct
     | Converting_db db ->
         Converting_ledger.merkle_root db
 
-  let create ~logger ~config ~depth () =
+  let create ~logger ~config ~depth ?(assert_synced = false) () =
     match config with
     | Config.Stable_db_config directory_name ->
         Stable_db (Stable_db.create ~directory_name ~depth ())
     | Converting_db_config config ->
         Converting_db
           (Converting_ledger.create ~config:(In_directories config) ~logger
-             ~depth () )
+             ~depth ~assert_synced () )
 
   let create_temporary ~logger ~backing_type ~depth () =
     match backing_type with
@@ -230,7 +230,8 @@ struct
       [empty_hardfork_db]. The accounts are set in the target database in chunks
       so the daemon is still responsive during this operation; the daemon would
       otherwise stop everything as it hashed every account in the list. *)
-  let chunked_migration ?(chunk_size = 1 lsl 6) stable_locations_and_accounts empty_migrated_db =
+  let chunked_migration ?(chunk_size = 1 lsl 6) stable_locations_and_accounts
+      empty_migrated_db =
     let open Async.Deferred.Let_syntax in
     let ledger_depth = Migrated_db.depth empty_migrated_db in
     let addrs_and_accounts =

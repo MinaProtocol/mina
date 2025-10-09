@@ -114,7 +114,13 @@ module Make
 
   (** Create a root ledger backed by a single database in the given
       directory. *)
-  val create : logger:Logger.t -> config:Config.t -> depth:int -> unit -> t
+  val create :
+       logger:Logger.t
+    -> config:Config.t
+    -> depth:int
+    -> ?assert_synced:bool
+    -> unit
+    -> t
 
   val create_temporary :
        logger:Logger.t
@@ -135,8 +141,7 @@ module Make
   (** Make a checkpoint of the root ledger [t] of the same backing type using
       [directory_name] as a template for its location. Return a new root ledger
       backed by that checkpoint. *)
-  val create_checkpoint_with_directory :
-    t -> directory_name:string -> t
+  val create_checkpoint_with_directory : t -> directory_name:string -> t
 
   (** Convert a root backed by a [Config.Stable_db] to *)
   val make_converting : t -> t Async.Deferred.t
