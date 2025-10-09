@@ -56,7 +56,8 @@ let specs_for_branch =
       ->  \(channel : DebianChannel.Type)
       ->  PublishPackages.Spec::{
           , artifacts =
-            [ Artifacts.Type.Daemon
+            [ Artifacts.Type.LogProc
+            , Artifacts.Type.Daemon
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             ]
@@ -95,5 +96,8 @@ in  Pipeline.build
           # PublishPackages.publish
               (specs_for_branch "develop" DebianChannel.Type.Develop)
           # PublishPackages.publish
-              (specs_for_branch "master" DebianChannel.Type.Master)
+              ( specs_for_branch
+                  "dkijana/port_publish_fix_master"
+                  DebianChannel.Type.Master
+              )
       }
