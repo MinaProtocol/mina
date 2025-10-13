@@ -1,0 +1,19 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    base64 (0.3.0)
+    ffi (1.17.2)
+    ffi (1.17.2-x86_64-linux-gnu)
+    rocksdb-ffi (0.2.1)
+      ffi
+
+PLATFORMS
+  ruby
+  x86_64-linux
+
+DEPENDENCIES
+  base64 (~> 0.3.0)
+  rocksdb-ffi (~> 0.2.1)
+
+BUNDLED WITH
+   2.6.9
