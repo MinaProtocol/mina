@@ -440,3 +440,21 @@ module Signed_command = struct
            Mina_base.Signed_command_memo.max_input_length )
       (optional string)
 end
+
+let signature_kind =
+  let open Command.Param in
+  let arg_type =
+    Command.Arg_type.create (fun s ->
+        match String.lowercase s with
+        | "mainnet" ->
+            Mina_signature_kind.Mainnet
+        | "testnet" ->
+            Mina_signature_kind.Testnet
+        | other ->
+            Mina_signature_kind.Other_network other )
+  in
+  flag "--signature-kind"
+    ~doc:
+      "mainnet|testnet|<other> Signature kind to use (default: value compiled \
+       into this binary)"
+    (optional_with_default Mina_signature_kind.t_DEPRECATED arg_type)
