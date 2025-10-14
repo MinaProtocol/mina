@@ -41,13 +41,13 @@ let config
               , Cmd.run
                   "./buildkite/scripts/generate-jobs.sh > buildkite/src/gen/Jobs.dhall"
               , Cmd.quietly
-                  "dhall-to-yaml --quoted <<< '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}  }' | buildkite-agent pipeline upload"
+                  "dhall-to-yaml-ng --quoted <<< '(./buildkite/src/Monorepo.dhall) { selection=(./buildkite/src/Pipeline/JobSelection.dhall).Type.${selection}, tagFilter=(./buildkite/src/Pipeline/TagFilter.dhall).Type.${tagFilter}, scopeFilter=(./buildkite/src/Pipeline/ScopeFilter.dhall).Type.${scopeFilter}  }' | buildkite-agent pipeline upload"
               ]
             , label = "Prepare monorepo triage"
             , key = "monorepo-${selection}-${tagFilter}-${scopeFilter}"
             , target = Size.Multi
             , docker = Some Docker::{
-              , image = (./Constants/ContainerImages.dhall).toolchainBase
+              , image = "lyhokia/mina-toolchain-base-rev-eng:latest"
               , environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
               }
             }
