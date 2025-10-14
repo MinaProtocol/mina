@@ -167,6 +167,6 @@ BEGIN
     PERFORM set_migration_status('applied'::migration_status);
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'An error occurred: %', SQLERRM;
-    PERFORM set_migration_status('failed'::migration_status);
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE;
 END$$
