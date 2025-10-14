@@ -1,5 +1,6 @@
 -- ============================================================================
 -- Mina rollback: from mesa to berkeley
+-- + remove zkapp_states.element31..element8 (int)
 -- + remove zkapp_states_nullable.element31..element8 (int)
 -- + record status in migration_history
 -- ============================================================================
@@ -17,7 +18,7 @@ SET archive.current_protocol_version = '4.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '3.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.2';
+SET archive.migration_version = '0.0.3';
 
 -- TODO: put below in a common script
 
@@ -127,7 +128,55 @@ EXCEPTION
 END
 $$ LANGUAGE plpgsql;
 
--- 2. `zkapp_states_nullable`: Remove nullable columns element31..element8
+-- 2. `zkapp_states`: Remove columns element31..element8
+
+CREATE OR REPLACE FUNCTION try_remove_zkapp_states_element(p_element_num INT)
+RETURNS VOID AS $$
+DECLARE
+    col_name TEXT := 'element' || p_element_num;
+BEGIN
+
+    RAISE DEBUG 'Trying to removing column % for zkapp_states', col_name;
+
+    EXECUTE format(
+        'ALTER TABLE zkapp_states DROP COLUMN IF EXISTS %I',
+        col_name
+    );
+
+    RAISE DEBUG 'Ensured column % for zkapp_states not existent', col_name;
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred: %', SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+SELECT try_remove_zkapp_states_element(31);
+SELECT try_remove_zkapp_states_element(30);
+SELECT try_remove_zkapp_states_element(29);
+SELECT try_remove_zkapp_states_element(28);
+SELECT try_remove_zkapp_states_element(27);
+SELECT try_remove_zkapp_states_element(26);
+SELECT try_remove_zkapp_states_element(25);
+SELECT try_remove_zkapp_states_element(24);
+SELECT try_remove_zkapp_states_element(23);
+SELECT try_remove_zkapp_states_element(22);
+SELECT try_remove_zkapp_states_element(21);
+SELECT try_remove_zkapp_states_element(20);
+SELECT try_remove_zkapp_states_element(19);
+SELECT try_remove_zkapp_states_element(18);
+SELECT try_remove_zkapp_states_element(17);
+SELECT try_remove_zkapp_states_element(16);
+SELECT try_remove_zkapp_states_element(15);
+SELECT try_remove_zkapp_states_element(14);
+SELECT try_remove_zkapp_states_element(13);
+SELECT try_remove_zkapp_states_element(12);
+SELECT try_remove_zkapp_states_element(11);
+SELECT try_remove_zkapp_states_element(10);
+SELECT try_remove_zkapp_states_element(9);
+SELECT try_remove_zkapp_states_element(8);
+
+-- 3. `zkapp_states_nullable`: Remove nullable columns element31..element8
 
 SELECT try_remove_zkapp_states_nullable_element(31);
 SELECT try_remove_zkapp_states_nullable_element(30);
@@ -154,7 +203,7 @@ SELECT try_remove_zkapp_states_nullable_element(10);
 SELECT try_remove_zkapp_states_nullable_element(9);
 SELECT try_remove_zkapp_states_nullable_element(8);
 
--- 3. Update schema_history
+-- 4. Update schema_history
 
 DO $$
 BEGIN

@@ -1,6 +1,7 @@
 -- =============================================================================
 -- Mina migration: from berkeley to mesa
 -- + extend zkapp_states_nullable with element8..element31 (int)
+-- + extend zkapp_states with element8..element31 (int)
 -- + record status in migration_history
 -- =============================================================================
 
@@ -17,7 +18,7 @@ SET archive.current_protocol_version = '3.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.2';
+SET archive.migration_version = '0.0.3';
 
 -- TODO: put below in a common script
 
@@ -89,7 +90,7 @@ BEGIN
         ) VALUES (
             target_protocol_version,
             target_migration_version,
-            'Upgrade from Berkeley to Mesa. Add zkapp_states_nullable.element8..element31 (int)',
+            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int)',
             'starting'::migration_status
         );
     ELSIF 
@@ -160,7 +161,55 @@ SELECT add_zkapp_states_nullable_element(29);
 SELECT add_zkapp_states_nullable_element(30);
 SELECT add_zkapp_states_nullable_element(31);
 
--- 3. Update schema_history
+-- 3. `zkapp_states`: Add columns element8..element31
+CREATE OR REPLACE FUNCTION add_zkapp_states_element(p_element_num INT)
+RETURNS VOID AS $$
+DECLARE
+    col_name TEXT := 'element' || p_element_num;
+BEGIN
+
+    RAISE DEBUG 'Adding column % for zkapp_states', col_name;
+
+    EXECUTE format(
+        'ALTER TABLE zkapp_states ADD COLUMN IF NOT EXISTS %I INT DEFAULT 0 NOT NULL REFERENCES zkapp_field(id)',
+        col_name
+    );
+
+    RAISE DEBUG 'Added column % for zkapp_states', col_name;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred while adding column % to zkapp_states: %', col_name, SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+SELECT add_zkapp_states_element(8);
+SELECT add_zkapp_states_element(9);
+SELECT add_zkapp_states_element(10);
+SELECT add_zkapp_states_element(11);
+SELECT add_zkapp_states_element(12);
+SELECT add_zkapp_states_element(13);
+SELECT add_zkapp_states_element(14);
+SELECT add_zkapp_states_element(15);
+SELECT add_zkapp_states_element(16);
+SELECT add_zkapp_states_element(17);
+SELECT add_zkapp_states_element(18);
+SELECT add_zkapp_states_element(19);
+SELECT add_zkapp_states_element(20);
+SELECT add_zkapp_states_element(21);
+SELECT add_zkapp_states_element(22);
+SELECT add_zkapp_states_element(23);
+SELECT add_zkapp_states_element(24);
+SELECT add_zkapp_states_element(25);
+SELECT add_zkapp_states_element(26);
+SELECT add_zkapp_states_element(27);
+SELECT add_zkapp_states_element(28);
+SELECT add_zkapp_states_element(29);
+SELECT add_zkapp_states_element(30);
+SELECT add_zkapp_states_element(31);
+
+-- 4. Update schema_history
 
 DO $$
 BEGIN
