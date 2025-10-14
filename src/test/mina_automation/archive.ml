@@ -47,7 +47,7 @@ module Scripts = struct
     | `DropTables ->
         "drop_tables.sql"
     | `Upgrade ->
-        "upgrade-to-mesa.sql"
+        "upgrade_to_mesa.sql"
     | `Rollback ->
         "rollback_to-berkeley.sql"
 
