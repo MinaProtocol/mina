@@ -67,31 +67,6 @@ var caml_pasta_fp_plonk_index_create_bytecode = function (
   );
 };
 
-// Provides: caml_pasta_fp_plonk_index_max_degree
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_index_max_degree =
-  plonk_wasm.caml_pasta_fp_plonk_index_max_degree;
-
-// Provides: caml_pasta_fp_plonk_index_public_inputs
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_index_public_inputs =
-  plonk_wasm.caml_pasta_fp_plonk_index_public_inputs;
-
-// Provides: caml_pasta_fp_plonk_index_domain_d1_size
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_index_domain_d1_size =
-  plonk_wasm.caml_pasta_fp_plonk_index_domain_d1_size;
-
-// Provides: caml_pasta_fp_plonk_index_domain_d4_size
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_index_domain_d4_size =
-  plonk_wasm.caml_pasta_fp_plonk_index_domain_d4_size;
-
-// Provides: caml_pasta_fp_plonk_index_domain_d8_size
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_index_domain_d8_size =
-  plonk_wasm.caml_pasta_fp_plonk_index_domain_d8_size;
-
 // Provides: caml_pasta_fp_plonk_index_read
 // Requires: plonk_wasm, caml_jsstring_of_string
 var caml_pasta_fp_plonk_index_read = function (offset, urs, path) {
@@ -173,31 +148,6 @@ var caml_pasta_fq_plonk_index_create_bytecode = function (
     lazy_mode
   );
 };
-
-// Provides: caml_pasta_fq_plonk_index_max_degree
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_index_max_degree =
-  plonk_wasm.caml_pasta_fq_plonk_index_max_degree;
-
-// Provides: caml_pasta_fq_plonk_index_public_inputs
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_index_public_inputs =
-  plonk_wasm.caml_pasta_fq_plonk_index_public_inputs;
-
-// Provides: caml_pasta_fq_plonk_index_domain_d1_size
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_index_domain_d1_size =
-  plonk_wasm.caml_pasta_fq_plonk_index_domain_d1_size;
-
-// Provides: caml_pasta_fq_plonk_index_domain_d4_size
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_index_domain_d4_size =
-  plonk_wasm.caml_pasta_fq_plonk_index_domain_d4_size;
-
-// Provides: caml_pasta_fq_plonk_index_domain_d8_size
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_index_domain_d8_size =
-  plonk_wasm.caml_pasta_fq_plonk_index_domain_d8_size;
 
 // Provides: caml_pasta_fq_plonk_index_read
 // Requires: plonk_wasm, caml_jsstring_of_string
