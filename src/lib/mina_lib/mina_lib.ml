@@ -2919,8 +2919,8 @@ module Hardfork_config = struct
 
   (** Generate the tar file and runtime ledger config for the given root
       database, and close and delete the database *)
-  let generate_tar_and_config ~get_directory ~get_root_hash ~close_root ~logger
-      ~target_dir ~ledger_name_prefix root =
+  let generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
+      ~ledger_name_prefix root =
     let open Deferred.Or_error.Let_syntax in
     let root_hash = get_root_hash root in
     let ledger_dirname =
@@ -2935,31 +2935,45 @@ module Hardfork_config = struct
       Genesis_ledger_helper.sha3_hash tar_path
       |> Deferred.map ~f:Or_error.return
     in
-    let config =
-      Runtime_config.ledger_of_hashes
-        ~root_hash:(Mina_base.Ledger_hash.to_base58_check root_hash)
-        ~s3_data_hash ()
-    in
-    close_root root ;
-    Mina_stdlib_unix.File_system.rmrf ledger_dirname ;
-    config
+    Runtime_config.ledger_of_hashes
+      ~root_hash:(Mina_base.Ledger_hash.to_base58_check root_hash)
+      ~s3_data_hash ()
 
-  let generate_tars_and_configs ~get_directory ~get_root_hash ~close_root
-      ~logger ~target_dir genesis_ledger genesis_staking_ledger
+  (** Bracket to close the temporary root ledger connections opened by
+      [copy_genesis_roots_and_diffs]. The underlying databases on disk are
+      created in a temporary build directory that will be automatically cleaned
+      up in [dump_reference_config]. *)
+  let with_root_close ledgers f =
+    let open Deferred.Or_error.Let_syntax in
+    let close () =
+      let genesis_ledger, genesis_staking_ledger, genesis_next_epoch_ledger =
+        ledgers
+      in
+      Ledger.Root.close genesis_ledger ;
+      Ledger.Root.close genesis_staking_ledger ;
+      Ledger.Root.close genesis_next_epoch_ledger
+    in
+    try
+      let%map result = f () in
+      close () ; result
+    with exn -> close () ; raise exn
+
+  let generate_tars_and_configs ~get_directory ~get_root_hash ~logger
+      ~target_dir genesis_ledger genesis_staking_ledger
       genesis_next_epoch_ledger =
     let open Deferred.Or_error.Let_syntax in
     Core.Unix.mkdir_p target_dir ;
     let%bind genesis_ledger_config =
-      generate_tar_and_config ~get_directory ~get_root_hash ~close_root ~logger
-        ~target_dir ~ledger_name_prefix:"genesis_ledger" genesis_ledger
+      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
+        ~ledger_name_prefix:"genesis_ledger" genesis_ledger
     in
     let%bind genesis_staking_ledger_config =
-      generate_tar_and_config ~get_directory ~get_root_hash ~close_root ~logger
-        ~target_dir ~ledger_name_prefix:"epoch_ledger" genesis_staking_ledger
+      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
+        ~ledger_name_prefix:"epoch_ledger" genesis_staking_ledger
     in
     let%map genesis_next_epoch_ledger_config =
-      generate_tar_and_config ~get_directory ~get_root_hash ~close_root ~logger
-        ~target_dir ~ledger_name_prefix:"epoch_ledger" genesis_next_epoch_ledger
+      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
+        ~ledger_name_prefix:"epoch_ledger" genesis_next_epoch_ledger
     in
     ( genesis_ledger_config
     , genesis_staking_ledger_config
@@ -2993,9 +3007,8 @@ module Hardfork_config = struct
     let genesis_dir = config_dir ^/ "genesis" in
     let%bind genesis_config =
       generate_tars_and_configs ~get_directory:Ledger.Db.get_directory
-        ~get_root_hash:Ledger.Db.merkle_root ~close_root:Ledger.Db.close ~logger
-        ~target_dir:genesis_dir genesis_ledger genesis_staking_ledger
-        genesis_next_epoch_ledger
+        ~get_root_hash:Ledger.Db.merkle_root ~logger ~target_dir:genesis_dir
+        genesis_ledger genesis_staking_ledger genesis_next_epoch_ledger
     in
     write_config_file
       ~filename:(config_dir ^/ "daemon.json")
@@ -3014,9 +3027,9 @@ module Hardfork_config = struct
     let genesis_dir = config_dir ^/ "genesis" in
     let%bind genesis_config =
       generate_tars_and_configs ~get_directory:Ledger.Hardfork_db.get_directory
-        ~get_root_hash:Ledger.Hardfork_db.merkle_root
-        ~close_root:Ledger.Hardfork_db.close ~logger ~target_dir:genesis_dir
-        genesis_ledger genesis_staking_ledger genesis_next_epoch_ledger
+        ~get_root_hash:Ledger.Hardfork_db.merkle_root ~logger
+        ~target_dir:genesis_dir genesis_ledger genesis_staking_ledger
+        genesis_next_epoch_ledger
     in
     write_config_file
       ~filename:(config_dir ^/ "daemon.json")
@@ -3061,6 +3074,11 @@ module Hardfork_config = struct
         , genesis_next_epoch_ledger_data ) =
       copy_genesis_roots_and_diffs ~source_ledgers build_dir
     in
+    with_root_close
+      ( fst genesis_ledger_data
+      , fst genesis_staking_ledger_data
+      , fst genesis_next_epoch_ledger_data )
+    @@ fun () ->
     let%bind.Deferred genesis_ledger_legacy, genesis_ledger_migrated =
       migrate_and_apply genesis_ledger_data
     in
