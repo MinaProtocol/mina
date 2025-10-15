@@ -741,7 +741,6 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     module Location = Location
     module Location_binable = Location_binable
     module Kvdb = In_memory_kvdb
-    module Storage_locations = Storage_locations
   end
 
   (* underlying Merkle tree *)
