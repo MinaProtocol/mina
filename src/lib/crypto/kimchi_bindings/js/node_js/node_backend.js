@@ -28,6 +28,7 @@ override('caml_pasta_fq_poseidon_block_cipher');
 override('prover_to_json');
 override('prover_index_fp_from_bytes');
 override('prover_index_fq_from_bytes'); 
+
 override('prover_index_fp_to_bytes');
 override('prover_index_fq_to_bytes');
 override('caml_pasta_fp_plonk_index_max_degree');
@@ -40,3 +41,9 @@ override('caml_pasta_fp_plonk_index_domain_d4_size');
 override('caml_pasta_fq_plonk_index_domain_d4_size');
 override('caml_pasta_fp_plonk_index_domain_d8_size');
 override('caml_pasta_fq_plonk_index_domain_d8_size');
+override('caml_pasta_fp_plonk_index_create');
+override('caml_pasta_fq_plonk_index_create');
+override('caml_pasta_fp_plonk_gate_vector_from_bytes');
+override('caml_pasta_fq_plonk_gate_vector_from_bytes');
+override('caml_fp_srs_from_bytes');
+override('caml_fq_srs_from_bytes');
