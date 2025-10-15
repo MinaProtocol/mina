@@ -167,8 +167,8 @@ fi
 if [[ -n "${COMPATIBILITY_BRANCH:-}" ]]; then
         echo "Running compatibility test with branch: $COMPATIBILITY_BRANCH"
 
-        upgrade_script_path="/etc/mina/archive/upgrade-to-mesa.sql"
-        rollback_script_path="/etc/mina/archive/downgrade-to-berkeley.sql"
+        upgrade_script_path="/etc/mina/archive/upgrade_to_mesa.sql"
+        rollback_script_path="/etc/mina/archive/downgrade_to_berkeley.sql"
 
         # Get initial block count
         initial_blocks=$(docker exec $container_id bash -c "psql $DB_CONN_STR -t -c 'SELECT COUNT(*) FROM blocks;'" | tr -d ' ')

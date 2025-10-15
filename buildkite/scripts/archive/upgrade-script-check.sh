@@ -137,8 +137,8 @@ main() {
     )
 
     local scripts=(
-        "src/app/archive/upgrade-to-mesa.sql"
-        "src/app/archive/downgrade-to-berkeley.sql"
+        "src/app/archive/upgrade_to_mesa.sql"
+        "src/app/archive/downgrade_to_berkeley.sql"
     )
 
     # Check if either monitored file has changes
