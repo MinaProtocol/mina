@@ -66,7 +66,7 @@ fi
 
 if [[ ! -L compatible-devnet ]]; then
   if [[ $# == 0 ]]; then
-    compatible_build=$(mktemp -d)
+    compatible_build=$(mktemp --tmpdir -d mina-compatible-worktree.XXXXXXXXXX)
     git fetch origin compatible
     git worktree add "$compatible_build" origin/compatible
     cd "$compatible_build"
