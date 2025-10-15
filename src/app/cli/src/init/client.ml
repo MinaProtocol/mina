@@ -2293,7 +2293,10 @@ let generate_hardfork_config =
   let open Command.Param in
   let hardfork_config_dir_flag =
     flag "--hardfork-config-dir"
-      ~doc:"DIR Directory to generate hardfork configuration" (required string)
+      ~doc:
+        "DIR Directory to generate hardfork configuration, relative to the \
+         daemon working directory"
+      (required string)
   in
   Command.async ~summary:"Generate reference hardfork configuration"
     (Cli_lib.Background_daemon.rpc_init hardfork_config_dir_flag
