@@ -29,10 +29,6 @@ module Ledger_inner = struct
   module Kvdb : Intf.Key_value_database with type config := string =
     Rocksdb.Database
 
-  module Storage_locations : Intf.Storage_locations = struct
-    let key_value_db_dir = "mina_key_value_db"
-  end
-
   module Hash = struct
     module Arg = struct
       type t = Ledger_hash.Stable.Latest.t
@@ -183,7 +179,6 @@ module Ledger_inner = struct
     module Kvdb = Kvdb
     module Location = Location_at_depth
     module Location_binable = Location_binable
-    module Storage_locations = Storage_locations
   end
 
   module type Account_Db =

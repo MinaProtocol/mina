@@ -40,7 +40,6 @@ module Inputs = struct
   module Location = Location
   module Location_binable = Location_binable
   module Kvdb = In_memory_kvdb
-  module Storage_locations = Storage_locations
 end
 
 module DB = Database.Make (Inputs)

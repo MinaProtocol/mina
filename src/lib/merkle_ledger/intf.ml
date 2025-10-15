@@ -205,10 +205,6 @@ module type Key_value_database = sig
     -> 'b
 end
 
-module type Storage_locations = sig
-  val key_value_db_dir : string
-end
-
 module type SYNCABLE = sig
   type root_hash
 
@@ -269,8 +265,6 @@ module Inputs = struct
     module Location_binable : Hashable.S_binable with type t := Location.t
 
     module Kvdb : Key_value_database with type config := string
-
-    module Storage_locations : Storage_locations
   end
 end
 
