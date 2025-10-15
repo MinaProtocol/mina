@@ -67,7 +67,8 @@ fi
 if [[ ! -L compatible-devnet ]]; then
   if [[ $# == 0 ]]; then
     compatible_build=$(mktemp -d)
-    git clone -b compatible --single-branch "https://github.com/MinaProtocol/mina.git" "$compatible_build"
+    git fetch origin compatible
+    git worktree add "$compatible_build" origin/compatible
     cd "$compatible_build"
   else
     git checkout -f $1
