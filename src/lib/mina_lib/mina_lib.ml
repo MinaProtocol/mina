@@ -2923,7 +2923,10 @@ module Hardfork_config = struct
       ~target_dir ~ledger_name_prefix root =
     let open Deferred.Or_error.Let_syntax in
     let root_hash = get_root_hash root in
-    let ledger_dirname = get_directory root |> Option.value_exn in
+    let ledger_dirname =
+      get_directory root
+      |> Option.value_exn ~message:"Root ledger must have a directory"
+    in
     let%bind tar_path =
       Genesis_ledger_helper.Ledger.generate_tar ~logger ~target_dir
         ~ledger_name_prefix ~root_hash ~ledger_dirname ()
