@@ -77,7 +77,7 @@ if [[ ! -L compatible-devnet ]]; then
     compatible_build="$INIT_DIR"
   fi
   git submodule sync --recursive
-  git submodule update --init --recursive
+  git submodule update --init --recursive --depth 1
   nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet" --out-link "$INIT_DIR/compatible-devnet"
   nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet.genesis" --out-link "$INIT_DIR/compatible-devnet"
   if [[ $# == 0 ]]; then
@@ -90,7 +90,7 @@ if [[ $# -gt 0 ]]; then
   # Branch is specified, this is a CI run
   git checkout -f $1
   git submodule sync --recursive
-  git submodule update --init --recursive
+  git submodule update --init --recursive --depth 1
 fi
 nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
 nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
