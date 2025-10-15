@@ -1704,34 +1704,34 @@ let snark_hashes =
       fun () -> if json then Core.printf "[]\n%!"]
 
 let internal_commands logger ~itn_features =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   [ ( Snark_worker.Intf.command_name
     , Snark_worker.command ~proof_level:Genesis_constants.Compiled.proof_level
         ~constraint_constants:Genesis_constants.Compiled.constraint_constants
-        ~commit_id:Mina_version.commit_id ~signature_kind )
+        ~commit_id:Mina_version.commit_id )
   ; ("snark-hashes", snark_hashes)
   ; ( "run-prover"
     , Command.async
         ~summary:"Run prover on a sexp provided on a single line of stdin"
-        (Command.Param.return (fun () ->
-             let logger = Logger.create () in
-             let constraint_constants =
-               Genesis_constants.Compiled.constraint_constants
-             in
-             let proof_level = Genesis_constants.Compiled.proof_level in
-             Parallel.init_master () ;
-             match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
-             | `Ok sexp ->
-                 let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
-                 [%log info] "Prover state being logged to %s" conf_dir ;
-                 let%bind prover =
-                   Prover.create ~commit_id:Mina_version.commit_id ~logger
-                     ~proof_level ~constraint_constants
-                     ~pids:(Pid.Table.create ()) ~conf_dir ~signature_kind ()
-                 in
-                 Prover.prove_from_input_sexp prover sexp >>| ignore
-             | `Eof ->
-                 failwith "early EOF while reading sexp" ) ) )
+        (let%map_open.Command signature_kind = Cli_lib.Flag.signature_kind in
+         fun () ->
+           let logger = Logger.create () in
+           let constraint_constants =
+             Genesis_constants.Compiled.constraint_constants
+           in
+           let proof_level = Genesis_constants.Compiled.proof_level in
+           Parallel.init_master () ;
+           match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
+           | `Ok sexp ->
+               let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
+               [%log info] "Prover state being logged to %s" conf_dir ;
+               let%bind prover =
+                 Prover.create ~commit_id:Mina_version.commit_id ~logger
+                   ~proof_level ~constraint_constants
+                   ~pids:(Pid.Table.create ()) ~conf_dir ~signature_kind ()
+               in
+               Prover.prove_from_input_sexp prover sexp >>| ignore
+           | `Eof ->
+               failwith "early EOF while reading sexp" ) )
   ; ( "run-snark-worker-single"
     , Command.async
         ~summary:"Run snark-worker on a sexp provided on a single line of stdin"
@@ -1739,7 +1739,7 @@ let internal_commands logger ~itn_features =
         let%map_open filename =
           flag "--file" (required string)
             ~doc:"File containing the s-expression of the snark work to execute"
-        in
+        and signature_kind = Cli_lib.Flag.signature_kind in
         fun () ->
           let open Deferred.Let_syntax in
           let logger = Logger.create () in
@@ -1956,7 +1956,7 @@ let internal_commands logger ~itn_features =
               "DIR Directory that contains the genesis ledger and the genesis \
                blockchain proof (default: <config-dir>)"
             (optional string)
-        in
+        and signature_kind = Cli_lib.Flag.signature_kind in
         fun () ->
           let open Deferred.Let_syntax in
           Parallel.init_master () ;

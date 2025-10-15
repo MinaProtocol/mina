@@ -365,7 +365,7 @@
         "narHash": "sha256-JEeAGWyzlWbUoYwav7mpFY/aYuZ/qay7xirnp+2pWGs=",
         "owner": "o1-labs",
         "repo": "opam-repository",
-        "rev": "677657206d9da47987a4eff8087c1f3a258908f3",
+        "rev": "cabde639f92d259d4c131b00200d7a53d854ee74",
         "type": "github"
       },
       "original": {

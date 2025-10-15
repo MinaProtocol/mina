@@ -166,7 +166,7 @@ let main ~logger ~proof_level ~constraint_constants ~signature_kind
   go ()
 
 let command_from_rpcs ~commit_id ~proof_level:default_proof_level
-    ~constraint_constants ~signature_kind =
+    ~constraint_constants =
   Command.async ~summary:"Snark worker"
     (let open Command.Let_syntax in
     let%map_open daemon_port =
@@ -187,6 +187,7 @@ let command_from_rpcs ~commit_id ~proof_level:default_proof_level
     and file_log_level = Cli_lib.Flag.Log.file_log_level
     and conf_dir = Cli_lib.Flag.conf_dir in
     fun () ->
+      let signature_kind = Mina_signature_kind.t_DEPRECATED in
       let logger =
         Logger.create () ~metadata:[ ("process", `String "Snark Worker") ]
       in

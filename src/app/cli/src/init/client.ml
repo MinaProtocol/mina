@@ -950,23 +950,24 @@ let currency_in_ledger =
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
-    (Command.Param.return (fun () ->
-         let signature_kind = Mina_signature_kind.t_DEPRECATED in
-         let constraint_constants =
-           Genesis_constants.Compiled.constraint_constants
-         in
-         let proof_level = Genesis_constants.Compiled.proof_level in
-         let all =
-           Transaction_snark.constraint_system_digests ~signature_kind
-             ~constraint_constants ()
-           @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ~proof_level ~constraint_constants ()
-         in
-         let all =
-           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
-         in
-         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
-         Deferred.unit ) )
+    (let open Command.Let_syntax in
+    let%map signature_kind = Cli_lib.Flag.signature_kind in
+    fun () ->
+      let constraint_constants =
+        Genesis_constants.Compiled.constraint_constants
+      in
+      let proof_level = Genesis_constants.Compiled.proof_level in
+      let all =
+        Transaction_snark.constraint_system_digests ~signature_kind
+          ~constraint_constants ()
+        @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+            ~proof_level ~constraint_constants ()
+      in
+      let all =
+        List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
+      in
+      List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+      Deferred.unit)
 
 let snark_job_list =
   let open Deferred.Let_syntax in
@@ -2146,8 +2147,7 @@ let receipt_chain_hash =
          ~doc:
            "NN For a zkApp, 0 for fee payer or 1-based index of account update"
          (optional string)
-     in
-     let signature_kind = Mina_signature_kind.t_DEPRECATED in
+     and signature_kind = Cli_lib.Flag.signature_kind in
      fun () ->
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash

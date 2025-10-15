@@ -8,6 +8,8 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let PipelineScope = ../../Pipeline/Scope.dhall
 
+let PipelineTag = ../../Pipeline/Tag.dhall
+
 in  Pipeline.build
       ( ArtifactPipelines.pipeline
           ArtifactPipelines.MinaBuildSpec::{
@@ -24,5 +26,14 @@ in  Pipeline.build
           , scope =
             [ PipelineScope.Type.MainlineNightly, PipelineScope.Type.Release ]
           , debVersion = DebianVersions.DebVersion.Focal
+          , tags =
+            [ PipelineTag.Type.Long
+            , PipelineTag.Type.Release
+            , PipelineTag.Type.Docker
+            , PipelineTag.Type.Rosetta
+            , PipelineTag.Type.Devnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Focal
+            ]
           }
       )
