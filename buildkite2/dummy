@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+cat <<'EOF' | buildkite-agent pipeline upload
+steps:
+  - label: "Echo 1"
+    command: "echo 1"
+EOF
