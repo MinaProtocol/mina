@@ -4,6 +4,8 @@ module Citools
   module Utils
     # Utils for downloading
     module Download
+      module_function
+
       def http(url, dest_path)
         uri = URI(url)
 

@@ -4,7 +4,9 @@ module Citools
   module Utils
     # Simple example helper
     module Helper
-      def self.greet(name)
+      module_function
+
+      def greet(name)
         "Hello, #{name}!"
       end
     end

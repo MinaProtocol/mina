@@ -1,8 +1,20 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "citools/utils/download"
+require "bundler/setup"
+
 require "citools/utils/extract"
+require "citools/utils/download"
+
+require "base64"
+require "net/http"
+require "openssl"
+require "rexml/document"
+require "rubygems/package"
+require "tmpdir"
+require "uri"
+require "zlib"
+require "rocksdb-ffi"
 
 target_version = "10.5.1"
 

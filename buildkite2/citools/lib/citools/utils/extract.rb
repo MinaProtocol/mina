@@ -4,6 +4,8 @@ module Citools
   module Utils
     # Utils extracting zips
     module Extract
+      module_function
+
       def tar_gz(tar_path, target_dir)
         Zlib::GzipReader.open(tar_path) do |gz|
           Gem::Package::TarReader.new(gz) do |tar|
