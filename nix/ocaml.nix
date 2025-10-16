@@ -66,10 +66,9 @@ let
       };
 
       rocksdb_stubs =
-        # TODO uncomment after updating rocksdb_stubs to 10.5.1
-        # assert (super.rocksdb_stubs.version == pkgs.rocksdb-mina.version)
-        #   || builtins.throw
-        #   "rocksdb_stubs version (${super.rocksdb_stubs.version}) does not match rocksdb-mina version (${pkgs.rocksdb-mina.version})";
+        assert (super.rocksdb_stubs.version == pkgs.rocksdb-mina.version)
+          || builtins.throw
+          "rocksdb_stubs version (${super.rocksdb_stubs.version}) does not match rocksdb-mina version (${pkgs.rocksdb-mina.version})";
         super.rocksdb_stubs.overrideAttrs {
           MINA_ROCKSDB = "${pkgs.rocksdb-mina}/lib/librocksdb.a";
         };
