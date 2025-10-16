@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "citools/utils/download"
+require "citools/utils/extract"
+
+target_version = "10.5.1"
+
+Citools::Utils::Download.http("https://github.com/facebook/rocksdb/archive/refs/tags/v#{target_version}.tar.gz",
+                              "/tmp/rocksdb.tar.gz")
+
+Citools::Utils::Extract.tar_gz("/tmp/rocksdb.tar.gz", "/tmp/rocksdb")
+
+workdir = "/tmp/rocksdb/rocksdb-#{target_version}"
+
+build_and_install_rocksdb_cmd = 'LIB_MODE=shared EXTRA_CXXFLAGS="-Wno-unused-parameter" make -j$(nproc) install'
+
+Dir.chdir(workdir) do
+  status = nil
+  Open3.popen2e(build_and_install_rocksdb_cmd) do |_, stdout_err, wait_thr|
+    stdout_err.each { |line| puts line }
+    status = wait_thr.value
+  end
+
+  abort "Command failed with exit code #{status.exitstatus}" unless status.success?
+end
