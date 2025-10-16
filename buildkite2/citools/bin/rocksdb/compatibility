@@ -1,20 +1,12 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# 1. Install RocksDB
+
 require "bundler/setup"
 
 require "citools/utils/extract"
 require "citools/utils/download"
-
-require "base64"
-require "net/http"
-require "openssl"
-require "rexml/document"
-require "rubygems/package"
-require "tmpdir"
-require "uri"
-require "zlib"
-require "rocksdb-ffi"
 
 target_version = "10.5.1"
 
@@ -35,4 +27,86 @@ Dir.chdir(workdir) do
   end
 
   abort "Command failed with exit code #{status.exitstatus}" unless status.success?
+end
+
+# 1. Run the test
+
+require "base64"
+require "net/http"
+require "openssl"
+require "rexml/document"
+require "rubygems/package"
+require "tmpdir"
+require "uri"
+require "zlib"
+require "rocksdb-ffi"
+
+# Public S3 bucket URL
+url = "https://snark-keys.o1test.net.s3.amazonaws.com/"
+uri = URI(url)
+
+# Match keys starting with "genesis_ledger" or "epoch_ledger" and ending with ".tar.gz"
+pattern = /\A(genesis_ledger|epoch_ledger)_.*\.tar\.gz\z/
+
+# Fetch all ledger tar files' name
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+# TODO: figure out how to enable SSL verification
+http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+
+request = Net::HTTP::Get.new(uri)
+response = http.request(request)
+
+tar_keys = []
+
+unless response.is_a?(Net::HTTPSuccess)
+  warn "Error: #{response.code} #{response.message}"
+  exit 1
+end
+
+xml = REXML::Document.new(response.body)
+xml.elements.each("ListBucketResult/Contents/Key") do |key_element|
+  key = key_element.text
+  tar_keys << key if key =~ pattern
+end
+
+if tar_keys.empty?
+  warn "No ledger tar files found."
+  exit 1
+end
+
+tar_keys.sample(5).each do |tar_key|
+  tar_uri = "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/#{tar_key}"
+
+  puts "Testing RocksDB compatibility on #{tar_uri}"
+
+  # Dir.mktmpdir do |dir|
+  dir = Dir.mktmpdir
+  tar_path = File.join(dir, File.basename(tar_key))
+
+  puts "  Downloading to #{tar_path}..."
+  Citools::Utils::Download.http(tar_uri, tar_path)
+
+  db_path = File.join(dir, "extracted")
+  puts "  Extracting to #{db_path}..."
+  FileUtils.mkdir_p(db_path)
+  Citools::Utils::Extract.tar_gz(tar_path, db_path)
+
+  puts "  Testing extracted RocksDB at #{db_path}"
+
+  begin
+    db = RocksDB.open(db_path)
+
+    count = 0
+    db.each do |key, value|
+      puts "    Encounter a kv-pair #{Base64.strict_encode64(key)} => #{Base64.strict_encode64(value)}"
+      count += 1
+      break if count >= 5
+    end
+
+    db.close
+  rescue StandardError => e
+    warn "  Failed to open RocksDB at #{db_path}: #{e.class}: #{e.message}"
+    exit 1
+  end
 end
