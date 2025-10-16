@@ -5,6 +5,13 @@
 
 require "bundler/setup"
 
+require "base64"
+require "net/http"
+require "openssl"
+require "rexml/document"
+require "tmpdir"
+require "uri"
+
 require "citools/utils/extract"
 require "citools/utils/download"
 
@@ -31,13 +38,7 @@ end
 
 # 1. Run the test
 
-require "base64"
-require "net/http"
-require "openssl"
-require "rexml/document"
-require "tmpdir"
-require "uri"
-require "rocksdb-ffi"
+autoload :RocksDB, "rocksdb-ffi"
 
 # Public S3 bucket URL
 url = "https://snark-keys.o1test.net.s3.amazonaws.com/"
