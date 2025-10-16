@@ -7,6 +7,7 @@ require "bundler/setup"
 
 require "base64"
 require "net/http"
+require "open3"
 require "openssl"
 require "rexml/document"
 require "tmpdir"
