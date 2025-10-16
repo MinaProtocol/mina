@@ -39,6 +39,7 @@ end
 
 # 1. Run the test
 
+# This is lazily loaded because we just installed RocksDB shared library above
 autoload :RocksDB, "rocksdb-ffi"
 
 # Public S3 bucket URL

@@ -20,6 +20,7 @@ module Citools
                 FileUtils.mkdir_p(File.dirname(dest))
                 File.write(dest, entry.read, mode: "wb")
               end
+              FileUtils.chmod(entry.header.mode, dest)
             end
           end
         end
