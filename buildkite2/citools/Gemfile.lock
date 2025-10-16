@@ -7,9 +7,12 @@ GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.3)
+    base64 (0.3.0)
     date (3.4.1)
     diff-lcs (1.6.2)
     erb (5.1.1)
+    ffi (1.17.2)
+    ffi (1.17.2-x86_64-linux-gnu)
     io-console (0.8.1)
     irb (1.15.2)
       pp (>= 0.6.0)
@@ -39,6 +42,9 @@ GEM
     regexp_parser (2.11.3)
     reline (0.6.2)
       io-console (~> 0.5)
+    rexml (3.4.4)
+    rocksdb-ffi (0.2.1)
+      ffi
     rspec (3.13.1)
       rspec-core (~> 3.13.0)
       rspec-expectations (~> 3.13.0)
@@ -78,9 +84,12 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  base64 (~> 0.3)
   citools!
   irb
   rake (~> 13.0)
+  rexml (~> 3.4)
+  rocksdb-ffi (~> 0.2)
   rspec (~> 3.0)
   rubocop (~> 1.21)
 

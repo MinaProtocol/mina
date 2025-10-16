@@ -12,7 +12,9 @@ gem "rspec", "~> 3.0"
 
 gem "rubocop", "~> 1.21"
 
-gem "base64", "~> 0.3.0"
+gem "base64", "~> 0.3"
 
 # Needed for RocksDB compatibility test
-gem "rocksdb-ffi", "~> 0.2.1"
+gem "rocksdb-ffi", "~> 0.2"
+
+gem "rexml", "~> 3.4"
