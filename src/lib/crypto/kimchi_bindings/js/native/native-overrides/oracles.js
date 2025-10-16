@@ -5,7 +5,7 @@
 // Requires: plonk_wasm, tsRustConversionNative
 function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
 
-    console.log("overriding the old wasm caml_pasta_fq_poseidon_block_cipher, now using the native one")
+  //console.log("overriding the old wasm caml_pasta_fq_poseidon_block_cipher, now using the native one")
 
   // 1. get permuted field vector from rust
   var wasm_flat_vector = plonk_wasm.caml_pasta_fq_poseidon_block_cipher(
@@ -23,7 +23,7 @@ function caml_pasta_fq_poseidon_block_cipher(_fake_params, fq_vector) {
 // Requires: plonk_wasm, tsRustConversionNative
 function caml_pasta_fp_poseidon_block_cipher(_fake_params, fp_vector) {
 
-    console.log("overriding the old wasm caml_pasta_fp_poseidon_block_cipher, now using the native one")
+  //console.log("overriding the old wasm caml_pasta_fp_poseidon_block_cipher, now using the native one")
 
 
   // 1. get permuted field vector from rust

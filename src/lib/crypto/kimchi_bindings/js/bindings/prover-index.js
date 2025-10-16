@@ -2,6 +2,7 @@
     free_on_finalize, caml_jsstring_of_string
  */
 
+/*
 // Provides: caml_pasta_fq_plonk_circuit_serialize
 // Requires: plonk_wasm, caml_string_of_jsstring
 var caml_pasta_fq_plonk_circuit_serialize = function (
@@ -15,6 +16,7 @@ var caml_pasta_fq_plonk_circuit_serialize = function (
     )
   );
 };
+*/
 
 // Provides: caml_pasta_fp_plonk_index_create
 // Requires: plonk_wasm, free_on_finalize, tsRustConversion

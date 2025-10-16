@@ -3,12 +3,15 @@
     free_on_finalize, tsRustConversion, caml_bytes_of_uint8array
 */
 
+/*
 // Provides: caml_pasta_fp_plonk_gate_vector_create
 // Requires: plonk_wasm, free_on_finalize
 var caml_pasta_fp_plonk_gate_vector_create = function () {
   return free_on_finalize(plonk_wasm.caml_pasta_fp_plonk_gate_vector_create());
 };
+*/
 
+/*
 // Provides: caml_pasta_fp_plonk_gate_vector_add
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_gate_vector_add = function (v, x) {
@@ -17,7 +20,9 @@ var caml_pasta_fp_plonk_gate_vector_add = function (v, x) {
     tsRustConversion.fp.gateToRust(x)
   );
 };
+*/
 
+/*
 // Provides: caml_pasta_fp_plonk_gate_vector_get
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_gate_vector_get = function (v, i) {
@@ -25,13 +30,17 @@ var caml_pasta_fp_plonk_gate_vector_get = function (v, i) {
     plonk_wasm.caml_pasta_fp_plonk_gate_vector_get(v, i)
   );
 };
+*/
 
+/*
 // Provides: caml_pasta_fp_plonk_gate_vector_len
 // Requires: plonk_wasm
 var caml_pasta_fp_plonk_gate_vector_len = function (v) {
   return plonk_wasm.caml_pasta_fp_plonk_gate_vector_len(v);
 };
+*/
 
+/*
 // Provides: caml_pasta_fp_plonk_gate_vector_wrap
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_gate_vector_wrap = function (v, x, y) {
@@ -41,7 +50,9 @@ var caml_pasta_fp_plonk_gate_vector_wrap = function (v, x, y) {
     tsRustConversion.wireToRust(y)
   );
 };
+*/
 
+/*
 // Provides: caml_pasta_fp_plonk_gate_vector_digest
 // Requires: plonk_wasm, caml_bytes_of_uint8array
 var caml_pasta_fp_plonk_gate_vector_digest = function (
@@ -54,7 +65,9 @@ var caml_pasta_fp_plonk_gate_vector_digest = function (
   );
   return caml_bytes_of_uint8array(uint8array);
 };
+*/
 
+/*
 // Provides: caml_pasta_fp_plonk_circuit_serialize
 // Requires: plonk_wasm, caml_string_of_jsstring
 var caml_pasta_fp_plonk_circuit_serialize = function (
@@ -68,13 +81,17 @@ var caml_pasta_fp_plonk_circuit_serialize = function (
     )
   );
 };
+*/
 
+/*
 // Provides: caml_pasta_fq_plonk_gate_vector_create
 // Requires: plonk_wasm, free_on_finalize
 var caml_pasta_fq_plonk_gate_vector_create = function () {
   return free_on_finalize(plonk_wasm.caml_pasta_fq_plonk_gate_vector_create());
 };
+*/
 
+/*
 // Provides: caml_pasta_fq_plonk_gate_vector_add
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_gate_vector_add = function (v, x) {
@@ -83,7 +100,9 @@ var caml_pasta_fq_plonk_gate_vector_add = function (v, x) {
     tsRustConversion.fq.gateToRust(x)
   );
 };
+*/
 
+/*
 // Provides: caml_pasta_fq_plonk_gate_vector_get
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_gate_vector_get = function (v, i) {
@@ -91,13 +110,17 @@ var caml_pasta_fq_plonk_gate_vector_get = function (v, i) {
     plonk_wasm.caml_pasta_fq_plonk_gate_vector_get(v, i)
   );
 };
+*/
 
+/*
 // Provides: caml_pasta_fq_plonk_gate_vector_len
 // Requires: plonk_wasm
 var caml_pasta_fq_plonk_gate_vector_len = function (v) {
   return plonk_wasm.caml_pasta_fq_plonk_gate_vector_len(v);
 };
+*/
 
+/*
 // Provides: caml_pasta_fq_plonk_gate_vector_wrap
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_gate_vector_wrap = function (v, x, y) {
@@ -107,7 +130,9 @@ var caml_pasta_fq_plonk_gate_vector_wrap = function (v, x, y) {
     tsRustConversion.wireToRust(y)
   );
 };
+*/
 
+/*
 // Provides: caml_pasta_fq_plonk_gate_vector_digest
 // Requires: plonk_wasm, caml_bytes_of_uint8array
 var caml_pasta_fq_plonk_gate_vector_digest = function (
@@ -120,3 +145,4 @@ var caml_pasta_fq_plonk_gate_vector_digest = function (
   );
   return caml_bytes_of_uint8array(uint8array);
 };
+*/

@@ -15,6 +15,7 @@
    bindings/util.js
    bindings/srs.js
    bindings/verifier-index.js
+   native/native-overrides/gate-vector.js
    native/native-overrides/oracles.js
    native/native-overrides/util.js
    ))

@@ -1,4 +1,4 @@
-/* global plonk_wasm, tsRustConversionNative, getTsBindings, tsBindings  */
+/* global plonk_wasm, tsRustConversionNative, getTsBindings, tsBindings */
 
 
 // Provides: tsRustConversionNative
