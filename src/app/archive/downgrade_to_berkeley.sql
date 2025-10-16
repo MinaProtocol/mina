@@ -1,240 +1,215 @@
 -- ============================================================================
--- Mina rollback: remove zkapp_states_nullable.element8..element31 + FKs
--- Idempotent, online-safe, and updates schema_version.status -> 'rolled_back'
+-- Mina rollback: from mesa to berkeley
+-- + remove zkapp_states.element31..element8 (int)
+-- + remove zkapp_states_nullable.element31..element8 (int)
+-- + record status in migration_history
 -- ============================================================================
 
+-- NOTE: When modifying this script, please keep TXNs small, and idempotent
+
+-- Fail fast
+\set ON_ERROR_STOP on
 -- Keep locks short; abort instead of blocking production traffic.
 SET lock_timeout = '10s';
 SET statement_timeout = '10min';
 
--- --- 0) Ensure version table exists & has desired columns --------------------
-CREATE TABLE IF NOT EXISTS public.schema_version (
-    version      text PRIMARY KEY,
-    description  text,
-    applied_at   timestamptz NOT NULL DEFAULT now()
+-- See "src/lib/node_config/version/node_config_version.ml" for protocol version
+SET archive.current_protocol_version = '4.0.0';
+-- Post-HF protocol version. This one corresponds to Mesa, specifically
+SET archive.target_protocol_version = '3.0.0';
+-- The version of this script. If you modify the script, please bump the version
+SET archive.migration_version = '0.0.3';
+
+-- TODO: put below in a common script
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'migration_status') THEN
+        CREATE TYPE migration_status AS ENUM ('starting', 'applied', 'failed');
+    END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION set_migration_status(p_target_status migration_status)
+RETURNS VOID AS $$
+DECLARE
+    target_protocol_version  text := current_setting('archive.target_protocol_version');
+    target_migration_version text := current_setting('archive.migration_version');
+BEGIN
+    UPDATE migration_history mh
+    SET status = p_target_status
+    FROM (
+        SELECT commit_start_at
+        FROM migration_history
+        WHERE protocol_version = target_protocol_version
+          AND migration_version = target_migration_version
+        ORDER BY commit_start_at DESC
+        LIMIT 1
+    ) latest
+    WHERE mh.commit_start_at = latest.commit_start_at;
+END
+$$ LANGUAGE plpgsql STRICT;
+
+-- 1. Ensure version table exists & has desired columns
+CREATE TABLE IF NOT EXISTS migration_history (
+    commit_start_at   timestamptz NOT NULL DEFAULT now() PRIMARY KEY,
+    protocol_version  text NOT NULL,
+    migration_version text NOT NULL,
+    description       text NOT NULL,
+    status            migration_status NOT NULL
 );
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-         WHERE table_schema='public' AND table_name='schema_version'
-             AND column_name='status'
-    ) THEN
-        ALTER TABLE public.schema_version
-            ADD COLUMN status text;
-    END IF;
+-- TODO: put above in a common script
 
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-         WHERE table_schema='public' AND table_name='schema_version'
-             AND column_name='validated_at'
-    ) THEN
-        ALTER TABLE public.schema_version
-            ADD COLUMN validated_at timestamptz;
+-- Upsert a row for this migration
+DO $$
+DECLARE 
+    target_protocol_version    text := current_setting('archive.target_protocol_version');
+    current_protocol_version    text := current_setting('archive.current_protocol_version');
+    target_migration_version   text := current_setting('archive.migration_version');
+    latest_protocol_version    text;
+    latest_migration_version   text;
+    latest_migration_status    migration_status;
+BEGIN
+    -- Try to fetch the existing migration row
+    SELECT  
+        protocol_version, 
+        migration_version,
+        status
+    INTO latest_protocol_version, latest_migration_version, latest_migration_status
+    FROM migration_history
+    ORDER BY commit_start_at DESC
+    LIMIT 1;
+
+    -- HACK: We don't have a record in migration history in Berkeley, hence 
+    -- setting to 3.0.0 if it's not present. 
+    latest_protocol_version := COALESCE(latest_protocol_version, '3.0.0'); 
+
+    IF latest_protocol_version = current_protocol_version THEN
+        INSERT INTO migration_history(
+            protocol_version, migration_version, description, status
+        ) VALUES (
+            target_protocol_version,
+            target_migration_version,
+            'Rollback from Mesa to Berkeley.',
+            'starting'::migration_status
+        );
+    ELSIF 
+        latest_protocol_version = target_protocol_version AND 
+        latest_migration_version = target_migration_version
+    THEN 
+        RAISE NOTICE 
+          'Previous migration in failed/progress/completed, reapplying';
+    ELSE 
+        RAISE EXCEPTION 
+          'Could not apply Migration to current protocol & migration version: (%, %)', 
+          latest_protocol_version,
+          latest_migration_version;
     END IF;
 END$$;
 
--- Ensure a row for this version exists (so we can mark rolled_back)
-DO $$
-DECLARE v text := '3.2.0';
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM public.schema_version WHERE version = v) THEN
-        INSERT INTO public.schema_version(version, description, status)
-        VALUES (v, 'Rollback placeholder for elements 8..31 + FKs', 'starting');
-    END IF;
-END$$;
-
--- --- 1) Pre-check: will rollback drop data? ---------------------------------
--- By default we abort if any new columns contain data.
--- To force a destructive rollback, run in this session first:
---   SET mina.allow_destructive_rollback = on;
-DO $$
+CREATE OR REPLACE FUNCTION try_remove_zkapp_states_nullable_element(p_element_num INT)
+RETURNS VOID AS $$
 DECLARE
-    non_null_rows bigint;
-    allow_rollback boolean := lower(coalesce(current_setting('mina.allow_destructive_rollback', true),'off')) IN ('on','true','1');
+    col_name TEXT := 'element' || p_element_num;
 BEGIN
-    SELECT count(*) INTO non_null_rows
-    FROM public.zkapp_states_nullable
-    WHERE
-        element8  IS NOT NULL OR element9  IS NOT NULL OR element10 IS NOT NULL OR element11 IS NOT NULL OR
-        element12 IS NOT NULL OR element13 IS NOT NULL OR element14 IS NOT NULL OR element15 IS NOT NULL OR
-        element16 IS NOT NULL OR element17 IS NOT NULL OR element18 IS NOT NULL OR element19 IS NOT NULL OR
-        element20 IS NOT NULL OR element21 IS NOT NULL OR element22 IS NOT NULL OR element23 IS NOT NULL OR
-        element24 IS NOT NULL OR element25 IS NOT NULL OR element26 IS NOT NULL OR element27 IS NOT NULL OR
-        element28 IS NOT NULL OR element29 IS NOT NULL OR element30 IS NOT NULL OR element31 IS NOT NULL;
 
-    IF non_null_rows > 0 AND NOT allow_rollback THEN
-        RAISE EXCEPTION
-            'Rollback would drop data: % row(s) have non-NULL in element8..element31. Set mina.allow_destructive_rollback=on to force.',
-            non_null_rows
-            USING HINT = 'Run: SET mina.allow_destructive_rollback = on; then re-run.';
-    ELSE
-        RAISE NOTICE 'Rollback pre-check: % non-NULL row(s) across element8..element31. Proceeding (forced=%).',
-                                 non_null_rows, allow_rollback;
-    END IF;
-END$$;
+    RAISE DEBUG 'Trying to removing column % for zkapp_states_nullable', col_name;
 
--- --- 2) Drop FKs (reverse order), if present --------------------------------
-DO $$
+    EXECUTE format(
+        'ALTER TABLE zkapp_states_nullable DROP COLUMN IF EXISTS %I',
+        col_name
+    );
+
+    RAISE DEBUG 'Ensured column % for zkapp_states_nullable not existent', col_name;
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred: %', SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+-- 2. `zkapp_states`: Remove columns element31..element8
+
+CREATE OR REPLACE FUNCTION try_remove_zkapp_states_element(p_element_num INT)
+RETURNS VOID AS $$
 DECLARE
-    fk_record RECORD;
-    drop_count int := 0;
-    error_count int := 0;
+    col_name TEXT := 'element' || p_element_num;
 BEGIN
-    RAISE NOTICE 'DEBUG: Starting FK removal process...';
-    
-    -- Get all FK constraints for elements 8-31 in reverse order
-    FOR fk_record IN
-        SELECT conname
-        FROM pg_constraint
-        WHERE conrelid = 'public.zkapp_states_nullable'::regclass
-          AND contype = 'f'
-          AND conname LIKE 'zkapp_states_nullable_element%_fk'
-          AND substring(conname FROM 'element(\d+)_fk')::int BETWEEN 8 AND 31
-        ORDER BY conname DESC
-    LOOP
-        RAISE NOTICE 'DEBUG: Found FK constraint %, attempting to drop...', fk_record.conname;
-        BEGIN
-            EXECUTE format('ALTER TABLE public.zkapp_states_nullable DROP CONSTRAINT %I', fk_record.conname);
-            RAISE NOTICE 'DEBUG: Successfully dropped constraint %', fk_record.conname;
-            drop_count := drop_count + 1;
-        EXCEPTION
-            WHEN lock_not_available THEN
-                RAISE NOTICE 'DEBUG: Could not drop %, lock timeout; will remain for now. Re-run later.', fk_record.conname;
-                error_count := error_count + 1;
-            WHEN OTHERS THEN
-                RAISE NOTICE 'DEBUG: Error dropping constraint %: % %', fk_record.conname, SQLSTATE, SQLERRM;
-                error_count := error_count + 1;
-        END;
-    END LOOP;
-    
-    RAISE NOTICE 'DEBUG: FK removal process completed. Dropped: %, Errors: %', drop_count, error_count;
-END$$;
 
--- --- 3) Drop columns (reverse order), if present ----------------------------
+    RAISE DEBUG 'Trying to removing column % for zkapp_states', col_name;
+
+    EXECUTE format(
+        'ALTER TABLE zkapp_states DROP COLUMN IF EXISTS %I',
+        col_name
+    );
+
+    RAISE DEBUG 'Ensured column % for zkapp_states not existent', col_name;
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred: %', SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+SELECT try_remove_zkapp_states_element(31);
+SELECT try_remove_zkapp_states_element(30);
+SELECT try_remove_zkapp_states_element(29);
+SELECT try_remove_zkapp_states_element(28);
+SELECT try_remove_zkapp_states_element(27);
+SELECT try_remove_zkapp_states_element(26);
+SELECT try_remove_zkapp_states_element(25);
+SELECT try_remove_zkapp_states_element(24);
+SELECT try_remove_zkapp_states_element(23);
+SELECT try_remove_zkapp_states_element(22);
+SELECT try_remove_zkapp_states_element(21);
+SELECT try_remove_zkapp_states_element(20);
+SELECT try_remove_zkapp_states_element(19);
+SELECT try_remove_zkapp_states_element(18);
+SELECT try_remove_zkapp_states_element(17);
+SELECT try_remove_zkapp_states_element(16);
+SELECT try_remove_zkapp_states_element(15);
+SELECT try_remove_zkapp_states_element(14);
+SELECT try_remove_zkapp_states_element(13);
+SELECT try_remove_zkapp_states_element(12);
+SELECT try_remove_zkapp_states_element(11);
+SELECT try_remove_zkapp_states_element(10);
+SELECT try_remove_zkapp_states_element(9);
+SELECT try_remove_zkapp_states_element(8);
+
+-- 3. `zkapp_states_nullable`: Remove nullable columns element31..element8
+
+SELECT try_remove_zkapp_states_nullable_element(31);
+SELECT try_remove_zkapp_states_nullable_element(30);
+SELECT try_remove_zkapp_states_nullable_element(29);
+SELECT try_remove_zkapp_states_nullable_element(28);
+SELECT try_remove_zkapp_states_nullable_element(27);
+SELECT try_remove_zkapp_states_nullable_element(26);
+SELECT try_remove_zkapp_states_nullable_element(25);
+SELECT try_remove_zkapp_states_nullable_element(24);
+SELECT try_remove_zkapp_states_nullable_element(23);
+SELECT try_remove_zkapp_states_nullable_element(22);
+SELECT try_remove_zkapp_states_nullable_element(21);
+SELECT try_remove_zkapp_states_nullable_element(20);
+SELECT try_remove_zkapp_states_nullable_element(19);
+SELECT try_remove_zkapp_states_nullable_element(18);
+SELECT try_remove_zkapp_states_nullable_element(17);
+SELECT try_remove_zkapp_states_nullable_element(16);
+SELECT try_remove_zkapp_states_nullable_element(15);
+SELECT try_remove_zkapp_states_nullable_element(14);
+SELECT try_remove_zkapp_states_nullable_element(13);
+SELECT try_remove_zkapp_states_nullable_element(12);
+SELECT try_remove_zkapp_states_nullable_element(11);
+SELECT try_remove_zkapp_states_nullable_element(10);
+SELECT try_remove_zkapp_states_nullable_element(9);
+SELECT try_remove_zkapp_states_nullable_element(8);
+
+-- 4. Update schema_history
+
 DO $$
-DECLARE
-    col_record RECORD;
-    drop_count int := 0;
-    error_count int := 0;
 BEGIN
-    RAISE NOTICE 'DEBUG: Starting column removal process...';
-    
-    -- Get all columns for elements 8-31 in reverse order  
-    FOR col_record IN
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name = 'zkapp_states_nullable'
-          AND column_name LIKE 'element%'
-          AND substring(column_name FROM 'element(\d+)')::int BETWEEN 8 AND 31
-        ORDER BY column_name DESC
-    LOOP
-        RAISE NOTICE 'DEBUG: Found column %, attempting to drop...', col_record.column_name;
-        BEGIN
-            EXECUTE format('ALTER TABLE public.zkapp_states_nullable DROP COLUMN %I', col_record.column_name);
-            RAISE NOTICE 'DEBUG: Successfully dropped column %', col_record.column_name;
-            drop_count := drop_count + 1;
-        EXCEPTION
-            WHEN lock_not_available THEN
-                RAISE NOTICE 'DEBUG: Could not drop %, lock timeout; re-run later.', col_record.column_name;
-                error_count := error_count + 1;
-            WHEN OTHERS THEN
-                RAISE NOTICE 'DEBUG: Error dropping column %: % %', col_record.column_name, SQLSTATE, SQLERRM;
-                error_count := error_count + 1;
-        END;
-    END LOOP;
-    
-    RAISE NOTICE 'DEBUG: Column removal process completed. Dropped: %, Errors: %', drop_count, error_count;
-END$$;
-
--- --- 4) Post-check & version table update -----------------------------------
-DO $$
-DECLARE
-    v text := '3.2.0';
-    remaining_cols int;
-    remaining_fks  int;
-    nowtxt text := to_char(now(),'YYYY-MM-DD HH24:MI:SS TZ');
-    col_list text := '';
-    fk_list text := '';
-    rec record;
-BEGIN
-    RAISE NOTICE 'DEBUG: Starting post-check analysis...';
-    
-    SELECT count(*)
-        INTO remaining_cols
-        FROM generate_series(8,31) g(n)
-        JOIN information_schema.columns c
-            ON c.table_schema='public'
-         AND c.table_name='zkapp_states_nullable'
-         AND c.column_name='element'||g.n;
-
-    SELECT count(*)
-        INTO remaining_fks
-        FROM pg_constraint c
-     WHERE c.conrelid='public.zkapp_states_nullable'::regclass
-         AND c.contype='f'
-         AND c.conname LIKE 'zkapp_states_nullable_element%_fk'
-         AND substring(c.conname FROM 'element(\d+)_fk')::int BETWEEN 8 AND 31;
-
-    RAISE NOTICE 'DEBUG: Found % remaining columns and % remaining FKs', remaining_cols, remaining_fks;
-
-    -- List remaining columns
-    IF remaining_cols > 0 THEN
-        FOR rec IN 
-            SELECT 'element'||g.n as col_name
-            FROM generate_series(8,31) g(n)
-            JOIN information_schema.columns c
-                ON c.table_schema='public'
-             AND c.table_name='zkapp_states_nullable'
-             AND c.column_name='element'||g.n
-            ORDER BY g.n
-        LOOP
-            col_list := col_list || rec.col_name || ', ';
-        END LOOP;
-        col_list := rtrim(col_list, ', ');
-        RAISE NOTICE 'DEBUG: Remaining columns: %', col_list;
-    END IF;
-
-    -- List remaining FKs
-    IF remaining_fks > 0 THEN
-        FOR rec IN 
-            SELECT c.conname as fk_name
-            FROM pg_constraint c
-            WHERE c.conrelid='public.zkapp_states_nullable'::regclass
-              AND c.contype='f'
-              AND c.conname LIKE 'zkapp_states_nullable_element%_fk'
-              AND substring(c.conname FROM 'element(\d+)_fk')::int BETWEEN 8 AND 31
-            ORDER BY c.conname
-        LOOP
-            fk_list := fk_list || rec.fk_name || ', ';
-        END LOOP;
-        fk_list := rtrim(fk_list, ', ');
-        RAISE NOTICE 'DEBUG: Remaining FKs: %', fk_list;
-    END IF;
-
-    IF remaining_cols = 0 AND remaining_fks = 0 THEN
-        UPDATE public.schema_version
-             SET status = 'rolled_back',
-                     description = CASE
-                         WHEN position('ROLLED BACK' in coalesce(description,'')) > 0
-                             THEN description
-                         ELSE coalesce(description,'') || ' [ROLLED BACK ' || nowtxt || ']'
-                     END,
-                     validated_at = NULL
-         WHERE version = v;
-        RAISE NOTICE 'DEBUG: Rollback complete: all target columns and FKs removed. Version marked rolled_back.';
-    ELSE
-        UPDATE public.schema_version
-             SET status = 'rollback_partial',
-                     description = CASE
-                         WHEN position('ROLLBACK PARTIAL' in coalesce(description,'')) > 0
-                             THEN description
-                         ELSE coalesce(description,'') || ' [ROLLBACK PARTIAL ' || nowtxt || ']'
-                     END
-         WHERE version = v;
-        RAISE NOTICE 'DEBUG: Rollback partial: % column(s) and % FK(s) remain. Re-run to finish.',
-                                 remaining_cols, remaining_fks;
-    END IF;
-END$$;
+    PERFORM set_migration_status('applied'::migration_status);
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE;
+END$$

@@ -1,233 +1,221 @@
 -- =============================================================================
 -- Mina migration: from berkeley to mesa
 -- + extend zkapp_states_nullable with element8..element31 (int)
--- + add FKs to zkapp_field(id), validate one-by-one
--- + record status in public.schema_version
+-- + extend zkapp_states with element8..element31 (int)
+-- + record status in migration_history
 -- =============================================================================
 
--- Version number for this migration
-DO $mig$
-DECLARE
-    migration_version text := '4.0.0';
-BEGIN
-    PERFORM 1;  -- no-op; just a block anchor
-END
-$mig$;
--- We'll use this constant in the script:
---   3.2.0 = version 3.2.0
--- If you copy this pattern, bump the version.
--- ============================================================================
+-- NOTE: When modifying this script, please keep TXNs small, and idempotent
 
+-- Fail fast
+\set ON_ERROR_STOP on
 -- Keep locks short; abort instead of blocking production traffic.
 SET lock_timeout = '10s';
 SET statement_timeout = '10min';
 
--- --- 0) Ensure version table exists & has desired columns --------------------
-CREATE TABLE IF NOT EXISTS public.schema_version (
-    version      text PRIMARY KEY,
-    description  text,
-    applied_at   timestamptz NOT NULL DEFAULT now()
+-- See "src/lib/node_config/version/node_config_version.ml" for protocol version
+SET archive.current_protocol_version = '3.0.0';
+-- Post-HF protocol version. This one corresponds to Mesa, specifically
+SET archive.target_protocol_version = '4.0.0';
+-- The version of this script. If you modify the script, please bump the version
+SET archive.migration_version = '0.0.3';
+
+-- TODO: put below in a common script
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'migration_status') THEN
+        CREATE TYPE migration_status AS ENUM ('starting', 'applied', 'failed');
+    END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION set_migration_status(p_target_status migration_status)
+RETURNS VOID AS $$
+DECLARE
+    target_protocol_version  text := current_setting('archive.target_protocol_version');
+    target_migration_version text := current_setting('archive.migration_version');
+BEGIN
+    UPDATE migration_history mh
+    SET status = p_target_status
+    FROM (
+        SELECT commit_start_at
+        FROM migration_history
+        WHERE protocol_version = target_protocol_version
+          AND migration_version = target_migration_version
+        ORDER BY commit_start_at DESC
+        LIMIT 1
+    ) latest
+    WHERE mh.commit_start_at = latest.commit_start_at;
+END
+$$ LANGUAGE plpgsql STRICT;
+
+-- 1. Ensure version table exists & has desired columns
+CREATE TABLE IF NOT EXISTS migration_history (
+    commit_start_at   timestamptz NOT NULL DEFAULT now() PRIMARY KEY,
+    protocol_version  text NOT NULL,
+    migration_version text NOT NULL,
+    description       text NOT NULL,
+    status            migration_status NOT NULL
 );
 
--- Add optional columns if missing (idempotent upgrades)
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-         WHERE table_schema='public' AND table_name='schema_version'
-             AND column_name='status'
-    ) THEN
-        ALTER TABLE public.schema_version
-            ADD COLUMN status text;
-    END IF;
+-- TODO: put above in a common script
 
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-         WHERE table_schema='public' AND table_name='schema_version'
-             AND column_name='validated_at'
-    ) THEN
-        ALTER TABLE public.schema_version
-            ADD COLUMN validated_at timestamptz;
-    END IF;
-END$$;
-
--- Upsert a row for this migration version
+-- Upsert a row for this migration
 DO $$
-DECLARE v text := '3.2.0';
+DECLARE 
+    target_protocol_version    text := current_setting('archive.target_protocol_version');
+    current_protocol_version   text := current_setting('archive.current_protocol_version');
+    target_migration_version   text := current_setting('archive.migration_version');
+    latest_protocol_version    text;
+    latest_migration_version   text;
+    latest_migration_status    migration_status;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM public.schema_version WHERE version = v) THEN
-        INSERT INTO public.schema_version(version, description, status)
-        VALUES (v,
-                        'Add zkapp_states_nullable.element8..element31 (int) + FKs to zkapp_field(id)',
-                        'starting');
-    ELSE
-        -- keep description but note re-run
-        UPDATE public.schema_version
-             SET status = COALESCE(status,'starting')
-         WHERE version = v;
-    END IF;
-END$$;
+    -- Try to fetch the existing migration row
+    SELECT  
+        protocol_version,
+        migration_version,
+        status
+    INTO latest_protocol_version, latest_migration_version, latest_migration_status
+    FROM migration_history
+    ORDER BY commit_start_at DESC
+    LIMIT 1;
 
--- --- 1) Add nullable columns element8..element31 (idempotent) ---------------
-DO $$
-DECLARE
-    missing_col_record RECORD;
-    added_count int := 0;
-BEGIN
-    RAISE NOTICE 'DEBUG: Starting column addition process...';
-    
-    -- Find missing columns in range 8-31
-    FOR missing_col_record IN
-        SELECT 'element' || g.n as col_name, g.n as col_num
-        FROM generate_series(8, 31) g(n)
-        LEFT JOIN information_schema.columns c
-            ON c.table_schema = 'public'
-           AND c.table_name = 'zkapp_states_nullable'
-           AND c.column_name = 'element' || g.n
-        WHERE c.column_name IS NULL
-        ORDER BY g.n
-    LOOP
-        RAISE NOTICE 'DEBUG: Adding missing column %...', missing_col_record.col_name;
-        EXECUTE format(
-            'ALTER TABLE public.zkapp_states_nullable ADD COLUMN %I integer',
-            missing_col_record.col_name
+    -- HACK: We don't have a record in migration history in Berkeley, hence 
+    -- setting to 3.0.0 if it's not present. 
+    latest_protocol_version := COALESCE(latest_protocol_version, '3.0.0'); 
+
+    IF latest_protocol_version = current_protocol_version THEN
+        INSERT INTO migration_history(
+            protocol_version, migration_version, description, status
+        ) VALUES (
+            target_protocol_version,
+            target_migration_version,
+            'Upgrade from Berkeley to Mesa. Add {zkapp_states,zkapp_states_nullable}.element8..element31 (int)',
+            'starting'::migration_status
         );
-        added_count := added_count + 1;
-    END LOOP;
-    
-    RAISE NOTICE 'DEBUG: Column addition completed. Added: % columns', added_count;
-END$$;
-
--- --- 2) Add NOT VALID foreign keys (idempotent) -----------------------------
-DO $$
-DECLARE
-    missing_fk_record RECORD;
-    added_count int := 0;
-BEGIN
-    RAISE NOTICE 'DEBUG: Starting FK addition process...';
-    
-    -- Find missing FK constraints for columns in range 8-31
-    FOR missing_fk_record IN
-        SELECT 'zkapp_states_nullable_element' || g.n || '_fk' as fk_name,
-               'element' || g.n as col_name,
-               g.n as col_num
-        FROM generate_series(8, 31) g(n)
-        LEFT JOIN pg_constraint c
-            ON c.conname = 'zkapp_states_nullable_element' || g.n || '_fk'
-           AND c.conrelid = 'public.zkapp_states_nullable'::regclass
-        WHERE c.conname IS NULL
-        ORDER BY g.n
-    LOOP
-        RAISE NOTICE 'DEBUG: Adding missing FK constraint %...', missing_fk_record.fk_name;
-        EXECUTE format(
-            'ALTER TABLE public.zkapp_states_nullable
-                 ADD CONSTRAINT %I
-                 FOREIGN KEY (%I) REFERENCES public.zkapp_field(id)
-                 NOT VALID',
-            missing_fk_record.fk_name, missing_fk_record.col_name
-        );
-        added_count := added_count + 1;
-    END LOOP;
-    
-    RAISE NOTICE 'DEBUG: FK addition completed. Added: % constraints', added_count;
-END$$;
-
--- --- 3) Validate FKs one-by-one (short locks; skip on timeout) --------------
-DO $$
-DECLARE
-    invalid_fk_record RECORD;
-    validated_now int := 0;
-    skipped_now int := 0;
-BEGIN
-    RAISE NOTICE 'DEBUG: Starting FK validation process...';
-    
-    -- Find invalid FK constraints for elements 8-31
-    FOR invalid_fk_record IN
-        SELECT c.conname
-        FROM pg_constraint c
-        WHERE c.conrelid = 'public.zkapp_states_nullable'::regclass
-          AND c.contype = 'f'
-          AND c.conname LIKE 'zkapp_states_nullable_element%_fk'
-          AND substring(c.conname FROM 'element(\d+)_fk')::int BETWEEN 8 AND 31
-          AND NOT c.convalidated
-        ORDER BY c.conname
-    LOOP
-        RAISE NOTICE 'DEBUG: Validating constraint %...', invalid_fk_record.conname;
-        BEGIN
-            EXECUTE format(
-                'ALTER TABLE public.zkapp_states_nullable VALIDATE CONSTRAINT %I',
-                invalid_fk_record.conname
-            );
-            validated_now := validated_now + 1;
-            RAISE NOTICE 'DEBUG: Successfully validated %', invalid_fk_record.conname;
-        EXCEPTION
-            WHEN lock_not_available THEN
-                RAISE NOTICE 'DEBUG: Skipped validation of % due to lock timeout; will try next run.', invalid_fk_record.conname;
-                skipped_now := skipped_now + 1;
-        END;
-    END LOOP;
-
-    RAISE NOTICE 'DEBUG: FK validation completed. Validated: %, Skipped: %', validated_now, skipped_now;
-END$$;
-
--- --- 4) Post-checks & version status update --------------------------------
-DO $$
-DECLARE
-    v text := '3.2.0';
-    missing_cols int;
-    total_fks    int;
-    valid_fks    int;
-    all_valid    boolean;
-BEGIN
-    -- all columns present?
-    SELECT count(*)
-        INTO missing_cols
-        FROM generate_series(8,31) g(n)
-        LEFT JOIN information_schema.columns c
-                     ON c.table_schema='public'
-                    AND c.table_name='zkapp_states_nullable'
-                    AND c.column_name='element'||g.n
-     WHERE c.column_name IS NULL;
-
-    IF missing_cols > 0 THEN
-        RAISE EXCEPTION 'Post-check failed: % columns missing in zkapp_states_nullable.', missing_cols;
+    ELSIF 
+        latest_protocol_version = target_protocol_version AND 
+        latest_migration_version = target_migration_version
+    THEN 
+        IF latest_migration_status = 'failed'::migration_status THEN
+            RAISE EXCEPTION 
+              'Previous migration failed, please roll back before rerunning this script';
+        ELSE 
+            RAISE NOTICE 
+              'Previous migration in progress/completed, reapplying';
+        END IF;
+    ELSE 
+        RAISE EXCEPTION 
+          'Could not apply migration to current protocol & migration version: (%, %)', 
+          latest_protocol_version,
+          latest_migration_version;
     END IF;
-
-    -- FK counts
-    SELECT count(*)
-        INTO total_fks
-        FROM pg_constraint c
-     WHERE c.conrelid='public.zkapp_states_nullable'::regclass
-         AND c.contype='f'
-         AND c.conname LIKE 'zkapp_states_nullable_element%_fk'
-         AND substring(c.conname FROM 'element(\d+)_fk')::int BETWEEN 8 AND 31;
-
-    SELECT count(*)
-        INTO valid_fks
-        FROM pg_constraint c
-     WHERE c.conrelid='public.zkapp_states_nullable'::regclass
-         AND c.contype='f'
-         AND c.convalidated
-         AND c.conname LIKE 'zkapp_states_nullable_element%_fk'
-         AND substring(c.conname FROM 'element(\d+)_fk')::int BETWEEN 8 AND 31;
-
-    all_valid := (valid_fks = 24);  -- 8..31 inclusive = 24 constraints
-
-    IF total_fks <> 24 THEN
-        RAISE NOTICE 'Expected 24 FKs, found % (validated %).', total_fks, valid_fks;
-    ELSE
-        RAISE NOTICE 'FKs present: %, validated: %.', total_fks, valid_fks;
-    END IF;
-
-    UPDATE public.schema_version
-         SET status = CASE WHEN all_valid THEN 'applied_validated' ELSE 'applied_pending_validation' END,
-                 validated_at = CASE WHEN all_valid THEN now() ELSE validated_at END
-     WHERE version = v;
 END$$;
 
--- =============================================================================
--- Re-run this script any time; it will:
---  * create any missing columns/FKs
---  * attempt to validate remaining NOT VALID FKs (skipping if it can't get a lock)
---  * update version status to 'applied_validated' once all are validated
--- =============================================================================
+-- 2. `zkapp_states_nullable`: Add nullable columns element8..element31
+
+CREATE OR REPLACE FUNCTION add_zkapp_states_nullable_element(p_element_num INT)
+RETURNS VOID AS $$
+DECLARE
+    col_name TEXT := 'element' || p_element_num;
+BEGIN
+
+    RAISE DEBUG 'Adding column % for zkapp_states_nullable', col_name;
+
+    EXECUTE format(
+        'ALTER TABLE zkapp_states_nullable ADD COLUMN IF NOT EXISTS %I INT REFERENCES zkapp_field(id)',
+        col_name
+    );
+
+    RAISE DEBUG 'Added column % for zkapp_states_nullable', col_name;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred while adding column % to zkapp_states_nullable: %', col_name, SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+SELECT add_zkapp_states_nullable_element(8);
+SELECT add_zkapp_states_nullable_element(9);
+SELECT add_zkapp_states_nullable_element(10);
+SELECT add_zkapp_states_nullable_element(11);
+SELECT add_zkapp_states_nullable_element(12);
+SELECT add_zkapp_states_nullable_element(13);
+SELECT add_zkapp_states_nullable_element(14);
+SELECT add_zkapp_states_nullable_element(15);
+SELECT add_zkapp_states_nullable_element(16);
+SELECT add_zkapp_states_nullable_element(17);
+SELECT add_zkapp_states_nullable_element(18);
+SELECT add_zkapp_states_nullable_element(19);
+SELECT add_zkapp_states_nullable_element(20);
+SELECT add_zkapp_states_nullable_element(21);
+SELECT add_zkapp_states_nullable_element(22);
+SELECT add_zkapp_states_nullable_element(23);
+SELECT add_zkapp_states_nullable_element(24);
+SELECT add_zkapp_states_nullable_element(25);
+SELECT add_zkapp_states_nullable_element(26);
+SELECT add_zkapp_states_nullable_element(27);
+SELECT add_zkapp_states_nullable_element(28);
+SELECT add_zkapp_states_nullable_element(29);
+SELECT add_zkapp_states_nullable_element(30);
+SELECT add_zkapp_states_nullable_element(31);
+
+-- 3. `zkapp_states`: Add columns element8..element31
+CREATE OR REPLACE FUNCTION add_zkapp_states_element(p_element_num INT)
+RETURNS VOID AS $$
+DECLARE
+    col_name TEXT := 'element' || p_element_num;
+BEGIN
+
+    RAISE DEBUG 'Adding column % for zkapp_states', col_name;
+
+    EXECUTE format(
+        'ALTER TABLE zkapp_states ADD COLUMN IF NOT EXISTS %I INT DEFAULT 0 NOT NULL REFERENCES zkapp_field(id)',
+        col_name
+    );
+
+    RAISE DEBUG 'Added column % for zkapp_states', col_name;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred while adding column % to zkapp_states: %', col_name, SQLERRM;
+END
+$$ LANGUAGE plpgsql;
+
+SELECT add_zkapp_states_element(8);
+SELECT add_zkapp_states_element(9);
+SELECT add_zkapp_states_element(10);
+SELECT add_zkapp_states_element(11);
+SELECT add_zkapp_states_element(12);
+SELECT add_zkapp_states_element(13);
+SELECT add_zkapp_states_element(14);
+SELECT add_zkapp_states_element(15);
+SELECT add_zkapp_states_element(16);
+SELECT add_zkapp_states_element(17);
+SELECT add_zkapp_states_element(18);
+SELECT add_zkapp_states_element(19);
+SELECT add_zkapp_states_element(20);
+SELECT add_zkapp_states_element(21);
+SELECT add_zkapp_states_element(22);
+SELECT add_zkapp_states_element(23);
+SELECT add_zkapp_states_element(24);
+SELECT add_zkapp_states_element(25);
+SELECT add_zkapp_states_element(26);
+SELECT add_zkapp_states_element(27);
+SELECT add_zkapp_states_element(28);
+SELECT add_zkapp_states_element(29);
+SELECT add_zkapp_states_element(30);
+SELECT add_zkapp_states_element(31);
+
+-- 4. Update schema_history
+
+DO $$
+BEGIN
+    PERFORM set_migration_status('applied'::migration_status);
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM set_migration_status('failed'::migration_status);
+        RAISE;
+END$$
