@@ -51,6 +51,7 @@ case "${MINA_DEB_CODENAME}" in
 esac
 
 MINA_DEB_NAME="mina-berkeley"
+MINA_DEVNET_DEB_NAME="mina-devnet"
 DUNE_PROFILE="${DUNE_PROFILE}"
 DEB_SUFFIX=""
 
@@ -63,6 +64,7 @@ case "${DUNE_PROFILE}" in
     _SUFFIX=${DUNE_PROFILE//_/-}
     DEB_SUFFIX="${_SUFFIX}"
     MINA_DEB_NAME="${MINA_DEB_NAME}-${DEB_SUFFIX}"
+    MINA_DEVNET_DEB_NAME="${MINA_DEVNET_DEB_NAME}-${DEB_SUFFIX}"
     ;;
 esac
 
@@ -387,7 +389,7 @@ build_daemon_devnet_deb() {
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
 
-  build_deb mina-devnet
+  build_deb "${MINA_DEVNET_DEB_NAME}"
 }
 ## END DEVNET PACKAGE ##
 
