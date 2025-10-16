@@ -4,7 +4,7 @@ set -euox pipefail
 
 ROCKSDB_VERSION=10.5.1
 
-ROCKSDB_SOURCE=`mktemp -d --tmpdir rocksdb-$ROCKSDB_VERSION`
+ROCKSDB_SOURCE=`mktemp -d --tmpdir rocksdb-$ROCKSDB_VERSION.XXXXXX`
 trap "rm -rf $ROCKSDB_SOURCE" EXIT
 
 curl -L https://github.com/facebook/rocksdb/archive/refs/tags/v${ROCKSDB_VERSION}.tar.gz | tar xz -C $ROCKSDB_SOURCE
@@ -28,8 +28,10 @@ PATTERN='^(genesis_ledger|epoch_ledger)_.*\.tar\.gz$'
 echo "Fetching list of objects from S3..."
 xml=$(curl -s "$S3_URL")
 
-# Extract <Key>...</Key> lines and filter by regex
-mapfile -t tar_keys < <(echo "$xml" | grep -oP '(?<=<Key>)[^<]+' | grep -E "$PATTERN")
+tar_keys=()
+while IFS= read -r key; do
+    tar_keys+=("$key")
+done < <(xmllint --xpath '//Key/text()' <<< "$xml" | tr ' ' '\n' | grep -E "$PATTERN")
 
 if [[ ${#tar_keys[@]} -eq 0 ]]; then
   echo "No ledger tar files found."
