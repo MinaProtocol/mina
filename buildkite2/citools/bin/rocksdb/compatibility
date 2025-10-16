@@ -37,7 +37,7 @@ Dir.chdir(workdir) do
   abort "Command failed with exit code #{status.exitstatus}" unless status.success?
 end
 
-# 1. Run the test
+# 2. Sample a bunch of ledger tars and check if we can load them via RocksDB
 
 # This is lazily loaded because we just installed RocksDB shared library above
 autoload :RocksDB, "rocksdb-ffi"
