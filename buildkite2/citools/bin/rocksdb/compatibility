@@ -35,10 +35,8 @@ require "base64"
 require "net/http"
 require "openssl"
 require "rexml/document"
-require "rubygems/package"
 require "tmpdir"
 require "uri"
-require "zlib"
 require "rocksdb-ffi"
 
 # Public S3 bucket URL
