@@ -47,6 +47,7 @@ def extract_tar_gz(tar_path: str, target_dir: str) -> None:
     with tarfile.open(tar_path, "r:gz") as tar:
         tar.extractall(path=target_dir)
 
+# TODO: figure out how to enable SSL here
 def list_s3_keys(url, matches_pattern) -> List[str] :
     buffer = BytesIO()
     c = pycurl.Curl()
