@@ -38,7 +38,7 @@
   # - dockerfiles/1-build-deps
   # - flake.nix (and flake.lock after running
   #   `nix flake update opam-repository`).
-  # - scripts/update_opam_switch.sh
+  # - scripts/update-opam-switch.sh
   inputs.opam-repository.url =
     "github:ocaml/opam-repository/08d8c16c16dc6b23a5278b06dff0ac6c7a217356";
   inputs.opam-repository.flake = false;
