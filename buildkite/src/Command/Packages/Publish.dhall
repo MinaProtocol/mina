@@ -229,6 +229,7 @@ let publish
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
+                                  ++  "--force-upload-debians "
                                 )
                             ]
                           , label = "Docker Packages Publishing"
