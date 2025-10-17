@@ -1,0 +1,48 @@
+let S = ../../Lib/SelectFiles.dhall
+
+let Pipeline = ../../Pipeline/Dsl.dhall
+
+let PipelineTag = ../../Pipeline/Tag.dhall
+
+let JobSpec = ../../Pipeline/JobSpec.dhall
+
+let Command = ../../Command/Base.dhall
+
+let Size = ../../Command/Size.dhall
+
+let RunInToolchain = ../../Command/RunInToolchain.dhall
+
+let key = "archive-hardfork-toolbox-test"
+
+in  Pipeline.build
+      Pipeline.Config::{
+      , spec = JobSpec::{
+        , dirtyWhen =
+          [ S.strictlyStart
+              (S.contains "buildkite/scripts/rocksdb-compatibility")
+          , S.exactly "buildkite/src/Jobs/Test/RocksdbTest" "dhall"
+          ]
+        , path = "Test"
+        , name = "RocksdbTest"
+        , tags =
+          [ PipelineTag.Type.Long
+          , PipelineTag.Type.Test
+          , PipelineTag.Type.Stable
+          ]
+        }
+      , steps =
+        [ Command.build
+            Command.Config::{
+            , commands =
+                RunInToolchain.runInToolchain
+                  ([] : List Text)
+                  (     "./buildkite/scripts/rocksdb-compatibility/install-rocks.sh"
+                    ++  " && pip install -r buildkite/scripts/rocksdb-compatibility/requirements.txt"
+                    ++  " && python3 ./buildkite/scripts/rocksdb-compatibility/rocksdb.py"
+                  )
+            , label = "Rocksdb Test"
+            , key = key
+            , target = Size.Large
+            }
+        ]
+      }
