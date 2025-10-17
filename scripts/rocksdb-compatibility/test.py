@@ -92,7 +92,7 @@ def main():
 
             print(f"  Testing extracted RocksDB at {db_path}")
             try:
-                rocksdb.test(db_path)
+                rocksdb.test(db_path, 10)
             except Exception as e:
                 raise RuntimeError(f"Failed to open RocksDB at {db_path}: {type(e).__name__}: {e}")
 
