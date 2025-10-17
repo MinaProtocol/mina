@@ -1915,6 +1915,10 @@ function pull(){
                 __networks=${2:?$error_message}
                 shift 2;
             ;;
+            --archs )
+                __arch=${2:?$error_message}
+                shift 2;
+            ;;
             * )
                 echo -e "${RED} !! Unknown option: $1${CLEAR}\n";
                 echo "";
@@ -1936,6 +1940,8 @@ function pull(){
     echo " - Target: $__target"
     echo " - Codenames: $__codenames"
     echo " - Networks: $__networks"
+    echo " - Architectures: $__arch"
+
     if [[ -n ${__from_special_folder+x} ]]; then
         echo " - From special folder: $__from_special_folder"
     fi
@@ -1947,26 +1953,28 @@ function pull(){
     read -r -a __artifacts_arr <<< "$__artifacts"
     read -r -a __codenames_arr <<< "$__codenames"
     read -r -a __networks_arr <<< "$__networks"
+    read -r -a __archs_arr <<< "$__arch"
 
-    for __artifact in "${__artifacts_arr[@]}"; do
-        for __codename in "${__codenames_arr[@]}"; do
-            for network in "${__networks_arr[@]}"; do
-                echo "  📥  Pulling $__artifact for $__codename codename and $network network"
-                local __artifact_full_name
-                local __source_path
-                __artifact_full_name=$(get_artifact_with_suffix $__artifact $network)
+    for __arch in "${__archs_arr[@]}"; do
+        for __artifact in "${__artifacts_arr[@]}"; do
+            for __codename in "${__codenames_arr[@]}"; do
+                for network in "${__networks_arr[@]}"; do
+                    echo "  📥  Pulling $__artifact for $__codename codename and $network network"
+                    local __artifact_full_name
+                    local __source_path
+                    __artifact_full_name=$(get_artifact_with_suffix $__artifact $network)
 
-                if [[ -n ${__from_special_folder+x} ]]; then
-                    __source_path="$(storage_root "$__backend")/$__from_special_folder/${__artifact_full_name}_*"
-                else
-                    __source_path="$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact_full_name}_*"
-                fi
+                    if [[ -n ${__from_special_folder+x} ]]; then
+                        __source_path="$(storage_root "$__backend")/$__from_special_folder/${__artifact_full_name}_*_${__arch}.deb"
+                    else
+                        __source_path="$(storage_root "$__backend")/$__buildkite_build_id/debians/$__codename/${__artifact_full_name}_*_${__arch}.deb"
+                    fi
 
-                storage_download "$__backend" "$__source_path" "$__target"
+                    storage_download "$__backend" "$__source_path" "$__target"
+                done
             done
         done
     done
-
     echo " ✅  Done."
     echo ""
 }
