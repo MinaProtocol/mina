@@ -67,6 +67,7 @@ module Network_config = struct
          ; txpool_max_size
          ; slot_tx_end
          ; slot_chain_end
+         ; hard_fork_genesis_slot_delta
          ; network_id
          ; _
          }
@@ -167,6 +168,7 @@ module Network_config = struct
             ; zkapp_cmd_limit_hardcap = None
             ; slot_tx_end
             ; slot_chain_end
+            ; hard_fork_genesis_slot_delta
             ; minimum_user_command_fee = None
             ; network_id
             ; sync_ledger_max_subtree_depth = None

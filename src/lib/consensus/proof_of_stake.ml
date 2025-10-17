@@ -461,7 +461,7 @@ module Make_str (A : Wire_types.Concrete) = struct
       let create_epoch_ledger ~config ~context:(module Context : CONTEXT)
           ~genesis_epoch_ledger =
         let open Context in
-        if Mina_ledger.Ledger.Root.Config.exists_backing config then (
+        if Mina_ledger.Ledger.Root.Config.exists_any_backing config then (
           [%log info]
             ~metadata:
               [ ("config", Mina_ledger.Ledger.Root.Config.to_yojson config) ]

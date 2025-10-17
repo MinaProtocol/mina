@@ -259,6 +259,7 @@ let%test_module "Epoch ledger sync tests" =
       let creatable_gossip_net =
         let chain_id = "dummy_chain_id" in
         let conf_dir = make_dirname "libp2p" in
+        let mina_net_location = Filename.concat conf_dir "mina_net2" in
         let seed_peer_list_url = None in
         let addrs_and_ports =
           let external_ip = Core.Unix.Inet_addr.localhost in
@@ -279,7 +280,7 @@ let%test_module "Epoch ledger sync tests" =
         let gossip_net_params : Gossip_net.Libp2p.Config.t =
           { timeout = Time.Span.of_sec 3.
           ; logger
-          ; conf_dir
+          ; mina_net_location
           ; chain_id
           ; unsafe_no_trust_ip = false
           ; seed_peer_list_url
