@@ -54,8 +54,12 @@ function wait_for_sync() {
     done
 }
 
+# TODO: make it configurable.
+DAEMON_SYNC_TIMEOUT=900
+
 function test_network_status() {
     declare -n __test_data=$1
+    wait_for_sync "$1" $DAEMON_SYNC_TIMEOUT
     assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/network/status" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"}}" | jq)" \
         '.sync_status.stage == "Synced"' \
         "   ✅  Rosetta is synced" \
@@ -64,6 +68,7 @@ function test_network_status() {
 
 function test_network_options() {
     declare -n __test_data=$1
+    wait_for_sync "$1" $DAEMON_SYNC_TIMEOUT
     assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/network/options" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"}}" | jq)" \
         '.version.rosetta_version == "1.4.9"' \
         "   ✅  Rosetta Version is correct" \
@@ -72,6 +77,7 @@ function test_network_options() {
 
 function test_block() {
     declare -n __test_data=$1
+    wait_for_sync "$1" $DAEMON_SYNC_TIMEOUT
     assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/block" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"},\"block_identifier\":{\"hash\":\"${__test_data[block]}\"}}" | jq)" \
         ".block.block_identifier.hash == \"${__test_data[block]}\" " \
         "   ✅  Block hash correct" \
@@ -80,6 +86,7 @@ function test_block() {
 
 function test_account_balance() {
     declare -n __test_data=$1
+    wait_for_sync "$1" $DAEMON_SYNC_TIMEOUT
     assert "$(curl --no-progress-meter --request POST "${__test_data[address]}/account/balance" "${DEFAULT_HEADERS[@]}" --data-raw "{\"network_identifier\":{\"blockchain\":\"$BLOCKCHAIN\",\"network\":\"${__test_data[id]}\"},\"account_identifier\":{\"address\":\"${__test_data[account]}\"}}" | jq)" \
         '.balances[0].currency.symbol == "MINA"' \
         "   ✅  Account: Balance ok" \
@@ -88,6 +95,7 @@ function test_account_balance() {
 
 function test_payment_transaction() {
     declare -n __test_data=$1
+    wait_for_sync "$1" $DAEMON_SYNC_TIMEOUT
     assert "$(curl --no-progress-meter --location "${__test_data[address]}/search/transactions" --header 'Content-Type: application/json' --data "{
         \"network_identifier\": {
             \"blockchain\": \"$BLOCKCHAIN\",
@@ -104,6 +112,7 @@ function test_payment_transaction() {
 
 function test_zkapp_transaction() {
     declare -n __test_data=$1
+    wait_for_sync "$1" $DAEMON_SYNC_TIMEOUT
     assert "$(curl --no-progress-meter --location "${__test_data[address]}/search/transactions" --header 'Content-Type: application/json' --data "{
         \"network_identifier\": {
             \"blockchain\": \"$BLOCKCHAIN\",

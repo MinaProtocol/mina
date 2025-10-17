@@ -11,14 +11,12 @@
 #
 # OPTIONS:
 #   --network <mainnet|devnet>    Specify the network to test (default: mainnet)
-#   --wait-for-sync               Wait for Rosetta node to sync before running tests
-#   --timeout <seconds>           Timeout for sync wait in seconds (default: 900)
 #   --address <url>               Override the default Rosetta endpoint address
 #   -h, --help                    Display this help message
 #
 # EXAMPLES:
 #   ./rosetta-sanity.sh --network mainnet
-#   ./rosetta-sanity.sh --network devnet --wait-for-sync --timeout 1200
+#   ./rosetta-sanity.sh --network devnet
 #   ./rosetta-sanity.sh --address http://localhost:3087 --network mainnet
 #
 # TEST COVERAGE:
@@ -42,8 +40,6 @@
 # VERSION: 1.0
 
 NETWORK="mainnet"
-WAIT_FOR_SYNC=false
-TIMEOUT=900
 
 declare -A mainnet
 mainnet[id]="mainnet"
@@ -64,9 +60,14 @@ devnet[zkapp_transaction]="5JuJuyKtrMvxGroWyNE3sxwpuVsupvj7SA8CDX4mqWms4ZZT4Arz"
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --network) NETWORK="$2"; shift ;;
-        --wait-for-sync) WAIT_FOR_SYNC=true ;;
-        --timeout) TIMEOUT="$2"; shift ;;
+        --network) 
+            NETWORK="$2"; 
+            if [[ "$NETWORK" != "mainnet" && "$NETWORK" != "devnet" ]]; then
+                echo "Unknown network: $NETWORK. Available networks: mainnet, devnet. Exiting..."
+                exit 1
+            fi
+            shift
+            ;;
         --address) 
                    
                    # shellcheck disable=SC2034
@@ -111,25 +112,4 @@ function run_tests_with_test_data() {
     echo "🎉  All tests passed successfully!"
 }
 
-if [[ "$NETWORK" == "mainnet" ]]; then
-    if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-        echo "⏳  Waiting for Rosetta to sync on mainnet..."
-        if ! wait_for_sync "mainnet" "$TIMEOUT"; then
-            echo "❌  Failed to sync with mainnet within timeout period"
-            exit 1
-        fi
-    fi
-    run_tests_with_test_data "mainnet"
-elif [[ "$NETWORK" == "devnet" ]]; then
-    if [[ "$WAIT_FOR_SYNC" == "true" ]]; then
-        echo "⏳  Waiting for Rosetta to sync on devnet..."
-        if ! wait_for_sync "devnet" "$TIMEOUT"; then
-            echo "❌  Failed to sync with devnet within timeout period"
-            exit 1
-        fi
-    fi
-    run_tests_with_test_data "devnet"
-else
-    echo "Unknown network: $NETWORK. available networks: mainnet, devnet. Exiting..."
-    exit 1
-fi
+run_tests_with_test_data "$NETWORK"

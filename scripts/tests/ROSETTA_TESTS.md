@@ -82,14 +82,12 @@ The Rosetta API test suite consists of four main scripts that work together to p
 
 **Usage**:
 ```bash
-./rosetta-sanity.sh [--network mainnet|devnet] [--address <address>] [--wait-for-sync] [--timeout <seconds>]
+./rosetta-sanity.sh [--network mainnet|devnet] [--address <address>]
 ```
 
 **Command-line Options**:
 - `--network`: Target network (mainnet or devnet, default: mainnet)
 - `--address`: Override Rosetta API endpoint address
-- `--wait-for-sync`: Wait for Rosetta to sync before running tests
-- `--timeout`: Sync timeout in seconds (default: 900)
 
 **Test Data Configuration**:
 
@@ -124,9 +122,6 @@ The Rosetta API test suite consists of four main scripts that work together to p
 
 # Devnet testing with custom endpoint
 ./rosetta-sanity.sh --network devnet --address http://localhost:3087
-
-# Wait for sync before testing
-./rosetta-sanity.sh --network mainnet --wait-for-sync --timeout 1200
 ```
 
 ### 3. rosetta-load.sh
