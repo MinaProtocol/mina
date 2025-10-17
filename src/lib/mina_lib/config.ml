@@ -37,6 +37,8 @@ type t =
   ; persistent_root_location : string
   ; persistent_frontier_location : string
   ; epoch_ledger_location : string
+  ; proof_cache_location : string
+  ; zkapp_vk_cache_location : string
   ; staged_ledger_transition_backup_capacity : int [@default 10]
   ; time_controller : Block_time.Controller.t
   ; snark_work_fee : Currency.Fee.t
