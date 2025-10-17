@@ -1,12 +1,10 @@
-import base64
 import os
 import random
-import shutil
 import tarfile
 import tempfile
 import xml.etree.ElementTree as ET
 from io import BytesIO
-from pathlib import Path
+from typing import List
 from urllib.parse import urljoin
 
 import pycurl
@@ -27,17 +25,18 @@ def download_file(url: str, dest_path: str) -> None:
         # Create a progress bar (tqdm)
         pbar = tqdm(unit="B", unit_scale=True, unit_divisor=1024, ncols=80)
 
-        def progress(download_t, download_d, upload_t, upload_d):
+        def progress(download_t, download_d, _upload_t, _upload_d):
+            _ = (_upload_t, _upload_d) # Make pyright happier
             if download_t > 0:
                 pbar.total = download_t
                 pbar.update(download_d - pbar.n)
 
         c = pycurl.Curl()
-        c.setopt(c.URL, url)
-        c.setopt(c.WRITEDATA, f)
-        c.setopt(c.FOLLOWLOCATION, True)
-        c.setopt(c.NOPROGRESS, False)
-        c.setopt(c.XFERINFOFUNCTION, progress)
+        c.setopt(pycurl.URL, url)
+        c.setopt(pycurl.WRITEDATA, f)
+        c.setopt(pycurl.FOLLOWLOCATION, True)
+        c.setopt(pycurl.NOPROGRESS, False)
+        c.setopt(pycurl.XFERINFOFUNCTION, progress)
         c.perform()
         c.close()
 
@@ -48,16 +47,16 @@ def extract_tar_gz(tar_path: str, target_dir: str) -> None:
     with tarfile.open(tar_path, "r:gz") as tar:
         tar.extractall(path=target_dir)
 
-def list_s3_keys(url, matches_pattern):
+def list_s3_keys(url, matches_pattern) -> List[str] :
     buffer = BytesIO()
     c = pycurl.Curl()
-    c.setopt(c.URL, url)
-    c.setopt(c.WRITEDATA, buffer)
-    c.setopt(c.FOLLOWLOCATION, True)
-    c.setopt(c.SSL_VERIFYPEER, False)
-    c.setopt(c.SSL_VERIFYHOST, 0)
+    c.setopt(pycurl.URL, url)
+    c.setopt(pycurl.WRITEDATA, buffer)
+    c.setopt(pycurl.FOLLOWLOCATION, True)
+    c.setopt(pycurl.SSL_VERIFYPEER, False)
+    c.setopt(pycurl.SSL_VERIFYHOST, 0)
     c.perform()
-    status_code = c.getinfo(c.RESPONSE_CODE)
+    status_code = c.getinfo(pycurl.RESPONSE_CODE)
     c.close()
 
     if status_code != 200:
@@ -67,9 +66,9 @@ def list_s3_keys(url, matches_pattern):
     root = ET.fromstring(data)
     ns = {"s3": "http://s3.amazonaws.com/doc/2006-03-01/"}
     tar_keys = [
-        elem.text
+        text
         for elem in root.findall(".//s3:Contents/s3:Key", ns)
-        if matches_pattern(elem.text)
+        if (text := elem.text) is not None and matches_pattern(text)
     ]
     return tar_keys
 
