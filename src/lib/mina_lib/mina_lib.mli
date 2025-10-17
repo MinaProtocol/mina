@@ -309,6 +309,12 @@ module Hardfork_config : sig
         | `Uncommitted of Mina_ledger.Ledger.t ]
     }
 
+  val genesis_source_ledger_cast :
+       [< `Genesis of Genesis_ledger.Packed.t
+       | `Root of Mina_ledger.Ledger.Root.t
+       | `Uncommitted of Mina_ledger.Ledger.t ]
+    -> Mina_ledger.Ledger.Any_ledger.witness
+
   (** Retrieve the [genesis_source_ledgers] from the transition frontier,
       starting at the given [breadcrumb]. *)
   val source_ledgers :
@@ -317,18 +323,33 @@ module Hardfork_config : sig
     -> genesis_source_ledgers Deferred.Or_error.t
 
   type inputs =
-    { staged_ledger : Mina_ledger.Ledger.t
+    { source_ledgers : genesis_source_ledgers
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
     ; state_hash : State_hash.t
-    ; staking_ledger : Mina_ledger.Ledger.Any_ledger.witness
     ; staking_epoch_seed : Epoch_seed.t
-    ; next_epoch_ledger : Mina_ledger.Ledger.Any_ledger.witness
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
+    ; block_timestamp : Block_time.t
     }
 
   val prepare_inputs :
     breadcrumb_spec:breadcrumb_spec -> mina_lib -> inputs Deferred.Or_error.t
+
+  (** Compute a full hard fork config (genesis ledger, genesis epoch ledgers,
+      and node config) both without hard fork ledger migrations applied (the
+      "legacy" format, compatible with the current daemon) and with the hard
+      fork ledger migrations applied (the actual hard fork format, compatible
+      with a hard fork daemon). The legacy format config will be saved in
+      [daemon.legacy.json] and [genesis_legacy/] in [directory_name], and the
+      hard fork format files will be saved in [daemon.json] and [genesis/] in
+      that same directory. An empty [activated] file will be created in
+      [directory_name] at the very end of this process to indicate that the
+      config was generated successfully. *)
+  val dump_reference_config :
+       breadcrumb_spec:breadcrumb_spec
+    -> directory_name:string
+    -> mina_lib
+    -> unit Deferred.Or_error.t
 end
 
 val zkapp_cmd_limit : t -> int option ref

@@ -2289,6 +2289,30 @@ let thread_graph =
                   (humanize_graphql_error ~graphql_endpoint e) ) ;
              exit 1 ) )
 
+let generate_hardfork_config =
+  let open Command.Param in
+  let hardfork_config_dir_flag =
+    flag "--hardfork-config-dir"
+      ~doc:
+        "DIR Directory to generate hardfork configuration, relative to the \
+         daemon working directory"
+      (required string)
+  in
+  Command.async ~summary:"Generate reference hardfork configuration"
+    (Cli_lib.Background_daemon.rpc_init hardfork_config_dir_flag
+       ~f:(fun port directory_name ->
+         match%bind
+           Daemon_rpcs.Client.dispatch_join_errors
+             Daemon_rpcs.Generate_hardfork_config.rpc directory_name port
+         with
+         | Ok () ->
+             printf "Hardfork configuration successfully generated\n" ;
+             exit 0
+         | Error e ->
+             eprintf "Failed to generate hard fork config: %s\n"
+               (Error.to_string_hum e) ;
+             exit 1 ) )
+
 let signature_kind =
   Command.basic
     ~summary:"Print the signature kind that this binary is compiled with"
@@ -2533,6 +2557,7 @@ let advanced ~itn_features =
     ; ("vrf", Cli_lib.Commands.Vrf.command_group)
     ; ("thread-graph", thread_graph)
     ; ("print-signature-kind", signature_kind)
+    ; ("generate-hardfork-config", generate_hardfork_config)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
           [ ("create-genesis", test_genesis_creation) ] )
