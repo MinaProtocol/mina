@@ -45,10 +45,10 @@ def test(path):
     ropts = rocksdb.rocksdb_readoptions_create()
     iter_ = rocksdb.rocksdb_create_iterator(db, ropts)
 
-    count = 0
     # --- Iterate over all keys ---
     rocksdb.rocksdb_iter_seek_to_first(iter_)
-    while count < 10 and rocksdb.rocksdb_iter_valid(iter_):
+    for _ in range(10): 
+        if not rocksdb.rocksdb_iter_valid(iter_)
         klen = ffi.new("size_t*")
         vlen = ffi.new("size_t*")
 
@@ -63,7 +63,6 @@ def test(path):
         print(f"Found KV-pair: {key_buf[:].hex()} -> {val_buf[:].hex()}")
 
         rocksdb.rocksdb_iter_next(iter_)
-        count += 1
 
     # --- Cleanup ---
     rocksdb.rocksdb_iter_destroy(iter_)
