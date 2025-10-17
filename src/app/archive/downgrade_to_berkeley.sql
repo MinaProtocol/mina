@@ -18,7 +18,7 @@ SET archive.current_protocol_version = '4.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '3.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.4';
+SET archive.migration_version = '0.0.5';
 
 -- TODO: put below in a common script
 

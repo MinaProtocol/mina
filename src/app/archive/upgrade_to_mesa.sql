@@ -18,7 +18,7 @@ SET archive.current_protocol_version = '3.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.4';
+SET archive.migration_version = '0.0.5';
 
 -- TODO: put below in a common script
 
@@ -163,30 +163,32 @@ SELECT add_zkapp_states_nullable_element(31);
 
 -- 3. `zkapp_states`: Add columns element8..element31
 
-CREATE OR REPLACE FUNCTION get_zero_field_id() RETURNS int AS $$
-DECLARE
-  result int;
-  zero text := '0';
+-- Ensure { id: 1, field: '0'} exist in `zkapp_field`
+DO $$
 BEGIN
-  -- Try to fetch existing id
-  SELECT id INTO result FROM zkapp_field WHERE field = zero;
+  -- 1️⃣ If the exact row exists, do nothing
+  IF NOT EXISTS (
+    SELECT 1 FROM zkapp_field WHERE id = 1 AND field = '0'
+  ) THEN
+    -- 2️⃣ Try inserting
+    BEGIN
+      INSERT INTO zkapp_field (id, field) VALUES (1, '0');
+    EXCEPTION
+      WHEN unique_violation THEN
+        -- 3️⃣ Insert failed due to id=1 or field='0' taken
+        RAISE EXCEPTION
+          'Insert failed: either id=1 or field=''0'' is already used by another row in `zkapp_field`';
+    END;
 
-  -- If not found, insert and get the new id
-  IF result IS NULL THEN
-    INSERT INTO zkapp_field(field)
-    VALUES (zero)
-    RETURNING id INTO result;
+  RAISE NOTICE 'Ensured that { id: 1, field: ''0''} exist in `zkapp_field`';
   END IF;
-
-  RETURN result;
-END
-$$ LANGUAGE plpgsql;
+END $$;
 
 CREATE OR REPLACE FUNCTION add_zkapp_states_element(p_element_num INT)
 RETURNS VOID AS $$
 DECLARE
     col_name TEXT := 'element' || p_element_num;
-    default_id int := get_zero_field_id();
+    default_id int := 1;
 BEGIN
 
     RAISE DEBUG 'Adding column % for zkapp_states', col_name;
@@ -205,14 +207,6 @@ EXCEPTION
         RAISE EXCEPTION 'An error occurred while adding column % to zkapp_states: %', col_name, SQLERRM;
 END
 $$ LANGUAGE plpgsql;
-
-DO $$
-DECLARE
-    default_id int := get_zero_field_id();
-BEGIN
-    RAISE NOTICE 'Zero field in table zkapp_field is of id = %', default_id;
-END
-$$;
 
 SELECT add_zkapp_states_element(8);
 SELECT add_zkapp_states_element(9);
