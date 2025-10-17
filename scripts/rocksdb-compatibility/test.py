@@ -14,6 +14,9 @@ from tqdm import tqdm
 
 import rocksdb
 
+NUM_LEDGER_TARS = 5
+NUM_KV_PER_LEDGER = 10
+
 # Match keys starting with "genesis_ledger" or "epoch_ledger" and ending with ".tar.gz"
 def matches_pattern(key: str) -> bool:
     return (key.startswith("genesis_ledger") or key.startswith("epoch_ledger")) and key.endswith(".tar.gz")
@@ -76,7 +79,7 @@ def main():
     if not tar_keys:
         raise RuntimeError("No ledger tar files found.")
 
-    for tar_key in random.sample(tar_keys, min(5, len(tar_keys))):
+    for tar_key in random.sample(tar_keys, min(NUM_LEDGER_TARS, len(tar_keys))):
         tar_uri = urljoin("https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/", tar_key)
         print(f"Testing RocksDB compatibility on {tar_uri}")
 
@@ -92,7 +95,7 @@ def main():
 
             print(f"  Testing extracted RocksDB at {db_path}")
             try:
-                rocksdb.test(db_path, 10)
+                rocksdb.test(db_path, NUM_KV_PER_LEDGER)
             except Exception as e:
                 raise RuntimeError(f"Failed to open RocksDB at {db_path}: {type(e).__name__}: {e}")
 
