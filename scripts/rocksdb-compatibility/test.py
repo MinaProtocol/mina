@@ -5,13 +5,14 @@ import shutil
 import tarfile
 import tempfile
 import xml.etree.ElementTree as ET
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import urljoin
+
+import pycurl
 from tqdm import tqdm
 
-import requests
 import rocksdb
-import pycurl
 
 # Match keys starting with "genesis_ledger" or "epoch_ledger" and ending with ".tar.gz"
 def matches_pattern(key: str) -> bool:
@@ -44,17 +45,33 @@ def extract_tar_gz(tar_path: str, target_dir: str) -> None:
     with tarfile.open(tar_path, "r:gz") as tar:
         tar.extractall(path=target_dir)
 
-def main():
-    # Fetch S3 XML listing
-    resp = requests.get("https://snark-keys.o1test.net.s3.amazonaws.com/", verify=False)
-    if not resp.ok:
-        raise RuntimeError(f"Failed to list S3 bucket: {resp.status_code} {resp.reason}")
+def list_s3_keys(url, matches_pattern):
+    buffer = BytesIO()
+    c = pycurl.Curl()
+    c.setopt(c.URL, url)
+    c.setopt(c.WRITEDATA, buffer)
+    c.setopt(c.FOLLOWLOCATION, True)
+    c.setopt(c.SSL_VERIFYPEER, False)
+    c.setopt(c.SSL_VERIFYHOST, 0)
+    c.perform()
+    status_code = c.getinfo(c.RESPONSE_CODE)
+    c.close()
 
+    if status_code != 200:
+        raise RuntimeError(f"Failed to list S3 bucket: {status_code}")
 
+    data = buffer.getvalue()
+    root = ET.fromstring(data)
     ns = {"s3": "http://s3.amazonaws.com/doc/2006-03-01/"}
+    tar_keys = [
+        elem.text
+        for elem in root.findall(".//s3:Contents/s3:Key", ns)
+        if matches_pattern(elem.text)
+    ]
+    return tar_keys
 
-    root = ET.fromstring(resp.text)
-    tar_keys = [elem.text for elem in root.findall(".//s3:Contents/s3:Key", ns) if matches_pattern(elem.text) ]
+def main():
+    tar_keys = list_s3_keys("https://snark-keys.o1test.net.s3.amazonaws.com/", matches_pattern)
 
     if not tar_keys:
         raise RuntimeError("No ledger tar files found.")
