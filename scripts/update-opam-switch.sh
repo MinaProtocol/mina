@@ -29,7 +29,8 @@ ocaml_version=4.14.2
 # - flake.nix (and flake.lock after running
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
-opam_repository_commit=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
+OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
+O1LABS_OPAM_REPOSITORY_COMMIT=cabde639f92d259d4c131b00200d7a53d854ee74
 
 if [[ -d _opam ]]; then
     read -rp "Directory '_opam' exists and will be removed. You can also bypass the check by setting the variable BYPASS_OPAM_SWITCH_UPDATE to any value. Continue? [y/N] " \
@@ -48,14 +49,14 @@ if [[ ! -d "${switch_dir}" ]]; then
     # We add o1-labs opam repository and make it default
     # (if it's repeated, it's a no-op)
     opam repository add --yes --set-default o1-labs \
-         https://github.com/o1-labs/opam-repository.git
+         "https://github.com/o1-labs/opam-repository.git#${O1LABS_OPAM_REPOSITORY_COMMIT}"
     # The default opam repository is set to a specific commit as some of our
     # dependencies have been archived.
     # See https://github.com/MinaProtocol/mina/pull/17450
     opam repository \
          set-url \
          default \
-         "git+https://github.com/ocaml/opam-repository.git#${opam_repository_commit}"
+         "git+https://github.com/ocaml/opam-repository.git#${OPAM_REPOSITORY_COMMIT}"
     opam update
     opam switch import -y --switch . opam.export
     mkdir -p opam_switches
