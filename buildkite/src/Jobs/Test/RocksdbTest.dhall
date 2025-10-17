@@ -18,8 +18,7 @@ in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.strictlyStart
-              (S.contains "buildkite/scripts/rocksdb-compatibility")
+          [ S.strictlyStart (S.contains "scripts/rocksdb-compatibility")
           , S.exactly "buildkite/src/Jobs/Test/RocksdbTest" "dhall"
           ]
         , path = "Test"
