@@ -12,7 +12,7 @@ let Size = ../../Command/Size.dhall
 
 let RunInToolchain = ../../Command/RunInToolchain.dhall
 
-let key = "archive-hardfork-toolbox-test"
+let key = "test"
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -22,7 +22,7 @@ in  Pipeline.build
           , S.exactly "buildkite/src/Jobs/Test/RocksdbTest" "dhall"
           ]
         , path = "Test"
-        , name = "RocksdbTest"
+        , name = "RocksDBLedgerTarCompatibilityTest"
         , tags =
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
@@ -35,11 +35,11 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchain
                   ([] : List Text)
-                  (     "./buildkite/scripts/rocksdb-compatibility/install-rocks.sh"
-                    ++  " && pip install -r buildkite/scripts/rocksdb-compatibility/requirements.txt"
-                    ++  " && python3 ./buildkite/scripts/rocksdb-compatibility/rocksdb.py"
+                  (     "./scripts/rocksdb-compatibility/install-rocks.sh"
+                    ++  " && pip install -r ./scripts/rocksdb-compatibility/requirements.txt"
+                    ++  " && python3 ./scripts/rocksdb-compatibility/rocksdb.py"
                   )
-            , label = "Rocksdb Test"
+            , label = "RocksDB: Ledger Tar Compatibility Test"
             , key = key
             , target = Size.Large
             }
