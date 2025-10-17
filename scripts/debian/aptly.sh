@@ -40,6 +40,8 @@ function start_aptly() {
         rm -rf ~/.aptly
     fi
 
+    aptly repo list | grep -q "^${__repo}$" && aptly repo drop "${__repo}" || true
+
     aptly repo create -component "${__component}" -distribution "${__distribution}" -architectures "${__archs}" "${__repo}"
 
     aptly repo add -architectures "${__archs}" "${__repo}" "${__debs}"
