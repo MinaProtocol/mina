@@ -115,7 +115,7 @@ module Root_test = struct
         in
         L.Root.Config.move_backing_exn ~src:config ~dst:config_moved ;
         assert (
-          (not (L.Root.Config.exists_backing config))
+          (not (L.Root.Config.exists_any_backing config))
           && L.Root.Config.exists_backing config_moved
           || failwith "Config is not moved" ) ;
         let root_moved =
