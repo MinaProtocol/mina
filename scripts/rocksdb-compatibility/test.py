@@ -75,7 +75,7 @@ def main():
 
             print(f"  Testing extracted RocksDB at {db_path}")
             try:
-                rocksdb.test(db_path.encode('utf-8'))
+                rocksdb.test(db_path)
             except Exception as e:
                 raise RuntimeError(f"Failed to open RocksDB at {db_path}: {type(e).__name__}: {e}")
 

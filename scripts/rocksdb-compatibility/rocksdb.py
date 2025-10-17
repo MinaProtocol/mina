@@ -1,4 +1,5 @@
 from cffi import FFI
+from contextlib import contextmanager
 
 ffi = FFI()
 
@@ -30,41 +31,50 @@ const char* rocksdb_iter_value(const rocksdb_iterator_t* iter, size_t* vlen);
 # Load the library
 rocksdb = ffi.dlopen("librocksdb.so")
 
+@contextmanager
+def rocksdb_options(create_if_missing=False):
+    opts = rocksdb.rocksdb_options_create()
+    rocksdb.rocksdb_options_set_create_if_missing(opts, int(create_if_missing))
+    try:
+        yield opts
+    finally:
+        rocksdb.rocksdb_options_destroy(opts)
 
-def test(path):
-    # --- Open existing DB ---
-    options = rocksdb.rocksdb_options_create()
-    rocksdb.rocksdb_options_set_create_if_missing(options, 0)  # do not create new DB
+@contextmanager
+def open_db(path, options):
     err_ptr = ffi.new("char**")
-    db = rocksdb.rocksdb_open(options, path, err_ptr)
+    db = rocksdb.rocksdb_open(options, path.encode('utf-8'), err_ptr)
     if err_ptr[0] != ffi.NULL:
         raise RuntimeError("Open error: " + ffi.string(err_ptr[0]).decode())
-    rocksdb.rocksdb_options_destroy(options)
+    try:
+        yield db
+    finally:
+        rocksdb.rocksdb_close(db)
 
-    # --- Create read options and iterator ---
+@contextmanager
+def read_iter(db):
     ropts = rocksdb.rocksdb_readoptions_create()
     iter_ = rocksdb.rocksdb_create_iterator(db, ropts)
+    try:
+        yield iter_
+    finally:
+        rocksdb.rocksdb_iter_destroy(iter_)
+        rocksdb.rocksdb_readoptions_destroy(ropts)
 
-    # --- Iterate over all keys ---
-    rocksdb.rocksdb_iter_seek_to_first(iter_)
-    for _ in range(10): 
-        if not rocksdb.rocksdb_iter_valid(iter_)
-        klen = ffi.new("size_t*")
-        vlen = ffi.new("size_t*")
+def test(path):
+    with rocksdb_options(create_if_missing=False) as opts, open_db(path, opts) as db, read_iter(db) as it:
+        rocksdb.rocksdb_iter_seek_to_first(it)
+        for _ in range(10):
+            if not rocksdb.rocksdb_iter_valid(it):
+                break
 
-        key_ptr = rocksdb.rocksdb_iter_key(iter_, klen)
-        val_ptr = rocksdb.rocksdb_iter_value(iter_, vlen)
+            klen = ffi.new("size_t*")
+            vlen = ffi.new("size_t*")
+            key_ptr = rocksdb.rocksdb_iter_key(it, klen)
+            val_ptr = rocksdb.rocksdb_iter_value(it, vlen)
 
-        # Create buffer views without copying
-        key_buf = ffi.buffer(key_ptr, klen[0])
-        val_buf = ffi.buffer(val_ptr, vlen[0])
+            key_buf = ffi.buffer(key_ptr, klen[0])
+            val_buf = ffi.buffer(val_ptr, vlen[0])
+            print(f"Found KV-pair: {key_buf[:].hex()} -> {val_buf[:].hex()}")
 
-        # key_buf and val_buf behave like bytes, e.g.,
-        print(f"Found KV-pair: {key_buf[:].hex()} -> {val_buf[:].hex()}")
-
-        rocksdb.rocksdb_iter_next(iter_)
-
-    # --- Cleanup ---
-    rocksdb.rocksdb_iter_destroy(iter_)
-    rocksdb.rocksdb_readoptions_destroy(ropts)
-    rocksdb.rocksdb_close(db)
+            rocksdb.rocksdb_iter_next(it)
