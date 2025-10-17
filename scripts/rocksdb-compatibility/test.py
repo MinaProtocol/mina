@@ -93,10 +93,7 @@ def main():
             extract_tar_gz(tar_path, db_path)
 
             print(f"  Testing extracted RocksDB at {db_path}")
-            try:
-                rocksdb.test(db_path, NUM_KV_PER_LEDGER)
-            except Exception as e:
-                raise RuntimeError(f"Failed to open RocksDB at {db_path}: {type(e).__name__}: {e}")
+            rocksdb.test(db_path, NUM_KV_PER_LEDGER)
 
 
 if __name__ == "__main__":
