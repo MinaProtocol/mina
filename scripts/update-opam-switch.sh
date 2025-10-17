@@ -30,7 +30,7 @@ ocaml_version=4.14.2
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
 OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
-O1LABS_OPAM_REPOSITORY_COMMIT=cabde639f92d259d4c131b00200d7a53d854ee74
+O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
 
 if [[ -d _opam ]]; then
     read -rp "Directory '_opam' exists and will be removed. You can also bypass the check by setting the variable BYPASS_OPAM_SWITCH_UPDATE to any value. Continue? [y/N] " \
