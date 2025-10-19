@@ -3,7 +3,7 @@ open Async
 open Signature_lib
 open Mina_base
 include Genesis_ledger_helper_lib
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 type exn += Genesis_state_initialization_error
 

@@ -14,7 +14,7 @@ module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 type t
 

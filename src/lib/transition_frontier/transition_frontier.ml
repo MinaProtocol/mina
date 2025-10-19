@@ -7,7 +7,7 @@ open Core
 open Async_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions

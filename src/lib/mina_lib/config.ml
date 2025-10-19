@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Signature_lib
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
 

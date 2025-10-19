@@ -3,7 +3,7 @@ open Async
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 open Signature_lib
 open Currency
 open Schema

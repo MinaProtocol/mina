@@ -1,7 +1,7 @@
 open Mina_base
 open Signature_lib
 open Core_kernel
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 module Timing = struct
   type t = (int, int, int, int) Account_timing.Poly.t

@@ -4,7 +4,7 @@ open Pipe_lib
 open Cache_lib
 open Mina_base
 open Network_peer
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -343,7 +343,7 @@ module type Transition_router_intf = sig
           -> Transaction_snark_work.Checked.t option )
     -> catchup_mode:[ `Super ]
     -> notify_online:(unit -> unit Deferred.t)
-    -> ledger_backing:Root_ledger.Config.backing_type
+    -> ledger_backing:Mina_ledger.Root.Config.backing_type
     -> unit
     -> ( [ `Transition of Mina_block.Validated.t ]
        * [ `Source of [ `Gossip | `Catchup | `Internal ] ]

@@ -7,7 +7,7 @@ open Fold_lib
 open Signature_lib
 open Snark_params
 open Num_util
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 module Segment_id = Mina_numbers.Nat.Make32 ()
 

@@ -9,7 +9,7 @@ open Async
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 let snark_job_list_json t =
   let open Participating_state.Let_syntax in

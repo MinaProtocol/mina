@@ -17,7 +17,7 @@ module Root_data = Root_data
 module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -156,7 +156,7 @@ module For_tests : sig
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
     -> ?create_root_and_accounts:
-         (   config:Root_ledger.Config.t
+         (   config:Mina_ledger.Root.Config.t
           -> depth:int
           -> unit
           -> Root_ledger.t Core_kernel.Or_error.t )
@@ -179,7 +179,7 @@ module For_tests : sig
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
     -> ?create_root_and_accounts:
-         (   config:Root_ledger.Config.t
+         (   config:Mina_ledger.Root.Config.t
           -> depth:int
           -> unit
           -> Root_ledger.t Core_kernel.Or_error.t )

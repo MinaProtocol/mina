@@ -3,7 +3,7 @@ open Currency
 open Signature_lib
 open Mina_base
 module Ledger = Mina_ledger.Ledger
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 module Intf = Intf
 module Ledger_transfer_mask =
   Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Any_ledger.M)

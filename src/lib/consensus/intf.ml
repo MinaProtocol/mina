@@ -4,7 +4,7 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t

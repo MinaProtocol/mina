@@ -5,7 +5,7 @@ let%test_module "Epoch ledger sync tests" =
     open Mina_base
     open Pipe_lib
     open Network_peer
-    module Root_ledger = Mina_ledger.Ledger.Root
+    module Root_ledger = Mina_ledger.Root
 
     module type CONTEXT = sig
       include Mina_lib.CONTEXT

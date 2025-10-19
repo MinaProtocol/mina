@@ -2,7 +2,7 @@ open Core
 open Mina_base
 open Frontier_base
 open Mina_ledger
-module Root_ledger = Ledger.Root
+module Root_ledger = Root
 
 module rec Instance_type : sig
   type t =

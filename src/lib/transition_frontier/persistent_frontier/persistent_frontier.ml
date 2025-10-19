@@ -5,7 +5,7 @@ open Mina_state
 open Mina_block
 open Frontier_base
 module Database = Database
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t

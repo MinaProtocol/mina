@@ -12,7 +12,7 @@
 open Mina_base
 open Frontier_base
 open Mina_state
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -87,7 +87,7 @@ module For_tests : sig
        Base_quickcheck.Generator.t
 
   val create_frontier :
-       epoch_ledger_backing_type:Root_ledger.Config.backing_type
+       epoch_ledger_backing_type:Mina_ledger.Root.Config.backing_type
     -> unit
     -> t Async_kernel.Deferred.t
 

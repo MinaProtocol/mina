@@ -4,7 +4,7 @@ module Ledger = Mina_ledger.Ledger
 open Frontier_base
 module Ledger_transfer_any =
   Mina_ledger.Ledger_transfer.Make (Ledger.Any_ledger.M) (Ledger.Any_ledger.M)
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in

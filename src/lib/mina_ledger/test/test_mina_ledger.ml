@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 module L = Mina_ledger.Ledger
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 
 let logger = Logger.create ~id:"test_mina_ledger" ()
 

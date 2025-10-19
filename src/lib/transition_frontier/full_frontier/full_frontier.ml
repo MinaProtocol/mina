@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 open Mina_state
 open Frontier_base
 

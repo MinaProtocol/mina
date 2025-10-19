@@ -7,7 +7,7 @@ open Pipe_lib.Strict_pipe
 open Network_peer
 open Mina_stdlib
 module Ledger = Mina_ledger.Ledger
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 module Sync_ledger = Mina_ledger.Sync_ledger
 module Transition_cache = Transition_cache
 

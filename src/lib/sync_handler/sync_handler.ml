@@ -2,7 +2,7 @@ open Core_kernel
 open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
-module Root_ledger = Mina_ledger.Ledger.Root
+module Root_ledger = Mina_ledger.Root
 module Sync_ledger = Mina_ledger.Sync_ledger
 open Frontier_base
 open Network_peer
