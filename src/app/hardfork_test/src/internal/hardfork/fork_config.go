@@ -1,6 +1,7 @@
 package hardfork
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -23,17 +24,19 @@ func (t *HardforkTest) ExtractForkConfig(port int, forkConfigPath string) ([]byt
 	for attempt := 1; attempt <= t.Config.ForkConfigMaxRetries; attempt++ {
 		forkConfig, err := t.Client.GetForkConfig(port)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get fork config: %w", err)
+			t.Logger.Error("Failed to get fork config: %v", err)
+			continue
 		}
 		forkConfigBytes := []byte(forkConfig.Raw)
 
 		// Write fork config to file
 		err = os.WriteFile(forkConfigPath, forkConfigBytes, 0644)
 		if err != nil {
-			return nil, fmt.Errorf("failed to write fork config: %w", err)
+			t.Logger.Error("Failed to write fork config: %v", err)
+			continue
 		}
 
-		if len(forkConfigBytes) > 4 && string(forkConfigBytes[:4]) != "null" {
+		if !bytes.Equal(forkConfigBytes, []byte("null")) {
 			return forkConfigBytes, nil
 		}
 
