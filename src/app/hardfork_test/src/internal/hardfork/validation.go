@@ -84,7 +84,7 @@ func (t *HardforkTest) CollectBlocks(ports []int, startSlot, endSlot int) ([]gra
 
 		blocksBatch, err := t.Client.GetBlocks(port)
 		if err != nil {
-			t.Logger.Debug("Failed to get blocks for slot %d: %v", i, err)
+			t.Logger.Debug("Failed to get blocks for slot %d: %v from port %d", i, err, port)
 		} else {
 			allBlocks = append(allBlocks, blocksBatch...)
 		}
@@ -100,7 +100,7 @@ func (t *HardforkTest) AnalyzeBlocks(ports []int) (*BlockAnalysisResult, error) 
 	// Get initial blocks to find genesis epoch hashes
 	blocks, err := t.Client.GetBlocks(ports[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get blocks: %w", err)
+		return nil, fmt.Errorf("failed to get blocks: %w from port %d", err, ports[0])
 	}
 
 	// Find the first non-empty block to get genesis epoch hashes
