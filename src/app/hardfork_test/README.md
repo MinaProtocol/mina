@@ -52,25 +52,25 @@ This validates the critical hardfork mechanism:
 - `--best-chain-query-from`: Slot from which to start calling bestchain query (default: 25)
 
 #### Slot Configuration
-- `--main-slot`: Slot duration in seconds for main version (default: 15)
-- `--fork-slot`: Slot duration in seconds for fork version (default: 15)
+- `--main-slot`: Slot duration for main version (default: 15)
+- `--fork-slot`: Slot duration for fork version (default: 15)
 
 #### Delay Configuration
-- `--main-delay`: Delay before genesis slot in minutes for main version (default: 5)
-- `--fork-delay`: Delay before genesis slot in minutes for fork version (default: 5)
+- `--main-delay`: Delay before genesis slot for main version (default: 5)
+- `--fork-delay`: Delay before genesis slot for fork version (default: 5)
 
 #### Script Configuration
 - `--script-dir`: Path to the hardfork script directory (default: "$PWD/scripts/hardfork")
 
 #### Timeout Configuration
-- `--shutdown-timeout`: Timeout in minutes to wait for graceful shutdown before forcing kill (default: 10)
-- `--http-timeout`: HTTP client timeout in seconds for GraphQL requests (default: 600)
+- `--shutdown-timeout`: Timeout to wait for graceful shutdown before forcing kill (default: 10)
+- `--http-timeout`: HTTP client timeout for GraphQL requests (default: 600)
 
 #### Polling and Retry Configuration
-- `--polling-interval`: Interval in seconds for polling height checks (default: 5)
-- `--fork-config-retry-delay`: Delay in seconds between fork config fetch retries (default: 60)
+- `--polling-interval`: Interval for polling height checks (default: 5)
+- `--fork-config-retry-delay`: Delay between fork config fetch retries (default: 60)
 - `--fork-config-max-retries`: Maximum number of retries for fork config fetch (default: 15)
-- `--no-new-blocks-wait`: Wait time in seconds to verify no new blocks after chain end (default: 300)
+- `--no-new-blocks-wait`: Wait time to verify no new blocks after chain end (default: 300)
 - `--user-command-check-max-iterations`: Max iterations to check for user commands in blocks (default: 10)
 - `--fork-earliest-block-max-retries`: Maximum number of retries to wait for earliest block in fork network (default: 10)
 - `--graphql-max-retries`: Maximum number of retries for GraphQL requests (default: 5)
