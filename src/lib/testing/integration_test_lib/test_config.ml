@@ -80,6 +80,7 @@ type t =
   ; txpool_max_size : int
   ; slot_tx_end : int option
   ; slot_chain_end : int option
+  ; hard_fork_genesis_slot_delta : int option
   ; network_id : string option
   ; block_window_duration_ms : int
   ; transaction_capacity_log_2 : int
@@ -142,6 +143,7 @@ let default ~(constants : constants) =
   ; txpool_max_size = genesis_constants.txpool_max_size
   ; slot_tx_end = None
   ; slot_chain_end = None
+  ; hard_fork_genesis_slot_delta = None
   ; network_id = None
   ; block_window_duration_ms = constraint_constants.block_window_duration_ms
   ; transaction_capacity_log_2 = constraint_constants.transaction_capacity_log_2

@@ -115,7 +115,7 @@ module Root_test = struct
         in
         L.Root.Config.move_backing_exn ~src:config ~dst:config_moved ;
         assert (
-          (not (L.Root.Config.exists_backing config))
+          (not (L.Root.Config.exists_any_backing config))
           && L.Root.Config.exists_backing config_moved
           || failwith "Config is not moved" ) ;
         let root_moved =
@@ -180,6 +180,36 @@ module Root_test = struct
               ~logger ~depth:ledger_depth ~assert_synced:true ()
             |> close) ) ;
         Deferred.unit )
+
+  (** Test that a root created with a stable backing and then made converting
+      has the expected database states *)
+  let test_root_make_converting ~random () =
+    Mina_stdlib_unix.File_system.with_temp_dir "root_gradual_migration"
+      ~f:(fun cwd ->
+        let cfg =
+          L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger")
+        in
+        let root =
+          L.Root.create ~logger
+            ~config:(cfg ~backing_type:Stable_db)
+            ~depth:ledger_depth ()
+        in
+        let loc_with_accounts =
+          populate_with_random_accounts ~num:num_accounts ~root ~random
+        in
+        let%bind root = L.Root.make_converting root in
+        (* Make sure the stable accounts are all still present *)
+        assert_accounts ~loc_with_accounts ~root ;
+        L.Root.close root ;
+        (* Re-open the root as converting to check that the databases are in
+           sync *)
+        let converting_root =
+          L.Root.create ~logger
+            ~config:(cfg ~backing_type:Converting_db)
+            ~depth:ledger_depth ~assert_synced:true ()
+        in
+        L.Root.close converting_root ;
+        Deferred.unit )
 end
 
 let () =
@@ -195,5 +225,7 @@ let () =
                 (Root_test.test_root_moving ~random)
             ; Alcotest_async.test_case "make checkpointing a root" `Quick
                 (Root_test.test_root_make_checkpointing ~random)
+            ; Alcotest_async.test_case "make converting a root" `Quick
+                (Root_test.test_root_make_converting ~random)
             ] )
         ] )

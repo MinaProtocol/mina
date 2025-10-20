@@ -624,17 +624,38 @@ module Epoch_data = struct
                  epoch ledger" ;
               Deferred.Or_error.return (None, None)
           | Some { ledger; seed } ->
-              let%map next_ledger, config'', ledger_file =
-                load_ledger ~genesis_backing_type ledger
-              in
-              [%log trace] "Loaded next epoch ledger from $ledger_file"
-                ~metadata:[ ("ledger_file", `String ledger_file) ] ;
-              ( Some
-                  { Consensus.Genesis_epoch_data.Data.ledger = next_ledger
-                  ; seed = Epoch_seed.of_base58_check_exn seed
-                  }
-              , Some { Runtime_config.Epoch_data.Data.ledger = config''; seed }
-              )
+              (* Check if next ledger has the same hash as staking ledger to avoid
+                 loading the same ledger twice, which causes RocksDB LOCK conflicts *)
+              let staking_hash = config.staking.ledger.hash in
+              let next_hash = ledger.hash in
+              if Option.equal String.equal staking_hash next_hash then (
+                [%log trace]
+                  "Next epoch ledger has the same hash as staking ledger, \
+                   reusing staking ledger" ;
+                Deferred.Or_error.return
+                  ( Some
+                      { Consensus.Genesis_epoch_data.Data.ledger =
+                          staking.ledger
+                      ; seed = Epoch_seed.of_base58_check_exn seed
+                      }
+                  , Some
+                      { Runtime_config.Epoch_data.Data.ledger =
+                          staking_config.ledger
+                      ; seed
+                      } ) )
+              else
+                let%map next_ledger, config'', ledger_file =
+                  load_ledger ~genesis_backing_type ledger
+                in
+                [%log trace] "Loaded next epoch ledger from $ledger_file"
+                  ~metadata:[ ("ledger_file", `String ledger_file) ] ;
+                ( Some
+                    { Consensus.Genesis_epoch_data.Data.ledger = next_ledger
+                    ; seed = Epoch_seed.of_base58_check_exn seed
+                    }
+                , Some
+                    { Runtime_config.Epoch_data.Data.ledger = config''; seed }
+                )
         in
         (* the staking ledger and the next ledger, if it exists,
            should have the genesis winner account as the first account, under
