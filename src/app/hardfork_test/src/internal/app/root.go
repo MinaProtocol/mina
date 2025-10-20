@@ -1,10 +1,6 @@
 package app
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/hardfork"
 	"github.com/spf13/cobra"
@@ -41,18 +37,8 @@ Example:
 			return err
 		}
 
-		// Check if ScriptDir contains $PWD and replace it if needed
-		if cfg.ScriptDir == "$PWD/scripts/hardfork" {
-			workDir, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get working directory: %w", err)
-			}
-			cfg.ScriptDir = filepath.Join(workDir, "scripts", "hardfork")
-		}
-
 		// Create and run the hardfork test
-		test := hardfork.NewHardforkTest(cfg)
-		return test.Run()
+		return hardfork.NewHardforkTest(cfg).Run()
 	},
 }
 

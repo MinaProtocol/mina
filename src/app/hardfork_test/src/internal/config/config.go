@@ -57,7 +57,6 @@ func DefaultConfig() *Config {
 		ForkSlot:                      15,
 		MainDelay:                     5,
 		ForkDelay:                     5,
-		ScriptDir:                     "$PWD/scripts/hardfork",
 		ShutdownTimeoutMinutes:        10,
 		PollingIntervalSeconds:        5,
 		ForkConfigRetryDelaySeconds:   60,
@@ -86,6 +85,9 @@ func (c *Config) Validate() error {
 	if c.ForkRuntimeGenesisLedger == "" {
 		return ErrMissingForkRuntimeGenesisLedger
 	}
+	if c.ScriptDir == "" {
+		return ErrMissingScriptDir
+	}
 
 	// Check if executables exist and have proper permissions
 	if err := validateExecutable(c.MainMinaExe); err != nil {
@@ -99,6 +101,10 @@ func (c *Config) Validate() error {
 	}
 	if err := validateExecutable(c.ForkRuntimeGenesisLedger); err != nil {
 		return FileValidationError(c.ForkRuntimeGenesisLedger, err)
+	}
+
+	if err := validateScriptDir(c.ScriptDir); err != nil {
+		return FileValidationError(c.ScriptDir, err)
 	}
 
 	return nil
@@ -142,6 +148,18 @@ func validateExecutable(path string) error {
 	// Check executable permission - mode & 0111 is checking for any execution bit (user, group, or others)
 	if info.Mode().Perm()&0111 == 0 {
 		return ErrNotExecutable
+	}
+
+	return nil
+}
+
+func validateScriptDir(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return ErrNotADir
 	}
 
 	return nil
