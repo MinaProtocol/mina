@@ -20,7 +20,7 @@ type ForkConfigData struct {
 }
 
 // ExtractForkConfig extracts the fork configuration from the network
-func (t *HardforkTest) ExtractForkConfig(port int, forkConfigPath string) ([]byte, error) {
+func (t *HardforkTest) GetForkConfig(port int) ([]byte, error) {
 	for attempt := 1; attempt <= t.Config.ForkConfigMaxRetries; attempt++ {
 		forkConfig, err := t.Client.GetForkConfig(port)
 		if err != nil {
@@ -28,13 +28,6 @@ func (t *HardforkTest) ExtractForkConfig(port int, forkConfigPath string) ([]byt
 			continue
 		}
 		forkConfigBytes := []byte(forkConfig.Raw)
-
-		// Write fork config to file
-		err = os.WriteFile(forkConfigPath, forkConfigBytes, 0644)
-		if err != nil {
-			t.Logger.Error("Failed to write fork config: %v", err)
-			continue
-		}
 
 		if !bytes.Equal(forkConfigBytes, []byte("null")) {
 			return forkConfigBytes, nil
