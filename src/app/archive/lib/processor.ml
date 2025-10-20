@@ -4294,6 +4294,7 @@ module Block = struct
          |sql} )
       (state_hash, height)
 
+  (* FIXME: logic in this function is wrong and we should be using `pending` to mark blocks that are not finalized instead of canonical *)
   (* update chain_status for blocks now known to be canonical or orphaned *)
   let update_chain_status ~logger (module Conn : Mina_caqti.CONNECTION)
       ~(genesis_constants : Genesis_constants.t) ~block_id =
