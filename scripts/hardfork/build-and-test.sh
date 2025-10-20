@@ -64,7 +64,7 @@ if [[ $# -gt 0 ]]; then
   nix-env -iA unstable.git-lfs
 fi
 
-if [[ ! -L compatible-devnet ]]; then
+if [[ ! -L compatible-devnet || ! -L compatible-devnet-genesis ]]; then
   if [[ $# == 0 ]]; then
     compatible_build=$(mktemp --tmpdir -d mina-compatible-worktree.XXXXXXXXXX)
     git fetch origin compatible
@@ -78,8 +78,12 @@ if [[ ! -L compatible-devnet ]]; then
   fi
   git submodule sync --recursive
   git submodule update --init --recursive --depth 1
-  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet" --out-link "$INIT_DIR/compatible-devnet"
+  if [ ! -L "$INIT_DIR/compatible-devnet" ]; then
+    nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet" --out-link "$INIT_DIR/compatible-devnet"
+  fi
+  if [ ! -L "$INIT_DIR/compatible-devnet-genesis" ]; then
   nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet.genesis" --out-link "$INIT_DIR/compatible-devnet"
+  fi
   if [[ $# == 0 ]]; then
     cd -
     rm -Rf "$compatible_build"
@@ -92,8 +96,12 @@ if [[ $# -gt 0 ]]; then
   git submodule sync --recursive
   git submodule update --init --recursive --depth 1
 fi
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
+if [ ! -L "$INIT_DIR/fork-devnet" ]; then
+  nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
+fi
+if [ ! -L "$INIT_DIR/fork-devnet-genesis" ]; then
+  nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
+fi
 
 if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws
