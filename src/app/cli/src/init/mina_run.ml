@@ -9,6 +9,7 @@ open Async
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
+module Root_ledger = Mina_ledger.Ledger.Root
 
 let snark_job_list_json t =
   let open Participating_state.Let_syntax in
@@ -316,7 +317,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   let%map accts = Mina_ledger.Ledger.to_list l_inner in
                   Ok accts
               | Ledger_root l ->
-                  let casted = Mina_ledger.Ledger.Root.as_unmasked l in
+                  let casted = Root_ledger.as_unmasked l in
                   let%map accts =
                     Mina_ledger.Ledger.Any_ledger.M.to_list casted
                   in

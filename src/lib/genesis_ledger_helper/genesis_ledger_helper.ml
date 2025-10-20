@@ -3,6 +3,7 @@ open Async
 open Signature_lib
 open Mina_base
 include Genesis_ledger_helper_lib
+module Root_ledger = Mina_ledger.Ledger.Root
 
 type exn += Genesis_state_initialization_error
 
@@ -401,17 +402,17 @@ module Ledger = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~extracted_path ~genesis_backing_type : Genesis_ledger.Packed.t =
     let genesis_config =
-      Mina_ledger.Ledger.Root.Config.with_directory
-        ~backing_type:genesis_backing_type ~directory_name:extracted_path
+      Root_ledger.Config.with_directory ~backing_type:genesis_backing_type
+        ~directory_name:extracted_path
     in
     ( module Genesis_ledger.Of_ledger (struct
       let backing_ledger =
         lazy
           (let ledger =
-             Mina_ledger.Ledger.Root.create ~logger ~config:genesis_config
+             Root_ledger.create ~logger ~config:genesis_config
                ~depth:constraint_constants.ledger_depth ()
            in
-           let ledger_root = Mina_ledger.Ledger.Root.merkle_root ledger in
+           let ledger_root = Root_ledger.merkle_root ledger in
            let expected_merkle_root =
              Option.map config.hash ~f:Ledger_hash.of_base58_check_exn
            in

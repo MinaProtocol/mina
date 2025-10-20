@@ -14,6 +14,7 @@ module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
+module Root_ledger = Mina_ledger.Ledger.Root
 
 type t
 
@@ -298,20 +299,19 @@ module Hardfork_config : sig
       (potentially) the [next_epoch_ledger], must have the [root_snarked_ledger]
       as its root. *)
   type genesis_source_ledgers =
-    { root_snarked_ledger : Mina_ledger.Ledger.Root.t
+    { root_snarked_ledger : Root_ledger.t
     ; staged_ledger : Mina_ledger.Ledger.t
     ; staking_ledger :
-        [ `Genesis of Genesis_ledger.Packed.t
-        | `Root of Mina_ledger.Ledger.Root.t ]
+        [ `Genesis of Genesis_ledger.Packed.t | `Root of Root_ledger.t ]
     ; next_epoch_ledger :
         [ `Genesis of Genesis_ledger.Packed.t
-        | `Root of Mina_ledger.Ledger.Root.t
+        | `Root of Root_ledger.t
         | `Uncommitted of Mina_ledger.Ledger.t ]
     }
 
   val genesis_source_ledger_cast :
        [< `Genesis of Genesis_ledger.Packed.t
-       | `Root of Mina_ledger.Ledger.Root.t
+       | `Root of Root_ledger.t
        | `Uncommitted of Mina_ledger.Ledger.t ]
     -> Mina_ledger.Ledger.Any_ledger.witness
 

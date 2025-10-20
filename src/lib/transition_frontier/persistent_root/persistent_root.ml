@@ -4,6 +4,7 @@ module Ledger = Mina_ledger.Ledger
 open Frontier_base
 module Ledger_transfer_any =
   Mina_ledger.Ledger_transfer.Make (Ledger.Any_ledger.M) (Ledger.Any_ledger.M)
+module Root_ledger = Mina_ledger.Ledger.Root
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in
@@ -40,8 +41,8 @@ let with_file ?size filename access_level ~f =
 (* TODO: create a reusable singleton factory abstraction *)
 module rec Instance_type : sig
   type t =
-    { snarked_ledger : Ledger.Root.t
-    ; potential_snarked_ledgers : Ledger.Root.Config.t Queue.t
+    { snarked_ledger : Root_ledger.t
+    ; potential_snarked_ledgers : Root_ledger.Config.t Queue.t
     ; factory : Factory_type.t
     }
 end =
@@ -53,7 +54,7 @@ and Factory_type : sig
     ; logger : Logger.t
     ; mutable instance : Instance_type.t option
     ; ledger_depth : int
-    ; backing_type : Ledger.Root.Config.backing_type
+    ; backing_type : Root_ledger.Config.backing_type
     }
 end =
   Factory_type
@@ -69,10 +70,10 @@ module Instance = struct
         the [Factory_type.t] directory. *)
     let make_instance_location filename t = Filename.concat t.directory filename
 
-    (** Helper to create a [Root.Config.t] for a snarked ledger based on a
+    (** Helper to create a [Root_ledger.Config.t] for a snarked ledger based on a
         subdirectory of the [Factory_type.t] directory *)
     let make_instance_config subdirectory t =
-      Ledger.Root.Config.with_directory ~backing_type:t.backing_type
+      Root_ledger.Config.with_directory ~backing_type:t.backing_type
         ~directory_name:(make_instance_location subdirectory t)
 
     (** The config for the actual snarked ledger that is initialized and used by
@@ -100,12 +101,12 @@ module Instance = struct
   end
 
   let potential_snarked_ledgers_to_yojson queue =
-    `List (List.map (Queue.to_list queue) ~f:Ledger.Root.Config.to_yojson)
+    `List (List.map (Queue.to_list queue) ~f:Root_ledger.Config.to_yojson)
 
   let potential_snarked_ledgers_of_yojson json =
     Yojson.Safe.Util.to_list json
     |> List.map ~f:(fun json ->
-           Ledger.Root.Config.of_yojson json |> Result.ok_or_failwith )
+           Root_ledger.Config.of_yojson json |> Result.ok_or_failwith )
 
   let load_potential_snarked_ledgers_from_disk factory =
     let location = Config.potential_snarked_ledgers factory in
@@ -124,25 +125,25 @@ module Instance = struct
 
   let dequeue_snarked_ledger t =
     let config = Queue.dequeue_exn t.potential_snarked_ledgers in
-    Ledger.Root.Config.delete_any_backing config ;
+    Root_ledger.Config.delete_any_backing config ;
     write_potential_snarked_ledgers_to_disk t
 
   let destroy t =
     List.iter
       (Queue.to_list t.potential_snarked_ledgers)
-      ~f:Ledger.Root.Config.delete_any_backing ;
+      ~f:Root_ledger.Config.delete_any_backing ;
     Mina_stdlib_unix.File_system.rmrf
       (Config.potential_snarked_ledgers t.factory) ;
-    Ledger.Root.close t.snarked_ledger ;
+    Root_ledger.close t.snarked_ledger ;
     t.factory.instance <- None
 
   let close t =
-    Ledger.Root.close t.snarked_ledger ;
+    Root_ledger.close t.snarked_ledger ;
     t.factory.instance <- None
 
   let create ~logger factory =
     let snarked_ledger =
-      Ledger.Root.create ~logger ~depth:factory.ledger_depth
+      Root_ledger.create ~logger ~depth:factory.ledger_depth
         ~config:(Config.snarked_ledger factory)
         ()
     in
@@ -163,11 +164,11 @@ module Instance = struct
       List.fold_until potential_snarked_ledgers ~init:None
         ~f:(fun _ config ->
           let potential_snarked_ledger =
-            Ledger.Root.create ~logger ~depth:factory.ledger_depth ~config ()
+            Root_ledger.create ~logger ~depth:factory.ledger_depth ~config ()
           in
           let potential_snarked_ledger_hash =
             Frozen_ledger_hash.of_ledger_hash
-            @@ Ledger.Root.merkle_root potential_snarked_ledger
+            @@ Root_ledger.merkle_root potential_snarked_ledger
           in
           [%log debug]
             ~metadata:
@@ -180,31 +181,31 @@ module Instance = struct
               snarked_ledger_hash
           then (
             let snarked_ledger =
-              Ledger.Root.create ~logger ~depth:factory.ledger_depth
+              Root_ledger.create ~logger ~depth:factory.ledger_depth
                 ~config:(Config.tmp_snarked_ledger factory)
                 ()
             in
             match
               Ledger_transfer_any.transfer_accounts
-                ~src:(Ledger.Root.as_unmasked potential_snarked_ledger)
-                ~dest:(Ledger.Root.as_unmasked snarked_ledger)
+                ~src:(Root_ledger.as_unmasked potential_snarked_ledger)
+                ~dest:(Root_ledger.as_unmasked snarked_ledger)
             with
             | Ok _ ->
-                Ledger.Root.close potential_snarked_ledger ;
-                Ledger.Root.Config.delete_any_backing
+                Root_ledger.close potential_snarked_ledger ;
+                Root_ledger.Config.delete_any_backing
                 @@ Config.snarked_ledger factory ;
-                Ledger.Root.Config.move_backing_exn
+                Root_ledger.Config.move_backing_exn
                   ~src:(Config.tmp_snarked_ledger factory)
                   ~dst:(Config.snarked_ledger factory) ;
                 List.iter potential_snarked_ledgers
-                  ~f:Ledger.Root.Config.delete_any_backing ;
+                  ~f:Root_ledger.Config.delete_any_backing ;
                 Mina_stdlib_unix.File_system.rmrf
                   (Config.potential_snarked_ledgers factory) ;
                 Stop (Some snarked_ledger)
             | Error e ->
-                Ledger.Root.close potential_snarked_ledger ;
+                Root_ledger.close potential_snarked_ledger ;
                 List.iter potential_snarked_ledgers
-                  ~f:Ledger.Root.Config.delete_any_backing ;
+                  ~f:Root_ledger.Config.delete_any_backing ;
                 Mina_stdlib_unix.File_system.rmrf
                   (Config.potential_snarked_ledgers factory) ;
                 [%log' error factory.logger]
@@ -212,11 +213,11 @@ module Instance = struct
                   "Ledger_transfer failed" ;
                 Stop None )
           else (
-            Ledger.Root.close potential_snarked_ledger ;
+            Root_ledger.close potential_snarked_ledger ;
             Continue None ) )
         ~finish:(fun _ ->
           List.iter potential_snarked_ledgers
-            ~f:Ledger.Root.Config.delete_any_backing ;
+            ~f:Root_ledger.Config.delete_any_backing ;
           Mina_stdlib_unix.File_system.rmrf
             (Config.potential_snarked_ledgers factory) ;
           None )
@@ -224,13 +225,13 @@ module Instance = struct
     match snarked_ledger with
     | None ->
         let snarked_ledger =
-          Ledger.Root.create ~logger ~depth:factory.ledger_depth
+          Root_ledger.create ~logger ~depth:factory.ledger_depth
             ~config:(Config.snarked_ledger factory)
             ()
         in
         let potential_snarked_ledger_hash =
           Frozen_ledger_hash.of_ledger_hash
-          @@ Ledger.Root.merkle_root snarked_ledger
+          @@ Root_ledger.merkle_root snarked_ledger
         in
         if
           Frozen_ledger_hash.equal potential_snarked_ledger_hash
@@ -242,7 +243,7 @@ module Instance = struct
             ; factory
             }
         else (
-          Ledger.Root.close snarked_ledger ;
+          Root_ledger.close snarked_ledger ;
           Error `Snarked_ledger_mismatch )
     | Some snarked_ledger ->
         Ok
@@ -325,7 +326,7 @@ let reset_factory_root_exn t ~create_root ~setup =
       ~depth:t.ledger_depth ()
     |> Or_error.ok_exn
   in
-  Ledger.Root.close root ;
+  Root_ledger.close root ;
   with_instance_exn t ~f:setup
 
 let reset_to_genesis_exn t ~precomputed_values =

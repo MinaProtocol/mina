@@ -7,6 +7,7 @@ open Pipe_lib.Strict_pipe
 open Network_peer
 open Mina_stdlib
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Ledger.Root
 module Sync_ledger = Mina_ledger.Sync_ledger
 module Transition_cache = Transition_cache
 
@@ -428,7 +429,7 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
               let%map staged_ledger_construction_time, construction_result =
                 time_deferred
                   (let open Deferred.Let_syntax in
-                  let temp_mask = Ledger.Root.as_masked temp_snarked_ledger in
+                  let temp_mask = Root_ledger.as_masked temp_snarked_ledger in
                   let%map result =
                     Staged_ledger
                     .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
@@ -967,10 +968,10 @@ let%test_module "Bootstrap_controller tests" =
             ~root:(Transition_frontier.root new_frontier)
             sorted_external_transitions ;
           [%test_result: Ledger_hash.t]
-            ( Ledger.Root.merkle_root
+            ( Root_ledger.merkle_root
             @@ Transition_frontier.root_snarked_ledger new_frontier )
             ~expect:
-              ( Ledger.Root.merkle_root
+              ( Root_ledger.merkle_root
               @@ Transition_frontier.root_snarked_ledger peer_net.state.frontier
               ) )
 
@@ -992,7 +993,7 @@ let%test_module "Bootstrap_controller tests" =
               in
               let snarked_ledger =
                 Transition_frontier.root_snarked_ledger frontier
-                |> Ledger.Root.as_masked
+                |> Root_ledger.as_masked
               in
               let snarked_local_state =
                 Transition_frontier.root frontier

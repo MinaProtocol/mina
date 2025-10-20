@@ -7,6 +7,7 @@ open Core
 open Async_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Ledger.Root
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions
@@ -671,7 +672,7 @@ module For_tests = struct
               ~f:(fun instance ->
                 Persistent_frontier.Database.close instance.db ) ;
             Option.iter persistent_root.Persistent_root.Factory_type.instance
-              ~f:(fun instance -> Ledger.Root.close instance.snarked_ledger) ;
+              ~f:(fun instance -> Root_ledger.close instance.snarked_ledger) ;
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 

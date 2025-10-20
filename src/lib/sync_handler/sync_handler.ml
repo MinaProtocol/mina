@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Ledger.Root
 module Sync_ledger = Mina_ledger.Sync_ledger
 open Frontier_base
 open Network_peer
@@ -51,7 +52,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
-      Ledger.Root.as_unmasked
+      Root_ledger.as_unmasked
       @@ Transition_frontier.root_snarked_ledger frontier
     in
     let staking_epoch_ledger =
@@ -76,7 +77,7 @@ module Make (Inputs : Inputs_intf) :
           _ ->
           None
       | Ledger_root ledger ->
-          Some (Ledger.Root.as_unmasked ledger)
+          Some (Root_ledger.as_unmasked ledger)
     else if
       Ledger_hash.equal ledger_hash
         (Consensus.Data.Local_state.Snapshot.Ledger_snapshot.merkle_root
@@ -87,7 +88,7 @@ module Make (Inputs : Inputs_intf) :
           _ ->
           None
       | Ledger_root ledger ->
-          Some (Ledger.Root.as_unmasked ledger)
+          Some (Root_ledger.as_unmasked ledger)
     else None
 
   let answer_query :

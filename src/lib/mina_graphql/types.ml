@@ -3,6 +3,7 @@ open Async
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Ledger.Root
 open Signature_lib
 open Currency
 open Schema
@@ -1514,7 +1515,7 @@ module AccountObj = struct
                             ledger." ;
                          None )
                  | Ledger_root staking_ledger -> (
-                     let casted = Ledger.Root.as_unmasked staking_ledger in
+                     let casted = Root_ledger.as_unmasked staking_ledger in
                      try
                        let index =
                          Ledger.Any_ledger.M.index_of_account_exn casted

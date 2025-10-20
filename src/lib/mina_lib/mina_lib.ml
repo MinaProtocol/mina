@@ -3,6 +3,7 @@ open Async
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Ledger.Root
 open Mina_block
 open Pipe_lib
 open Strict_pipe
@@ -693,7 +694,7 @@ let get_snarked_ledger_full t state_hash_opt =
       let root_snarked_ledger =
         Transition_frontier.root_snarked_ledger frontier
       in
-      let ledger = Ledger.Root.as_masked root_snarked_ledger in
+      let ledger = Root_ledger.as_masked root_snarked_ledger in
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
       let%bind () =
         Mina_stdlib.Deferred.Result.List.iter path ~f:(fun b ->
@@ -2723,7 +2724,7 @@ module Hardfork_config = struct
         let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
         Ledger.Any_ledger.cast (module Ledger) l_inner
     | `Root l ->
-        Ledger.Root.as_unmasked l
+        Root_ledger.as_unmasked l
     | `Uncommitted l ->
         Ledger.Any_ledger.cast (module Ledger) l
 
@@ -2731,13 +2732,13 @@ module Hardfork_config = struct
     genesis_source_ledger_cast l |> Ledger.Any_ledger.M.merkle_root
 
   type genesis_source_ledgers =
-    { root_snarked_ledger : Ledger.Root.t
+    { root_snarked_ledger : Root_ledger.t
     ; staged_ledger : Ledger.t
     ; staking_ledger :
-        [ `Genesis of Genesis_ledger.Packed.t | `Root of Ledger.Root.t ]
+        [ `Genesis of Genesis_ledger.Packed.t | `Root of Root_ledger.t ]
     ; next_epoch_ledger :
         [ `Genesis of Genesis_ledger.Packed.t
-        | `Root of Ledger.Root.t
+        | `Root of Root_ledger.t
         | `Uncommitted of Ledger.t ]
     }
 
@@ -2875,7 +2876,7 @@ module Hardfork_config = struct
     let genesis_ledger_data =
       let directory_name = parent_directory ^/ "genesis_ledger" in
       let root =
-        Ledger.Root.create_checkpoint_with_directory
+        Root_ledger.create_checkpoint_with_directory
           source_ledgers.root_snarked_ledger ~directory_name
       in
       let diff = Ledger.all_accounts_on_masks source_ledgers.staged_ledger in
@@ -2890,7 +2891,7 @@ module Hardfork_config = struct
              unsupported"
       | `Root l ->
           let root =
-            Ledger.Root.create_checkpoint_with_directory l ~directory_name
+            Root_ledger.create_checkpoint_with_directory l ~directory_name
           in
           let diff = Ledger.Location.Map.empty in
           (root, diff)
@@ -2904,13 +2905,13 @@ module Hardfork_config = struct
              unsupported"
       | `Root l ->
           let root =
-            Ledger.Root.create_checkpoint_with_directory l ~directory_name
+            Root_ledger.create_checkpoint_with_directory l ~directory_name
           in
           let diff = Ledger.Location.Map.empty in
           (root, diff)
       | `Uncommitted l ->
           let root =
-            Ledger.Root.create_checkpoint_with_directory
+            Root_ledger.create_checkpoint_with_directory
               source_ledgers.root_snarked_ledger ~directory_name
           in
           let diff = Ledger.all_accounts_on_masks l in
@@ -2952,9 +2953,9 @@ module Hardfork_config = struct
       let genesis_ledger, genesis_staking_ledger, genesis_next_epoch_ledger =
         ledgers
       in
-      Ledger.Root.close genesis_ledger ;
-      Ledger.Root.close genesis_staking_ledger ;
-      Ledger.Root.close genesis_next_epoch_ledger
+      Root_ledger.close genesis_ledger ;
+      Root_ledger.close genesis_staking_ledger ;
+      Root_ledger.close genesis_next_epoch_ledger
     in
     try
       let%map result = f () in
@@ -3057,12 +3058,12 @@ module Hardfork_config = struct
         } ~build_dir directory_name =
     let open Deferred.Or_error.Let_syntax in
     let migrate_and_apply (root, diff) =
-      let%map.Deferred root = Ledger.Root.make_converting root in
+      let%map.Deferred root = Root_ledger.make_converting root in
       Ledger.Any_ledger.M.set_batch
-        (Ledger.Root.as_unmasked root)
+        (Root_ledger.as_unmasked root)
         (Map.to_alist diff) ;
       let stable_db, migrated_db_opt =
-        Ledger.Root.unsafely_decompose_root root
+        Root_ledger.unsafely_decompose_root root
       in
       let migrated_db =
         migrated_db_opt

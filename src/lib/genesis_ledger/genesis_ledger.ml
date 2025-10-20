@@ -3,6 +3,7 @@ open Currency
 open Signature_lib
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Ledger.Root
 module Intf = Intf
 module Ledger_transfer_mask =
   Mina_ledger.Ledger_transfer.Make (Ledger) (Ledger.Any_ledger.M)
@@ -76,9 +77,9 @@ module Utils = struct
     assert (
       Ledger_hash.equal
         (Ledger.merkle_root genesis_mask)
-        (Ledger.Root.merkle_root root) ) ;
-    assert (Ledger.Root.depth root = depth) ;
-    Ledger.Root.create_checkpoint ~config root () |> Or_error.return
+        (Root_ledger.merkle_root root) ) ;
+    assert (Root_ledger.depth root = depth) ;
+    Root_ledger.create_checkpoint ~config root () |> Or_error.return
 
   let keypair_of_account_record_exn (private_key, account) =
     let open Account in
@@ -121,7 +122,7 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
   (* TODO: #1488 compute this at compile time instead of lazily *)
   (* The backing_ledger is either an `Ephemeral ledger, which exists purely as a
      mask in memory, with a null ledger root, or a `Root ledger, which is backed
-     by a concrete [Ledger.Root.t] on disk. We need a single mask to present to
+     by a concrete [Root_ledger.t] on disk. We need a single mask to present to
      the users of the genesis ledger interface (through the [t] value below), so
      that is also saved here. *)
   let backing_ledger =
@@ -133,14 +134,14 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       | `New backing_type ->
           lazy
             ( `Root
-                (Ledger.Root.create_temporary ~logger ~backing_type ~depth ())
+                (Root_ledger.create_temporary ~logger ~backing_type ~depth ())
             , true )
       | `Path (directory_name, backing_type) ->
           lazy
             ( `Root
-                (Ledger.Root.create ~logger
+                (Root_ledger.create ~logger
                    ~config:
-                     (Ledger.Root.Config.with_directory ~backing_type
+                     (Root_ledger.Config.with_directory ~backing_type
                         ~directory_name )
                    ~depth () )
             , false )
@@ -150,7 +151,7 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
       | `Ephemeral ledger ->
           ledger
       | `Root ledger ->
-          Ledger.Root.as_masked ledger
+          Root_ledger.as_masked ledger
     in
     ( if insert_accounts then
       let addrs_and_accounts =
@@ -169,12 +170,12 @@ module Make (Inputs : Intf.Ledger_input_intf) : Intf.S = struct
     match backing_ledger with
     | `Ephemeral ledger ->
         let open Or_error.Let_syntax in
-        let root = Ledger.Root.create ~logger ~config ~depth () in
+        let root = Root_ledger.create ~logger ~config ~depth () in
         (* We are transferring to an unmasked view of the root, so this is
            used solely for the transfer side effect *)
         let%map _dest =
           Ledger_transfer_mask.transfer_accounts ~src:ledger
-            ~dest:(Ledger.Root.as_unmasked root)
+            ~dest:(Root_ledger.as_unmasked root)
         in
         root
     | `Root ledger ->
@@ -241,7 +242,7 @@ module Packed = struct
 end
 
 module Of_ledger (T : sig
-  val backing_ledger : Ledger.Root.t Lazy.t
+  val backing_ledger : Root_ledger.t Lazy.t
 
   val depth : int
 end) : Intf.S = struct
@@ -249,7 +250,7 @@ end) : Intf.S = struct
 
   let backing_ledger =
     Lazy.map
-      ~f:(fun ledger -> (ledger, Ledger.Root.as_masked ledger))
+      ~f:(fun ledger -> (ledger, Root_ledger.as_masked ledger))
       backing_ledger
 
   let t = Lazy.map ~f:snd backing_ledger

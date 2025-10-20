@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Signature_lib
+module Root_ledger = Mina_ledger.Ledger.Root
 
 (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
 
@@ -76,6 +77,6 @@ type t =
 let ledger_backing ~hardfork_mode =
   match hardfork_mode with
   | Cli_lib.Arg_type.Hardfork_mode.Auto ->
-      Mina_ledger.Ledger.Root.Config.Converting_db
+      Root_ledger.Config.Converting_db
   | _ ->
       Stable_db

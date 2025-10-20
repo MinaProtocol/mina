@@ -17,6 +17,7 @@ module Root_data = Root_data
 module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+module Root_ledger = Mina_ledger.Ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -89,7 +90,7 @@ val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
 
-val root_snarked_ledger : t -> Mina_ledger.Ledger.Root.t
+val root_snarked_ledger : t -> Root_ledger.t
 
 val extensions : t -> Extensions.t
 
@@ -155,10 +156,10 @@ module For_tests : sig
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
     -> ?create_root_and_accounts:
-         (   config:Mina_ledger.Ledger.Root.Config.t
+         (   config:Root_ledger.Config.t
           -> depth:int
           -> unit
-          -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
+          -> Root_ledger.t Core_kernel.Or_error.t )
          * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
@@ -178,10 +179,10 @@ module For_tests : sig
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
     -> ?create_root_and_accounts:
-         (   config:Mina_ledger.Ledger.Root.Config.t
+         (   config:Root_ledger.Config.t
           -> depth:int
           -> unit
-          -> Mina_ledger.Ledger.Root.t Core_kernel.Or_error.t )
+          -> Root_ledger.t Core_kernel.Or_error.t )
          * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
