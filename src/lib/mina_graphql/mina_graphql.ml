@@ -2612,16 +2612,24 @@ module Queries = struct
               Deferred.Or_error.error_string
                 "Cannot specify both state hash and height"
         in
-        let%bind { staged_ledger
+        let%bind { source_ledgers
                  ; global_slot_since_genesis
                  ; state_hash
-                 ; staking_ledger
                  ; staking_epoch_seed
-                 ; next_epoch_ledger
                  ; next_epoch_seed
                  ; blockchain_length
+                 ; block_timestamp = _
                  } =
           Mina_lib.Hardfork_config.prepare_inputs ~breadcrumb_spec mina
+        in
+        let staged_ledger = source_ledgers.staged_ledger in
+        let staking_ledger =
+          Mina_lib.Hardfork_config.genesis_source_ledger_cast
+            source_ledgers.staking_ledger
+        in
+        let next_epoch_ledger =
+          Mina_lib.Hardfork_config.genesis_source_ledger_cast
+            source_ledgers.next_epoch_ledger
         in
         let%bind new_config =
           Runtime_config.make_fork_config ~staged_ledger

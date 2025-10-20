@@ -49,6 +49,43 @@ let plugin_flag =
          times"
   else Command.Param.return []
 
+module Chain_state_locations = struct
+  (** The locations of the chain state in a daemon. These will be computed by
+      [chain_state_locations] based on the runtime daemon config. By default,
+      the [chain_state] will be located in the mina config directory and the
+      other directories will be located in the [chain_state]. *)
+  type t =
+    { chain_state : string  (** The top-level chain state directory *)
+    ; mina_net : string  (** Mina networking information *)
+    ; trust : string  (** P2P trust information *)
+    ; root : string  (** The root snarked ledgers *)
+    ; genesis : string  (** The genesis ledgers *)
+    ; frontier : string  (** The transition frontier *)
+    ; epoch_ledger : string  (** The epoch ledger snapshots *)
+    ; proof_cache : string  (** The proof cache *)
+    ; zkapp_vk_cache : string  (** The zkApp vk cache *)
+    ; snark_pool : string  (** The snark pool *)
+    }
+
+  (** Determine the locations of the chain state components based on the daemon
+      runtime config *)
+  let of_config ~conf_dir (config : Runtime_config.t) : t =
+    (* TODO: post hard fork, we should not be ignoring this *)
+    let _config = config in
+    let chain_state = conf_dir in
+    { chain_state
+    ; mina_net = chain_state ^/ "mina_net2"
+    ; trust = chain_state ^/ "trust"
+    ; root = chain_state ^/ "root"
+    ; genesis = chain_state ^/ "genesis"
+    ; frontier = chain_state ^/ "frontier"
+    ; epoch_ledger = chain_state
+    ; proof_cache = chain_state ^/ "proof_cache"
+    ; zkapp_vk_cache = chain_state ^/ "zkapp_vk_cache"
+    ; snark_pool = chain_state ^/ "snark_pool"
+    }
+end
+
 let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
     ~genesis_dir ~cli_proof_level ~proof_level ~genesis_backing_type
     config_files =
@@ -98,7 +135,12 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
                 ] ;
             failwithf "Could not parse configuration file: %s" err () )
   in
-  let genesis_dir = Option.value ~default:(conf_dir ^/ "genesis") genesis_dir in
+  let chain_state_locations =
+    Chain_state_locations.of_config ~conf_dir config
+  in
+  let genesis_dir =
+    Option.value ~default:chain_state_locations.genesis genesis_dir
+  in
   let%bind precomputed_values =
     match%map
       Genesis_ledger_helper.init_from_config_file ~cli_proof_level ~genesis_dir
@@ -138,7 +180,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
           ~metadata ;
         Error.raise err
   in
-  return (precomputed_values, config_jsons, config)
+  return (precomputed_values, config_jsons, config, chain_state_locations)
 
 let setup_daemon logger ~itn_features ~default_snark_worker_fee =
   let open Command.Let_syntax in
@@ -793,13 +835,15 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           let ledger_backing_type =
             Mina_lib.Config.ledger_backing ~hardfork_mode
           in
-          let%bind precomputed_values, config_jsons, config =
+          let%bind ( precomputed_values
+                   , config_jsons
+                   , config
+                   , chain_state_locations ) =
             load_config_files ~logger ~conf_dir ~genesis_dir
               ~proof_level:Genesis_constants.Compiled.proof_level config_files
               ~genesis_constants ~constraint_constants ~cli_proof_level
               ~genesis_backing_type:ledger_backing_type
           in
-
           constraint_constants.block_window_duration_ms |> Float.of_int
           |> Time.Span.of_ms |> Mina_metrics.initialize_all ;
 
@@ -1133,7 +1177,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             Logger.trace logger ~module_:__MODULE__ "Creating %s at %s"
               ~location typ
           in
-          let trust_dir = conf_dir ^/ "trust" in
+          let trust_dir = chain_state_locations.trust in
           let%bind () = Async.Unix.mkdir ~p:() trust_dir in
           let%bind trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
@@ -1151,7 +1195,9 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
                    (kp, Public_key.compress kp.Keypair.public_key) )
             |> Option.to_list |> Keypair.And_compressed_pk.Set.of_list
           in
-          let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
+          let epoch_ledger_location =
+            chain_state_locations.epoch_ledger ^/ "epoch_ledger"
+          in
           let module Context = struct
             let logger = logger
 
@@ -1286,7 +1332,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
             Gossip_net.Libp2p.Config.
               { timeout = Time.Span.of_sec 3.
               ; logger
-              ; conf_dir
+              ; mina_net_location = chain_state_locations.mina_net
               ; chain_id
               ; unsafe_no_trust_ip = false
               ; seed_peer_list_url =
@@ -1408,20 +1454,23 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                    ; num_threads = snark_worker_parallelism_flag
                    }
                  ~snark_coordinator_key:run_snark_coordinator_flag
-                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~snark_pool_disk_location:chain_state_locations.snark_pool
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
-                 ~persistent_root_location:(conf_dir ^/ "root")
-                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
-                 ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
-                 ~time_controller ~block_production_keypairs ~monitor
-                 ~consensus_local_state ~is_archive_rocksdb
-                 ~work_reassignment_wait ~archive_process_location
-                 ~log_block_creation ~precomputed_values ~start_time
-                 ?precomputed_blocks_path ~log_precomputed_blocks
-                 ~start_filtered_logs ~upload_blocks_to_gcloud
-                 ~block_reward_threshold ~uptime_url ~uptime_submitter_keypair
-                 ~uptime_send_node_commit ~stop_time ~node_status_url
-                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
+                 ~persistent_root_location:chain_state_locations.root
+                 ~persistent_frontier_location:chain_state_locations.frontier
+                 ~epoch_ledger_location
+                 ~proof_cache_location:chain_state_locations.proof_cache
+                 ~zkapp_vk_cache_location:chain_state_locations.zkapp_vk_cache
+                 ~snark_work_fee:snark_work_fee_flag ~time_controller
+                 ~block_production_keypairs ~monitor ~consensus_local_state
+                 ~is_archive_rocksdb ~work_reassignment_wait
+                 ~archive_process_location ~log_block_creation
+                 ~precomputed_values ~start_time ?precomputed_blocks_path
+                 ~log_precomputed_blocks ~start_filtered_logs
+                 ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
+                 ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
+                 ~node_status_url ~graphql_control_port:itn_graphql_port
+                 ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
                  ~itn_features ~compile_config ~hardfork_mode () )
           in
@@ -1973,7 +2022,10 @@ let internal_commands logger ~itn_features =
             List.map config_files ~f:(fun config_file ->
                 (config_file, `Must_exist) )
           in
-          let%bind precomputed_values, _config_jsons, _config =
+          let%bind ( precomputed_values
+                   , _config_jsons
+                   , _config
+                   , _chain_state_locations ) =
             load_config_files ~logger ~conf_dir ~genesis_dir ~genesis_constants
               ~constraint_constants ~proof_level ~cli_proof_level:None
               ~genesis_backing_type:Stable_db config_files
