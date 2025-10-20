@@ -93,7 +93,7 @@ in  Pipeline.build
       , steps =
             PublishPackages.publish
               ( specs_for_branch
-                  "dkijania/add_missing_configurations"
+                  "compatible"
                   DebianChannel.Type.Compatible
                   Profiles.Type.Lightnet
               )
@@ -111,7 +111,7 @@ in  Pipeline.build
               )
           # PublishPackages.publish
               ( specs_for_branch
-                  "dkijania/add_missing_configurations"
+                  "compatible"
                   DebianChannel.Type.Compatible
                   Profiles.Type.Devnet
               )
