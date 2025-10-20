@@ -119,7 +119,13 @@ func (t *HardforkTest) Run() error {
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
-	forkConfigBytes, analysis, err := t.RunMainNetworkPhase(forkConfigPath, mainGenesisTs)
+	forkConfigBytes, analysis, err := t.RunMainNetworkPhase(mainGenesisTs)
+	if err != nil {
+		return err
+	}
+
+	// Write fork config to file
+	err = os.WriteFile(forkConfigPath, forkConfigBytes, 0644)
 	if err != nil {
 		return err
 	}
