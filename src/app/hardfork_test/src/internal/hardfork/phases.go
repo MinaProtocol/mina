@@ -75,9 +75,6 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 		t.gracefulShutdown(forkCmd, "Fork network")
 	}()
 
-	// Sleep until fork genesis
-	t.Logger.Info("Sleeping for %d minutes until fork genesis...", t.Config.ForkDelay)
-
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
 
