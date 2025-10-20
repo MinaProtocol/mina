@@ -119,4 +119,6 @@ echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
   --fork-mina-exe "$INIT_DIR/fork-devnet/bin/mina" \
   --fork-runtime-genesis-ledger "$INIT_DIR/fork-devnet-genesis/bin/runtime_genesis_ledger" \
   --slot-tx-end "$SLOT_TX_END" \
-  --slot-chain-end "$SLOT_CHAIN_END" && echo "HF test completed successfully"
+  --slot-chain-end "$SLOT_CHAIN_END" \
+  --script-dir "$SCRIPT_DIR" \
+&& echo "HF test completed successfully"
