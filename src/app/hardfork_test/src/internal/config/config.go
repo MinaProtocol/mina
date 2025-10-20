@@ -110,19 +110,6 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// CalculateTimestamps computes the UNIX timestamps for main and fork genesis
-func (c *Config) CalculateTimestamps() (mainGenesisTs, forkGenesisTs int64) {
-	now := time.Now().Unix()
-	// Round to nearest minute
-	nowRounded := now - (now % 60)
-
-	// Calculate genesis timestamps as in the shell script
-	mainGenesisTs = nowRounded + int64(c.MainDelay*60)
-	forkGenesisTs = nowRounded + int64(c.ForkDelay*60)
-
-	return mainGenesisTs, forkGenesisTs
-}
-
 // FormatTimestamp formats a UNIX timestamp into the format used by the shell script
 func FormatTimestamp(unixTs int64) string {
 	t := time.Unix(unixTs, 0).UTC()
