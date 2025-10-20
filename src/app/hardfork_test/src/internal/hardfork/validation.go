@@ -117,7 +117,14 @@ func (t *HardforkTest) AnalyzeBlocks(ports []int) (*BlockAnalysisResult, error) 
 	}
 
 	genesisEpochStakingHash := firstEpochBlock.CurEpochHash
+	if genesisEpochStakingHash == "" {
+		return nil, fmt.Errorf("genesis epoch staking hash is empty")
+	}
+
 	genesisEpochNextHash := firstEpochBlock.NextEpochHash
+	if genesisEpochNextHash == "" {
+		return nil, fmt.Errorf("genesis next staking hash is empty")
+	}
 
 	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s",
 		genesisEpochStakingHash, genesisEpochNextHash)
