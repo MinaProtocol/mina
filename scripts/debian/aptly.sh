@@ -28,7 +28,7 @@ check_required jq
 function start_aptly() {
     local __distribution=$1
     local __debs=$2
-    local __arch=$3
+    local __archs=$3
     local __background=$4
     local __clean=$5
     local __component=$6

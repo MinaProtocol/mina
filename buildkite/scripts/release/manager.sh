@@ -1916,7 +1916,7 @@ function pull(){
                 shift 2;
             ;;
             --archs )
-                __arch=${2:?$error_message}
+                __archs=${2:?$error_message}
                 shift 2;
             ;;
             * )
@@ -1940,7 +1940,7 @@ function pull(){
     echo " - Target: $__target"
     echo " - Codenames: $__codenames"
     echo " - Networks: $__networks"
-    echo " - Architectures: $__arch"
+    echo " - Architectures: $__archs"
 
     if [[ -n ${__from_special_folder+x} ]]; then
         echo " - From special folder: $__from_special_folder"
@@ -1953,7 +1953,7 @@ function pull(){
     read -r -a __artifacts_arr <<< "$__artifacts"
     read -r -a __codenames_arr <<< "$__codenames"
     read -r -a __networks_arr <<< "$__networks"
-    read -r -a __archs_arr <<< "$__arch"
+    read -r -a __archs_arr <<< "$__archs"
 
     for __arch in "${__archs_arr[@]}"; do
         for __artifact in "${__artifacts_arr[@]}"; do
