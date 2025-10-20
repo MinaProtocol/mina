@@ -19,7 +19,9 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "scripts/rocksdb-compatibility")
-          , S.exactly "buildkite/src/Jobs/Test/RocksDBLedgerTarCompatibilityTest" "dhall"
+          , S.exactly
+              "buildkite/src/Jobs/Test/RocksDBLedgerTarCompatibilityTest"
+              "dhall"
           ]
         , path = "Test"
         , name = "RocksDBLedgerTarCompatibilityTest"
