@@ -77,6 +77,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 
 	// Sleep until fork genesis
 	t.Logger.Info("Sleeping for %d minutes until fork genesis...", t.Config.ForkDelay)
+
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
 
@@ -86,7 +87,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 	}
 
 	// Wait until best chain query time
-	t.WaitUntilBestChainQuery(t.Config.MainSlot, t.Config.MainDelay)
+	t.WaitUntilBestChainQuery(t.Config.ForkSlot, t.Config.ForkDelay)
 
 	// Check block height at slot BestChainQueryFrom
 	blockHeight, err := t.Client.GetHeight(10303)
