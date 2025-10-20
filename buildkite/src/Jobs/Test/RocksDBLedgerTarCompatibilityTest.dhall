@@ -19,7 +19,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "scripts/rocksdb-compatibility")
-          , S.exactly "buildkite/src/Jobs/Test/RocksdbTest" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/RocksDBLedgerTarCompatibilityTest" "dhall"
           ]
         , path = "Test"
         , name = "RocksDBLedgerTarCompatibilityTest"
@@ -35,7 +35,7 @@ in  Pipeline.build
             , commands =
                 RunInToolchain.runInToolchain
                   ([] : List Text)
-                  (     "./scripts/rocksdb-compatibility/install-rocks.sh"
+                  (     "./scripts/rocksdb-compatibility/install-rocksdb.sh"
                     ++  " && pip install -r ./scripts/rocksdb-compatibility/requirements.txt"
                     ++  " && python3 ./scripts/rocksdb-compatibility/rocksdb.py"
                   )
