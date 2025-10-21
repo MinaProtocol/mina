@@ -13,7 +13,7 @@
     "gcr.io/o1labs-192920/mina-toolchain@sha256:524a3fb77d6702f38ad63ec737e398478e082387753b8d01e1ccf607d2917343"
 , minaToolchainNoble =
     { amd64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:3fd6ebfedb905ba358903639c2ebcdbd2277316b854d80f12c74df8dcd83734b"
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:51c06affdbee4cdf3189fa716e277a8242d44aa9f91798155cd7fddc26bdc958"
     , arm64 =
         "gcr.io/o1labs-192920/mina-toolchain@sha256:adfff17bf21b79efc3b2d54d0648049a36fa7b54b732773bd7f2f651869c1f54"
     }
