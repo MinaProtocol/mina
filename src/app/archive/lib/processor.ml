@@ -4351,6 +4351,7 @@ module Block = struct
           let%bind canonical_blocks =
             Metrics.time ~label:"get_subchain (< canonical_height)" ~logger
               (fun () ->
+                (* NOTE: we some how assumed blocks are continuous here *)
                 get_subchain
                   (module Conn)
                   ~start_block_id:canonical_block_below_id
