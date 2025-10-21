@@ -1,17 +1,5 @@
 opam-version: "2.0"
-# The version must be the same as the version used in:
-# - dockerfiles/1-build-deps
-# - opam.export
-# - scripts/update_opam_switch.sh
-compiler: [
-  "base-bigarray.base"
-  "base-threads.base"
-  "base-unix.base"
-  "ocaml.4.14.2"
-  "ocaml-base-compiler.4.14.2"
-  "ocaml-config.2"
-  "ocaml-options-vanilla.1"
-]
+compiler: ["ocaml-base-compiler.4.14.2"]
 roots: [
   "alcotest.1.1.0"
   "alcotest-async.1.1.0"
@@ -103,6 +91,7 @@ installed: [
   "conf-libffi.2.0.0"
   "conf-libssl.4"
   "conf-m4.1"
+  "conf-openssl.2"
   "conf-perl.2"
   "conf-pkg-config.4"
   "conf-postgresql.2"
