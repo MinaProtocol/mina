@@ -163,6 +163,7 @@ installed: [
   "lwt_react.1.1.2"
   "macaddr.5.0.1"
   "magic-mime.1.1.2"
+  "memtrace.0.2.3"
   "menhir.20210419"
   "menhirLib.20210419"
   "menhirSdk.20210419"

@@ -22,6 +22,7 @@
   async.async_command
   result
   sexplib0
+  memtrace
   ;;local libraries
   verifier
   ledger_proof

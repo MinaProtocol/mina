@@ -2087,6 +2087,7 @@ let print_version_help coda_exe version =
 let print_version_info () = Core.printf "Commit %s\n" Mina_version.commit_id
 
 let () =
+  Memtrace.trace_if_requested () ;
   Random.self_init () ;
   let itn_features = Sys.getenv "ITN_FEATURES" |> Option.is_some in
   let logger = Logger.create ~itn_features () in
