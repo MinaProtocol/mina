@@ -1,21 +1,21 @@
 (tests
  (names archive_node_tests)
  (libraries
-   ;; opam libraries
-   async_kernel
-   core_kernel
-   ppx_inline_test.config
-   async
-   core
-   async_unix
-   stdio
-   alcotest
-   cmdliner
-   ;; mina libraries
-   mina_automation
-   mina_automation.fixture
-   mina_automation.runner)
- 
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_mina ppx_compare)))
-
+  ;; opam libraries
+  async_kernel
+  core_kernel
+  ppx_inline_test.config
+  async
+  core
+  async_unix
+  stdio
+  alcotest
+  cmdliner
+  ;; mina libraries
+  mina_automation
+  mina_automation.fixture
+  mina_automation.runner)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane ppx_mina ppx_compare)))
