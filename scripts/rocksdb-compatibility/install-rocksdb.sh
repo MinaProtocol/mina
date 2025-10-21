@@ -18,4 +18,4 @@ cd $ROCKSDB_SOURCE/rocksdb-${ROCKSDB_VERSION}
 # util/compression.cc:684:40: error: unused parameter ‘args’ [-Werror=unused-parameter]
 # 684 |   Status ExtractUncompressedSize(Args& args) override {
 #     |                                  ~~~~~~^~~~
-EXTRA_CXXFLAGS="-Wno-unused-parameter" make -j"$(nproc)" install
+sudo EXTRA_CXXFLAGS="-Wno-unused-parameter" make -j"$(nproc)" install
