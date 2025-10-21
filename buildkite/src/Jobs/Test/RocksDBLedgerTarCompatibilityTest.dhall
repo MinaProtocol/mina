@@ -43,7 +43,7 @@ in  Pipeline.build
                   )
             , label = "RocksDB: Ledger Tar Compatibility Test"
             , key = key
-            , target = Size.Large
+            , target = Size.Multi
             }
         ]
       }
