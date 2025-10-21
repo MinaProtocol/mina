@@ -19,8 +19,7 @@ type BlockAnalysisResult struct {
 // ValidateSlotOccupancy checks if block occupancy is above 50%
 func (t *HardforkTest) ValidateSlotOccupancy(startingHeight, blockHeight int) error {
 	if 2*blockHeight < t.Config.BestChainQueryFrom {
-		t.Logger.Error("Assertion failed: slot occupancy is below 50%%")
-		return fmt.Errorf("slot occupancy is below 50%%")
+		return fmt.Errorf("slot occupancy (%d/%d) is below 50%%", blockHeight, t.Config.BestChainQueryFrom)
 	}
 	return nil
 }
