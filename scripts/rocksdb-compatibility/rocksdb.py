@@ -51,14 +51,32 @@ def open_db(path, options):
     finally:
         rocksdb.rocksdb_close(db)
 
-@contextmanager
 def read_iter(db):
+    """
+    Generator that yields (key, value) pairs from a RocksDB database.
+
+    Args:
+        db (rocksdb_t*): A RocksDB database handle.
+
+    Yields:
+        tuple[bytes, bytes]: The (key, value) pairs from the database.
+    """
     ropts = rocksdb.rocksdb_readoptions_create()
-    iter_ = rocksdb.rocksdb_create_iterator(db, ropts)
+    it = rocksdb.rocksdb_create_iterator(db, ropts)
     try:
-        yield iter_
+        rocksdb.rocksdb_iter_seek_to_first(it)
+        while rocksdb.rocksdb_iter_valid(it):
+            klen = ffi.new("size_t*")
+            vlen = ffi.new("size_t*")
+            key_ptr = rocksdb.rocksdb_iter_key(it, klen)
+            val_ptr = rocksdb.rocksdb_iter_value(it, vlen)
+            yield (
+                bytes(ffi.buffer(key_ptr, klen[0])),
+                bytes(ffi.buffer(val_ptr, vlen[0])),
+            )
+            rocksdb.rocksdb_iter_next(it)
     finally:
-        rocksdb.rocksdb_iter_destroy(iter_)
+        rocksdb.rocksdb_iter_destroy(it)
         rocksdb.rocksdb_readoptions_destroy(ropts)
 
 def test(path, rounds):
@@ -75,19 +93,8 @@ def test(path, rounds):
         - Prints each key-value pair as hexadecimal strings.
         - Stops early if the iterator reaches the end of the DB before 'rounds' entries.
     """
-    with rocksdb_options(create_if_missing=False) as opts, open_db(path, opts) as db, read_iter(db) as it:
-        rocksdb.rocksdb_iter_seek_to_first(it)
-        for _ in range(rounds):
-            if not rocksdb.rocksdb_iter_valid(it):
+    with rocksdb_options(create_if_missing=False) as opts, open_db(path, opts) as db:
+        for i, (key, val) in enumerate(read_iter(db)):
+            print(f"Found KV-pair: {key.hex()} -> {val.hex()}")
+            if i + 1 >= rounds:
                 break
-
-            klen = ffi.new("size_t*")
-            vlen = ffi.new("size_t*")
-            key_ptr = rocksdb.rocksdb_iter_key(it, klen)
-            val_ptr = rocksdb.rocksdb_iter_value(it, vlen)
-
-            key_buf = ffi.buffer(key_ptr, klen[0])
-            val_buf = ffi.buffer(val_ptr, vlen[0])
-            print(f"Found KV-pair: {key_buf[:].hex()} -> {val_buf[:].hex()}")
-
-            rocksdb.rocksdb_iter_next(it)
