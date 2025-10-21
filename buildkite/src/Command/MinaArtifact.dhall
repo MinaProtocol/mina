@@ -139,7 +139,7 @@ let build_artifacts
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , target = Size.XLarge
+            , target = Size.Multi
             , if_ = spec.if_
             , retries =
               [ Command.Retry::{
