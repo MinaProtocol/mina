@@ -19,3 +19,6 @@ cd $ROCKSDB_SOURCE/rocksdb-${ROCKSDB_VERSION}
 # 684 |   Status ExtractUncompressedSize(Args& args) override {
 #     |                                  ~~~~~~^~~~
 sudo EXTRA_CXXFLAGS="-Wno-unused-parameter" make -j"$(nproc)" install-shared
+
+# Refresh LD cache so follow up programs can locate the dyn libaray
+sudo ldconfig
