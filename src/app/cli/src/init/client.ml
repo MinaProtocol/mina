@@ -1856,6 +1856,7 @@ let compile_time_constants =
                  ~constraint_constants ~logger:(Logger.null ()) ~proof_level
                  ~cli_proof_level:None ~genesis_dir
                  ~genesis_backing_type:Stable_db
+                 ~signature_kind:Mina_signature_kind.t_DEPRECATED
            >>| Or_error.ok_exn
          in
          let all_constants =
