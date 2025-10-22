@@ -1,4 +1,4 @@
-/* global plonk_wasm, tsRustConversionNative */
+/* global plonk_wasm */
 
 
 // Provides: prover_to_json

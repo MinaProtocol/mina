@@ -55,19 +55,7 @@ var caml_pasta_fp_plonk_gate_vector_digest = function (
   return caml_bytes_of_uint8array(uint8array);
 };
 
-// Provides: caml_pasta_fp_plonk_circuit_serialize
-// Requires: plonk_wasm, caml_string_of_jsstring
-var caml_pasta_fp_plonk_circuit_serialize = function (
-  public_input_size,
-  gate_vector
-) {
-  return caml_string_of_jsstring(
-    plonk_wasm.caml_pasta_fp_plonk_circuit_serialize(
-      public_input_size,
-      gate_vector
-    )
-  );
-};
+
 
 // Provides: caml_pasta_fq_plonk_gate_vector_create
 // Requires: plonk_wasm, free_on_finalize

@@ -2,19 +2,6 @@
     free_on_finalize, caml_jsstring_of_string
  */
 
-// Provides: caml_pasta_fq_plonk_circuit_serialize
-// Requires: plonk_wasm, caml_string_of_jsstring
-var caml_pasta_fq_plonk_circuit_serialize = function (
-  public_input_size,
-  gate_vector
-) {
-  return caml_string_of_jsstring(
-    plonk_wasm.caml_pasta_fq_plonk_circuit_serialize(
-      public_input_size,
-      gate_vector
-    )
-  );
-};
 
  
 // Provides: caml_pasta_fp_plonk_index_create_bytecode

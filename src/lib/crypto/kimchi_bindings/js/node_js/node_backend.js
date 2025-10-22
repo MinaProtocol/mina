@@ -47,3 +47,5 @@ override('caml_pasta_fp_plonk_gate_vector_from_bytes');
 override('caml_pasta_fq_plonk_gate_vector_from_bytes');
 override('caml_fp_srs_from_bytes');
 override('caml_fq_srs_from_bytes');
+override('caml_pasta_fp_plonk_circuit_serialize');
+override('caml_pasta_fq_plonk_circuit_serialize');
