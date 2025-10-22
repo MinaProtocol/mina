@@ -1,8 +1,6 @@
 /* global plonk_wasm, tsRustConversion, caml_string_of_jsstring,
     free_on_finalize, caml_jsstring_of_string
  */
-
-
  
 // Provides: caml_pasta_fp_plonk_index_create_bytecode
 // Requires: caml_pasta_fp_plonk_index_create

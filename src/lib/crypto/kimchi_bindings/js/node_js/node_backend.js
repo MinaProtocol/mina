@@ -7,6 +7,13 @@ try {
   // native not available, keep WASM
 }
 
+if (native) {
+  plonk_wasm.__kimchi_napi = true;
+  if (typeof globalThis !== 'undefined') {
+    globalThis.__kimchi_napi = true;
+  }
+}
+
 function snakeToCamel(name) {
   return name.replace(/_([a-z])/g, function (_match, ch) {
     return ch.toUpperCase();
@@ -56,3 +63,21 @@ override('caml_pasta_fp_plonk_index_encode');
 override('caml_pasta_fq_plonk_index_encode');
 override('caml_pasta_fq_plonk_index_read');
 override('caml_pasta_fp_plonk_index_read');
+
+// GateVector 
+[ 
+  'caml_pasta_fp_plonk_gate_vector_create', 
+  'caml_pasta_fq_plonk_gate_vector_create', 
+  'caml_pasta_fp_plonk_gate_vector_add',
+  'caml_pasta_fq_plonk_gate_vector_add',
+  'caml_pasta_fp_plonk_gate_vector_get',
+  'caml_pasta_fq_plonk_gate_vector_get',
+  'caml_pasta_fp_plonk_gate_vector_len', 
+  'caml_pasta_fq_plonk_gate_vector_len',
+  'caml_pasta_fp_plonk_gate_vector_wrap',
+  'caml_pasta_fq_plonk_gate_vector_wrap',
+  'caml_pasta_fp_plonk_gate_vector_digest',
+  'caml_pasta_fq_plonk_gate_vector_digest',
+  'caml_pasta_fp_plonk_circuit_serialize',
+  'caml_pasta_fq_plonk_circuit_serialize',
+].forEach(override);
