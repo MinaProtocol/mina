@@ -49,3 +49,10 @@ override('caml_fp_srs_from_bytes');
 override('caml_fq_srs_from_bytes');
 override('caml_pasta_fp_plonk_circuit_serialize');
 override('caml_pasta_fq_plonk_circuit_serialize');
+
+override('caml_pasta_fp_plonk_index_decode')
+override('caml_pasta_fq_plonk_index_decode') 
+override('caml_pasta_fp_plonk_index_encode');
+override('caml_pasta_fq_plonk_index_encode');
+override('caml_pasta_fq_plonk_index_read');
+override('caml_pasta_fp_plonk_index_read');
