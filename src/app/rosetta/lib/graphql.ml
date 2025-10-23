@@ -41,7 +41,10 @@ let query ~minimum_user_command_fee query_obj uri =
           ~body:(Cohttp_async.Body.of_string body_string)
           uri )
     |> Deferred.Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Internal POST to Mina Daemon failed"
+           Errors.create
+             ~context:
+               (Printf.sprintf "Internal POST to Mina Daemon failed on %s"
+                  (Uri.to_string uri) )
              (`Graphql_mina_query (Error.to_string_hum e)) )
   in
   let%bind body_str =
