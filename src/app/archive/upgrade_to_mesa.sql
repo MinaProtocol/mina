@@ -18,7 +18,7 @@ SET archive.current_protocol_version = '3.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.3';
+SET archive.migration_version = '0.0.4';
 
 -- TODO: put below in a common script
 
@@ -162,17 +162,39 @@ SELECT add_zkapp_states_nullable_element(30);
 SELECT add_zkapp_states_nullable_element(31);
 
 -- 3. `zkapp_states`: Add columns element8..element31
+
+CREATE OR REPLACE FUNCTION get_zero_field_id() RETURNS int AS $$
+DECLARE
+  result int;
+  zero text := '0';
+BEGIN
+  -- Try to fetch existing id
+  SELECT id INTO result FROM zkapp_field WHERE field = zero;
+
+  -- If not found, insert and get the new id
+  IF result IS NULL THEN
+    INSERT INTO zkapp_field(field)
+    VALUES (zero)
+    RETURNING id INTO result;
+  END IF;
+
+  RETURN result;
+END
+$$ LANGUAGE plpgsql;
+
 CREATE OR REPLACE FUNCTION add_zkapp_states_element(p_element_num INT)
 RETURNS VOID AS $$
 DECLARE
     col_name TEXT := 'element' || p_element_num;
+    default_id int := get_zero_field_id();
 BEGIN
 
     RAISE DEBUG 'Adding column % for zkapp_states', col_name;
 
     EXECUTE format(
-        'ALTER TABLE zkapp_states ADD COLUMN IF NOT EXISTS %I INT DEFAULT 0 NOT NULL REFERENCES zkapp_field(id)',
-        col_name
+        'ALTER TABLE zkapp_states ADD COLUMN IF NOT EXISTS %I INT DEFAULT %s NOT NULL REFERENCES zkapp_field(id)',
+        col_name,
+        default_id
     );
 
     RAISE DEBUG 'Added column % for zkapp_states', col_name;
@@ -183,6 +205,14 @@ EXCEPTION
         RAISE EXCEPTION 'An error occurred while adding column % to zkapp_states: %', col_name, SQLERRM;
 END
 $$ LANGUAGE plpgsql;
+
+DO $$
+DECLARE
+    default_id int := get_zero_field_id();
+BEGIN
+    RAISE NOTICE 'Zero field in table zkapp_field is of id = %', default_id;
+END
+$$;
 
 SELECT add_zkapp_states_element(8);
 SELECT add_zkapp_states_element(9);
