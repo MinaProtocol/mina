@@ -83,10 +83,11 @@ let create (config : Test_config.Test_account.t list) =
     Network_keypair.create_network_keypair ~keypair_name ~keypair
   in
   let genesis_keypairs =
-    List.fold genesis_accounts_and_keys ~init:String.Map.empty
-      ~f:(fun map ({ account_name; _ }, (pk, sk)) ->
+    List.map genesis_accounts_and_keys
+      ~f:(fun ({ account_name; _ }, (pk, sk)) ->
         let keypair = mk_net_keypair account_name (pk, sk) in
-        String.Map.add_exn map ~key:account_name ~data:keypair )
+        (account_name, keypair) )
+    |> String.Map.of_alist_exn
   in
   let genesis_ledger_accounts = add_accounts genesis_accounts_and_keys in
   { accounts = genesis_ledger_accounts; keypairs = genesis_keypairs }
