@@ -78,8 +78,12 @@ module Network_config = struct
         (Genesis_ledger_helper.make_genesis_constants ~logger
            ~default:constants.genesis_constants runtime_config )
     in
+    let constraint_constants =
+      Genesis_ledger_helper.make_constraint_constants
+        ~default:constants.constraint_constants test_config.proof_config
+    in
     let constants : Test_config.constants =
-      { constants with genesis_constants }
+      { constants with genesis_constants; constraint_constants }
     in
     let long_commit_id =
       if String.is_substring Mina_version.commit_id ~substring:"[DIRTY]" then
