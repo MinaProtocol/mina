@@ -1,7 +1,6 @@
 open Core
 open Async
 open Cmdliner
-open Pipe_lib
 open Integration_test_lib
 
 type test = string * (module Intf.Test.Functor_intf)
@@ -203,16 +202,17 @@ let report_test_errors ~log_error_set ~internal_error_set =
 
 let dispatch_cleanup ~logger ~pause_cleanup_func ~network_cleanup_func
     ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
-    ~log_engine_ref ~network_state_writer_ref ~cleanup_deferred_ref ~exit_reason
-    ~test_result : unit Deferred.t =
+    ~log_engine_ref ~network_state_generator_ref ~cleanup_deferred_ref
+    ~exit_reason ~test_result ~cleanup_state_generator : unit Deferred.t =
   let cleanup () : unit Deferred.t =
     let%bind log_engine_cleanup_result =
       Option.value_map !log_engine_ref
         ~default:(Deferred.Or_error.return ())
         ~f:log_engine_cleanup_func
     in
-    Option.value_map !network_state_writer_ref ~default:()
-      ~f:Broadcast_pipe.Writer.close ;
+    Option.value_map
+      !network_state_generator_ref
+      ~default:() ~f:cleanup_state_generator ;
     let%bind test_error_set = Malleable_error.lift_error_set_unit test_result in
     let log_error_set = lift_accumulated_errors_func () in
     let internal_error_set =
@@ -305,7 +305,7 @@ let main inputs =
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let error_accumulator_ref = ref None in
-  let network_state_writer_ref = ref None in
+  let network_state_generator_ref = ref None in
   let cleanup_deferred_ref = ref None in
   [%log trace] "preparing up cleanup phase" ;
   let f_dispatch_cleanup =
@@ -322,7 +322,8 @@ let main inputs =
       ~network_cleanup_func:Engine.Network_manager.cleanup
       ~log_engine_cleanup_func:Engine.Log_engine.destroy
       ~lift_accumulated_errors_func ~net_manager_ref ~log_engine_ref
-      ~network_state_writer_ref ~cleanup_deferred_ref
+      ~network_state_generator_ref ~cleanup_deferred_ref
+      ~cleanup_state_generator:Dsl.Network_state.Generator.close
   in
   (* run test while gracefully recovering handling exceptions and interrupts *)
   [%log trace] "attaching signal handler" ;
@@ -370,13 +371,15 @@ let main inputs =
           error_accumulator_ref :=
             Some (Dsl.watch_log_errors ~logger ~event_router ~on_fatal_error) ;
           [%log trace] "beginning to process network events" ;
-          let network_state_reader, network_state_writer =
-            Dsl.Network_state.listen ~logger event_router
+          let network_state_generator =
+            Dsl.Network_state.Generator.from_router ~logger event_router
           in
-          network_state_writer_ref := Some network_state_writer ;
+          network_state_generator_ref := Some network_state_generator ;
           [%log trace] "initializing dsl" ;
           let (`Don't_call_in_tests dsl) =
-            Dsl.create ~logger ~network ~event_router ~network_state_reader
+            Dsl.create ~logger ~network ~event_router
+              ~network_state_reader:
+                (Dsl.Network_state.Generator.reader network_state_generator)
           in
           (network, dsl)
         in

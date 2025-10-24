@@ -222,10 +222,16 @@ module Dsl = struct
           State_hash.Set.t Mina_transaction.Transaction_hash.Map.t
       }
 
-    val listen :
-         logger:Logger.t
-      -> Event_router.t
-      -> t Broadcast_pipe.Reader.t * t Broadcast_pipe.Writer.t
+    module Generator : sig
+      (* HACK: I can't name it `gen` due to name collision *)
+      type gen
+
+      val from_router : logger:Logger.t -> Event_router.t -> gen
+
+      val reader : gen -> t Broadcast_pipe.Reader.t
+
+      val close : gen -> unit
+    end
   end
 
   module type Wait_condition_intf = sig
