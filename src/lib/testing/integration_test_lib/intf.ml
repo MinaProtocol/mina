@@ -106,7 +106,7 @@ module Engine = struct
 
     val archive_nodes : t -> Node.t Core.String.Map.t
 
-    val all_mina_nodes : t -> Node.t Core.String.Map.t
+    val all_daemon_nodes : t -> Node.t Core.String.Map.t
 
     val all_nodes : t -> Node.t Core.String.Map.t
 

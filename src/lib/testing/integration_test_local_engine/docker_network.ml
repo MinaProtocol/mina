@@ -293,7 +293,7 @@ let snark_coordinators { snark_coordinators; _ } = snark_coordinators
 
 let archive_nodes { archive_nodes; _ } = archive_nodes
 
-let all_mina_nodes { seeds; block_producers; snark_coordinators; _ } =
+let all_daemon_nodes { seeds; block_producers; snark_coordinators; _ } =
   List.concat
     [ Core.String.Map.to_alist seeds
     ; Core.String.Map.to_alist block_producers

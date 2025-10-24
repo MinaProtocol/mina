@@ -100,7 +100,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let window_ms =
       (Network.constraint_constants network).block_window_duration_ms
     in
-    let all_nodes = Network.all_mina_nodes network in
+    let all_nodes = Network.all_daemon_nodes network in
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize (String.Map.data all_nodes))

@@ -37,11 +37,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let all_mina_nodes = Network.all_mina_nodes network in
+    let all_daemon_nodes = Network.all_daemon_nodes network in
     let%bind () =
       wait_for t
         (Wait_condition.nodes_to_initialize
-           (Core.String.Map.data all_mina_nodes) )
+           (Core.String.Map.data all_daemon_nodes) )
     in
     let node_a = Network.block_producer_exn network "node-a" in
     let node_b = Network.block_producer_exn network "node-b" in
@@ -105,7 +105,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          further block production is needed. if previous sections change, then this
          may need to be re-adjusted*)
       (let%bind (labeled_chains : (string * string list) list) =
-         Malleable_error.List.map (Core.String.Map.data all_mina_nodes)
+         Malleable_error.List.map (Core.String.Map.data all_daemon_nodes)
            ~f:(fun node ->
              let%map chain =
                Integration_test_lib.Graphql_requests.must_get_best_chain ~logger
