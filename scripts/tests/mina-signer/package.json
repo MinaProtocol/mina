@@ -1,0 +1,19 @@
+{
+  "name": "test-signer",
+  "type": "module",
+  "version": "1.0.0",
+  "main": "test-signer.js",
+  "bin": {
+    "mina-test-signer": "mina-test-signer.js"
+  },
+  "scripts": {
+    "start": "node mina-test-signer.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "o1-labs",
+  "license": "ISC",
+  "description": "test app for mina-test-signer",
+  "dependencies": {
+    "mina-signer": "^1.0.0"
+  }
+}
