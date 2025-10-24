@@ -81,17 +81,24 @@ module Make
     }
 
   module Generator = struct
-    type gen = t Broadcast_pipe.Reader.t * t Broadcast_pipe.Writer.t
+    type gen =
+      { reader : t Broadcast_pipe.Reader.t
+      ; writer : t Broadcast_pipe.Writer.t
+      ; closed : unit Ivar.t
+      }
 
     let from_router ~logger event_router =
       let r, w = Broadcast_pipe.create empty in
+      let closed = Ivar.create () in
       let update ~f =
-        (* should be safe to ignore the write here, so long as `f` is synchronous *)
-        let state = f (Broadcast_pipe.Reader.peek r) in
-        [%log debug] "updated network state to: $state"
-          ~metadata:[ ("state", to_yojson state) ] ;
-        ignore (Broadcast_pipe.Writer.write w state : unit Deferred.t) ;
-        Deferred.return `Continue
+        if Ivar.is_full closed then Deferred.return (`Stop ())
+        else
+          (* should be safe to ignore the write here, so long as `f` is synchronous *)
+          let state = f (Broadcast_pipe.Reader.peek r) in
+          [%log debug] "updated network state to: $state"
+            ~metadata:[ ("state", to_yojson state) ] ;
+          ignore (Broadcast_pipe.Writer.write w state : unit Deferred.t) ;
+          Deferred.return `Continue
       in
       (* handle_block_produced *)
       ignore
@@ -328,10 +335,12 @@ module Make
                   ; blocks_including_txn = blocks_including_txn'
                   } ) )
           : _ Event_router.event_subscription ) ;
-      (r, w)
+      { reader = r; writer = w; closed }
 
-    let reader ((reader, _) : gen) = reader
+    let reader ({ reader; _ } : gen) = reader
 
-    let close ((_, writer) : gen) = Broadcast_pipe.Writer.close writer
+    let close ({ writer; closed; _ } : gen) =
+      Ivar.fill closed () ;
+      Broadcast_pipe.Writer.close writer
   end
 end

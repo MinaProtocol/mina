@@ -226,6 +226,9 @@ module Dsl = struct
       (* HACK: I can't name it `gen` due to name collision *)
       type gen
 
+      (* Create a network state generator that could be broadcast-consumed from
+         event router. Under the hood, it's aggregating on events interesting to
+         the network state *)
       val from_router : logger:Logger.t -> Event_router.t -> gen
 
       val reader : gen -> t Broadcast_pipe.Reader.t
