@@ -8,8 +8,8 @@ module Make (Engine : Intf.Engine.S) () :
 
   module Event_handler_id = Unique_id.Int ()
 
-  type ('a, 'b) handler_func =
-    Node.t -> 'a -> [ `Stop of 'b | `Continue ] Deferred.t
+  type ('data, 'result) handler_func =
+    Node.t -> 'data -> [ `Stop of 'result | `Continue ] Deferred.t
 
   type event_handler =
     | Event_handler :
@@ -19,8 +19,8 @@ module Make (Engine : Intf.Engine.S) () :
   (* event subscriptions surface information from the handler (as type witnesses), but do not existentially hide the result parameter *)
   type _ event_subscription =
     | Event_subscription :
-        Event_handler_id.t * 'b Ivar.t * 'a Event_type.t
-        -> 'b event_subscription
+        Event_handler_id.t * 'result Ivar.t * 'data Event_type.t
+        -> 'result event_subscription
 
   type handler_map = event_handler list Event_type.Map.t
 
