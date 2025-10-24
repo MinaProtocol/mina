@@ -290,8 +290,6 @@ let main inputs =
     { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node =
         Option.value inputs.archive_image ~default:"archive_image_unused"
-    ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
-    ; points = "codaprotocol/coda-points-hack:32b.4"
     }
   in
   let test_config = T.config ~constants in
