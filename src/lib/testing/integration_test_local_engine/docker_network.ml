@@ -35,8 +35,6 @@ module Node = struct
 
   let id { config; _ } = config.service_id
 
-  let infra_id { config; _ } = config.service_id
-
   let should_be_running { should_be_running; _ } = should_be_running
 
   let network_keypair { config; _ } = config.network_keypair
