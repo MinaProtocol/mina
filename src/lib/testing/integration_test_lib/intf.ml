@@ -60,8 +60,11 @@ module Engine = struct
       *)
       val should_be_running : t -> bool
 
+      (** Returns the GraphQL endpoint of this node that's reachable from host 
+          environment. *)
       val get_ingress_uri : t -> Uri.t
 
+      (** Dump archive data of an archive node to host at [data_file]. *)
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
 
@@ -71,9 +74,12 @@ module Engine = struct
         -> t
         -> string Malleable_error.t
 
+      (** Dump JSON logs of the node to host at [data_file]. *)
       val dump_mina_logs :
         logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
 
+      (** Dump a bunch of precomputed block json files with name formatted as 
+          state_hash.json in CWD. *)
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
     end
