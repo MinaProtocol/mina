@@ -380,8 +380,6 @@ let main inputs =
           in
           (network, dsl)
         in
-        [%log trace] "initializing network abstraction" ;
-        let%bind () = Engine.Network.initialize_infra ~logger network in
 
         [%log info] "Starting the daemons within the pods" ;
         let start_print (node : Engine.Network.Node.t) =

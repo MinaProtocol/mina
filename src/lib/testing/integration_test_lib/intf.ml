@@ -115,8 +115,6 @@ module Engine = struct
     val genesis_keypairs : t -> Network_keypair.t Core.String.Map.t
 
     val genesis_keypair_exn : t -> String.t -> Network_keypair.t
-
-    val initialize_infra : logger:Logger.t -> t -> unit Malleable_error.t
   end
 
   module type Network_manager_intf = sig

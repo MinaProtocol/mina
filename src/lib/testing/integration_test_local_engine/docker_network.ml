@@ -331,8 +331,3 @@ let all_ids t =
   let deployments = all_nodes t |> Core.Map.to_alist in
   List.fold deployments ~init:[] ~f:(fun acc (_, node) ->
       List.cons node.config.service_id acc )
-
-let initialize_infra ~logger network =
-  let _ = logger in
-  let _ = network in
-  Malleable_error.return ()
