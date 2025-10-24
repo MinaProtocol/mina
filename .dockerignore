@@ -4,6 +4,7 @@
 !mina.deb
 !coda-discovery.deb
 !scripts/run-demo.sh
+!scripts/tests/mina-signer/**/*
 !src/external/**/*
 !src/app/libp2p_helper
 !src/app/trace-tool
