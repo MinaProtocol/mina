@@ -714,6 +714,8 @@ copy_common_archive_configs() {
     "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe \
     "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
+  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
+    "${BUILDDIR}/usr/local/bin/mina-archive-hardfork-toolbox"
 
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/missing-blocks-guardian.sh \
