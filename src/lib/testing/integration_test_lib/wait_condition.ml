@@ -167,7 +167,9 @@ struct
     }
 
   let block_height_growth ~height_growth =
-    (* block height is an objective measurement for the whole chain.  block height growth checks that the block height increased by the desired_height since the wait condition was called *)
+    (* block height is an objective measurement for the whole chain.  block
+       this condition checks that the block height increased by [height_growth]
+       since the wait condition was called *)
     let init state = Predicate_continuation state.block_height in
     let check initial_height (state : Network_state.t) =
       if state.block_height - initial_height >= height_growth then
