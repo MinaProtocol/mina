@@ -1,9 +1,11 @@
 open Core_kernel
 open Mina_base
 
-let all_equal ~equal ~compare ls =
-  Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-      List.equal equal [ h ] (List.find_all_dups ~compare ls) )
+let all_equal ~equal = function
+  | [] ->
+      true
+  | hd :: rest ->
+      List.for_all ~f:(equal hd) rest
 
 module Make
     (Engine : Intf.Engine.S)
@@ -193,7 +195,6 @@ struct
     let check () state =
       let all_best_tips_equal =
         all_equal ~equal:[%equal: State_hash.t option]
-          ~compare:[%compare: State_hash.t option]
       in
       let best_tips =
         List.map nodes ~f:(fun node ->
