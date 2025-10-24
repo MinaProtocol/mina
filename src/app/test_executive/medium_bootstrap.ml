@@ -87,7 +87,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       section_hard "network is fully connected after one node was restarted"
         (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 240.0)) in
          let%bind final_connectivity_data =
-           fetch_connectivity_data ~logger (Core.String.Map.data all_daemon_nodes)
+           fetch_connectivity_data ~logger
+             (Core.String.Map.data all_daemon_nodes)
          in
          assert_peers_completely_connected final_connectivity_data )
     in
