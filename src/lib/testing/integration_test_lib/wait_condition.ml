@@ -120,13 +120,13 @@ struct
         , state.num_transition_frontier_loaded_from_persistence )
     in
 
-    let check init state =
+    let check condition state =
       let ( num_init_persisted_frontier_loaded
           , num_init_persisted_frontier_fresh_boot
           , num_init_bootstrap_required
           , num_init_persisted_frontier_dropped
           , num_init_transition_frontier_loaded_from_persistence ) =
-        init
+        condition
       in
 
       let fresh_data_condition =
@@ -153,13 +153,7 @@ struct
         && state.num_transition_frontier_loaded_from_persistence
            > num_init_transition_frontier_loaded_from_persistence
       then Predicate_passed
-      else
-        Predicate_continuation
-          ( num_init_persisted_frontier_loaded
-          , num_init_persisted_frontier_fresh_boot
-          , num_init_bootstrap_required
-          , num_init_persisted_frontier_dropped
-          , num_init_transition_frontier_loaded_from_persistence )
+      else Predicate_continuation condition
     in
     { id = Transition_frontier_loaded_from_persistence
     ; description =
