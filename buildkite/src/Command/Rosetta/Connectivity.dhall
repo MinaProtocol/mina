@@ -26,6 +26,8 @@ let Profiles = ../../Constants/Profiles.dhall
 
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
+let B/If = B.definitions/commandStep/properties/if/Type
+
 let Spec =
       { Type =
           { dockerType : Dockers.Type
@@ -35,6 +37,7 @@ let Spec =
           , timeout : Natural
           , profile : Profiles.Type
           , scope : List PipelineScope.Type
+          , if_ : B/If
           }
       , default =
           { dockerType = Dockers.Type.Bullseye
@@ -44,6 +47,8 @@ let Spec =
           , timeout = 1000
           , profile = Profiles.Type.Devnet
           , scope = PipelineScope.Full
+          , if_ =
+              "build.pull_request.base_branch != \"develop\" && build.branch != \"develop\""
           }
       }
 
@@ -59,7 +64,7 @@ let command
                   , "source ./buildkite/scripts/export-git-env-vars.sh"
                   , "scripts/tests/rosetta-connectivity.sh --network ${Network.lowerName
                                                                          spec.network} --tag \\\${MINA_DOCKER_TAG} --timeout ${Natural/show
-                                                                                                                                 spec.timeout} --run-load-test"
+                                                                                                                                 spec.timeout} --run-compatibility-test develop --run-load-test "
                   ]
               ]
             , label =
@@ -68,6 +73,7 @@ let command
                 "rosetta-${Network.lowerName spec.network}-connectivity-test"
             , target = Size.XLarge
             , soft_fail = Some spec.softFail
+            , if_ = Some spec.if_
             , depends_on =
                 Dockers.dependsOn
                   Dockers.DepsSpec::{

@@ -4,23 +4,23 @@
 -- NOTE: minaToolchainBookworm is also used for building Ubuntu Jammy packages in CI
 { toolchainBase = "codaprotocol/ci-toolchain-base:v3"
 , minaToolchainBookworm =
-    { arm64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:d3a479556ebd293ffdd1fe2cd552fe1a03ceaf118c9fcbd29d3ecb5cfad62326"
-    , amd64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:4d0f55b32c072d59a4a09c5b4484c6afb6600da90e55aed645a59c841cb6ee36"
+    { amd64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:a3517722b1573ac19f9361d42aa0b5f15a108d62fa73f97f0a74e195af1a2e90"
+    , arm64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:b4a7040b64473f89e51372ab6e11f9332730e085766aa157c25e28c6b9c0c6d4"
     }
 , minaToolchainBullseye.amd64 =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:20e86f1931599826c888a88ac956de0cdbad326bf155b6cf8e1536c3509b7a17"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:524a3fb77d6702f38ad63ec737e398478e082387753b8d01e1ccf607d2917343"
 , minaToolchainNoble =
-    { arm64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:6fa48067fea8d81e15379781ad22ba99ffec0623a2613ea5b1447b32dbdd3114"
-    , amd64 =
-        "gcr.io/o1labs-192920/mina-toolchain@sha256:d81adae569e02eb5295f7cd56aa53df95576d8ad001358066bcae3a612cc39b7"
+    { amd64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:3fd6ebfedb905ba358903639c2ebcdbd2277316b854d80f12c74df8dcd83734b"
+    , arm64 =
+        "gcr.io/o1labs-192920/mina-toolchain@sha256:adfff17bf21b79efc3b2d54d0648049a36fa7b54b732773bd7f2f651869c1f54"
     }
 , minaToolchainJammy.amd64 =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:42d55ac7521096ade25c9b0d24062894fa433bf214c07cc4f991df2d2d5392f3"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:6db30a6faf94f7dcc23a14bcbc01d558b2164955067fd21eb92a981fe231dfe1"
 , minaToolchain =
-    "gcr.io/o1labs-192920/mina-toolchain@sha256:20e86f1931599826c888a88ac956de0cdbad326bf155b6cf8e1536c3509b7a17"
+    "gcr.io/o1labs-192920/mina-toolchain@sha256:524a3fb77d6702f38ad63ec737e398478e082387753b8d01e1ccf607d2917343"
 , postgres = "postgres:12.4-alpine"
 , xrefcheck =
     "dkhamsing/awesome_bot@sha256:a8adaeb3b3bd5745304743e4d8a6d512127646e420544a6d22d9f58a07f35884"

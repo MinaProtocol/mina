@@ -64,7 +64,7 @@ let MinaBuildSpec =
           , arch : Arch.Type
           , deb_legacy_version : Text
           , suffix : Optional Text
-          , if : Optional B/If
+          , if_ : Optional B/If
           }
       , default =
           { prefix = "MinaArtifact"
@@ -83,7 +83,7 @@ let MinaBuildSpec =
           , suffix = None Text
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , arch = Arch.Type.Amd64
-          , if = None B/If
+          , if_ = None B/If
           }
       }
 
@@ -139,8 +139,9 @@ let build_artifacts
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , target = Size.XLarge
-            , if = spec.if
+            , target =
+                merge { Amd64 = Size.Multi, Arm64 = Size.XLarge } spec.arch
+            , if_ = spec.if_
             , retries =
               [ Command.Retry::{
                 , exit_status = Command.ExitStatus.Code +2
@@ -183,7 +184,7 @@ let docker_step
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
                     , arch = spec.arch
-                    , if = spec.if
+                    , if_ = spec.if_
                     }
                   ]
                 , DaemonAutoHardfork =
@@ -244,7 +245,7 @@ let docker_step
                     , deb_repo = DebianRepo.Type.Local
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
-                    , if = spec.if
+                    , if_ = spec.if_
                     }
                   ]
                 , Archive =
@@ -260,7 +261,7 @@ let docker_step
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
                     , arch = spec.arch
-                    , if = spec.if
+                    , if_ = spec.if_
                     }
                   ]
                 , Rosetta =
@@ -275,7 +276,7 @@ let docker_step
                     , deb_legacy_version = spec.deb_legacy_version
                     , verify = True
                     , arch = spec.arch
-                    , if = spec.if
+                    , if_ = spec.if_
                     }
                   ]
                 , ZkappTestTransaction =
@@ -289,7 +290,7 @@ let docker_step
                     , deb_codename = spec.debVersion
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
-                    , if = spec.if
+                    , if_ = spec.if_
                     }
                   ]
                 , FunctionalTestSuite =
@@ -304,7 +305,7 @@ let docker_step
                     , deb_profile = spec.profile
                     , deb_legacy_version = spec.deb_legacy_version
                     , arch = spec.arch
-                    , if = spec.if
+                    , if_ = spec.if_
                     }
                   ]
                 , Toolchain = [] : List DockerImage.ReleaseSpec.Type

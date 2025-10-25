@@ -10,11 +10,11 @@
 #   upgrade-script-check.sh [OPTIONS]
 #
 # OPTIONS:
-#   -m, --mode MODE     Execution mode: 'default' or 'verbose' (default: default)
-#                       default: Returns exit code 0/1 without error messages
-#                       verbose: Prints error messages and fails with descriptive output
-#   -b, --branch BRANCH Target branch for comparison (default: develop)
-#   -h, --help          Show this help message
+#   -m, --mode MODE                 Execution mode: 'default' or 'verbose' (default: default)
+#                                   default: Returns exit code 0/1 without error messages
+#                                   verbose: Prints error messages and fails with descriptive output
+#   -b, --comparison-branch BRANCH  Target branch for comparison (default: develop)
+#   -h, --help                      Show this help message
 #
 # EXIT CODES:
 #   0: Success (no schema changes or upgrade script exists)
@@ -28,7 +28,7 @@
 set -euo pipefail
 
 MODE="default"
-BRANCH="develop"
+COMPARISION_BRANCH="develop"
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 # Parse command line arguments
@@ -43,8 +43,8 @@ parse_args() {
                 fi
                 shift 2
                 ;;
-            -b|--branch)
-                BRANCH="$2"
+            -b|--comparison-branch)
+                COMPARISION_BRANCH="$2"
                 shift 2
                 ;;
             -h|--help)
@@ -80,17 +80,52 @@ has_changes() {
     fi
 
     # Fetch latest branch to ensure accurate comparison
-    git fetch origin "$BRANCH" >/dev/null 2>&1 || {
+    git fetch origin "$COMPARISION_BRANCH" >/dev/null 2>&1 || {
+        echo "Error: Failed to fetch origin/$COMPARISION_BRANCH" >&2
+        exit 1
+    }
+
+    # Check if file has differences
+    if ! git diff --quiet "origin/$COMPARISION_BRANCH" -- "$REPO_ROOT/$file" 2>/dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+has_changes_in_git() {
+    local file="$1"
+    if ! check_file_exists "$file"; then
+        return 1
+    fi
+
+    # Fetch latest branch to ensure accurate comparison
+    git fetch origin "$COMPARISION_BRANCH" >/dev/null 2>&1 || {
         if [[ "$MODE" == "verbose" ]]; then
-            echo "Error: Failed to fetch origin/$BRANCH" >&2
+            echo "Error: Failed to fetch origin/$COMPARISION_BRANCH" >&2
         fi
         return 1
     }
 
-    # Check if file has differences
-    git diff --quiet "origin/$BRANCH" -- "$REPO_ROOT/$file" 2>/dev/null
-    return $?
+    # Check if file was modified in last commit, staged, or has unstaged changes
+    local file_path="$REPO_ROOT/$file"
+
+    # Check if file was modified in last commit
+    if git diff --quiet HEAD~1 HEAD -- "$file_path" 2>/dev/null; then
+        # No changes in last commit, check staged changes
+        if git diff --quiet --cached -- "$file_path" 2>/dev/null; then
+            # No staged changes, check unstaged changes
+            if git diff --quiet -- "$file_path" 2>/dev/null; then
+                # No changes found
+                return 1
+            fi
+        fi
+    fi
+
+    # File has changes in one of the three states
+    return 0
 }
+
 
 # Main execution
 main() {
@@ -102,8 +137,8 @@ main() {
     )
 
     local scripts=(
-        "src/app/archive/upgrade-to-mesa.sql"
-        "src/app/archive/downgrade-to-berkeley.sql"
+        "src/app/archive/upgrade_to_mesa.sql"
+        "src/app/archive/downgrade_to_berkeley.sql"
     )
 
     # Check if either monitored file has changes
@@ -120,6 +155,12 @@ main() {
 
     # If schema files changed, verify upgrade script exists
     if [[ "$schema_changed" == "true" ]]; then
+
+        if ./buildkite/scripts/git/check-bypass.sh "!ci-bypass-upgrade-script-check"; then
+            echo "⏭️  Skipping upgrade script check as PR is bypassed"
+            exit 0
+        fi
+
         # Check that all required scripts exist
         for script_path in "${scripts[@]}"; do
             if ! check_file_exists "$script_path"; then
@@ -130,6 +171,23 @@ main() {
             fi
             exit 1
             fi
+
+            # Check if the upgrade script itself has changes
+            if has_changes_in_git "$script_path"; then
+                if [[ "$MODE" == "verbose" ]]; then
+                    echo "✓ Upgrade script has been modified: $script_path"
+                fi
+            else
+                if [[ "$MODE" == "verbose" ]]; then
+                    echo "Error: Schema changed but upgrade script not updated: $script_path"
+                    echo "Please update the upgrade script to reflect schema changes."
+                    echo "This is critical to ensure smooth database migrations in production."
+                    echo "Upgrade/Rollback scripts must be updated together with schema changes, in the same commit."
+                    echo "For local testing, scripts can be modified in staged/unstaged git states."
+                    exit 1
+                fi
+            fi
+
         done
 
         if [[ "$MODE" == "verbose" ]]; then
