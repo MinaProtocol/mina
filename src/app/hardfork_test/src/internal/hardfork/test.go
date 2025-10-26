@@ -124,15 +124,13 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 
-	// Write fork config to file
-	err = os.WriteFile(forkConfigPath, forkConfigBytes, 0644)
-	if err != nil {
-		return err
-	}
-
 	t.Logger.Info("Phase 2: Validating extracted fork configuration...")
 	// Validate fork config data
 	if err := t.ValidateForkConfigData(analysis.LatestNonEmptyBlock, forkConfigBytes); err != nil {
+		return err
+	}
+	// Write fork config to file
+	if err := os.WriteFile(forkConfigPath, forkConfigBytes, 0644); err != nil {
 		return err
 	}
 	{
