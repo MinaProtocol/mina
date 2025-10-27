@@ -107,27 +107,6 @@ BEGIN
     END IF;
 END$$;
 
-CREATE FUNCTION pg_temp.try_remove_zkapp_states_nullable_element(p_element_num INT)
-RETURNS VOID AS $$
-DECLARE
-    col_name TEXT := 'element' || p_element_num;
-BEGIN
-
-    RAISE DEBUG 'Trying to removing column % for zkapp_states_nullable', col_name;
-
-    EXECUTE format(
-        'ALTER TABLE zkapp_states_nullable DROP COLUMN IF EXISTS %I',
-        col_name
-    );
-
-    RAISE DEBUG 'Ensured column % for zkapp_states_nullable not existent', col_name;
-EXCEPTION
-    WHEN OTHERS THEN
-        PERFORM pg_temp.set_migration_status('failed'::migration_status);
-        RAISE EXCEPTION 'An error occurred: %', SQLERRM;
-END
-$$ LANGUAGE plpgsql;
-
 -- 2. `zkapp_states`: Remove columns element31..element8
 
 CREATE FUNCTION pg_temp.try_remove_zkapp_states_element(p_element_num INT)
@@ -177,6 +156,27 @@ SELECT pg_temp.try_remove_zkapp_states_element(9);
 SELECT pg_temp.try_remove_zkapp_states_element(8);
 
 -- 3. `zkapp_states_nullable`: Remove nullable columns element31..element8
+
+CREATE FUNCTION pg_temp.try_remove_zkapp_states_nullable_element(p_element_num INT)
+RETURNS VOID AS $$
+DECLARE
+    col_name TEXT := 'element' || p_element_num;
+BEGIN
+
+    RAISE DEBUG 'Trying to removing column % for zkapp_states_nullable', col_name;
+
+    EXECUTE format(
+        'ALTER TABLE zkapp_states_nullable DROP COLUMN IF EXISTS %I',
+        col_name
+    );
+
+    RAISE DEBUG 'Ensured column % for zkapp_states_nullable not existent', col_name;
+EXCEPTION
+    WHEN OTHERS THEN
+        PERFORM pg_temp.set_migration_status('failed'::migration_status);
+        RAISE EXCEPTION 'An error occurred: %', SQLERRM;
+END
+$$ LANGUAGE plpgsql;
 
 SELECT pg_temp.try_remove_zkapp_states_nullable_element(31);
 SELECT pg_temp.try_remove_zkapp_states_nullable_element(30);
