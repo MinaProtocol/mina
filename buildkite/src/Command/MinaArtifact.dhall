@@ -113,7 +113,8 @@ let build_artifacts
       ->  Command.build
             Command.Config::{
             , commands =
-                  Toolchain.select
+                  [ Cmd.run "./scripts/docker/setup_buildx.sh" ]
+                # Toolchain.select
                     spec.toolchainSelectMode
                     spec.debVersion
                     spec.arch
