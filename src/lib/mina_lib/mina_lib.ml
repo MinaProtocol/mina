@@ -283,6 +283,8 @@ module Snark_worker = struct
               , `Int (Pid.to_int (Process.pid snark_worker_process)) )
             ]
           "Started snark worker process with pid: $snark_worker_pid" ;
+        Mina_metrics.Process_memory.Snark_worker.set_pid
+          (Pid.to_int (Process.pid snark_worker_process)) ;
         if Ivar.is_full process_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill process_ivar snark_worker_process
@@ -301,6 +303,7 @@ module Snark_worker = struct
           ~metadata:
             [ ("snark_worker_pid", `Int (Pid.to_int (Process.pid process))) ] ;
         Signal.send_exn Signal.term (`Pid (Process.pid process)) ;
+        Mina_metrics.Process_memory.Snark_worker.clear_pid () ;
         if should_wait_kill then Ivar.read kill_ivar else Deferred.unit
     | `Off _ ->
         [%log' warn t.config.logger]
