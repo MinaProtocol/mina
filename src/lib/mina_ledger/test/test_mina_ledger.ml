@@ -2,6 +2,7 @@ open Core
 open Async
 open Mina_base
 module L = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
 
 let logger = Logger.create ~id:"test_mina_ledger" ()
 
@@ -17,7 +18,7 @@ module Root_test = struct
   (** populate a root with at most [num] accounts. This is because generated 
       accounts might duplicate *)
   let populate_with_random_accounts ~num ~root ~random =
-    let unmasked = L.Root.as_unmasked root in
+    let unmasked = Root_ledger.as_unmasked root in
     let module LocMap = L.Any_ledger.Location.Map in
     Quickcheck.Generator.(
       list_with_length num Mina_base.Account.gen
@@ -39,7 +40,7 @@ module Root_test = struct
   let assert_accounts ~loc_with_accounts ~root =
     let module LocMap = L.Any_ledger.Location.Map in
     let locations = LocMap.keys loc_with_accounts in
-    L.Any_ledger.M.get_batch (L.Root.as_unmasked root) locations
+    L.Any_ledger.M.get_batch (Root_ledger.as_unmasked root) locations
     |> List.iter ~f:(fun (loc, account) ->
            let actual_account =
              Option.value_exn account
@@ -64,10 +65,10 @@ module Root_test = struct
         (* STEP 1: create a stable root, fill with some accounts, get the locs
            and closing *)
         let cfg =
-          L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger")
+          Root_ledger.Config.with_directory ~directory_name:(cwd ^/ "ledger")
         in
         let stable_root =
-          L.Root.create ~logger
+          Root_ledger.create ~logger
             ~config:(cfg ~backing_type:Stable_db)
             ~depth:ledger_depth ()
         in
@@ -75,16 +76,16 @@ module Root_test = struct
           populate_with_random_accounts ~num:num_accounts ~root:stable_root
             ~random
         in
-        L.Root.close stable_root ;
+        Root_ledger.close stable_root ;
         let converting_root =
-          L.Root.create ~logger
+          Root_ledger.create ~logger
             ~config:(cfg ~backing_type:Converting_db)
             ~depth:ledger_depth ()
         in
         (* STEP 2: reopening the root now as converting, check accounts are
            matched up. *)
         assert_accounts ~loc_with_accounts ~root:converting_root ;
-        L.Root.close converting_root ;
+        Root_ledger.close converting_root ;
         Deferred.unit )
 
   let test_root_moving ~random () =
@@ -96,36 +97,36 @@ module Root_test = struct
            closing *)
         let backing_type =
           Quickcheck.Generator.of_list
-            [ L.Root.Config.Stable_db; Converting_db ]
+            [ Root_ledger.Config.Stable_db; Converting_db ]
           |> Quickcheck.Generator.generate ~size:quickcheck_size ~random
         in
         let config =
-          L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger")
+          Root_ledger.Config.with_directory ~directory_name:(cwd ^/ "ledger")
             ~backing_type
         in
-        let root = L.Root.create ~logger ~config ~depth:ledger_depth () in
+        let root = Root_ledger.create ~logger ~config ~depth:ledger_depth () in
         let loc_with_accounts =
           populate_with_random_accounts ~num:num_accounts ~root ~random
         in
-        L.Root.close root ;
+        Root_ledger.close root ;
         let moved_primary_dir = cwd ^/ "ledger_moved" in
         let config_moved =
-          L.Root.Config.with_directory ~directory_name:moved_primary_dir
+          Root_ledger.Config.with_directory ~directory_name:moved_primary_dir
             ~backing_type
         in
-        L.Root.Config.move_backing_exn ~src:config ~dst:config_moved ;
+        Root_ledger.Config.move_backing_exn ~src:config ~dst:config_moved ;
         assert (
-          (not (L.Root.Config.exists_any_backing config))
-          && L.Root.Config.exists_backing config_moved
+          (not (Root_ledger.Config.exists_any_backing config))
+          && Root_ledger.Config.exists_backing config_moved
           || failwith "Config is not moved" ) ;
         let root_moved =
-          L.Root.create ~logger ~config:config_moved ~depth:ledger_depth ()
+          Root_ledger.create ~logger ~config:config_moved ~depth:ledger_depth ()
         in
 
         (* STEP 2: reopening the root in moved location, check accounts is
            matched up. *)
         assert_accounts ~loc_with_accounts ~root:root_moved ;
-        L.Root.close root_moved ;
+        Root_ledger.close root_moved ;
         ( if phys_equal backing_type Converting_db then
           L.Converting_ledger.(
             create
@@ -146,30 +147,31 @@ module Root_test = struct
            closing *)
         let backing_type =
           Quickcheck.Generator.of_list
-            [ L.Root.Config.Stable_db; Converting_db ]
+            [ Root_ledger.Config.Stable_db; Converting_db ]
           |> Quickcheck.Generator.generate ~size:quickcheck_size ~random
         in
         let config =
-          L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger")
+          Root_ledger.Config.with_directory ~directory_name:(cwd ^/ "ledger")
             ~backing_type
         in
-        let root = L.Root.create ~logger ~config ~depth:ledger_depth () in
+        let root = Root_ledger.create ~logger ~config ~depth:ledger_depth () in
         let loc_with_accounts =
           populate_with_random_accounts ~num:num_accounts ~root ~random
         in
         let checkpointed_primary_dir = cwd ^/ "ledger_checkpointed" in
         let config_checkpoint =
-          L.Root.Config.with_directory ~directory_name:checkpointed_primary_dir
-            ~backing_type
+          Root_ledger.Config.with_directory
+            ~directory_name:checkpointed_primary_dir ~backing_type
         in
-        L.Root.make_checkpoint root ~config:config_checkpoint ;
-        L.Root.close root ;
+        Root_ledger.make_checkpoint root ~config:config_checkpoint ;
+        Root_ledger.close root ;
         let root_checkpointed =
-          L.Root.create ~logger ~config:config_checkpoint ~depth:ledger_depth ()
+          Root_ledger.create ~logger ~config:config_checkpoint
+            ~depth:ledger_depth ()
         in
         (* STEP 2: opening the checkpointed root, check accounts are matched up. *)
         assert_accounts ~loc_with_accounts ~root:root_checkpointed ;
-        L.Root.close root_checkpointed ;
+        Root_ledger.close root_checkpointed ;
         ( if phys_equal backing_type Converting_db then
           L.Converting_ledger.(
             create
@@ -187,28 +189,28 @@ module Root_test = struct
     Mina_stdlib_unix.File_system.with_temp_dir "root_gradual_migration"
       ~f:(fun cwd ->
         let cfg =
-          L.Root.Config.with_directory ~directory_name:(cwd ^/ "ledger")
+          Root_ledger.Config.with_directory ~directory_name:(cwd ^/ "ledger")
         in
         let root =
-          L.Root.create ~logger
+          Root_ledger.create ~logger
             ~config:(cfg ~backing_type:Stable_db)
             ~depth:ledger_depth ()
         in
         let loc_with_accounts =
           populate_with_random_accounts ~num:num_accounts ~root ~random
         in
-        let%bind root = L.Root.make_converting root in
+        let%bind root = Root_ledger.make_converting root in
         (* Make sure the stable accounts are all still present *)
         assert_accounts ~loc_with_accounts ~root ;
-        L.Root.close root ;
+        Root_ledger.close root ;
         (* Re-open the root as converting to check that the databases are in
            sync *)
         let converting_root =
-          L.Root.create ~logger
+          Root_ledger.create ~logger
             ~config:(cfg ~backing_type:Converting_db)
             ~depth:ledger_depth ~assert_synced:true ()
         in
-        L.Root.close converting_root ;
+        Root_ledger.close converting_root ;
         Deferred.unit )
 end
 
