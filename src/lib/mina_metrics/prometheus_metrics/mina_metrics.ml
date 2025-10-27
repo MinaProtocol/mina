@@ -291,6 +291,9 @@ module Process_memory = struct
     val is_daemon : bool
   end) =
   struct
+    let logger =
+      Logger.create ~id:(Printf.sprintf "rss_%s" Config.process_name) ()
+
     let process_pid : int option ref = ref None
 
     let set_pid pid = process_pid := Some pid
@@ -307,7 +310,9 @@ module Process_memory = struct
 
     let update () =
       if Config.is_daemon || Option.is_some !process_pid then
-        Option.iter (read_rss_kb !process_pid) ~f:(Gauge.set gauge)
+        Option.iter (read_rss_kb !process_pid) ~f:(fun reading ->
+            Gauge.set gauge reading ;
+            [%log info] "RSS for %s process: %f KB" Config.process_name reading )
   end
 
   module Daemon = Make_rss_gauge (struct
