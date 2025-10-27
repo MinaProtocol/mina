@@ -34,6 +34,9 @@ MINA_EXE=${MINA_EXE:-mina}
 # Genesis ledger directory
 GENESIS_LEDGER_DIR=${GENESIS_LEDGER_DIR:-}
 
+# Log level
+NODE_STDOUT_LOG_LEVEL=${STDOUT_LOG_LEVEL:-Debug}
+
 # Slot duration (a.k.a. block window duration), seconds
 SLOT=${SLOT:-30}
 
@@ -74,6 +77,7 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 1 ;;
     *)
+      # These params are passed to prepare-test-ledger.sh
       KEYS+=("$1") ; shift ;;
   esac
 done
@@ -148,7 +152,7 @@ fi
 # Launch two Mina nodes and send transactions on an interval
 ##############################################################
 
-COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
+COMMON_ARGS=( --log-json --log-level "$NODE_STDOUT_LOG_LEVEL" --seed )
 COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
 COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
 
