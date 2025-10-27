@@ -145,20 +145,19 @@ function get_suffix() {
 
     case $__profile in
         lightnet)
-            echo "-lightnet"
+            __profile_part="-lightnet"
         ;;
         instrumented)
-            echo "-instrumented"
+            __profile_part="-instrumented"
         ;;
-
         *)
-            echo ""
+            __profile_part=""
         ;;
     esac
 
     case $__artifact in
         mina-daemon)
-            echo "-$__network$__profile"
+            echo "-$__network$__profile_part"
         ;;
         mina-rosetta)
             echo "-$__network"
@@ -256,9 +255,10 @@ function calculate_docker_tag() {
     local __target_version=$3
     local __codename=$4
     local __network=$5
+    local __profile=$6
 
     local __network_suffix
-    __network_suffix=$(get_suffix $__artifact $__network)
+    __network_suffix=$(get_suffix $__artifact $__network "$__profile")
 
     local __arch_suffix
     __arch_suffix=$(get_arch_suffix $__arch)
@@ -518,7 +518,7 @@ function promote_and_verify_docker() {
     fi
 
     echo " 🐋 Publishing $__artifact docker for '$__network' network and '$__codename' codename with '$__target_version' version and '$__arch' "
-    echo "    📦 Target version: $(calculate_docker_tag $__publish_to_docker_io $__artifact $__target_version $__codename "$__network ")"
+    echo "    📦 Target version: $(calculate_docker_tag $__publish_to_docker_io $__artifact $__target_version $__codename $__network $__profile )"
     echo ""
     if [[ $__dry_run == 0 ]]; then
         prefix_cmd "$SUBCOMMAND_TAB" $SCRIPTPATH/../../../scripts/docker/promote.sh \
@@ -1202,7 +1202,7 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__arch $__dry_run
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
                                 fi
                             done
                         ;;
@@ -1225,7 +1225,7 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__arch $__dry_run
+                                        promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
                                 fi
                             done
                         ;;
@@ -1247,7 +1247,7 @@ function promote(){
                                 fi
 
                                 if [[ $__only_debians == 0 ]]; then
-                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__publish_to_docker_io $__verify $__arch $__dry_run
+                                    promote_and_verify_docker $artifact $__source_version $__target_version $__codename $network $__profile $__publish_to_docker_io $__verify $__arch $__dry_run
                                 fi
                             done
                         ;;
