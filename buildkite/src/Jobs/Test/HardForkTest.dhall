@@ -27,7 +27,7 @@ in  Pipeline.build
       , spec = JobSpec::{
         , dirtyWhen =
           [ S.strictlyStart (S.contains "src")
-          , S.exactly "buildkite/src/Jobs/Test/HFTest" "dhall"
+          , S.exactly "buildkite/src/Jobs/Test/HardForkTest" "dhall"
           , S.strictlyStart (S.contains "scripts/hardfork")
           , S.strictlyStart (S.contains "nix")
           , S.exactly "flake" "nix"
@@ -35,7 +35,7 @@ in  Pipeline.build
           , S.exactly "default" "nix"
           ]
         , path = "Test"
-        , name = "HFTest"
+        , name = "HardForkTest"
         , scope = PipelineScope.AllButPullRequest
         , tags =
           [ PipelineTag.Type.Long
