@@ -79,7 +79,12 @@ def main():
     if not tar_keys:
         raise RuntimeError("No ledger tar files found.")
 
-    for tar_key in random.sample(tar_keys, min(NUM_LEDGER_TARS, len(tar_keys))):
+    test_cases = random.sample(tar_keys, min(NUM_LEDGER_TARS, len(tar_keys)))
+
+    # Add some testcases that we know it's broken
+    test_cases += ["epoch_ledger_21bae06cfdfafbd70c9920622c20ead2a114fba904ef5fe7c1e2a7be8456e80d.tar.gz"]
+
+    for tar_key in test_cases:
         tar_uri = urljoin("https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net/", tar_key)
         print(f"Testing RocksDB compatibility on {tar_uri}")
 
