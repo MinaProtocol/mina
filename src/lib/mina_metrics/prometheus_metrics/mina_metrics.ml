@@ -247,6 +247,127 @@ module Runtime = struct
         register default info collector )
 end
 
+module Process_memory = struct
+  let subsystem = "Process_memory"
+
+  (* Read RSS (Resident Set Size) from /proc/<pid>/status *)
+  let read_rss_kb pid_opt =
+    try
+      let proc_file =
+        match pid_opt with
+        | None ->
+            "/proc/self/status"
+        | Some pid ->
+            Printf.sprintf "/proc/%d/status" pid
+      in
+      let ic = In_channel.create proc_file in
+      let rec find_vmrss () =
+        match In_channel.input_line ic with
+        | None ->
+            None
+        | Some line ->
+            if String.is_prefix line ~prefix:"VmRSS:" then
+              (* VmRSS line format: "VmRSS:    12345 kB" *)
+              let parts = String.split line ~on:' ' in
+              let kb_str =
+                List.find parts ~f:(fun s ->
+                    String.for_all s ~f:Char.is_digit && not (String.is_empty s) )
+              in
+              match kb_str with
+              | Some kb ->
+                  Option.try_with (fun () -> Float.of_string kb)
+              | None ->
+                  None
+            else find_vmrss ()
+      in
+      let result = find_vmrss () in
+      In_channel.close ic ; result
+    with _ -> None
+
+  (* Functor to create RSS gauge for a specific process type *)
+  module Make_rss_gauge (Config : sig
+    val process_name : string
+
+    val is_daemon : bool
+  end) =
+  struct
+    let process_pid : int option ref = ref None
+
+    let set_pid pid = process_pid := Some pid
+
+    let clear_pid () = process_pid := None
+
+    let gauge =
+      let name = Printf.sprintf "rss_%s" Config.process_name in
+      let help =
+        Printf.sprintf "Resident Set Size (RSS) in kilobytes for %s process"
+          Config.process_name
+      in
+      Gauge.v name ~help ~namespace ~subsystem
+
+    let update () =
+      if Config.is_daemon || Option.is_some !process_pid then
+        Option.iter (read_rss_kb !process_pid) ~f:(Gauge.set gauge)
+  end
+
+  module Daemon = Make_rss_gauge (struct
+    let process_name = "daemon"
+
+    let is_daemon = true
+  end)
+
+  module Prover = Make_rss_gauge (struct
+    let process_name = "prover"
+
+    let is_daemon = false
+  end)
+
+  module Verifier = Make_rss_gauge (struct
+    let process_name = "verifier"
+
+    let is_daemon = false
+  end)
+
+  module Snark_worker = Make_rss_gauge (struct
+    let process_name = "snark_worker"
+
+    let is_daemon = false
+  end)
+
+  module Uptime_snark_worker = Make_rss_gauge (struct
+    let process_name = "uptime_snark_worker"
+
+    let is_daemon = false
+  end)
+
+  module Vrf_evaluator = Make_rss_gauge (struct
+    let process_name = "vrf_evaluator"
+
+    let is_daemon = false
+  end)
+
+  module Libp2p_helper = Make_rss_gauge (struct
+    let process_name = "libp2p_helper"
+
+    let is_daemon = false
+  end)
+
+  (* Update interval for RSS metrics *)
+  let rss_update_interval_mins = ref 1.
+
+  (* Background loop to update all RSS metrics periodically *)
+  let rec update_rss_metrics () =
+    let%bind () = after (Time_ns.Span.of_min !rss_update_interval_mins) in
+    Daemon.update () ;
+    Prover.update () ;
+    Verifier.update () ;
+    Snark_worker.update () ;
+    Uptime_snark_worker.update () ;
+    Vrf_evaluator.update () ;
+    Libp2p_helper.update () ;
+    update_rss_metrics ()
+end
+
 module Cryptography = struct
   let subsystem = "Cryptography"
 
@@ -1712,6 +1833,8 @@ type t = (Async.Socket.Address.Inet.t, int) Cohttp_async.Server.t
 
 let server ?forward_uri ~port ~logger () =
   O1trace.background_thread "collect_gc_metrics" Runtime.gc_stat ;
+  O1trace.background_thread "collect_rss_metrics"
+    Process_memory.update_rss_metrics ;
   O1trace.thread "serve_metrics"
     (generic_server ?forward_uri ~port ~logger
        ~registry:CollectorRegistry.default )
