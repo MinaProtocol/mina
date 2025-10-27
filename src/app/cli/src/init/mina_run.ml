@@ -215,7 +215,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_trustlist = []) ?rest_server_port
+let setup_local_server ?(client_trustlist = []) ~rest_server_port
     ?limited_graphql_port ?itn_graphql_port ?auth_keys
     ?(open_limited_graphql_port = false) ?(insecure_rest_server = false) mina =
   let compile_config = (Mina_lib.config mina).compile_config in
@@ -498,14 +498,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
       ~mk_context:(fun ~with_seq_no:_ _req -> mina)
       ?auth_keys:None
   in
-  Option.iter rest_server_port ~f:(fun rest_server_port ->
-      O1trace.background_thread "serve_graphql" (fun () ->
-          create_graphql_server
-            ~bind_to_address:
-              Tcp.Bind_to_address.(
-                if insecure_rest_server then All_addresses else Localhost)
-            ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
-            ~require_auth:false rest_server_port ) ) ;
+  O1trace.background_thread "serve_graphql" (fun () ->
+      create_graphql_server
+        ~bind_to_address:
+          Tcp.Bind_to_address.(
+            if insecure_rest_server then All_addresses else Localhost)
+        ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
+        ~require_auth:false rest_server_port ) ;
   (* Second graphql server with limited queries exposed *)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       O1trace.background_thread "serve_limited_graphql" (fun () ->
