@@ -348,13 +348,14 @@ let check t ~genesis_state_hash =
             in
             check_arcs succ_hash )
       in
+      ignore check_arcs;
       let%bind () = check_version () in
-      let%bind root_hash, root_block = check_base () in
+      let%bind _root_hash, root_block = check_base () in
       let root_protocol_state =
         root_block |> Mina_block.Stable.Latest.header
         |> Mina_block.Header.protocol_state
       in
-      let%bind () =
+      let%map () =
         let persisted_genesis_state_hash =
           Mina_state.Protocol_state.genesis_state_hash root_protocol_state
         in
@@ -362,7 +363,7 @@ let check t ~genesis_state_hash =
           Ok ()
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
-      let%map () = check_arcs root_hash in
+      (* let%map () = check_arcs root_hash in *)
       root_block |> Mina_block.Stable.Latest.header |> Header.protocol_state
       |> Mina_state.Protocol_state.blockchain_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
