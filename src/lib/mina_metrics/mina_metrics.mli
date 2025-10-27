@@ -49,6 +49,52 @@ module Runtime : sig
   val long_async_job : Long_job_histogram.t
 end
 
+module Process_memory : sig
+  val rss_update_interval_mins : float ref
+
+  module Daemon : sig
+    val set_pid : int -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Prover : sig
+    val set_pid : int -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Verifier : sig
+    val set_pid : int -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Snark_worker : sig
+    val set_pid : int -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Uptime_snark_worker : sig
+    val set_pid : int -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Vrf_evaluator : sig
+    val set_pid : int -> unit
+
+    val clear_pid : unit -> unit
+  end
+
+  module Libp2p_helper : sig
+    val set_pid : int -> unit
+
+    val clear_pid : unit -> unit
+  end
+end
+
 module Cryptography : sig
   val blockchain_proving_time_ms : Gauge.t
 
