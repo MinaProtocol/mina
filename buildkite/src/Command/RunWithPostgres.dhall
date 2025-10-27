@@ -57,10 +57,14 @@ let Cmd = ../Lib/Cmds.dhall
 
 let ContainerImages = ../Constants/ContainerImages.dhall
 
+let ScriptOrArchive
+    : Type
+    = < Script : Text | Archive : { Script : Text, Archive : Text } >
+
 let runInDockerWithPostgresConn
-    : List Text -> Text -> Text -> Text -> Cmd.Type
+    : List Text -> ScriptOrArchive -> Text -> Text -> Cmd.Type
     =     \(environment : List Text)
-      ->  \(initScript : Text)
+      ->  \(initScript : ScriptOrArchive)
       ->  \(docker : Text)
       ->  \(innerScript : Text)
       ->  let port = "5432"
@@ -97,13 +101,31 @@ let runInDockerWithPostgresConn
               : Text
               = "\\\$BUILDKITE_BUILD_CHECKOUT_PATH"
 
-          in  Cmd.chain
-                [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
-                , "source buildkite/scripts/export-git-env-vars.sh"
-                , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
-                , "sleep 5"
-                , "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${initScript}"
-                , "docker run --pid=container:postgres --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
-                ]
+          let runInitScript =
+                merge
+                  { Script =
+                          \(script : Text)
+                      ->  [ "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${script}"
+                          ]
+                  , Archive =
+                          \(archive : { Script : Text, Archive : Text })
+                      ->  [ "tar -xzf ${archive.Archive}"
+                          , "docker exec ${postgresDockerName} find /workdir -name \"${archive.Script}\" -exec psql ${pg_conn} -f {} \\;"
+                          ]
+                  }
+                  initScript
 
-in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn }
+          in  Cmd.chain
+                (   [ "( docker stop ${postgresDockerName} && docker rm ${postgresDockerName} ) || true"
+                    , "source buildkite/scripts/export-git-env-vars.sh"
+                    , "docker run --network host --volume ${outerDir}:/workdir --workdir /workdir --name ${postgresDockerName} -d -e POSTGRES_USER=${user} -e POSTGRES_PASSWORD=${password} -e POSTGRES_DB=${dbName} ${dockerVersion}"
+                    , "sleep 5"
+                    ]
+                  # runInitScript
+                  # [ "docker run --pid=container:postgres --network host --volume ${outerDir}:/workdir --workdir /workdir --entrypoint bash ${envVars} ${docker} ${innerScript}"
+                    ]
+                )
+
+in  { runInDockerWithPostgresConn = runInDockerWithPostgresConn
+    , ScriptOrArchive = ScriptOrArchive
+    }
