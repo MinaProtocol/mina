@@ -7,13 +7,18 @@ let ContainerImages = ../Constants/ContainerImages.dhall
 let Arch = ../Constants/Arch.dhall
 
 let runInToolchainImage
-    : Text -> List Text -> Text -> List Cmd.Type
+    : Text -> Text -> List Text -> Text -> List Cmd.Type
     =     \(image : Text)
+      ->  \(platform : Text)
       ->  \(environment : List Text)
       ->  \(innerScript : Text)
       ->    [ Mina.fixPermissionsCommand ]
           # [ Cmd.runInDocker
-                Cmd.Docker::{ image = image, extraEnv = environment }
+                Cmd.Docker::{
+                , image = image
+                , extraEnv = environment
+                , platform = platform
+                }
                 innerScript
             ]
 
@@ -29,7 +34,11 @@ let runInToolchainNoble
                   }
                   arch
 
-          in  runInToolchainImage image environment innerScript
+          in  runInToolchainImage
+                image
+                (Arch.platform arch)
+                environment
+                innerScript
 
 let runInToolchainJammy
     : List Text -> Text -> List Cmd.Type
@@ -37,6 +46,7 @@ let runInToolchainJammy
       ->  \(innerScript : Text)
       ->  runInToolchainImage
             ContainerImages.minaToolchainJammy.amd64
+            (Arch.platform Arch.Type.Amd64)
             environment
             innerScript
 
@@ -52,7 +62,11 @@ let runInToolchainBookworm
                   }
                   arch
 
-          in  runInToolchainImage image environment innerScript
+          in  runInToolchainImage
+                image
+                (Arch.platform arch)
+                environment
+                innerScript
 
 let runInToolchainBullseye
     : Arch.Type -> List Text -> Text -> List Cmd.Type
@@ -61,6 +75,7 @@ let runInToolchainBullseye
       ->  \(innerScript : Text)
       ->  runInToolchainImage
             ContainerImages.minaToolchainBullseye.amd64
+            (Arch.platform arch)
             environment
             innerScript
 
@@ -70,6 +85,7 @@ let runInToolchain
       ->  \(innerScript : Text)
       ->  runInToolchainImage
             ContainerImages.minaToolchain
+            (Arch.platform Arch.Type.Amd64)
             environment
             innerScript
 
