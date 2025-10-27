@@ -2053,6 +2053,11 @@ let internal_commands logger ~itn_features =
               Format.eprintf "Failed to generate block@.%s@."
                 (Yojson.Safe.to_string @@ Error_json.error_to_yojson err) ;
               exit 1) )
+  ; ( "graphql"
+    , Command.group ~summary:"GraphQL introspection commands"
+        [ ("list", Graphql_introspection.list_cmd)
+        ; ("inspect", Graphql_introspection.inspect_cmd)
+        ] )
   ]
 
 let mina_commands logger ~itn_features =
