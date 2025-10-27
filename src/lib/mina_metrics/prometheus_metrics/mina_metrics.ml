@@ -105,6 +105,8 @@ module type Histogram = sig
 end
 
 module Runtime = struct
+  let logger = Logger.create ~id:"runtime" ()
+  
   let subsystem = "Runtime"
 
   module Long_async_histogram = Histogram (struct
@@ -127,7 +129,7 @@ module Runtime = struct
 
   let current_gc = ref (Gc.stat ())
 
-  let gc_stat_interval_mins = ref 15.
+  let gc_stat_interval_mins = ref 1.
 
   let gc_allocated_bytes = ref (Gc.allocated_bytes ())
 
@@ -135,6 +137,7 @@ module Runtime = struct
     let%bind () = after (Time_ns.Span.of_min !gc_stat_interval_mins) in
     current_gc := Gc.stat () ;
     gc_allocated_bytes := Gc.allocated_bytes () ;
+    [%log info] "GC heap=%d live=%d" !current_gc.Gc.Stat.heap_words !current_gc.Gc.Stat.live_words ;
     gc_stat ()
 
   let simple_metric ~metric_type ~help name fn =
