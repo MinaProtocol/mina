@@ -121,6 +121,13 @@ module Limited = struct
   let scan_state t = Common.scan_state t.common
 
   let pending_coinbase t = Common.pending_coinbase t.common
+
+  let read_all_proofs_from_disk t =
+    { Stable.Latest.transition =
+        Mina_block.Validated.read_all_proofs_from_disk t.transition
+    ; protocol_states = t.protocol_states
+    ; common = Common.read_all_proofs_from_disk t.common
+    }
 end
 
 module Minimal = struct
@@ -174,6 +181,17 @@ module Minimal = struct
   let scan_state t = Common.scan_state t.common
 
   let pending_coinbase t = Common.pending_coinbase t.common
+
+  let write_all_proofs_to_disk ~proof_cache_db ~signature_kind
+      Stable.Latest.{ hash; common = { scan_state; pending_coinbase } } =
+    { hash
+    ; common =
+        { pending_coinbase
+        ; scan_state =
+            Staged_ledger.Scan_state.write_all_proofs_to_disk ~signature_kind
+              ~proof_cache_db scan_state
+        }
+    }
 
   let read_all_proofs_from_disk
       { hash; common = { scan_state; pending_coinbase } } =
