@@ -2,7 +2,7 @@
 var plonk_wasm = require('./plonk_wasm.js');
 var native = null;
 try {
-  native = require('../native/plonk_napi.node');
+  native = require(`@o1labs/o1js-${process.platform}-${process.arch}`);
 } catch (e) {
   // native not available, keep WASM
 }

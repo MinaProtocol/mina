@@ -1,0 +1,6 @@
+{
+  "napi": {
+    "binaryName": "plonk_napi",
+    "dtsHeaderFile": "./header-d.ts"
+  }
+}
