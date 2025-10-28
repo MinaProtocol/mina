@@ -215,6 +215,7 @@
 (package (name user_command_input))
 (package (name validate_keypair))
 (package (name verifier))
+(package (name verify_packaged_fork_config))
 (package (name visualization))
 (package (name vrf_evaluator))
 (package (name vrf_lib))

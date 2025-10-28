@@ -1,0 +1,18 @@
+(executable
+ (package verify_packaged_fork_config)
+ (name verify_packaged_fork_config)
+ (public_name mina-verify-packaged-fork-config)
+ (modes native)
+ (libraries
+  async
+  async_unix
+  async.async_command
+  core
+  core_kernel
+  rocksdb
+  mina_version)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_jane))
+ (flags :standard -w +a-4-44))
