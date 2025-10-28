@@ -516,5 +516,7 @@ end
     if the account is not actively vesting at [hardfork_slot]. See the
     [Slot_reduction_update] module documentation for general usage notes. *)
 let slot_reduction_update ~hardfork_slot (t : as_record) =
-  Slot_reduction_update.(
-    t |> of_record |> hardfork_adjustment ~hardfork_slot |> to_record)
+  if t.is_timed then
+    Slot_reduction_update.(
+      t |> of_record |> hardfork_adjustment ~hardfork_slot |> to_record)
+  else t
