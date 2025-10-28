@@ -294,6 +294,36 @@ module Ledger_inner = struct
       (Db)
       (Hardfork_db)
 
+  module Make_converting (Converting_inputs : sig
+    val convert : Account.t -> Account.Hardfork.t
+  end) :
+    Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+      with module Location = Location
+       and module Addr = Location.Addr
+      with type root_hash := Ledger_hash.t
+       and type hash := Ledger_hash.t
+       and type account := Account.t
+       and type key := Signature_lib.Public_key.Compressed.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
+       and type converted_account := Account.Hardfork.t
+       and type primary_ledger = Db.t
+       and type converting_ledger = Hardfork_db.t =
+    Converting_merkle_tree.With_database
+      (struct
+        type converted_account = Account.Hardfork.t
+
+        let convert = Converting_inputs.convert
+
+        let converted_equal = Account.Hardfork.equal
+
+        include Inputs
+      end)
+      (Db)
+      (Hardfork_db)
+
   let of_any_ledger ledger =
     let mask = Mask.create ~depth:(Any_ledger.M.depth ledger) () in
     Maskable.register_mask ledger mask
@@ -327,12 +357,6 @@ module Ledger_inner = struct
     let mask = Mask.create ~depth () in
     ( Maskable.register_mask casted mask
     , Converting_ledger.converting_ledger converting_ledger )
-
-  module Root = struct
-    include Root.Make (Any_ledger) (Db) (Hardfork_db) (Converting_ledger)
-
-    let as_masked t = as_unmasked t |> of_any_ledger
-  end
 
   (** Create a new empty ledger.
 
