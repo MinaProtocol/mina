@@ -1,466 +1,318 @@
-(* verify_packaged_fork_config.ml -- OCaml version of the bash script *)
+(** Main entry point for the packaged fork configuration verification tool.
+
+    This application orchestrates the complete verification process for
+    Mina packaged fork configurations, including ledger generation,
+    daemon export, and comprehensive comparison validation.
+*)
 
 open Core
 open Async
 
-(* Helper function to find an executable in PATH or use a fallback *)
-let source_build_fallback cmd_name fallback_path =
-  Log.Global.info "Looking for executable: %s (fallback: %s)" cmd_name
-    fallback_path ;
-  match%bind
-    Unix.system (sprintf "command -v %s > /dev/null 2>&1" cmd_name)
-  with
-  | Ok () ->
-      Log.Global.info "Found %s in PATH" cmd_name ;
-      return cmd_name
-  | Error _ -> (
-      Log.Global.info "Command %s not found in PATH, checking fallback path"
-        cmd_name ;
-      match%bind Sys.file_exists fallback_path with
-      | `Yes ->
-          Log.Global.info "Found fallback executable at %s" fallback_path ;
-          return fallback_path
-      | `No | `Unknown ->
-          Log.Global.error
-            "Error: program not found in PATH (as %s) or relative to cwd (as \
-             %s)"
-            cmd_name fallback_path ;
-          eprintf
-            "Error: program not found in PATH (as %s) or relative to cwd (as %s)\n\
-             %!"
-            cmd_name fallback_path ;
+(* Import all library modules *)
+open Verify_packaged_fork_config_lib
+
+(** Extract ledgers from a running daemon.
+
+    This function:
+    1. Starts a Mina daemon with specified config
+    2. Waits for daemon readiness
+    3. Exports staged, staking, and next epoch ledgers
+    4. Stops the daemon
+
+    @param config Validation configuration
+    @param config_file Path to daemon configuration file
+    @param ledger_dir Directory containing genesis ledgers
+    @param json_prefix Prefix for output JSON files
+    @return Deferred unit on success
+    @raise Exit if daemon fails or export fails
+*)
+let extract_ledgers config config_file ledger_dir json_prefix =
+  Log.Global.info "Starting ledger extraction" ;
+  Log.Global.info "Config: %s" config_file ;
+  Log.Global.info "Ledger dir: %s" ledger_dir ;
+  Log.Global.info "Output prefix: %s" json_prefix ;
+
+  let override_file =
+    File_operations.workdir_path config.Types.workdir
+      Constants.FileNames.override_genesis_timestamp
+  in
+
+  (* Start daemon in background *)
+  Log.Global.info "Starting mina daemon in background" ;
+  let%bind () =
+    Shell_operations.run_command
+      ~env:[ (Constants.EnvVars.mina_libp2p_pass, "") ]
+      (sprintf
+         "%s daemon --libp2p-keypair %s/%s/%s --config-file %s --config-file \
+          %s --seed --genesis-ledger-dir %s --log-level %s > /dev/null 2>&1 &"
+         config.executables.mina
+         (Filename.quote config.workdir)
+         Constants.Subdirs.keys Constants.FileNames.p2p_key
+         (Filename.quote config_file)
+         (Filename.quote override_file)
+         (Filename.quote ledger_dir)
+         config.mina_log_level )
+    |> Deferred.ignore_m
+  in
+
+  (* Wait for daemon to be ready and export staged ledger *)
+  let rec wait_for_export () =
+    Log.Global.debug "Attempting to export staged ledger" ;
+    match%bind
+      Shell_operations.run_command
+        (sprintf
+           "%s ledger export staged-ledger | jq . > %s-staged.json 2>/dev/null"
+           config.executables.mina
+           (Filename.quote json_prefix) )
+    with
+    | Ok () ->
+        Log.Global.info "Successfully exported staged ledger" ;
+        return ()
+    | Error _ ->
+        Log.Global.debug "Daemon not ready yet, waiting 60 seconds" ;
+        let%bind () = after Constants.Timeouts.daemon_ready_poll_interval in
+        (* Check if daemon is still running *)
+        let%bind daemon_running = Shell_operations.is_daemon_running () in
+        if not daemon_running then (
+          Log.Global.error "Daemon died before exporting ledgers" ;
+          eprintf "%s" Constants.Messages.daemon_died ;
           exit 1 )
-
-(* RocksDB scanning function that replaces ldb command *)
-let scan_rocksdb_to_hex db_path output_file =
-  Log.Global.info "Scanning RocksDB at %s to output file %s" db_path output_file ;
-  let open Rocksdb.Database in
-  try
-    let db = create db_path in
-    let alist = to_alist db in
-    let%bind oc = Writer.open_file output_file in
-    List.iter alist ~f:(fun (key, value) ->
-        let key_hex =
-          Bigstring.to_string key |> String.to_list
-          |> List.map ~f:(fun c -> sprintf "%02x" (Char.to_int c))
-          |> String.concat ~sep:""
-        in
-        let value_hex =
-          Bigstring.to_string value |> String.to_list
-          |> List.map ~f:(fun c -> sprintf "%02x" (Char.to_int c))
-          |> String.concat ~sep:""
-        in
-        Writer.write oc (sprintf "%s : %s\n" key_hex value_hex) ) ;
-    close db ;
-    let%bind () = Writer.close oc in
-    return (Ok ())
-  with exn -> return (Error (Exn.to_string exn))
-
-(* Run a shell command and return exit status *)
-let run_command ?(env = []) cmd =
-  let env_vars =
-    if List.is_empty env then ""
-    else
-      ( List.map env ~f:(fun (k, v) -> sprintf "%s=%s" k v)
-      |> String.concat ~sep:" " )
-      ^ " "
+        else wait_for_export ()
   in
-  let full_cmd = env_vars ^ cmd in
-  Log.Global.info "Executing command: %s" full_cmd ;
-  match%map Unix.system full_cmd with
-  | Ok () ->
-      Log.Global.info "Command completed successfully: %s" full_cmd ;
-      Ok ()
-  | Error err ->
-      Log.Global.error "Command failed: %s (error: %s)" full_cmd
-        (Unix.Exit_or_signal.to_string_hum (Error err)) ;
-      Error (Unix.Exit_or_signal.to_string_hum (Error err))
 
-(* Run a shell command and capture stdout *)
-let run_command_capture cmd =
-  Log.Global.info "Executing command and capturing output: %s" cmd ;
-  let%bind result = Process.run_lines ~prog:"bash" ~args:[ "-c"; cmd ] () in
-  match result with
-  | Ok output ->
-      Log.Global.info "Command output captured successfully (lines: %d)"
-        (List.length output) ;
-      return (Or_error.map result ~f:(String.concat ~sep:"\n"))
-  | Error err ->
-      Log.Global.error "Command failed to capture output: %s (error: %s)" cmd
-        (Error.to_string_hum err) ;
-      return (Or_error.map result ~f:(String.concat ~sep:"\n"))
+  let%bind () = wait_for_export () in
 
-(* Extract a JSON field using jq *)
-let jq_extract file_path query =
-  let cmd = sprintf "jq -r '%s' %s" query (Filename.quote file_path) in
-  Log.Global.info "Extracting JSON field with query '%s' from file %s" query
-    file_path ;
-  match%bind run_command_capture cmd with
-  | Ok value ->
-      Log.Global.info "JSON extraction successful, value: %s" value ;
-      return value
-  | Error err ->
-      Log.Global.error "JSON extraction failed: %s" (Error.to_string_hum err) ;
-      eprintf "Error extracting JSON: %s\n%!" (Error.to_string_hum err) ;
-      exit 1
-
-(* Compare two files *)
-let files_equal file1 file2 =
-  let cmd =
-    sprintf "cmp -s %s %s" (Filename.quote file1) (Filename.quote file2)
+  (* Export other ledgers *)
+  Log.Global.info "Exporting staking epoch ledger" ;
+  let%bind () =
+    Shell_operations.run_command
+      (sprintf "%s ledger export staking-epoch-ledger | jq . > %s-staking.json"
+         config.executables.mina
+         (Filename.quote json_prefix) )
+    |> Deferred.ignore_m
   in
-  Log.Global.info "Comparing files: %s vs %s" file1 file2 ;
-  match%map Unix.system cmd with
-  | Ok () ->
-      Log.Global.info "Files are identical: %s = %s" file1 file2 ;
-      true
-  | Error _ ->
-      Log.Global.info "Files differ: %s ≠ %s" file1 file2 ;
-      false
 
+  Log.Global.info "Exporting next epoch ledger" ;
+  let%bind () =
+    Shell_operations.run_command
+      (sprintf "%s ledger export next-epoch-ledger | jq . > %s-next.json"
+         config.executables.mina
+         (Filename.quote json_prefix) )
+    |> Deferred.ignore_m
+  in
+
+  (* Stop daemon *)
+  Log.Global.info "Stopping mina daemon" ;
+  Shell_operations.run_command
+    (sprintf "%s client stop" config.executables.mina)
+  |> Deferred.ignore_m
+
+(** Perform RocksDB validation for a single ledger tarball.
+
+    Extracts and compares packaged, generated, and web-hosted versions
+    of the ledger database.
+
+    @param config Validation configuration
+    @param tarname Name of the tarball (without .tar.gz extension)
+    @param error Reference to accumulating error count
+    @return Deferred unit
+*)
+let validate_ledger_tarball config tarname error =
+  Log.Global.info "Validating ledger tarball: %s" tarname ;
+
+  let tardir =
+    sprintf "%s/%s/%s" config.Types.workdir Constants.Subdirs.ledgers tarname
+  in
+  let workdir = config.workdir in
+
+  (* Create directories *)
+  let%bind () =
+    Shell_operations.run_command
+      (sprintf "mkdir -p %s/{packaged,generated,web}" (Filename.quote tardir))
+    |> Deferred.ignore_m
+  in
+
+  (* Extract tar files *)
+  Log.Global.debug "Extracting generated ledger" ;
+  let%bind () =
+    Shell_operations.run_command
+      (sprintf "tar -xzf %s/%s/%s.tar.gz -C %s/generated"
+         (Filename.quote workdir) Constants.Subdirs.ledgers tarname
+         (Filename.quote tardir) )
+    |> Deferred.ignore_m
+  in
+
+  Log.Global.debug "Extracting packaged ledger" ;
+  let%bind () =
+    Shell_operations.run_command
+      (sprintf "tar -xzf %s/%s.tar.gz -C %s/packaged"
+         (Filename.quote config.genesis_ledger_dir)
+         tarname (Filename.quote tardir) )
+    |> Deferred.ignore_m
+  in
+
+  (* Download from S3 *)
+  Log.Global.debug "Downloading ledger from S3" ;
+  let%bind () =
+    Shell_operations.run_command
+      (sprintf "curl %s/%s.tar.gz | tar -xz -C %s/web"
+         config.mina_ledger_s3_bucket tarname (Filename.quote tardir) )
+    |> Deferred.ignore_m
+  in
+
+  (* Use RocksDB library to scan databases *)
+  Log.Global.info "Scanning RocksDB databases" ;
+  let%bind packaged_scan_result =
+    Rocksdb_utils.scan_rocksdb_to_hex
+      (sprintf "%s/packaged" tardir)
+      (sprintf "%s/packaged.scan" workdir)
+  in
+  let%bind web_scan_result =
+    Rocksdb_utils.scan_rocksdb_to_hex (sprintf "%s/web" tardir)
+      (sprintf "%s/web.scan" workdir)
+  in
+  let%bind generated_scan_result =
+    Rocksdb_utils.scan_rocksdb_to_hex
+      (sprintf "%s/generated" tardir)
+      (sprintf "%s/generated.scan" workdir)
+  in
+
+  (* Check for scan errors *)
+  ( match (packaged_scan_result, web_scan_result, generated_scan_result) with
+  | Ok (), Ok (), Ok () ->
+      ()
+  | _ ->
+      Log.Global.error "Failed to scan RocksDB for: %s" tarname ;
+      eprintf "Error: failed to scan RocksDB for %s\n%!" tarname ;
+      error := !error + 1 ) ;
+
+  (* Compare scan results *)
+  Log.Global.info "Comparing RocksDB scan results" ;
+  let%bind gen_pkg_match =
+    File_operations.files_equal
+      (sprintf "%s/generated.scan" workdir)
+      (sprintf "%s/packaged.scan" workdir)
+  in
+  let%bind pkg_web_match =
+    File_operations.files_equal
+      (sprintf "%s/packaged.scan" workdir)
+      (sprintf "%s/web.scan" workdir)
+  in
+
+  if not (gen_pkg_match && pkg_web_match) then (
+    Log.Global.error "RocksDB contents mismatch for: %s" tarname ;
+    eprintf "Error: kvdb contents mismatch for %s\n%!" tarname ;
+    error := !error + 1 ) ;
+
+  return ()
+
+(** Main validation workflow.
+
+    Orchestrates the complete verification process from setup through
+    final validation and comparison.
+
+    @param network_name Network identifier
+    @param fork_config Path to fork configuration
+    @param workdir Working directory
+    @param precomputed_block_prefix_arg Optional GCS prefix override
+    @return Deferred unit, exits with code 0 on success or 1 on failure
+*)
 let main network_name fork_config workdir precomputed_block_prefix_arg =
-  Log.Global.info "Starting verification process" ;
-  Log.Global.info "Network name: %s" network_name ;
+  Log.Global.info "=== Starting Fork Config Verification ===" ;
+  Log.Global.info "Network: %s" network_name ;
   Log.Global.info "Fork config: %s" fork_config ;
   Log.Global.info "Working directory: %s" workdir ;
-  Log.Global.info "Precomputed block prefix: %s"
-    (Option.value precomputed_block_prefix_arg ~default:"(default)") ;
 
-  Log.Global.info "Resolving executable paths" ;
-  let%bind mina_exe =
-    match Sys.getenv "MINA_EXE" with
-    | Some exe ->
-        Log.Global.info "Using MINA_EXE from environment: %s" exe ;
-        return exe
-    | None ->
-        Log.Global.info "MINA_EXE not set, searching for mina executable" ;
-        source_build_fallback "mina" "./_build/default/src/app/cli/src/mina.exe"
+  (* Build configuration *)
+  let%bind config =
+    Validation.build_validation_config network_name fork_config workdir
+      precomputed_block_prefix_arg
   in
-  let%bind mina_genesis_exe =
-    match Sys.getenv "MINA_GENESIS_EXE" with
-    | Some exe ->
-        Log.Global.info "Using MINA_GENESIS_EXE from environment: %s" exe ;
-        return exe
-    | None ->
-        Log.Global.info
-          "MINA_GENESIS_EXE not set, searching for mina-create-genesis" ;
-        source_build_fallback "mina-create-genesis"
-          "./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
-  in
-  let%bind mina_legacy_genesis_exe =
-    match Sys.getenv "MINA_LEGACY_GENESIS_EXE" with
-    | Some exe ->
-        Log.Global.info "Using MINA_LEGACY_GENESIS_EXE from environment: %s" exe ;
-        return exe
-    | None ->
-        Log.Global.info
-          "MINA_LEGACY_GENESIS_EXE not set, searching for \
-           mina-create-legacy-genesis" ;
-        source_build_fallback "mina-create-legacy-genesis"
-          "./runtime_genesis_ledger_of_mainnet.exe"
-  in
-  let%bind create_runtime_config =
-    match Sys.getenv "CREATE_RUNTIME_CONFIG" with
-    | Some exe ->
-        Log.Global.info "Using CREATE_RUNTIME_CONFIG from environment: %s" exe ;
-        return exe
-    | None ->
-        Log.Global.info
-          "CREATE_RUNTIME_CONFIG not set, searching for \
-           mina-hf-create-runtime-config" ;
-        source_build_fallback "mina-hf-create-runtime-config"
-          "./scripts/hardfork/create_runtime_config.sh"
-  in
-  Log.Global.info "Checking for gsutil availability" ;
-  let%bind gsutil =
-    match Sys.getenv "GSUTIL" with
-    | Some exe ->
-        Log.Global.info "Using GSUTIL from environment: %s" exe ;
-        return exe
-    | None -> (
-        Log.Global.info "GSUTIL not set, searching in PATH" ;
-        match%bind run_command_capture "command -v gsutil || echo ''" with
-        | Ok path ->
-            let stripped_path = String.strip path in
-            Log.Global.info "Found gsutil at: %s" stripped_path ;
-            return stripped_path
-        | Error _ ->
-            Log.Global.info "gsutil not found" ;
-            return "" )
-  in
-  (* Check if PRECOMPUTED_FORK_BLOCK exists or gsutil is available *)
-  Log.Global.info "Validating precomputed fork block availability" ;
-  let precomputed_fork_block = Sys.getenv "PRECOMPUTED_FORK_BLOCK" in
-  let%bind () =
-    match precomputed_fork_block with
-    | Some path -> (
-        Log.Global.info "PRECOMPUTED_FORK_BLOCK set to: %s" path ;
-        let%bind file_exists = Sys.file_exists path in
-        match file_exists with
-        | `Yes ->
-            Log.Global.info "Precomputed fork block exists" ;
-            return ()
-        | `No | `Unknown ->
-            if String.is_empty gsutil then (
-              Log.Global.error
-                "gsutil is required when PRECOMPUTED_FORK_BLOCK is nonexistent \
-                 path" ;
-              eprintf
-                "Error: gsutil is required when PRECOMPUTED_FORK_BLOCK is \
-                 nonexistent path\n\
-                 %!" ;
-              exit 1 )
-            else return () )
-    | None ->
-        Log.Global.info "PRECOMPUTED_FORK_BLOCK not set, will fetch with gsutil" ;
-        return ()
-  in
-  (* Find packaged daemon config *)
-  Log.Global.info "Locating packaged daemon config" ;
-  let%bind installed_config =
-    run_command_capture "echo /var/lib/coda/config_*.json"
-  in
-  let packaged_daemon_config =
-    match Sys.getenv "PACKAGED_DAEMON_CONFIG" with
-    | Some path ->
-        Log.Global.info "Using PACKAGED_DAEMON_CONFIG from environment: %s" path ;
-        path
-    | None -> (
-        Log.Global.info
-          "PACKAGED_DAEMON_CONFIG not set, using discovered config" ;
-        match installed_config with
-        | Ok path ->
-            let stripped_path = String.strip path in
-            Log.Global.info "Found config at: %s" stripped_path ;
-            stripped_path
-        | Error _ ->
-            Log.Global.error "No config found" ;
-            "" )
-  in
-  let%bind () =
-    Log.Global.info "Verifying packaged daemon config exists: %s"
-      packaged_daemon_config ;
-    match%bind Sys.file_exists packaged_daemon_config with
-    | `Yes ->
-        Log.Global.info "Packaged daemon config found" ;
-        return ()
-    | `No | `Unknown ->
-        Log.Global.error "Packaged daemon config not found: %s"
-          packaged_daemon_config ;
-        eprintf
-          "Error: set PACKAGED_DAEMON_CONFIG to the path to the JSON file to \
-           verify\n\
-           %!" ;
-        exit 1
-  in
-  let genesis_ledger_dir =
-    match Sys.getenv "GENESIS_LEDGER_DIR" with
-    | Some dir ->
-        Log.Global.info "Using GENESIS_LEDGER_DIR from environment: %s" dir ;
-        dir
-    | None ->
-        Log.Global.info "Using default GENESIS_LEDGER_DIR: /var/lib/coda" ;
-        "/var/lib/coda"
-  in
-  let seconds_per_slot =
-    match Sys.getenv "SECONDS_PER_SLOT" with
-    | Some s ->
-        Log.Global.info "Using SECONDS_PER_SLOT from environment: %s" s ;
-        s
-    | None ->
-        Log.Global.info "Using default SECONDS_PER_SLOT: 180" ;
-        "180"
-  in
-  let%bind forking_from_config_json =
-    match Sys.getenv "FORKING_FROM_CONFIG_JSON" with
-    | Some path ->
-        Log.Global.info "Using FORKING_FROM_CONFIG_JSON from environment: %s"
-          path ;
-        return path
-    | None ->
-        Log.Global.info
-          "FORKING_FROM_CONFIG_JSON not set, searching for mainnet.json" ;
-        source_build_fallback "/var/lib/coda/mainnet.json"
-          "genesis_ledgers/mainnet.json"
-  in
+
+  Log.Global.info "Precomputed block prefix: %s" config.precomputed_block_prefix ;
+
   (* Create working directories *)
-  Log.Global.info "Creating working directories in %s" workdir ;
-  let%bind () =
-    run_command
-      (sprintf "mkdir -p %s/{ledgers{,-backup},keys}" (Filename.quote workdir))
-    |> Deferred.ignore_m
-  in
-  Log.Global.info "Setting permissions for keys directory" ;
-  let%bind () =
-    run_command (sprintf "chmod 700 %s/keys" (Filename.quote workdir))
-    |> Deferred.ignore_m
-  in
+  let%bind () = File_operations.create_workdir_structure workdir in
+
   (* Extract fork block information *)
   Log.Global.info "Extracting fork block information from config" ;
   let%bind fork_block_state_hash =
-    jq_extract fork_config ".proof.fork.state_hash"
+    Json_utils.jq_extract fork_config Constants.JsonPaths.ForkConfig.state_hash
   in
   let%bind fork_block_length =
-    jq_extract fork_config ".proof.fork.blockchain_length"
+    Json_utils.jq_extract fork_config
+      Constants.JsonPaths.ForkConfig.blockchain_length
   in
   Log.Global.info "Fork block - state hash: %s, length: %s"
     fork_block_state_hash fork_block_length ;
 
-  (* Put the fork block where we want it *)
-  Log.Global.info "Obtaining precomputed fork block" ;
+  (* Obtain precomputed fork block *)
   let%bind () =
-    match precomputed_fork_block with
-    | Some path -> (
-        Log.Global.info "Checking if precomputed fork block exists at: %s" path ;
-        match%bind Sys.file_exists path with
-        | `Yes ->
-            Log.Global.info "Copying precomputed fork block from %s" path ;
-            run_command
-              (sprintf "cp %s %s/precomputed_fork_block.json"
-                 (Filename.quote path) (Filename.quote workdir) )
-            |> Deferred.ignore_m
-        | `No | `Unknown ->
-            Log.Global.info
-              "Precomputed fork block not found locally, downloading from GCS" ;
-            let prefix =
-              match precomputed_block_prefix_arg with
-              | Some p ->
-                  p
-              | None ->
-                  sprintf "gs://mina_network_block_data/%s" network_name
-            in
-            let block_path =
-              sprintf "%s-%s-%s.json" prefix fork_block_length
-                fork_block_state_hash
-            in
-            run_command
-              (sprintf "%s cp %s %s/precomputed_fork_block.json" gsutil
-                 (Filename.quote block_path)
-                 (Filename.quote workdir) )
-            |> Deferred.ignore_m )
-    | None ->
-        Log.Global.info "Downloading precomputed fork block from GCS" ;
-        let prefix =
-          match precomputed_block_prefix_arg with
-          | Some p ->
-              p
-          | None ->
-              sprintf "gs://mina_network_block_data/%s" network_name
-        in
-        let block_path =
-          sprintf "%s-%s-%s.json" prefix fork_block_length fork_block_state_hash
-        in
-        run_command
-          (sprintf "%s cp %s %s/precomputed_fork_block.json" gsutil
-             (Filename.quote block_path)
-             (Filename.quote workdir) )
-        |> Deferred.ignore_m
+    Validation.obtain_precomputed_fork_block config ~fork_block_state_hash
+      ~fork_block_length
   in
-  (* Generate libp2p keypair if needed *)
-  let p2p_key_path = sprintf "%s/keys/p2p" workdir in
-  Log.Global.info "Checking for libp2p keypair at %s" p2p_key_path ;
-  let%bind () =
-    match%bind Sys.file_exists p2p_key_path with
-    | `Yes ->
-        Log.Global.info "libp2p keypair already exists" ;
-        return ()
-    | `No | `Unknown ->
-        Log.Global.info "Generating new libp2p keypair" ;
-        run_command
-          ~env:[ ("MINA_LIBP2P_PASS", "") ]
-          (sprintf "%s libp2p generate-keypair --privkey-path %s" mina_exe
-             (Filename.quote p2p_key_path) )
-        |> Deferred.ignore_m
-  in
-  eprintf "generating genesis ledgers ... (this may take a while)\n%!" ;
+
+  (* Generate libp2p keypair *)
+  let%bind () = Validation.ensure_libp2p_keypair config in
+
+  (* Generate genesis ledgers *)
+  eprintf "%s" Constants.Messages.generating_genesis_ledgers ;
   Log.Global.info "Starting genesis ledger generation process" ;
 
   (* Copy and patch config *)
   Log.Global.info "Copying fork config to working directory" ;
   let%bind () =
-    run_command
-      (sprintf "cp %s %s/config_orig.json"
-         (Filename.quote fork_config)
-         (Filename.quote workdir) )
-    |> Deferred.ignore_m
+    File_operations.copy_file ~src:fork_config
+      ~dst:
+        (File_operations.workdir_path workdir Constants.FileNames.config_orig)
   in
+
   Log.Global.info "Patching config to remove ledger metadata" ;
   let%bind () =
-    run_command
-      (sprintf
-         "jq 'del(.ledger.num_accounts) | del(.ledger.name)' \
-          %s/config_orig.json > %s/config.json"
-         (Filename.quote workdir) (Filename.quote workdir) )
+    Shell_operations.run_command
+      (sprintf "jq 'del(.ledger.num_accounts) | del(.ledger.name)' %s > %s"
+         (Filename.quote
+            (File_operations.workdir_path workdir
+               Constants.FileNames.config_orig ) )
+         (Filename.quote
+            (File_operations.workdir_path workdir Constants.FileNames.config) ) )
     |> Deferred.ignore_m
   in
+
   (* Generate legacy ledgers *)
-  Log.Global.info "Generating legacy ledgers" ;
-  let%bind () =
-    run_command
-      (sprintf
-         "%s --config-file %s/config.json --genesis-dir %s/legacy_ledgers \
-          --hash-output-file %s/legacy_hashes.json"
-         mina_legacy_genesis_exe (Filename.quote workdir)
-         (Filename.quote workdir) (Filename.quote workdir) )
-    |> Deferred.ignore_m
-  in
+  let%bind () = Validation.generate_legacy_ledgers config in
+
   (* Verify hashes match precomputed block *)
   Log.Global.info "Verifying legacy hashes match precomputed block" ;
-  let%bind result =
-    run_command_capture
-      (sprintf
-         "jq --slurpfile block %s/precomputed_fork_block.json --slurpfile \
-          legacy_hashes %s/legacy_hashes.json -n \
-          '($legacy_hashes[0].epoch_data.staking.hash == \
-          $block[0].data.protocol_state.body.consensus_state.staking_epoch_data.ledger.hash \
-          and $legacy_hashes[0].epoch_data.next.hash == \
-          $block[0].data.protocol_state.body.consensus_state.next_epoch_data.ledger.hash \
-          and $legacy_hashes[0].ledger.hash == \
-          $block[0].data.protocol_state.body.blockchain_state.staged_ledger_hash.non_snark.ledger_hash)'"
-         (Filename.quote workdir) (Filename.quote workdir) )
+  let%bind hashes_match =
+    Json_utils.verify_legacy_hashes_match
+      ~legacy_hashes_file:
+        (File_operations.workdir_path workdir Constants.FileNames.legacy_hashes)
+      ~precomputed_block_file:
+        (File_operations.workdir_path workdir
+           Constants.FileNames.precomputed_fork_block )
   in
+
   let%bind () =
-    match result with
-    | Ok "true" ->
-        Log.Global.info
-          "Hash verification successful - legacy hashes match precomputed block" ;
-        return ()
-    | _ ->
-        Log.Global.error
-          "Hash verification failed - legacy hashes don't match precomputed \
-           block" ;
-        eprintf
-          "Hashes in config %s don't match hashes from the precomputed block\n\
-           %!"
-          fork_config ;
-        exit 1
+    if hashes_match then (
+      Log.Global.info "Hash verification successful" ;
+      return () )
+    else (
+      Log.Global.error "Hash verification failed" ;
+      eprintf
+        "Hashes in config %s don't match hashes from the precomputed block\n%!"
+        fork_config ;
+      exit 1 )
   in
-  (* Patch verification key format *)
-  Log.Global.info "Patching verification key format in config" ;
-  let%bind () =
-    run_command
-      (sprintf
-         "sed -i -e 's/\"set_verification_key\": \
-          \"signature\"/\"set_verification_key\": {\"auth\": \"signature\", \
-          \"txn_version\": \"2\"}/g' %s/config.json"
-         (Filename.quote workdir) )
-    |> Deferred.ignore_m
-  in
+
   (* Generate new ledgers *)
-  Log.Global.info "Generating new ledgers with patched config" ;
-  let%bind () =
-    run_command
-      (sprintf
-         "%s --config-file %s/config.json --genesis-dir %s/ledgers \
-          --hash-output-file %s/hashes.json"
-         mina_genesis_exe (Filename.quote workdir) (Filename.quote workdir)
-         (Filename.quote workdir) )
-    |> Deferred.ignore_m
-  in
+  let%bind () = Validation.generate_new_ledgers config in
+
   (* Extract genesis timestamp from packaged config *)
   Log.Global.info "Extracting genesis timestamp from packaged config" ;
   let%bind genesis_timestamp =
-    jq_extract packaged_daemon_config ".genesis.genesis_state_timestamp"
+    Json_utils.jq_extract config.packaged_daemon_config
+      Constants.JsonPaths.DaemonConfig.genesis_timestamp
   in
   Log.Global.info "Genesis timestamp: %s" genesis_timestamp ;
 
@@ -469,215 +321,104 @@ let main network_name fork_config workdir precomputed_block_prefix_arg =
   let%bind () =
     let env =
       [ ("FORK_CONFIG_JSON", fork_config)
-      ; ("LEDGER_HASHES_JSON", sprintf "%s/hashes.json" workdir)
+      ; ( "LEDGER_HASHES_JSON"
+        , File_operations.workdir_path workdir Constants.FileNames.hashes )
       ; ("GENESIS_TIMESTAMP", genesis_timestamp)
-      ; ("SECONDS_PER_SLOT", seconds_per_slot)
-      ; ("FORKING_FROM_CONFIG_JSON", forking_from_config_json)
+      ; ("SECONDS_PER_SLOT", config.seconds_per_slot)
+      ; ("FORKING_FROM_CONFIG_JSON", config.forking_from_config_json)
       ]
     in
-    run_command ~env
-      (sprintf "%s > %s/config-substituted.json" create_runtime_config
-         (Filename.quote workdir) )
+    Shell_operations.run_command ~env
+      (sprintf "%s > %s" config.executables.create_runtime_config
+         (Filename.quote
+            (File_operations.workdir_path workdir
+               Constants.FileNames.config_substituted ) ) )
     |> Deferred.ignore_m
   in
-  eprintf "exporting ledgers from running node ... (this may take a while)\n%!" ;
+
+  (* Create genesis timestamp override *)
+  eprintf "%s" Constants.Messages.exporting_ledgers ;
   Log.Global.info "Starting ledger export process from running nodes" ;
 
-  (* Create override file *)
   Log.Global.info "Creating genesis timestamp override file" ;
+  let%bind override_content = Json_utils.create_genesis_timestamp_override () in
   let%bind () =
-    run_command
-      (sprintf
-         "echo '{\"genesis\":{\"genesis_state_timestamp\":\"'$(date -u \
-          +\"%%Y-%%m-%%dT%%H:%%M:%%SZ\")'\"}}' > \
-          %s/override-genesis-timestamp.json"
-         (Filename.quote workdir) )
-    |> Deferred.ignore_m
-  in
-  (* Extract ledgers function *)
-  let extract_ledgers config_file ledger_dir json_prefix =
-    Log.Global.info
-      "Starting ledger extraction with config: %s, ledger_dir: %s, prefix: %s"
-      config_file ledger_dir json_prefix ;
-    let override_file = sprintf "%s/override-genesis-timestamp.json" workdir in
-    let mina_log_level =
-      match Sys.getenv "MINA_LOG_LEVEL" with
-      | Some level ->
-          Log.Global.info "Using MINA_LOG_LEVEL from environment: %s" level ;
-          level
-      | None ->
-          Log.Global.info "Using default MINA_LOG_LEVEL: info" ;
-          "info"
-    in
-    (* Start daemon in background *)
-    Log.Global.info "Starting mina daemon in background" ;
-    let%bind () =
-      run_command
-        ~env:[ ("MINA_LIBP2P_PASS", "") ]
-        (sprintf
-           "%s daemon --libp2p-keypair %s/keys/p2p --config-file %s \
-            --config-file %s --seed --genesis-ledger-dir %s --log-level %s > \
-            /dev/null 2>&1 &"
-           mina_exe (Filename.quote workdir)
-           (Filename.quote config_file)
-           (Filename.quote override_file)
-           (Filename.quote ledger_dir)
-           mina_log_level )
-      |> Deferred.ignore_m
-    in
-    (* Wait for daemon to be ready and export staged ledger *)
-    let rec wait_for_export () =
-      Log.Global.info "Attempting to export staged ledger" ;
-      match%bind
-        run_command
-          (sprintf
-             "%s ledger export staged-ledger | jq . > %s-staged.json \
-              2>/dev/null"
-             mina_exe
-             (Filename.quote json_prefix) )
-      with
-      | Ok () ->
-          Log.Global.info "Successfully exported staged ledger" ;
-          return ()
-      | Error _ ->
-          Log.Global.info "Daemon not ready yet, waiting 60 seconds" ;
-          let%bind () = after (Time.Span.of_sec 60.0) in
-          (* Check if daemon is still running *)
-          Log.Global.info "Checking if daemon is still running" ;
-          let%bind daemon_pid =
-            run_command_capture
-              "cat ~/.mina-config/.mina-lock 2>/dev/null || echo ''"
-          in
-          let%bind daemon_running =
-            match daemon_pid with
-            | Ok pid_str ->
-                let pid = String.strip pid_str in
-                if String.is_empty pid then return false
-                else (
-                  Log.Global.info
-                    "Checking if daemon process %s is still running" pid ;
-                  match%map
-                    run_command (sprintf "kill -0 %s 2>/dev/null" pid)
-                  with
-                  | Ok () ->
-                      true
-                  | Error _ ->
-                      false )
-            | Error _ ->
-                return false
-          in
-          if not daemon_running then (
-            eprintf "daemon died before exporting ledgers\n%!" ;
-            exit 1 )
-          else wait_for_export ()
-    in
-    let%bind () = wait_for_export () in
-    (* Export other ledgers *)
-    Log.Global.info "Exporting staking epoch ledger" ;
-    let%bind () =
-      run_command
-        (sprintf
-           "%s ledger export staking-epoch-ledger | jq . > %s-staking.json"
-           mina_exe
-           (Filename.quote json_prefix) )
-      |> Deferred.ignore_m
-    in
-    Log.Global.info "Exporting next epoch ledger" ;
-    let%bind () =
-      run_command
-        (sprintf "%s ledger export next-epoch-ledger | jq . > %s-next.json"
-           mina_exe
-           (Filename.quote json_prefix) )
-      |> Deferred.ignore_m
-    in
-    (* Stop daemon *)
-    Log.Global.info "Stopping mina daemon" ;
-    run_command (sprintf "%s client stop" mina_exe) |> Deferred.ignore_m
+    Writer.save
+      (File_operations.workdir_path workdir
+         Constants.FileNames.override_genesis_timestamp )
+      ~contents:override_content
   in
 
-  (* Create ledgers-downloaded directory *)
-  let%bind () =
-    run_command
-      (sprintf "mkdir -p %s/ledgers-downloaded" (Filename.quote workdir))
-    |> Deferred.ignore_m
-  in
   (* Move existing tar.gz files to backup *)
   let%bind () =
-    run_command
-      (sprintf "mv -t %s/ledgers-backup %s/*.tar.gz 2>/dev/null || true"
-         (Filename.quote workdir)
-         (Filename.quote genesis_ledger_dir) )
-    |> Deferred.ignore_m
+    File_operations.move_tar_gz_files ~src_dir:config.genesis_ledger_dir
+      ~dst_dir:
+        (File_operations.workdir_path workdir Constants.Subdirs.ledgers_backup)
   in
+
   (* Extract ledgers (with download test if not disabled) *)
-  let no_test_ledger_download = Sys.getenv "NO_TEST_LEDGER_DOWNLOAD" in
   let%bind () =
-    match no_test_ledger_download with
-    | None ->
-        let%bind () =
-          extract_ledgers packaged_daemon_config
-            (sprintf "%s/ledgers-downloaded" workdir)
-            (sprintf "%s/downloaded" workdir)
-        in
-        run_command
-          "rm -Rf /tmp/coda_cache_dir/*.tar.gz /tmp/s3_cache_dir/*.tar.gz"
-        |> Deferred.ignore_m
-    | Some _ ->
-        return ()
+    if config.test_ledger_download then
+      let%bind () =
+        extract_ledgers config config.packaged_daemon_config
+          (File_operations.workdir_path workdir
+             Constants.Subdirs.ledgers_downloaded )
+          (File_operations.workdir_path workdir "downloaded")
+      in
+      Shell_operations.run_command
+        "rm -Rf /tmp/coda_cache_dir/*.tar.gz /tmp/s3_cache_dir/*.tar.gz"
+      |> Deferred.ignore_m
+    else return ()
   in
+
   (* Extract reference ledgers *)
   let%bind () =
-    extract_ledgers
-      (sprintf "%s/config-substituted.json" workdir)
-      (sprintf "%s/ledgers" workdir)
-      (sprintf "%s/reference" workdir)
+    extract_ledgers config
+      (File_operations.workdir_path workdir
+         Constants.FileNames.config_substituted )
+      (File_operations.workdir_path workdir Constants.Subdirs.ledgers)
+      (File_operations.workdir_path workdir "reference")
   in
+
   (* Move tar.gz files back *)
   let%bind () =
-    run_command
-      (sprintf "mv -t %s %s/ledgers-backup/* 2>/dev/null || true"
-         (Filename.quote genesis_ledger_dir)
-         (Filename.quote workdir) )
-    |> Deferred.ignore_m
+    File_operations.move_tar_gz_files
+      ~src_dir:
+        (File_operations.workdir_path workdir Constants.Subdirs.ledgers_backup)
+      ~dst_dir:config.genesis_ledger_dir
   in
+
   (* Extract packaged ledgers *)
   let%bind () =
-    extract_ledgers packaged_daemon_config genesis_ledger_dir
-      (sprintf "%s/packaged" workdir)
+    extract_ledgers config config.packaged_daemon_config
+      config.genesis_ledger_dir
+      (File_operations.workdir_path workdir "packaged")
   in
-  eprintf "Performing final comparisons...\n%!" ;
+
+  (* Final comparisons *)
+  eprintf "%s" Constants.Messages.performing_final_comparisons ;
   Log.Global.info "Starting final comparison phase" ;
+
   (* Compare config hashes *)
-  let%bind config_hash_result =
-    run_command_capture
-      (sprintf
-         "jq --slurpfile a %s/config-substituted.json --slurpfile b %s -n \
-          '($a[0].epoch_data.staking.hash == $b[0].epoch_data.staking.hash and \
-          $a[0].epoch_data.next.hash == $b[0].epoch_data.next.hash and \
-          $a[0].ledger.hash == $b[0].ledger.hash)'"
-         (Filename.quote workdir)
-         (Filename.quote packaged_daemon_config) )
+  let%bind config_hashes_match =
+    Json_utils.verify_config_hashes_match
+      ~config1_file:
+        (File_operations.workdir_path workdir
+           Constants.FileNames.config_substituted )
+      ~config2_file:config.packaged_daemon_config
   in
+
   let error = ref 0 in
-  let () =
-    match config_hash_result with
-    | Ok "true" ->
-        ()
-    | _ ->
-        Log.Global.error
-          "Packaged config hashes in %s not expected compared to \
-           %s/config-substituted.json"
-          packaged_daemon_config workdir ;
-        eprintf
-          "Packaged config hashes in %s not expected compared to \
-           %s/config-substituted.json\n\
-           %!"
-          packaged_daemon_config workdir ;
-        error := 1
-  in
+  if not config_hashes_match then (
+    Log.Global.error "Packaged config hashes not expected" ;
+    eprintf "Packaged config hashes in %s not expected compared to %s/%s\n%!"
+      config.packaged_daemon_config workdir
+      Constants.FileNames.config_substituted ;
+    error := 1 ) ;
+
   (* Compare packaged JSON files *)
   let%bind packaged_files =
-    run_command_capture
+    Shell_operations.run_command_capture
       (sprintf "ls %s/packaged-*.json" (Filename.quote workdir))
   in
   let%bind () =
@@ -691,31 +432,36 @@ let main network_name fork_config workdir precomputed_block_prefix_arg =
               |> fun s -> String.chop_prefix_exn ~prefix:"packaged-" s
             in
             let reference_file = sprintf "%s/reference-%s.json" workdir name in
-            let%bind match_ref = files_equal file reference_file in
-            let () =
-              if not match_ref then (
-                eprintf "Error: %s does not match reference\n%!" file ;
-                error := 1 )
+            let%bind match_ref =
+              File_operations.files_equal file reference_file
             in
-            match no_test_ledger_download with
-            | None ->
-                let downloaded_file =
-                  sprintf "%s/downloaded-%s.json" workdir name
-                in
-                let%bind match_dl = files_equal file downloaded_file in
-                if not match_dl then (
-                  eprintf "Error: %s does not match downloaded\n%!" file ;
-                  error := 1 ) ;
-                return ()
-            | Some _ ->
-                return () )
+            if not match_ref then (
+              Log.Global.error "File %s does not match reference" file ;
+              eprintf "Error: %s does not match reference\n%!" file ;
+              error := !error + 1 ) ;
+
+            if config.test_ledger_download then (
+              let downloaded_file =
+                sprintf "%s/downloaded-%s.json" workdir name
+              in
+              let%bind match_dl =
+                File_operations.files_equal file downloaded_file
+              in
+              if not match_dl then (
+                Log.Global.error "File %s does not match downloaded" file ;
+                eprintf "Error: %s does not match downloaded\n%!" file ;
+                error := !error + 1 ) ;
+              return () )
+            else return () )
     | Error _ ->
         return ()
   in
-  (* Compare RocksDB contents using OCaml library *)
+
+  (* Compare RocksDB contents *)
   let%bind ledger_tars =
-    run_command_capture
-      (sprintf "ls %s/ledgers/*.tar.gz" (Filename.quote workdir))
+    Shell_operations.run_command_capture
+      (sprintf "ls %s/%s/*.tar.gz" (Filename.quote workdir)
+         Constants.Subdirs.ledgers )
   in
   let%bind () =
     match ledger_tars with
@@ -726,100 +472,26 @@ let main network_name fork_config workdir precomputed_block_prefix_arg =
               Filename.basename file
               |> fun s -> String.chop_suffix_exn ~suffix:".tar.gz" s
             in
-            let tardir = sprintf "%s/ledgers/%s" workdir tarname in
-            (* Create directories *)
-            let%bind () =
-              run_command
-                (sprintf "mkdir -p %s/{packaged,generated,web}"
-                   (Filename.quote tardir) )
-              |> Deferred.ignore_m
-            in
-            (* Extract tar files *)
-            let%bind () =
-              run_command
-                (sprintf "tar -xzf %s -C %s/generated" (Filename.quote file)
-                   (Filename.quote tardir) )
-              |> Deferred.ignore_m
-            in
-            let%bind () =
-              run_command
-                (sprintf "tar -xzf %s/%s.tar.gz -C %s/packaged"
-                   (Filename.quote genesis_ledger_dir)
-                   tarname (Filename.quote tardir) )
-              |> Deferred.ignore_m
-            in
-            (* Download from S3 *)
-            let base_s3_url =
-              match Sys.getenv "MINA_LEDGER_S3_BUCKET" with
-              | Some url ->
-                  url
-              | None ->
-                  "https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net"
-            in
-            let%bind () =
-              run_command
-                (sprintf "curl %s/%s.tar.gz | tar -xz -C %s/web" base_s3_url
-                   tarname (Filename.quote tardir) )
-              |> Deferred.ignore_m
-            in
-            (* Use RocksDB library to scan databases *)
-            let%bind packaged_scan_result =
-              scan_rocksdb_to_hex
-                (sprintf "%s/packaged" tardir)
-                (sprintf "%s/packaged.scan" workdir)
-            in
-            let%bind web_scan_result =
-              scan_rocksdb_to_hex (sprintf "%s/web" tardir)
-                (sprintf "%s/web.scan" workdir)
-            in
-            let%bind generated_scan_result =
-              scan_rocksdb_to_hex
-                (sprintf "%s/generated" tardir)
-                (sprintf "%s/generated.scan" workdir)
-            in
-            (* Check for errors *)
-            let () =
-              match
-                (packaged_scan_result, web_scan_result, generated_scan_result)
-              with
-              | Ok (), Ok (), Ok () ->
-                  ()
-              | _ ->
-                  eprintf "Error: failed to scan RocksDB for %s\n%!" tarname ;
-                  error := 1
-            in
-            (* Compare scan results *)
-            let%bind gen_pkg_match =
-              files_equal
-                (sprintf "%s/generated.scan" workdir)
-                (sprintf "%s/packaged.scan" workdir)
-            in
-            let%bind pkg_web_match =
-              files_equal
-                (sprintf "%s/packaged.scan" workdir)
-                (sprintf "%s/web.scan" workdir)
-            in
-            if not (gen_pkg_match && pkg_web_match) then (
-              eprintf "Error: kvdb contents mismatch for %s\n%!" tarname ;
-              error := 1 ) ;
-            return () )
+            validate_ledger_tarball config tarname error )
     | Error _ ->
         return ()
   in
+
+  (* Final result *)
   if !error <> 0 then (
     Log.Global.error "Validation failed with %d errors" !error ;
-    eprintf "Error: failed validation\n%!" ;
+    eprintf "%s" Constants.Messages.validation_failed ;
     exit 1 )
   else (
     Log.Global.info "All validations passed successfully" ;
-    eprintf "Validation successful\n%!" ;
+    eprintf "%s" Constants.Messages.validation_successful ;
     exit 0 )
 
+(** Application entry point with CLI argument parsing. *)
 let () =
   (* Setup logging *)
   Log.Global.set_level `Info ;
   Log.Global.set_output [ Log.Output.stderr () ] ;
-  Log.Global.info "Starting verify_packaged_fork_config application" ;
 
   Command.run
     (Command.async
@@ -827,7 +499,7 @@ let () =
          "Verify that an installed package is correct according to an exported \
           fork_config.json file"
        ~readme:(fun () ->
-         {|This script validates an installed package against a fork_config.json file.
+         {|This app validates an installed package against a fork_config.json file.
 
 ENVIRONMENT VARIABLES:
 - MINA_EXE (default: mina or ./_build/default/src/app/cli/src/mina.exe)
@@ -851,7 +523,9 @@ VALIDATION:
 
 EXIT CODES:
 - 0: Validation successful
-- 1: Validation failed|}
+- 1: Validation failed
+
+For detailed documentation, see README.md|}
          )
        (let%map_open.Command network_name =
           flag "--network-name" (required string)

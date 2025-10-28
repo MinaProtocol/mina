@@ -1,8 +1,30 @@
+(library
+ (name verify_packaged_fork_config_lib)
+ (modules
+  types
+  constants
+  file_operations
+  json_utils
+  shell_operations
+  rocksdb_utils
+  validation)
+ (libraries
+  async
+  async_unix
+  core
+  core_kernel
+  rocksdb
+  yojson)
+ (preprocess
+  (pps ppx_jane ppx_version))
+ (flags :standard -w +a-4-40-42-44-70))
+
 (executable
  (package verify_packaged_fork_config)
  (name verify_packaged_fork_config)
  (public_name mina-verify-packaged-fork-config)
  (modes native)
+ (modules verify_packaged_fork_config)
  (libraries
   async
   async_unix
@@ -10,9 +32,10 @@
   core
   core_kernel
   rocksdb
-  mina_version)
+  mina_version
+  verify_packaged_fork_config_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
   (pps ppx_version ppx_jane))
- (flags :standard -w +a-4-44))
+ (flags :standard -w +a-4-40-42-44))
