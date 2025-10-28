@@ -32,10 +32,7 @@ in  Pipeline.build
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
-            , PipelineTag.Type.Docker
             , PipelineTag.Type.Stable
-            , PipelineTag.Type.Arm64
-            , PipelineTag.Type.Bookworm
             ]
           , profile = Profiles.Type.Mainnet
           , arch = Arch.Type.Arm64
