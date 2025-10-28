@@ -32,6 +32,7 @@ in  Pipeline.build
           , tags =
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
+            , PipelineTag.Type.Docker
             , PipelineTag.Type.Stable
             , PipelineTag.Type.Mainnet
             , PipelineTag.Type.Arm64
