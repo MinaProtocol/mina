@@ -13,9 +13,6 @@ TX_INTERVAL=${TX_INTERVAL:-30s}
 # Ignored if GENESIS_TIMESTAMP variable is specified
 DELAY_MIN=${DELAY_MIN:-20}
 
-# Allows to use develop ledger when equals to .develop
-CONF_SUFFIX=${CONF_SUFFIX:-}
-
 # Allows to specify a specific configuration file.
 # If specified, ledger will not be generated.
 # Specified config file is applied the latest and
@@ -42,7 +39,7 @@ SLOT=${SLOT:-30}
 
 usage() {
   echo "Creates a quick-epoch-turnaround configuration in localnet/ and launches two Mina nodes" >&2
-  echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [--develop] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
+  echo "Usage: $0 [-m|--mina $MINA_EXE] [-i|--tx-interval $TX_INTERVAL] [-d|--delay-min $DELAY_MIN] [-s|--slot $SLOT] [-c|--config ./config.json] [--slot-tx-end 100] [--slot-chain-end 130] [--genesis-ledger-dir ./genesis]" >&2
   echo "Consider reading script's code for information on optional arguments" >&2
 }
 
@@ -58,8 +55,6 @@ while [[ $# -gt 0 ]]; do
       DELAY_MIN="$2"; shift; shift ;;
     -i|--tx-interval)
       TX_INTERVAL="$2"; shift; shift ;;
-    --develop)
-      CONF_SUFFIX=".develop"; shift ;;
     -m|--mina)
       MINA_EXE="$2"; shift; shift ;;
     -s|--slot)
@@ -81,12 +76,6 @@ while [[ $# -gt 0 ]]; do
       KEYS+=("$1") ; shift ;;
   esac
 done
-
-if [[ "$CONF_SUFFIX" != "" ]] && [[ "$CUSTOM_CONF" != "" ]]; then
-  echo "Can't use both --develop and --config options" >&2
-  usage
-  exit 1
-fi
 
 # Check mina command exists
 command -v "$MINA_EXE" >/dev/null || { echo "No 'mina' executable found"; exit 1; }
@@ -154,7 +143,7 @@ fi
 
 COMMON_ARGS=( --log-json --log-level "$NODE_STDOUT_LOG_LEVEL" --seed )
 COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
-COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
+COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon.json" )
 
 if [[ "$GENESIS_LEDGER_DIR" != "" ]]; then
   rm -Rf localnet/genesis_{1,2}
