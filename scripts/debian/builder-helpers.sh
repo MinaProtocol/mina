@@ -169,6 +169,9 @@ copy_common_daemon_configs() {
     "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
   cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
     "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
+  cp ./default/src/app/verify_packaged_fork_config/verify_packaged_fork_config.exe \
+    "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
+
   # Copy signature-based Binaries (based on signature type $2 passed into the \
   # function)
   cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe \
@@ -192,8 +195,6 @@ copy_common_daemon_configs() {
     "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
   cp ../scripts/hardfork/create_runtime_config.sh \
     "${BUILDDIR}/usr/local/bin/mina-hf-create-runtime-config"
-  cp ../scripts/hardfork/mina-verify-packaged-fork-config \
-    "${BUILDDIR}/usr/local/bin/mina-verify-packaged-fork-config"
   # Update the mina.service with a new default PEERS_URL based on Seed List \
   # URL $3
   mkdir -p "${BUILDDIR}/usr/lib/systemd/user/"
