@@ -92,6 +92,7 @@ fi
 if [[ -z "$GENESIS_TIMESTAMP" ]]; then
   GENESIS_TIMESTAMP="None Text"
 else
+  # shellcheck disable=SC2089
   GENESIS_TIMESTAMP="(Some \"${GENESIS_TIMESTAMP}\")"
 fi
 
@@ -99,6 +100,7 @@ fi
 if [[ -z "$VERSION" ]]; then
   VERSION="(None Text)"
 else
+  # shellcheck disable=SC2089
   VERSION="(Some \"${VERSION}\")"
 fi
 
@@ -106,9 +108,20 @@ fi
 if [[ -z "$PRECOMPUTED_FORK_BLOCK_PREFIX" ]]; then
   PRECOMPUTED_FORK_BLOCK_PREFIX="(None Text)"
 else
+  # shellcheck disable=SC2089
   PRECOMPUTED_FORK_BLOCK_PREFIX="(Some \"${PRECOMPUTED_FORK_BLOCK_PREFIX}\")"
 fi
 
 DHALL_CODENAMES=$(to_dhall_list "$CODENAMES" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
 
-echo $GENERATE_HARDFORK_PACKAGE_DHALL_DEF'.generate_hardfork_package '"$DHALL_CODENAMES"' '$NETWORK_DHALL_DEF'.Type.'"${NETWORK}"' '${GENESIS_TIMESTAMP}' "'"${CONFIG_JSON_GZ_URL}"'" "'""'" '${VERSION}' '${PRECOMPUTED_FORK_BLOCK_PREFIX}' ' | dhall-to-yaml --quoted
+# shellcheck disable=SC2089
+printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s\n' \
+  "$GENERATE_HARDFORK_PACKAGE_DHALL_DEF" \
+  "$DHALL_CODENAMES" \
+  "$NETWORK_DHALL_DEF" \
+  "$NETWORK" \
+  "$GENESIS_TIMESTAMP" \
+  "$CONFIG_JSON_GZ_URL" \
+  "" \
+  "$VERSION" \
+  "$PRECOMPUTED_FORK_BLOCK_PREFIX" | dhall-to-yaml --quoted
