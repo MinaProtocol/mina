@@ -94,6 +94,7 @@ RUN apt-get update --quiet \
   git-lfs \
   m4 \
   pkg-config \
+  rocksdb-tools \
   rsync \
   sudo \
   unzip \
