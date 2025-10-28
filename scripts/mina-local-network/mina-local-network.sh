@@ -169,14 +169,10 @@ exec-daemon() {
   BASE_PORT=${1}
   shift
   CLIENT_PORT=${BASE_PORT}
-  # shellcheck disable=SC2004
-  REST_PORT=$((${BASE_PORT} + 1))
-  # shellcheck disable=SC2004
-  EXTERNAL_PORT=$((${BASE_PORT} + 2))
-  # shellcheck disable=SC2004
-  DAEMON_METRICS_PORT=$((${BASE_PORT} + 3))
-  # shellcheck disable=SC2004
-  LIBP2P_METRICS_PORT=$((${BASE_PORT} + 4))
+  REST_PORT=$((BASE_PORT + 1))
+  EXTERNAL_PORT=$((BASE_PORT + 2))
+  DAEMON_METRICS_PORT=$((BASE_PORT + 3))
+  LIBP2P_METRICS_PORT=$((BASE_PORT + 4))
 
   # shellcheck disable=SC2068
   exec ${MINA_EXE} daemon \
@@ -492,29 +488,25 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   fi
 
   generate-keypair "${LEDGER_FOLDER}"/snark_coordinator_keys/snark_coordinator_account
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${FISH}; i++)); do
+  for ((i = 0; i < FISH; i++)); do
     generate-keypair "${LEDGER_FOLDER}"/offline_fish_keys/offline_fish_account_${i}
     generate-keypair "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_${i}
     generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i}
   done
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${WHALES}; i++)); do
+  for ((i = 0; i < WHALES; i++)); do
     generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
     generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
     generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i}
   done
-  # shellcheck disable=SC2004
-  for ((i = 0; i < ${NODES}; i++)); do
+  for ((i = 0; i < NODES; i++)); do
     generate-keypair "${LEDGER_FOLDER}"/offline_whale_keys/offline_whale_account_${i}
     generate-keypair "${LEDGER_FOLDER}"/online_whale_keys/online_whale_account_${i}
     generate-libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i}
   done
 
   if [ "$(uname)" != "Darwin" ] && [ ${FISH} -gt 0 ]; then
-    # shellcheck disable=SC2012
-    FILE=$(ls "${LEDGER_FOLDER}"/offline_fish_keys/ | head -n 1)
-    OWNER=$(stat -c "%U" "${LEDGER_FOLDER}"/offline_fish_keys/"${FILE}")
+    FILE=$(find "${LEDGER_FOLDER}/offline_fish_keys" -mindepth 1 -maxdepth 1 -type f | head -n 1)
+    OWNER=$(stat -c "%U" "${FILE}")
 
     if [ "${FILE}" != "${OWNER}" ]; then
       # Check if sudo command exists
@@ -719,8 +711,7 @@ fi
 
 #---------- Starting snark workers
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${SNARK_WORKERS_COUNT}; i++)); do
+for ((i = 0; i < SNARK_WORKERS_COUNT; i++)); do
   FOLDER=${NODES_FOLDER}/snark_workers/worker_${i}
   mkdir -p "${FOLDER}"
   spawn-worker "${FOLDER}" "${SNARK_COORDINATOR_PORT}"
@@ -729,8 +720,7 @@ done
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${WHALES}; i++)); do
+for ((i = 0; i < WHALES; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
@@ -741,8 +731,7 @@ done
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${FISH}; i++)); do
+for ((i = 0; i < FISH; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
@@ -753,8 +742,7 @@ done
 
 # ----------
 
-# shellcheck disable=SC2004
-for ((i = 0; i < ${NODES}; i++)); do
+for ((i = 0; i < NODES; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
   mkdir -p "${FOLDER}"
   spawn-node "${FOLDER}" $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
