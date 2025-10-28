@@ -54,7 +54,6 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [[ $# -gt 0 ]]; then
   # Branch is specified, this is a CI run
-  ln -sf /usr/share/zoneinfo/UTC /etc/localtime
   chown -R "${USER}" /workdir
   git config --global --add safe.directory /workdir
   git fetch
