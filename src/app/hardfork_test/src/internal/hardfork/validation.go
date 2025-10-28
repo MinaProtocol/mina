@@ -19,8 +19,7 @@ type BlockAnalysisResult struct {
 // ValidateSlotOccupancy checks if block occupancy is above 50%
 func (t *HardforkTest) ValidateSlotOccupancy(startingHeight, blockHeight int) error {
 	if 2*blockHeight < t.Config.BestChainQueryFrom {
-		t.Logger.Error("Assertion failed: slot occupancy is below 50%%")
-		return fmt.Errorf("slot occupancy is below 50%%")
+		return fmt.Errorf("slot occupancy (%d/%d) is below 50%%", blockHeight, t.Config.BestChainQueryFrom)
 	}
 	return nil
 }
@@ -84,7 +83,7 @@ func (t *HardforkTest) CollectBlocks(ports []int, startSlot, endSlot int) ([]gra
 
 		blocksBatch, err := t.Client.GetBlocks(port)
 		if err != nil {
-			t.Logger.Debug("Failed to get blocks for slot %d: %v", i, err)
+			t.Logger.Debug("Failed to get blocks for slot %d: %v from port %d", i, err, port)
 		} else {
 			allBlocks = append(allBlocks, blocksBatch...)
 		}
@@ -100,7 +99,7 @@ func (t *HardforkTest) AnalyzeBlocks(ports []int) (*BlockAnalysisResult, error) 
 	// Get initial blocks to find genesis epoch hashes
 	blocks, err := t.Client.GetBlocks(ports[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get blocks: %w", err)
+		return nil, fmt.Errorf("failed to get blocks: %w from port %d", err, ports[0])
 	}
 
 	// Find the first non-empty block to get genesis epoch hashes
@@ -117,7 +116,14 @@ func (t *HardforkTest) AnalyzeBlocks(ports []int) (*BlockAnalysisResult, error) 
 	}
 
 	genesisEpochStakingHash := firstEpochBlock.CurEpochHash
+	if genesisEpochStakingHash == "" {
+		return nil, fmt.Errorf("genesis epoch staking hash is empty")
+	}
+
 	genesisEpochNextHash := firstEpochBlock.NextEpochHash
+	if genesisEpochNextHash == "" {
+		return nil, fmt.Errorf("genesis next staking hash is empty")
+	}
 
 	t.Logger.Info("Genesis epoch staking/next hashes: %s, %s",
 		genesisEpochStakingHash, genesisEpochNextHash)

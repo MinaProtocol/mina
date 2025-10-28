@@ -119,7 +119,7 @@ func (t *HardforkTest) Run() error {
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
-	forkConfigBytes, analysis, err := t.RunMainNetworkPhase(forkConfigPath, mainGenesisTs)
+	forkConfigBytes, analysis, err := t.RunMainNetworkPhase(mainGenesisTs)
 	if err != nil {
 		return err
 	}
@@ -127,6 +127,10 @@ func (t *HardforkTest) Run() error {
 	t.Logger.Info("Phase 2: Validating extracted fork configuration...")
 	// Validate fork config data
 	if err := t.ValidateForkConfigData(analysis.LatestNonEmptyBlock, forkConfigBytes); err != nil {
+		return err
+	}
+	// Write fork config to file
+	if err := os.WriteFile(forkConfigPath, forkConfigBytes, 0644); err != nil {
 		return err
 	}
 	{

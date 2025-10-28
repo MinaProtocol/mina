@@ -57,7 +57,6 @@ func DefaultConfig() *Config {
 		ForkSlot:                      15,
 		MainDelay:                     5,
 		ForkDelay:                     5,
-		ScriptDir:                     "$PWD/scripts/hardfork",
 		ShutdownTimeoutMinutes:        10,
 		PollingIntervalSeconds:        5,
 		ForkConfigRetryDelaySeconds:   60,
@@ -86,6 +85,9 @@ func (c *Config) Validate() error {
 	if c.ForkRuntimeGenesisLedger == "" {
 		return ErrMissingForkRuntimeGenesisLedger
 	}
+	if c.ScriptDir == "" {
+		return ErrMissingScriptDir
+	}
 
 	// Check if executables exist and have proper permissions
 	if err := validateExecutable(c.MainMinaExe); err != nil {
@@ -101,20 +103,11 @@ func (c *Config) Validate() error {
 		return FileValidationError(c.ForkRuntimeGenesisLedger, err)
 	}
 
+	if err := validateScriptDir(c.ScriptDir); err != nil {
+		return FileValidationError(c.ScriptDir, err)
+	}
+
 	return nil
-}
-
-// CalculateTimestamps computes the UNIX timestamps for main and fork genesis
-func (c *Config) CalculateTimestamps() (mainGenesisTs, forkGenesisTs int64) {
-	now := time.Now().Unix()
-	// Round to nearest minute
-	nowRounded := now - (now % 60)
-
-	// Calculate genesis timestamps as in the shell script
-	mainGenesisTs = nowRounded + int64(c.MainDelay*60)
-	forkGenesisTs = nowRounded + int64(c.ForkDelay*60)
-
-	return mainGenesisTs, forkGenesisTs
 }
 
 // FormatTimestamp formats a UNIX timestamp into the format used by the shell script
@@ -142,6 +135,18 @@ func validateExecutable(path string) error {
 	// Check executable permission - mode & 0111 is checking for any execution bit (user, group, or others)
 	if info.Mode().Perm()&0111 == 0 {
 		return ErrNotExecutable
+	}
+
+	return nil
+}
+
+func validateScriptDir(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return ErrNotADir
 	}
 
 	return nil

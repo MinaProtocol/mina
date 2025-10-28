@@ -2,7 +2,7 @@ package hardfork
 
 // RunMainNetworkPhase runs the main network and validates its operation
 // and returns the fork config bytes and block analysis result
-func (t *HardforkTest) RunMainNetworkPhase(forkConfigPath string, mainGenesisTs int64) ([]byte, *BlockAnalysisResult, error) {
+func (t *HardforkTest) RunMainNetworkPhase(mainGenesisTs int64) ([]byte, *BlockAnalysisResult, error) {
 	// Start the main network
 	mainNetCmd, err := t.RunMainNetwork(mainGenesisTs)
 	if err != nil {
@@ -53,7 +53,7 @@ func (t *HardforkTest) RunMainNetworkPhase(forkConfigPath string, mainGenesisTs 
 	}
 
 	// Extract fork config before nodes shutdown
-	forkConfigBytes, err := t.ExtractForkConfig(10313, forkConfigPath)
+	forkConfigBytes, err := t.GetForkConfig(10313)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -75,8 +75,6 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 		t.gracefulShutdown(forkCmd, "Fork network")
 	}()
 
-	// Sleep until fork genesis
-	t.Logger.Info("Sleeping for %d minutes until fork genesis...", t.Config.ForkDelay)
 	// Calculate expected genesis slot
 	expectedGenesisSlot := (forkGenesisTs - mainGenesisTs) / int64(t.Config.MainSlot)
 
@@ -86,7 +84,7 @@ func (t *HardforkTest) RunForkNetworkPhase(latestPreForkHeight int, configFile, 
 	}
 
 	// Wait until best chain query time
-	t.WaitUntilBestChainQuery(t.Config.MainSlot, t.Config.MainDelay)
+	t.WaitUntilBestChainQuery(t.Config.ForkSlot, t.Config.ForkDelay)
 
 	// Check block height at slot BestChainQueryFrom
 	blockHeight, err := t.Client.GetHeight(10303)

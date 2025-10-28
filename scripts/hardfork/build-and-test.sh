@@ -54,14 +54,24 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [[ $# -gt 0 ]]; then
   # Branch is specified, this is a CI run
-  ln -sf /usr/share/zoneinfo/UTC /etc/localtime
   chown -R "${USER}" /workdir
   git config --global --add safe.directory /workdir
   git fetch
-  nix-env -iA unstable.jq
-  nix-env -iA unstable.curl
-  nix-env -iA unstable.gnused
-  nix-env -iA unstable.git-lfs
+  nix-env -iA unstable.{curl,git-lfs,gnused,jq}
+
+  # Manually patch zone infos, nix doesn't provide stdenv breaking janestreet's core
+  zone_info=(/nix/store/*tzdata*/share/zoneinfo)
+  if [ "${#zone_info[@]}" -lt 1 ]; then
+    echo "Error: expected at least one tzdata path, none found" >&2
+    exit 1
+  fi
+  unlink /usr/share && mkdir -p /usr/share
+  ln -sf "${zone_info[0]}" /usr/share/zoneinfo
+  ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+  if [ ! -L /etc/localtime ] || [ ! -e /etc/localtime ]; then
+    echo "Error: timezone file invalid!" >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -L compatible-devnet ]]; then
@@ -119,4 +129,6 @@ echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
   --fork-mina-exe "$INIT_DIR/fork-devnet/bin/mina" \
   --fork-runtime-genesis-ledger "$INIT_DIR/fork-devnet-genesis/bin/runtime_genesis_ledger" \
   --slot-tx-end "$SLOT_TX_END" \
-  --slot-chain-end "$SLOT_CHAIN_END" && echo "HF test completed successfully"
+  --slot-chain-end "$SLOT_CHAIN_END" \
+  --script-dir "$SCRIPT_DIR" \
+&& echo "HF test completed successfully"
