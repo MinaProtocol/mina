@@ -9,6 +9,8 @@ trap "killall background" EXIT
 # ================================================
 # Constants
 
+POLL_INTERVAL=10s
+
 MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
 ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
 LOGPROC_EXE=${LOGPROC_EXE:-_build/default/src/app/logproc/logproc.exe}
@@ -692,7 +694,7 @@ echo 'Waiting for seed to go up...'
 printf "\n"
 
 until ${MINA_EXE} client status -daemon-port "${SEED_START_PORT}" &>/dev/null; do
-  sleep 1
+  sleep ${POLL_INTERVAL}
 done
 
 #---------- Starting snark coordinator
@@ -711,7 +713,7 @@ else
   printf "\n"
 
   until ${MINA_EXE} client status -daemon-port "${SNARK_COORDINATOR_PORT}" &>/dev/null; do
-    sleep 1
+    sleep ${POLL_INTERVAL}
   done
 fi
 
@@ -865,7 +867,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   printf "\n"
 
   until ${MINA_EXE} client status -daemon-port "${FISH_START_PORT}" &>/dev/null; do
-    sleep 1
+    sleep ${POLL_INTERVAL}
   done
 
   SYNCED=0
@@ -878,7 +880,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   while [ $SYNCED -eq 0 ]; do
     SYNC_STATUS=$(curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
     SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
-    sleep 1
+    sleep ${POLL_INTERVAL}
   done
 
   echo "Starting to send value transfer transactions/zkApp transactions every: ${TRANSACTION_FREQUENCY} seconds"
