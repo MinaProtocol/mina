@@ -34,7 +34,7 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
             , PipelineTag.Type.Mainnet
-            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Arm64
             , PipelineTag.Type.Bookworm
             ]
           , profile = Profiles.Type.Mainnet
