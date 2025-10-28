@@ -33,7 +33,7 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Mainnet
-            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Arm64
             , PipelineTag.Type.Noble
             ]
           , debVersion = DebianVersions.DebVersion.Noble
