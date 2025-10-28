@@ -2220,7 +2220,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
 
           let ledger_backing =
-            Config.ledger_backing ~hardfork_mode:config.hardfork_mode
+            Config.ledger_backing ~hardfork_handling:config.hardfork_handling
           in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
