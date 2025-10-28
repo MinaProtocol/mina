@@ -32,7 +32,6 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
-            , PipelineTag.Type.Mainnet
             , PipelineTag.Type.Arm64
             , PipelineTag.Type.Noble
             ]

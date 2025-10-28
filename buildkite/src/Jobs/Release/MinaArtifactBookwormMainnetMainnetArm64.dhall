@@ -34,7 +34,6 @@ in  Pipeline.build
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
             , PipelineTag.Type.Stable
-            , PipelineTag.Type.Mainnet
             , PipelineTag.Type.Arm64
             , PipelineTag.Type.Bookworm
             ]
