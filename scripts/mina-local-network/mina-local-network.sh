@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -x
 
 # Exit script when commands fail
 set -e
