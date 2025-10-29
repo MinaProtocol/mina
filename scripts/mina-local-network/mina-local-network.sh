@@ -304,6 +304,10 @@ config_mode_is_inherit() {
   [[ "$1" == "inherit" || "$1" == inherit_with:* ]]
 }
 
+is_process_running() {
+    kill -0 "$1" 2>/dev/null
+}
+
 # ================================================
 # Parse inputs from arguments
 
@@ -986,7 +990,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   state=0
 
   # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger. 
-  while true; do
+  while is_process_running "${FISH_PIDS[0]}"; do
     sleep ${TRANSACTION_FREQUENCY}
 
     if ${VALUE_TRANSFERS}; then
