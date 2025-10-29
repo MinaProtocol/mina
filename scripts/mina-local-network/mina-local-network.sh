@@ -34,7 +34,7 @@ FILE_LOG_LEVEL=${LOG_LEVEL}
 VALUE_TRANSFERS=false
 SNARK_WORKERS_COUNT=1
 ZKAPP_TRANSACTIONS=false
-RESET=false
+CONFIG_MODE=inherit
 UPDATE_GENESIS_TIMESTAMP=no
 OVERRIDE_SLOT_TIME_MS=""
 PROOF_LEVEL="full"
@@ -132,8 +132,8 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)
                                          |   Default: ${PROOF_LEVEL}
--r   |--reset                            | Whether to reset the Mina Local Network storage file-system (presence of argument)
-                                         |   Default: ${RESET}
+-c   |--config                           | Config to use. Set to `reset` to generate a new config, `inheirt` to reuse the one found in previously deployed networks, `file:PATH` to use a custom config
+                                         |   Default: ${CONFIG_MODE}
 -u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to `fixed:TIMESTAMP` to be a fixed time, `delay_sec:SECONDS` to be set genesis to be SECONDS in the future, or `no` to do nothing.
                                          |   Default: ${UPDATE_GENESIS_TIMESTAMP}
 -st  |--override-slot-time <milliseconds>| Override the slot time for block production
@@ -372,7 +372,10 @@ while [[ "$#" -gt 0 ]]; do
     PROOF_LEVEL="${2}"
     shift
     ;;
-  -r | --reset) RESET=true ;;
+  -c | --config)
+    CONFIG_MODE="${2}"
+    shift
+    ;;
   -u | --update-genesis-timestamp) 
     UPDATE_GENESIS_TIMESTAMP="${2}"
     shift
@@ -435,7 +438,7 @@ In case of any issues please make sure that you:
 
 EOF
 
-  if ${RESET}; then
+  if [[ $CONFIG_MODE != "inherit" ]]; then
     recreate-schema
   fi
 
@@ -479,8 +482,9 @@ else
   LEDGER_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
 fi
 
-if ${RESET}; then
+if [[ $CONFIG_MODE != "inherit" ]]; then
   rm -rf "${LEDGER_FOLDER}"
+  # TODO: schema already recreated, remove this in next commit
   if ${ARCHIVE}; then
     recreate-schema
   fi
@@ -620,9 +624,20 @@ EOF
 
 CONFIG=${LEDGER_FOLDER}/daemon.json
 
-if ${RESET} || [ ! -f "${CONFIG}" ]; then
-  reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
-fi
+case "${CONFIG_MODE}" in
+  inherit)
+    if [ ! -f "${CONFIG}" ]; then
+      echo "Error: Config file '${CONFIG}' does not exist, can't inheirt." >&2
+      exit 1
+    fi
+    ;;
+  reset)
+    reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
+    ;;
+  file:*)
+    cp -f "${CONFIG_MODE#file:}" "${CONFIG}"
+    ;;
+esac
 
 jq-inplace() {
   local jq_filter="$1"
@@ -686,7 +701,7 @@ if ! ${DEMO_MODE}; then
   mkdir -p "${NODES_FOLDER}"/snark_workers
 fi
 
-if ${RESET}; then
+if [[ $CONFIG_MODE != "inherit" ]]; then
   clean-dir "${NODES_FOLDER}"
   mkdir -p "${NODES_FOLDER}"/seed
   mkdir -p "${NODES_FOLDER}"/snark_coordinator
