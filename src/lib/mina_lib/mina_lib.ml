@@ -1229,7 +1229,12 @@ let check_and_stop_daemon t ~wait =
             `Check_in (Core.Time.Span.scale vrf_poll_interval 2.0) )
 
 let stop_long_running_daemon t =
-  let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
+  (* The Random.int upper bound is exclusive *)
+  let additional_wait_hours =
+    if t.config.stop_time_interval < 1 then 0
+    else Random.int (t.config.stop_time_interval + 1)
+  in
+  let wait_mins = (t.config.stop_time + additional_wait_hours) * 60 in
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
      produced"
