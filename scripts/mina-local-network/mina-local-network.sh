@@ -633,6 +633,16 @@ if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
   jq --inplace ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
 fi
 
+if [ ! -z "${SLOT_TX_END}" ]; then
+  echo 'Modifying configuration to override slot transaction end...'
+  jq --inplace ".daemon.slot_tx_end=${SLOT_TX_END}" "${CONFIG}"
+fi
+
+if [ ! -z "${SLOT_CHAIN_END}" ]; then
+  echo 'Modifying configuration to override slot chain end...'
+  jq --inplace ".daemon.slot_chain_end=${SLOT_CHAIN_END}" "${CONFIG}"
+fi
+
 # ================================================
 # Launch the Nodes
 
