@@ -961,7 +961,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   set +e
 
   while [ $SYNCED -eq 0 ]; do
-    SYNC_STATUS=$(curl -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
+    SYNC_STATUS=$(curl -sS -g -X POST -H "Content-Type: application/json" -d '{"query":"query { syncStatus }"}' ${REST_SERVER})
     SYNCED=$(echo "${SYNC_STATUS}" | grep -c "SYNCED")
     sleep ${POLL_INTERVAL}
   done
