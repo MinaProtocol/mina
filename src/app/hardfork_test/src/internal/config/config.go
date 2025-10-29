@@ -34,6 +34,9 @@ type Config struct {
 	NumFish   int
 	NumNodes  int
 
+	// Interval of sending payments in second
+	PaymentInterval int
+
 	// Script directory path
 	ScriptDir string
 
@@ -65,6 +68,7 @@ func DefaultConfig() *Config {
 		NumWhales:                     2,
 		NumFish:                       1,
 		NumNodes:                      1,
+		PaymentInterval:               10,
 		ShutdownTimeoutMinutes:        10,
 		PollingIntervalSeconds:        5,
 		ForkConfigRetryDelaySeconds:   60,
