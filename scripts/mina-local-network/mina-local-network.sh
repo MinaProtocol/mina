@@ -12,7 +12,6 @@ POLL_INTERVAL=10s
 
 MINA_EXE=${MINA_EXE:-_build/default/src/app/cli/src/mina.exe}
 ARCHIVE_EXE=${ARCHIVE_EXE:-_build/default/src/app/archive/archive.exe}
-LOGPROC_EXE=${LOGPROC_EXE:-_build/default/src/app/logproc/logproc.exe}
 ZKAPP_EXE=${ZKAPP_EXE:-_build/default/src/app/zkapp_test_transaction/zkapp_test_transaction.exe}
 
 unset MINA_BP_PRIVKEY
@@ -189,7 +188,6 @@ exec-daemon() {
     -metrics-port ${DAEMON_METRICS_PORT} \
     -libp2p-metrics-port ${LIBP2P_METRICS_PORT} \
     -config-file "${CONFIG}" \
-    -log-json \
     -log-level "${LOG_LEVEL}" \
     -file-log-level "${FILE_LOG_LEVEL}" \
     -precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
@@ -228,7 +226,7 @@ spawn-node() {
   FOLDER=${1}
   shift
   # shellcheck disable=SC2068
-  exec-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  exec-daemon $@ -config-directory "${FOLDER}" &
 }
 
 # Spawns worker in background
@@ -236,7 +234,7 @@ spawn-worker() {
   FOLDER=${1}
   shift
   # shellcheck disable=SC2068
-  exec-worker-daemon $@ -config-directory "${FOLDER}" &>"${FOLDER}"/log.txt &
+  exec-worker-daemon $@ -config-directory "${FOLDER}" &
 }
 
 # Spawns the Archive Node in background
@@ -244,7 +242,7 @@ spawn-archive-node() {
   FOLDER=${1}
   shift
   # shellcheck disable=SC2068
-  exec-archive-node $@ &>"${FOLDER}"/log.txt &
+  exec-archive-node $@ &
 }
 
 # Resets genesis ledger
@@ -853,7 +851,6 @@ Network participants information:
 		Instance #0:
 		  pid ${SEED_PID}
 		  status: ${MINA_EXE} client status -daemon-port ${SEED_START_PORT}
-		  logs: cat ${NODES_FOLDER}/seed/log.txt | ${LOGPROC_EXE}
 EOF
 
 if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
@@ -862,7 +859,6 @@ if [ "${SNARK_WORKERS_COUNT}" -gt 0 ]; then
 		Instance #0:
 		  pid ${SNARK_COORDINATOR_PID}
 		  status: ${MINA_EXE} client status -daemon-port ${SNARK_COORDINATOR_PORT}
-		  logs: cat ${NODES_FOLDER}/snark_coordinator/log.txt | ${LOGPROC_EXE}
 
 	Snark Workers:
 EOF
@@ -871,7 +867,6 @@ EOF
     cat <<EOF
 		Instance #${i}:
 		  pid ${SNARK_WORKERS_PIDS[${i}]}
-		  logs: cat ${NODES_FOLDER}/snark_workers/snark_worker_${i}/log.txt | ${LOGPROC_EXE}
 EOF
   done
 fi
@@ -882,7 +877,6 @@ if ${ARCHIVE}; then
 		Instance #0:
 		  pid ${ARCHIVE_PID}
 		  server-port: ${ARCHIVE_SERVER_PORT}
-		  logs: cat ${NODES_FOLDER}/archive/log.txt | ${LOGPROC_EXE}
 EOF
 fi
 
@@ -895,7 +889,6 @@ EOF
 		Instance #${i}:
 		  pid ${WHALE_PIDS[${i}]}
 		  status: ${MINA_EXE} client status -daemon-port $((WHALE_START_PORT + i * 5))
-		  logs: cat ${NODES_FOLDER}/whale_${i}/log.txt | ${LOGPROC_EXE}
 EOF
   done
 fi
@@ -909,7 +902,6 @@ EOF
 		Instance #${i}:
 		  pid ${FISH_PIDS[${i}]}
 		  status: ${MINA_EXE} client status -daemon-port $((FISH_START_PORT + i * 5))
-		  logs: cat ${NODES_FOLDER}/fish_${i}/log.txt | ${LOGPROC_EXE}
 EOF
   done
 fi
@@ -923,7 +915,6 @@ EOF
 		Instance #${i}:
 		  pid ${NODE_PIDS[${i}]}
 		  status: ${MINA_EXE} client status -daemon-port $((NODE_START_PORT + i * 5))
-		  logs: cat ${NODES_FOLDER}/node_${i}/log.txt | ${LOGPROC_EXE}
 EOF
   done
 fi
