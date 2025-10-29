@@ -964,6 +964,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   sender_nonce=1
   state=0
 
+  # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger. 
   while true; do
     sleep ${TRANSACTION_FREQUENCY}
 
