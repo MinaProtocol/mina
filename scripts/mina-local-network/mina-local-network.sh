@@ -59,6 +59,9 @@ PG_DB="archive"
 ARCHIVE_ADDRESS_CLI_ARG=""
 DEMO_MODE=false
 
+SLOT_TX_END=
+SLOT_CHAIN_END=
+
 # ================================================
 # Globals (assigned during execution of script)
 
@@ -137,6 +140,10 @@ help() {
                                          |   Default: value from executable
 -d   |--demo                             | Whether to run the demo (presence of argument). Demo mode is used to run the single node which is already bootstrapped and synced with the network.
                                          |   Default: false
+-ste |--slot-transaction-end             | When set, stop adding transactions from this slot on.
+                                         |   Default: None
+-sce |--slot-chain-end                   | When set, stop producing blocks from this chain on.
+                                         |   Default: None
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -368,10 +375,18 @@ while [[ "$#" -gt 0 ]]; do
   -r | --reset) RESET=true ;;
   -u | --update-genesis-timestamp) UPDATE_GENESIS_TIMESTAMP=true ;;
   -st |--override-slot-time)
-      OVERRIDE_SLOT_TIME_MS="${2}"
-      shift
-      ;;
+    OVERRIDE_SLOT_TIME_MS="${2}"
+    shift
+    ;;
   -d | --demo) DEMO_MODE=true ;;
+  -ste | --slot-transaction-end) 
+    SLOT_TX_END="${2}"
+    shift
+    ;;
+  -sce | --slot-chain-end) 
+    SLOT_CHAIN_END="${2}"
+    shift
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
