@@ -105,6 +105,8 @@ func (t *HardforkTest) setupSignalHandler() {
 
 // Run executes the hardfork test process with well-defined phases
 func (t *HardforkTest) Run() error {
+	os.MkdirAll("fork_data", 0755)
+
 	// Set up signal handler for Ctrl+C
 	t.setupSignalHandler()
 	defer t.cleanupAllProcesses()
@@ -114,8 +116,8 @@ func (t *HardforkTest) Run() error {
 	// Calculate main network genesis timestamp
 	mainGenesisTs := time.Now().Unix() + int64(t.Config.MainDelay*60)
 
-	// Define all localnet file paths
-	forkConfigPath := "localnet/fork_config.json"
+	// Define all fork_data file paths
+	forkConfigPath := "fork_data/fork_config.json"
 
 	// Phase 1: Run and validate main network
 	t.Logger.Info("Phase 1: Running main network...")
@@ -134,24 +136,24 @@ func (t *HardforkTest) Run() error {
 		return err
 	}
 	{
-		preforkLedgersDir := "localnet/prefork_hf_ledgers"
-		preforkHashesFile := "localnet/prefork_hf_ledger_hashes.json"
+		preforkLedgersDir := "fork_data/prefork_hf_ledgers"
+		preforkHashesFile := "fork_data/prefork_hf_ledger_hashes.json"
 		if err := t.GenerateAndValidatePreforkLedgers(analysis, forkConfigPath, preforkLedgersDir, preforkHashesFile); err != nil {
 			return err
 		}
 	}
 
-	configFile := "localnet/config.json"
-	forkLedgersDir := "localnet/hf_ledgers"
+	configFile := "fork_data/config.json"
+	forkLedgersDir := "fork_data/hf_ledgers"
 
 	// Calculate fork genesis timestamp relative to now (before starting fork network)
 	forkGenesisTs := time.Now().Unix() + int64(t.Config.ForkDelay*60)
 
 	t.Logger.Info("Phase 3: Generating fork configuration and ledgers...")
 	{
-		os.MkdirAll("localnet/config", 0755)
-		baseConfigFile := "localnet/config/base.json"
-		forkHashesFile := "localnet/hf_ledger_hashes.json"
+		os.MkdirAll("fork_data/config", 0755)
+		baseConfigFile := "fork_data/config/base.json"
+		forkHashesFile := "fork_data/hf_ledger_hashes.json"
 		if err := t.GenerateForkConfigAndLedgers(analysis, forkConfigPath, forkLedgersDir, forkHashesFile, configFile, baseConfigFile, forkGenesisTs, mainGenesisTs); err != nil {
 			return err
 		}
