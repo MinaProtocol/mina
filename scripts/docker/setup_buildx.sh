@@ -104,7 +104,7 @@ if [[ "${INSTALL_BINFMT}" = "1" ]]; then
   echo "[binfmt] Ensuring emulators are installed (driver: $CURRENT_DRIVER)"
 
   # Install all requested emulators in one shot (idempotent)
-  docker run --privileged --rm tonistiigi/binfmt --install "$(IFS=','; echo "${_ARCHES[*]}")" >/dev/null || {
+  docker run --privileged --rm europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/tonistiigi/binfmt:latest --install "$(IFS=','; echo "${_ARCHES[*]}")" >/dev/null || {
     echo "[binfmt] ERROR: Failed to install binfmt for: ${_ARCHES[*]}" >&2
     exit 1
   }
