@@ -302,7 +302,7 @@ config_mode_is_inherit() {
 }
 
 is_process_running() {
-    kill -0 "$1" 2>/dev/null
+  kill -0 "$1" 2>/dev/null
 }
 
 # ================================================
@@ -982,6 +982,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger. 
   while is_process_running "${FISH_PIDS[0]}"; do
     sleep ${TRANSACTION_FREQUENCY}
+    echo "Fish 1 at ${FISH_PIDS[0]} is alive, sending txns"
 
     if ${VALUE_TRANSFERS}; then
       ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
