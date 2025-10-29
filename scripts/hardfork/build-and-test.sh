@@ -57,7 +57,11 @@ if [[ $# -gt 0 ]]; then
   chown -R "${USER}" /workdir
   git config --global --add safe.directory /workdir
   git fetch
-  nix-env -iA unstable.{curl,git-lfs,gnused,jq}
+  nix-env -iA unstable.{curl,git-lfs,gnused,jq,python311}
+
+  python -m venv .venv
+  source .venv/bin/activate
+  pip install -r $INIT_DIR/scripts/mina-local-network/requirements.txt
 
   # Manually patch zone infos, nix doesn't provide stdenv breaking janestreet's core
   zone_info=(/nix/store/*tzdata*/share/zoneinfo)

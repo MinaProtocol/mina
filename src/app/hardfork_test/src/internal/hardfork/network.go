@@ -42,18 +42,24 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 	// Set environment variables
 	mainGenesisTimestamp := config.FormatTimestamp(mainGenesisTs)
 
-	// Prepare run-localnet.sh command
+	// Prepare mina-local-network.sh command
 	cmd := exec.Command(
-		filepath.Join(t.ScriptDir, "run-localnet.sh"),
-		"-m", t.Config.MainMinaExe,
-		"-i", strconv.Itoa(t.Config.MainSlot),
-		"-s", strconv.Itoa(t.Config.MainSlot),
-		"--slot-tx-end", strconv.Itoa(t.Config.SlotTxEnd),
+		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
+		"--whales", "2",
+		"--fish", "1",
+		"--nodes", "1",
+		"--update-genesis-timestamp", fmt.Sprintf("fixed:%s", mainGenesisTimestamp),
+		"--log-level", "Error",
+		"--file-log-level", "Trace",
+		"--config", "reset",
+		"--value-transfer-txns",
+		"--transactions-frequency", strconv.Itoa(t.Config.MainSlot),
+		"--override-slot-time", strconv.Itoa(t.Config.MainSlot*1000),
+		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
 	)
+	cmd.Env = append(os.Environ(), "MINA_EXE="+t.Config.MainMinaExe)
 
-	// Set environment variable
-	cmd.Env = append(os.Environ(), "GENESIS_TIMESTAMP="+mainGenesisTimestamp)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -73,15 +79,21 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.Cmd, error) {
 	t.Logger.Info("Starting fork network...")
 
+	// Prepare mina-local-network.sh command
 	cmd := exec.Command(
-		filepath.Join(t.ScriptDir, "run-localnet.sh"),
-		"-m", t.Config.ForkMinaExe,
-		"-d", strconv.Itoa(t.Config.ForkDelay),
-		"-i", strconv.Itoa(t.Config.ForkSlot),
-		"-s", strconv.Itoa(t.Config.ForkSlot),
-		"-c", configFile,
-		"--genesis-ledger-dir", forkLedgersDir,
+		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
+		"--whales", "2",
+		"--fish", "1",
+		"--nodes", "1",
+		"--update-genesis-timestamp", fmt.Sprintf("delay_sec:%d", t.Config.ForkDelay*60),
+		"--log-level", "Error",
+		"--file-log-level", "Trace",
+		"--config", fmt.Sprintf("inherit_with:%s,%s", configFile, forkLedgersDir),
+		"--value-transfer-txns",
+		"--transactions-frequency", strconv.Itoa(t.Config.ForkSlot),
+		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot*1000),
 	)
+	cmd.Env = append(os.Environ(), "MINA_EXE="+t.Config.ForkMinaExe)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
