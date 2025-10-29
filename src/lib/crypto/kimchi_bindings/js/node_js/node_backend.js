@@ -81,3 +81,43 @@ override('caml_pasta_fp_plonk_index_read');
   'caml_pasta_fp_plonk_circuit_serialize',
   'caml_pasta_fq_plonk_circuit_serialize',
 ].forEach(override);
+
+// Poly Commitment, Affine Point conversions
+[
+  'WasmFpPolyComm',
+  'WasmFqPolyComm',
+  'WasmGPallas',
+  'WasmGVesta',
+  'WasmPastaFp',
+  'WasmPastaFq',
+].forEach(override);
+
+// SRS
+[
+  'WasmFpSrs',
+  'caml_fp_srs_create',
+  'caml_fp_srs_create_parallel',
+  'caml_fq_srs_get',
+  'caml_fq_srs_set',
+  'caml_fp_srs_write',
+  'caml_fp_srs_read',
+  'caml_fp_srs_add_lagrange_basis',
+  'caml_fp_srs_commit_evaluations',
+  'caml_fp_srs_b_poly_commitment',
+  'caml_fp_srs_batch_accumulator_check',
+  'caml_fp_srs_batch_accumulator_generate',
+  'caml_fp_srs_h',
+  'WasmFqSrs',
+  'caml_fq_srs_create',
+  'caml_fq_srs_create_parallel',
+  'caml_fq_srs_get',
+  'caml_fq_srs_set',
+  'caml_fq_srs_write',
+  'caml_fq_srs_read',
+  'caml_fq_srs_add_lagrange_basis',
+  'caml_fq_srs_commit_evaluations',
+  'caml_fq_srs_b_poly_commitment',
+  'caml_fq_srs_batch_accumulator_check',
+  'caml_fq_srs_batch_accumulator_generate',
+  'caml_fq_srs_h',
+].forEach(override);
