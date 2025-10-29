@@ -512,7 +512,6 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   clean-dir "${LEDGER_FOLDER}"/online_whale_keys
   clean-dir "${LEDGER_FOLDER}"/online_fish_keys
   clean-dir "${LEDGER_FOLDER}"/snark_coordinator_keys
-  clean-dir "${LEDGER_FOLDER}"/service-keys
   clean-dir "${LEDGER_FOLDER}"/libp2p_keys
   clean-dir "${LEDGER_FOLDER}"/zkapp_keys
 
@@ -555,7 +554,6 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
       ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/offline_whale_keys
       ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/online_whale_keys
       ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/snark_coordinator_keys
-      ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/service-keys
       ${SUDO_CMD} chown -R "${OWNER}" "${LEDGER_FOLDER}"/libp2p_keys
     fi
   fi
@@ -566,7 +564,6 @@ if [ ! -d "${LEDGER_FOLDER}" ]; then
   chmod -R 0700 "${LEDGER_FOLDER}"/offline_whale_keys
   chmod -R 0700 "${LEDGER_FOLDER}"/online_whale_keys
   chmod -R 0700 "${LEDGER_FOLDER}"/snark_coordinator_keys
-  chmod -R 0700 "${LEDGER_FOLDER}"/service-keys
   chmod -R 0700 "${LEDGER_FOLDER}"/libp2p_keys
 
   python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
