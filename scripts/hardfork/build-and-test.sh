@@ -93,7 +93,6 @@ if [[ ! -L compatible-devnet ]]; then
   git submodule sync --recursive
   git submodule update --init --recursive --depth 1
   nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet" --out-link "$INIT_DIR/compatible-devnet"
-  nix "${NIX_OPTS[@]}" build "$compatible_build?submodules=1#devnet.genesis" --out-link "$INIT_DIR/compatible-devnet"
   if [[ $# == 0 ]]; then
     cd -
     rm -Rf "$compatible_build"
@@ -107,7 +106,6 @@ if [[ $# -gt 0 ]]; then
   git submodule update --init --recursive --depth 1
 fi
 nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet" --out-link "$INIT_DIR/fork-devnet"
-nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#devnet.genesis" --out-link "$INIT_DIR/fork-devnet"
 
 if [[ "$NIX_CACHE_GCP_ID" != "" ]] && [[ "$NIX_CACHE_GCP_SECRET" != "" ]]; then
   mkdir -p $HOME/.aws
@@ -130,9 +128,9 @@ echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
 
 "$INIT_DIR/hardfork_test/bin/hardfork_test" \
   --main-mina-exe "$INIT_DIR/compatible-devnet/bin/mina" \
-  --main-runtime-genesis-ledger "$INIT_DIR/compatible-devnet-genesis/bin/runtime_genesis_ledger" \
+  --main-runtime-genesis-ledger "$INIT_DIR/compatible-devnet/bin/runtime_genesis_ledger" \
   --fork-mina-exe "$INIT_DIR/fork-devnet/bin/mina" \
-  --fork-runtime-genesis-ledger "$INIT_DIR/fork-devnet-genesis/bin/runtime_genesis_ledger" \
+  --fork-runtime-genesis-ledger "$INIT_DIR/fork-devnet/bin/runtime_genesis_ledger" \
   --slot-tx-end "$SLOT_TX_END" \
   --slot-chain-end "$SLOT_CHAIN_END" \
   --script-dir "$SCRIPT_DIR" \
