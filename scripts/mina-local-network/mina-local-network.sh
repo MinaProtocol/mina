@@ -132,9 +132,9 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)
                                          |   Default: ${PROOF_LEVEL}
--c   |--config                           | Config to use. Set to `reset` to generate a new config, `inheirt` to reuse the one found in previously deployed networks, `file:PATH` to use a custom config
+-c   |--config                           | Config to use. Set to 'reset' to generate a new config, 'inheirt' to reuse the one found in previously deployed networks, 'file:PATH' to use a custom config
                                          |   Default: ${CONFIG_MODE}
--u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to `fixed:TIMESTAMP` to be a fixed time, `delay_sec:SECONDS` to be set genesis to be SECONDS in the future, or `no` to do nothing.
+-u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
                                          |   Default: ${UPDATE_GENESIS_TIMESTAMP}
 -st  |--override-slot-time <milliseconds>| Override the slot time for block production
                                          |   Default: value from executable
