@@ -101,6 +101,8 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~genesis_backing_type:Stable_db runtime_config
     >>| Result.map_error ~f:Error.to_string_mach
   in
+  (* Initialize Parallel as master before creating verifier *)
+  Parallel.init_master () ;
   (* Create verifier - simplified without blockchain keys for now *)
   let%bind ( `Blockchain blockchain_verification_key
            , `Transaction transaction_verification_key ) =
