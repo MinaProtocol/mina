@@ -1015,3 +1015,6 @@ fi
 # Wait for child processes to finish
 
 wait
+
+# All nodes has already exited
+trap - EXIT
