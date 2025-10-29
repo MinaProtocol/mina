@@ -980,12 +980,18 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   state=0
 
   # TODO: simulate scripts/hardfork/run-localnet.sh to send txns to everyone in the ledger. 
+  value_txn_id=0
   while is_process_running "${FISH_PIDS[0]}"; do
     sleep ${TRANSACTION_FREQUENCY}
     echo "Fish 1 at ${FISH_PIDS[0]} is alive, sending txns"
 
-    if ${VALUE_TRANSFERS}; then
-      ${MINA_EXE} client send-payment -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}
+    if ${VALUE_TRANSFERS} && \
+      ${MINA_EXE} client send-payment \
+        -rest-server ${REST_SERVER} -amount 1 -receiver ${PUB_KEY} -sender ${PUB_KEY}; then
+      echo "Sent value txn #$value_txn_id"
+      value_txn_id=$((value_txn_id+1))
+    else
+      echo "Failed to send value txn #$value_txn_id"
     fi
 
     if ${ZKAPP_TRANSACTIONS}; then
