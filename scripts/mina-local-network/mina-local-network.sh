@@ -624,14 +624,22 @@ if ${RESET} || [ ! -f "${CONFIG}" ]; then
   reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
 fi
 
+jq-inplace() {
+  local jq_filter="$1"
+  local file="$2"
+
+  local tmp
+  tmp=$(mktemp)
+  jq "$jq_filter" "$file" > "$tmp" && mv -f "$tmp" "$file"
+}
+
+
 update_genesis_timestamp() {
   case "$1" in
     fixed:*)
       local timestamp="${1#fixed:}"
       echo "Updating Genesis State timestamp to ${timestamp}..."
-      jq --inplace \
-        ".genesis.genesis_state_timestamp=\"${timestamp}\"" \
-        "${CONFIG}"
+      jq-inplace ".genesis.genesis_state_timestamp=\"${timestamp}\"" "${CONFIG}"
       ;;
     delay_sec:*)
       local delay_sec="${1#delay_sec:}"
@@ -640,9 +648,7 @@ update_genesis_timestamp() {
       local timestamp
       timestamp=$(date -u -d "@$(( now + delay_sec ))" '+%F %H:%M:%S+00:00')
       echo "Updating Genesis State timestamp to ${timestamp}..."
-      jq --inplace \
-        ".genesis.genesis_state_timestamp=\"${timestamp}\"" \
-        "${CONFIG}"
+      jq-inplace ".genesis.genesis_state_timestamp=\"${timestamp}\"" "${CONFIG}"
       ;;
     no)
       : ;;
@@ -656,17 +662,17 @@ update_genesis_timestamp "${UPDATE_GENESIS_TIMESTAMP}"
 
 if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
   echo 'Modifying configuration to override slot time...'
-  jq --inplace ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
+  jq-inplace ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
 fi
 
 if [ ! -z "${SLOT_TX_END}" ]; then
   echo 'Modifying configuration to override slot transaction end...'
-  jq --inplace ".daemon.slot_tx_end=${SLOT_TX_END}" "${CONFIG}"
+  jq-inplace ".daemon.slot_tx_end=${SLOT_TX_END}" "${CONFIG}"
 fi
 
 if [ ! -z "${SLOT_CHAIN_END}" ]; then
   echo 'Modifying configuration to override slot chain end...'
-  jq --inplace ".daemon.slot_chain_end=${SLOT_CHAIN_END}" "${CONFIG}"
+  jq-inplace ".daemon.slot_chain_end=${SLOT_CHAIN_END}" "${CONFIG}"
 fi
 
 # ================================================
