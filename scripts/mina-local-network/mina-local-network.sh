@@ -617,32 +617,20 @@ EOF
 
 CONFIG=${LEDGER_FOLDER}/daemon.json
 
-if ${RESET}; then
+if ${RESET} || [ ! -f "${CONFIG}" ]; then
   reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
 fi
 
 if ${UPDATE_GENESIS_TIMESTAMP}; then
-  if test -f "${CONFIG}"; then
-    echo 'Updating Genesis State timestamp...'
-    printf "\n"
-
-    tmp=$(mktemp)
-    jq ".genesis.genesis_state_timestamp=\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"" "${CONFIG}" >"$tmp" && mv -f "$tmp" "${CONFIG}"
-  else
-    reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
-  fi
+  echo 'Updating Genesis State timestamp...'
+  jq --inplace \
+    ".genesis.genesis_state_timestamp=\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"" \
+    "${CONFIG}"
 fi
 
 if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
-  echo 'Modifying configuration to override slot time'
-  
-  if [ ! -f "${CONFIG}" ]; then
-    reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
-  fi
-  
-  printf "\n"
-  tmp=$(mktemp)
-  jq ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}" >"$tmp" && mv -f "$tmp" "${CONFIG}"
+  echo 'Modifying configuration to override slot time...'
+  jq --inplace ".proof.block_window_duration_ms=${OVERRIDE_SLOT_TIME_MS}" "${CONFIG}"
 fi
 
 # ================================================
