@@ -19,7 +19,7 @@ require_external_commands() {
     fi
 }
 
-require_external_commands curl jq date
+require_external_commands curl jq
 
 # Balance of keys to which delegation will happen
 KEY_BALANCE=${KEY_BALANCE:-1000}
