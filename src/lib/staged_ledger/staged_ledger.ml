@@ -1236,12 +1236,25 @@ module T = struct
                 t.scan_state work )
     in
     [%log internal] "Prediff" ;
+    let to_valid_unsafe (tx : _ With_status.t) =
+      (* This is used in the case where tx verification can be skipped,
+          i.e. [skip_verification = Some `All] *)
+      let (`If_this_is_used_it_should_have_a_comment_justifying_it valid_tx) =
+        User_command.to_valid_unsafe tx.data
+      in
+      valid_tx
+    in
+    let check txs =
+      match skip_verification with
+      | Some `All ->
+          Deferred.return @@ Ok (Ok (List.map ~f:to_valid_unsafe txs))
+      | _ ->
+          Check_commands.check_commands t.ledger ~verifier
+            ~transaction_pool_proxy txs
+    in
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
-        ~supercharge_coinbase
-        ~check:
-          (Check_commands.check_commands t.ledger ~verifier
-             ~transaction_pool_proxy )
+        ~supercharge_coinbase ~check
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->
