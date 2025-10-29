@@ -113,7 +113,8 @@ let build_artifacts
       ->  Command.build
             Command.Config::{
             , commands =
-                  Toolchain.select
+                  [ Cmd.run "./scripts/docker/setup_buildx.sh" ]
+                # Toolchain.select
                     spec.toolchainSelectMode
                     spec.debVersion
                     spec.arch
@@ -139,7 +140,8 @@ let build_artifacts
                   ]
             , label = "Debian: Build ${labelSuffix spec}"
             , key = "build-deb-pkg${Optional/default Text "" spec.suffix}"
-            , target = Size.Multi
+            , target =
+                merge { Amd64 = Size.Multi, Arm64 = Size.XLarge } spec.arch
             , if_ = spec.if_
             , retries =
               [ Command.Retry::{

@@ -12,6 +12,7 @@
 open Mina_base
 open Frontier_base
 open Mina_state
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -59,8 +60,7 @@ val protocol_states_for_root_scan_state :
 val apply_diffs :
      t
   -> Diff.Full.E.t list
-  -> enable_epoch_ledger_sync:
-       [ `Enabled of Mina_ledger.Ledger.Root.t | `Disabled ]
+  -> enable_epoch_ledger_sync:[ `Enabled of Root_ledger.t | `Disabled ]
   -> has_long_catchup_job:bool
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
@@ -87,7 +87,7 @@ module For_tests : sig
        Base_quickcheck.Generator.t
 
   val create_frontier :
-       epoch_ledger_backing_type:Mina_ledger.Ledger.Root.Config.backing_type
+       epoch_ledger_backing_type:Mina_ledger.Root.Config.backing_type
     -> unit
     -> t Async_kernel.Deferred.t
 
