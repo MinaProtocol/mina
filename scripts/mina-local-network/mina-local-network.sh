@@ -465,7 +465,7 @@ fi
 # ================================================
 # Configure the Seed Peer ID
 
-SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((${SEED_START_PORT} + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
+SEED_PEER_ID="/ip4/127.0.0.1/tcp/$((SEED_START_PORT + 2))/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr"
 
 # ================================================
 #
@@ -669,7 +669,7 @@ update_genesis_timestamp() {
       local now
       now=$(date +%s)
       local timestamp
-      timestamp=$(date -u -d "@$(( now + delay_sec ))" '+%F %H:%M:%S+00:00')
+      timestamp=$(date -u -d "@$((now + delay_sec))" '+%F %H:%M:%S+00:00')
       echo "Updating Genesis State timestamp to ${timestamp}..."
       jq-inplace ".genesis.genesis_state_timestamp=\"${timestamp}\"" "${CONFIG}"
       ;;
@@ -792,7 +792,7 @@ for ((i = 0; i < WHALES; i++)); do
   FOLDER=${NODES_FOLDER}/whale_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_whale_keys/online_whale_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${WHALE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
+  spawn-node "${FOLDER}" $((WHALE_START_PORT + i * 5)) -peer ${SEED_PEER_ID} -block-producer-key ${KEY_FILE} \
     -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/whale_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   WHALE_PIDS[${i}]=$!
 done
@@ -803,7 +803,7 @@ for ((i = 0; i < FISH; i++)); do
   FOLDER=${NODES_FOLDER}/fish_${i}
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${FISH_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
+  spawn-node "${FOLDER}" $((FISH_START_PORT + i * 5)) -peer ${SEED_PEER_ID} -block-producer-key "${KEY_FILE}" \
     -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/fish_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   FISH_PIDS[${i}]=$!
 done
@@ -813,7 +813,7 @@ done
 for ((i = 0; i < NODES; i++)); do
   FOLDER=${NODES_FOLDER}/node_${i}
   mkdir -p "${FOLDER}"
-  spawn-node "${FOLDER}" $((${NODE_START_PORT} + (${i} * 5))) -peer ${SEED_PEER_ID} \
+  spawn-node "${FOLDER}" $((NODE_START_PORT + i * 5)) -peer ${SEED_PEER_ID} \
     -libp2p-keypair "${LEDGER_FOLDER}"/libp2p_keys/node_${i} "${ARCHIVE_ADDRESS_CLI_ARG}"
   NODE_PIDS[${i}]=$!
 done
@@ -869,7 +869,7 @@ EOF
     cat <<EOF
 		Instance #${i}:
 		  pid ${WHALE_PIDS[${i}]}
-		  status: ${MINA_EXE} client status -daemon-port $((${WHALE_START_PORT} + i*5))
+		  status: ${MINA_EXE} client status -daemon-port $((WHALE_START_PORT + i * 5))
 		  logs: cat ${NODES_FOLDER}/whale_${i}/log.txt | ${LOGPROC_EXE}
 EOF
   done
@@ -883,7 +883,7 @@ EOF
     cat <<EOF
 		Instance #${i}:
 		  pid ${FISH_PIDS[${i}]}
-		  status: ${MINA_EXE} client status -daemon-port $((${FISH_START_PORT} + i*5))
+		  status: ${MINA_EXE} client status -daemon-port $((FISH_START_PORT + i * 5))
 		  logs: cat ${NODES_FOLDER}/fish_${i}/log.txt | ${LOGPROC_EXE}
 EOF
   done
@@ -897,7 +897,7 @@ EOF
     cat <<EOF
 		Instance #${i}:
 		  pid ${NODE_PIDS[${i}]}
-		  status: ${MINA_EXE} client status -daemon-port $((${NODE_START_PORT} + i*5))
+		  status: ${MINA_EXE} client status -daemon-port $((NODE_START_PORT + i * 5))
 		  logs: cat ${NODES_FOLDER}/node_${i}/log.txt | ${LOGPROC_EXE}
 EOF
   done
@@ -919,7 +919,7 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
 
   KEY_FILE=${LEDGER_FOLDER}/online_fish_keys/online_fish_account_0
   PUB_KEY=$(cat "${LEDGER_FOLDER}"/online_fish_keys/online_fish_account_0.pub)
-  REST_SERVER="http://127.0.0.1:$((${FISH_START_PORT} + 1))/graphql"
+  REST_SERVER="http://127.0.0.1:$((FISH_START_PORT + 1))/graphql"
 
   echo "Waiting for Node (${REST_SERVER}) to be up to start sending value transfer transactions..."
   printf "\n"
