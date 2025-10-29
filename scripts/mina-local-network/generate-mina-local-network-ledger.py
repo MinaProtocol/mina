@@ -1,3 +1,4 @@
+# Note: this script creates 2 ledgers json file, annotated_ledger.json and genesis_ledger.json
 import csv
 import glob
 import json
