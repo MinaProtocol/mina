@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# NOTE: don't remove this just yet, there's some functionality unported yet.
+
 set -eo pipefail
 
 export MINA_LIBP2P_PASS=
