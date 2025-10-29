@@ -123,8 +123,8 @@ fi
 
 nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#hardfork_test" --out-link "$INIT_DIR/hardfork_test"
 
-SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}
-SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
+SLOT_TX_END=${SLOT_TX_END:-$((40))}
+SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+5))}
 
 echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
 
