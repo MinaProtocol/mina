@@ -499,6 +499,10 @@ fi
 
 if [[ $CONFIG_MODE != "inherit" ]]; then
   rm -rf "${NETWORK_FOLDER}"
+elif [ ! -d "${NETWORK_FOLDER}" ]; then
+  # inherit but there's nothing to inheirt, raise an exit.
+  echo "Error: NETWORK_FOLDER does not exist to inherit from."
+  exit 1
 fi
 
 if [ ! -d "${NETWORK_FOLDER}" ]; then
