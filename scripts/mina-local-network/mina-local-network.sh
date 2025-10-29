@@ -132,7 +132,7 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)
                                          |   Default: ${PROOF_LEVEL}
--c   |--config                           | Config to use. Set to 'reset' to generate a new config, 'inheirt' to reuse the one found in previously deployed networks, 'file:CONFIG_PATH' to use a custom config
+-c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks, 'inherit_with:CONFIG_PATH,GENESIS_LEDGER_PATH' to inherit keys with new config & genesis ledgers overriden
                                          |   Default: ${CONFIG_MODE}
 -u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
                                          |   Default: ${UPDATE_GENESIS_TIMESTAMP}
@@ -290,6 +290,19 @@ recreate-schema() {
 
   echo "Schema '${PG_DB}' created successfully."
   printf "\n"
+}
+
+jq-inplace() {
+  local jq_filter="$1"
+  local file="$2"
+
+  local tmp
+  tmp=$(mktemp)
+  jq "$jq_filter" "$file" > "$tmp" && mv -f "$tmp" "$file"
+}
+
+config_mode_is_inherit() {
+  [[ "$1" == "inherit" || "$1" == inherit_with:* ]]
 }
 
 # ================================================
@@ -453,7 +466,7 @@ In case of any issues please make sure that you:
 
 EOF
 
-  if [[ $CONFIG_MODE != "inherit" ]]; then
+  if ! config_mode_is_inherit "$CONFIG_MODE"; then
     recreate-schema
   fi
 
@@ -497,16 +510,15 @@ else
   NETWORK_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
 fi
 
-if [[ $CONFIG_MODE != "inherit" ]]; then
+if ! config_mode_is_inherit "$CONFIG_MODE" ; then
   rm -rf "${NETWORK_FOLDER}"
 elif [ ! -d "${NETWORK_FOLDER}" ]; then
-  # inherit but there's nothing to inheirt, raise an exit.
   echo "Error: NETWORK_FOLDER does not exist to inherit from."
   exit 1
 fi
 
 if [ ! -d "${NETWORK_FOLDER}" ]; then
-  echo "Making the Ledger..."
+  echo "Generating keypairs..."
   printf "\n"
 
   mkdir -p "${NETWORK_FOLDER}"
@@ -569,22 +581,14 @@ if [ ! -d "${NETWORK_FOLDER}" ]; then
   chmod -R 0700 "${NETWORK_FOLDER}"/online_whale_keys
   chmod -R 0700 "${NETWORK_FOLDER}"/snark_coordinator_keys
   chmod -R 0700 "${NETWORK_FOLDER}"/libp2p_keys
-
-  python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
-    --num-whale-accounts "${WHALES}" \
-    --num-fish-accounts "${FISH}" \
-    --offline-whale-accounts-directory "${NETWORK_FOLDER}"/offline_whale_keys \
-    --offline-fish-accounts-directory "${NETWORK_FOLDER}"/offline_fish_keys \
-    --online-whale-accounts-directory "${NETWORK_FOLDER}"/online_whale_keys \
-    --online-fish-accounts-directory "${NETWORK_FOLDER}"/online_fish_keys \
-    --snark-coordinator-accounts-directory "${NETWORK_FOLDER}"/snark_coordinator_keys
-
-  mv -f scripts/mina-local-network/genesis_ledger.json "${NETWORK_FOLDER}"/genesis_ledger.json
-
-  printf "\n"
-  echo "================================"
-  printf "\n"
 fi
+
+export MINA_KEYS_PATH="${NETWORK_FOLDER}"/genesis_ledger_dir
+mkdir -p "$MINA_KEYS_PATH"
+
+printf "\n"
+echo "================================"
+printf "\n"
 
 SNARK_COORDINATOR_PUBKEY=$(cat "${NETWORK_FOLDER}"/snark_coordinator_keys/snark_coordinator_account.pub)
 
@@ -636,30 +640,44 @@ EOF
 
 CONFIG=${NETWORK_FOLDER}/daemon.json
 
-case "${CONFIG_MODE}" in
-  inherit)
-    if [ ! -f "${CONFIG}" ]; then
-      echo "Error: Config file '${CONFIG}' does not exist, can't inheirt." >&2
-      exit 1
-    fi
-    ;;
-  reset)
-    reset-genesis-ledger "${NETWORK_FOLDER}" "${CONFIG}"
-    ;;
-  file:*)
-    cp -f "${CONFIG_MODE#file:}" "${CONFIG}"
-    ;;
-esac
+load_config() {
+  local config_mode="${1}"
+  local config_file="${2}"
 
-jq-inplace() {
-  local jq_filter="$1"
-  local file="$2"
+  case "${config_mode}" in
+    inherit)
+      if [ ! -f "${config_file}" ]; then
+        echo "Error: Config file '${config_file}' does not exist, can't inherit." >&2
+        exit 1
+      fi
+      ;;
+    reset)
 
-  local tmp
-  tmp=$(mktemp)
-  jq "$jq_filter" "$file" > "$tmp" && mv -f "$tmp" "$file"
+      echo "Making the Ledger..." 
+      python3 scripts/mina-local-network/generate-mina-local-network-ledger.py \
+        --num-whale-accounts "${WHALES}" \
+        --num-fish-accounts "${FISH}" \
+        --offline-whale-accounts-directory "${NETWORK_FOLDER}"/offline_whale_keys \
+        --offline-fish-accounts-directory "${NETWORK_FOLDER}"/offline_fish_keys \
+        --online-whale-accounts-directory "${NETWORK_FOLDER}"/online_whale_keys \
+        --online-fish-accounts-directory "${NETWORK_FOLDER}"/online_fish_keys \
+        --snark-coordinator-accounts-directory "${NETWORK_FOLDER}"/snark_coordinator_keys \
+        --out-genesis-ledger-file "${NETWORK_FOLDER}"/genesis_ledger.json
+
+      reset-genesis-ledger "${NETWORK_FOLDER}" "${config_file}"
+      ;;
+    inherit_with:*)
+      local replaced_config_file replaced_genesis_ledger_folder
+      IFS=',' read -r replaced_config_file replaced_genesis_ledger_folder <<< "${config_mode#inherit_with:}"
+      echo "Inheirting ledgers with config at ${replaced_config_file} and ledgers at ${replaced_genesis_ledger_folder}"
+      cp -f "${replaced_config_file}" "${config_file}"
+      rm -rf "${MINA_KEYS_PATH:?}"/*
+      cp -a "${replaced_genesis_ledger_folder}" "$MINA_KEYS_PATH"
+      ;;
+  esac
 }
 
+load_config "${CONFIG_MODE}" "${CONFIG}"
 
 update_genesis_timestamp() {
   case "$1" in
@@ -713,7 +731,7 @@ if ! ${DEMO_MODE}; then
   mkdir -p "${NODES_FOLDER}"/snark_workers
 fi
 
-if [[ $CONFIG_MODE != "inherit" ]]; then
+if ! config_mode_is_inherit "$CONFIG_MODE"; then
   clean-dir "${NODES_FOLDER}"
   mkdir -p "${NODES_FOLDER}"/seed
   mkdir -p "${NODES_FOLDER}"/snark_coordinator
