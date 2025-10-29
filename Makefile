@@ -48,6 +48,13 @@ GITLONGHASH := $(shell git rev-parse HEAD)
 # Unique signature of libp2p code tree
 LIBP2P_HELPER_SIG := $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
+# Database for archive
+PG_USER ?= mina
+PG_PW 	?= minaminamina
+PG_DB 	?= archive
+PG_HOST	?= localhost
+PG_PORT	?= 5432
+
 ########################################
 .PHONY: help
 help: ## Display this help information
@@ -728,3 +735,35 @@ hardfork-docker: ocaml_checks ## Generate hardfork packages
 .PHONY: ml-docs
 ml-docs: ocaml_checks ## Generate OCaml documentation
 	dune build --profile=$(DUNE_PROFILE) @doc
+
+
+########################################
+# PostgreSQL, used for the archive node
+
+.PHONY: postgres-setup
+postgres-setup: ## Set up PostgreSQL database for archive node
+	@echo "Setting up PostgreSQL database: ${PG_DB} with user: ${PG_USER}"
+	@sudo -u postgres createuser -d -r -s $(PG_USER) 2>/dev/null || true
+	@sudo -u postgres psql -c "ALTER USER $(PG_USER) PASSWORD '$(PG_PW)'" 2>/dev/null || true
+	@sudo -u postgres createdb -O $(PG_USER) $(PG_DB) 2>/dev/null || true
+	@sudo -u postgres createdb -O $(PG_USER) $(PG_USER) 2>/dev/null || true
+	@echo "PostgreSQL setup complete"
+
+.PHONY: postgres-login
+postgres-login: ## Login to PostgreSQL database
+	@echo "Connecting to PostgreSQL database: ${PG_DB} as user: ${PG_USER}"
+	@PGPASSWORD=$(PG_PW) psql -h $(PG_HOST) -p $(PG_PORT) -U $(PG_USER) -d $(PG_DB)
+
+.PHONY: postgres-clean
+postgres-clean:
+	@echo "Dropping DB: ${PG_DB} and user: ${PG_USER}"
+	@sudo -u postgres psql -c "DROP DATABASE IF EXISTS ${PG_DB}"
+	@sudo -u postgres psql -c "DROP DATABASE IF EXISTS ${PG_USER}"
+	@sudo -u postgres psql -c "DROP ROLE IF EXISTS ${PG_USER}"
+	@echo "Cleanup complete."
+
+.PHONY: regenerate-archive
+regenerate-archive: ## Regenerate archive database with test data
+	@echo "Regenerating archive database using configured PG variables"
+	@PG_USER=$(PG_USER) PG_PW=$(PG_PW) PG_DB=$(PG_DB) PG_HOST=$(PG_HOST) PG_PORT=$(PG_PORT) \
+	./scripts/regenerate-archive.sh
