@@ -53,17 +53,11 @@ let string_to_input s =
     ; bitstrings = Stdlib.(Array.of_seq (Seq.map char_bits (String.to_seq s)))
     }
 
-let verify ?signature_kind signature pk s =
+let verify ~signature_kind signature pk s =
   let m = string_to_input s in
   let inner_curve = Inner_curve.of_affine pk in
-  let signature_kind =
-    Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
-  in
   Schnorr.Legacy.verify ~signature_kind signature inner_curve m
 
-let sign ?signature_kind sk s =
+let sign ~signature_kind sk s =
   let m = string_to_input s in
-  let signature_kind =
-    Option.value signature_kind ~default:Mina_signature_kind.t_DEPRECATED
-  in
   Schnorr.Legacy.sign ~signature_kind sk m

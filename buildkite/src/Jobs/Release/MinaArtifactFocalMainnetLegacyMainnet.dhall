@@ -22,6 +22,8 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Docker
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Focal
             ]
           , debVersion = DebianVersions.DebVersion.Focal
           , network = Network.Type.MainnetLegacy

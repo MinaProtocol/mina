@@ -472,7 +472,21 @@ module Json_layout = struct
       ; max_action_elements : int option [@default None]
       ; zkapp_cmd_limit_hardcap : int option [@default None]
       ; slot_tx_end : int option [@default None]
+            (** This option is set during a planned hard fork. This is the slot
+                at which the daemon should stop accepting transactions, or
+                producing or validating blocks with transactions or coinbase in
+                them. The last block produced before this slot will become the
+                hard fork block. *)
       ; slot_chain_end : int option [@default None]
+            (** This option is set during a planned hard fork. This is the slot
+                at which the daemon should stop producing blocks entirely. *)
+      ; hard_fork_genesis_slot_delta : int option [@default None]
+            (** This option is set during a planned hard fork. This is the
+                difference between the [slot_chain_end] and the genesis slot of
+                the hard fork chain. The genesis timestamp in the hard fork
+                config is expected to be set to the timestamp of the genesis
+                slot according to the current chain's genesis and slot time, and
+                so that parameter is not tracked separately. *)
       ; minimum_user_command_fee : Currency.Fee.t option [@default None]
       ; network_id : string option [@default None]
       ; sync_ledger_max_subtree_depth : int option [@default None]
@@ -1058,7 +1072,7 @@ module Proof_keys = struct
     ; account_creation_fee : Currency.Fee.Stable.Latest.t option
     ; fork : Fork_config.t option
     }
-  [@@deriving bin_io_unversioned]
+  [@@deriving bin_io_unversioned, yojson]
 
   let make ?level ?sub_windows_per_window ?ledger_depth ?work_delay
       ?block_window_duration_ms ?transaction_capacity ?coinbase_amount
@@ -1266,6 +1280,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap : int option [@default None]
     ; slot_tx_end : int option [@default None]
     ; slot_chain_end : int option [@default None]
+    ; hard_fork_genesis_slot_delta : int option [@default None]
     ; minimum_user_command_fee : Currency.Fee.Stable.Latest.t option
           [@default None]
     ; network_id : string option [@default None]
@@ -1310,6 +1325,9 @@ module Daemon = struct
     ; slot_tx_end = opt_fallthrough ~default:t1.slot_tx_end t2.slot_tx_end
     ; slot_chain_end =
         opt_fallthrough ~default:t1.slot_chain_end t2.slot_chain_end
+    ; hard_fork_genesis_slot_delta =
+        opt_fallthrough ~default:t1.hard_fork_genesis_slot_delta
+          t2.hard_fork_genesis_slot_delta
     ; minimum_user_command_fee =
         opt_fallthrough ~default:t1.minimum_user_command_fee
           t2.minimum_user_command_fee
@@ -1346,6 +1364,7 @@ module Daemon = struct
     ; zkapp_cmd_limit_hardcap = Some zkapp_cmd_limit_hardcap
     ; slot_tx_end = None
     ; slot_chain_end = None
+    ; hard_fork_genesis_slot_delta = None
     ; minimum_user_command_fee = Some minimum_user_command_fee
     ; network_id = None
     ; sync_ledger_max_subtree_depth = None

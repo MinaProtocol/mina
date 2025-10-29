@@ -1,6 +1,7 @@
 open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
 open Mina_state
 open Frontier_base
 
@@ -462,14 +463,14 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
           t.persistent_root_instance.factory
       in
       let () =
-        Ledger.Root.make_checkpoint t.persistent_root_instance.snarked_ledger
+        Root_ledger.make_checkpoint t.persistent_root_instance.snarked_ledger
           ~config
       in
       [%log' info t.logger]
         ~metadata:
           [ ( "potential_snarked_ledger_hash"
             , Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash
-              @@ Ledger.Root.merkle_root
+              @@ Root_ledger.merkle_root
                    t.persistent_root_instance.snarked_ledger )
           ]
         "Enqueued a snarked ledger" ;

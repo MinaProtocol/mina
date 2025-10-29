@@ -54,6 +54,7 @@ let targetVersion =
 let specs_for_branch =
           \(branch : Text)
       ->  \(channel : DebianChannel.Type)
+      ->  \(profile : Profiles.Type)
       ->  PublishPackages.Spec::{
           , artifacts =
             [ Artifacts.Type.LogProc
@@ -61,7 +62,7 @@ let specs_for_branch =
             , Artifacts.Type.Archive
             , Artifacts.Type.Rosetta
             ]
-          , profile = Profiles.Type.Devnet
+          , profile = profile
           , networks = [ Network.Type.Devnet ]
           , codenames =
             [ DebianVersions.DebVersion.Noble
@@ -91,9 +92,39 @@ in  Pipeline.build
         }
       , steps =
             PublishPackages.publish
-              (specs_for_branch "compatible" DebianChannel.Type.Compatible)
+              ( specs_for_branch
+                  "compatible"
+                  DebianChannel.Type.Compatible
+                  Profiles.Type.Lightnet
+              )
           # PublishPackages.publish
-              (specs_for_branch "develop" DebianChannel.Type.Develop)
+              ( specs_for_branch
+                  "develop"
+                  DebianChannel.Type.Develop
+                  Profiles.Type.Lightnet
+              )
           # PublishPackages.publish
-              (specs_for_branch "master" DebianChannel.Type.Master)
+              ( specs_for_branch
+                  "master"
+                  DebianChannel.Type.Master
+                  Profiles.Type.Lightnet
+              )
+          # PublishPackages.publish
+              ( specs_for_branch
+                  "compatible"
+                  DebianChannel.Type.Compatible
+                  Profiles.Type.Devnet
+              )
+          # PublishPackages.publish
+              ( specs_for_branch
+                  "develop"
+                  DebianChannel.Type.Develop
+                  Profiles.Type.Devnet
+              )
+          # PublishPackages.publish
+              ( specs_for_branch
+                  "master"
+                  DebianChannel.Type.Master
+                  Profiles.Type.Devnet
+              )
       }

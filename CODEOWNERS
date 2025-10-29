@@ -1,6 +1,5 @@
 /CODEOWNERS @dannywillems @deepthiskumar @georgeee
 /buildkite @MinaProtocol/infra-eng-reviewers
-/frontend/ @MinaProtocol/product-eng-reviewers
 /dockerfiles/ @MinaProtocol/infra-eng-reviewers
 /scripts/ @MinaProtocol/infra-eng-reviewers @MinaProtocol/protocol-eng-reviewers
 /Makefile @MinaProtocol/infra-eng-reviewers

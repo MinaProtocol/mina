@@ -27,7 +27,10 @@ let select =
       ->  merge
             { ByDebianAndArch = runner debVersion arch
             , Custom =
-                \(image : Text) -> RunInToolchain.runInToolchainImage image
+                    \(image : Text)
+                ->  RunInToolchain.runInToolchainImage
+                      image
+                      (Arch.platform arch)
             }
             mode
 

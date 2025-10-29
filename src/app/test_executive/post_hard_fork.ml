@@ -1,4 +1,4 @@
-(* hard_fork.ml -- run nodes with fork config, epoch ledger *)
+(* post_hard_fork.ml -- run nodes with fork config, epoch ledger *)
 
 open Core
 open Integration_test_lib
