@@ -484,10 +484,6 @@ fi
 
 if [[ $CONFIG_MODE != "inherit" ]]; then
   rm -rf "${LEDGER_FOLDER}"
-  # TODO: schema already recreated, remove this in next commit
-  if ${ARCHIVE}; then
-    recreate-schema
-  fi
 fi
 
 if [ ! -d "${LEDGER_FOLDER}" ]; then
