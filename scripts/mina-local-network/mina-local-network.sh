@@ -199,13 +199,12 @@ exec-daemon() {
 exec-worker-daemon() {
   COORDINATOR_PORT=${1}
   shift
-  SHUTDOWN_ON_DISCONNECT="false"
   COORDINATOR_HOST_AND_PORT="localhost:${COORDINATOR_PORT}"
 
   # shellcheck disable=SC2068
   exec ${MINA_EXE} internal snark-worker \
     -proof-level "${PROOF_LEVEL}" \
-    -shutdown-on-disconnect "${SHUTDOWN_ON_DISCONNECT}" \
+    -shutdown-on-disconnect false \
     -daemon-address "${COORDINATOR_HOST_AND_PORT}" \
     $@
 }
@@ -1002,6 +1001,13 @@ if ${VALUE_TRANSFERS} || ${ZKAPP_TRANSACTIONS}; then
   done
 
   set -e
+
+  echo "Killing all SNARK workers"
+  printf "\n"
+
+  for pid in "${SNARK_WORKERS_PIDS[@]}"; do
+      kill "$pid"
+  done
 fi
 
 # ================================================
