@@ -4,7 +4,7 @@ set -x
 # Exit script when commands fail
 set -e
 # Kill background process when script exits
-trap "jobs -p | xargs kill" EXIT
+trap "jobs -p | xargs -r kill" EXIT
 
 # ================================================
 # Constants
