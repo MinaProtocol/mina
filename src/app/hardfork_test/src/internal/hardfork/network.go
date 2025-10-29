@@ -2,6 +2,7 @@ package hardfork
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,13 +21,50 @@ const WHALE_START_PORT = 4000
 const FISH_START_PORT = 5000
 const NODE_START_PORT = 6000
 
+type PortType int
+
+const (
+	PORT_CLIENT PortType = iota
+	PORT_REST
+	PORT_EXTERNAL
+	PORT_DAEMON_METRICS
+	PORT_LIBP2P_METRICS
+)
+
+func (t *HardforkTest) AllPortOfType(ty PortType) []int {
+	all_ports := []int{SEED_START_PORT, SNARK_COORDINATOR_PORT}
+
+	for i := 0; i < t.Config.NumWhales; i++ {
+		all_ports = append(all_ports, WHALE_START_PORT+i*5)
+	}
+
+	for i := 0; i < t.Config.NumFish; i++ {
+		all_ports = append(all_ports, FISH_START_PORT+i*5)
+	}
+
+	for i := 0; i < t.Config.NumNodes; i++ {
+		all_ports = append(all_ports, NODE_START_PORT+i*5)
+	}
+	for i := range all_ports {
+		all_ports[i] += int(ty)
+	}
+	return all_ports
+}
+
+func (t *HardforkTest) AnyPortOfType(ty PortType) int {
+	candidates_ports := t.AllPortOfType(ty)
+
+	idx := rand.Intn(len(candidates_ports))
+	return candidates_ports[idx]
+}
+
 func (t *HardforkTest) stopNode(execPath string, port int, tag string) error {
 	t.Logger.Info("Stopping %s at %d", tag, port)
 	cmd1 := exec.Command(execPath, "client", "stop-daemon", "--daemon-port", strconv.Itoa(port))
 	cmd1.Stdout = os.Stdout
 	cmd1.Stderr = os.Stderr
 	if err := cmd1.Run(); err != nil {
-		return fmt.Errorf("failed to stop %s on port 10301: %w", tag, err)
+		return fmt.Errorf("failed to stop %s on port %d: %w", tag, port, err)
 	}
 	return nil
 }
