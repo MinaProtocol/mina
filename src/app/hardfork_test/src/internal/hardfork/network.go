@@ -45,9 +45,9 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 	// Prepare mina-local-network.sh command
 	cmd := exec.Command(
 		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
-		"--whales", "2",
-		"--fish", "1",
-		"--nodes", "1",
+		"--whales", strconv.Itoa(t.Config.NumWhales),
+		"--fish", strconv.Itoa(t.Config.NumFish),
+		"--nodes", strconv.Itoa(t.Config.NumNodes),
 		"--update-genesis-timestamp", fmt.Sprintf("fixed:%s", mainGenesisTimestamp),
 		"--log-level", "Error",
 		"--file-log-level", "Trace",
@@ -82,9 +82,9 @@ func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.
 	// Prepare mina-local-network.sh command
 	cmd := exec.Command(
 		filepath.Join(t.ScriptDir, "../mina-local-network/mina-local-network.sh"),
-		"--whales", "2",
-		"--fish", "1",
-		"--nodes", "1",
+		"--whales", strconv.Itoa(t.Config.NumWhales),
+		"--fish", strconv.Itoa(t.Config.NumFish),
+		"--nodes", strconv.Itoa(t.Config.NumNodes),
 		"--update-genesis-timestamp", fmt.Sprintf("delay_sec:%d", t.Config.ForkDelay*60),
 		"--log-level", "Error",
 		"--file-log-level", "Trace",

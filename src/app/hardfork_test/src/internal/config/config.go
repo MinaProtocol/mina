@@ -29,6 +29,11 @@ type Config struct {
 	MainDelay int
 	ForkDelay int
 
+	// Configuration for network sizes
+	NumWhales int
+	NumFish   int
+	NumNodes  int
+
 	// Script directory path
 	ScriptDir string
 
@@ -57,6 +62,9 @@ func DefaultConfig() *Config {
 		ForkSlot:                      15,
 		MainDelay:                     8,
 		ForkDelay:                     8,
+		NumWhales:                     2,
+		NumFish:                       1,
+		NumNodes:                      1,
 		ShutdownTimeoutMinutes:        10,
 		PollingIntervalSeconds:        5,
 		ForkConfigRetryDelaySeconds:   60,
