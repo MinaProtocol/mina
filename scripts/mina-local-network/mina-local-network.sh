@@ -35,7 +35,7 @@ VALUE_TRANSFERS=false
 SNARK_WORKERS_COUNT=1
 ZKAPP_TRANSACTIONS=false
 RESET=false
-UPDATE_GENESIS_TIMESTAMP=false
+UPDATE_GENESIS_TIMESTAMP=no
 OVERRIDE_SLOT_TIME_MS=""
 PROOF_LEVEL="full"
 LOG_PRECOMPUTED_BLOCKS=false
@@ -134,7 +134,7 @@ help() {
                                          |   Default: ${PROOF_LEVEL}
 -r   |--reset                            | Whether to reset the Mina Local Network storage file-system (presence of argument)
                                          |   Default: ${RESET}
--u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument)
+-u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to `fixed:TIMESTAMP` to be a fixed time, `delay_sec:SECONDS` to be set genesis to be SECONDS in the future, or `no` to do nothing.
                                          |   Default: ${UPDATE_GENESIS_TIMESTAMP}
 -st  |--override-slot-time <milliseconds>| Override the slot time for block production
                                          |   Default: value from executable
@@ -373,7 +373,10 @@ while [[ "$#" -gt 0 ]]; do
     shift
     ;;
   -r | --reset) RESET=true ;;
-  -u | --update-genesis-timestamp) UPDATE_GENESIS_TIMESTAMP=true ;;
+  -u | --update-genesis-timestamp) 
+    UPDATE_GENESIS_TIMESTAMP="${2}"
+    shift
+    ;;
   -st |--override-slot-time)
     OVERRIDE_SLOT_TIME_MS="${2}"
     shift
@@ -621,12 +624,35 @@ if ${RESET} || [ ! -f "${CONFIG}" ]; then
   reset-genesis-ledger "${LEDGER_FOLDER}" "${CONFIG}"
 fi
 
-if ${UPDATE_GENESIS_TIMESTAMP}; then
-  echo 'Updating Genesis State timestamp...'
-  jq --inplace \
-    ".genesis.genesis_state_timestamp=\"$(date +"%Y-%m-%dT%H:%M:%S%z")\"" \
-    "${CONFIG}"
-fi
+update_genesis_timestamp() {
+  case "$1" in
+    fixed:*)
+      local timestamp="${1#fixed:}"
+      echo "Updating Genesis State timestamp to ${timestamp}..."
+      jq --inplace \
+        ".genesis.genesis_state_timestamp=\"${timestamp}\"" \
+        "${CONFIG}"
+      ;;
+    delay_sec:*)
+      local delay_sec="${1#delay_sec:}"
+      local now
+      now=$(date +%s)
+      local timestamp
+      timestamp=$(date -u -d "@$(( now + delay_sec ))" '+%F %H:%M:%S+00:00')
+      echo "Updating Genesis State timestamp to ${timestamp}..."
+      jq --inplace \
+        ".genesis.genesis_state_timestamp=\"${timestamp}\"" \
+        "${CONFIG}"
+      ;;
+    no)
+      : ;;
+    *)
+      echo "Unknown UPDATE_GENESIS_TIMESTAMP value: $1" >&2
+      return 1 ;;
+  esac
+}
+
+update_genesis_timestamp "${UPDATE_GENESIS_TIMESTAMP}"
 
 if [ ! -z "${OVERRIDE_SLOT_TIME_MS}" ]; then
   echo 'Modifying configuration to override slot time...'
