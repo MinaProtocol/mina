@@ -11,24 +11,54 @@ import (
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
 )
 
+// TODO: ensure integrity of ports in hf-test-go and mina-local-network
+
+const SEED_START_PORT = 3000
+const ARCHIVE_SERVER_PORT = 3086
+const SNARK_COORDINATOR_PORT = 7000
+const WHALE_START_PORT = 4000
+const FISH_START_PORT = 5000
+const NODE_START_PORT = 6000
+
+func (t *HardforkTest) stopNode(execPath string, port int, tag string) error {
+	t.Logger.Info("Stopping %s at %d", tag, port)
+	cmd1 := exec.Command(execPath, "client", "stop-daemon", "--daemon-port", strconv.Itoa(port))
+	cmd1.Stdout = os.Stdout
+	cmd1.Stderr = os.Stderr
+	if err := cmd1.Run(); err != nil {
+		return fmt.Errorf("failed to stop %s on port 10301: %w", tag, err)
+	}
+	return nil
+}
+
 // StopNodes stops the nodes running on the specified ports
 func (t *HardforkTest) StopNodes(execPath string) error {
 	t.Logger.Info("Stopping nodes...")
 
-	// Stop node on port 10301
-	cmd1 := exec.Command(execPath, "client", "stop-daemon", "--daemon-port", "10301")
-	cmd1.Stdout = os.Stdout
-	cmd1.Stderr = os.Stderr
-	if err := cmd1.Run(); err != nil {
-		return fmt.Errorf("failed to stop daemon on port 10301: %w", err)
+	if err := t.stopNode(execPath, SEED_START_PORT, "seed"); err != nil {
+		return err
 	}
 
-	// Stop node on port 10311
-	cmd2 := exec.Command(execPath, "client", "stop-daemon", "--daemon-port", "10311")
-	cmd2.Stdout = os.Stdout
-	cmd2.Stderr = os.Stderr
-	if err := cmd2.Run(); err != nil {
-		return fmt.Errorf("failed to stop daemon on port 10311: %w", err)
+	if err := t.stopNode(execPath, SNARK_COORDINATOR_PORT, "snark-cooridinator"); err != nil {
+		return err
+	}
+
+	for i := 0; i < t.Config.NumWhales; i++ {
+		if err := t.stopNode(execPath, WHALE_START_PORT+i*5, "whale"); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < t.Config.NumFish; i++ {
+		if err := t.stopNode(execPath, FISH_START_PORT+i*5, "fish"); err != nil {
+			return err
+		}
+	}
+
+	for i := 0; i < t.Config.NumNodes; i++ {
+		if err := t.stopNode(execPath, NODE_START_PORT+i*5, "plain-node"); err != nil {
+			return err
+		}
 	}
 
 	t.Logger.Info("Nodes stopped successfully")
