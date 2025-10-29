@@ -65,6 +65,8 @@ val apply_diffs :
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
 
+val calculate_root_transition_diff : t -> Breadcrumb.t -> Diff.Full.E.t
+
 module For_tests : sig
   val equal : t -> t -> bool
 
