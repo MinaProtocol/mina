@@ -3,6 +3,7 @@ Module to run daemon process.
 *)
 open Core
 
+open Integration_test_lib
 open Async
 
 module Paths = struct
@@ -135,21 +136,38 @@ module Config = struct
 
     let dirs t = [ t.conf; t.genesis; t.libp2p_keypair ]
 
+    let default =
+      let root = Filename.temp_dir ~in_dir:"/tmp" "mina_automation" "" in
+      create ~root_path:root ()
+
     let mina_log t = t.conf ^/ "mina.log"
   end
 
-  type t = { port : int; dirs : ConfigDirs.t }
-
-  let default ?dirs () =
-    let root_path = Filename.temp_dir ~in_dir:"/tmp" "mina_automation" "" in
-    { port = 8031
-    ; dirs =
-        ( match dirs with
-        | Some dirs ->
-            dirs
-        | None ->
-            ConfigDirs.create ~root_path () )
+  type t =
+    { port : int
+    ; dirs : ConfigDirs.t
+    ; config : Test_config.t
+    ; runtime_config : Runtime_config.t
+    ; genesis_ledger : Genesis_ledger.t
     }
+
+  let create ?(port = 8031) ~(dirs : ConfigDirs.t) ~(config : Test_config.t) ()
+      =
+    let genesis_ledger = Genesis_ledger.create config.genesis_ledger in
+    let runtime_config =
+      Runtime_config_builder.create ~test_config:config ~genesis_ledger
+    in
+
+    Yojson.Safe.to_file
+      (dirs.conf ^/ "daemon.json")
+      (Runtime_config.to_yojson runtime_config) ;
+
+    { port; dirs; config; runtime_config; genesis_ledger }
+
+  let default () =
+    create ~dirs:ConfigDirs.default
+      ~config:(Test_config.default ~constants:Test_config.default_constants)
+      ()
 
   let libp2p_keypair_folder t = ConfigDirs.libp2p_keypair_folder t.dirs
 
@@ -194,6 +212,12 @@ let archive_blocks_from_files t ~archive_address ~format ?(sleep = 5) blocks =
   Deferred.List.iter blocks ~f:(fun block ->
       let%bind _ = archive_blocks t ~archive_address ~format [ block ] () in
       after (Time.Span.of_sec (Float.of_int sleep)) )
+
+let of_test_config test_config =
+  { config =
+      Config.create ~dirs:Config.ConfigDirs.default ~config:test_config ()
+  ; executor = Executor.AutoDetect
+  }
 
 let of_config config = { config; executor = Executor.AutoDetect }
 

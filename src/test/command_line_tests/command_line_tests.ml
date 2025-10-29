@@ -1,6 +1,50 @@
 open Core
 open Async
 open Mina_automation
+open Signature_lib
+
+module MinaSignerIntegrationTest = struct
+  type t = Integration_test_lib.Test_config.t
+
+  let setup () : t =
+    let open Integration_test_lib.Test_config in
+    { (default ~constants:default_constants) with
+      genesis_ledger =
+        (let open Test_account in
+        [ create ~account_name:"bp" ~balance:"400000" ()
+        ; create ~account_name:"sender" ~balance:"30" ()
+        ; create ~account_name:"receiver" ~balance:"1" ()
+        ])
+    ; block_producers = [ { node_name = "node"; account_name = "bp" } ]
+    }
+
+  let test_case (config : t) =
+    let daemon = Daemon.of_test_config config in
+    let sender =
+      Core.Map.find_exn daemon.config.genesis_ledger.keypairs "sender"
+    in
+    let receiver =
+      Core.Map.find_exn daemon.config.genesis_ledger.keypairs "receiver"
+    in
+    let%bind process = Daemon.start daemon in
+    let%bind.Deferred.Result () =
+      Daemon.Client.wait_for_bootstrap process.client ()
+    in
+    let%bind.Deferred.Result _ =
+      Mina_automation.Js_signer.run
+        { Mina_automation.Js_signer.Config.sender_sk =
+            Private_key.to_base58_check sender.keypair.private_key
+        ; receiver_address = receiver.public_key
+        ; graphql_url =
+            Some
+              (Printf.sprintf "http://localhost:%d/graphql" daemon.config.port)
+        ; nonce = Some 0
+        }
+    in
+    (*let%bind () = Daemon.Client.stop_daemon process.client in
+*)
+    Deferred.Or_error.return @@ Mina_automation_fixture.Intf.Passed
+end
 
 module BackgroundMode = struct
   type t = Mina_automation_fixture.Daemon.before_bootstrap
@@ -221,5 +265,15 @@ let () =
                ( module Mina_automation_fixture.Daemon
                         .Make_FixtureWithoutBootstrap
                           (AdvancedConstraintSystemDigests) ) )
+        ] )
+    ; ( "mina-signer-integration"
+      , [ test_case
+            "The mina cli does not print log when printing mina signer \
+             integration test"
+            `Quick
+            (Mina_automation_runner.Runner.run_blocking
+               ( module Mina_automation_fixture.Daemon
+                        .Make_FixtureWithBootstrapAndFromTestConfig
+                          (MinaSignerIntegrationTest) ) )
         ] )
     ]

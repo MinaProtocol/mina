@@ -15,6 +15,7 @@
   cmdliner
   ;; mina libraries
   init
+  integration_test_lib
   mina_automation
   mina_automation.fixture
   mina_automation.runner)
