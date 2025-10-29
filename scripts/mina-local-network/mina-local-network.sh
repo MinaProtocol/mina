@@ -56,7 +56,6 @@ PG_USER="${USER}"
 PG_PASSWD=""
 PG_DB="archive"
 
-ARCHIVE_ADDRESS_CLI_ARG=""
 DEMO_MODE=false
 
 SLOT_TX_END=
@@ -65,6 +64,7 @@ SLOT_CHAIN_END=
 # ================================================
 # Globals (assigned during execution of script)
 
+ARCHIVE_ADDRESS_CLI_ARG=""
 LEDGER_FOLDER=""
 SNARK_COORDINATOR_PUBKEY=""
 NODES_FOLDER=""
