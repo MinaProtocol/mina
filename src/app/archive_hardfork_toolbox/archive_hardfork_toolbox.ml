@@ -10,6 +10,11 @@ let run_check_and_exit check_fn () =
   report_all_checks results ;
   if has_failures results then Shutdown.exit 1 else Deferred.return ()
 
+let fork_state_hash =
+  Command.Param.(
+    flag "--fork-state-hash" (required string)
+      ~doc:"String Hash of the fork state")
+
 let fork_slot =
   Command.Param.(
     flag "--fork-slot" (required int)
@@ -18,10 +23,7 @@ let fork_slot =
 let is_in_best_chain_command =
   Async.Command.async ~summary:"Verify fork block is in best chain"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
-     and fork_state_hash =
-       Command.Param.flag "--fork-state-hash"
-         Command.Param.(required string)
-         ~doc:"String Hash of the fork state"
+     and fork_state_hash = fork_state_hash
      and fork_height =
        Command.Param.flag "--fork-height"
          Command.Param.(required int)
@@ -54,10 +56,7 @@ let confirmations_command =
 let no_commands_after_command =
   Async.Command.async ~summary:"Verify no commands after the fork block"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
-     and fork_state_hash =
-       Command.Param.flag "--fork-state-hash"
-         Command.Param.(required string)
-         ~doc:"String Hash of the fork state"
+     and fork_state_hash = fork_state_hash
      and fork_slot = fork_slot in
 
      run_check_and_exit
@@ -77,10 +76,7 @@ let verify_upgrade_command =
 let validate_fork_command =
   Async.Command.async ~summary:"Validate fork block and its ancestors"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
-     and fork_state_hash =
-       Command.Param.flag "--fork-state-hash"
-         Command.Param.(required string)
-         ~doc:"String Hash of the fork state"
+     and fork_state_hash = fork_state_hash
      and fork_slot = fork_slot in
      run_check_and_exit
        (validate_fork ~postgres_uri ~fork_state_hash ~fork_slot) )
