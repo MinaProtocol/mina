@@ -454,7 +454,10 @@ let get_node_state t =
   }
 
 (** Compute the hard fork genesis slot from the runtime config, if all the stop
-    slots and the genesis slot delta have been set *)
+    slots and the genesis slot delta have been set. Note that this is the hard
+    fork genesis slot expressed as a
+    [Mina_numbers.Global_slot_since_hard_fork.t] of the current chain/hard
+    fork. *)
 let scheduled_hard_fork_genesis_slot t :
     Mina_numbers.Global_slot_since_hard_fork.t option =
   let open Option.Let_syntax in
