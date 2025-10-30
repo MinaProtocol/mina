@@ -47,7 +47,10 @@ in  Pipeline.build
             , label = "Check RocksDB Ledger Tar Compatibility"
             , key = "test"
             , target = Size.Multi
-            , docker = Some Docker::{ image = "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:noble" }
+            , docker = Some Docker::{
+              , image =
+                  "europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:noble"
+              }
             }
         ]
       }
