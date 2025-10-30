@@ -18,6 +18,7 @@
    native/native-overrides/oracles.js
    native/native-overrides/util.js
    native/native-overrides/circuit.js
+   native/native-overrides/verifier-index.js
    ))
  (instrumentation
   (backend bisect_ppx))

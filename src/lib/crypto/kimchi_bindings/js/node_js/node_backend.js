@@ -27,3 +27,5 @@ override('caml_pasta_fp_poseidon_block_cipher');
 override('caml_pasta_fq_poseidon_block_cipher');
 override('prover_to_json');
 override('prover_index_from_bytes');
+override('caml_pasta_fq_plonk_verifier_index_shifts');
+override('caml_pasta_fp_plonk_verifier_index_shifts');
