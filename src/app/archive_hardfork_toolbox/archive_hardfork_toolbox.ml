@@ -95,6 +95,7 @@ let validate_fork_command =
      run_check_and_exit
        (validate_fork ~postgres_uri ~fork_state_hash ~fork_slot) )
 
+(* TODO: consider refactor these commands to reuse queries in the future. *)
 let commands =
   [ ( "fork-candidate"
     , Async_command.group ~summary:"Pre-fork verifications"
