@@ -48,7 +48,7 @@ let is_in_the_best_chain_query =
     |sql}
 
 let is_in_the_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
-    ~check_height ~check_slot () =
+    ~check_height ~check_slot =
   Conn.find is_in_the_best_chain_query
     (tip_hash, check_hash, check_height, check_slot)
 

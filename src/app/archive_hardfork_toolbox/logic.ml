@@ -53,11 +53,12 @@ let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
 
-  let%bind tip = query_db ~f:(fun db -> Sql.latest_state_hash db) in
+  let%bind tip = query_db ~f:Sql.latest_state_hash in
   let%bind (in_chain : bool) =
-    query_db ~f:(fun db ->
-        Sql.is_in_the_best_chain db ~tip_hash:tip ~check_hash:fork_state_hash
-          ~check_height:fork_height ~check_slot:(Int64.of_int fork_slot) () )
+    query_db
+      ~f:
+        (Sql.is_in_the_best_chain ~tip_hash:tip ~check_hash:fork_state_hash
+           ~check_height:fork_height ~check_slot:(Int64.of_int fork_slot) )
   in
   let result =
     if in_chain then Success
@@ -77,8 +78,7 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
   let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind confirmations =
-    query_db ~f:(fun db ->
-        Sql.no_of_confirmations db ~latest_state_hash ~fork_slot )
+    query_db ~f:(Sql.no_of_confirmations ~latest_state_hash ~fork_slot)
   in
   let result =
     if confirmations >= required_confirmations then Success
@@ -99,18 +99,18 @@ let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind _, _, _, user_commands_count =
-    query_db ~f:(fun db ->
-        Sql.number_of_user_commands_since_block db ~fork_state_hash ~fork_slot )
+    query_db
+      ~f:(Sql.number_of_user_commands_since_block ~fork_state_hash ~fork_slot)
   in
   let%bind _, _, _, internal_commands_count =
-    query_db ~f:(fun db ->
-        Sql.number_of_internal_commands_since_block db ~fork_state_hash
-          ~fork_slot )
+    query_db
+      ~f:
+        (Sql.number_of_internal_commands_since_block ~fork_state_hash ~fork_slot)
   in
 
   let%bind _, _, _, zkapps_commands_count =
-    query_db ~f:(fun db ->
-        Sql.number_of_zkapps_commands_since_block db ~fork_state_hash ~fork_slot )
+    query_db
+      ~f:(Sql.number_of_zkapps_commands_since_block ~fork_state_hash ~fork_slot)
   in
 
   let result =
@@ -139,16 +139,17 @@ let verify_upgrade ~postgres_uri ~version () =
   let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind res =
-    query_db ~f:(fun db -> Sql.SchemaVerification.fetch_schema_row db ~version)
+    query_db ~f:(Sql.SchemaVerification.fetch_schema_row ~version)
   in
   let%bind missing_cols_zkapp_states =
-    query_db ~f:(fun db ->
-        Sql.SchemaVerification.fetch_missing_cols db ~table:"zkapp_states" )
+    query_db
+      ~f:(Sql.SchemaVerification.fetch_missing_cols ~table:"zkapp_states")
   in
   let%bind missing_cols_zkapp_states_nullable =
-    query_db ~f:(fun db ->
-        Sql.SchemaVerification.fetch_missing_cols db
-          ~table:"zkapp_states_nullable" )
+    query_db
+      ~f:
+        (Sql.SchemaVerification.fetch_missing_cols
+           ~table:"zkapp_states_nullable" )
   in
 
   let%bind () =
@@ -222,7 +223,7 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let query_db = Mina_caqti.query pool in
   let fork_slot = Int64.of_int fork_slot in
 
-  let%bind last_fork_block = query_db ~f:(fun db -> Sql.last_fork_block db) in
+  let%bind last_fork_block = query_db ~f:Sql.last_fork_block in
   let result =
     if
       String.equal (fst last_fork_block) fork_state_hash
