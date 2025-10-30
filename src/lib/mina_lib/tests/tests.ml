@@ -60,6 +60,7 @@ let%test_module "Epoch ledger sync tests" =
       dir_prefix ^/ sprintf "%s_%s" s uuid
 
     let make_context () : (module CONTEXT) Deferred.t =
+      let signature_kind = Mina_signature_kind.Testnet in
       let%bind precomputed_values =
         let runtime_config : Runtime_config.t =
           { daemon = None
@@ -83,7 +84,7 @@ let%test_module "Epoch ledger sync tests" =
             ~genesis_dir:(make_dirname "genesis_dir")
             ~constraint_constants ~genesis_constants ~logger
             ~proof_level:No_check runtime_config ~cli_proof_level:None
-            ~genesis_backing_type:Stable_db
+            ~genesis_backing_type:Stable_db ~signature_kind
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -150,7 +151,7 @@ let%test_module "Epoch ledger sync tests" =
 
         let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
 
-        let signature_kind = Mina_signature_kind.Testnet
+        let signature_kind = signature_kind
       end in
       return (module Context : CONTEXT)
 
@@ -218,7 +219,7 @@ let%test_module "Epoch ledger sync tests" =
             ~slot_tx_end:None
             ~proof_cache_db:(Proof_cache_tag.For_tests.create_db ())
             ~vk_cache_db:(Zkapp_vk_cache_tag.For_tests.create_db ())
-            ~signature_kind:Testnet
+            ~signature_kind:Context.signature_kind
         in
         Network_pool.Transaction_pool.create ~config ~constraint_constants
           ~consensus_constants ~time_controller ~logger

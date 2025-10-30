@@ -4691,6 +4691,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
             ~proof_level:Genesis_constants.Compiled.proof_level
             ~genesis_constants ~constraint_constants runtime_config
             ~cli_proof_level:None ~genesis_backing_type:Stable_db
+            ~signature_kind:Mina_signature_kind.t_DEPRECATED
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
