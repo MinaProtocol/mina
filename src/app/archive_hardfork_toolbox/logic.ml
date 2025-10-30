@@ -133,89 +133,52 @@ let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   in
   Deferred.return [ check_result ]
 
-let verify_upgrade ~postgres_uri ~version () =
+let verify_upgrade ~postgres_uri ~expected_protocol_version
+    ~expected_migration_version () =
   let open Deferred.Let_syntax in
-  let results = ref [] in
   let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
-  let%bind res =
-    query_db ~f:(Sql.SchemaVerification.fetch_schema_row ~version)
-  in
-  let%bind missing_cols_zkapp_states =
-    query_db
-      ~f:(Sql.SchemaVerification.fetch_missing_cols ~table:"zkapp_states")
-  in
-  let%bind missing_cols_zkapp_states_nullable =
-    query_db
-      ~f:
-        (Sql.SchemaVerification.fetch_missing_cols
-           ~table:"zkapp_states_nullable" )
-  in
-
-  let%bind () =
-    match res with
-    | None ->
-        results :=
+  let%map res = query_db ~f:Sql.fetch_latest_migration_history in
+  match res with
+  | Some (status, protocol_version, migration_version) -> (
+      let results = Queue.create () in
+      if String.(status <> "applied") then
+        Queue.enqueue results
           { id = "4.S"
-          ; name = "Schema migration status"
+          ; name = "Schema migration"
+          ; result = Failure (sprintf "Latest migration has status %s" status)
+          } ;
+      if String.(protocol_version <> expected_protocol_version) then
+        Queue.enqueue results
+          { id = "4.S"
+          ; name = "Schema migration"
           ; result =
               Failure
-                (sprintf "No schema migration found for version %s" version)
-          }
-          :: !results ;
-        Deferred.return ()
-    | Some status ->
-        let expected = "applied" in
-        let result =
-          if String.equal status expected then Success
-          else
-            Failure
-              (sprintf
-                 "Expected schema migration with version %s to be \"%s\" \
-                  however got status %s"
-                 version expected status )
-        in
-        results :=
-          { id = "4.S"; name = "Schema migration status"; result } :: !results ;
-        Deferred.return ()
-  in
-
-  let%bind () =
-    let result =
-      if Int.( = ) missing_cols_zkapp_states 0 then Success
-      else
-        Failure
-          (sprintf
-             "Missing columns for zkapp_states detected during upgrade \
-              verification: %d"
-             missing_cols_zkapp_states )
-    in
-    results :=
-      { id = "5.M"; name = "Missing columns check [zkapp_states]"; result }
-      :: !results ;
-    Deferred.return ()
-  in
-
-  let%bind () =
-    let result =
-      if Int.( = ) missing_cols_zkapp_states_nullable 0 then Success
-      else
-        Failure
-          (sprintf
-             "Missing columns for zkapp_states_nullable detected during \
-              upgrade verification: %d"
-             missing_cols_zkapp_states_nullable )
-    in
-    results :=
-      { id = "6.M"
-      ; name = "Missing columns check [zkapp_states_nullable]"
-      ; result
-      }
-      :: !results ;
-    Deferred.return ()
-  in
-
-  Deferred.return !results
+                (sprintf
+                   "Latest protool version mismatch: actual %s vs expected %s"
+                   protocol_version expected_protocol_version )
+          } ;
+      if String.(migration_version <> expected_migration_version) then
+        Queue.enqueue results
+          { id = "4.S"
+          ; name = "Schema migration"
+          ; result =
+              Failure
+                (sprintf
+                   "Latest migration version mismatch: actual %s vs expected %s"
+                   migration_version expected_protocol_version )
+          } ;
+      match Queue.to_list results with
+      | [] ->
+          [ { id = "4.S"; name = "Schema migration"; result = Success } ]
+      | _ :: _ as results ->
+          results )
+  | None ->
+      [ { id = "4.S"
+        ; name = "Schema migration"
+        ; result = Failure "Can't find latest migration record"
+        }
+      ]
 
 let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let open Deferred.Let_syntax in

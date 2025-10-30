@@ -66,12 +66,18 @@ let verify_upgrade_command =
   Async.Command.async
     ~summary:"Verify upgrade from pre-fork to post-fork schema"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
-     and version =
-       Command.Param.flag "--version"
+     and expected_protocol_version =
+       Command.Param.flag "--protocol-version"
          Command.Param.(required string)
-         ~doc:"String Version to upgrade to (e.g. 3.2.0 etc)"
+         ~doc:"String Protocol Version to upgrade to (e.g. 3.2.0 etc)"
+     and expected_migration_version =
+       Command.Param.flag "--migration-version"
+         Command.Param.(required string)
+         ~doc:"String Migration Version that generates current schema"
      in
-     run_check_and_exit (verify_upgrade ~postgres_uri ~version) )
+     run_check_and_exit
+       (verify_upgrade ~postgres_uri ~expected_protocol_version
+          ~expected_migration_version ) )
 
 let validate_fork_command =
   Async.Command.async ~summary:"Validate fork block and its ancestors"

@@ -120,59 +120,15 @@ let last_fork_block_query =
 let last_fork_block (module Conn : CONNECTION) =
   Conn.find last_fork_block_query ()
 
-module SchemaVerification = struct
-  module Types = struct
-    type schema_row =
-      { status : string option
-      ; description : string option
-      ; applied_at : string
-      ; validated_at : string option
-      }
-
-    type result =
-      { missing_cols : int
-      ; total_fks : int
-      ; valid_fks : int
-      ; expected_cols_min : int
-      ; expected_cols_max : int
-      ; expected_fk_count : int
-      ; schema : schema_row option
-      ; ok_cols : bool
-      ; ok_fk_present : bool
-      ; ok_fk_validated : bool
-      ; ok_schema_status : bool
-      ; ok : bool
-      }
-  end
-
-  module Queries = struct
-    (* 1) How many of element8..element31 are missing in table ? *)
-    let missing_cols_req =
-      Caqti_type.(string ->! int)
-      @@ {|
-      SELECT count(*) FROM generate_series(8,31) g(n)
-      LEFT JOIN information_schema.columns c
-        ON c.table_schema='public'
-       AND c.table_name=?
-       AND c.column_name='element'||g.n
-      WHERE c.column_name IS NULL
-    |}
-
-    (* 2) Row from public.schema_version for a given version.
-          We stringify timestamps for driver simplicity. *)
-    let schema_row_req =
-      Caqti_type.(string ->? string)
-      @@ {|
+let fetch_latest_migration_history_query =
+  Caqti_type.(unit ->? t3 string string string)
+    {|
       SELECT
-        status
+        status, protocol_version, migration_version
       FROM migration_history
-      WHERE protocol_version = ?
+      ORDER BY commit_start_at DESC
+      LIMIT 1;
     |}
-  end
 
-  let fetch_missing_cols (module Conn : CONNECTION) ~table =
-    Conn.find Queries.missing_cols_req table
-
-  let fetch_schema_row (module Conn : CONNECTION) ~version =
-    Conn.find_opt Queries.schema_row_req version
-end
+let fetch_latest_migration_history (module Conn : CONNECTION) =
+  Conn.find_opt fetch_latest_migration_history_query ()
