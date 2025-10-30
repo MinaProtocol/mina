@@ -29,6 +29,7 @@ in  Pipeline.build
           [ S.strictlyStart (S.contains "src")
           , S.exactly "buildkite/src/Jobs/Test/HardForkTest" "dhall"
           , S.strictlyStart (S.contains "scripts/hardfork")
+          , S.strictlyStart (S.contains "scripts/mina-local-network")
           , S.strictlyStart (S.contains "nix")
           , S.exactly "flake" "nix"
           , S.exactly "flake" "lock"
