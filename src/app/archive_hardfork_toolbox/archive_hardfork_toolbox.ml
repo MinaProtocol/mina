@@ -10,6 +10,11 @@ let run_check_and_exit check_fn () =
   report_all_checks results ;
   if has_failures results then Shutdown.exit 1 else Deferred.return ()
 
+let fork_slot =
+  Command.Param.(
+    flag "--fork-slot" (required int)
+      ~doc:"Int64 Global slot since genesis of the fork block")
+
 let is_in_best_chain_command =
   Async.Command.async ~summary:"Verify fork block is in best chain"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
@@ -21,11 +26,7 @@ let is_in_best_chain_command =
        Command.Param.flag "--fork-height"
          Command.Param.(required int)
          ~doc:"Int Height of the fork block"
-     and fork_slot =
-       Command.Param.flag "--fork-slot"
-         Command.Param.(required int)
-         ~doc:"Int64 Global slot since genesis of the fork block"
-     in
+     and fork_slot = fork_slot in
 
      run_check_and_exit
        (is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot)
@@ -39,10 +40,7 @@ let confirmations_command =
        Command.Param.flag "--latest-state-hash"
          Command.Param.(required string)
          ~doc:"String Hash of the latest state"
-     and fork_slot =
-       Command.Param.flag "--fork-slot"
-         Command.Param.(required int)
-         ~doc:"Int64 Global slot since genesis of the fork block"
+     and fork_slot = fork_slot
      and required_confirmations =
        Command.Param.flag "--required-confirmations"
          Command.Param.(required int)
@@ -60,11 +58,7 @@ let no_commands_after_command =
        Command.Param.flag "--fork-state-hash"
          Command.Param.(required string)
          ~doc:"String Hash of the fork state"
-     and fork_slot =
-       Command.Param.flag "--fork-slot"
-         Command.Param.(required int)
-         ~doc:"Int64 Global slot since genesis of the fork block"
-     in
+     and fork_slot = fork_slot in
 
      run_check_and_exit
        (no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot) )
@@ -87,11 +81,7 @@ let validate_fork_command =
        Command.Param.flag "--fork-state-hash"
          Command.Param.(required string)
          ~doc:"String Hash of the fork state"
-     and fork_slot =
-       Command.Param.flag "--fork-slot"
-         Command.Param.(required int)
-         ~doc:"Int64 Global slot since genesis of the fork block"
-     in
+     and fork_slot = fork_slot in
      run_check_and_exit
        (validate_fork ~postgres_uri ~fork_state_hash ~fork_slot) )
 
