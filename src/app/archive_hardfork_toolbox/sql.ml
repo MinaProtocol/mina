@@ -4,7 +4,7 @@ open Caqti_request.Infix
 module type CONNECTION = Mina_caqti.CONNECTION
 
 let latest_state_hash_query =
-  (Caqti_type.unit ->! Caqti_type.string)
+  Caqti_type.(unit ->! string)
     {sql|
           SELECT state_hash from blocks order by height desc limit 1;
         |sql}
@@ -39,7 +39,7 @@ let chain_of_query =
   |sql}
 
 let is_in_best_chain_query =
-  (Caqti_type.(t4 string string int int64) ->! Caqti_type.bool)
+  Caqti_type.(t4 string string int int64 ->! bool)
     ( chain_of_query
     ^ {sql|
     SELECT EXISTS (
@@ -57,7 +57,7 @@ let is_in_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
     (tip_hash, check_hash, check_height, check_slot)
 
 let num_of_confirmations_query =
-  (Caqti_type.(t2 string int) ->! Caqti_type.int)
+  Caqti_type.(t2 string int ->! int)
     ( chain_of_query
     ^ {sql|
     SELECT count(*) FROM chain 
@@ -70,7 +70,7 @@ let num_of_confirmations (module Conn : CONNECTION) ~latest_state_hash
   Conn.find num_of_confirmations_query (latest_state_hash, fork_slot)
 
 let number_of_commands_since_block_query block_commands_table =
-  (Caqti_type.(t2 string int) ->! Caqti_type.(t4 string int int int))
+  Caqti_type.(t2 string int ->! t4 string int int int)
     ( chain_of_query
     ^ Printf.sprintf
         {sql|
@@ -109,7 +109,7 @@ let number_of_zkapps_commands_since_block (module Conn : CONNECTION)
     (fork_state_hash, fork_slot)
 
 let last_fork_block_query =
-  (Caqti_type.unit ->! Caqti_type.(t2 string int64))
+  Caqti_type.(unit ->! t2 string int64)
     {sql|
     SELECT state_hash, global_slot_since_genesis FROM blocks
     WHERE global_slot_since_hard_fork = 0
@@ -148,7 +148,7 @@ module SchemaVerification = struct
   module Queries = struct
     (* 1) How many of element8..element31 are missing in table ? *)
     let missing_cols_req =
-      (Caqti_type.string ->! Caqti_type.int)
+      Caqti_type.(string ->! int)
       @@ {|
       SELECT count(*) FROM generate_series(8,31) g(n)
       LEFT JOIN information_schema.columns c
@@ -161,7 +161,7 @@ module SchemaVerification = struct
     (* 2) Row from public.schema_version for a given version.
           We stringify timestamps for driver simplicity. *)
     let schema_row_req =
-      (Caqti_type.string ->? Caqti_type.string)
+      Caqti_type.(string ->? string)
       @@ {|
       SELECT
         status
