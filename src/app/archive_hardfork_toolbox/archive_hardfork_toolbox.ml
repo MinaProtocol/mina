@@ -87,6 +87,11 @@ let validate_fork_command =
      run_check_and_exit
        (validate_fork ~postgres_uri ~fork_state_hash ~fork_slot) )
 
+let fetch_last_filled_block_command =
+  Async.Command.async ~summary:"Select last filled block"
+    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres in
+     fun () -> fetch_last_filled_block ~postgres_uri () )
+
 (* TODO: consider refactor these commands to reuse queries in the future. *)
 let commands =
   [ ( "fork-candidate"
@@ -95,6 +100,7 @@ let commands =
         [ ("is-in-best-chain", is_in_best_chain_command)
         ; ("confirmations", confirmations_command)
         ; ("no-commands-after", no_commands_after_command)
+        ; ("last-filled-block", fetch_last_filled_block_command)
         ] )
   ; ("verify-upgrade", verify_upgrade_command)
   ; ("validate-fork", validate_fork_command)

@@ -201,3 +201,21 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   in
   let check_result = { id = "8.F"; name = "Fork validation"; result } in
   Deferred.return [ check_result ]
+
+let fetch_last_filled_block ~postgres_uri () =
+  let open Deferred.Let_syntax in
+  let%bind pool = connect postgres_uri in
+  let query_db = Mina_caqti.query pool in
+  let%bind hash, slot_since_genesis, height =
+    query_db ~f:(fun db -> Sql.fetch_last_filled_block db)
+  in
+
+  let json =
+    `Assoc
+      [ ("state_hash", `String hash)
+      ; ("slot_since_genesis", `Int (Int64.to_int_exn slot_since_genesis))
+      ; ("height", `Int height)
+      ]
+  in
+  printf "%s\n" (Yojson.Safe.pretty_to_string json) ;
+  Deferred.return ()
