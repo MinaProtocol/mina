@@ -41,17 +41,16 @@ let has_failures results =
   List.exists results ~f:(fun { result; _ } ->
       match result with Failure _ -> true | _ -> false )
 
-let connect archive_uri =
-  let archive_uri = Uri.of_string archive_uri in
-  match Mina_caqti.connect_pool archive_uri with
+let connect postgres_uri =
+  match Mina_caqti.connect_pool postgres_uri with
   | Error e ->
       failwithf "❌ Connection failed to db, due to: %s" (Caqti_error.show e) ()
   | Ok pool ->
       Deferred.return pool
 
-let is_in_best_chain ~archive_uri ~fork_state_hash ~fork_height ~fork_slot () =
+let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect archive_uri in
+  let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
 
   let%bind tip = query_db ~f:(fun db -> Sql.latest_state_hash db) in
@@ -72,10 +71,10 @@ let is_in_best_chain ~archive_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let check_result = { id = "1.B"; name = "Best chain validation"; result } in
   Deferred.return [ check_result ]
 
-let confirmations_check ~archive_uri ~latest_state_hash ~fork_slot
+let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
     ~required_confirmations () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect archive_uri in
+  let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind confirmations =
     query_db ~f:(fun db ->
@@ -95,9 +94,9 @@ let confirmations_check ~archive_uri ~latest_state_hash ~fork_slot
   in
   Deferred.return [ check_result ]
 
-let no_commands_after ~archive_uri ~fork_state_hash ~fork_slot () =
+let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect archive_uri in
+  let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind _, _, _, user_commands_count =
     query_db ~f:(fun db ->
@@ -134,10 +133,10 @@ let no_commands_after ~archive_uri ~fork_state_hash ~fork_slot () =
   in
   Deferred.return [ check_result ]
 
-let verify_upgrade ~archive_uri ~version () =
+let verify_upgrade ~postgres_uri ~version () =
   let open Deferred.Let_syntax in
   let results = ref [] in
-  let%bind pool = connect archive_uri in
+  let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind res =
     query_db ~f:(fun db -> Sql.SchemaVerification.fetch_schema_row db ~version)
@@ -217,9 +216,9 @@ let verify_upgrade ~archive_uri ~version () =
 
   Deferred.return !results
 
-let validate_fork ~archive_uri ~fork_state_hash ~fork_slot () =
+let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect archive_uri in
+  let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let fork_slot = Int64.of_int fork_slot in
 

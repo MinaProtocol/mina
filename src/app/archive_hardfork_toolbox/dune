@@ -12,6 +12,7 @@
    stdio
    caqti-driver-postgresql
    caqti
+   cli_lib
    async
    core_kernel
    caqti-async
@@ -41,8 +42,8 @@
    runtime_config
    signature_lib
    unsigned_extended
-   with_hash
- )
+   with_hash)
+ 
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_mina ppx_let ppx_hash ppx_compare ppx_sexp_conv h_list.ppx)))

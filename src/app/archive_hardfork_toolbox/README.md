@@ -22,14 +22,14 @@ Verifies that the fork block is in the best chain of the blockchain.
 **Usage:**
 ```bash
 archive_hardfork_toolbox fork-candidate is-in-best-chain \
-  --archive-uri "postgresql://user:pass@host:port/db" \
+  --postgres-uri "postgresql://user:pass@host:port/db" \
   --fork-state-hash "3NKx..." \
   --fork-height 12345 \
   --fork-slot 67890
 ```
 
 **Parameters:**
-- `--archive-uri`: URI for connecting to the mainnet archive database
+- `--postgres-uri`: URI for connecting to the mainnet archive database
 - `--fork-state-hash`: Hash of the fork state
 - `--fork-height`: Height of the fork block
 - `--fork-slot`: Global slot since genesis of the fork block
@@ -41,14 +41,14 @@ Verifies that the fork block has the required number of confirmations.
 **Usage:**
 ```bash
 archive_hardfork_toolbox fork-candidate confirmations \
-  --archive-uri "postgresql://user:pass@host:port/db" \
+  --postgres-uri "postgresql://user:pass@host:port/db" \
   --fork-state-hash "3NKx..." \
   --fork-slot 67890 \
   --required-confirmations 290
 ```
 
 **Parameters:**
-- `--archive-uri`: URI for connecting to the mainnet archive database
+- `--postgres-uri`: URI for connecting to the mainnet archive database
 - `--fork-state-hash`: Hash of the fork state
 - `--fork-slot`: Global slot since genesis of the fork block
 - `--required-confirmations`: Number of confirmations required for the fork block
@@ -60,13 +60,13 @@ Verifies that no commands were executed after the fork block, ensuring a clean f
 **Usage:**
 ```bash
 archive_hardfork_toolbox fork-candidate no-commands-after \
-  --archive-uri "postgresql://user:pass@host:port/db" \
+  --postgres-uri "postgresql://user:pass@host:port/db" \
   --fork-state-hash "3NKx..." \
   --fork-slot 67890
 ```
 
 **Parameters:**
-- `--archive-uri`: URI for connecting to the mainnet archive database
+- `--postgres-uri`: URI for connecting to the mainnet archive database
 - `--fork-state-hash`: Hash of the fork state
 - `--fork-slot`: Global slot since genesis of the fork block
 
@@ -77,12 +77,12 @@ Verifies the upgrade from pre-fork to post-fork database schema.
 **Usage:**
 ```bash
 archive_hardfork_toolbox verify-upgrade \
-  --archive-uri "postgresql://user:pass@host:port/db" \
+  --postgres-uri "postgresql://user:pass@host:port/db" \
   --version "3.2.0"
 ```
 
 **Parameters:**
-- `--archive-uri`: URI for connecting to the pre-fork mainnet archive database
+- `--postgres-uri`: URI for connecting to the pre-fork mainnet archive database
 - `--version`: Version to upgrade to (e.g., "3.2.0")
 
 ### validate-fork
@@ -92,13 +92,13 @@ Validates the fork block and its ancestors to ensure blockchain integrity.
 **Usage:**
 ```bash
 archive_hardfork_toolbox validate-fork \
-  --archive-uri "postgresql://user:pass@host:port/db" \
+  --postgres-uri "postgresql://user:pass@host:port/db" \
   --fork-state-hash "3NKx..." \
   --fork-slot 67890
 ```
 
 **Parameters:**
-- `--archive-uri`: URI for connecting to the mainnet archive database
+- `--postgres-uri`: URI for connecting to the mainnet archive database
 - `--fork-state-hash`: Hash of the fork state
 - `--fork-slot`: Global slot since genesis of the fork block
 
@@ -115,7 +115,7 @@ archive_hardfork_toolbox validate-fork \
 
 ## Database Connection
 
-All commands require an `--archive-uri` parameter that should be a PostgreSQL connection string in the format:
+All commands require an `--postgres-uri` parameter that should be a PostgreSQL connection string in the format:
 ```
 postgresql://username:password@hostname:port/database_name
 ```
