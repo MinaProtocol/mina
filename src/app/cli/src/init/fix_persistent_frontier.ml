@@ -128,7 +128,11 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~time_controller:(Block_time.Controller.basic ~logger)
       ~signature_kind
   in
-  let proof_cache_db = Proof_cache_tag.create_identity_db () in
+  let%bind.Deferred.Result proof_cache_db =
+    Proof_cache_tag.create_db ~logger chain_state_locations.proof_cache
+    >>| Result.map_error ~f:(fun (`Initialization_error err) ->
+            Error.to_string_mach err )
+  in
   let%bind.Deferred.Result root_transition =
     Persistent_frontier.with_instance_exn persistent_frontier
       ~f:
