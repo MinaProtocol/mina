@@ -57,7 +57,7 @@ let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let%bind (in_chain : bool) =
     query_db
       ~f:
-        (Sql.is_in_the_best_chain ~tip_hash:tip ~check_hash:fork_state_hash
+        (Sql.is_in_best_chain ~tip_hash:tip ~check_hash:fork_state_hash
            ~check_height:fork_height ~check_slot:(Int64.of_int fork_slot) )
   in
   let result =

@@ -12,7 +12,7 @@ let latest_state_hash_query =
 let latest_state_hash (module Conn : CONNECTION) =
   Conn.find latest_state_hash_query ()
 
-let is_in_the_best_chain_query =
+let is_in_best_chain_query =
   (Caqti_type.(t4 string string int int64) ->! Caqti_type.bool)
     {sql|
     WITH RECURSIVE chain AS (
@@ -47,9 +47,9 @@ let is_in_the_best_chain_query =
     ) AS is_in_chain;
     |sql}
 
-let is_in_the_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
+let is_in_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
     ~check_height ~check_slot =
-  Conn.find is_in_the_best_chain_query
+  Conn.find is_in_best_chain_query
     (tip_hash, check_hash, check_height, check_slot)
 
 let no_of_confirmations_query =
