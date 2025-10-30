@@ -56,7 +56,7 @@ let is_in_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
   Conn.find is_in_best_chain_query
     (tip_hash, check_hash, check_height, check_slot)
 
-let no_of_confirmations_query =
+let num_of_confirmations_query =
   (Caqti_type.(t2 string int) ->! Caqti_type.int)
     ( chain_of_query
     ^ {sql|
@@ -65,9 +65,9 @@ let no_of_confirmations_query =
     |sql}
     )
 
-let no_of_confirmations (module Conn : CONNECTION) ~latest_state_hash ~fork_slot
-    =
-  Conn.find no_of_confirmations_query (latest_state_hash, fork_slot)
+let num_of_confirmations (module Conn : CONNECTION) ~latest_state_hash
+    ~fork_slot =
+  Conn.find num_of_confirmations_query (latest_state_hash, fork_slot)
 
 let number_of_commands_since_block_query block_commands_table =
   (Caqti_type.(t2 string int) ->! Caqti_type.(t4 string int int int))

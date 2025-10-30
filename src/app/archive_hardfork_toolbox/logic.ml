@@ -78,7 +78,7 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
   let%bind pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind confirmations =
-    query_db ~f:(Sql.no_of_confirmations ~latest_state_hash ~fork_slot)
+    query_db ~f:(Sql.num_of_confirmations ~latest_state_hash ~fork_slot)
   in
   let result =
     if confirmations >= required_confirmations then Success
