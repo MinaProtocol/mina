@@ -12,40 +12,44 @@ let latest_state_hash_query =
 let latest_state_hash (module Conn : CONNECTION) =
   Conn.find latest_state_hash_query ()
 
+let chain_of_query =
+  {sql|
+    WITH RECURSIVE chain AS (
+        SELECT
+            b.id AS id,
+            b.parent_id AS parent_id,
+            b.state_hash AS state_hash,
+            b.height AS height,
+            b.global_slot_since_genesis AS global_slot_since_genesis
+        FROM blocks b
+        WHERE b.state_hash = ?
+
+        UNION ALL
+
+        SELECT
+            p.id,
+            p.parent_id,
+            p.state_hash,
+            p.height,
+            p.global_slot_since_genesis
+        FROM blocks p
+        JOIN chain c ON p.id = c.parent_id
+        WHERE p.parent_id IS NOT NULL
+    )
+  |sql}
+
 let is_in_best_chain_query =
   (Caqti_type.(t4 string string int int64) ->! Caqti_type.bool)
-    {sql|
-    WITH RECURSIVE chain AS (
-      SELECT
-        b.id,
-        NULLIF(b.parent_id, 0) AS parent_id,
-        b.state_hash,
-        b.height,
-        b.global_slot_since_genesis,
-        ARRAY[b.id] AS path
-      FROM blocks b
-      WHERE b.state_hash = ?
-
-      UNION ALL
-
-      SELECT
-        p.id,
-        NULLIF(p.parent_id, 0) AS parent_id,
-        p.state_hash,
-        p.height,
-        p.global_slot_since_genesis,
-        c.path || p.id
-      FROM blocks p
-      JOIN chain c ON p.id = c.parent_id
-      WHERE NOT p.id = ANY (c.path)
-    )
+    ( chain_of_query
+    ^ {sql|
     SELECT EXISTS (
       SELECT 1 FROM chain
       WHERE state_hash = ?
         AND height = ?
         AND global_slot_since_genesis = ?
-    ) AS is_in_chain;
+    );
     |sql}
+    )
 
 let is_in_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
     ~check_height ~check_slot =
@@ -54,76 +58,54 @@ let is_in_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
 
 let no_of_confirmations_query =
   (Caqti_type.(t2 string int) ->! Caqti_type.int)
-    {sql|
-    WITH RECURSIVE chain AS
-(
-    SELECT id, parent_id, chain_status, state_hash, height, global_slot_since_genesis FROM blocks
-    WHERE state_hash = ?
-
-    UNION ALL
-    SELECT b.id, b.parent_id, b.chain_status, b.state_hash, b.height, b.global_slot_since_genesis FROM blocks b
-    INNER JOIN chain ON b.id = chain.parent_id AND (chain.id <> 0 OR b.id = 0)
- ) SELECT count(*) FROM chain where global_slot_since_genesis >= ?;
+    ( chain_of_query
+    ^ {sql|
+    SELECT count(*) FROM chain 
+    WHERE global_slot_since_genesis >= ?;
     |sql}
+    )
 
 let no_of_confirmations (module Conn : CONNECTION) ~latest_state_hash ~fork_slot
     =
   Conn.find no_of_confirmations_query (latest_state_hash, fork_slot)
 
-let number_of_user_commands_since_block_query =
+let number_of_commands_since_block_query block_commands_table =
   (Caqti_type.(t2 string int) ->! Caqti_type.(t4 string int int int))
-    {sql|
-    WITH RECURSIVE chain AS
-(
-    SELECT id, parent_id, chain_status, state_hash, height, global_slot_since_genesis FROM blocks
-    WHERE state_hash = ?
-    UNION ALL
-    SELECT b.id, b.parent_id, b.chain_status, b.state_hash, b.height, b.global_slot_since_genesis FROM blocks b
-    INNER JOIN chain ON b.id = chain.parent_id AND (chain.id <> 0 OR b.id = 0)
- ) SELECT state_hash,  height, global_slot_since_genesis, count(bc.block_id) as user_command_count  FROM chain left join blocks_user_commands bc on bc.block_id = id where global_slot_since_genesis >= ? group by state_hash, height, global_slot_since_genesis;
+    ( chain_of_query
+    ^ Printf.sprintf
+        {sql|
+    SELECT 
+        state_hash,
+        height,
+        global_slot_since_genesis,
+        COUNT(bc.block_id) AS command_count
+    FROM chain
+    LEFT JOIN %s bc 
+        ON chain.id = bc.block_id
+    WHERE global_slot_since_genesis >= ?
+    GROUP BY 
+        state_hash,
+        height,
+        global_slot_since_genesis;
     |sql}
+        block_commands_table )
 
 let number_of_user_commands_since_block (module Conn : CONNECTION)
     ~fork_state_hash ~fork_slot =
-  Conn.find number_of_user_commands_since_block_query
+  Conn.find
+    (number_of_commands_since_block_query "blocks_user_commands")
     (fork_state_hash, fork_slot)
-
-let number_of_internal_commands_since_block_query =
-  (Caqti_type.(t2 string int) ->! Caqti_type.(t4 string int int int))
-    {sql|
-    WITH RECURSIVE chain AS
-    (
-        SELECT id, parent_id, chain_status, state_hash, height, global_slot_since_genesis FROM blocks
-        WHERE state_hash = ?
-        UNION ALL
-        SELECT b.id, b.parent_id, b.chain_status, b.state_hash, b.height, b.global_slot_since_genesis FROM blocks b
-        INNER JOIN chain ON b.id = chain.parent_id AND (chain.id <> 0 OR b.id = 0)
-     ) SELECT state_hash,  height, global_slot_since_genesis, count(bc.block_id) as internal_command_count  FROM chain left join blocks_internal_commands bc on bc.block_id = id where global_slot_since_genesis >= ? group by state_hash, height, global_slot_since_genesis
-;
-    |sql}
 
 let number_of_internal_commands_since_block (module Conn : CONNECTION)
     ~fork_state_hash ~fork_slot =
-  Conn.find number_of_internal_commands_since_block_query
+  Conn.find
+    (number_of_commands_since_block_query "blocks_internal_commands")
     (fork_state_hash, fork_slot)
-
-let number_of_zkapps_commands_since_block_query =
-  (Caqti_type.(t2 string int) ->! Caqti_type.(t4 string int int int))
-    {sql|
-    WITH RECURSIVE chain AS
-    (
-        SELECT id, parent_id, chain_status, state_hash, height, global_slot_since_genesis FROM blocks
-        WHERE state_hash = ?
-        UNION ALL
-        SELECT b.id, b.parent_id, b.chain_status, b.state_hash, b.height, b.global_slot_since_genesis FROM blocks b
-        INNER JOIN chain ON b.id = chain.parent_id AND (chain.id <> 0 OR b.id = 0)
-     ) SELECT state_hash,  height, global_slot_since_genesis, count(bc.block_id) as zkapp_command_count  FROM chain left join blocks_zkapp_commands bc on bc.block_id = id where global_slot_since_genesis >= ? group by state_hash, height, global_slot_since_genesis
-;
-    |sql}
 
 let number_of_zkapps_commands_since_block (module Conn : CONNECTION)
     ~fork_state_hash ~fork_slot =
-  Conn.find number_of_zkapps_commands_since_block_query
+  Conn.find
+    (number_of_commands_since_block_query "blocks_zkapp_commands")
     (fork_state_hash, fork_slot)
 
 let last_fork_block_query =
