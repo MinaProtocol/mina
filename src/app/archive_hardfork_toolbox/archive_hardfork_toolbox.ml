@@ -17,15 +17,15 @@ let is_in_best_chain_command =
         ~doc:"URI URI for connecting to the mainnet archive database"
         Command.Param.(required string)
     and fork_state_hash =
-      Command.Param.flag "--fork-state-hash" ~aliases:[ "-fork-state-hash" ]
+      Command.Param.flag "--fork-state-hash"
         Command.Param.(required string)
         ~doc:"String Hash of the fork state"
     and fork_height =
-      Command.Param.flag "--fork-height" ~aliases:[ "-fork-height" ]
+      Command.Param.flag "--fork-height"
         Command.Param.(required int)
         ~doc:"Int Height of the fork block"
     and fork_slot =
-      Command.Param.flag "--fork-slot" ~aliases:[ "-fork-slot" ]
+      Command.Param.flag "--fork-slot"
         Command.Param.(required int)
         ~doc:"Int64 Global slot since genesis of the fork block"
     in
@@ -44,16 +44,15 @@ let confirmations_command =
         ~doc:"URI URI for connecting to the mainnet archive database"
         Command.Param.(required string)
     and latest_state_hash =
-      Command.Param.flag "--latest-state-hash" ~aliases:[ "-latest-state-hash" ]
+      Command.Param.flag "--latest-state-hash"
         Command.Param.(required string)
         ~doc:"String Hash of the latest state"
     and fork_slot =
-      Command.Param.flag "--fork-slot" ~aliases:[ "-fork-slot" ]
+      Command.Param.flag "--fork-slot"
         Command.Param.(required int)
         ~doc:"Int64 Global slot since genesis of the fork block"
     and required_confirmations =
       Command.Param.flag "--required-confirmations"
-        ~aliases:[ "-required-confirmations" ]
         Command.Param.(required int)
         ~doc:"Int Number of confirmations required for the fork block"
     in
@@ -71,11 +70,11 @@ let no_commands_after_command =
         ~doc:"URI URI for connecting to the mainnet archive database"
         Command.Param.(required string)
     and fork_state_hash =
-      Command.Param.flag "--fork-state-hash" ~aliases:[ "-fork-state-hash" ]
+      Command.Param.flag "--fork-state-hash"
         Command.Param.(required string)
         ~doc:"String Hash of the fork state"
     and fork_slot =
-      Command.Param.flag "--fork-slot" ~aliases:[ "-fork-slot" ]
+      Command.Param.flag "--fork-slot"
         Command.Param.(required int)
         ~doc:"Int64 Global slot since genesis of the fork block"
     in
@@ -93,7 +92,7 @@ let verify_upgrade_command =
         ~doc:"URI URI for connecting to the pre-fork mainnet archive database"
         Command.Param.(required string)
     and version =
-      Command.Param.flag "--version" ~aliases:[ "-version" ]
+      Command.Param.flag "--version"
         Command.Param.(required string)
         ~doc:"String Version to upgrade to (e.g. 3.2.0 etc)"
     in
@@ -108,11 +107,11 @@ let validate_fork_command =
         ~doc:"URI URI for connecting to the mainnet archive database"
         Command.Param.(required string)
     and fork_state_hash =
-      Command.Param.flag "--fork-state-hash" ~aliases:[ "-fork-state-hash" ]
+      Command.Param.flag "--fork-state-hash"
         Command.Param.(required string)
         ~doc:"String Hash of the fork state"
     and fork_slot =
-      Command.Param.flag "--fork-slot" ~aliases:[ "-fork-slot" ]
+      Command.Param.flag "--fork-slot"
         Command.Param.(required int)
         ~doc:"Int64 Global slot since genesis of the fork block"
     in
