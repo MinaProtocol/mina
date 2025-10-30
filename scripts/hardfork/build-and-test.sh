@@ -110,7 +110,6 @@ hardfork_test/bin/hardfork_test \
   --fork-runtime-genesis-ledger postfork-devnet/bin/runtime_genesis_ledger \
   --slot-tx-end "$SLOT_TX_END" \
   --slot-chain-end "$SLOT_CHAIN_END" \
-  --script-dir "$SCRIPT_DIR" \
-&& echo "HF test completed successfully"
+  --script-dir "$SCRIPT_DIR"
 
 popd
