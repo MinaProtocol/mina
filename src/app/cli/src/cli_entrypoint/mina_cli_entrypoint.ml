@@ -547,6 +547,14 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             were no slots won within an hour after the stop time) (Default: \
             %d)"
            Cli_lib.Default.stop_time )
+  and stop_time_interval =
+    flag "--stop-time-interval" ~aliases:[ "stop-time-interval" ] (optional int)
+      ~doc:
+        (sprintf
+           "UPTIME An upper bound (inclusive) on the random number of hours \
+            added to the stop-time. Setting it to zero disables this \
+            randomness. (Default: %d)"
+           Cli_lib.Default.stop_time_interval )
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:[ "upload-blocks-to-gcloud" ]
@@ -1289,6 +1297,10 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             or_from_config YJ.Util.to_int_option "stop-time"
               ~default:Cli_lib.Default.stop_time stop_time
           in
+          let stop_time_interval =
+            or_from_config YJ.Util.to_int_option "stop-time-interval"
+              ~default:Cli_lib.Default.stop_time_interval stop_time_interval
+          in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let%bind () =
             if enable_internal_tracing then
@@ -1469,8 +1481,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_precomputed_blocks ~start_filtered_logs
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port
-                 ~simplified_node_stats
+                 ~stop_time_interval ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
                  ~itn_features ~compile_config ~hardfork_mode () )
           in
