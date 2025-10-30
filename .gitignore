@@ -39,6 +39,9 @@ target
 .envrc
 .direnv/
 
+### Python ###
+**/.venv
+**/__pycache__
 # pipenv
 Pipfile
 Pipfile.lock
