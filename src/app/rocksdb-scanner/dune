@@ -1,7 +1,7 @@
 (executable
- (package rocksdb-scanner)
+ (package rocksdb_scanner)
  (name rocksdb_scanner)
- (public_name mina-rocksdb-scanner)
+ (public_name mina_rocksdb_scanner)
  (modes native)
  (libraries
   async
