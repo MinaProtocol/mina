@@ -1,12 +1,14 @@
 package hardfork
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/MinaProtocol/mina/src/app/hardfork_test/src/internal/config"
@@ -73,34 +75,51 @@ func (t *HardforkTest) stopNode(execPath string, port int, tag string) error {
 func (t *HardforkTest) StopNodes(execPath string) error {
 	t.Logger.Info("Stopping nodes...")
 
-	if err := t.stopNode(execPath, SEED_START_PORT, "seed"); err != nil {
-		return err
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var errs []error
+
+	stop := func(port int, name string) {
+		defer wg.Done()
+		if err := t.stopNode(execPath, port, name); err != nil {
+			mu.Lock()
+			errs = append(errs, err)
+			mu.Unlock()
+		}
 	}
 
-	if err := t.stopNode(execPath, SNARK_COORDINATOR_PORT, "snark-cooridinator"); err != nil {
-		return err
-	}
+	// Step 1: stop all non-seed nodes
+	wg.Add(1)
+	go stop(SNARK_COORDINATOR_PORT, "snark-coordinator")
 
 	for i := 0; i < t.Config.NumWhales; i++ {
-		if err := t.stopNode(execPath, WHALE_START_PORT+i*5, "whale"); err != nil {
-			return err
-		}
+		wg.Add(1)
+		go stop(WHALE_START_PORT+i*5, "whale")
 	}
 
 	for i := 0; i < t.Config.NumFish; i++ {
-		if err := t.stopNode(execPath, FISH_START_PORT+i*5, "fish"); err != nil {
-			return err
-		}
+		wg.Add(1)
+		go stop(FISH_START_PORT+i*5, "fish")
 	}
 
 	for i := 0; i < t.Config.NumNodes; i++ {
-		if err := t.stopNode(execPath, NODE_START_PORT+i*5, "plain-node"); err != nil {
-			return err
-		}
+		wg.Add(1)
+		go stop(NODE_START_PORT+i*5, "plain-node")
 	}
 
-	t.Logger.Info("Nodes stopped successfully")
-	return nil
+	wg.Wait()
+
+	// Step 2: stop the seed node
+	if err := t.stopNode(execPath, SEED_START_PORT, "seed"); err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("multiple stopNode errors: %w", errors.Join(errs...))
+	} else {
+		t.Logger.Info("Nodes stopped successfully")
+		return nil
+	}
 }
 
 // RunMainNetwork starts the main network
