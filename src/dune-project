@@ -3,6 +3,7 @@
 
 (package (name allocation_functor))
 (package (name archive))
+(package (name archive_hardfork_toolbox))
 (package (name archive_blocks))
 (package (name archive_lib))
 (package (name base58_check))
