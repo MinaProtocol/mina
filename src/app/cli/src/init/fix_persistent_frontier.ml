@@ -276,14 +276,26 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       [%log info] "Successfully moved frontier root to match persistent root"
 
 let fix_persistent_frontier_root ~config_directory ~config_file =
-  Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
-    ~id:Logger.Logger_id.mina ~processor:Internal_tracing.For_logger.processor
+  Logger.Consumer_registry.register ~commit_id:"" ~id:Logger.Logger_id.mina
+    ~processor:Internal_tracing.For_logger.processor
     ~transport:
       (Internal_tracing.For_logger.json_lines_rotate_transport
          ~directory:(config_directory ^ "/internal-tracing")
          () )
     () ;
   let logger = Logger.create ~id:Logger.Logger_id.mina () in
+  let log_processor =
+    Logger.Processor.pretty ~log_level:Logger.Level.Trace
+      ~config:
+        { Interpolator_lib.Interpolator.mode = Inline
+        ; max_interpolation_length = 50
+        ; pretty_print = true
+        }
+  in
+  Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+    ~id:Logger.Logger_id.mina ~processor:log_processor
+    ~transport:(Logger.Transport.stdout ())
+    () ;
   let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
   (* Load the persistent root identifier *)
   (* Load and initialize precomputed values from config *)
