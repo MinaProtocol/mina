@@ -278,6 +278,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
 
 let fix_persistent_frontier_root ~config_directory ~config_file =
   let logger = Logger.create () in
+  let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
   (* Load the persistent root identifier *)
   (* Load and initialize precomputed values from config *)
   let%bind.Deferred.Result runtime_config_json =
