@@ -54,11 +54,13 @@ in  Pipeline.build
             , commands =
               [ RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
-                  ( RunWithPostgres.ScriptOrArchive.Archive
-                      { Script = "post_upgrade_archive.sql"
-                      , Archive =
-                          "scripts/tests/archive-hardfork-toolbox/post_upgrade_archive.tar.gz"
-                      }
+                  ( Some
+                      ( RunWithPostgres.ScriptOrArchive.Archive
+                          { Script = "post_upgrade_archive.sql"
+                          , Archive =
+                              "scripts/tests/archive-hardfork-toolbox/post_upgrade_archive.tar.gz"
+                          }
+                      )
                   )
                   ( Artifacts.fullDockerTag
                       Artifacts.Tag::{
@@ -72,11 +74,13 @@ in  Pipeline.build
                   )
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
-                  ( RunWithPostgres.ScriptOrArchive.Archive
-                      { Script = "hf_archive.sql"
-                      , Archive =
-                          "scripts/tests/archive-hardfork-toolbox/hf_archive.tar.gz"
-                      }
+                  ( Some
+                      ( RunWithPostgres.ScriptOrArchive.Archive
+                          { Script = "hf_archive.sql"
+                          , Archive =
+                              "scripts/tests/archive-hardfork-toolbox/hf_archive.tar.gz"
+                          }
+                      )
                   )
                   ( Artifacts.fullDockerTag
                       Artifacts.Tag::{
