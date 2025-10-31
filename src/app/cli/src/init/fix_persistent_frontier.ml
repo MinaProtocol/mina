@@ -185,7 +185,6 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~epoch_ledger_backing_type:Stable_db
       Signature_lib.Public_key.Compressed.Set.empty
   in
-
   (* Load transition frontier using the standard API *)
   let%bind frontier =
     match%map
@@ -277,7 +276,14 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       [%log info] "Successfully moved frontier root to match persistent root"
 
 let fix_persistent_frontier_root ~config_directory ~config_file =
-  let logger = Logger.create () in
+  Logger.Consumer_registry.register ~commit_id:Mina_version.commit_id
+    ~id:Logger.Logger_id.mina ~processor:Internal_tracing.For_logger.processor
+    ~transport:
+      (Internal_tracing.For_logger.json_lines_rotate_transport
+         ~directory:(config_directory ^ "/internal-tracing")
+         () )
+    () ;
+  let logger = Logger.create ~id:Logger.Logger_id.mina () in
   let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
   (* Load the persistent root identifier *)
   (* Load and initialize precomputed values from config *)
