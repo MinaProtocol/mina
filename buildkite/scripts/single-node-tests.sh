@@ -19,7 +19,7 @@ sudo apt-get install --no-install-recommends -y nodejs=20.*
 sudo rm -rf /var/lib/apt/lists/*
 
 # --- Copy and install mina-test-signer
-npm install -g ./scripts/tests/mina-signer
+sudo npm install -g ./scripts/tests/mina-signer
 
 export MINA_LIBP2P_PASS="naughty blue worm"
 export MINA_PRIVKEY_PASS="naughty blue worm"
