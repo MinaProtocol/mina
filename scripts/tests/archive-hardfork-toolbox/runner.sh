@@ -4,18 +4,18 @@ set -euox pipefail
 
 # This script runs the archive hardfork toolbox tests.
 # It assumes that the archive hardfork toolbox has already been built.
-# It requires the archive database URI to be provided via --archive-uri argument.
+# It requires the archive database URI to be provided via --postgres-uri argument.
 
 # Parse command line arguments
-ARCHIVE_URI="${PG_CONN:-}"
+POSTGRES_URI="${PG_CONN:-}"
 TOOLBOX_PATH="mina-archive-hardfork-toolbox"
 AVAILABLE_MODES=("pre-fork" "post-fork" "upgrade")
 MODE=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --archive-uri)
-            ARCHIVE_URI="$2"
+        --postgres-uri)
+            POSTGRES_URI="$2"
             shift 2
             ;;
         --toolbox-path)
@@ -33,20 +33,20 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 --archive-uri <database_uri> [--toolbox-path <path_to_binary>]"
+            echo "Usage: $0 --postgres-uri <database_uri> [--toolbox-path <path_to_binary>]"
             exit 1
             ;;
     esac
 done
 
 # Validate required arguments
-if [[ -z "$ARCHIVE_URI" ]]; then
-    echo "Error: --archive-uri argument is required"
-    echo "Usage: $0 --archive-uri <database_uri> [--toolbox-path <path_to_binary>]"
+if [[ -z "$POSTGRES_URI" ]]; then
+    echo "Error: --postgres-uri argument is required"
+    echo "Usage: $0 --postgres-uri <database_uri> [--toolbox-path <path_to_binary>]"
     exit 1
 fi
 
-echo "Using archive database URI: $ARCHIVE_URI"
+echo "Using archive database URI: $POSTGRES_URI"
 echo "Using toolbox binary: $TOOLBOX_PATH"
 
 # Run the archive hardfork toolbox tests
@@ -73,17 +73,17 @@ FORK_SLOT=1067
 FORK_STATE_HASH="3NK38gNjWR6sE2MTKV8AqogjY6WaboPjSDq3zfpfVtiUgLMze1Wm"
 
 if [[ "$MODE" == "pre-fork" ]]; then
-    "$TOOLBOX_PATH" fork-candidate is-in-best-chain --archive-uri "$ARCHIVE_URI" --fork-state-hash "$FORK_CANDIDATE_STATE_HASH" --fork-height "$FORK_CANDIDATE_HEIGHT" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT"
+    "$TOOLBOX_PATH" fork-candidate is-in-best-chain --postgres-uri "$POSTGRES_URI" --fork-state-hash "$FORK_CANDIDATE_STATE_HASH" --fork-height "$FORK_CANDIDATE_HEIGHT" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT"
 
-    "$TOOLBOX_PATH" fork-candidate confirmations --archive-uri "$ARCHIVE_URI" --latest-state-hash "$LATEST_STATE_HASH" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT" --required-confirmations 1
+    "$TOOLBOX_PATH" fork-candidate confirmations --postgres-uri "$POSTGRES_URI" --latest-state-hash "$LATEST_STATE_HASH" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT" --required-confirmations 1
 
-    "$TOOLBOX_PATH" fork-candidate no-commands-after --archive-uri "$ARCHIVE_URI" --fork-state-hash "$FORK_CANDIDATE_STATE_HASH" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT"
+    "$TOOLBOX_PATH" fork-candidate no-commands-after --postgres-uri "$POSTGRES_URI" --fork-state-hash "$FORK_CANDIDATE_STATE_HASH" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT"
 fi
 
 if [[ "$MODE" == "upgrade" ]]; then
-    "$TOOLBOX_PATH" verify-upgrade --archive-uri "$ARCHIVE_URI" --version 4.0.0
+    "$TOOLBOX_PATH" verify-upgrade --postgres-uri "$POSTGRES_URI" --version 4.0.0
 fi
 
 if [[ "$MODE" == "post-fork" ]]; then
-    "$TOOLBOX_PATH" validate-fork --archive-uri "$ARCHIVE_URI" --fork-slot "$FORK_SLOT" --fork-state-hash "$FORK_STATE_HASH"
+    "$TOOLBOX_PATH" validate-fork --postgres-uri "$POSTGRES_URI" --fork-slot "$FORK_SLOT" --fork-state-hash "$FORK_STATE_HASH"
 fi
