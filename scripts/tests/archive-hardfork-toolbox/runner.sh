@@ -52,6 +52,34 @@ echo "Using toolbox binary: $TOOLBOX_PATH"
 # Run the archive hardfork toolbox tests
 echo "Running archive hardfork toolbox tests..."
 
+
+# Define helper to validate last-filled-block against expected fork candidate values
+validate_last_filled_block() {
+  local toolbox="$1"
+  local postgres_uri="$2"
+  local expected_height="$3"
+  local expected_state_hash="$4"
+  local expected_global_slot="$5"
+
+  local lfb_json lfb_height lfb_state_hash lfb_global_slot
+  lfb_json="$("$toolbox" last-filled-block --postgres-uri "$postgres_uri")"
+  lfb_height="$(jq -r '.height' <<<"$lfb_json")"
+  lfb_state_hash="$(jq -r '.state_hash' <<<"$lfb_json")"
+  lfb_global_slot="$(jq -r '.slot_since_genesis' <<<"$lfb_json")"
+
+  if [[ -z "$lfb_height" || -z "$lfb_state_hash" || -z "$lfb_global_slot" || "$lfb_height" == "null" || "$lfb_state_hash" == "null" || "$lfb_global_slot" == "null" ]]; then
+    echo "Error: failed to parse last-filled-block output. Got: $lfb_json" >&2
+    exit 1
+  fi
+
+  if [[ "$lfb_height" -ne "$expected_height" || "$lfb_global_slot" -ne "$expected_global_slot" || "$lfb_state_hash" != "$expected_state_hash" ]]; then
+    echo "Error: last-filled-block mismatch." >&2
+    echo "Expected height=$expected_height, state_hash=$expected_state_hash, global_slot_since_genesis=$expected_global_slot" >&2
+    echo "Actual   height=$lfb_height, state_hash=$lfb_state_hash, global_slot_since_genesis=$lfb_global_slot" >&2
+    exit 1
+  fi
+}
+
 # Define test parameters
 # Those values are hardcoded for the purpose of testing the toolbox.
 # They correspond sql scripts scripts/tests/archive-hardfork-toolbox/*.sql
@@ -78,6 +106,9 @@ if [[ "$MODE" == "pre-fork" ]]; then
     "$TOOLBOX_PATH" fork-candidate confirmations --postgres-uri "$POSTGRES_URI" --latest-state-hash "$LATEST_STATE_HASH" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT" --required-confirmations 1
 
     "$TOOLBOX_PATH" fork-candidate no-commands-after --postgres-uri "$POSTGRES_URI" --fork-state-hash "$FORK_CANDIDATE_STATE_HASH" --fork-slot "$FORK_CANDIDATE_GENESIS_SLOT"
+
+    # Validate last-filled-block against the fork candidate
+    validate_last_filled_block "$TOOLBOX_PATH" "$POSTGRES_URI" "$FORK_CANDIDATE_HEIGHT" "$FORK_CANDIDATE_STATE_HASH" "$FORK_CANDIDATE_GENESIS_SLOT"
 fi
 
 if [[ "$MODE" == "upgrade" ]]; then
