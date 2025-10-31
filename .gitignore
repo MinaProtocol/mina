@@ -34,17 +34,14 @@ target
 ./release
 .vscode
 
-### IntelliJ IDEA ###
-**/.idea/
-*.iws
-*.iml
-*.ipr
-
 ### Direnv ###
 .env
 .envrc
 .direnv/
 
+### Python ###
+**/.venv
+**/__pycache__
 # pipenv
 Pipfile
 Pipfile.lock
