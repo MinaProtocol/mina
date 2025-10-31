@@ -73,7 +73,7 @@ var caml_fp_srs_b_poly_commitment = function (srs, chals) {
   console.log("native caml_fp_srs_b_poly_commitment");
   var res = plonk_wasm.caml_fp_srs_b_poly_commitment(
     srs,
-    tsRustConversionNative.fieldsToRustFlat(chals)
+    tsRustConversionNative.fp.vectorToRust(chals)
   );
   return tsRustConversionNative.fp.polyCommFromRust(res);
 };
@@ -171,7 +171,7 @@ var caml_fq_srs_b_poly_commitment = function (srs, chals) {
   console.log("native caml_fq_srs_b_poly_commitment");
   var res = plonk_wasm.caml_fq_srs_b_poly_commitment(
     srs,
-    tsRustConversionNative.fieldsToRustFlat(chals)
+    tsRustConversionNative.fq.vectorToRust(chals)
   );
   return tsRustConversionNative.fq.polyCommFromRust(res);
 };
