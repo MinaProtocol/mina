@@ -93,7 +93,8 @@ val move_root :
   -> unit
 
 val get_transition :
-     signature_kind:Mina_signature_kind.t
+     logger:Logger.t
+  -> signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
   -> t
   -> State_hash.t
@@ -124,7 +125,8 @@ val get_best_tip :
 val set_best_tip : State_hash.t -> batch_t -> unit
 
 val crawl_successors :
-     signature_kind:Mina_signature_kind.t
+     logger:Logger.t
+  -> signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
   -> ?max_depth:int
   -> t

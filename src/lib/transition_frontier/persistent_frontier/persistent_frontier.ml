@@ -169,9 +169,9 @@ module Instance = struct
   let check_database t = Database.check t.db
 
   let get_root_transition ~signature_kind ~proof_cache_db t =
-    let open Result.Let_syntax in
-    Database.get_root_hash t.db
-    >>= Database.get_transition t.db ~signature_kind ~proof_cache_db
+    Result.bind (Database.get_root_hash t.db) ~f:(fun root_hash ->
+        Database.get_transition ~logger:t.factory.logger ~signature_kind
+          ~proof_cache_db t.db root_hash )
     |> Result.map_error ~f:Database.Error.message
 
   let fast_forward t target_root :
@@ -226,7 +226,8 @@ module Instance = struct
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.Stable.Latest.hash root in
       let%bind root_transition =
-        Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
+        Database.get_transition ~logger ~signature_kind ~proof_cache_db t.db
+          root_hash
       in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
@@ -291,10 +292,12 @@ module Instance = struct
       [%log internal] "Notify_frontier_extensions_done" ;
       Result.return result
     in
+    [%log internal] "Load_full_frontier_crawl_start"
+      ~metadata:[ ("root_hash", State_hash.to_yojson root_hash) ] ;
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
-        (Database.crawl_successors ~signature_kind ~proof_cache_db
+        (Database.crawl_successors ~logger ~signature_kind ~proof_cache_db
            ?max_depth:max_frontier_depth t.db root_hash
            ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
              let%bind transition =

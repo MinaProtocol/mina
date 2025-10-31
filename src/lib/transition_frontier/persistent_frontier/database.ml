@@ -460,10 +460,14 @@ let move_root ~old_root_hash ~new_root ~garbage =
         Batch.remove batch ~key:(Transition node_hash) ;
         Batch.remove batch ~key:(Arcs node_hash) )
 
-let get_transition ~signature_kind ~proof_cache_db t hash =
+let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
+  [%log internal] "Database_get_transition_start"
+    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   let%map transition =
     get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
   in
+  [%log internal] "Database_read_from_rocksdb_done"
+    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   let block =
     { With_hash.data = transition
     ; hash =
@@ -475,15 +479,24 @@ let get_transition ~signature_kind ~proof_cache_db t hash =
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
+  [%log internal] "Database_write_proofs_to_disk_start"
+    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   let cached_block =
     With_hash.map
       ~f:(Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db)
       block
   in
+  [%log internal] "Database_write_proofs_to_disk_done"
+    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
-  Mina_block.Validated.unsafe_of_trusted_block
-    ~delta_block_chain_proof:(Mina_stdlib.Nonempty_list.singleton parent_hash)
-    (`This_block_is_trusted_to_be_safe cached_block)
+  let result =
+    Mina_block.Validated.unsafe_of_trusted_block
+      ~delta_block_chain_proof:(Mina_stdlib.Nonempty_list.singleton parent_hash)
+      (`This_block_is_trusted_to_be_safe cached_block)
+  in
+  [%log internal] "Database_get_transition_done"
+    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
+  result
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
@@ -495,26 +508,45 @@ let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
 let set_best_tip data = Batch.set ~key:Best_tip ~data
 
-let rec crawl_successors ~signature_kind ~proof_cache_db ?max_depth t hash ~init
-    ~f =
+let rec crawl_successors ~logger ~signature_kind ~proof_cache_db ?max_depth t
+    hash ~init ~f =
   let open Deferred.Result.Let_syntax in
   match max_depth with
   | Some 0 ->
       (* Depth limit reached, stop crawling *)
+      [%log internal] "Crawl_depth_limit_reached" ;
       Deferred.Result.return ()
   | _ ->
       let remaining_depth = Option.map max_depth ~f:(fun d -> d - 1) in
+      [%log internal] "Crawl_get_arcs_start"
+        ~metadata:
+          [ ("state_hash", State_hash.to_yojson hash)
+          ; ( "remaining_depth"
+            , `Int (Option.value remaining_depth ~default:(-1)) )
+          ] ;
       let%bind successors = Deferred.return (get_arcs t hash) in
+      [%log internal] "Crawl_get_arcs_done"
+        ~metadata:
+          [ ("state_hash", State_hash.to_yojson hash)
+          ; ("successor_count", `Int (List.length successors))
+          ] ;
       deferred_list_result_iter successors ~f:(fun succ_hash ->
+          [%log internal] "Crawl_process_successor_start"
+            ~metadata:[ ("state_hash", State_hash.to_yojson succ_hash) ] ;
           let%bind transition =
             Deferred.return
-              (get_transition ~signature_kind ~proof_cache_db t succ_hash)
+              (get_transition ~logger ~signature_kind ~proof_cache_db t
+                 succ_hash )
           in
+          [%log internal] "Crawl_apply_diff_start"
+            ~metadata:[ ("state_hash", State_hash.to_yojson succ_hash) ] ;
           let%bind init' =
             Deferred.map (f init transition)
               ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
           in
-          crawl_successors ~signature_kind ~proof_cache_db
+          [%log internal] "Crawl_apply_diff_done"
+            ~metadata:[ ("state_hash", State_hash.to_yojson succ_hash) ] ;
+          crawl_successors ~logger ~signature_kind ~proof_cache_db
             ?max_depth:remaining_depth t succ_hash ~init:init' ~f )
 
 let with_batch t = Batch.with_batch t.db
