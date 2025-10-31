@@ -96,9 +96,14 @@ let find t hash =
   let%map node = Hashtbl.find t.table hash in
   node.breadcrumb
 
-let find_exn t hash =
-  let node = Hashtbl.find_exn t.table hash in
-  node.breadcrumb
+let find_exn ~message t hash =
+  match Hashtbl.find t.table hash with
+  | None ->
+      raise_s
+      @@ [%sexp_of: string * State_hash.t]
+           (message ^ " not found in frontier", hash)
+  | Some node ->
+      node.breadcrumb
 
 let find_protocol_state (t : t) hash =
   match find t hash with
@@ -112,12 +117,12 @@ let find_protocol_state (t : t) hash =
         ( breadcrumb |> Breadcrumb.block |> Mina_block.header
         |> Mina_block.Header.protocol_state )
 
-let root t = find_exn t t.root
+let root t = find_exn ~message:"root" t t.root
 
 let protocol_states_for_root_scan_state t =
   t.protocol_states_for_root_scan_state
 
-let best_tip t = find_exn t t.best_tip
+let best_tip t = find_exn ~message:"best_tip" t t.best_tip
 
 let close ~loc t =
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
@@ -200,7 +205,7 @@ let rec successor_hashes_rec t hash =
 let successors t breadcrumb =
   List.map
     (successor_hashes t (Breadcrumb.state_hash breadcrumb))
-    ~f:(find_exn t)
+    ~f:(find_exn ~message:"successor" t)
 
 let rec successors_rec t breadcrumb =
   List.bind (successors t breadcrumb) ~f:(fun succ ->
@@ -217,7 +222,10 @@ let path_map ?max_length t breadcrumb ~f =
         let parent_hash = Breadcrumb.parent_hash b in
         if State_hash.equal (Breadcrumb.state_hash b) t.root then acc
         else if State_hash.equal parent_hash t.root then elem :: acc
-        else find_path (find_exn t parent_hash) count_opt (elem :: acc)
+        else
+          find_path
+            (find_exn ~message:"parent" t parent_hash)
+            count_opt (elem :: acc)
   in
   find_path breadcrumb max_length []
 
@@ -254,7 +262,9 @@ let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t =
       let parent_unless_root breadcrumb =
         if State_hash.equal (Breadcrumb.state_hash breadcrumb) t.root then
           breadcrumb
-        else find_exn t (Breadcrumb.parent_hash breadcrumb)
+        else
+          find_exn ~message:"parent (in common_ancestor)" t
+            (Breadcrumb.parent_hash breadcrumb)
       in
       go ancestors1 ancestors2 (parent_unless_root b1) (parent_unless_root b2)
   in
@@ -423,7 +433,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     List.iter garbage ~f:(fun node ->
         let open Diff.Node_list in
         let hash = Mina_block.Validated.state_hash node.transition in
-        let breadcrumb = find_exn t hash in
+        let breadcrumb = find_exn ~message:"garbage" t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
         ignore
@@ -580,7 +590,9 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
       (* check if new breadcrumb extends frontier to longer than k *)
       let diffs =
         if parent_node.length + 1 - root_node.length > t.max_length then
-          let heir = find_exn t (List.hd_exn (hash_path t breadcrumb)) in
+          let heir =
+            find_exn ~message:"heir" t (List.hd_exn (hash_path t breadcrumb))
+          in
           calculate_root_transition_diff t heir :: diffs
         else diffs
       in
@@ -671,7 +683,7 @@ module Metrics = struct
       |> List.max_elt ~compare:Int.compare
       |> Option.value ~default:0
     in
-    longest_fork (find_exn t t.root)
+    longest_fork @@ root t
 
   let parent t b = find t (Breadcrumb.parent_hash b)
 
