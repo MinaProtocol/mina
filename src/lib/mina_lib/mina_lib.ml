@@ -2884,24 +2884,39 @@ module Hardfork_config = struct
     in
     Option.value ~default:block_global_slot configured_slot
 
-  (** Helper to convert a global slot since hard fork to a global slot since genesis *)
-  let global_slot_since_hard_fork_to_genesis
-      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      global_slot =
-    (* Convert the global slot to a span of slots since the current hard fork *)
+  (** We schedule the hard fork genesis to occur at a particular
+      [Mina_numbers.Global_slot_since_hard_fork.t], but need a
+      [Mina_numbers.Global_slot_since_genesis.t] for the hard fork config. This
+      method does this conversion by taking the hard fork block's consensus data
+      applying the same slot update as [Consensus.Data.Consensus_state.update]
+      to the hard fork block's global slots (since hard fork and since genesis),
+      then returning the resulting global slot since genesis.
+
+      This method requires that the desired hard fork genesis slot occur after
+      the hard fork block's slot. This property is guaranteed by
+      [hard_fork_global_slot] (which determines the scheduled genesis slot) and
+      [breadcrumb] (which retrieves the hard fork block). *)
+  let move_hard_fork_consensus_to_scheduled_genesis ~hard_fork_consensus_data
+      next_genesis_global_slot =
+    let block_global_slot =
+      Consensus.Data.Consensus_state.curr_global_slot hard_fork_consensus_data
+    in
+    let block_global_slot_since_genesis =
+      Consensus.Data.Consensus_state.global_slot_since_genesis
+        hard_fork_consensus_data
+    in
+    (* We pretend that the consensus moved forward from the hard fork block's
+       slot to the scheduled genesis slot, and get that slot difference *)
     let global_slot_span =
-      global_slot |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
-      |> Mina_numbers.Global_slot_span.of_uint32
+      Mina_numbers.Global_slot_since_hard_fork.diff next_genesis_global_slot
+        block_global_slot
+      |> Option.value_exn ~here:[%here]
+           ~message:
+             "Invariant: hard fork genesis cannot be scheduled before the hard \
+              fork block"
     in
-    (* Retrieve the global slot since genesis of the genesis of the current
-       chain *)
-    let current_genesis_global_slot =
-      constraint_constants.fork
-      |> Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
-           ~f:(fun fork -> fork.global_slot_since_genesis)
-    in
-    (* Add the slot span to the current chain's genesis slot to get the desired quantity *)
-    Mina_numbers.Global_slot_since_genesis.add current_genesis_global_slot
+    (* Now apply that difference to the hard fork block's slot since genesis *)
+    Mina_numbers.Global_slot_since_genesis.add block_global_slot_since_genesis
       global_slot_span
 
   let prepare_inputs ~breadcrumb_spec mina =
@@ -2913,9 +2928,8 @@ module Hardfork_config = struct
       hard_fork_global_slot ~breadcrumb_spec ~block mina
     in
     let global_slot_since_genesis =
-      global_slot_since_hard_fork_to_genesis
-        ~constraint_constants:
-          mina.config.precomputed_values.constraint_constants
+      move_hard_fork_consensus_to_scheduled_genesis
+        ~hard_fork_consensus_data:(Mina_block.consensus_state block)
         global_slot_since_hard_fork
     in
     let genesis_state_timestamp =
