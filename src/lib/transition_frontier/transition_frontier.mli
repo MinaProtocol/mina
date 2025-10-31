@@ -66,6 +66,7 @@ val global_max_length : Genesis_constants.t -> int
 
 val load :
      ?retry_with_fresh_db:bool
+  -> ?max_frontier_depth:int
   -> context:(module CONTEXT)
   -> verifier:Verifier.t
   -> consensus_local_state:Consensus.Data.Local_state.t
@@ -122,6 +123,7 @@ module For_tests : sig
        context:(module CONTEXT)
     -> max_length:int
     -> ?retry_with_fresh_db:bool
+    -> ?max_frontier_depth:int
     -> verifier:Verifier.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
