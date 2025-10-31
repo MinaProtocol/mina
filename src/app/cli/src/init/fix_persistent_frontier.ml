@@ -191,8 +191,9 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     match%map
       Transition_frontier.load
         ~context:(module Context)
-        ~retry_with_fresh_db:false ~verifier ~consensus_local_state
-        ~persistent_root ~persistent_frontier ~catchup_mode:`Super ()
+        ~retry_with_fresh_db:false ~max_frontier_depth:20 ~verifier
+        ~consensus_local_state ~persistent_root ~persistent_frontier
+        ~catchup_mode:`Super ()
     with
     | Error err ->
         let err_str =

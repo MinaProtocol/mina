@@ -99,7 +99,7 @@ let genesis_root_data ~precomputed_values =
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ignore_consensus_local_state =
+    ~catchup_mode ?max_frontier_depth ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -143,7 +143,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
             ~root_ledger:
               (Persistent_root.Instance.snarked_ledger persistent_root_instance)
             ~consensus_local_state ~ignore_consensus_local_state
-            ~persistent_root_instance
+            ~persistent_root_instance ?max_frontier_depth ()
         with
         | Error `Sync_cannot_be_running ->
             Error (`Failure "sync job is already running on persistent frontier")
@@ -194,6 +194,7 @@ let rec load_with_max_length :
        context:(module CONTEXT)
     -> max_length:int
     -> ?retry_with_fresh_db:bool
+    -> ?max_frontier_depth:int
     -> verifier:Verifier.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
@@ -207,8 +208,9 @@ let rec load_with_max_length :
          | `Failure of string ] )
        Deferred.Result.t =
  fun ~context:(module Context : CONTEXT) ~max_length
-     ?(retry_with_fresh_db = true) ~verifier ~consensus_local_state
-     ~persistent_root ~persistent_frontier ~catchup_mode () ->
+     ?(retry_with_fresh_db = true) ?max_frontier_depth ~verifier
+     ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
+     () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -239,7 +241,8 @@ let rec load_with_max_length :
             ~context:(module Context)
             ~verifier ~consensus_local_state ~max_length ~persistent_root
             ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ignore_consensus_local_state
+            ~persistent_frontier_instance ?max_frontier_depth
+            ignore_consensus_local_state
         with
         | Ok _ as result ->
             [%str_log trace] Persisted_frontier_loaded ;
@@ -371,9 +374,9 @@ let rec load_with_max_length :
           [%str_log trace] Transition_frontier_loaded_from_persistence ;
           return res )
 
-let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
-    ~verifier ~consensus_local_state ~persistent_root ~persistent_frontier
-    ~catchup_mode () =
+let load ?(retry_with_fresh_db = true) ?max_frontier_depth
+    ~context:(module Context : CONTEXT) ~verifier ~consensus_local_state
+    ~persistent_root ~persistent_frontier ~catchup_mode () =
   let open Context in
   O1trace.thread "transition_frontier_load" (fun () ->
       let max_length =
@@ -382,8 +385,9 @@ let load ?(retry_with_fresh_db = true) ~context:(module Context : CONTEXT)
       in
       load_with_max_length
         ~context:(module Context)
-        ~max_length ~retry_with_fresh_db ~verifier ~consensus_local_state
-        ~persistent_root ~persistent_frontier ~catchup_mode () )
+        ~max_length ~retry_with_fresh_db ?max_frontier_depth ~verifier
+        ~consensus_local_state ~persistent_root ~persistent_frontier
+        ~catchup_mode () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)

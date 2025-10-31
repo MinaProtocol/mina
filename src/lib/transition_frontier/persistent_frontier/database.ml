@@ -348,7 +348,7 @@ let check t ~genesis_state_hash =
             in
             check_arcs succ_hash )
       in
-      ignore check_arcs;
+      ignore check_arcs ;
       let%bind () = check_version () in
       let%bind _root_hash, root_block = check_base () in
       let root_protocol_state =
@@ -495,19 +495,26 @@ let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
 let set_best_tip data = Batch.set ~key:Best_tip ~data
 
-let rec crawl_successors ~signature_kind ~proof_cache_db t hash ~init ~f =
+let rec crawl_successors ~signature_kind ~proof_cache_db ?max_depth t hash ~init
+    ~f =
   let open Deferred.Result.Let_syntax in
-  let%bind successors = Deferred.return (get_arcs t hash) in
-  deferred_list_result_iter successors ~f:(fun succ_hash ->
-      let%bind transition =
-        Deferred.return
-          (get_transition ~signature_kind ~proof_cache_db t succ_hash)
-      in
-      let%bind init' =
-        Deferred.map (f init transition)
-          ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
-      in
-      crawl_successors ~signature_kind ~proof_cache_db t succ_hash ~init:init'
-        ~f )
+  match max_depth with
+  | Some 0 ->
+      (* Depth limit reached, stop crawling *)
+      Deferred.Result.return ()
+  | _ ->
+      let remaining_depth = Option.map max_depth ~f:(fun d -> d - 1) in
+      let%bind successors = Deferred.return (get_arcs t hash) in
+      deferred_list_result_iter successors ~f:(fun succ_hash ->
+          let%bind transition =
+            Deferred.return
+              (get_transition ~signature_kind ~proof_cache_db t succ_hash)
+          in
+          let%bind init' =
+            Deferred.map (f init transition)
+              ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
+          in
+          crawl_successors ~signature_kind ~proof_cache_db
+            ?max_depth:remaining_depth t succ_hash ~init:init' ~f )
 
 let with_batch t = Batch.with_batch t.db

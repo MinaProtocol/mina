@@ -198,7 +198,7 @@ module Instance = struct
 
   let load_full_frontier t ~context:(module Context : CONTEXT) ~root_ledger
       ~consensus_local_state ~max_length ~ignore_consensus_local_state
-      ~persistent_root_instance =
+      ~persistent_root_instance ?max_frontier_depth () =
     let open Context in
     let open Deferred.Result.Let_syntax in
     let validate genesis_state_hash (b, v) =
@@ -294,9 +294,9 @@ module Instance = struct
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
-        (Database.crawl_successors ~signature_kind ~proof_cache_db t.db
-           root_hash ~init:(Full_frontier.root frontier)
-           ~f:(fun parent transition ->
+        (Database.crawl_successors ~signature_kind ~proof_cache_db
+           ?max_depth:max_frontier_depth t.db root_hash
+           ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
              let%bind transition =
                match
                  downgrade_transition transition root_genesis_state_hash
