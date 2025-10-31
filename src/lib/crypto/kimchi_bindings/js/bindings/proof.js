@@ -69,34 +69,6 @@ var caml_pasta_fp_plonk_proof_deep_copy = function (proof) {
   );
 };
 
-// Provides: caml_pasta_fq_plonk_proof_create
-// Requires: plonk_wasm, tsRustConversion
-var caml_pasta_fq_plonk_proof_create = function (
-  index,
-  witness_cols,
-  caml_runtime_tables,
-  prev_challenges,
-  prev_sgs
-) {
-  var w = new plonk_wasm.WasmVecVecFq(witness_cols.length - 1);
-  for (var i = 1; i < witness_cols.length; i++) {
-    w.push(tsRustConversion.fq.vectorToRust(witness_cols[i]));
-  }
-  witness_cols = w;
-  prev_challenges = tsRustConversion.fq.vectorToRust(prev_challenges);
-  var wasm_runtime_tables =
-    tsRustConversion.fq.runtimeTablesToRust(caml_runtime_tables);
-  prev_sgs = tsRustConversion.fq.pointsToRust(prev_sgs);
-  var proof = plonk_wasm.caml_pasta_fq_plonk_proof_create(
-    index,
-    witness_cols,
-    wasm_runtime_tables,
-    prev_challenges,
-    prev_sgs
-  );
-  return tsRustConversion.fq.proofFromRust(proof);
-};
-
 // Provides: caml_pasta_fq_plonk_proof_verify
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fq_plonk_proof_verify = function (index, proof) {
