@@ -148,7 +148,7 @@ fi
 # Launch two Mina nodes and send transactions on an interval
 ##############################################################
 
-COMMON_ARGS=( --file-log-level Info --log-level Error --seed )
+COMMON_ARGS=( --file-log-level Info --log-level Info --log-json --seed )
 COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/base.json" )
 COMMON_ARGS+=( --config-file "$PWD/$CONF_DIR/daemon$CONF_SUFFIX.json" )
 
