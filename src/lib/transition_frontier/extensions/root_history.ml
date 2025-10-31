@@ -67,8 +67,9 @@ module T = struct
       List.exists diffs_with_mutants ~f:(function
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
         | E (Root_transitioned { new_root; _ }, _) ->
-            Full_frontier.find_exn frontier
+            Full_frontier.find frontier
               (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
+            |> Option.value_exn ~message:"new root not found in frontier"
             |> Root_data.Historical.of_breadcrumb |> enqueue root_history ;
             true
         | E _ ->

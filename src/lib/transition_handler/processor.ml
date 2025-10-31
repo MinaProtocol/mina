@@ -241,7 +241,9 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
       (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       [%log internal] "Find_parent_breadcrumb" ;
       let parent_breadcrumb =
-        Transition_frontier.find_exn frontier parent_hash
+        Transition_frontier.find frontier parent_hash
+        |> Option.value_exn
+             ~message:"process_transition: parent not found in frontier"
       in
       let%bind breadcrumb =
         cached_transform_deferred_result cached_initially_validated_transition

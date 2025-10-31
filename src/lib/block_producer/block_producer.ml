@@ -731,7 +731,9 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
              attempting to produce our own. Build upon its parent instead
              of attempting (and failing) to build upon the block itself.
           *)
-          Transition_frontier.find_exn frontier (Breadcrumb.parent_hash crumb)
+          Transition_frontier.find frontier (Breadcrumb.parent_hash crumb)
+          |> Option.value_exn
+               ~message:"block producer: parent not found in frontier"
         else crumb
       in
       let start = Block_time.now time_controller in

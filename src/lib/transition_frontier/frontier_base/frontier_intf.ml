@@ -6,8 +6,6 @@ open Mina_base
 module type S = sig
   type t
 
-  val find_exn : t -> State_hash.t -> Breadcrumb.t
-
   val max_length : t -> int
 
   val consensus_local_state : t -> Consensus.Data.Local_state.t

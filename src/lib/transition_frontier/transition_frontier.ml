@@ -550,9 +550,6 @@ include struct
 
   let genesis_constants = proxy1 genesis_constants
 
-  (* TODO: find -> option externally, find_exn internally *)
-  let find_exn = proxy1 find_exn
-
   (* TODO: is this an abstraction leak? *)
   let root_length = proxy1 root_length
 

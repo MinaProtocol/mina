@@ -41,8 +41,8 @@ let%test_module "Full_frontier tests" =
               let%map breadcrumb = make_breadcrumb root in
               add_breadcrumb frontier breadcrumb ;
               let queried_breadcrumb =
-                Full_frontier.find_exn frontier
-                  (Breadcrumb.state_hash breadcrumb)
+                Full_frontier.find frontier (Breadcrumb.state_hash breadcrumb)
+                |> Option.value_exn ~message:"breadcrumb not found in frontier"
               in
               test_eq ~message:"retrieved unexpected benchmark from frontier"
                 breadcrumb queried_breadcrumb ;

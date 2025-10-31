@@ -916,7 +916,12 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                 Time.(Span.to_ms @@ diff (now ()) start_time)) ;
             match result with
             | `In_frontier hash ->
-                finish t node (Ok (Transition_frontier.find_exn frontier hash)) ;
+                let transition =
+                  Transition_frontier.find frontier hash
+                  |> Option.value_exn
+                       ~message:"super_catchup: parent not found in frontier"
+                in
+                finish t node (Ok transition) ;
                 Deferred.return (Ok ())
             | `Building_path tv ->
                 (* To_initial_validate may only occur for a downloaded block,
