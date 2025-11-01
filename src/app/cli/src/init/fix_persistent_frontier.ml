@@ -192,7 +192,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
         ~context:(module Context)
         ~retry_with_fresh_db:false ~max_frontier_depth:20 ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
-        ~catchup_mode:`Super ()
+        ~catchup_mode:`Super ~set_best_tip:false ()
     with
     | Error err ->
         let err_str =
