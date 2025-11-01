@@ -35,10 +35,12 @@ let run config =
         (String.concat ~sep:" " (repo_path :: Config.to_args config)) ;
       Util.run_cmd_or_error "." "node" ([ repo_path ] @ Config.to_args config)
   | _ -> (
-      match%bind Sys.file_exists official_name with
-      | `Yes ->
-          [%log info] "Running command %s %s" official_name
+      let%bind which = Util.run_cmd_exn "." "which" [ official_name ] in
+      match String.strip which with
+      | "" ->
+          Deferred.Or_error.error_string
+            "Could not find js_signer executable on PATH"
+      | path ->
+          [%log info] "Running command %s %s" path
             (String.concat ~sep:" " (Config.to_args config)) ;
-          Util.run_cmd_or_error "" official_name (Config.to_args config)
-      | _ ->
-          Deferred.Or_error.error_string "Could not find js_signer executable" )
+          Util.run_cmd_or_error "" path (Config.to_args config) )
