@@ -190,7 +190,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     match%map
       Transition_frontier.load
         ~context:(module Context)
-        ~retry_with_fresh_db:false ~max_frontier_depth:20 ~verifier
+        ~retry_with_fresh_db:false ~max_frontier_depth:1 ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
         ~catchup_mode:`Super ~set_best_tip:false ()
     with
@@ -287,7 +287,7 @@ let fix_persistent_frontier_root ~config_directory ~config_file =
   let log_processor =
     Logger.Processor.pretty ~log_level:Logger.Level.Trace
       ~config:
-        { Interpolator_lib.Interpolator.mode = Inline
+        { Interpolator_lib.Interpolator.mode = After
         ; max_interpolation_length = 50
         ; pretty_print = true
         }
