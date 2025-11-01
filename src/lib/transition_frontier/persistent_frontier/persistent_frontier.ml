@@ -263,6 +263,11 @@ module Instance = struct
       ~get_completed_work:(Fn.const None) ~sender:None ~transition_receipt_time
       ()
 
+  let set_best_tip ~logger ~frontier ~extensions ~ignore_consensus_local_state
+      ~root_ledger best_tip_hash =
+    apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
+      ~root_ledger (E (Best_tip_changed best_tip_hash))
+
   let load_full_frontier t ~context:(module Context : CONTEXT) ~root_ledger
       ~consensus_local_state ~max_length ~ignore_consensus_local_state
       ~persistent_root_instance =
@@ -324,21 +329,20 @@ module Instance = struct
         (Extensions.create ~logger:t.factory.logger frontier)
         ~f:Result.return
     in
-    let apply_diff =
-      apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
-        ~root_ledger
-    in
     let visit parent transition =
       let%bind breadcrumb =
         load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
           ~parent transition
       in
-      let%map () = apply_diff (E (New_node (Full breadcrumb))) in
+      let%map () =
+        apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
+          ~root_ledger (E (New_node (Full breadcrumb)))
+      in
       [%log internal] "Breadcrumb_integrated" ;
       breadcrumb
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)
-    let%bind () =
+    let%map () =
       Deferred.map
         (Database.crawl_successors ~signature_kind ~proof_cache_db t.db
            root_hash
@@ -362,8 +366,7 @@ module Instance = struct
             | `Not_found _ as err ->
                 `Failure (Database.Error.not_found_message err) ) )
     in
-    let%map () = apply_diff (E (Best_tip_changed best_tip)) in
-    (frontier, extensions)
+    (root_ledger, best_tip, frontier, extensions)
 end
 
 type t = Factory_type.t
