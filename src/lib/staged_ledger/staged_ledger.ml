@@ -320,11 +320,14 @@ module T = struct
       ~last_proof_statement ~ledger ~scan_state ~pending_coinbase_collection
       ~first_pass_ledger_target =
     let open Deferred.Or_error.Let_syntax in
+    [%log internal] "Of_scan_state_get_pending_coinbase_stack_start" ;
     let%bind pending_coinbase_stack =
       Pending_coinbase.latest_stack ~is_new_stack:false
         pending_coinbase_collection
       |> Deferred.return
     in
+    [%log internal] "Of_scan_state_get_pending_coinbase_stack_done" ;
+    [%log internal] "Of_scan_state_check_invariants_start" ;
     let%bind () =
       Statement_scanner.check_invariants ~constraint_constants ~logger
         scan_state ~statement_check:`Partial ~verifier:()
@@ -338,6 +341,7 @@ module T = struct
           ; pending_coinbase_stack
           }
     in
+    [%log internal] "Of_scan_state_check_invariants_done" ;
     return
       { ledger; scan_state; constraint_constants; pending_coinbase_collection }
 

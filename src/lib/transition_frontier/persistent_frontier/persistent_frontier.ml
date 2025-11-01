@@ -27,20 +27,26 @@ let construct_staged_ledger_at_root ~proof_cache_db
     ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
     ~signature_kind =
   let open Deferred.Or_error.Let_syntax in
+  [%log internal] "Construct_staged_ledger_extract_blockchain_state_start" ;
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
     |> Mina_block.header |> Mina_block.Header.protocol_state
     |> Protocol_state.blockchain_state
   in
+  [%log internal] "Construct_staged_ledger_extract_root_data_start" ;
   let pending_coinbases, scan_state_unwrapped =
     Root_data.Minimal.Stable.Latest.(pending_coinbase root, scan_state root)
   in
+  [%log internal] "Construct_staged_ledger_build_protocol_states_map_start"
+    ~metadata:
+      [ ("protocol_states_count", `Int (List.length protocol_states)) ] ;
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
         Map.add_exn acc ~key:(Protocol_state.hashes protocol_state).state_hash
           ~data:protocol_state )
   in
+  [%log internal] "Construct_staged_ledger_build_protocol_states_map_done" ;
   let get_state hash =
     match Map.find protocol_states_map hash with
     | None ->
@@ -56,15 +62,20 @@ let construct_staged_ledger_at_root ~proof_cache_db
     | Some protocol_state ->
         Ok protocol_state
   in
+  [%log internal] "Construct_staged_ledger_setup_ledger_mask_start" ;
   let mask = Mina_ledger.Ledger.Root.as_masked root_ledger in
   let local_state = Blockchain_state.snarked_local_state blockchain_state in
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
   in
+  [%log internal] "Construct_staged_ledger_write_scan_state_proofs_start" ;
   let scan_state =
     Staged_ledger.Scan_state.write_all_proofs_to_disk ~signature_kind
       ~proof_cache_db scan_state_unwrapped
   in
+  [%log internal] "Construct_staged_ledger_write_scan_state_proofs_done" ;
+  [%log internal]
+    "Construct_staged_ledger_of_scan_state_pending_coinbases_start" ;
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
@@ -73,19 +84,27 @@ let construct_staged_ledger_at_root ~proof_cache_db
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
       ~get_state ~signature_kind
   in
+  [%log internal]
+    "Construct_staged_ledger_of_scan_state_pending_coinbases_done" ;
+  [%log internal] "Construct_staged_ledger_compute_hash_start" ;
   let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
+  [%log internal] "Construct_staged_ledger_compute_hash_done" ;
+  [%log internal] "Construct_staged_ledger_validate_hash_start" ;
   if
     Mina_block.Validated.is_genesis root_transition
     || Staged_ledger_hash.equal staged_ledger_hash
          constructed_staged_ledger_hash
-  then Deferred.return (Ok staged_ledger)
-  else
+  then (
+    [%log internal] "Construct_staged_ledger_validate_hash_success" ;
+    Deferred.return (Ok staged_ledger) )
+  else (
+    [%log internal] "Construct_staged_ledger_validate_hash_mismatch" ;
     Deferred.return
       (Or_error.errorf
          !"Constructed staged ledger %{sexp: Staged_ledger_hash.t} did not \
            match the staged ledger hash in the protocol state %{sexp: \
            Staged_ledger_hash.t}"
-         constructed_staged_ledger_hash staged_ledger_hash )
+         constructed_staged_ledger_hash staged_ledger_hash ) )
 
 module rec Instance_type : sig
   type t =
@@ -214,7 +233,8 @@ module Instance = struct
 
   let apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
       ~root_ledger diff =
-    [%log internal] "Apply_full_frontier_diffs" ;
+    [%log internal] "Apply_diff_start" ;
+    [%log internal] "Apply_full_frontier_diffs_start" ;
     let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
       Full_frontier.apply_diffs frontier [ diff ] ~has_long_catchup_job:false
         ~enable_epoch_ledger_sync:
@@ -222,11 +242,12 @@ module Instance = struct
           else `Enabled root_ledger )
     in
     [%log internal] "Apply_full_frontier_diffs_done" ;
-    [%log internal] "Notify_frontier_extensions" ;
+    [%log internal] "Notify_frontier_extensions_start" ;
     let%map.Deferred result =
       Extensions.notify extensions ~logger ~frontier ~diffs_with_mutants
     in
     [%log internal] "Notify_frontier_extensions_done" ;
+    [%log internal] "Apply_diff_done" ;
     Result.return result
 
   let load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
@@ -256,11 +277,16 @@ module Instance = struct
        don't assign a timestamp
     *)
     let transition_receipt_time = None in
-    Breadcrumb.build ~skip_staged_ledger_verification:`All
-      ~logger:t.factory.logger ~precomputed_values ~verifier:t.factory.verifier
-      ~trust_system:(Trust_system.null ()) ~parent ~transition
-      ~get_completed_work:(Fn.const None) ~sender:None ~transition_receipt_time
-      ()
+    [%log internal] "Breadcrumb_build_start" ;
+    let%map breadcrumb =
+      Breadcrumb.build ~skip_staged_ledger_verification:`All
+        ~logger:t.factory.logger ~precomputed_values ~verifier:t.factory.verifier
+        ~trust_system:(Trust_system.null ()) ~parent ~transition
+        ~get_completed_work:(Fn.const None) ~sender:None ~transition_receipt_time
+        ()
+    in
+    [%log internal] "Breadcrumb_build_done" ;
+    breadcrumb
 
   let set_best_tip ~logger ~frontier ~extensions ~ignore_consensus_local_state
       ~root_ledger best_tip_hash =
@@ -273,29 +299,50 @@ module Instance = struct
     let open Context in
     let open Deferred.Result.Let_syntax in
     let%bind () = Deferred.return (assert_no_sync t) in
+    [%log internal] "Load_full_frontier_read_metadata_start" ;
     (* read basic information from the database *)
-    let%bind root, root_transition, best_tip, protocol_states, root_hash =
-      (let open Result.Let_syntax in
-      let%bind root = Database.get_root t.db in
-      let root_hash = Root_data.Minimal.Stable.Latest.hash root in
-      let%bind root_transition =
-        Database.get_transition ~logger ~signature_kind ~proof_cache_db t.db
-          root_hash
-      in
-      let%bind best_tip = Database.get_best_tip t.db in
-      let%map protocol_states =
-        Database.get_protocol_states_for_root_scan_state t.db
-      in
-      (root, root_transition, best_tip, protocol_states, root_hash))
+    [%log internal] "Database_get_root_start" ;
+    let%bind root =
+      Database.get_root t.db
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
     in
+    [%log internal] "Database_get_root_done" ;
+    let root_hash = Root_data.Minimal.Stable.Latest.hash root in
+    [%log internal] "Database_get_root_transition_start"
+      ~metadata:[ ("root_hash", State_hash.to_yojson root_hash) ] ;
+    let%bind root_transition =
+      Database.get_transition ~logger ~signature_kind ~proof_cache_db t.db
+        root_hash
+      |> Result.map_error ~f:(fun err ->
+             `Failure (Database.Error.not_found_message err) )
+      |> Deferred.return
+    in
+    [%log internal] "Database_get_root_transition_done" ;
+    [%log internal] "Database_get_best_tip_start" ;
+    let%bind best_tip =
+      Database.get_best_tip t.db
+      |> Result.map_error ~f:(fun err ->
+             `Failure (Database.Error.not_found_message err) )
+      |> Deferred.return
+    in
+    [%log internal] "Database_get_best_tip_done" ;
+    [%log internal] "Database_get_protocol_states_start" ;
+    let%bind protocol_states =
+      Database.get_protocol_states_for_root_scan_state t.db
+      |> Result.map_error ~f:(fun err ->
+             `Failure (Database.Error.not_found_message err) )
+      |> Deferred.return
+    in
+    [%log internal] "Database_get_protocol_states_done" ;
+    [%log internal] "Load_full_frontier_read_metadata_done" ;
     let root_genesis_state_hash =
       root_transition |> Mina_block.Validated.forget |> With_hash.data
       |> Mina_block.header |> Mina_block.Header.protocol_state
       |> Protocol_state.genesis_state_hash
     in
+    [%log internal] "Load_full_frontier_construct_staged_ledger_start" ;
     (* construct the root staged ledger in memory *)
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
@@ -309,6 +356,8 @@ module Instance = struct
       | Ok staged_ledger ->
           Ok staged_ledger
     in
+    [%log internal] "Load_full_frontier_construct_staged_ledger_done" ;
+    [%log internal] "Load_full_frontier_create_frontier_start" ;
     (* initialize the new in memory frontier and extensions *)
     let frontier =
       Full_frontier.create
@@ -324,22 +373,29 @@ module Instance = struct
         ~root_ledger:(Mina_ledger.Ledger.Root.as_unmasked root_ledger)
         ~consensus_local_state ~max_length ~persistent_root_instance
     in
+    [%log internal] "Load_full_frontier_create_frontier_done" ;
+    [%log internal] "Load_full_frontier_create_extensions_start" ;
     let%bind extensions =
       Deferred.map
         (Extensions.create ~logger:t.factory.logger frontier)
         ~f:Result.return
     in
+    [%log internal] "Load_full_frontier_create_extensions_done" ;
     [%log internal] "Load_full_frontier_crawl_start"
       ~metadata:[ ("root_hash", State_hash.to_yojson root_hash) ] ;
     let visit parent transition =
+      [%log internal] "Visit_load_transition_start" ;
       let%bind breadcrumb =
         load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
           ~parent transition
       in
+      [%log internal] "Visit_load_transition_done" ;
+      [%log internal] "Visit_apply_diff_start" ;
       let%map () =
         apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
           ~root_ledger (E (New_node (Full breadcrumb)))
       in
+      [%log internal] "Visit_apply_diff_done" ;
       [%log internal] "Breadcrumb_integrated" ;
       breadcrumb
     in

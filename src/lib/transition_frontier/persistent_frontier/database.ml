@@ -273,22 +273,30 @@ let get db ~key ~error =
 Don't use this when possible. It cost ~90s while get_root_hash cost seconds.
 *)
 let get_root t =
+  [%log' internal t.logger] "Get_root_get_batch_start" ;
   match get_batch t.db ~keys:[ Some_key Root_hash; Some_key Root_common ] with
   | [ Some (Some_key_value (Root_hash, hash))
     ; Some (Some_key_value (Root_common, common))
     ] ->
-      Ok (Root_data.Minimal.Stable.V2.of_limited ~common hash)
+      [%log' internal t.logger] "Get_root_found_split_keys" ;
+      [%log' internal t.logger] "Get_root_of_limited_start" ;
+      let result = Ok (Root_data.Minimal.Stable.V2.of_limited ~common hash) in
+      [%log' internal t.logger] "Get_root_of_limited_done" ;
+      result
   | _ -> (
+      [%log' internal t.logger] "Get_root_fallback_to_legacy_Root_key" ;
       match get t.db ~key:Root ~error:(`Not_found `Root) with
       | Ok root ->
+          [%log' internal t.logger] "Get_root_legacy_read_done" ;
           (* automatically split Root into (Root_hash, Root_common) *)
+          [%log' internal t.logger] "Get_root_split_batch_start" ;
           Batch.with_batch t.db ~f:(fun batch ->
               let hash = Root_data.Minimal.Stable.Latest.hash root in
               let common = Root_data.Minimal.Stable.V2.common root in
               Batch.remove batch ~key:Root ;
               Batch.set batch ~key:Root_hash ~data:hash ;
               Batch.set batch ~key:Root_common ~data:common ) ;
-
+          [%log' internal t.logger] "Get_root_split_batch_done" ;
           Ok root
       | Error _ as e ->
           e )
@@ -501,10 +509,19 @@ let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
 let get_protocol_states_for_root_scan_state t =
-  get t.db ~key:Protocol_states_for_root_scan_state
-    ~error:(`Not_found `Protocol_states_for_root_scan_state)
+  [%log' internal t.logger] "Get_protocol_states_start" ;
+  let result =
+    get t.db ~key:Protocol_states_for_root_scan_state
+      ~error:(`Not_found `Protocol_states_for_root_scan_state)
+  in
+  [%log' internal t.logger] "Get_protocol_states_done" ;
+  result
 
-let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
+let get_best_tip t =
+  [%log' internal t.logger] "Get_best_tip_start" ;
+  let result = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip) in
+  [%log' internal t.logger] "Get_best_tip_done" ;
+  result
 
 let set_best_tip data = Batch.set ~key:Best_tip ~data
 
