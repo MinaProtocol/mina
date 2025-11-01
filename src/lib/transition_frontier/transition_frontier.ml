@@ -133,24 +133,28 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
             "Unable to fast forward persistent frontier: %s" msg ;
           Error (`Failure msg) )
   in
-  let%bind full_frontier, extensions =
-    O1trace.thread "persistent_frontier_read_from_disk" (fun () ->
-        let open Deferred.Let_syntax in
-        match%map
-          Persistent_frontier.Instance.load_full_frontier
-            ~context:(module Context)
-            persistent_frontier_instance ~max_length
-            ~root_ledger:
-              (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-            ~consensus_local_state ~ignore_consensus_local_state
-            ~persistent_root_instance ?max_frontier_depth ()
-        with
-        | Error `Sync_cannot_be_running ->
-            Error (`Failure "sync job is already running on persistent frontier")
-        | Error (`Failure _) as err ->
-            err
-        | Ok result ->
-            Ok result )
+  let%bind root_ledger, best_tip_hash, full_frontier, extensions =
+    O1trace.thread "persistent_frontier_read_from_disk"
+    @@ fun () ->
+    match%map.Deferred
+      Persistent_frontier.Instance.load_full_frontier
+        ~context:(module Context)
+        persistent_frontier_instance ~max_length
+        ~root_ledger:
+          (Persistent_root.Instance.snarked_ledger persistent_root_instance)
+        ~consensus_local_state ~ignore_consensus_local_state
+        ~persistent_root_instance ?max_frontier_depth ()
+    with
+    | Error `Sync_cannot_be_running ->
+        Error (`Failure "sync job is already running on persistent frontier")
+    | Error (`Failure _) as err ->
+        err
+    | Ok result ->
+        Ok result
+  in
+  let%bind () =
+    Persistent_frontier.Instance.set_best_tip ~logger ~frontier:full_frontier
+      ~extensions ~ignore_consensus_local_state ~root_ledger best_tip_hash
   in
   [%log info] "Loaded full frontier and extensions" ;
   let%map () =
