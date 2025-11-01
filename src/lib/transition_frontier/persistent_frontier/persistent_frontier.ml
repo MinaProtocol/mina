@@ -328,19 +328,22 @@ module Instance = struct
       apply_diff ~logger ~frontier ~extensions ~ignore_consensus_local_state
         ~root_ledger
     in
+    let visit parent transition =
+      let%bind breadcrumb =
+        load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
+          ~parent transition
+      in
+      let%map () = apply_diff (E (New_node (Full breadcrumb))) in
+      [%log internal] "Breadcrumb_integrated" ;
+      breadcrumb
+    in
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
         (Database.crawl_successors ~signature_kind ~proof_cache_db t.db
-           root_hash ~init:(Full_frontier.root frontier)
-           ~f:(fun parent transition ->
-             let%bind breadcrumb =
-               load_transition ~root_genesis_state_hash ~logger
-                 ~precomputed_values t ~parent transition
-             in
-             let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
-             [%log internal] "Breadcrumb_integrated" ;
-             breadcrumb ) )
+           root_hash
+           ~init:(Full_frontier.root frontier)
+           ~f:visit )
         ~f:
           (Result.map_error ~f:(function
             | `Crawl_error err ->
@@ -359,7 +362,7 @@ module Instance = struct
             | `Not_found _ as err ->
                 `Failure (Database.Error.not_found_message err) ) )
     in
-    let%map () = apply_diff Diff.(E (Best_tip_changed best_tip)) in
+    let%map () = apply_diff (E (Best_tip_changed best_tip)) in
     (frontier, extensions)
 end
 
