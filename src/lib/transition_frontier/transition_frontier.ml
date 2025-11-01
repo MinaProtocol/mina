@@ -100,7 +100,8 @@ let genesis_root_data ~precomputed_values =
 let load_from_persistence_and_start ~context:(module Context : CONTEXT)
     ~verifier ~consensus_local_state ~max_length ~persistent_root
     ~persistent_root_instance ~persistent_frontier ~persistent_frontier_instance
-    ~catchup_mode ?max_frontier_depth ignore_consensus_local_state =
+    ~catchup_mode ?max_frontier_depth ?(set_best_tip = true)
+    ignore_consensus_local_state =
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -154,8 +155,10 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
         Ok result
   in
   let%bind () =
-    Persistent_frontier.Instance.set_best_tip ~logger ~frontier:full_frontier
-      ~extensions ~ignore_consensus_local_state ~root_ledger best_tip_hash
+    if set_best_tip then
+      Persistent_frontier.Instance.set_best_tip ~logger ~frontier:full_frontier
+        ~extensions ~ignore_consensus_local_state ~root_ledger best_tip_hash
+    else return ()
   in
   [%log info] "Loaded full frontier and extensions" ;
   let%map () =
@@ -205,6 +208,7 @@ let rec load_with_max_length :
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> catchup_mode:[ `Super ]
+    -> ?set_best_tip:bool
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -215,7 +219,7 @@ let rec load_with_max_length :
  fun ~context:(module Context : CONTEXT) ~max_length
      ?(retry_with_fresh_db = true) ?max_frontier_depth ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier ~catchup_mode
-     () ->
+     ?set_best_tip () ->
   let open Context in
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -246,7 +250,7 @@ let rec load_with_max_length :
             ~context:(module Context)
             ~verifier ~consensus_local_state ~max_length ~persistent_root
             ~persistent_root_instance ~catchup_mode ~persistent_frontier
-            ~persistent_frontier_instance ?max_frontier_depth
+            ~persistent_frontier_instance ?max_frontier_depth ?set_best_tip
             ignore_consensus_local_state
         with
         | Ok _ as result ->
@@ -379,7 +383,7 @@ let rec load_with_max_length :
           [%str_log trace] Transition_frontier_loaded_from_persistence ;
           return res )
 
-let load ?(retry_with_fresh_db = true) ?max_frontier_depth
+let load ?(retry_with_fresh_db = true) ?max_frontier_depth ?set_best_tip
     ~context:(module Context : CONTEXT) ~verifier ~consensus_local_state
     ~persistent_root ~persistent_frontier ~catchup_mode () =
   let open Context in
@@ -392,7 +396,7 @@ let load ?(retry_with_fresh_db = true) ?max_frontier_depth
         ~context:(module Context)
         ~max_length ~retry_with_fresh_db ?max_frontier_depth ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
-        ~catchup_mode () )
+        ~catchup_mode ?set_best_tip () )
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -584,8 +588,6 @@ module For_tests = struct
   let proxy2 f { full_frontier = x; _ } { full_frontier = y; _ } = f x y
 
   let equal = proxy2 equal
-
-  let load_with_max_length = load_with_max_length
 
   let rec deferred_rose_tree_iter (Mina_stdlib.Rose_tree.T (root, trees)) ~f =
     let%bind () = f root in

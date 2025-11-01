@@ -67,6 +67,7 @@ val global_max_length : Genesis_constants.t -> int
 val load :
      ?retry_with_fresh_db:bool
   -> ?max_frontier_depth:int
+  -> ?set_best_tip:bool
   -> context:(module CONTEXT)
   -> verifier:Verifier.t
   -> consensus_local_state:Consensus.Data.Local_state.t
@@ -118,24 +119,6 @@ module For_tests : sig
   open Signature_lib
 
   val equal : t -> t -> bool
-
-  val load_with_max_length :
-       context:(module CONTEXT)
-    -> max_length:int
-    -> ?retry_with_fresh_db:bool
-    -> ?max_frontier_depth:int
-    -> verifier:Verifier.t
-    -> consensus_local_state:Consensus.Data.Local_state.t
-    -> persistent_root:Persistent_root.t
-    -> persistent_frontier:Persistent_frontier.t
-    -> catchup_mode:[ `Super ]
-    -> unit
-    -> ( t
-       , [ `Failure of string
-         | `Bootstrap_required
-         | `Persistent_frontier_malformed
-         | `Snarked_ledger_mismatch ] )
-       Deferred.Result.t
 
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
