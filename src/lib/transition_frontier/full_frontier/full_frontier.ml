@@ -99,9 +99,10 @@ let find t hash =
 let find_exn ~message t hash =
   match Hashtbl.find t.table hash with
   | None ->
+      let backtrace = Backtrace.get () in
       raise_s
-      @@ [%sexp_of: string * State_hash.t]
-           (message ^ " not found in frontier", hash)
+      @@ [%sexp_of: string * State_hash.t * Backtrace.t]
+           (message ^ " not found in frontier", hash, backtrace)
   | Some node ->
       node.breadcrumb
 
@@ -894,9 +895,7 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
     assert (
       match
         Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
-          ~consensus_state:
-            (Breadcrumb.consensus_state
-               (Hashtbl.find_exn t.table t.best_tip).breadcrumb )
+          ~consensus_state:(Breadcrumb.consensus_state @@ best_tip t)
           ~local_state:t.consensus_local_state
       with
       | Some jobs when local_state_was_synced_at_start ->
