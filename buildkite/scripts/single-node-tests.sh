@@ -24,4 +24,4 @@ sudo npm install -g ./scripts/tests/mina-signer
 export MINA_LIBP2P_PASS="naughty blue worm"
 export MINA_PRIVKEY_PASS="naughty blue worm"
 
-mina-command-line-tests test -v
+mina-command-line-tests test
