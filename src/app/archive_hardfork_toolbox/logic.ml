@@ -46,15 +46,15 @@ let connect postgres_uri =
   | Error e ->
       failwithf "❌ Connection failed to db, due to: %s" (Caqti_error.show e) ()
   | Ok pool ->
-      Deferred.return pool
+      pool
 
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
 
   let%bind tip = query_db ~f:Sql.latest_state_hash in
-  let%bind (in_chain : bool) =
+  let%map (in_chain : bool) =
     query_db
       ~f:
         (Sql.is_in_best_chain ~tip_hash:tip ~check_hash:fork_state_hash
@@ -70,14 +70,14 @@ let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
            fork_state_hash fork_slot tip )
   in
   let check_result = { id = "1.B"; name = "Best chain validation"; result } in
-  Deferred.return [ check_result ]
+  [ check_result ]
 
 let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
     ~required_confirmations () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
-  let%bind confirmations =
+  let%map confirmations =
     query_db ~f:(Sql.num_of_confirmations ~latest_state_hash ~fork_slot)
   in
   let result =
@@ -92,11 +92,11 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
   let check_result =
     { id = "2.C"; name = "Confirmation count check"; result }
   in
-  Deferred.return [ check_result ]
+  [ check_result ]
 
 let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind _, _, _, user_commands_count =
     query_db
@@ -108,7 +108,7 @@ let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
         (Sql.number_of_internal_commands_since_block ~fork_state_hash ~fork_slot)
   in
 
-  let%bind _, _, _, zkapps_commands_count =
+  let%map _, _, _, zkapps_commands_count =
     query_db
       ~f:(Sql.number_of_zkapps_commands_since_block ~fork_state_hash ~fork_slot)
   in
@@ -131,12 +131,12 @@ let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let check_result =
     { id = "3.N"; name = "No commands after fork check"; result }
   in
-  Deferred.return [ check_result ]
+  [ check_result ]
 
 let verify_upgrade ~postgres_uri ~expected_protocol_version
     ~expected_migration_version () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%map res = query_db ~f:Sql.fetch_latest_migration_history in
   match res with
@@ -182,11 +182,11 @@ let verify_upgrade ~postgres_uri ~expected_protocol_version
 
 let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let fork_slot = Int64.of_int fork_slot in
 
-  let%bind last_fork_block = query_db ~f:Sql.last_fork_block in
+  let%map last_fork_block = query_db ~f:Sql.last_fork_block in
   let result =
     if
       String.equal (fst last_fork_block) fork_state_hash
@@ -200,13 +200,13 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
            (fst last_fork_block) (snd last_fork_block) fork_state_hash fork_slot )
   in
   let check_result = { id = "8.F"; name = "Fork validation"; result } in
-  Deferred.return [ check_result ]
+  [ check_result ]
 
 let fetch_last_filled_block ~postgres_uri () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
-  let%bind hash, slot_since_genesis, height =
+  let%map hash, slot_since_genesis, height =
     query_db ~f:(fun db -> Sql.fetch_last_filled_block db)
   in
 
@@ -217,5 +217,5 @@ let fetch_last_filled_block ~postgres_uri () =
       ; ("height", `Int height)
       ]
   in
-  printf "%s\n" (Yojson.Safe.pretty_to_string json) ;
-  Deferred.return ()
+  Yojson.Safe.to_channel Out_channel.stdout json ;
+  Out_channel.newline Out_channel.stdout

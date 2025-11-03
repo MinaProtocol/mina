@@ -136,7 +136,7 @@ let fetch_latest_migration_history (module Conn : CONNECTION) =
 (* Fetch the most recent block that has internal commands.
    This block should contain last ledger state. *)
 let fetch_last_filled_block_query =
-  (Caqti_type.unit ->! Caqti_type.(t3 string int64 int))
+  Caqti_type.(unit ->! t3 string int64 int)
     {sql|
     SELECT b.state_hash, b.global_slot_since_genesis, b.height
     FROM blocks b
