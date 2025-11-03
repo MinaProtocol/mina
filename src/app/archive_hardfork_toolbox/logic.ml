@@ -46,11 +46,11 @@ let connect postgres_uri =
   | Error e ->
       failwithf "❌ Connection failed to db, due to: %s" (Caqti_error.show e) ()
   | Ok pool ->
-      Deferred.return pool
+      pool
 
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
 
   let%bind tip = query_db ~f:Sql.latest_state_hash in
@@ -75,7 +75,7 @@ let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
 let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
     ~required_confirmations () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%map confirmations =
     query_db ~f:(Sql.num_of_confirmations ~latest_state_hash ~fork_slot)
@@ -96,7 +96,7 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
 
 let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind _, _, _, user_commands_count =
     query_db
@@ -136,7 +136,7 @@ let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
 let verify_upgrade ~postgres_uri ~expected_protocol_version
     ~expected_migration_version () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%map res = query_db ~f:Sql.fetch_latest_migration_history in
   match res with
@@ -182,7 +182,7 @@ let verify_upgrade ~postgres_uri ~expected_protocol_version
 
 let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let fork_slot = Int64.of_int fork_slot in
 
@@ -204,7 +204,7 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
 
 let fetch_last_filled_block ~postgres_uri () =
   let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%map hash, slot_since_genesis, height =
     query_db ~f:(fun db -> Sql.fetch_last_filled_block db)
