@@ -201,3 +201,61 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   in
   let check_result = { id = "8.F"; name = "Fork validation"; result } in
   Deferred.return [ check_result ]
+
+let convert_chain_to_canonical ~postgres_uri ~target_block_hash
+    ~protocol_version ~stop_at_slot () =
+  let open Deferred.Let_syntax in
+  let%bind pool = connect postgres_uri in
+  let query_db = Mina_caqti.query pool in
+  let%bind genesis_opt = query_db ~f:(Sql.genesis_block ~protocol_version) in
+  let%bind.Deferred.Or_error genesis =
+    match genesis_opt with
+    | Some genesis ->
+        Deferred.Or_error.return genesis
+    | None ->
+        Deferred.Or_error.errorf
+          "Cannot locate genesis block for protocol version %d" protocol_version
+  in
+  let%bind target_opt =
+    query_db ~f:(Sql.block_info_by_state_hash ~state_hash:target_block_hash)
+  in
+  let%bind.Deferred.Or_error target =
+    match target_opt with
+    | Some info ->
+        Deferred.Or_error.return info
+    | None ->
+        Deferred.Or_error.errorf "Cannot find block with state hash %s"
+          target_block_hash
+  in
+  if target.protocol_version_id <> protocol_version then
+    Deferred.Or_error.errorf "Block %s uses protocol version %d, expected %d"
+      target_block_hash target.protocol_version_id protocol_version
+  else
+    let%bind chain_ids =
+      query_db
+        ~f:
+          (Sql.canonical_chain_ids ~target_block_id:target.id
+             ~genesis_id:genesis.id ~protocol_version )
+    in
+    if List.is_empty chain_ids then
+      Deferred.Or_error.errorf "Failed to compute canonical chain for block %s"
+        target_block_hash
+    else
+      let%bind () =
+        query_db ~f:(fun conn ->
+            Sql.mark_blocks_as_orphaned conn ~protocol_version ~stop_at_slot )
+      in
+      (* Arbitrary batch size. Pending chain shouldn't be longer than this (k=290).
+         If it is, we can increase the size or implement a more sophisticated
+           batching mechanism.
+      *)
+      let batch_size = 500 in
+      let%bind () =
+        Deferred.List.iter (List.chunks_of chain_ids ~length:batch_size)
+          ~f:(fun ids ->
+            query_db
+              ~f:
+                (Sql.mark_blocks_as_canonical ~protocol_version ~ids
+                   ~stop_at_slot ) )
+      in
+      Deferred.Or_error.return ()
