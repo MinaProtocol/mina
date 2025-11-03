@@ -2984,10 +2984,15 @@ module Hardfork_config = struct
     let genesis_staking_ledger_data =
       let directory_name = parent_directory ^/ "staking_ledger" in
       match source_ledgers.staking_ledger with
-      | `Genesis _l ->
-          failwith
-            "Daemon has genesis staking ledger - hard fork dump currently \
-             unsupported"
+      | `Genesis l ->
+          let depth = Genesis_ledger.Packed.depth l in
+          let root =
+            Genesis_ledger.Packed.create_root_with_directory l
+              ~directory:directory_name ~depth ()
+            |> Or_error.ok_exn
+          in
+          let diff = Ledger.Location.Map.empty in
+          (root, diff)
       | `Root l ->
           let root =
             Root_ledger.create_checkpoint_with_directory l ~directory_name
@@ -2998,10 +3003,15 @@ module Hardfork_config = struct
     let genesis_next_epoch_ledger_data =
       let directory_name = parent_directory ^/ "next_epoch_ledger" in
       match source_ledgers.next_epoch_ledger with
-      | `Genesis _l ->
-          failwith
-            "Daemon has genesis epoch ledger - hard fork dump currently \
-             unsupported"
+      | `Genesis l ->
+          let depth = Genesis_ledger.Packed.depth l in
+          let root =
+            Genesis_ledger.Packed.create_root_with_directory l
+              ~directory:directory_name ~depth ()
+            |> Or_error.ok_exn
+          in
+          let diff = Ledger.Location.Map.empty in
+          (root, diff)
       | `Root l ->
           let root =
             Root_ledger.create_checkpoint_with_directory l ~directory_name
