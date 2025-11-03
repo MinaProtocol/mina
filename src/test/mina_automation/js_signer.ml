@@ -43,4 +43,4 @@ let run config =
       | _ ->
           [%log info] "Running command %s %s" official_name
             (String.concat ~sep:" " (Config.to_args config)) ;
-          Util.run_cmd_or_error "" official_name (Config.to_args config) )
+          Util.run_cmd_or_error "." official_name (Config.to_args config) )
