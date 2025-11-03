@@ -133,16 +133,15 @@ let fetch_latest_migration_history_query =
 let fetch_latest_migration_history (module Conn : CONNECTION) =
   Conn.find_opt fetch_latest_migration_history_query ()
 
+(* Fetch the most recent block that has internal commands.
+   This block should contain last ledger state. *)
 let fetch_last_filled_block_query =
   (Caqti_type.unit ->! Caqti_type.(t3 string int64 int))
     {sql|
     SELECT b.state_hash, b.global_slot_since_genesis, b.height
     FROM blocks b
-    WHERE b.height = (
-      SELECT MAX(b2.height) + 1
-      FROM blocks b2
-      INNER JOIN blocks_internal_commands bic ON b2.id = bic.block_id
-    )
+    INNER JOIN blocks_internal_commands bic ON b.id = bic.block_id
+    ORDER BY b.height DESC
     LIMIT 1;
     |sql}
 
