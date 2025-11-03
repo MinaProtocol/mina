@@ -3091,14 +3091,35 @@ module Hardfork_config = struct
       ~next_epoch_ledger_config:(Some genesis_next_epoch_ledger_config)
       ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
 
-  let write_config_file ~filename daemon_config =
-    Async.Writer.save filename
-      ~contents:(Yojson.Safe.to_string (Runtime_config.to_yojson daemon_config))
+  let write_config_file ~staging_path ~final_path daemon_config =
+    let open Deferred.Or_error.Let_syntax in
+    let dir = Filename.dirname final_path in
+    let backup_name = dir ^/ "daemon.berkeley.json" in
+    (* Step 1: Backup existing daemon.json if present *)
+    let%bind () =
+      match%bind.Deferred Sys.file_exists final_path with
+      | `Yes ->
+          let%bind.Deferred contents = Async.Reader.file_contents final_path in
+          Async.Writer.save backup_name ~contents ~fsync:true
+          |> Deferred.map ~f:Or_error.return
+      | _ ->
+          return ()
+    in
+    (* Step 2: Write new config to staging location with fsync *)
+    let contents =
+      Yojson.Safe.to_string (Runtime_config.to_yojson daemon_config)
+    in
+    let%bind () =
+      Async.Writer.save staging_path ~contents ~fsync:true
+      |> Deferred.map ~f:Or_error.return
+    in
+    (* Step 3: Atomic rename from staging to final location *)
+    Unix.rename ~src:staging_path ~dst:final_path
     |> Deferred.map ~f:Or_error.return
 
   let write_stable_config_directory ~logger ~genesis_state_timestamp
       ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
-      ~next_epoch_seed ~blockchain_length ~config_dir genesis_ledger
+      ~next_epoch_seed ~blockchain_length ~config_dir ~build_dir genesis_ledger
       genesis_staking_ledger genesis_next_epoch_ledger =
     let open Deferred.Or_error.Let_syntax in
     [%log debug]
@@ -3111,14 +3132,15 @@ module Hardfork_config = struct
         genesis_ledger genesis_staking_ledger genesis_next_epoch_ledger
     in
     write_config_file
-      ~filename:(config_dir ^/ "daemon.json")
+      ~staging_path:(build_dir ^/ "daemon_stable.json")
+      ~final_path:(config_dir ^/ "daemon.json")
       (make_full_config ~genesis_state_timestamp ~global_slot_since_genesis
          ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
          genesis_config )
 
   let write_migrated_config_directory ~logger ~genesis_state_timestamp
       ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
-      ~next_epoch_seed ~blockchain_length ~config_dir genesis_ledger
+      ~next_epoch_seed ~blockchain_length ~config_dir ~build_dir genesis_ledger
       genesis_staking_ledger genesis_next_epoch_ledger =
     let open Deferred.Or_error.Let_syntax in
     [%log debug]
@@ -3132,7 +3154,8 @@ module Hardfork_config = struct
         genesis_next_epoch_ledger
     in
     write_config_file
-      ~filename:(config_dir ^/ "daemon.json")
+      ~staging_path:(build_dir ^/ "daemon_migrated.json")
+      ~final_path:(config_dir ^/ "daemon.json")
       (make_full_config ~genesis_state_timestamp ~global_slot_since_genesis
          ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
          genesis_config )
@@ -3148,6 +3171,27 @@ module Hardfork_config = struct
         ; blockchain_length
         } ~build_dir directory_name =
     let open Deferred.Or_error.Let_syntax in
+    (* Clean up old generated files if regenerating *)
+    let%bind.Deferred () =
+      let activated_file = directory_name ^/ "activated" in
+      let fork_validation_dir = directory_name ^/ "fork_validation" in
+      (* Delete activated file first - it signals generation completion *)
+      let%bind.Deferred () =
+        match%bind.Deferred Sys.file_exists activated_file with
+        | `Yes ->
+            [%log info] "Removing old activated file" ;
+            Sys.remove activated_file
+        | _ ->
+            Deferred.return ()
+      in
+      (* Then clean up validation data *)
+      match%bind.Deferred Sys.file_exists fork_validation_dir with
+      | `Yes ->
+          [%log info] "Cleaning up old fork_validation directory" ;
+          Mina_stdlib_unix.File_system.clear_dir fork_validation_dir
+      | _ ->
+          Deferred.return ()
+    in
     let migrate_and_apply (root, diff) =
       let%map.Deferred root = Root_ledger.make_converting root in
       Ledger.Any_ledger.M.set_batch
@@ -3191,14 +3235,14 @@ module Hardfork_config = struct
         ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
         ~next_epoch_seed ~blockchain_length
         ~config_dir:(directory_name ^/ "fork_validation" ^/ "legacy")
-        genesis_ledger_legacy genesis_staking_ledger_legacy
+        ~build_dir genesis_ledger_legacy genesis_staking_ledger_legacy
         genesis_next_epoch_ledger_legacy
     in
     let%bind () =
       write_migrated_config_directory ~logger ~genesis_state_timestamp
         ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
         ~next_epoch_seed ~blockchain_length ~config_dir:directory_name
-        genesis_ledger_migrated genesis_staking_ledger_migrated
+        ~build_dir genesis_ledger_migrated genesis_staking_ledger_migrated
         genesis_next_epoch_ledger_migrated
     in
     let activated_file_name = directory_name ^/ "activated" in
@@ -3214,15 +3258,6 @@ module Hardfork_config = struct
     let logger = mina.config.logger in
     Deferred.Or_error.try_with_join ~here:[%here]
     @@ fun () ->
-    let%bind.Deferred dir_exists =
-      Mina_stdlib_unix.File_system.dir_exists directory_name
-    in
-    let%bind () =
-      if dir_exists then
-        Deferred.Or_error.error_string
-          "Requested config directory already exists"
-      else return ()
-    in
     [%log debug] "Creating reference hard fork config in $directory_name"
       ~metadata:[ ("directory_name", `String directory_name) ] ;
     let%bind.Deferred () =
