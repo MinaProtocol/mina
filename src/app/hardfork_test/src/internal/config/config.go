@@ -53,8 +53,8 @@ func DefaultConfig() *Config {
 		SlotTxEnd:                     30,
 		SlotChainEnd:                  38, // SlotTxEnd + 8
 		BestChainQueryFrom:            25,
-		MainSlot:                      15,
-		ForkSlot:                      15,
+		MainSlot:                      30,
+		ForkSlot:                      30,
 		MainDelay:                     5,
 		ForkDelay:                     5,
 		ShutdownTimeoutMinutes:        10,
