@@ -219,12 +219,10 @@ let fetch_last_filled_block ~postgres_uri () =
   in
   Yojson.Safe.to_channel Out_channel.stdout json ;
   Out_channel.newline Out_channel.stdout
-  Deferred.return [ check_result ]
 
 let convert_chain_to_canonical ~postgres_uri ~target_block_hash
     ~protocol_version ~stop_at_slot () =
-  let open Deferred.Let_syntax in
-  let%bind pool = connect postgres_uri in
+  let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind genesis_opt = query_db ~f:(Sql.genesis_block ~protocol_version) in
   let%bind.Deferred.Or_error genesis =
