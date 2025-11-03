@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euox pipefail
+set -eux -o pipefail
 
 # This script runs the archive hardfork toolbox tests.
 # It assumes that the archive hardfork toolbox has already been built.
@@ -52,32 +52,44 @@ echo "Using toolbox binary: $TOOLBOX_PATH"
 # Run the archive hardfork toolbox tests
 echo "Running archive hardfork toolbox tests..."
 
+check_null_or_empty() {
+    local name="$1"
+    local value="$2"
+    if [[ -z "$value" || "$value" == "null" ]]; then
+        echo "Error: $name is null or empty" >&2
+        return 1
+    fi
+}
 
 # Define helper to validate last-filled-block against expected fork candidate values
 validate_last_filled_block() {
-  local toolbox="$1"
-  local postgres_uri="$2"
-  local expected_height="$3"
-  local expected_state_hash="$4"
-  local expected_global_slot="$5"
+    local toolbox="$1"
+    local postgres_uri="$2"
+    local expected_height="$3"
+    local expected_state_hash="$4"
+    local expected_global_slot="$5"
 
-  local lfb_json lfb_height lfb_state_hash lfb_global_slot
-  lfb_json="$("$toolbox" last-filled-block --postgres-uri "$postgres_uri")"
-  lfb_height="$(jq -r '.height' <<<"$lfb_json")"
-  lfb_state_hash="$(jq -r '.state_hash' <<<"$lfb_json")"
-  lfb_global_slot="$(jq -r '.slot_since_genesis' <<<"$lfb_json")"
+    local lfb_json lfb_height lfb_state_hash lfb_global_slot
+    lfb_json="$("$toolbox" last-filled-block --postgres-uri "$postgres_uri")"
+    lfb_height="$(jq -r '.height' <<<"$lfb_json")"
+    lfb_state_hash="$(jq -r '.state_hash' <<<"$lfb_json")"
+    lfb_global_slot="$(jq -r '.slot_since_genesis' <<<"$lfb_json")"
 
-  if [[ -z "$lfb_height" || -z "$lfb_state_hash" || -z "$lfb_global_slot" || "$lfb_height" == "null" || "$lfb_state_hash" == "null" || "$lfb_global_slot" == "null" ]]; then
-    echo "Error: failed to parse last-filled-block output. Got: $lfb_json" >&2
-    exit 1
-  fi
+    if ! (
+        check_null_or_empty "lfb_height" "$lfb_height" &&
+        check_null_or_empty "lfb_state_hash" "$lfb_state_hash" &&
+        check_null_or_empty "lfb_global_slot" "$lfb_global_slot"
+    ); then
+        echo "Got: $lfb_json" >&2
+        exit 1
+    fi
 
-  if [[ "$lfb_height" -ne "$expected_height" || "$lfb_global_slot" -ne "$expected_global_slot" || "$lfb_state_hash" != "$expected_state_hash" ]]; then
-    echo "Error: last-filled-block mismatch." >&2
-    echo "Expected height=$expected_height, state_hash=$expected_state_hash, global_slot_since_genesis=$expected_global_slot" >&2
-    echo "Actual   height=$lfb_height, state_hash=$lfb_state_hash, global_slot_since_genesis=$lfb_global_slot" >&2
-    exit 1
-  fi
+    if [[ "$lfb_height" -ne "$expected_height" || "$lfb_global_slot" -ne "$expected_global_slot" || "$lfb_state_hash" != "$expected_state_hash" ]]; then
+        echo "Error: last-filled-block mismatch." >&2
+        echo "Expected height=$expected_height, state_hash=$expected_state_hash, global_slot_since_genesis=$expected_global_slot" >&2
+        echo "Actual   height=$lfb_height, state_hash=$lfb_state_hash, global_slot_since_genesis=$lfb_global_slot" >&2
+        exit 1
+    fi
 }
 
 # Define test parameters
