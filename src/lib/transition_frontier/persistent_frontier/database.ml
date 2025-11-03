@@ -316,6 +316,19 @@ let get_root_hash t =
   | Error _ ->
       Result.map ~f:Root_data.Minimal.Stable.Latest.hash (get_root t)
 
+let get_transition_do ~error db hash =
+  let make_hashes state_body_hash =
+    { State_hash.State_hashes.state_hash = hash; state_body_hash }
+  in
+  match get db ~key:(Transition_extended hash) ~error:() with
+  | Ok { block; update_coinbase_stack_and_get_data_result; state_body_hash } ->
+      Ok
+        ( { With_hash.data = block; hash = make_hashes (Some state_body_hash) }
+        , update_coinbase_stack_and_get_data_result )
+  | Error _ ->
+      let%map.Result block = get db ~key:(Transition hash) ~error in
+      ({ With_hash.data = block; hash = make_hashes None }, None)
+
 (* TODO: check that best tip is connected to root *)
 (* TODO: check for garbage *)
 let check t ~genesis_state_hash =
@@ -338,16 +351,18 @@ let check t ~genesis_state_hash =
           get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
         in
         let%bind.Result root_transition =
-          get t.db ~key:(Transition root_hash)
+          get_transition_do
             ~error:(`Corrupt (`Not_found `Root_transition))
+            t.db root_hash
         in
         let%bind.Result _ =
           get t.db ~key:Protocol_states_for_root_scan_state
             ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
         in
         let%map.Result _ =
-          get t.db ~key:(Transition best_tip)
+          get_transition_do
             ~error:(`Corrupt (`Not_found `Best_tip_transition))
+            t.db best_tip
         in
         (root_hash, root_transition)
       in
@@ -359,16 +374,17 @@ let check t ~genesis_state_hash =
         List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
             let%bind.Result () = acc in
             let%bind.Result _ =
-              get t.db ~key:(Transition succ_hash)
+              get_transition_do
                 ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
+                t.db succ_hash
             in
             check_arcs succ_hash )
       in
       ignore check_arcs ;
       let%bind.Result () = check_version () in
-      let%bind.Result _root_hash, root_block = check_base () in
+      let%bind.Result _root_hash, (root_block, _) = check_base () in
       let root_protocol_state =
-        root_block |> Mina_block.Stable.Latest.header
+        With_hash.data root_block |> Mina_block.Stable.Latest.header
         |> Mina_block.Header.protocol_state
       in
       let%map.Result () =
@@ -380,28 +396,28 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       (* let%map () = check_arcs root_hash in *)
-      root_block |> Mina_block.Stable.Latest.header
-      |> Mina_block.Header.protocol_state
-      |> Mina_state.Protocol_state.blockchain_state
+      root_protocol_state |> Mina_state.Protocol_state.blockchain_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join
 
 let initialize t ~root_data =
-  let root_state_hash, root_transition =
-    let t =
-      Mina_block.Validated.forget (Root_data.Limited.transition root_data)
-    in
-    ( State_hash.With_state_hashes.state_hash t
-    , State_hash.With_state_hashes.data t )
-  in
-  let root_transition = Mina_block.read_all_proofs_from_disk root_transition in
+  let root_transition = Root_data.Limited.transition root_data in
+  let root_state_hash = Mina_block.Validated.state_hash root_transition in
   [%log' trace t.logger]
     ~metadata:[ ("root_data", Root_data.Limited.to_yojson root_data) ]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
-      Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
+      Batch.set batch ~key:(Transition_extended root_state_hash)
+        ~data:
+          { block =
+              Mina_block.Validated.forget root_transition
+              |> With_hash.data |> Mina_block.read_all_proofs_from_disk
+          ; update_coinbase_stack_and_get_data_result = None
+          ; state_body_hash =
+              Mina_block.Validated.state_body_hash root_transition
+          } ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
       Batch.set batch ~key:Root_common
@@ -437,7 +453,8 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
   | _ ->
       Error (`Not_found `Old_root_transition)
 
-let add ~arcs_cache ~transition =
+let add ~update_coinbase_stack_and_get_data_result ~arcs_cache ~transition =
+  let state_body_hash = Mina_block.Validated.state_body_hash transition in
   let transition = Mina_block.Validated.forget transition in
   let hash = State_hash.With_state_hashes.state_hash transition in
   let parent_hash =
@@ -452,7 +469,16 @@ let add ~arcs_cache ~transition =
     With_hash.data transition |> Mina_block.read_all_proofs_from_disk
   in
   fun batch ->
-    Batch.set batch ~key:(Transition hash) ~data:transition_unwrapped ;
+    Batch.set batch ~key:(Transition_extended hash)
+      ~data:
+        { block = transition_unwrapped
+        ; update_coinbase_stack_and_get_data_result =
+            Option.map update_coinbase_stack_and_get_data_result
+              ~f:
+                Staged_ledger.Update_coinbase_stack_and_get_data_result
+                .read_all_proofs_from_disk
+        ; state_body_hash
+        } ;
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
@@ -475,23 +501,11 @@ let move_root ~old_root_hash ~new_root ~garbage =
          * we are deleting since there we are deleting all of a node's
          * parents as well
          *)
+        Batch.remove batch ~key:(Transition_extended node_hash) ;
+        (* according to rocksdb docs, operation does nothing if
+         * the key does not exist *)
         Batch.remove batch ~key:(Transition node_hash) ;
         Batch.remove batch ~key:(Arcs node_hash) )
-
-let get_transition_do db hash =
-  let make_hashes state_body_hash =
-    { State_hash.State_hashes.state_hash = hash; state_body_hash }
-  in
-  match get db ~key:(Transition_extended hash) ~error:() with
-  | Ok { block; update_coinbase_stack_and_get_data_result; state_body_hash } ->
-      Ok
-        ( { With_hash.data = block; hash = make_hashes (Some state_body_hash) }
-        , update_coinbase_stack_and_get_data_result )
-  | Error _ ->
-      let%map.Result block =
-        get db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
-      in
-      ({ With_hash.data = block; hash = make_hashes None }, None)
 
 type get_transition_result =
   { block : Mina_block.Validated.t
@@ -504,7 +518,7 @@ let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
   [%log internal] "Database_get_transition_start"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   let%map.Result block, update_coinbase_stack_and_get_data_result =
-    get_transition_do t.db hash
+    get_transition_do t.db hash ~error:(`Not_found (`Transition hash))
   in
   [%log internal] "Database_read_from_rocksdb_done"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;

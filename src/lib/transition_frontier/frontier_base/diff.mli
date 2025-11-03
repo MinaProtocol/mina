@@ -21,9 +21,13 @@ type lite = Lite
  *  transition frontier and the persistent transition frontier.
  *)
 module Node : sig
-  type 'a t =
-    | Full : Breadcrumb.t -> full t
-    | Lite : Mina_block.Validated.t -> lite t
+  type lite_data =
+    { transition : Mina_block.Validated.t
+    ; update_coinbase_stack_and_get_data_result :
+        Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
+    }
+
+  type 'a t = Full : Breadcrumb.t -> full t | Lite : lite_data -> lite t
 end
 
 module Node_list : sig

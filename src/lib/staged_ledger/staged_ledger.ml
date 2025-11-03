@@ -1125,11 +1125,7 @@ module T = struct
         ; ("proofs_waiting", `Int proofs_waiting)
         ; ("max_throughput", `Int max_throughput)
         ] ;
-    let%bind ( is_new_stack
-             , data
-             , stack_update_in_snark
-             , stack_update
-             , `First_pass_ledger_end first_pass_ledger_end ) =
+    let%bind update_coinbase_stack_and_get_data_result =
       match cached_update_coinbase_stack_and_get_data_result with
       | Some cached ->
           return cached
@@ -1139,6 +1135,13 @@ module T = struct
                 ~global_slot ~signature_kind t.scan_state new_ledger
                 t.pending_coinbase_collection transactions current_state_view
                 state_and_body_hash )
+    in
+    let ( is_new_stack
+        , data
+        , stack_update_in_snark
+        , stack_update
+        , `First_pass_ledger_end first_pass_ledger_end ) =
+      update_coinbase_stack_and_get_data_result
     in
     let slots = List.length data in
     let work_count = List.length works in
@@ -1261,7 +1264,9 @@ module T = struct
         ( is_new_stack
         , { Pending_coinbase.Update.Poly.action = stack_update_in_snark
           ; coinbase_amount
-          } ) )
+          } )
+    , `Update_coinbase_stack_and_get_data_result
+        update_coinbase_stack_and_get_data_result )
 
   let update_metrics (t : t) (witness : Staged_ledger_diff.t) =
     let open Or_error.Let_syntax in
@@ -1337,7 +1342,7 @@ module T = struct
     in
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
-    let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
+    let%map ((_, _, `Staged_ledger new_staged_ledger, _, _) as res) =
       apply_diff ?cached_update_coinbase_stack_and_get_data_result
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
@@ -1365,7 +1370,8 @@ module T = struct
 
   let apply_diff_unchecked ~constraint_constants ~global_slot ~logger
       ~current_state_view ~state_and_body_hash ~coinbase_receiver
-      ~supercharge_coinbase ~zkapp_cmd_limit_hardcap ~signature_kind t
+      ~supercharge_coinbase ~zkapp_cmd_limit_hardcap ~signature_kind
+      ?cached_update_coinbase_stack_and_get_data_result t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
@@ -1374,7 +1380,7 @@ module T = struct
            ~supercharge_coinbase sl_diff
       |> Deferred.return
     in
-    apply_diff t
+    apply_diff ?cached_update_coinbase_stack_and_get_data_result t
       (forget_prediff_info prediff)
       ~constraint_constants ~global_slot ~logger ~current_state_view
       ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
@@ -2537,7 +2543,9 @@ let%test_module "staged ledger tests" =
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
-              , `Pending_coinbase_update (is_new_stack, pc_update) ) =
+              , `Pending_coinbase_update (is_new_stack, pc_update)
+              , `Update_coinbase_stack_and_get_data_result
+                  update_coinbase_stack_and_get_data_result ) =
         match%map
           Sl.apply ~constraint_constants ~global_slot !sl diff' ~logger
             ~verifier ~get_completed_work:(Fn.const None) ~current_state_view
@@ -2551,13 +2559,18 @@ let%test_module "staged ledger tests" =
       in
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
-      (ledger_proof, diff', is_new_stack, pc_update, supercharge_coinbase)
+      ( ledger_proof
+      , diff'
+      , is_new_stack
+      , pc_update
+      , supercharge_coinbase
+      , update_coinbase_stack_and_get_data_result )
 
     let create_and_apply ?(coinbase_receiver = coinbase_receiver)
         ?(winner = self_pk) ~global_slot ~protocol_state_view
         ~state_and_body_hash ~signature_kind sl txns stmt_to_work =
       let open Deferred.Let_syntax in
-      let%map ledger_proof, diff, _, _, _ =
+      let%map ledger_proof, diff, _, _, _, _ =
         create_and_apply_with_state_body_hash ~coinbase_receiver ~winner
           ~current_state_view:protocol_state_view ~global_slot
           ~state_and_body_hash sl txns stmt_to_work ~signature_kind
@@ -3523,7 +3536,8 @@ let%test_module "staged ledger tests" =
                           ( `Hash_after_applying _hash
                           , `Ledger_proof _ledger_proof
                           , `Staged_ledger sl'
-                          , `Pending_coinbase_update _ ) ->
+                          , `Pending_coinbase_update _
+                          , `Update_coinbase_stack_and_get_data_result _ ) ->
                           sl := sl' ;
                           (false, diff)
                     in
@@ -4077,7 +4091,12 @@ let%test_module "staged ledger tests" =
               ( state_hashes.state_hash
               , state_hashes.state_body_hash |> Option.value_exn )
             in
-            let%map proof, diff, is_new_stack, pc_update, supercharge_coinbase =
+            let%map ( proof
+                    , diff
+                    , is_new_stack
+                    , pc_update
+                    , supercharge_coinbase
+                    , _ ) =
               create_and_apply_with_state_body_hash ~current_state_view
                 ~global_slot ~state_and_body_hash ~signature_kind sl
                 cmds_this_iter

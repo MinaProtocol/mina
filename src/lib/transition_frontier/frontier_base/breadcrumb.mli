@@ -25,6 +25,8 @@ val create :
   -> staged_ledger:Staged_ledger.t
   -> just_emitted_a_proof:bool
   -> transition_receipt_time:Time.t option
+  -> update_coinbase_stack_and_get_data_result:
+       Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
   -> t
 
 val build :
@@ -86,6 +88,9 @@ val display : t -> display
 val name : t -> string
 
 val staged_ledger_hash : t -> Staged_ledger_hash.t
+
+val update_coinbase_stack_and_get_data_result :
+  t -> Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
 
 module For_tests : sig
   val gen :

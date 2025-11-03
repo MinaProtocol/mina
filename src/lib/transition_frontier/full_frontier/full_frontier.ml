@@ -163,7 +163,7 @@ let create ~context:(module Context : CONTEXT) ~root_data ~root_ledger
   let root_breadcrumb =
     Breadcrumb.create ~validated_transition
       ~staged_ledger:root_data.staged_ledger ~just_emitted_a_proof:false
-      ~transition_receipt_time
+      ~transition_receipt_time ~update_coinbase_stack_and_get_data_result:None
   in
   let root_node =
     { Node.breadcrumb = root_breadcrumb; successor_hashes = []; length = 0 }
@@ -551,6 +551,9 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
         (Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb)
       ~transition_receipt_time:
         (Breadcrumb.transition_receipt_time new_root_node.breadcrumb)
+      ~update_coinbase_stack_and_get_data_result:
+        (Breadcrumb.update_coinbase_stack_and_get_data_result
+           new_root_node.breadcrumb )
   in
   (*Update the protocol states required for scan state at the new root.
     Note: this should be after applying the transactions to the snarked ledger (Step 5)

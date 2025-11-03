@@ -14,6 +14,8 @@ module T = struct
     ; just_emitted_a_proof : bool
     ; transition_receipt_time : Time.t option
     ; staged_ledger_hash : Staged_ledger_hash.t
+    ; update_coinbase_stack_and_get_data_result :
+        Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
     }
   [@@deriving fields]
 
@@ -22,16 +24,19 @@ module T = struct
     -> staged_ledger:Staged_ledger.t
     -> just_emitted_a_proof:bool
     -> transition_receipt_time:Time.t option
+    -> update_coinbase_stack_and_get_data_result:
+         Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
     -> 'a
 
   let map_creator creator ~f ~validated_transition ~staged_ledger
-      ~just_emitted_a_proof ~transition_receipt_time =
+      ~just_emitted_a_proof ~transition_receipt_time
+      ~update_coinbase_stack_and_get_data_result =
     f
       (creator ~validated_transition ~staged_ledger ~just_emitted_a_proof
-         ~transition_receipt_time )
+         ~transition_receipt_time ~update_coinbase_stack_and_get_data_result )
 
   let create ~validated_transition ~staged_ledger ~just_emitted_a_proof
-      ~transition_receipt_time =
+      ~transition_receipt_time ~update_coinbase_stack_and_get_data_result =
     (* TODO This looks terrible, consider removing this in the hardfork by either
        removing staged_ledger_hash from the header or computing it consistently
        for the genesis block *)
@@ -48,6 +53,7 @@ module T = struct
     ; just_emitted_a_proof
     ; transition_receipt_time
     ; staged_ledger_hash
+    ; update_coinbase_stack_and_get_data_result
     }
 
   let to_yojson
@@ -56,6 +62,7 @@ module T = struct
       ; just_emitted_a_proof
       ; transition_receipt_time
       ; staged_ledger_hash = _
+      ; update_coinbase_stack_and_get_data_result = _
       } =
     `Assoc
       [ ( "validated_transition"
@@ -76,7 +83,8 @@ T.
   , just_emitted_a_proof
   , transition_receipt_time
   , to_yojson
-  , staged_ledger_hash )]
+  , staged_ledger_hash
+  , update_coinbase_stack_and_get_data_result )]
 
 include Allocation_functor.Make.Basic (T)
 
@@ -134,14 +142,18 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy
       | Ok
           ( `Just_emitted_a_proof just_emitted_a_proof
           , `Block_with_validation fully_valid_block
-          , `Staged_ledger transitioned_staged_ledger ) ->
+          , `Staged_ledger transitioned_staged_ledger
+          , `Update_coinbase_stack_and_get_data_result
+              update_coinbase_stack_and_get_data_result ) ->
           [%log internal] "Create_breadcrumb" ;
           Deferred.Result.return
             (create
                ~validated_transition:
                  (Mina_block.Validated.lift fully_valid_block)
                ~staged_ledger:transitioned_staged_ledger ~just_emitted_a_proof
-               ~transition_receipt_time )
+               ~transition_receipt_time
+               ~update_coinbase_stack_and_get_data_result:
+                 (Some update_coinbase_stack_and_get_data_result) )
       | Error `Invalid_body_reference ->
           let message = "invalid body reference" in
           let%map () =
@@ -419,7 +431,8 @@ module For_tests = struct
       let%bind ( `Hash_after_applying staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
-               , `Pending_coinbase_update _ ) =
+               , `Pending_coinbase_update _
+               , `Update_coinbase_stack_and_get_data_result _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
             ~global_slot:current_global_slot ~coinbase_receiver ~logger

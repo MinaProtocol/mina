@@ -293,7 +293,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
               , `Ledger_proof ledger_proof_opt
               , `Staged_ledger transitioned_staged_ledger
               , `Pending_coinbase_update (is_new_stack, pending_coinbase_update)
-              ) ->
+              , `Update_coinbase_stack_and_get_data_result
+                  update_coinbase_stack_and_get_data_result ) ->
               (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
               ignore
               @@ Mina_ledger.Ledger.unregister_mask_exn ~loc:__LOC__
@@ -303,7 +304,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 , next_staged_ledger_hash
                 , ledger_proof_opt
                 , is_new_stack
-                , pending_coinbase_update )
+                , pending_coinbase_update
+                , update_coinbase_stack_and_get_data_result )
           | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
               [%log error] "Failed to apply the diff: $error"
                 ~metadata:[ ("error", Error_json.error_to_yojson e) ] ;
@@ -340,7 +342,8 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
           , next_staged_ledger_hash
           , ledger_proof_opt
           , is_new_stack
-          , pending_coinbase_update ) ->
+          , pending_coinbase_update
+          , update_coinbase_stack_and_get_data_result ) ->
           let diff_unwrapped =
             Staged_ledger_diff.read_all_proofs_from_disk
             @@ Staged_ledger_diff.forget diff
@@ -428,7 +431,11 @@ let generate_next_state ~commit_id ~zkapp_cmd_limit ~constraint_constants
                 ; is_new_stack
                 }
               in
-              Some (protocol_state, internal_transition, witness) ) )
+              Some
+                ( protocol_state
+                , internal_transition
+                , witness
+                , update_coinbase_stack_and_get_data_result ) ) )
 
 let handle_block_production_errors ~logger ~rejected_blocks_logger
     ~time_taken:span ~previous_protocol_state ~protocol_state x =
@@ -792,7 +799,11 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
       match next_state_opt with
       | None ->
           Interruptible.return ()
-      | Some (protocol_state, internal_transition, pending_coinbase_witness) ->
+      | Some
+          ( protocol_state
+          , internal_transition
+          , pending_coinbase_witness
+          , cached_update_coinbase_stack_and_get_data_result ) ->
           let diff =
             Internal_transition.staged_ledger_diff internal_transition
           in
@@ -920,6 +931,7 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
                       ~sender:None (* Consider skipping `All here *)
                       ~skip_staged_ledger_verification:`Proofs
                       ~transition_receipt_time
+                      ~cached_update_coinbase_stack_and_get_data_result
                       ~transaction_pool_proxy:
                         { find_by_hash =
                             Network_pool.Transaction_pool.Resource_pool

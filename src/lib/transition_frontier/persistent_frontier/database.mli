@@ -60,12 +60,9 @@ val check :
          [> `Not_found of
             [> `Best_tip
             | `Best_tip_transition
-            | `Frontier_hash
+            | `Protocol_states_for_root_scan_state
             | `Root
-            | `Root_transition
-            | `Transition of State_hash.t
-            | `Arcs of State_hash.t
-            | `Protocol_states_for_root_scan_state ]
+            | `Root_transition ]
          | `Raised of Core_kernel.Error.t ] ] )
      Result.t
 
@@ -80,7 +77,9 @@ val find_arcs_and_root :
      result
 
 val add :
-     arcs_cache:State_hash.t list State_hash.Table.t
+     update_coinbase_stack_and_get_data_result:
+       Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
+  -> arcs_cache:State_hash.t list State_hash.Table.t
   -> transition:Mina_block.Validated.t
   -> batch_t
   -> unit

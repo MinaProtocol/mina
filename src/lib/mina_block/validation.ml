@@ -502,7 +502,9 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
   let%bind.Deferred.Result ( `Hash_after_applying staged_ledger_hash
                            , `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
-                           , `Pending_coinbase_update _ ) =
+                           , `Pending_coinbase_update _
+                           , `Update_coinbase_stack_and_get_data_result
+                               update_coinbase_stack_and_get_data_result ) =
     Staged_ledger.apply ?cached_update_coinbase_stack_and_get_data_result
       ?skip_verification:skip_staged_ledger_verification ~get_completed_work
       ~constraint_constants:
@@ -565,7 +567,9 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         ( `Just_emitted_a_proof (Option.is_some proof_opt)
         , `Block_with_validation
             (t, Unsafe.set_valid_staged_ledger_diff validation)
-        , `Staged_ledger transitioned_staged_ledger )
+        , `Staged_ledger transitioned_staged_ledger
+        , `Update_coinbase_stack_and_get_data_result
+            update_coinbase_stack_and_get_data_result )
   | Error errors ->
       Error (`Invalid_staged_ledger_diff errors)
 

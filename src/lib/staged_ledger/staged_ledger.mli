@@ -284,6 +284,8 @@ val apply :
            option ]
        * [ `Staged_ledger of t ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
+       * [ `Update_coinbase_stack_and_get_data_result of
+           Update_coinbase_stack_and_get_data_result.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
@@ -297,6 +299,8 @@ val apply_diff_unchecked :
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
   -> signature_kind:Mina_signature_kind.t
+  -> ?cached_update_coinbase_stack_and_get_data_result:
+       Update_coinbase_stack_and_get_data_result.t
   -> t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
@@ -310,6 +314,8 @@ val apply_diff_unchecked :
            option ]
        * [ `Staged_ledger of t ]
        * [ `Pending_coinbase_update of bool * Pending_coinbase.Update.t ]
+       * [ `Update_coinbase_stack_and_get_data_result of
+           Update_coinbase_stack_and_get_data_result.t ]
      , Staged_ledger_error.t )
      Deferred.Result.t
 
