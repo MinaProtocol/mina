@@ -213,7 +213,7 @@ let fetch_last_filled_block ~postgres_uri () =
   let json =
     `Assoc
       [ ("state_hash", `String hash)
-      ; ("slot_since_genesis", `Int (Int64.to_int_exn slot_since_genesis))
+      ; ("slot_since_genesis", `Intlit (Int64.to_string slot_since_genesis))
       ; ("height", `Int height)
       ]
   in
