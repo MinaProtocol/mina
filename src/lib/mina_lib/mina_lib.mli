@@ -260,6 +260,9 @@ val runtime_config : t -> Runtime_config.t
 
 val compile_config : t -> Mina_compile_config.t
 
+val scheduled_hard_fork_genesis_slot :
+  t -> Mina_numbers.Global_slot_since_hard_fork.t option
+
 val start_filtered_log : t -> string list -> unit Or_error.t
 
 val get_filtered_log_entries : t -> int -> string list * bool
