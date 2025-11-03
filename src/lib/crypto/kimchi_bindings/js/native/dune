@@ -2,8 +2,6 @@
  (name native_backend)
  (public_name bindings_js.native_backend)
  (js_of_ocaml
-  (flags
-   (:include flags.sexp))
   (javascript_files native_backend.js))
  (instrumentation
   (backend bisect_ppx))
@@ -11,11 +9,14 @@
   (pps ppx_version js_of_ocaml-ppx)))
 
 (rule
- (targets
-  plonk_napi.node
-  flags.sexp)
+ (targets plonk_napi.node index.d.ts)
+ (mode
+  (promote
+   (into ./artifacts)))
  (deps
+  package.json
   build.sh
+  header-d.ts
   ../../dune-build-root
   (source_tree ../../../proof-systems))
  (locks /cargo-lock)
@@ -24,6 +25,4 @@
    (setenv
     CARGO_TARGET_DIR
     "%{read:../../dune-build-root}/cargo_kimchi_native"
-    (run bash build.sh))
-   (write-file flags.sexp "()"))))
-   
+    (run bash build.sh)))))

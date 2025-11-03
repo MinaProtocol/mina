@@ -1,4 +1,2 @@
 // Provides: plonk_napi
-var plonk_napi = require('./plonk_napi.node');
-
-module.exports = plonk_napi;
+var plonk_napi = require('@o1js/native-' + process.platform + '-' + process.arch)
