@@ -2614,11 +2614,11 @@ module Queries = struct
         in
         let%bind { source_ledgers
                  ; global_slot_since_genesis
+                 ; genesis_state_timestamp = _
                  ; state_hash
                  ; staking_epoch_seed
                  ; next_epoch_seed
                  ; blockchain_length
-                 ; block_timestamp = _
                  } =
           Mina_lib.Hardfork_config.prepare_inputs ~breadcrumb_spec mina
         in
