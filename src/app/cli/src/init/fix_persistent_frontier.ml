@@ -43,43 +43,36 @@ let check_directories_exist ~logger ~persistent_root_location
   else Deferred.return (Ok `Both_exist)
 
 (* Apply a sequence of root transition diffs to the persistent database *)
-let apply_root_transitions ~logger ~db root_transition_diffs =
+let apply_root_transitions ~logger ~db diffs =
   try
     (* Get initial root hash *)
     let initial_root_hash =
-      match
-        Transition_frontier.Persistent_frontier.Database.get_root_hash db
-      with
-      | Ok h ->
-          h
-      | Error err ->
-          failwith
-            ( "Failed to get root hash: "
-            ^ Transition_frontier.Persistent_frontier.Database.Error.message err
-            )
+      Transition_frontier.Persistent_frontier.Database.get_root_hash db
+      |> Result.map_error ~f:(fun err ->
+             Exn.create_s
+               (Sexp.of_string
+                  ( "Failed to get root hash: "
+                  ^ Transition_frontier.Persistent_frontier.Database.Error
+                    .message err ) ) )
+      |> Result.ok_exn
     in
     Transition_frontier.Persistent_frontier.Database.with_batch db
       ~f:(fun batch ->
-        let (_ : State_hash.t) =
-          List.fold root_transition_diffs ~init:initial_root_hash
-            ~f:(fun old_root_hash diff ->
+        ( List.fold diffs ~init:initial_root_hash ~f:(fun old_root_hash diff ->
               match diff with
               | Diff.Lite.E.E
                   (Diff.Root_transitioned
                     { new_root; garbage = Lite garbage; _ } ) ->
-                  let move_root_fn =
-                    Transition_frontier.Persistent_frontier.Database.move_root
-                      ~old_root_hash ~new_root ~garbage
-                  in
-                  move_root_fn batch ;
+                  Transition_frontier.Persistent_frontier.Database.move_root
+                    ~old_root_hash ~new_root ~garbage batch ;
                   (* Return new root hash for next iteration *)
                   (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
               | _ ->
                   failwith "Expected Root_transitioned diff" )
-        in
-        () ) ;
-    [%log' info logger] "Successfully applied $count root transitions"
-      ~metadata:[ ("count", `Int (List.length root_transition_diffs)) ] ;
+          : State_hash.t )
+        |> ignore ) ;
+    [%log' info logger] "Successfully applied $count diffs"
+      ~metadata:[ ("count", `Int (List.length diffs)) ] ;
     Deferred.return (Ok ())
   with exn ->
     [%log' error logger] "Failed to apply root transitions: $error"
@@ -87,8 +80,22 @@ let apply_root_transitions ~logger ~db root_transition_diffs =
     Deferred.return
       (Error ("Failed to apply root transitions: " ^ Exn.to_string exn))
 
+let persist_all_transitions ~logger ~db frontier =
+  let breadcrumbs = Transition_frontier.all_breadcrumbs frontier in
+  [%log info] "Re-persisting %d transitions" (List.length breadcrumbs) ;
+  Transition_frontier.Persistent_frontier.Database.with_batch db
+    ~f:(fun batch ->
+      List.iter breadcrumbs ~f:(fun breadcrumb ->
+          Transition_frontier.Persistent_frontier.Database.set_transition
+            ~update_coinbase_stack_and_get_data_result:
+              (Breadcrumb.update_coinbase_stack_and_get_data_result breadcrumb)
+            ~transition:(Breadcrumb.validated_transition breadcrumb)
+            batch ) ) ;
+  [%log info] "Re-persisted %d transitions" (List.length breadcrumbs)
+
 let fix_persistent_frontier_root_do ~logger ~config_directory
-    ~chain_state_locations runtime_config =
+    ~chain_state_locations ~max_frontier_depth ~migrate_frontier runtime_config
+    =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
   (* Get compile-time constants *)
   let genesis_constants = Genesis_constants.Compiled.genesis_constants in
@@ -190,7 +197,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     match%map
       Transition_frontier.load
         ~context:(module Context)
-        ~retry_with_fresh_db:false ~max_frontier_depth:5 ~verifier
+        ~retry_with_fresh_db:false ~max_frontier_depth ~verifier
         ~consensus_local_state ~persistent_root ~persistent_frontier
         ~catchup_mode:`Super ~set_best_tip:false ()
     with
@@ -215,7 +222,24 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
   let frontier_root_hash =
     Transition_frontier.root frontier |> Breadcrumb.state_hash
   in
-
+  let create_persistent_frontier_db () =
+    let persistent_frontier_for_db =
+      Transition_frontier.persistent_frontier frontier
+    in
+    let persistent_frontier_instance =
+      Transition_frontier.Persistent_frontier.create_instance_exn
+        persistent_frontier_for_db
+    in
+    persistent_frontier_instance.db
+  in
+  let migrate_frontier_do ?db () =
+    if migrate_frontier then
+      let db =
+        match db with Some db -> db | None -> create_persistent_frontier_db ()
+      in
+      persist_all_transitions ~logger ~db frontier
+    else ()
+  in
   (* Check if persistent root is in the frontier *)
   match
     ( State_hash.equal frontier_root_hash persistent_root_hash
@@ -224,8 +248,9 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
   | true, _ ->
       [%log' info logger]
         "Frontier root already matches persistent root. Nothing to do." ;
-      let%bind () = Transition_frontier.close ~loc:__LOC__ frontier in
-      Deferred.return (Ok ())
+      migrate_frontier_do () ;
+      let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+      Ok ()
   | _, None ->
       [%log' error logger]
         "Persistent root $persistent_root not found in frontier. Bootstrap \
@@ -234,9 +259,9 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
           [ ("persistent_root", State_hash.to_yojson persistent_root_hash)
           ; ("frontier_root", State_hash.to_yojson frontier_root_hash)
           ] ;
-      let%bind () = Transition_frontier.close ~loc:__LOC__ frontier in
-      Deferred.return
-        (Error "Persistent root not found in frontier. Bootstrap required.")
+      migrate_frontier_do () ;
+      let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+      Error "Persistent root not found in frontier. Bootstrap required."
   | _, Some _persistent_root_breadcrumb ->
       (* Build path from persistent root back to frontier root *)
       let%bind.Deferred.Result path =
@@ -248,7 +273,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
         "Built path from persistent root to frontier root: $length blocks"
         ~metadata:[ ("length", `Int (List.length path)) ] ;
       (* Generate root transition diffs for each step *)
-      let root_transition_diffs =
+      let diffs =
         List.map path ~f:(fun breadcrumb ->
             let diff =
               Transition_frontier.calculate_root_transition_diff frontier
@@ -257,25 +282,20 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
             (* Convert Full diff to Lite diff *)
             Diff.Full.E.to_lite diff )
       in
-      [%log info] "Generated $count root transition diffs"
-        ~metadata:[ ("count", `Int (List.length root_transition_diffs)) ] ;
+      [%log info] "Generated $count transition diffs"
+        ~metadata:[ ("count", `Int (List.length diffs)) ] ;
       (* Get database before closing frontier *)
-      let persistent_frontier_for_db =
-        Transition_frontier.persistent_frontier frontier
-      in
-      let persistent_frontier_instance =
-        Transition_frontier.Persistent_frontier.create_instance_exn
-          persistent_frontier_for_db
-      in
-      let db = persistent_frontier_instance.db in
-      let%bind () = Transition_frontier.close ~loc:__LOC__ frontier in
+      let db = create_persistent_frontier_db () in
       (* Apply the diffs to persistent frontier database *)
+      let%bind.Deferred.Result () = apply_root_transitions ~logger ~db diffs in
+      migrate_frontier_do ~db () ;
       let%map.Deferred.Result () =
-        apply_root_transitions ~logger ~db root_transition_diffs
+        Transition_frontier.close ~loc:__LOC__ frontier >>| Result.return
       in
       [%log info] "Successfully moved frontier root to match persistent root"
 
-let fix_persistent_frontier_root ~config_directory ~config_file =
+let fix_persistent_frontier_root ~config_directory ~config_file
+    ~max_frontier_depth ~migrate_frontier =
   Logger.Consumer_registry.register ~commit_id:"" ~id:Logger.Logger_id.mina
     ~processor:Internal_tracing.For_logger.processor
     ~transport:
@@ -319,7 +339,8 @@ let fix_persistent_frontier_root ~config_directory ~config_file =
       Deferred.Result.return ()
   | `Both_exist ->
       fix_persistent_frontier_root_do ~logger ~config_directory
-        ~chain_state_locations runtime_config
+        ~chain_state_locations ~max_frontier_depth ~migrate_frontier
+        runtime_config
 
 let command =
   Command.async
@@ -331,6 +352,14 @@ let command =
     and config_file =
       flag "--config-file" ~aliases:[ "config-file" ]
         ~doc:"PATH path to a configuration file" (required string)
+    and max_frontier_depth =
+      flag "--max-frontier-depth" ~aliases:[ "max-frontier-depth" ]
+        ~doc:"INT maximum frontier depth (default: 10)" (optional int)
+    and migrate_frontier =
+      flag "--migrate-frontier" ~aliases:[ "migrate-frontier" ]
+        ~doc:
+          "BOOL whether to migrate frontier to the new format (default: false)"
+        (optional bool)
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
@@ -345,6 +374,8 @@ let command =
     in
     match%bind
       fix_persistent_frontier_root ~config_directory:conf_dir ~config_file
+        ~max_frontier_depth:(Option.value max_frontier_depth ~default:10)
+        ~migrate_frontier:(Option.value migrate_frontier ~default:false)
     with
     | Ok () ->
         printf "Persistent frontier root fix completed successfully.\n" ;

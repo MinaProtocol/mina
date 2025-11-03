@@ -453,20 +453,12 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
   | _ ->
       Error (`Not_found `Old_root_transition)
 
-let add ~update_coinbase_stack_and_get_data_result ~arcs_cache ~transition =
+let set_transition ~update_coinbase_stack_and_get_data_result ~transition =
   let state_body_hash = Mina_block.Validated.state_body_hash transition in
-  let transition = Mina_block.Validated.forget transition in
-  let hash = State_hash.With_state_hashes.state_hash transition in
-  let parent_hash =
-    With_hash.data transition |> Mina_block.header
-    |> Mina_block.Header.protocol_state
-    |> Mina_state.Protocol_state.previous_state_hash
-  in
-  let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
-  State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
-  State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+  let hash = Mina_block.Validated.state_hash transition in
   let transition_unwrapped =
-    With_hash.data transition |> Mina_block.read_all_proofs_from_disk
+    Mina_block.Validated.forget transition
+    |> With_hash.data |> Mina_block.read_all_proofs_from_disk
   in
   fun batch ->
     Batch.set batch ~key:(Transition_extended hash)
@@ -478,7 +470,20 @@ let add ~update_coinbase_stack_and_get_data_result ~arcs_cache ~transition =
                 Staged_ledger.Update_coinbase_stack_and_get_data_result
                 .read_all_proofs_from_disk
         ; state_body_hash
-        } ;
+        }
+
+let add ~update_coinbase_stack_and_get_data_result ~arcs_cache ~transition =
+  let hash = Mina_block.Validated.state_hash transition in
+  let parent_hash =
+    Mina_block.Validated.header transition
+    |> Mina_block.Header.protocol_state
+    |> Mina_state.Protocol_state.previous_state_hash
+  in
+  let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
+  State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
+  State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
+  fun batch ->
+    set_transition ~update_coinbase_stack_and_get_data_result ~transition batch ;
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 

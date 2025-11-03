@@ -76,6 +76,13 @@ val find_arcs_and_root :
      , [> `Not_found of [> `Arcs of State_hash.t | `Old_root_transition ] ] )
      result
 
+val set_transition :
+     update_coinbase_stack_and_get_data_result:
+       Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
+  -> transition:Mina_block.Validated.t
+  -> batch_t
+  -> unit
+
 val add :
      update_coinbase_stack_and_get_data_result:
        Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
