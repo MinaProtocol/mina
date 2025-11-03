@@ -87,6 +87,35 @@ let validate_fork_command =
      run_check_and_exit
        (validate_fork ~postgres_uri ~fork_state_hash ~fork_slot) )
 
+let convert_chain_to_canonical_command =
+  Async.Command.async_or_error
+    ~summary:
+      "Mark the chain leading to the target block as canonical for a protocol \
+       version"
+    (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
+     and target_block_hash =
+       Command.Param.flag "--target-block-hash"
+         Command.Param.(required string)
+         ~doc:"String State hash of block that should remain canonical"
+     and protocol_version =
+       Command.Param.flag "--protocol-version"
+         Command.Param.(required int)
+         ~doc:"Int Protocol version identifier"
+     and stop_at_slot =
+       Command.Param.flag "--stop-at-slot"
+         Command.Param.(optional int)
+         ~doc:
+           "Int If provided, stops marking blocks as canonical when this \
+            global slot since genesis is reached"
+     in
+     fun () ->
+       let open Deferred.Or_error.Let_syntax in
+       let%bind () =
+         Logic.convert_chain_to_canonical ~postgres_uri ~target_block_hash
+           ~protocol_version ~stop_at_slot ()
+       in
+       Deferred.Or_error.return () )
+       
 let fetch_last_filled_block_command =
   Async.Command.async ~summary:"Select last filled block"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres in
@@ -104,6 +133,7 @@ let commands =
         ] )
   ; ("verify-upgrade", verify_upgrade_command)
   ; ("validate-fork", validate_fork_command)
+  ; ("convert-chain-to-canonical", convert_chain_to_canonical_command)
   ]
 
 let () =
