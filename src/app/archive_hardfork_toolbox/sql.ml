@@ -134,7 +134,7 @@ let fetch_latest_migration_history (module Conn : CONNECTION) =
   Conn.find_opt fetch_latest_migration_history_query ()
 
 let fetch_last_filled_block_query =
-  (Caqti_type.unit ->! Caqti_type.(t3 string int64 int))
+  Caqti_type.(unit ->! t3 string int64 int)
     {sql|
     SELECT b.state_hash, b.global_slot_since_genesis, b.height
     FROM blocks b
