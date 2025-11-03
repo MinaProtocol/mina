@@ -21,6 +21,137 @@ let snark_pool_list t =
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
 
+let start_auto_hardfork_config_generation ~logger mina =
+  let open Deferred.Let_syntax in
+  let config = Mina_lib.config mina in
+  let runtime_config = config.precomputed_values.runtime_config in
+  let consensus_constants = config.precomputed_values.consensus_constants in
+  match config.hardfork_handling with
+  | Cli_lib.Arg_type.Hardfork_handling.Keep_running ->
+      Deferred.unit
+  | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit -> (
+      match
+        ( Runtime_config.slot_chain_end runtime_config
+        , Runtime_config.slot_tx_end runtime_config
+        , Runtime_config.scheduled_hard_fork_genesis_slot runtime_config )
+      with
+      | Some slot_chain_end, Some slot_tx_end, Some _scheduled_genesis -> (
+          (* Calculate when slot_chain_end begins *)
+          let chain_end_time =
+            Consensus.Data.Consensus_time.(
+              start_time ~constants:consensus_constants
+                (of_global_slot ~constants:consensus_constants slot_chain_end))
+          in
+          let chain_end_time_str =
+            Block_time.to_time_exn chain_end_time
+            |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+          in
+          [%log debug]
+            "Spawning background thread to wait for hardfork config \
+             generation. Will wait until slot_chain_end: slot %s at %s"
+            (Mina_numbers.Global_slot_since_hard_fork.to_string slot_chain_end)
+            chain_end_time_str ;
+          (* Wait until slot_chain_end time *)
+          let%bind () =
+            let span =
+              Block_time.diff chain_end_time
+                (Block_time.now config.time_controller)
+            in
+            after (Block_time.Span.to_time_span span)
+          in
+          [%log debug]
+            "Reached slot_chain_end time, now waiting for best tip to reach \
+             slot_tx_end: %s"
+            (Mina_numbers.Global_slot_since_hard_fork.to_string slot_tx_end) ;
+          (* Now poll until best tip >= slot_tx_end *)
+          let rec wait_for_best_tip () =
+            match Mina_lib.best_tip mina with
+            | `Bootstrapping ->
+                [%log debug] "Node is bootstrapping, waiting 15s before retry" ;
+                let%bind () = after (Time.Span.of_sec 15.0) in
+                wait_for_best_tip ()
+            | `Active breadcrumb ->
+                let protocol_state =
+                  Transition_frontier.Breadcrumb.protocol_state breadcrumb
+                in
+                let consensus_state =
+                  Mina_state.Protocol_state.consensus_state protocol_state
+                in
+                let current_slot =
+                  Consensus.Data.Consensus_state.curr_global_slot
+                    consensus_state
+                in
+                let blockchain_length =
+                  Consensus.Data.Consensus_state.blockchain_length
+                    consensus_state
+                in
+                let state_hash =
+                  Transition_frontier.Breadcrumb.state_hash breadcrumb
+                in
+                if
+                  Mina_numbers.Global_slot_since_hard_fork.(
+                    current_slot >= slot_tx_end)
+                then (
+                  [%log debug]
+                    "Best tip has reached slot_tx_end. Current slot: %s, \
+                     target slot: %s, blockchain_length: %s, state_hash: %s"
+                    (Mina_numbers.Global_slot_since_hard_fork.to_string
+                       current_slot )
+                    (Mina_numbers.Global_slot_since_hard_fork.to_string
+                       slot_tx_end )
+                    (Mina_numbers.Length.to_string blockchain_length)
+                    (Mina_base.State_hash.to_base58_check state_hash) ;
+                  Deferred.unit )
+                else (
+                  [%log debug]
+                    "Best tip not yet at slot_tx_end. Current slot: %s, target \
+                     slot: %s, blockchain_length: %s, state_hash: %s. Waiting \
+                     15s before retry"
+                    (Mina_numbers.Global_slot_since_hard_fork.to_string
+                       current_slot )
+                    (Mina_numbers.Global_slot_since_hard_fork.to_string
+                       slot_tx_end )
+                    (Mina_numbers.Length.to_string blockchain_length)
+                    (Mina_base.State_hash.to_base58_check state_hash) ;
+                  let%bind () = after (Time.Span.of_sec 15.0) in
+                  wait_for_best_tip () )
+          in
+          let%bind () = wait_for_best_tip () in
+          let network_id =
+            match Mina_lib.signature_kind mina with
+            | Mainnet ->
+                "mainnet"
+            | Testnet ->
+                "devnet"
+            | Other_network s ->
+                "other-network-" ^ s
+          in
+          let config_dir =
+            config.conf_dir ^/ sprintf "auto-fork-mesa-%s" network_id
+          in
+          [%log info] "Generating hardfork config in $config_dir"
+            ~metadata:[ ("config_dir", `String config_dir) ] ;
+          let%bind result =
+            Mina_lib.Hardfork_config.dump_reference_config
+              ~breadcrumb_spec:`Stop_slot ~config_dir
+              ~generate_fork_validation:false mina
+          in
+          match result with
+          | Ok () ->
+              [%log info]
+                "Successfully generated hardfork config, shutting down daemon" ;
+              (* Shutdown like Stop_daemon *)
+              Scheduler.yield () >>= fun () -> exit 0
+          | Error e ->
+              [%log error]
+                "Failed to generate hardfork config: %s. Daemon will continue \
+                 running"
+                (Error.to_string_hum e) ;
+              Deferred.unit )
+      | _ ->
+          (* Config not complete for auto-generation *)
+          Deferred.unit )
+
 (* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
 let make_conf_dir_item_io ~conf_dir ~filename =
   let item_file = conf_dir ^/ filename in
