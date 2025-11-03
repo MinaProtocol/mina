@@ -210,6 +210,49 @@ val hash : t -> Staged_ledger_hash.t
 
 type transaction_pool_proxy = Check_commands.transaction_pool_proxy
 
+module Update_coinbase_stack_and_get_data_result : sig
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V1 : sig
+      type t =
+        bool
+        * Transaction_snark_scan_state.Transaction_with_witness
+          .With_account_update_digests
+          .Stable
+          .V1
+          .t
+          list
+        * Pending_coinbase.Update.Action.Stable.V1.t
+        * [ `Update_none
+          | `Update_one of Pending_coinbase.Stack_versioned.Stable.V1.t
+          | `Update_two of
+            Pending_coinbase.Stack_versioned.Stable.V1.t
+            * Pending_coinbase.Stack_versioned.Stable.V1.t ]
+        * [ `First_pass_ledger_end of Frozen_ledger_hash.Stable.V1.t ]
+
+      val to_latest : t -> t
+    end
+  end]
+
+  type t =
+    bool
+    * Transaction_snark_scan_state.Transaction_with_witness.t list
+    * Pending_coinbase.Update.Action.t
+    * [ `Update_none
+      | `Update_one of Pending_coinbase.Stack_versioned.t
+      | `Update_two of
+        Pending_coinbase.Stack_versioned.t * Pending_coinbase.Stack_versioned.t
+      ]
+    * [ `First_pass_ledger_end of Frozen_ledger_hash.t ]
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+  val write_all_proofs_to_disk :
+    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+end
+
 val apply :
      ?skip_verification:[ `Proofs | `All ]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -226,6 +269,8 @@ val apply :
   -> zkapp_cmd_limit_hardcap:int
   -> signature_kind:Mina_signature_kind.t
   -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
+  -> ?cached_update_coinbase_stack_and_get_data_result:
+       Update_coinbase_stack_and_get_data_result.t
   -> t
   -> Staged_ledger_diff.t
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
@@ -402,15 +447,7 @@ module Test_helpers : sig
     -> Transaction.t With_status.t list
     -> Zkapp_precondition.Protocol_state.View.t
     -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
-    -> ( bool
-         * Transaction_snark_scan_state.Transaction_with_witness.t list
-         * Pending_coinbase.Update.Action.t
-         * [> `Update_none
-           | `Update_one of Pending_coinbase.Stack_versioned.t
-           | `Update_two of
-             Pending_coinbase.Stack_versioned.t
-             * Pending_coinbase.Stack_versioned.t ]
-         * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
+    -> ( Update_coinbase_stack_and_get_data_result.t
        , Staged_ledger_error.t )
        Deferred.Result.t
 end

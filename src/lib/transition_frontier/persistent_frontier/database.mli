@@ -92,13 +92,20 @@ val move_root :
   -> batch_t
   -> unit
 
+type get_transition_result =
+  { block : Mina_block.Validated.t
+  ; update_coinbase_stack_and_get_data_result :
+      Staged_ledger.Update_coinbase_stack_and_get_data_result.Stable.Latest.t
+      option
+  }
+
 val get_transition :
      logger:Logger.t
   -> signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
   -> t
   -> State_hash.t
-  -> ( Mina_block.Validated.t
+  -> ( get_transition_result
      , [> `Not_found of [> `Transition of State_hash.t ] ] )
      Result.t
 
@@ -132,7 +139,14 @@ val crawl_successors :
   -> t
   -> State_hash.t
   -> init:'a
-  -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> f:
+       (   ?update_coinbase_stack_and_get_data_result:
+             Staged_ledger.Update_coinbase_stack_and_get_data_result.Stable
+             .Latest
+             .t
+        -> acc:'a
+        -> Mina_block.Validated.t
+        -> ('a, 'b) Deferred.Result.t )
   -> ( unit
      , [> `Crawl_error of 'b
        | `Not_found of [> `Arcs of State_hash.t | `Transition of State_hash.t ]

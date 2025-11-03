@@ -38,8 +38,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
     Root_data.Minimal.Stable.Latest.(pending_coinbase root, scan_state root)
   in
   [%log internal] "Construct_staged_ledger_build_protocol_states_map_start"
-    ~metadata:
-      [ ("protocol_states_count", `Int (List.length protocol_states)) ] ;
+    ~metadata:[ ("protocol_states_count", `Int (List.length protocol_states)) ] ;
   let protocol_states_map =
     List.fold protocol_states ~init:State_hash.Map.empty
       ~f:(fun acc protocol_state ->
@@ -84,8 +83,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
       ~get_state ~signature_kind
   in
-  [%log internal]
-    "Construct_staged_ledger_of_scan_state_pending_coinbases_done" ;
+  [%log internal] "Construct_staged_ledger_of_scan_state_pending_coinbases_done" ;
   [%log internal] "Construct_staged_ledger_compute_hash_start" ;
   let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
   [%log internal] "Construct_staged_ledger_compute_hash_done" ;
@@ -251,7 +249,7 @@ module Instance = struct
     Result.return result
 
   let load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
-      ~parent transition =
+      ~parent ?cached_update_coinbase_stack_and_get_data_result transition =
     let%bind.Deferred.Result transition =
       match downgrade_transition transition root_genesis_state_hash with
       | Ok t ->
@@ -279,11 +277,12 @@ module Instance = struct
     let transition_receipt_time = None in
     [%log internal] "Breadcrumb_build_start" ;
     let%map breadcrumb =
-      Breadcrumb.build ~skip_staged_ledger_verification:`All
-        ~logger:t.factory.logger ~precomputed_values ~verifier:t.factory.verifier
+      Breadcrumb.build ?cached_update_coinbase_stack_and_get_data_result
+        ~skip_staged_ledger_verification:`All ~logger:t.factory.logger
+        ~precomputed_values ~verifier:t.factory.verifier
         ~trust_system:(Trust_system.null ()) ~parent ~transition
-        ~get_completed_work:(Fn.const None) ~sender:None ~transition_receipt_time
-        ()
+        ~get_completed_work:(Fn.const None) ~sender:None
+        ~transition_receipt_time ()
     in
     [%log internal] "Breadcrumb_build_done" ;
     breadcrumb
@@ -312,7 +311,7 @@ module Instance = struct
     let root_hash = Root_data.Minimal.Stable.Latest.hash root in
     [%log internal] "Database_get_root_transition_start"
       ~metadata:[ ("root_hash", State_hash.to_yojson root_hash) ] ;
-    let%bind root_transition =
+    let%bind { block = root_transition; _ } =
       Database.get_transition ~logger ~signature_kind ~proof_cache_db t.db
         root_hash
       |> Result.map_error ~f:(fun err ->
@@ -383,11 +382,19 @@ module Instance = struct
     [%log internal] "Load_full_frontier_create_extensions_done" ;
     [%log internal] "Load_full_frontier_crawl_start"
       ~metadata:[ ("root_hash", State_hash.to_yojson root_hash) ] ;
-    let visit parent transition =
+    let visit ?update_coinbase_stack_and_get_data_result ~acc:parent transition
+        =
+      let cached_update_coinbase_stack_and_get_data_result =
+        Option.map
+          ~f:
+            (Staged_ledger.Update_coinbase_stack_and_get_data_result
+             .write_all_proofs_to_disk ~proof_cache_db )
+          update_coinbase_stack_and_get_data_result
+      in
       [%log internal] "Visit_load_transition_start" ;
       let%bind breadcrumb =
         load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
-          ~parent transition
+          ~parent transition ?cached_update_coinbase_stack_and_get_data_result
       in
       [%log internal] "Visit_load_transition_done" ;
       [%log internal] "Visit_apply_diff_start" ;

@@ -338,6 +338,8 @@ val validate_staged_ledger_diff :
   -> parent_staged_ledger:Staged_ledger.t
   -> parent_protocol_state:Protocol_state.Value.t
   -> ?transaction_pool_proxy:Staged_ledger.transaction_pool_proxy
+  -> ?cached_update_coinbase_stack_and_get_data_result:
+       Staged_ledger.Update_coinbase_stack_and_get_data_result.t
   -> ( 'a
      , 'b
      , 'c

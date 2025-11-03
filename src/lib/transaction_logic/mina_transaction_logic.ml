@@ -94,7 +94,7 @@ module type S = sig
     -> state_view:Zkapp_precondition.Protocol_state.View.t
     -> ledger
     -> Zkapp_command.t
-    -> ( Transaction_applied.Zkapp_command_applied.t
+    -> ( Zkapp_command.t Transaction_applied.Zkapp_command_applied.t
        * ( ( Stack_frame.value
            , Stack_frame.value list
            , Amount.Signed.t
@@ -144,7 +144,8 @@ module type S = sig
     -> ?supply_increase:Amount.Signed.t
     -> ledger
     -> Zkapp_command.t
-    -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
+    -> (Zkapp_command.t Transaction_applied.Zkapp_command_applied.t * 'acc)
+       Or_error.t
 
   val apply_zkapp_command_first_pass_aux :
        signature_kind:Mina_signature_kind.t
@@ -189,7 +190,8 @@ module type S = sig
           -> 'acc )
     -> ledger
     -> Transaction_partially_applied.Zkapp_command_partially_applied.t
-    -> (Transaction_applied.Zkapp_command_applied.t * 'acc) Or_error.t
+    -> (Zkapp_command.t Transaction_applied.Zkapp_command_applied.t * 'acc)
+       Or_error.t
 
   val apply_fee_transfer :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -1720,7 +1722,8 @@ module Make (L : Ledger_intf.S) :
   let apply_zkapp_command_second_pass_aux (type user_acc) ~(init : user_acc) ~f
       ledger
       (c : Transaction_partially_applied.Zkapp_command_partially_applied.t) :
-      (Transaction_applied.Zkapp_command_applied.t * user_acc) Or_error.t =
+      (Zkapp_command.t Transaction_applied.Zkapp_command_applied.t * user_acc)
+      Or_error.t =
     let open Or_error.Let_syntax in
     let perform eff =
       Env.perform ~constraint_constants:c.constraint_constants eff
@@ -1870,7 +1873,7 @@ module Make (L : Ledger_intf.S) :
                some of the other account_update updates applied"
 
   let apply_zkapp_command_second_pass ledger c :
-      Transaction_applied.Zkapp_command_applied.t Or_error.t =
+      Zkapp_command.t Transaction_applied.Zkapp_command_applied.t Or_error.t =
     let open Or_error.Let_syntax in
     let%map x, () =
       apply_zkapp_command_second_pass_aux ~init:() ~f:Fn.const ledger c

@@ -136,6 +136,40 @@ end
 
 include T
 
+module With_account_update_digests = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Account_update.Stable.V1.t
+        , Digest.Account_update.Stable.V1.t
+        , Digest.Forest.Stable.V1.t )
+        Call_forest.Stable.V1.t
+        Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let read_all_proofs_from_disk (t : T.t) : t =
+    { fee_payer = t.fee_payer
+    ; memo = t.memo
+    ; account_updates =
+        Call_forest.map ~f:Account_update.read_all_proofs_from_disk
+          t.account_updates
+    }
+
+  let write_all_proofs_to_disk ~proof_cache_db (w : t) : T.t =
+    { fee_payer = w.fee_payer
+    ; memo = w.memo
+    ; account_updates =
+        Call_forest.map
+          ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
+          w.account_updates
+    }
+end
+
 let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
     (w : Stable.Latest.t) : t =
   { fee_payer = w.fee_payer

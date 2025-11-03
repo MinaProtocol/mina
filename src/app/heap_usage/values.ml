@@ -69,7 +69,9 @@ let verification_key =
 let applied = Mina_base.Transaction_status.Applied
 
 let mk_scan_state_base_node
-    (varying : Mina_transaction_logic.Transaction_applied.Varying.t)
+    (varying :
+      Mina_base.Zkapp_command.t
+      Mina_transaction_logic.Transaction_applied.Varying.t )
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) :
     Transaction_snark_scan_state.Transaction_with_witness.t Parallel_scan.Base.t
     =
@@ -144,7 +146,9 @@ let mk_scan_state_base_node
   (weight, job)
 
 let scan_state_base_node_coinbase =
-  let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
+  let varying :
+      Mina_base.Zkapp_command.t
+      Mina_transaction_logic.Transaction_applied.Varying.t =
     let coinbase =
       Mina_base.Coinbase.create ~amount:Currency.Amount.zero
         ~receiver:sample_pk_compressed ~fee_transfer:None
@@ -159,7 +163,9 @@ let scan_state_base_node_coinbase =
   mk_scan_state_base_node varying
 
 let scan_state_base_node_payment =
-  let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
+  let varying :
+      Mina_base.Zkapp_command.t
+      Mina_transaction_logic.Transaction_applied.Varying.t =
     let payload : Mina_base.Signed_command_payload.t =
       let payment_payload =
         Quickcheck.random_value
@@ -200,8 +206,11 @@ let scan_state_base_node_payment =
   mk_scan_state_base_node varying
 
 let scan_state_base_node_zkapp ~constraint_constants ~zkapp_command =
-  let varying : Mina_transaction_logic.Transaction_applied.Varying.t =
+  let varying :
+      Mina_base.Zkapp_command.t
+      Mina_transaction_logic.Transaction_applied.Varying.t =
     let zkapp_command_applied :
+        Mina_base.Zkapp_command.t
         Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t =
       let accounts =
         (* fudge: the `accounts` calculation is more complex; see `apply_zkapp_command_unchecked_aux`

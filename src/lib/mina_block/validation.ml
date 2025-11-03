@@ -477,7 +477,8 @@ let reset_frontier_dependencies_validation (transition_with_hash, validation) =
 
 let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     ~get_completed_work ~precomputed_values ~verifier ~parent_staged_ledger
-    ~parent_protocol_state ?transaction_pool_proxy (t, validation) =
+    ~parent_protocol_state ?transaction_pool_proxy
+    ?cached_update_coinbase_stack_and_get_data_result (t, validation) =
   [%log internal] "Validate_staged_ledger_diff" ;
   let block = With_hash.data t in
   let header = Block.header block in
@@ -502,8 +503,8 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
                            , `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
                            , `Pending_coinbase_update _ ) =
-    Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
-      ~get_completed_work
+    Staged_ledger.apply ?cached_update_coinbase_stack_and_get_data_result
+      ?skip_verification:skip_staged_ledger_verification ~get_completed_work
       ~constraint_constants:
         precomputed_values.Precomputed_values.constraint_constants ~global_slot
       ~logger ~verifier parent_staged_ledger

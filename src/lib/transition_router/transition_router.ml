@@ -397,7 +397,7 @@ let initialize ~transaction_pool_proxy ~context:(module Context : CONTEXT)
   with
   | best_seen_transition, None ->
       [%log info] "Unable to load frontier; starting bootstrap" ;
-      let%map initial_root_transition =
+      let%map { block = initial_root_transition; _ } =
         Persistent_frontier.(
           with_instance_exn persistent_frontier
             ~f:(Instance.get_root_transition ~signature_kind ~proof_cache_db))

@@ -29,7 +29,7 @@ let%test_module "supply_increase" =
           ; body = Body.Payment { new_accounts = account_id }
           }
       in
-      let command_input : Command_applied.t =
+      let command_input : Zkapp_command.t Command_applied.t =
         Command_applied.Signed_command signed_command_input
       in
       let%map varying_input = return @@ Varying.Command command_input

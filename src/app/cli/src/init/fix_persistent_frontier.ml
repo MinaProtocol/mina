@@ -133,7 +133,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     >>| Result.map_error ~f:(fun (`Initialization_error err) ->
             Error.to_string_mach err )
   in
-  let%bind.Deferred.Result root_transition =
+  let%bind.Deferred.Result { block = root_transition; _ } =
     Persistent_frontier.with_instance_exn persistent_frontier
       ~f:
         (Persistent_frontier.Instance.get_root_transition ~proof_cache_db

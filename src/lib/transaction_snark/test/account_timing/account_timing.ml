@@ -1336,6 +1336,7 @@ let%test_module "account timing check" =
     let check_zkapp_failure expected_failure = function
       | Ok
           ( (zkapp_command_applied :
+              Mina_base.Zkapp_command.t
               Mina_transaction_logic.Transaction_applied.Zkapp_command_applied.t
               )
           , ( (local_state :

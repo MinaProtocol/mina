@@ -103,7 +103,8 @@ let compute_block_trace_metadata transition_with_validation =
     ; ("coinbase_receiver", Account.key_to_yojson @@ coinbase_receiver cs)
     ]
 
-let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
+let build ?skip_staged_ledger_verification ?transaction_pool_proxy
+    ?cached_update_coinbase_stack_and_get_data_result ~logger
     ~precomputed_values ~verifier ~trust_system ~parent
     ~transition:(transition_with_validation : Mina_block.almost_valid_block)
     ~get_completed_work ~sender ~transition_receipt_time () =
@@ -120,8 +121,10 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy ~logger
   O1trace.thread "build_breadcrumb" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
-        Validation.validate_staged_ledger_diff ?skip_staged_ledger_verification
-          ~get_completed_work ~logger ~precomputed_values ~verifier
+        Validation.validate_staged_ledger_diff
+          ?cached_update_coinbase_stack_and_get_data_result
+          ?skip_staged_ledger_verification ~get_completed_work ~logger
+          ~precomputed_values ~verifier
           ~parent_staged_ledger:(staged_ledger parent)
           ~parent_protocol_state:
             ( parent.validated_transition |> Mina_block.Validated.header

@@ -1,10 +1,7 @@
 open Async_kernel
 open Core
 open Mina_base
-open Mina_block
 open Frontier_base
-
-(* TODO: cache state body hashes in db to avoid re-hashing on load (#10293) *)
 
 (* TODO: bundle together with other writes by sharing batch requests between
  * function calls in this module (#3738) *)
@@ -19,8 +16,6 @@ let rec deferred_list_result_iter ls ~f =
       deferred_list_result_iter t ~f
 
 (* TODO: should debug assert garbage checks be added? *)
-open Result.Let_syntax
-
 (* TODO: implement versions with module versioning. For
  * now, this is just stubbed so we can add db migrations
  * later. (#3736) *)
@@ -51,6 +46,9 @@ module Schema = struct
   type _ t =
     | Db_version : int t
     | Transition : State_hash.Stable.V1.t -> Mina_block.Stable.V2.t t
+    | Transition_extended :
+        State_hash.Stable.V1.t
+        -> Extended_block.Stable.V1.t t
     | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
     (* TODO:
        In hard forks, `Root` should be replaced by `(Root_hash, Root_common)`;
@@ -76,6 +74,8 @@ module Schema = struct
         "Db_version"
     | Transition _ ->
         "Transition _"
+    | Transition_extended _ ->
+        "Transition_extended _"
     | Arcs _ ->
         "Arcs _"
     | Root ->
@@ -94,6 +94,8 @@ module Schema = struct
         [%bin_type_class: int]
     | Transition _ ->
         [%bin_type_class: Mina_block.Stable.Latest.t]
+    | Transition_extended _ ->
+        [%bin_type_class: Extended_block.Stable.Latest.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.Latest.t list]
     | Root ->
@@ -177,6 +179,12 @@ module Schema = struct
           ~to_gadt:(fun _ -> Protocol_states_for_root_scan_state)
           ~of_gadt:(fun Protocol_states_for_root_scan_state ->
             "protocol_states_in_root_scan_state" )
+    | Transition_extended _ ->
+        gadt_input_type_class
+          (module Keys.Prefixed_state_hash.Stable.Latest)
+          ~to_gadt:(fun (_, hash) -> Transition_extended hash)
+          ~of_gadt:(fun (Transition_extended hash) ->
+            ("transition_extended", hash) )
 end
 
 module Error = struct
@@ -323,47 +331,47 @@ let check t ~genesis_state_hash =
       in
       (* checks the pointers, frontier hash, and checks pointer references *)
       let check_base () =
-        let%bind root_hash =
+        let%bind.Result root_hash =
           Result.map_error (get_root_hash t) ~f:(fun e -> `Corrupt e)
         in
-        let%bind best_tip =
+        let%bind.Result best_tip =
           get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
         in
-        let%bind root_transition =
+        let%bind.Result root_transition =
           get t.db ~key:(Transition root_hash)
             ~error:(`Corrupt (`Not_found `Root_transition))
         in
-        let%bind _ =
+        let%bind.Result _ =
           get t.db ~key:Protocol_states_for_root_scan_state
             ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
         in
-        let%map _ =
+        let%map.Result _ =
           get t.db ~key:(Transition best_tip)
             ~error:(`Corrupt (`Not_found `Best_tip_transition))
         in
         (root_hash, root_transition)
       in
       let rec check_arcs pred_hash =
-        let%bind successors =
+        let%bind.Result successors =
           get t.db ~key:(Arcs pred_hash)
             ~error:(`Corrupt (`Not_found (`Arcs pred_hash)))
         in
         List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
-            let%bind () = acc in
-            let%bind _ =
+            let%bind.Result () = acc in
+            let%bind.Result _ =
               get t.db ~key:(Transition succ_hash)
                 ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
             in
             check_arcs succ_hash )
       in
       ignore check_arcs ;
-      let%bind () = check_version () in
-      let%bind _root_hash, root_block = check_base () in
+      let%bind.Result () = check_version () in
+      let%bind.Result _root_hash, root_block = check_base () in
       let root_protocol_state =
         root_block |> Mina_block.Stable.Latest.header
         |> Mina_block.Header.protocol_state
       in
-      let%map () =
+      let%map.Result () =
         let persisted_genesis_state_hash =
           Mina_state.Protocol_state.genesis_state_hash root_protocol_state
         in
@@ -372,7 +380,8 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       (* let%map () = check_arcs root_hash in *)
-      root_block |> Mina_block.Stable.Latest.header |> Header.protocol_state
+      root_block |> Mina_block.Stable.Latest.header
+      |> Mina_block.Header.protocol_state
       |> Mina_state.Protocol_state.blockchain_state
       |> Mina_state.Blockchain_state.snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
@@ -432,7 +441,8 @@ let add ~arcs_cache ~transition =
   let transition = Mina_block.Validated.forget transition in
   let hash = State_hash.With_state_hashes.state_hash transition in
   let parent_hash =
-    With_hash.data transition |> Mina_block.header |> Header.protocol_state
+    With_hash.data transition |> Mina_block.header
+    |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
   let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
@@ -468,20 +478,36 @@ let move_root ~old_root_hash ~new_root ~garbage =
         Batch.remove batch ~key:(Transition node_hash) ;
         Batch.remove batch ~key:(Arcs node_hash) )
 
+let get_transition_do db hash =
+  let make_hashes state_body_hash =
+    { State_hash.State_hashes.state_hash = hash; state_body_hash }
+  in
+  match get db ~key:(Transition_extended hash) ~error:() with
+  | Ok { block; update_coinbase_stack_and_get_data_result; state_body_hash } ->
+      Ok
+        ( { With_hash.data = block; hash = make_hashes (Some state_body_hash) }
+        , update_coinbase_stack_and_get_data_result )
+  | Error _ ->
+      let%map.Result block =
+        get db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
+      in
+      ({ With_hash.data = block; hash = make_hashes None }, None)
+
+type get_transition_result =
+  { block : Mina_block.Validated.t
+  ; update_coinbase_stack_and_get_data_result :
+      Staged_ledger.Update_coinbase_stack_and_get_data_result.Stable.Latest.t
+      option
+  }
+
 let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
   [%log internal] "Database_get_transition_start"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
-  let%map transition =
-    get t.db ~key:(Transition hash) ~error:(`Not_found (`Transition hash))
+  let%map.Result block, update_coinbase_stack_and_get_data_result =
+    get_transition_do t.db hash
   in
   [%log internal] "Database_read_from_rocksdb_done"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
-  let block =
-    { With_hash.data = transition
-    ; hash =
-        { State_hash.State_hashes.state_hash = hash; state_body_hash = None }
-    }
-  in
   let parent_hash =
     block |> With_hash.data |> Mina_block.Stable.Latest.header
     |> Mina_block.Header.protocol_state
@@ -504,7 +530,7 @@ let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
   in
   [%log internal] "Database_get_transition_done"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
-  result
+  { block = result; update_coinbase_stack_and_get_data_result }
 
 let get_arcs t hash = get t.db ~key:(Arcs hash) ~error:(`Not_found (`Arcs hash))
 
@@ -550,7 +576,7 @@ let rec crawl_successors ~logger ~signature_kind ~proof_cache_db ?max_depth t
       deferred_list_result_iter successors ~f:(fun succ_hash ->
           [%log internal] "Crawl_process_successor_start"
             ~metadata:[ ("state_hash", State_hash.to_yojson succ_hash) ] ;
-          let%bind transition =
+          let%bind { block; update_coinbase_stack_and_get_data_result } =
             Deferred.return
               (get_transition ~logger ~signature_kind ~proof_cache_db t
                  succ_hash )
@@ -558,7 +584,8 @@ let rec crawl_successors ~logger ~signature_kind ~proof_cache_db ?max_depth t
           [%log internal] "Crawl_apply_diff_start"
             ~metadata:[ ("state_hash", State_hash.to_yojson succ_hash) ] ;
           let%bind init' =
-            Deferred.map (f init transition)
+            Deferred.map
+              (f ?update_coinbase_stack_and_get_data_result ~acc:init block)
               ~f:(Result.map_error ~f:(fun err -> `Crawl_error err))
           in
           [%log internal] "Crawl_apply_diff_done"

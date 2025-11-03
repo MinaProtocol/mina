@@ -28,6 +28,26 @@ module Transaction_with_witness : sig
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
+
+  module With_account_update_digests : sig
+    [%%versioned:
+    module Stable : sig
+      [@@@no_toplevel_latest_type]
+
+      module V1 : sig
+        type t
+
+        val to_latest : t -> t
+      end
+    end]
+
+    val write_all_proofs_to_disk :
+      proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+
+    val read_all_proofs_from_disk : t -> Stable.Latest.t
+
+    type t
+  end
 end
 
 module Ledger_proof_with_sok_message : sig

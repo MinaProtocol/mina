@@ -35,6 +35,69 @@ module Pre_statement = struct
     }
 end
 
+module Update_coinbase_stack_and_get_data_result = struct
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t =
+        bool
+        * Transaction_snark_scan_state.Transaction_with_witness
+          .With_account_update_digests
+          .Stable
+          .V1
+          .t
+          list
+        * Pending_coinbase.Update.Action.Stable.V1.t
+        * [ `Update_none
+          | `Update_one of Pending_coinbase.Stack_versioned.Stable.V1.t
+          | `Update_two of
+            Pending_coinbase.Stack_versioned.Stable.V1.t
+            * Pending_coinbase.Stack_versioned.Stable.V1.t ]
+        * [ `First_pass_ledger_end of Frozen_ledger_hash.Stable.V1.t ]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t =
+    bool
+    * Transaction_snark_scan_state.Transaction_with_witness.t list
+    * Pending_coinbase.Update.Action.t
+    * [ `Update_none
+      | `Update_one of Pending_coinbase.Stack_versioned.t
+      | `Update_two of
+        Pending_coinbase.Stack_versioned.t * Pending_coinbase.Stack_versioned.t
+      ]
+    * [ `First_pass_ledger_end of Frozen_ledger_hash.t ]
+
+  let read_all_proofs_from_disk : t -> Stable.Latest.t =
+   fun (a, witness, b, c, d) ->
+    ( a
+    , List.map
+        ~f:
+          Transaction_snark_scan_state.Transaction_with_witness
+          .With_account_update_digests
+          .read_all_proofs_from_disk witness
+    , b
+    , c
+    , d )
+
+  let write_all_proofs_to_disk ~proof_cache_db : Stable.Latest.t -> t =
+   fun (a, witness, b, c, d) ->
+    ( a
+    , List.map
+        ~f:(fun x ->
+          Transaction_snark_scan_state.Transaction_with_witness
+          .With_account_update_digests
+          .write_all_proofs_to_disk ~proof_cache_db x )
+        witness
+    , b
+    , c
+    , d )
+end
+
 module T = struct
   module Scan_state = Transaction_snark_scan_state
   module Pre_diff_info = Pre_diff_info
@@ -816,7 +879,8 @@ module T = struct
   let update_coinbase_stack_and_get_data_impl ~logger ~constraint_constants
       ~global_slot ~first_partition_slots:slots ~no_second_partition
       ~is_new_stack ~signature_kind ledger pending_coinbase_collection
-      transactions current_state_view state_and_body_hash =
+      transactions current_state_view state_and_body_hash :
+      (Update_coinbase_stack_and_get_data_result.t, _) Deferred.Result.t =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
       List.fold_until ~init:false txns
@@ -832,13 +896,13 @@ module T = struct
       (*Single partition:
         1.Check if a new stack is required and get a working stack [working_stack]
         2.create data for enqueuing onto the scan state *)
-      let%bind working_stack =
-        working_stack pending_coinbase_collection ~is_new_stack
-        |> Deferred.return
-      in
       [%log internal] "Update_ledger_and_get_statements"
         ~metadata:[ ("partition", `String "single") ] ;
       let%map data, updated_stack, _, first_pass_ledger_end =
+        let%bind working_stack =
+          working_stack pending_coinbase_collection ~is_new_stack
+          |> Deferred.return
+        in
         update_ledger_and_get_statements ~constraint_constants ~global_slot
           ~signature_kind ledger working_stack (transactions, None)
           current_state_view state_and_body_hash
@@ -867,14 +931,14 @@ module T = struct
         5. get the second set of scan_state data[data2]*)
       let txns_for_partition1 = List.take transactions slots in
       let coinbase_in_first_partition = coinbase_exists txns_for_partition1 in
-      let%bind working_stack1 =
-        working_stack pending_coinbase_collection ~is_new_stack:false
-        |> Deferred.return
-      in
       let txns_for_partition2 = List.drop transactions slots in
       [%log internal] "Update_ledger_and_get_statements"
         ~metadata:[ ("partition", `String "both") ] ;
       let%map data, updated_stack1, updated_stack2, first_pass_ledger_end =
+        let%bind working_stack1 =
+          working_stack pending_coinbase_collection ~is_new_stack:false
+          |> Deferred.return
+        in
         update_ledger_and_get_statements ~constraint_constants ~global_slot
           ~signature_kind ledger working_stack1
           (txns_for_partition1, Some txns_for_partition2)
@@ -921,7 +985,8 @@ module T = struct
 
   let update_coinbase_stack_and_get_data ~logger ~constraint_constants
       ~global_slot ~signature_kind scan_state ledger pending_coinbase_collection
-      transactions current_state_view state_and_body_hash =
+      transactions current_state_view state_and_body_hash :
+      (Update_coinbase_stack_and_get_data_result.t, _) Deferred.Result.t =
     let { Scan_state.Space_partition.first = slots, _; second } =
       Scan_state.partition_if_overflowing scan_state
     in
@@ -1009,7 +1074,8 @@ module T = struct
 
   let apply_diff ?(skip_verification = false) ~logger ~constraint_constants
       ~global_slot ~current_state_view ~state_and_body_hash ~log_prefix
-      ~zkapp_cmd_limit_hardcap ~signature_kind t pre_diff_info =
+      ~zkapp_cmd_limit_hardcap ~signature_kind
+      ?cached_update_coinbase_stack_and_get_data_result t pre_diff_info =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -1064,11 +1130,15 @@ module T = struct
              , stack_update_in_snark
              , stack_update
              , `First_pass_ledger_end first_pass_ledger_end ) =
-      O1trace.thread "update_coinbase_stack_start_time" (fun () ->
-          update_coinbase_stack_and_get_data ~logger ~constraint_constants
-            ~global_slot ~signature_kind t.scan_state new_ledger
-            t.pending_coinbase_collection transactions current_state_view
-            state_and_body_hash )
+      match cached_update_coinbase_stack_and_get_data_result with
+      | Some cached ->
+          return cached
+      | None ->
+          O1trace.thread "update_coinbase_stack_start_time" (fun () ->
+              update_coinbase_stack_and_get_data ~logger ~constraint_constants
+                ~global_slot ~signature_kind t.scan_state new_ledger
+                t.pending_coinbase_collection transactions current_state_view
+                state_and_body_hash )
     in
     let slots = List.length data in
     let work_count = List.length works in
@@ -1224,7 +1294,8 @@ module T = struct
       ~get_completed_work ~logger ~verifier ~current_state_view
       ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase
       ~zkapp_cmd_limit_hardcap ~signature_kind
-      ?(transaction_pool_proxy = Check_commands.dummy_transaction_pool_proxy) t
+      ?(transaction_pool_proxy = Check_commands.dummy_transaction_pool_proxy)
+      ?cached_update_coinbase_stack_and_get_data_result t
       (witness : Staged_ledger_diff.t) =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
@@ -1267,7 +1338,7 @@ module T = struct
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
-      apply_diff
+      apply_diff ?cached_update_coinbase_stack_and_get_data_result
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
         ~constraint_constants ~global_slot t

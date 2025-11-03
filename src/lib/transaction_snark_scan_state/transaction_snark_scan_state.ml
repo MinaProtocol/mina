@@ -18,47 +18,123 @@ module type Monad_with_Or_error_intf = sig
   end
 end
 
+(* TODO introduce a new type that will be like the one below but without
+   the zkapp tx hashes removed *)
+
 module Transaction_with_witness = struct
+  module T = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V2 = struct
+        (* TODO: The statement is redundant here - it can be computed from the
+           witness and the transaction
+        *)
+        type 'tx_applied t =
+          { transaction_with_info : 'tx_applied
+          ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
+          ; statement : Transaction_snark.Statement.Stable.V2.t
+          ; init_stack :
+              Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable
+              .V1
+              .t
+          ; first_pass_ledger_witness :
+              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+          ; second_pass_ledger_witness :
+              (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
+          ; block_global_slot :
+              Mina_numbers.Global_slot_since_genesis.Stable.V1.t
+          }
+        [@@deriving sexp, to_yojson]
+      end
+    end]
+
+    type t =
+      { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
+      ; state_hash : State_hash.t * State_body_hash.t
+      ; statement : Transaction_snark.Statement.t
+      ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
+      ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+      ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
+      ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
+      }
+  end
+
+  include T
+
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V2 = struct
-      (* TODO: The statement is redundant here - it can be computed from the
-         witness and the transaction
-      *)
       type t =
-        { transaction_with_info :
-            Mina_transaction_logic.Transaction_applied.Stable.V2.t
-        ; state_hash : State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
-        ; statement : Transaction_snark.Statement.Stable.V2.t
-        ; init_stack :
-            Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
-            .t
-        ; first_pass_ledger_witness :
-            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
-        ; second_pass_ledger_witness :
-            (Mina_ledger.Sparse_ledger.Stable.V2.t[@sexp.opaque])
-        ; block_global_slot : Mina_numbers.Global_slot_since_genesis.Stable.V1.t
-        }
+        Mina_transaction_logic.Transaction_applied.Stable.V2.t T.Stable.V2.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t =
-    { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
-    ; state_hash : State_hash.t * State_body_hash.t
-    ; statement : Transaction_snark.Statement.t
-    ; init_stack : Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
-    ; first_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
-    ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
-    ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
-    }
+  module With_account_update_digests = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Mina_transaction_logic.Transaction_applied.With_account_update_digests
+          .Stable
+          .V1
+          .t
+          T.Stable.V2.t
+        [@@deriving sexp, to_yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    let write_all_proofs_to_disk ~proof_cache_db : t -> T.t =
+     fun { T.Stable.Latest.transaction_with_info
+         ; state_hash
+         ; statement
+         ; init_stack
+         ; first_pass_ledger_witness
+         ; second_pass_ledger_witness
+         ; block_global_slot
+         } ->
+      { T.transaction_with_info =
+          Mina_transaction_logic.Transaction_applied.With_account_update_digests
+          .write_all_proofs_to_disk ~proof_cache_db transaction_with_info
+      ; state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      }
+
+    let read_all_proofs_from_disk : T.t -> t =
+     fun { T.transaction_with_info
+         ; state_hash
+         ; statement
+         ; init_stack
+         ; first_pass_ledger_witness
+         ; second_pass_ledger_witness
+         ; block_global_slot
+         } ->
+      { T.Stable.Latest.transaction_with_info =
+          Mina_transaction_logic.Transaction_applied.With_account_update_digests
+          .read_all_proofs_from_disk transaction_with_info
+      ; state_hash
+      ; statement
+      ; init_stack
+      ; first_pass_ledger_witness
+      ; second_pass_ledger_witness
+      ; block_global_slot
+      }
+  end
 
   let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
-      { Stable.Latest.transaction_with_info
+      { T.Stable.Latest.transaction_with_info
       ; state_hash
       ; statement
       ; init_stack
@@ -66,7 +142,7 @@ module Transaction_with_witness = struct
       ; second_pass_ledger_witness
       ; block_global_slot
       } =
-    { transaction_with_info =
+    { T.transaction_with_info =
         Mina_transaction_logic.Transaction_applied.write_all_proofs_to_disk
           ~signature_kind ~proof_cache_db transaction_with_info
     ; state_hash
@@ -78,7 +154,7 @@ module Transaction_with_witness = struct
     }
 
   let read_all_proofs_from_disk
-      { transaction_with_info
+      { T.transaction_with_info
       ; state_hash
       ; statement
       ; init_stack
@@ -86,7 +162,7 @@ module Transaction_with_witness = struct
       ; second_pass_ledger_witness
       ; block_global_slot
       } =
-    { Stable.Latest.transaction_with_info =
+    { T.Stable.Latest.transaction_with_info =
         Mina_transaction_logic.Transaction_applied.read_all_proofs_from_disk
           transaction_with_info
     ; state_hash

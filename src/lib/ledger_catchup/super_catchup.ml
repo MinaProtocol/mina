@@ -1425,6 +1425,7 @@ let run ~context:(module Context : CONTEXT) ~trust_system ~verifier ~network
         ~unprocessed_transition_cache ~catchup_breadcrumbs_writer
         ~build_func:
           (Transition_frontier.Breadcrumb.build
+             ?cached_update_coinbase_stack_and_get_data_result:None
              ~get_completed_work:(Fn.const None) ) )
 
 (* Unit tests *)
