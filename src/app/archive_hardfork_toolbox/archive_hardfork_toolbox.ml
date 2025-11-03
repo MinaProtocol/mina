@@ -5,7 +5,6 @@ open Cli_lib.Flag
 open Logic
 
 let run_check_and_exit check_fn () =
-  let open Deferred.Let_syntax in
   let%bind results = check_fn () in
   report_all_checks results ;
   if has_failures results then Shutdown.exit 1 else Deferred.return ()
@@ -25,8 +24,7 @@ let is_in_best_chain_command =
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
      and fork_state_hash = fork_state_hash
      and fork_height =
-       Command.Param.flag "--fork-height"
-         Command.Param.(required int)
+       Command.Param.(flag "--fork-height" (required int))
          ~doc:"Int Height of the fork block"
      and fork_slot = fork_slot in
 
@@ -39,13 +37,11 @@ let confirmations_command =
     ~summary:"Verify number of confirmations for the fork block"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
      and latest_state_hash =
-       Command.Param.flag "--latest-state-hash"
-         Command.Param.(required string)
+       Command.Param.(flag "--latest-state-hash" (required string))
          ~doc:"String Hash of the latest state"
      and fork_slot = fork_slot
      and required_confirmations =
-       Command.Param.flag "--required-confirmations"
-         Command.Param.(required int)
+       Command.Param.(flag "--required-confirmations" (required int))
          ~doc:"Int Number of confirmations required for the fork block"
      in
 
@@ -67,12 +63,10 @@ let verify_upgrade_command =
     ~summary:"Verify upgrade from pre-fork to post-fork schema"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
      and expected_protocol_version =
-       Command.Param.flag "--protocol-version"
-         Command.Param.(required string)
+       Command.Param.(flag "--protocol-version" (required string))
          ~doc:"String Protocol Version to upgrade to (e.g. 3.2.0 etc)"
      and expected_migration_version =
-       Command.Param.flag "--migration-version"
-         Command.Param.(required string)
+       Command.Param.(flag "--migration-version" (required string))
          ~doc:"String Migration Version that generates current schema"
      in
      run_check_and_exit
@@ -94,27 +88,19 @@ let convert_chain_to_canonical_command =
        version"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
      and target_block_hash =
-       Command.Param.flag "--target-block-hash"
-         Command.Param.(required string)
+       Command.Param.(flag "--target-block-hash" (required string))
          ~doc:"String State hash of block that should remain canonical"
      and protocol_version =
-       Command.Param.flag "--protocol-version"
-         Command.Param.(required int)
+       Command.Param.(flag "--protocol-version" (required int))
          ~doc:"Int Protocol version identifier"
      and stop_at_slot =
-       Command.Param.flag "--stop-at-slot"
-         Command.Param.(optional int)
+       Command.Param.(flag "--stop-at-slot" (optional int))
          ~doc:
            "Int If provided, stops marking blocks as canonical when this \
             global slot since genesis is reached"
      in
-     fun () ->
-       let open Deferred.Or_error.Let_syntax in
-       let%bind () =
-         Logic.convert_chain_to_canonical ~postgres_uri ~target_block_hash
-           ~protocol_version ~stop_at_slot ()
-       in
-       Deferred.Or_error.return () )
+     convert_chain_to_canonical ~postgres_uri ~target_block_hash
+       ~protocol_version ~stop_at_slot )
 
 (* TODO: consider refactor these commands to reuse queries in the future. *)
 let commands =
