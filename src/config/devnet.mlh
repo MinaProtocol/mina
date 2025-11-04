@@ -6,7 +6,7 @@
 
 
 (*BEGIN src/config/coinbase/realistic.mlh*)
-[%%define coinbase "720"]
+[%%define coinbase "360"]
 (*END src/config/coinbase/realistic.mlh*)
 
 
