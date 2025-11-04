@@ -49,7 +49,6 @@ let connect postgres_uri =
       pool
 
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
-  let open Deferred.Let_syntax in
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
 
@@ -74,7 +73,6 @@ let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
 
 let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
     ~required_confirmations () =
-  let open Deferred.Let_syntax in
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%map confirmations =
@@ -95,7 +93,6 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
   [ check_result ]
 
 let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
-  let open Deferred.Let_syntax in
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%bind _, _, _, user_commands_count =
@@ -135,7 +132,6 @@ let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
 
 let verify_upgrade ~postgres_uri ~expected_protocol_version
     ~expected_migration_version () =
-  let open Deferred.Let_syntax in
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let%map res = query_db ~f:Sql.fetch_latest_migration_history in
@@ -181,7 +177,6 @@ let verify_upgrade ~postgres_uri ~expected_protocol_version
       ]
 
 let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
-  let open Deferred.Let_syntax in
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
   let fork_slot = Int64.of_int fork_slot in
@@ -267,7 +262,7 @@ let convert_chain_to_canonical ~postgres_uri ~target_block_hash
            batching mechanism.
       *)
       let batch_size = 500 in
-      let%bind () =
+      let%map () =
         Deferred.List.iter (List.chunks_of chain_ids ~length:batch_size)
           ~f:(fun ids ->
             query_db
@@ -275,4 +270,4 @@ let convert_chain_to_canonical ~postgres_uri ~target_block_hash
                 (Sql.mark_blocks_as_canonical ~protocol_version ~ids
                    ~stop_at_slot ) )
       in
-      Deferred.Or_error.return ()
+      Ok ()
