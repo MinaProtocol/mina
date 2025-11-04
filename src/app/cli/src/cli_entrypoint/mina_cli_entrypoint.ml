@@ -618,20 +618,24 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
-  and hardfork_mode =
-    (*
-      There's 2 hardfork mode, namely Legacy and Auto. Reference:
-        - https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e 
-        - https://www.notion.so/o1labs/V2-MIP-draft-HF-automation-250e79b1f9108010b0c5f2b1f416640b
-        *)
-    flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
+  and hardfork_handling =
+    (* The two hard fork modes are migrate-exit (the "auto" hard fork mode) and
+       keep-running (the "legacy" hard fork mode). See
+       https://github.com/MinaProtocol/MIPs/pull/32. This option currently only
+       controls the ledger sync feature (keeping migrated versions of the root
+       and epoch ledger databases alongside the stable ones). TODO: the code
+       will eventually need to be updated so this option also causes the daemon
+       to generate and save its own hard fork config at the [slot_chain_end] and
+       then shut down. *)
+    flag "--hardfork-handling" ~aliases:[ "hardfork-handling" ]
       ~doc:
-        "auto|legacy Mode of hardfork. Under auto mode, the daemon would back \
-         all ledgers that are needed for post-hardfork node to bootstrap with \
-         2 databases, one for before, and one for after the hardfork. Under \
-         legacy mode, all databased backed ledgers are backed by one database. \
-         THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
-      (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
+        "keep-running|migrate-exit Internal flag, controlling how the daemon \
+         handles an upcoming hard fork. Exposed for testing purposes. \
+         Currently it only causes the daemon to maintain migrated versions of \
+         the root and epoch ledger databases alongside the stable databases. \
+         (default: keep-running). "
+      (optional_with_default Hardfork_handling.Keep_running
+         Hardfork_handling.arg )
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -841,7 +845,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           in
           let compile_config = Mina_compile_config.Compiled.t in
           let ledger_backing_type =
-            Mina_lib.Config.ledger_backing ~hardfork_mode
+            Mina_lib.Config.ledger_backing ~hardfork_handling
           in
           let%bind ( precomputed_values
                    , config_jsons
@@ -1484,7 +1488,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~stop_time_interval ~node_status_url
                  ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config ~hardfork_mode () )
+                 ~itn_features ~compile_config ~hardfork_handling () )
           in
           { mina
           ; client_trustlist
