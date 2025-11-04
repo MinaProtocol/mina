@@ -27,7 +27,6 @@ let construct_staged_ledger_at_root ~proof_cache_db
     ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
     ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
     ~signature_kind =
-  let open Deferred.Or_error.Let_syntax in
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
     |> Mina_block.header |> Mina_block.Header.protocol_state
@@ -66,27 +65,12 @@ let construct_staged_ledger_at_root ~proof_cache_db
     Staged_ledger.Scan_state.write_all_proofs_to_disk ~signature_kind
       ~proof_cache_db scan_state_unwrapped
   in
-  let%bind staged_ledger =
-    Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
-      ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
-      ~constraint_constants:precomputed_values.constraint_constants ~logger
-      ~pending_coinbases
-      ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
-      ~get_state ~signature_kind
-  in
-  let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
-  if
-    Mina_block.Validated.is_genesis root_transition
-    || Staged_ledger_hash.equal staged_ledger_hash
-         constructed_staged_ledger_hash
-  then Deferred.return (Ok staged_ledger)
-  else
-    Deferred.return
-      (Or_error.errorf
-         !"Constructed staged ledger %{sexp: Staged_ledger_hash.t} did not \
-           match the staged ledger hash in the protocol state %{sexp: \
-           Staged_ledger_hash.t}"
-         constructed_staged_ledger_hash staged_ledger_hash )
+  Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
+    ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
+    ~constraint_constants:precomputed_values.constraint_constants ~logger
+    ~pending_coinbases
+    ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
+    ~get_state ~signature_kind
 
 module rec Instance_type : sig
   type t =
