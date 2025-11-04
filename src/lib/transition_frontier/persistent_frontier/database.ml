@@ -321,10 +321,13 @@ let get_transition_do ~error db hash =
     { State_hash.State_hashes.state_hash = hash; state_body_hash }
   in
   match get db ~key:(Transition_extended hash) ~error:() with
-  | Ok { block; update_coinbase_stack_and_get_data_result; state_body_hash } ->
+  | Ok extended_block ->
       Ok
-        ( { With_hash.data = block; hash = make_hashes (Some state_body_hash) }
-        , update_coinbase_stack_and_get_data_result )
+        ( { With_hash.data = Extended_block.to_block extended_block
+          ; hash = make_hashes (Some extended_block.state_body_hash)
+          }
+        , Extended_block.update_coinbase_stack_and_get_data_result
+            extended_block )
   | Error _ ->
       let%map.Result block = get db ~key:(Transition hash) ~error in
       ({ With_hash.data = block; hash = make_hashes None }, None)
@@ -410,14 +413,7 @@ let initialize t ~root_data =
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Transition_extended root_state_hash)
-        ~data:
-          { block =
-              Mina_block.Validated.forget root_transition
-              |> With_hash.data |> Mina_block.read_all_proofs_from_disk
-          ; update_coinbase_stack_and_get_data_result = None
-          ; state_body_hash =
-              Mina_block.Validated.state_body_hash root_transition
-          } ;
+        ~data:(Extended_block.of_validate_block root_transition) ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
       Batch.set batch ~key:Root_common
@@ -454,23 +450,12 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
       Error (`Not_found `Old_root_transition)
 
 let set_transition ~update_coinbase_stack_and_get_data_result ~transition =
-  let state_body_hash = Mina_block.Validated.state_body_hash transition in
   let hash = Mina_block.Validated.state_hash transition in
-  let transition_unwrapped =
-    Mina_block.Validated.forget transition
-    |> With_hash.data |> Mina_block.read_all_proofs_from_disk
-  in
   fun batch ->
     Batch.set batch ~key:(Transition_extended hash)
       ~data:
-        { block = transition_unwrapped
-        ; update_coinbase_stack_and_get_data_result =
-            Option.map update_coinbase_stack_and_get_data_result
-              ~f:
-                Staged_ledger.Update_coinbase_stack_and_get_data_result
-                .read_all_proofs_from_disk
-        ; state_body_hash
-        }
+        (Extended_block.of_validate_block
+           ?update_coinbase_stack_and_get_data_result transition )
 
 let add ~update_coinbase_stack_and_get_data_result ~arcs_cache ~transition =
   let hash = Mina_block.Validated.state_hash transition in
@@ -539,41 +524,10 @@ let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
            Staged_ledger.Update_coinbase_stack_and_get_data_result
            .write_all_proofs_to_disk ~proof_cache_db x )
   in
-  let take_hashes_from_witnesses
-      ~(witnesses : Transaction_snark_scan_state.Transaction_with_witness.t list)
-      block =
-    let header = Mina_block.Stable.Latest.header block in
-    let { Staged_ledger_diff.Body.Stable.Latest.staged_ledger_diff = { diff } }
-        =
-      Mina_block.Stable.Latest.body block
-    in
-    let witness_to_cmd tx =
-      Mina_transaction_logic.Transaction_applied.transaction_with_status
-        tx
-          .Transaction_snark_scan_state.Transaction_with_witness
-           .transaction_with_info
-      |> function
-      | { With_status.data = Mina_transaction.Transaction.Command tx; status }
-        ->
-          Some { With_status.data = tx; status }
-      | _ ->
-          None
-    in
-    let cmds = List.filter_map ~f:witness_to_cmd witnesses in
-    let diff' =
-      Staged_ledger_diff.Diff.(
-        map
-          ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
-          ~f2:Fn.id diff
-        |> replace_cmds_exn cmds)
-    in
-    let body' = Staged_ledger_diff.Body.create { diff = diff' } in
-    Mina_block.create ~header ~body:body'
-  in
   let cache_block =
     match update_coinbase_stack_and_get_data_result with
     | Some (_, witnesses, _, _, _) ->
-        take_hashes_from_witnesses ~witnesses
+        Extended_block.take_hashes_from_witnesses ~proof_cache_db ~witnesses
     | None ->
         Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
   in

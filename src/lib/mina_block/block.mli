@@ -12,6 +12,9 @@ module Stable : sig
 
     val body : t -> Staged_ledger_diff.Body.Stable.V1.t
 
+    val create :
+      header:Header.Stable.V2.t -> body:Staged_ledger_diff.Body.Stable.V1.t -> t
+
     val transactions :
          constraint_constants:Genesis_constants.Constraint_constants.t
       -> t

@@ -38,6 +38,14 @@ module Transaction_with_witness : sig
         type t
 
         val to_latest : t -> t
+
+        val transaction_with_info :
+             t
+          -> Mina_transaction_logic.Transaction_applied
+             .With_account_update_digests
+             .Stable
+             .V1
+             .t
       end
     end]
 

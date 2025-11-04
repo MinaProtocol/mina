@@ -88,6 +88,8 @@ module Transaction_with_witness = struct
           T.Stable.V2.t
         [@@deriving sexp, to_yojson]
 
+        let transaction_with_info t = t.T.Stable.V2.transaction_with_info
+
         let to_latest = Fn.id
       end
     end]

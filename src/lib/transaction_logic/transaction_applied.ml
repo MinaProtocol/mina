@@ -304,6 +304,19 @@ module With_account_update_digests = struct
     ; varying =
         Varying.With_account_update_digests.read_all_proofs_from_disk varying
     }
+
+  let command_with_status = function
+    | { varying = Command (Signed_command uc); _ } ->
+        Option.some
+        @@ With_status.map uc.common.user_command ~f:(fun cmd ->
+               User_command.Signed_command cmd )
+    | { varying = Command (Zkapp_command s); _ } ->
+        Option.some
+        @@ With_status.map s.command ~f:(fun c ->
+               User_command.Zkapp_command
+                 (Zkapp_command.With_account_update_digests.forget_digests c) )
+    | _ ->
+        None
 end
 
 let burned_tokens : t -> Currency.Amount.t =

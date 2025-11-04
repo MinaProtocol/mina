@@ -168,6 +168,12 @@ module With_account_update_digests = struct
           ~f:(Account_update.write_all_proofs_to_disk ~proof_cache_db)
           w.account_updates
     }
+
+  let forget_digests (t : Stable.Latest.t) : T.Stable.Latest.t =
+    { fee_payer = t.fee_payer
+    ; memo = t.memo
+    ; account_updates = Call_forest.forget_hashes t.account_updates
+    }
 end
 
 let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
