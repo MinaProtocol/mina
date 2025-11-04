@@ -26,7 +26,6 @@ let construct_staged_ledger_at_root ~proof_cache_db
     ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
     ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
     ~signature_kind =
-  let open Deferred.Or_error.Let_syntax in
   [%log internal] "Construct_staged_ledger_extract_blockchain_state_start" ;
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
@@ -75,7 +74,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
   [%log internal] "Construct_staged_ledger_write_scan_state_proofs_done" ;
   [%log internal]
     "Construct_staged_ledger_of_scan_state_pending_coinbases_start" ;
-  let%bind staged_ledger =
+  let%map.Deferred.Or_error staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
       ~snarked_local_state:local_state ~snarked_ledger:mask ~scan_state
       ~constraint_constants:precomputed_values.constraint_constants ~logger
@@ -84,25 +83,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
       ~get_state ~signature_kind
   in
   [%log internal] "Construct_staged_ledger_of_scan_state_pending_coinbases_done" ;
-  [%log internal] "Construct_staged_ledger_compute_hash_start" ;
-  let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
-  [%log internal] "Construct_staged_ledger_compute_hash_done" ;
-  [%log internal] "Construct_staged_ledger_validate_hash_start" ;
-  if
-    Mina_block.Validated.is_genesis root_transition
-    || Staged_ledger_hash.equal staged_ledger_hash
-         constructed_staged_ledger_hash
-  then (
-    [%log internal] "Construct_staged_ledger_validate_hash_success" ;
-    Deferred.return (Ok staged_ledger) )
-  else (
-    [%log internal] "Construct_staged_ledger_validate_hash_mismatch" ;
-    Deferred.return
-      (Or_error.errorf
-         !"Constructed staged ledger %{sexp: Staged_ledger_hash.t} did not \
-           match the staged ledger hash in the protocol state %{sexp: \
-           Staged_ledger_hash.t}"
-         constructed_staged_ledger_hash staged_ledger_hash ) )
+  staged_ledger
 
 module rec Instance_type : sig
   type t =
