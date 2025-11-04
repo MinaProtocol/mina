@@ -164,6 +164,7 @@ build-daemon-utils: ocaml_checks reformat-diff libp2p_helper ## Build daemon uti
 		src/app/validate_keypair/validate_keypair.exe \
 		src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
 		src/lib/snark_worker/standalone/run_snark_worker.exe \
+		src/app/rocksdb-scanner/rocksdb_scanner.exe \
 		--profile=$(DUNE_PROFILE) \
 		&& echo "✅ Build complete"
 
@@ -221,6 +222,7 @@ build-archive-utils: ocaml_checks reformat-diff ## Build archive node and relate
 		src/app/archive_blocks/archive_blocks.exe \
 		src/app/extract_blocks/extract_blocks.exe \
 		src/app/missing_blocks_auditor/missing_blocks_auditor.exe \
+		src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
 		--profile=$(DUNE_PROFILE)  \
 		&& echo "✅ Build complete"
 

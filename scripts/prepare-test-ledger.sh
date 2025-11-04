@@ -2,22 +2,16 @@
 
 set -euo pipefail
 
-# Check required dependencies
-check_dependencies() {
+require_external_commands() {
+    local deps=("$@")
     local missing_deps=()
-    
-    if ! command -v curl >/dev/null 2>&1; then
-        missing_deps+=("curl")
-    fi
-    
-    if ! command -v jq >/dev/null 2>&1; then
-        missing_deps+=("jq")
-    fi
-    
-    if ! command -v date >/dev/null 2>&1; then
-        missing_deps+=("date")
-    fi
-    
+
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" >/dev/null 2>&1; then
+            missing_deps+=("$dep")
+        fi
+    done
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         echo "Error: Missing required dependencies: ${missing_deps[*]}" >&2
         echo "Please install the missing dependencies and try again." >&2
@@ -25,7 +19,7 @@ check_dependencies() {
     fi
 }
 
-check_dependencies
+require_external_commands curl jq
 
 # Balance of keys to which delegation will happen
 KEY_BALANCE=${KEY_BALANCE:-1000}
