@@ -2,8 +2,8 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
-# Supports debian:bullseye-slim, and ubuntu:focal
-ARG image=ubuntu:focal
+# Supports europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim, and europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 # Use the image argument to select the base image for this stage
 # This allows us to use the same Dockerfile for different base images
 # This arg is defined here globally and does not need to be redefined in

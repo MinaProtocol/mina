@@ -1,6 +1,6 @@
 #!/usr/bin/env bash 
 
-set -euox pipefail
+set -eux -o pipefail
 
 ROCKSDB_VERSION=10.5.1
 

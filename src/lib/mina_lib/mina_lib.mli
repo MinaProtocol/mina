@@ -278,9 +278,6 @@ val best_chain_block_by_height :
 val best_chain_block_by_state_hash :
   t -> State_hash.t -> Transition_frontier.Breadcrumb.t Or_error.t
 
-val best_chain_block_before_stop_slot :
-  t -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
-
 module Hardfork_config : sig
   type mina_lib = t
 
@@ -325,11 +322,11 @@ module Hardfork_config : sig
   type inputs =
     { source_ledgers : genesis_source_ledgers
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; genesis_state_timestamp : string
     ; state_hash : State_hash.t
     ; staking_epoch_seed : Epoch_seed.t
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
-    ; block_timestamp : Block_time.t
     }
 
   val prepare_inputs :

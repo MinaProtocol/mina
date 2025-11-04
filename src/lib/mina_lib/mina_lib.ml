@@ -453,6 +453,24 @@ let get_node_state t =
   ; uptime_of_node
   }
 
+(** Compute the hard fork genesis slot from the runtime config, if all the stop
+    slots and the genesis slot delta have been set. Note that this is the hard
+    fork genesis slot expressed as a
+    [Mina_numbers.Global_slot_since_hard_fork.t] of the current chain/hard
+    fork. *)
+let scheduled_hard_fork_genesis_slot t :
+    Mina_numbers.Global_slot_since_hard_fork.t option =
+  let open Option.Let_syntax in
+  let runtime_config = t.config.precomputed_values.runtime_config in
+  let%bind slot_chain_end_since_hard_fork =
+    Runtime_config.slot_chain_end runtime_config
+  in
+  let%map hard_fork_genesis_slot_delta =
+    Runtime_config.hard_fork_genesis_slot_delta runtime_config
+  in
+  Mina_numbers.Global_slot_since_hard_fork.add slot_chain_end_since_hard_fork
+    hard_fork_genesis_slot_delta
+
 (* This is a hack put in place to deal with nodes getting stuck
    in Offline states, that is, not receiving blocks for an extended period,
    or stuck in Bootstrap for too long
@@ -2225,7 +2243,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
 
           let ledger_backing =
-            Config.ledger_backing ~hardfork_mode:config.hardfork_mode
+            Config.ledger_backing ~hardfork_handling:config.hardfork_handling
           in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
@@ -2834,24 +2852,97 @@ module Hardfork_config = struct
   type inputs =
     { source_ledgers : genesis_source_ledgers
     ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; genesis_state_timestamp : string
     ; state_hash : State_hash.t
     ; staking_epoch_seed : Epoch_seed.t
     ; next_epoch_seed : Epoch_seed.t
     ; blockchain_length : Mina_numbers.Length.t
-    ; block_timestamp : Block_time.t
     }
+
+  (** The genesis state timestamp string is the timestamp of the start of the
+      [global_slot] of the hard fork, relative to the current chain *)
+  let genesis_timestamp_str ~consensus_constants global_slot =
+    Consensus.Data.Consensus_time.(
+      start_time ~constants:consensus_constants
+        (of_global_slot ~constants:consensus_constants global_slot))
+    |> Block_time.to_time_exn
+    |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+
+  (** Compute the hard fork slot. This will be derived from the stop slots and
+      hard fork genesis slot delta in the runtime config, if those have been set
+      and the [breadcrum_spec] was [`Stop_slot]. Otherwise, it will be the
+      global slot since genesis of the hard fork block. *)
+  let hard_fork_global_slot ~breadcrumb_spec ~block mina :
+      Mina_numbers.Global_slot_since_hard_fork.t =
+    let block_global_slot =
+      Mina_block.consensus_state block
+      |> Consensus.Data.Consensus_state.curr_global_slot
+    in
+    let configured_slot =
+      match breadcrumb_spec with
+      | `Stop_slot ->
+          scheduled_hard_fork_genesis_slot mina
+      | `State_hash _state_hash_base58 ->
+          None
+      | `Block_height _block_height ->
+          None
+    in
+    Option.value ~default:block_global_slot configured_slot
+
+  (** We schedule the hard fork genesis to occur at a particular
+      [Mina_numbers.Global_slot_since_hard_fork.t], but need a
+      [Mina_numbers.Global_slot_since_genesis.t] for the hard fork config. This
+      method does this conversion by taking the hard fork block's consensus data
+      applying the same slot update as [Consensus.Data.Consensus_state.update]
+      to the hard fork block's global slots (since hard fork and since genesis),
+      then returning the resulting global slot since genesis.
+
+      This method requires that the desired hard fork genesis slot occur after
+      the hard fork block's slot. This property is guaranteed by
+      [hard_fork_global_slot] (which determines the scheduled genesis slot) and
+      [breadcrumb] (which retrieves the hard fork block). *)
+  let move_hard_fork_consensus_to_scheduled_genesis ~hard_fork_consensus_data
+      next_genesis_global_slot =
+    let block_global_slot =
+      Consensus.Data.Consensus_state.curr_global_slot hard_fork_consensus_data
+    in
+    let block_global_slot_since_genesis =
+      Consensus.Data.Consensus_state.global_slot_since_genesis
+        hard_fork_consensus_data
+    in
+    (* We pretend that the consensus moved forward from the hard fork block's
+       slot to the scheduled genesis slot, and get that slot difference *)
+    let global_slot_span =
+      Mina_numbers.Global_slot_since_hard_fork.diff next_genesis_global_slot
+        block_global_slot
+      |> Option.value_exn ~here:[%here]
+           ~message:
+             "Invariant: hard fork genesis cannot be scheduled before the hard \
+              fork block"
+    in
+    (* Now apply that difference to the hard fork block's slot since genesis *)
+    Mina_numbers.Global_slot_since_genesis.add block_global_slot_since_genesis
+      global_slot_span
 
   let prepare_inputs ~breadcrumb_spec mina =
     let open Deferred.Result.Let_syntax in
     let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
     let block = Transition_frontier.Breadcrumb.block breadcrumb in
     let blockchain_length = Mina_block.blockchain_length block in
+    let global_slot_since_hard_fork =
+      hard_fork_global_slot ~breadcrumb_spec ~block mina
+    in
     let global_slot_since_genesis =
-      Mina_block.consensus_state block
-      |> Consensus.Data.Consensus_state.global_slot_since_genesis
+      move_hard_fork_consensus_to_scheduled_genesis
+        ~hard_fork_consensus_data:(Mina_block.consensus_state block)
+        global_slot_since_hard_fork
+    in
+    let genesis_state_timestamp =
+      genesis_timestamp_str
+        ~consensus_constants:mina.config.precomputed_values.consensus_constants
+        global_slot_since_hard_fork
     in
     let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-    let block_timestamp = block |> Mina_block.timestamp in
     let protocol_state =
       Transition_frontier.Breadcrumb.protocol_state breadcrumb
     in
@@ -2867,11 +2958,11 @@ module Hardfork_config = struct
     let%map source_ledgers = source_ledgers ~breadcrumb mina in
     { source_ledgers
     ; global_slot_since_genesis
+    ; genesis_state_timestamp
     ; state_hash
     ; staking_epoch_seed
     ; next_epoch_seed
     ; blockchain_length
-    ; block_timestamp
     }
 
   (** Copy the roots of the [source_ledgers] and gather the stable ledger
@@ -3046,20 +3137,15 @@ module Hardfork_config = struct
          ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
          genesis_config )
 
-  let genesis_timestamp_str ~hardfork_genesis_timestamp_offset block_timestamp =
-    block_timestamp |> Block_time.to_time_exn
-    |> Fn.flip Time.add hardfork_genesis_timestamp_offset
-    |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
-
   let generate_hardfork_configs ~logger
       ~inputs:
         { source_ledgers
         ; global_slot_since_genesis
+        ; genesis_state_timestamp
         ; state_hash
         ; staking_epoch_seed
         ; next_epoch_seed
         ; blockchain_length
-        ; block_timestamp
         } ~build_dir directory_name =
     let open Deferred.Or_error.Let_syntax in
     let migrate_and_apply (root, diff) =
@@ -3098,12 +3184,6 @@ module Hardfork_config = struct
     let%bind.Deferred ( genesis_next_epoch_ledger_legacy
                       , genesis_next_epoch_ledger_migrated ) =
       migrate_and_apply genesis_next_epoch_ledger_data
-    in
-    (* TODO: the correct timestamp is actually the timestamp of the slot_tx_end plus the hardfork genesis offset *)
-    let genesis_state_timestamp =
-      genesis_timestamp_str
-        ~hardfork_genesis_timestamp_offset:(Time.Span.of_int_sec 0)
-        block_timestamp
     in
     [%log debug] "Writing hard fork config directories" ;
     let%bind () =
