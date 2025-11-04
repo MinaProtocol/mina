@@ -251,6 +251,31 @@ module Diff = struct
     Pre_diff_with_at_most_two_coinbase.t
     * Pre_diff_with_at_most_one_coinbase.t option
 
+  let map ~f1 ~f2
+      ( pre_diff_with_at_most_two_coinbase
+      , pre_diff_with_at_most_one_coinbase_opt ) =
+    ( Pre_diff_two.map ~f1 ~f2 pre_diff_with_at_most_two_coinbase
+    , Option.map pre_diff_with_at_most_one_coinbase_opt ~f:(fun x ->
+          Pre_diff_one.map ~f1 ~f2 x ) )
+
+  let replace_cmds_exn cmds
+      ( pre_diff_with_at_most_two_coinbase
+      , pre_diff_with_at_most_one_coinbase_opt ) =
+    let cmds_len1 =
+      List.length pre_diff_with_at_most_two_coinbase.Pre_diff_two.commands
+    in
+    let cmds_len2 =
+      Option.value_map pre_diff_with_at_most_one_coinbase_opt ~default:0
+        ~f:(fun x -> List.length x.Pre_diff_one.commands)
+    in
+    if cmds_len1 + cmds_len2 <> List.length cmds then
+      failwith "replace_cmds_exn: cmds length mismatch"
+    else
+      let cmds1, cmds2 = List.split_n cmds cmds_len1 in
+      ( { pre_diff_with_at_most_two_coinbase with Pre_diff_two.commands = cmds1 }
+      , Option.map pre_diff_with_at_most_one_coinbase_opt ~f:(fun x ->
+            { x with Pre_diff_one.commands = cmds2 } ) )
+
   let write_all_proofs_to_disk ~signature_kind ~proof_cache_db
       (( pre_diff_with_at_most_two_coinbase
        , pre_diff_with_at_most_one_coinbase_opt ) :

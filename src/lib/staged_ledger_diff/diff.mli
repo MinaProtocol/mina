@@ -131,6 +131,17 @@ module Diff : sig
     -> supercharge_coinbase:bool
     -> t
     -> Currency.Amount.t option
+
+  val map :
+       f1:('a -> 'b)
+    -> f2:('c -> 'd)
+    -> ('a, 'c) Pre_diff_two.t * ('a, 'c) Pre_diff_one.t option
+    -> ('b, 'd) Pre_diff_two.t * ('b, 'd) Pre_diff_one.t option
+
+  val replace_cmds_exn :
+       'new_tx list
+    -> ('w, 'old_tx) Pre_diff_two.t * ('w, 'old_tx) Pre_diff_one.t option
+    -> ('w, 'new_tx) Pre_diff_two.t * ('w, 'new_tx) Pre_diff_one.t option
 end
 
 type t = { diff : Diff.t } [@@deriving fields]

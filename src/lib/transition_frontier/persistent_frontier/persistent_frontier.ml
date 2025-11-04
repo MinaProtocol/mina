@@ -384,17 +384,12 @@ module Instance = struct
       ~metadata:[ ("root_hash", State_hash.to_yojson root_hash) ] ;
     let visit ?update_coinbase_stack_and_get_data_result ~acc:parent transition
         =
-      let cached_update_coinbase_stack_and_get_data_result =
-        Option.map
-          ~f:
-            (Staged_ledger.Update_coinbase_stack_and_get_data_result
-             .write_all_proofs_to_disk ~proof_cache_db )
-          update_coinbase_stack_and_get_data_result
-      in
       [%log internal] "Visit_load_transition_start" ;
       let%bind breadcrumb =
         load_transition ~root_genesis_state_hash ~logger ~precomputed_values t
-          ~parent transition ?cached_update_coinbase_stack_and_get_data_result
+          ~parent transition
+          ?cached_update_coinbase_stack_and_get_data_result:
+            update_coinbase_stack_and_get_data_result
       in
       [%log internal] "Visit_load_transition_done" ;
       [%log internal] "Visit_apply_diff_start" ;

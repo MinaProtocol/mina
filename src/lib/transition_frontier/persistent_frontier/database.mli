@@ -101,8 +101,7 @@ val move_root :
 type get_transition_result =
   { block : Mina_block.Validated.t
   ; update_coinbase_stack_and_get_data_result :
-      Staged_ledger.Update_coinbase_stack_and_get_data_result.Stable.Latest.t
-      option
+      Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
   }
 
 val get_transition :
@@ -147,9 +146,7 @@ val crawl_successors :
   -> init:'a
   -> f:
        (   ?update_coinbase_stack_and_get_data_result:
-             Staged_ledger.Update_coinbase_stack_and_get_data_result.Stable
-             .Latest
-             .t
+             Staged_ledger.Update_coinbase_stack_and_get_data_result.t
         -> acc:'a
         -> Mina_block.Validated.t
         -> ('a, 'b) Deferred.Result.t )

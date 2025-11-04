@@ -515,8 +515,7 @@ let move_root ~old_root_hash ~new_root ~garbage =
 type get_transition_result =
   { block : Mina_block.Validated.t
   ; update_coinbase_stack_and_get_data_result :
-      Staged_ledger.Update_coinbase_stack_and_get_data_result.Stable.Latest.t
-      option
+      Staged_ledger.Update_coinbase_stack_and_get_data_result.t option
   }
 
 let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
@@ -534,11 +533,51 @@ let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
   in
   [%log internal] "Database_write_proofs_to_disk_start"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
-  let cached_block =
-    With_hash.map
-      ~f:(Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db)
-      block
+  let update_coinbase_stack_and_get_data_result =
+    update_coinbase_stack_and_get_data_result
+    |> Option.map ~f:(fun x ->
+           Staged_ledger.Update_coinbase_stack_and_get_data_result
+           .write_all_proofs_to_disk ~proof_cache_db x )
   in
+  let take_hashes_from_witnesses
+      ~(witnesses : Transaction_snark_scan_state.Transaction_with_witness.t list)
+      block =
+    let header = Mina_block.Stable.Latest.header block in
+    let { Staged_ledger_diff.Body.Stable.Latest.staged_ledger_diff = { diff } }
+        =
+      Mina_block.Stable.Latest.body block
+    in
+    let witness_to_cmd tx =
+      Mina_transaction_logic.Transaction_applied.transaction_with_status
+        tx
+          .Transaction_snark_scan_state.Transaction_with_witness
+           .transaction_with_info
+      |> function
+      | { With_status.data = Mina_transaction.Transaction.Command tx; status }
+        ->
+          Some { With_status.data = tx; status }
+      | _ ->
+          None
+    in
+    let cmds = List.filter_map ~f:witness_to_cmd witnesses in
+    let diff' =
+      Staged_ledger_diff.Diff.(
+        map
+          ~f1:(Transaction_snark_work.write_all_proofs_to_disk ~proof_cache_db)
+          ~f2:Fn.id diff
+        |> replace_cmds_exn cmds)
+    in
+    let body' = Staged_ledger_diff.Body.create { diff = diff' } in
+    Mina_block.create ~header ~body:body'
+  in
+  let cache_block =
+    match update_coinbase_stack_and_get_data_result with
+    | Some (_, witnesses, _, _, _) ->
+        take_hashes_from_witnesses ~witnesses
+    | None ->
+        Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+  in
+  let cached_block = With_hash.map ~f:cache_block block in
   [%log internal] "Database_write_proofs_to_disk_done"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
