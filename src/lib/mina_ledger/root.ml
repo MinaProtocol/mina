@@ -14,6 +14,17 @@ module Config = struct
         Merkle_ledger.Converting_merkle_tree.With_database_config.t
   [@@deriving yojson]
 
+  (* Pre Mesa hardfork the only config option was equivalent to
+     Stable_db_config which was a type alias of string. This requires
+     overriding the ppx yojson instances to maintain backward compatibility.
+  *)
+  let of_yojson json =
+    match json with
+    | `String filename ->
+        Ok (Stable_db_config filename)
+    | _ ->
+        of_yojson json
+
   let backing_of_config = function
     | Stable_db_config _ ->
         Stable_db
