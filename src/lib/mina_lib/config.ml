@@ -63,6 +63,7 @@ type t =
   ; uptime_submitter_keypair : Keypair.t option [@default None]
   ; uptime_send_node_commit : bool [@default false]
   ; stop_time : int
+  ; stop_time_interval : int
   ; file_log_level : Logger.Level.t [@default Logger.Level.Info]
   ; log_level : Logger.Level.t [@default Logger.Level.Info]
   ; log_json : bool [@default false]
