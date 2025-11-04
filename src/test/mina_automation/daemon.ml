@@ -207,7 +207,6 @@ let start t =
     [ "daemon"
     ; "--seed"
     ; "--demo-mode"
-    ; "--background"
     ; "--working-dir"
     ; "."
     ; "--client-port"
