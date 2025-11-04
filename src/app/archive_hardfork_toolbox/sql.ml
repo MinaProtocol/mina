@@ -133,13 +133,18 @@ let fetch_latest_migration_history_query =
 let fetch_latest_migration_history (module Conn : CONNECTION) =
   Conn.find_opt fetch_latest_migration_history_query ()
 
-(* Fetch the most recent block that has internal commands. This block should contain last ledger state.
-   Empty block or last filled block is a term used in context of stop transaction slot
-   and stop network slot. Just before hard fork we want to stop including any transactions
-   in the blocks. No internal, user or zkapp commands should be included in the blocks after that.
-   However, blocks can still be produced with no transactions, to keep chain progressing but
-   only from stop  transaction slot till stop network slot. Last filled block is the last block which
-   has any transaction included in it. Therefore it is our fork candidate
+(* Fetches last filled block before stop transaction slot.
+
+   Every block in mina should have internal commands since system transactions (like coinbase, fee transfer etc)
+   are implemented as internal commands. It CAN have zero user commands and zero zkapp commands,
+   but it should have internal commands.
+
+   However, in context of hard fork, we want to stop including any transactions
+   in the blocks after specified slot (called stop transaction slot). No internal, user or zkapp commands should be included in the blocks after that slot.
+   Blocks can still be produced with no transactions, to keep chain progressing and give us confirmations but
+   only from stop transaction slot till stop network slot, where we completely stop the chain.
+   Knowing above we can detect last filled block by only looking at internal transactions occurrence.
+   Therefore our fork candidate is the block with highest height that has internal transaction included in it.
 *)
 let fetch_last_filled_block_query =
   Caqti_type.(unit ->! t3 string int64 int)
