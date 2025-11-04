@@ -133,8 +133,14 @@ let fetch_latest_migration_history_query =
 let fetch_latest_migration_history (module Conn : CONNECTION) =
   Conn.find_opt fetch_latest_migration_history_query ()
 
-(* Fetch the most recent block that has internal commands.
-   This block should contain last ledger state. *)
+(* Fetch the most recent block that has internal commands. This block should contain last ledger state.
+   Empty block or last filled block is a term used in context of stop transaction slot
+   and stop network slot. Just before hard fork we want to stop including any transactions
+   in the blocks. No internal, user or zkapp commands should be included in the blocks after that.
+   However, blocks can still be produced with no transactions, to keep chain progressing but
+   only from stop  transaction slot till stop network slot. Last filled block is the last block which
+   has any transaction included in it. Therefore it is our fork candidate
+*)
 let fetch_last_filled_block_query =
   Caqti_type.(unit ->! t3 string int64 int)
     {sql|
