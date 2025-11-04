@@ -1,80 +1,53 @@
 // Provides: plonk_wasm
-var plonk_wasm = require('./plonk_wasm.js');
-var native = null;
-try {
-  native = require('../native/plonk_napi.node');
-} catch (e) {
-  // native not available, keep WASM
-}
+var plonk_wasm = (function() {
+  var wasm = require('./plonk_wasm.js');
 
-if (native) {
-  plonk_wasm.__kimchi_napi = true;
-  if (typeof globalThis !== 'undefined') {
-    globalThis.__kimchi_napi = true;
+  try {
+    var native =  require('@o1js/native-' + process.platform + '-' + process.arch)
+
+    // THIS IS A RUNTIME OVERRIDE
+    // YOU HAVE TO RUN IT TO SEE IF IT BREAKS
+    // IT WON'T CRASH UNLESS O1JS_REQUIRE_NATIVE_BINDINGS
+    // IS SET
+    var overrides = [
+      "prover_to_json",
+      "prover_index_from_bytes",
+      "prover_index_to_bytes",
+      "caml_pasta_fp_poseidon_block_cipher",
+      "caml_pasta_fq_poseidon_block_cipher",
+      "caml_pasta_fp_plonk_proof_create",
+      "caml_pasta_fp_plonk_verifier_index_shifts",
+      "caml_pasta_fq_plonk_verifier_index_shifts",
+      "WasmFpPolyComm",
+      "WasmFqPolyComm",
+      "caml_pasta_fp_plonk_gate_vector_create",
+      "caml_pasta_fq_plonk_gate_vector_create",
+      "caml_pasta_fp_plonk_gate_vector_add",
+      "caml_pasta_fq_plonk_gate_vector_add",
+      "caml_pasta_fp_plonk_gate_vector_get",
+      "caml_pasta_fq_plonk_gate_vector_get",
+      "caml_pasta_fp_plonk_gate_vector_len",
+      "caml_pasta_fq_plonk_gate_vector_len",
+      "caml_pasta_fp_plonk_gate_vector_wrap",
+      "caml_pasta_fq_plonk_gate_vector_wrap",
+      "caml_pasta_fp_plonk_gate_vector_digest",
+      "caml_pasta_fq_plonk_gate_vector_digest",
+      "caml_pasta_fp_plonk_circuit_serialize",
+      "caml_pasta_fq_plonk_circuit_serialize",
+    ]
+
+    overrides.forEach(function (override) {
+      wasm[override] = native[override]
+    })
+
+    wasm.native = true;
+  } catch (e) {
+    if (process.env.O1JS_REQUIRE_NATIVE_BINDINGS) {
+      console.error(e)
+      console.log("native didn't load")
+      process.exit(1);
+    }
   }
-}
 
-function snakeToCamel(name) {
-  return name.replace(/_([a-z])/g, function (_match, ch) {
-    return ch.toUpperCase();
-  });
-}
-
-function override(functionName) {
-  if (!native) return;
-  var camel = snakeToCamel(functionName);
-  var impl = native[functionName] || native[camel];
-  if (typeof impl === 'function') {
-    plonk_wasm[functionName] = impl;
-  }
-}
-
-// Overwrite only the functions that are already available in native
-
-// Poseidon
-[
-  'caml_pasta_fp_poseidon_block_cipher',
-  'caml_pasta_fq_poseidon_block_cipher',
-].forEach(override);
-
-// PolyComm
-/*
-[
-  'WasmFpPolyComm',
-  'WasmFqPolyComm',
-].forEach(override);
-*/
-
-// Group
-/*
-[
-  'WasmGPallas',
-  'WasmGVesta',
-].forEach(override);
-*/
-
-// Vector
-/*
-[
-  'WasmVecVecFp',
-  'WasmVecVecFq',
-].forEach(override);
-*/
-
-// GateVector 
-[ 
-  'caml_pasta_fp_plonk_gate_vector_create', 
-  'caml_pasta_fq_plonk_gate_vector_create', 
-  'caml_pasta_fp_plonk_gate_vector_add',
-  'caml_pasta_fq_plonk_gate_vector_add',
-  'caml_pasta_fp_plonk_gate_vector_get',
-  'caml_pasta_fq_plonk_gate_vector_get',
-  'caml_pasta_fp_plonk_gate_vector_len', 
-  'caml_pasta_fq_plonk_gate_vector_len',
-  'caml_pasta_fp_plonk_gate_vector_wrap',
-  'caml_pasta_fq_plonk_gate_vector_wrap',
-  'caml_pasta_fp_plonk_gate_vector_digest',
-  'caml_pasta_fq_plonk_gate_vector_digest',
-  'caml_pasta_fp_plonk_circuit_serialize',
-  'caml_pasta_fq_plonk_circuit_serialize',
-].forEach(override);
+  return wasm
+})()
