@@ -359,7 +359,7 @@ let command =
       flag "--migrate-frontier" ~aliases:[ "migrate-frontier" ]
         ~doc:
           "BOOL whether to migrate frontier to the new format (default: false)"
-        (optional bool)
+        no_arg
     in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
@@ -375,7 +375,7 @@ let command =
     match%bind
       fix_persistent_frontier_root ~config_directory:conf_dir ~config_file
         ~max_frontier_depth:(Option.value max_frontier_depth ~default:10)
-        ~migrate_frontier:(Option.value migrate_frontier ~default:false)
+        ~migrate_frontier
     with
     | Ok () ->
         printf "Persistent frontier root fix completed successfully.\n" ;
