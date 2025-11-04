@@ -1,0 +1,26 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2025-10-31T10:00:00Z"
+  },
+  "ledger": {
+    "add_genesis_winner": false,
+    "s3_data_hash": "28fdc7a9be359461f483bff2ef6da9ad61804b1f723b7c0e2a85188c463b4a8c",
+    "hash": "jxR1RQrwHr4iiC5SzDutDsgcehnAk4cm3SNLqojhggHZVpXuqqy"
+  },
+  "daemon": {
+    "slot_tx_end": 1535,
+    "slot_chain_end": 1575
+  },
+  "epoch_data": {
+    "staking": {
+      "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
+      "s3_data_hash": "fc73d6698cdac289cab65f2dc3252603b13976dff7b6d1f0381eb95980551068",
+      "hash": "jwm1xqc4NEGuCEWr9kesghgY5CJQAc42t8qsYuLDFgkY6m4rgYF"
+    },
+    "next": {
+      "seed": "2vbH4D8B76WMYPRFgeuVvdWVhv6tAFoCJtg83yuJT1dud3QVSiZn",
+      "s3_data_hash": "aec6eacfccd39a344eabeccd3708a84a196c1d13086e6b2ed36bd9d2e2c43ba0",
+      "hash": "jxspH3MGk6KnqDCJnPUjBf1oE2xQam3pGua5XeiEzen4oxusayQ"
+    }
+  }
+}
