@@ -56,6 +56,7 @@ MINA_EXE=${MINA_EXE:-$(source_build_fallback mina ./_build/default/src/app/cli/s
 MINA_GENESIS_EXE=${MINA_GENESIS_EXE:-$(source_build_fallback mina-create-genesis ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe)}
 MINA_LEGACY_GENESIS_EXE=${MINA_LEGACY_GENESIS_EXE:-$(source_build_fallback mina-create-legacy-genesis ./runtime_genesis_ledger_of_mainnet.exe)}
 CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback mina-hf-create-runtime-config ./scripts/hardfork/create_runtime_config.sh)}
+MINA_ROCKSDB_SCANNER=${MINA_ROCKSDB_SCANNER:-$(source_build_fallback mina-rocksdb-scanner ./_build/default/src/app/rocksdb-scanner/rocksdb_scanner.exe)}
 GSUTIL=${GSUTIL:-$(command -v gsutil || echo "")}
 
 if [[ ! -e "$PRECOMPUTED_FORK_BLOCK" && ( -z "$GSUTIL" || ! -x "$GSUTIL" ) ]]; then
@@ -206,7 +207,6 @@ for file in "$workdir"/packaged-*.json; do
     fi
 done
 
-ldb_cmd=$(command -v rocksdb-ldb || command -v rocksdb_ldb || command -v ldb)
 for file in "$workdir"/ledgers/*.tar.gz; do
     tarname=$(basename "$file")
     tarname=${tarname%.tar.gz}
@@ -218,9 +218,9 @@ for file in "$workdir"/ledgers/*.tar.gz; do
     base_s3_url="${MINA_LEDGER_S3_BUCKET:-https://s3-us-west-2.amazonaws.com/snark-keys-ro.o1test.net}"
     curl "$base_s3_url/$tarname.tar.gz" | tar -xz -C "$tardir/web"
 
-    $ldb_cmd --hex --db="$tardir/packaged" scan > "$workdir/packaged.scan"
-    $ldb_cmd --hex --db="$tardir/web" scan > "$workdir/web.scan"
-    $ldb_cmd --hex --db="$tardir/generated" scan > "$workdir/generated.scan"
+    for kind in {packaged,web,generated}; do
+        $MINA_ROCKSDB_SCANNER --db-path "$tardir/$kind" --output-file "$workdir/$kind.scan"
+    done
 
     if ! cmp "$workdir/generated.scan" "$workdir/packaged.scan" || ! cmp "$workdir/packaged.scan" "$workdir/web.scan"; then
         echo "Error: kvdb contents mismatch for $tarname" >&2

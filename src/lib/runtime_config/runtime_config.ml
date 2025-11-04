@@ -1665,6 +1665,12 @@ let slot_tx_end, slot_chain_end =
   in
   (f (fun d -> d.slot_tx_end), f (fun d -> d.slot_chain_end))
 
+let hard_fork_genesis_slot_delta t =
+  let open Option.Let_syntax in
+  let%bind daemon = t.daemon in
+  let%map delta = daemon.hard_fork_genesis_slot_delta in
+  Mina_numbers.Global_slot_span.of_int delta
+
 (** This method creates a runtime daemon config for a hard fork, containing the
     data that can't necessarily be computed in advance of the hard fork. This
     ends up being data that's computed based on the last block produced before

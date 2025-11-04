@@ -33,7 +33,6 @@ set -E # inherit -e
 set -e # exit immediately on errors
 set -u # exit on not assigned variables
 set -o pipefail # exit on pipe failure
-set -x
 
 CLEAR='\033[0m'
 RED='\033[0;31m'
@@ -111,6 +110,7 @@ function main_help(){
     echo ""
     echo " publish - publish build artifact to debian repository and docker registry";
     echo " promote - promote artifacts from one channel (registry) to another";
+    echo " progress - show progress of promoting/publishing release artifacts";
     echo " fix - fix debian package repository";
     echo " verify - verify artifacts in target channel (registry)";
     echo " version - show version";
@@ -1979,6 +1979,410 @@ function pull(){
     echo ""
 }
 
+#==============
+# progress
+#==============
+function progress_help(){
+    echo Show progress of promoting/publishing release artifacts.
+    echo ""
+    echo "     $CLI_NAME progress [-options]"
+    echo ""
+    echo "Parameters:"
+    echo ""
+    printf "  %-25s %s\n" "-h  | --help" "show help";
+    printf "  %-25s %s\n" "--version" "[string] target version to check (required)";
+    printf "  %-25s %s\n" "--release" "[string] target release (alpha, beta, stable) (required)";
+    printf "  %-25s %s\n" "--artifacts" "[comma separated list] list of artifacts to check. Default: $DEFAULT_ARTIFACTS";
+    printf "  %-25s %s\n" "--codenames" "[comma separated list] list of debian codenames to check. Default: bullseye,focal,jammy,noble,bookworm";
+    printf "  %-25s %s\n" "--only-debians" "[bool] check only debian packages";
+    printf "  %-25s %s\n" "--only-dockers" "[bool] check only docker images";
+    printf "  %-25s %s\n" "--skip-mina-public" "[bool] skip checking packages.minaprotocol.com repositories";
+    echo ""
+    echo "Example:"
+    echo ""
+    echo "  $CLI_NAME progress --version 3.0.0-beta1 --release beta"
+    echo ""
+    echo " Above command will show progress of publishing 3.0.0-beta1 to beta release"
+    echo ""
+    echo ""
+}
+
+function get_network_for_channel() {
+    local __channel=$1
+    case $__channel in
+        alpha)
+            echo "devnet"
+            ;;
+        beta|stable)
+            echo "mainnet"
+            ;;
+        *)
+            echo "mainnet"
+            ;;
+    esac
+}
+
+function get_debian_buckets_for_channel() {
+    local __channel=$1
+    case $__channel in
+        alpha|beta)
+            echo "unstable.apt.packages.minaprotocol.com packages.o1test.net"
+            ;;
+        stable)
+            echo "stable.apt.packages.minaprotocol.com packages.o1test.net"
+            ;;
+        *)
+            echo "packages.o1test.net"
+            ;;
+    esac
+}
+
+function check_debian_package() {
+    local __bucket=$1
+    local __component=$2
+    local __codename=$3
+    local __package_name=$4
+    local __version=$5
+    local __arch=$6
+
+    # Use deb-s3 list to check if package exists
+    local output
+    output=$(deb-s3 list --bucket="$__bucket" --s3-region=us-west-2 --component "$__component" --codename "$__codename" --arch "$__arch" 2>/dev/null || echo "")
+
+    # Check if the package with the version exists
+    if echo "$output" | grep -q "${__package_name}_${__version}_${__arch}.deb"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function check_docker_image() {
+    local __repo=$1
+    local __artifact=$2
+    local __tag=$3
+
+    # Try to pull the manifest without downloading the image
+    if docker manifest inspect "$__repo/$__artifact:$__tag" &>/dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function progress(){
+    if [[ ${#} == 0 ]]; then
+        progress_help; exit 0;
+    fi
+
+    local __version
+    local __release
+    local __artifacts="$DEFAULT_ARTIFACTS"
+    local __codenames="bullseye,focal,jammy,noble,bookworm"
+    local __only_debians=0
+    local __only_dockers=0
+    local __skip_mina_public=0
+
+    while [ ${#} -gt 0 ]; do
+        error_message="❌ Error: a value is needed for '$1'";
+        case $1 in
+            -h | --help )
+                progress_help; exit 0;
+            ;;
+            --version )
+                __version=${2:?$error_message}
+                shift 2;
+            ;;
+            --release )
+                __release=${2:?$error_message}
+                shift 2;
+            ;;
+            --artifacts )
+                __artifacts=${2:?$error_message}
+                shift 2;
+            ;;
+            --codenames )
+                __codenames=${2:?$error_message}
+                shift 2;
+            ;;
+            --only-debians )
+                __only_debians=1
+                shift 1;
+            ;;
+            --only-dockers )
+                __only_dockers=1
+                shift 1;
+            ;;
+            --skip-mina-public )
+                __skip_mina_public=1
+                shift 1;
+            ;;
+            * )
+                echo -e "❌ ${RED} !! Unknown option: $1${CLEAR}\n";
+                echo "";
+                progress_help; exit 1;
+            ;;
+        esac
+    done
+
+    if [[ -z ${__version+x} ]]; then
+        echo -e "❌ ${RED} !! Version (--version) is required${CLEAR}\n";
+        progress_help; exit 1;
+    fi
+
+    if [[ -z ${__release+x} ]]; then
+        echo -e "❌ ${RED} !! Release (--release) is required${CLEAR}\n";
+        progress_help; exit 1;
+    fi
+
+    local __network
+    __network=$(get_network_for_channel "$__release")
+
+    local __debian_buckets
+    __debian_buckets=$(get_debian_buckets_for_channel "$__release")
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🎯  Release Progress Report"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " 📦  Version: $__version"
+    echo " 🏷️   Release: $__release"
+    echo " 🌐  Network: $__network"
+    echo " 📚  Artifacts: $__artifacts"
+    echo " 🖥️   Codenames: $__codenames"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    IFS=', '
+    read -r -a __artifacts_arr <<< "$__artifacts"
+    read -r -a __codenames_arr <<< "$__codenames"
+    read -r -a __debian_buckets_arr <<< "$__debian_buckets"
+
+    local total_debian_checks=0
+    local passed_debian_checks=0
+    local total_docker_checks=0
+    local passed_docker_checks=0
+
+    # Debian Packages Check
+    if [[ $__only_dockers == 0 ]]; then
+        echo "📦 DEBIAN PACKAGES"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+
+        for bucket in "${__debian_buckets_arr[@]}"; do
+            # Skip mina public repos if requested
+            if [[ $__skip_mina_public == 1 ]] && [[ "$bucket" == *"packages.minaprotocol.com"* ]]; then
+                continue
+            fi
+
+            echo "  🗄️  Repository: $bucket"
+            echo "  ─────────────────────────────────────────────────────────────"
+            echo ""
+
+            for codename in "${__codenames_arr[@]}"; do
+                # Determine architectures based on codename
+                local architectures="amd64"
+                if [[ "$codename" == "bookworm" || "$codename" == "noble" ]]; then
+                    architectures="amd64 arm64"
+                fi
+
+                for arch in $architectures; do
+                    echo "    📋  Checking $codename/$arch..."
+                    
+                    # Fetch all packages for this codename/release/arch combination once
+                    local available_packages
+                    available_packages=$(deb-s3 list --bucket="$bucket" --s3-region=us-west-2 --component "$__release" --codename "$codename" --arch "$arch" 2>/dev/null || echo "")
+
+                    for artifact in "${__artifacts_arr[@]}"; do
+                        # Handle artifacts that need network suffix
+                        case $artifact in
+                            mina-logproc)
+                                local package_name="$artifact"
+                                ((total_debian_checks=total_debian_checks+1))
+
+                                if echo "$available_packages" | awk '{print $1, $2, $3}' | grep -q "^${package_name} ${__version} ${arch}$"; then
+                                    echo "      ✅  $package_name"
+                                    ((passed_debian_checks=passed_debian_checks+1))
+                                else
+                                    echo "      ❌  $package_name - MISSING"
+                                fi
+                                ;;
+                            mina-archive)
+                                # For mina-archive, check both with and without network suffix
+                                local package_with_suffix
+                                package_with_suffix=$(get_artifact_with_suffix "$artifact" "$__network")
+                                local package_without_suffix="$artifact"
+
+                                # Check with network suffix
+                                ((total_debian_checks=total_debian_checks+1))
+                                if echo "$available_packages" | awk '{print $1, $2, $3}' | grep -q "^${package_with_suffix} ${__version} ${arch}$"; then
+                                    echo "      ✅  $package_with_suffix"
+                                    ((passed_debian_checks=passed_debian_checks+1))
+                                else
+                                    echo "      ❌  $package_with_suffix - MISSING"
+                                fi
+
+                                # Check without network suffix (only for non-devnet)
+                                if [[ "$__network" != "devnet" ]]; then
+                                    ((total_debian_checks=total_debian_checks+1))
+                                    if echo "$available_packages" | awk '{print $1, $2, $3}' | grep -q "^${package_without_suffix} ${__version} ${arch}$"; then
+                                        echo "      ✅  $package_without_suffix"
+                                        ((passed_debian_checks=passed_debian_checks+1))
+                                    else
+                                        echo "      ❌  $package_without_suffix - MISSING"
+                                    fi
+                                fi
+                                ;;
+                            mina-daemon|mina-rosetta)
+                                local package_with_suffix
+                                package_with_suffix=$(get_artifact_with_suffix "$artifact" "$__network")
+
+                                ((total_debian_checks=total_debian_checks+1))
+                                if echo "$available_packages" | awk '{print $1, $2, $3}' | grep -q "^${package_with_suffix} ${__version} ${arch}$"; then
+                                    echo "      ✅  $package_with_suffix"
+                                    ((passed_debian_checks=passed_debian_checks+1))
+                                else
+                                    echo "      ❌  $package_with_suffix - MISSING"
+                                fi
+                                ;;
+                        esac
+                    done
+                done
+            done
+            echo ""
+        done
+    fi
+
+    # Docker Images Check
+    if [[ $__only_debians == 0 ]]; then
+        echo "🐋 DOCKER IMAGES"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+
+        # Select registry based on release
+        local docker_repo
+        if [[ "$__release" == "stable" ]]; then
+            docker_repo="$DOCKER_IO_REPO"
+        else
+            docker_repo="$GCR_REPO"
+        fi
+
+        echo "  🐳  Registry: $docker_repo"
+        echo "  ─────────────────────────────────────────────────────────────"
+        echo ""
+
+        for artifact in "${__artifacts_arr[@]}"; do
+            # Skip mina-logproc as it has no docker image
+            if [[ "$artifact" == "mina-logproc" ]]; then
+                continue
+            fi
+
+            for codename in "${__codenames_arr[@]}"; do
+                # Determine architectures based on codename
+                local architectures="amd64"
+                if [[ "$codename" == "bookworm" || "$codename" == "noble" ]]; then
+                    architectures="amd64 arm64"
+                fi
+
+                for arch in $architectures; do
+                    local network_suffix
+                    network_suffix=$(get_suffix "$artifact" "$__network")
+
+                    local arch_suffix
+                    arch_suffix=$(get_arch_suffix "$arch")
+
+                    local tag="$__version-$codename$network_suffix$arch_suffix"
+
+                    ((total_docker_checks=total_docker_checks+1))
+                    if check_docker_image "$docker_repo" "$artifact" "$tag"; then
+                        echo "    ✅  $artifact:$tag"
+                        ((passed_docker_checks=passed_docker_checks+1))
+                    else
+                        echo "    ❌  $artifact:$tag - MISSING"
+                    fi
+                done
+            done
+        done
+        echo ""
+    fi
+
+    # Summary
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📊 SUMMARY"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    if [[ $__only_dockers == 0 ]]; then
+        local debian_progress=$((passed_debian_checks * 100 / (total_debian_checks > 0 ? total_debian_checks : 1)))
+        echo "  📦  Debian Packages: $passed_debian_checks / $total_debian_checks ($debian_progress%)"
+
+        # Progress bar for debian
+        local bar_length=50
+        local filled=$((passed_debian_checks * bar_length / (total_debian_checks > 0 ? total_debian_checks : 1)))
+        printf "      ["
+        for ((i=0; i<bar_length; i++)); do
+            if ((i < filled)); then
+                printf "█"
+            else
+                printf "░"
+            fi
+        done
+        printf "]\n"
+        echo ""
+    fi
+
+    if [[ $__only_debians == 0 ]]; then
+        local docker_progress=$((passed_docker_checks * 100 / (total_docker_checks > 0 ? total_docker_checks : 1)))
+        echo "  🐋  Docker Images: $passed_docker_checks / $total_docker_checks ($docker_progress%)"
+
+        # Progress bar for docker
+        local bar_length=50
+        local filled=$((passed_docker_checks * bar_length / (total_docker_checks > 0 ? total_docker_checks : 1)))
+        printf "      ["
+        for ((i=0; i<bar_length; i++)); do
+            if ((i < filled)); then
+                printf "█"
+            else
+                printf "░"
+            fi
+        done
+        printf "]\n"
+        echo ""
+    fi
+
+    local total_checks=$((total_debian_checks + total_docker_checks))
+    local passed_checks=$((passed_debian_checks + passed_docker_checks))
+
+    if [[ $total_checks -gt 0 ]]; then
+        local overall_progress=$((passed_checks * 100 / total_checks))
+        echo "  🎯  Overall Progress: $passed_checks / $total_checks ($overall_progress%)"
+
+        # Overall progress bar
+        local bar_length=50
+        local filled=$((passed_checks * bar_length / total_checks))
+        printf "      ["
+        for ((i=0; i<bar_length; i++)); do
+            if ((i < filled)); then
+                printf "█"
+            else
+                printf "░"
+            fi
+        done
+        printf "]\n"
+        echo ""
+    fi
+
+    if [[ $passed_checks -eq $total_checks ]]; then
+        echo "  🎉  Congratulations! All artifacts are published!"
+    else
+        echo "  ⚠️   There are missing artifacts. Please review the list above."
+    fi
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+}
+
 function main(){
     if (( ${#} == 0 )); then
         main_help 0;
@@ -1988,7 +2392,7 @@ function main(){
         help )
             main_help 0;
         ;;
-        publish | promote | verify | fix | persist | pull)
+        publish | promote | verify | fix | persist | pull | progress)
             $1 "${@:2}";
         ;;
         * )

@@ -911,6 +911,16 @@ let liquid_balance_at_slot ~global_slot (account : t) =
               ~vesting_period ~vesting_increment ~initial_minimum_balance ) )
       |> Option.value_exn
 
+(** Apply the vesting parameter update to an account's timing information. See
+    [Timing.Slot_reduction_update] for usage notes. *)
+let slot_reduction_update ~hardfork_slot (account : t) =
+  let timing =
+    account.timing |> Timing.to_record
+    |> Timing.slot_reduction_update ~hardfork_slot
+    |> Timing.of_record
+  in
+  { account with timing }
+
 let gen : t Quickcheck.Generator.t =
   let open Quickcheck.Let_syntax in
   let%bind public_key = Public_key.Compressed.gen in
