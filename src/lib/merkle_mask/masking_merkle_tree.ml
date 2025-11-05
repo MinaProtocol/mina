@@ -22,7 +22,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     type t = unit Async.Ivar.t
   end
 
-  type maps_t =
+  type maps_t = Inputs.maps_t =
     { accounts : Account.t Location.Map.t
     ; token_owners : Account_id.t Token_id.Map.t
     ; hashes : Hash.t Addr.Map.t
@@ -200,6 +200,12 @@ module Make (Inputs : Inputs_intf.S) = struct
       Option.iter t.accumulated ~f:(fun acc ->
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
+
+    let get_maps t = assert_is_attached t ; t.maps
+
+    let append_maps t maps =
+      assert_is_attached t ;
+      update_maps t ~f:(Fn.flip maps_merge maps)
 
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->

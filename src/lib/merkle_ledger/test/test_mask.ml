@@ -741,6 +741,14 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     module Location = Location
     module Location_binable = Location_binable
     module Kvdb = In_memory_kvdb
+
+    type maps_t =
+      { accounts : Account.t Location.Map.t
+      ; token_owners : Account_id.t Token_id.Map.t
+      ; hashes : Hash.t Location.Addr.Map.t
+      ; locations : Location.t Account_id.Map.t
+      ; non_existent_accounts : Account_id.Set.t
+      }
   end
 
   (* underlying Merkle tree *)
@@ -774,7 +782,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
        and type hash := Hash.t
-       and type parent := Base.t = Merkle_mask.Masking_merkle_tree.Make (struct
+       and type parent := Base.t
+       and type maps_t = Inputs.maps_t =
+  Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Base
   end)
@@ -797,6 +807,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type accumulated_t = Mask.accumulated_t
        and type t := Base.t = struct
     type accumulated_t = Mask.accumulated_t
+
+    type maps_t = Inputs.maps_t
 
     include Merkle_mask.Maskable_merkle_tree.Make (struct
       include Inputs

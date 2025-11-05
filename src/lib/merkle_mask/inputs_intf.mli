@@ -26,6 +26,14 @@ module type S = sig
     include Core_kernel.Comparable.S_binable with type t := Location.t
   end
 
+  type maps_t =
+    { accounts : Account.t Location.Map.t
+    ; token_owners : Account_id.t Token_id.Map.t
+    ; hashes : Hash.t Location.Addr.Map.t
+    ; locations : Location.t Account_id.Map.t
+    ; non_existent_accounts : Account_id.Set.t
+    }
+
   module Base :
     Base_merkle_tree_intf.S
       with module Addr = Location.Addr
