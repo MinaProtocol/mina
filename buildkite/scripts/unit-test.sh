@@ -21,11 +21,6 @@ echo "--- Make libp2p helper"
 export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
 time DUNE_PROFILE="${profile}" make libp2p_helper
 
-# TODO: make this a separate CI job instead of triggering it for every other 
-# unit test invocation.  
-echo "--- Check for changes to verification keys"
-time dune runtest "src/app/print_blockchain_snark_vk" --profile="${profile}"
-
 # Turn on the proof-cache assertion, so that CI will fail if the proofs need to
 # be updated.
 export ERROR_ON_PROOF=true
