@@ -741,6 +741,14 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     module Location = Location
     module Location_binable = Location_binable
     module Kvdb = In_memory_kvdb
+
+    type maps_t =
+      { accounts : Account.t Location.Map.t
+      ; token_owners : Account_id.t Token_id.Map.t
+      ; hashes : Hash.t Location.Addr.Map.t
+      ; locations : Location.t Account_id.Map.t
+      ; non_existent_accounts : Account_id.Set.t
+      }
   end
 
   (* underlying Merkle tree *)
