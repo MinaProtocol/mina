@@ -18,7 +18,6 @@
    native/native-overrides/circuit.js
    native/native-overrides/gate-vector.js
    native/native-overrides/oracles.js
-   native/native-overrides/circuit.js
    native/native-overrides/prover-index.js
    native/native-overrides/srs.js
    native/native-overrides/util.js))

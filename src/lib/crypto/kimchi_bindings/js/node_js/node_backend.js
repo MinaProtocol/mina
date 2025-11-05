@@ -54,8 +54,8 @@ var plonk_wasm = (function() {
       "caml_pasta_fq_plonk_index_decode",
       "caml_pasta_fp_plonk_index_encode",
       "caml_pasta_fq_plonk_index_encode",
-      "caml_pasta_fq_plonk_index_read",
       "caml_pasta_fp_plonk_index_read",
+      "caml_pasta_fq_plonk_index_read",
       "caml_fp_srs_from_bytes",
       "caml_fq_srs_from_bytes",
       "WasmFpSrs",
@@ -103,6 +103,5 @@ var plonk_wasm = (function() {
       process.exit(1);
     }
   }
-
   return wasm
 })()
