@@ -17,13 +17,12 @@ export MINA_LIBP2P_PASS="naughty blue worm"
 export NO_JS_BUILD=1 # skip some JS targets which have extra implicit dependencies
 export LAGRANGE_CACHE_DIR="/tmp/lagrange-cache"
 
-echo "--- Make build"
+echo "--- Make libp2p helper"
 export LIBP2P_NIXLESS=1 PATH=/usr/lib/go/bin:$PATH GO=/usr/lib/go/bin/go
-time make build
+time DUNE_PROFILE="${profile}" make libp2p_helper
 
-echo "--- Build all targets"
-dune build "${path}" --profile="${profile}"
-
+# TODO: make this a separate CI job instead of triggering it for every other 
+# unit test invocation.  
 echo "--- Check for changes to verification keys"
 time dune runtest "src/app/print_blockchain_snark_vk" --profile="${profile}"
 
