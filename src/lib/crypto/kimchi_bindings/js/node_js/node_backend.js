@@ -35,7 +35,6 @@ override('caml_pasta_fq_poseidon_block_cipher');
 override('prover_to_json');
 override('prover_index_fp_from_bytes');
 override('prover_index_fq_from_bytes'); 
-
 override('prover_index_fp_to_bytes');
 override('prover_index_fq_to_bytes');
 override('caml_pasta_fp_plonk_index_max_degree');
@@ -52,72 +51,56 @@ override('caml_pasta_fp_plonk_index_create');
 override('caml_pasta_fq_plonk_index_create');
 override('caml_pasta_fp_plonk_gate_vector_from_bytes');
 override('caml_pasta_fq_plonk_gate_vector_from_bytes');
+override('caml_pasta_fp_plonk_gate_vector_from_bytes_external')
 override('caml_fp_srs_from_bytes');
 override('caml_fq_srs_from_bytes');
 override('caml_pasta_fp_plonk_circuit_serialize');
 override('caml_pasta_fq_plonk_circuit_serialize');
-
 override('caml_pasta_fp_plonk_index_decode')
 override('caml_pasta_fq_plonk_index_decode') 
 override('caml_pasta_fp_plonk_index_encode');
 override('caml_pasta_fq_plonk_index_encode');
 override('caml_pasta_fq_plonk_index_read');
 override('caml_pasta_fp_plonk_index_read');
-
-// GateVector 
-[ 
-  'caml_pasta_fp_plonk_gate_vector_create', 
-  'caml_pasta_fq_plonk_gate_vector_create', 
-  'caml_pasta_fp_plonk_gate_vector_add',
-  'caml_pasta_fq_plonk_gate_vector_add',
-  'caml_pasta_fp_plonk_gate_vector_get',
-  'caml_pasta_fq_plonk_gate_vector_get',
-  'caml_pasta_fp_plonk_gate_vector_len', 
-  'caml_pasta_fq_plonk_gate_vector_len',
-  'caml_pasta_fp_plonk_gate_vector_wrap',
-  'caml_pasta_fq_plonk_gate_vector_wrap',
-  'caml_pasta_fp_plonk_gate_vector_digest',
-  'caml_pasta_fq_plonk_gate_vector_digest',
-  'caml_pasta_fp_plonk_circuit_serialize',
-  'caml_pasta_fq_plonk_circuit_serialize',
-].forEach(override);
-
-// Poly Commitment, Affine Point conversions
-[
-  'WasmFpPolyComm',
-  'WasmFqPolyComm',
-  'WasmGPallas',
-  'WasmGVesta',
-  'WasmPastaFp',
-  'WasmPastaFq',
-].forEach(override);
-
-// SRS
-[
-  'WasmFpSrs',
-  'caml_fp_srs_create',
-  'caml_fp_srs_create_parallel',
-  'caml_fq_srs_get',
-  'caml_fq_srs_set',
-  'caml_fp_srs_write',
-  'caml_fp_srs_read',
-  'caml_fp_srs_add_lagrange_basis',
-  'caml_fp_srs_commit_evaluations',
-  'caml_fp_srs_b_poly_commitment',
-  'caml_fp_srs_batch_accumulator_check',
-  'caml_fp_srs_batch_accumulator_generate',
-  'caml_fp_srs_h',
-  'WasmFqSrs',
-  'caml_fq_srs_create',
-  'caml_fq_srs_create_parallel',
-  'caml_fq_srs_get',
-  'caml_fq_srs_set',
-  'caml_fq_srs_write',
-  'caml_fq_srs_read',
-  'caml_fq_srs_add_lagrange_basis',
-  'caml_fq_srs_commit_evaluations',
-  'caml_fq_srs_b_poly_commitment',
-  'caml_fq_srs_batch_accumulator_check',
-  'caml_fq_srs_batch_accumulator_generate',
-  'caml_fq_srs_h',
-].forEach(override);
+override('caml_fp_srs_from_bytes_external');
+override('caml_fq_srs_from_bytes_external');
+override('caml_pasta_fp_plonk_gate_vector_create'); 
+override('caml_pasta_fq_plonk_gate_vector_create'); 
+override('caml_pasta_fp_plonk_gate_vector_add');
+override('caml_pasta_fq_plonk_gate_vector_add');
+override('caml_pasta_fp_plonk_gate_vector_get');
+override('caml_pasta_fq_plonk_gate_vector_get');
+override('caml_pasta_fp_plonk_gate_vector_len'); 
+override('caml_pasta_fq_plonk_gate_vector_len');
+override('caml_pasta_fp_plonk_gate_vector_wrap');
+override('caml_pasta_fq_plonk_gate_vector_wrap');
+override('caml_pasta_fp_plonk_gate_vector_digest');
+override('caml_pasta_fq_plonk_gate_vector_digest');
+override('caml_pasta_fp_plonk_circuit_serialize');
+override('caml_pasta_fq_plonk_circuit_serialize');
+override('WasmFpSrs');
+override('caml_fp_srs_create');
+override('caml_fp_srs_create_parallel');
+override('caml_fq_srs_get');
+override('caml_fq_srs_set');
+override('caml_fp_srs_write');
+override('caml_fp_srs_read');
+override('caml_fp_srs_add_lagrange_basis');
+override('caml_fp_srs_commit_evaluations');
+override('caml_fp_srs_b_poly_commitment');
+override('caml_fp_srs_batch_accumulator_check');
+override('caml_fp_srs_batch_accumulator_generate');
+override('caml_fp_srs_h');
+override('WasmFqSrs');
+override('caml_fq_srs_create');
+override('caml_fq_srs_create_parallel');
+override('caml_fq_srs_get');
+override('caml_fq_srs_set');
+override('caml_fq_srs_write');
+override('caml_fq_srs_read');
+override('caml_fq_srs_add_lagrange_basis');
+override('caml_fq_srs_commit_evaluations');
+override('caml_fq_srs_b_poly_commitment');
+override('caml_fq_srs_batch_accumulator_check');
+override('caml_fq_srs_batch_accumulator_generate');
+override('caml_fq_srs_h');
