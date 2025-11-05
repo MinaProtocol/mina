@@ -126,6 +126,9 @@ class PaymentApp {
       logger.step(`Submitting to GraphQL endpoint ${url}...`);
       // The GraphQL client returns the parsed JSON response from the daemon.
       const result = await graphqlClient.sendPayment(signedPayment);
+      if (!result) {
+        throw new Error('No response from GraphQL client.');
+      }
 
       const paymentId = result?.data?.sendPayment?.payment?.id;
       if (!paymentId) {
@@ -146,6 +149,10 @@ class PaymentApp {
           record('Pool status', false, 'Not yet in pool');
         }
       } catch (poolError) {
+        logger.error(`Pool check error: ${poolError.message}`);
+        if (poolError.response) {
+          logger.error(`Response: ${JSON.stringify(poolError.response)}`);
+        }
         record('Pool status', false, poolError.message);
         throw poolError;
       }
@@ -155,6 +162,9 @@ class PaymentApp {
       logger.summary(summary);
     } catch (error) {
       logger.error(`Application error: ${error.message}`);
+      if (error.response) {
+        logger.error(`Response: ${JSON.stringify(error.response)}`);
+      }
       record('Run status', false, error.message);
       logger.summary(summary);
       process.exit(1);
