@@ -459,7 +459,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
       let config =
-        Persistent_root.Instance.Config.make_potential_snarked_ledger
+        Persistent_root.Config.make_potential_snarked_ledger
           t.persistent_root_instance.factory
       in
       let () =

@@ -25,36 +25,6 @@ end
 module Instance : sig
   type t = Instance_type.t
 
-  module Config : sig
-    (** Helper to create a filesystem location (for a file or directory) inside
-        the [Factory_type.t] directory. *)
-    val make_instance_location : string -> Factory_type.t -> string
-
-    (** Helper to create a [Root.Config.t] for a snarked ledger based on a
-        subdirectory of the [Factory_type.t] directory *)
-    val make_instance_config : string -> Factory_type.t -> Root_ledger.Config.t
-
-    (** The config for the actual snarked ledger that is initialized and used by
-        the daemon *)
-    val snarked_ledger : Factory_type.t -> Root_ledger.Config.t
-
-    (** The config for the temporary snarked ledger, used while recovering a
-        vaild potential snarked ledger during startup *)
-    val tmp_snarked_ledger : Factory_type.t -> Root_ledger.Config.t
-
-    (** The name of a json file that lists the directory names of the potential
-        snarked ledgers in the [potential_snarked_ledgers] queue *)
-    val potential_snarked_ledgers : Factory_type.t -> string
-
-    (** A method that generates fresh potential snarked ledger configs, each
-        using a distinct root subdirectory *)
-    val make_potential_snarked_ledger : Factory_type.t -> Root_ledger.Config.t
-
-    (** The name of the file recording the [Root_identifier.t] of the snarked
-        root *)
-    val root_identifier : Factory_type.t -> string
-  end
-
   val enqueue_snarked_ledger : config:Root_ledger.Config.t -> t -> unit
 
   val dequeue_snarked_ledger : t -> unit
@@ -79,15 +49,45 @@ module Instance : sig
     -> (t, [> `Snarked_ledger_mismatch ]) result
 
   val snarked_ledger : t -> Root_ledger.t
+end
 
-  val set_root_identifier : t -> Root_identifier.t -> unit
+module Config : sig
+  (** Helper to create a filesystem location (for a file or directory) inside
+        the [Factory_type.t] directory. *)
+  val make_instance_location : string -> Factory_type.t -> string
 
-  val load_root_identifier : t -> Root_identifier.t option
+  (** Helper to create a [Root_ledger.Config.t] for a snarked ledger based on a
+        subdirectory of the [Factory_type.t] directory *)
+  val make_instance_config : string -> Factory_type.t -> Root_ledger.Config.t
 
-  val set_root_state_hash : t -> Frozen_ledger_hash.t -> unit
+  (** The config for the actual snarked ledger that is initialized and used by
+        the daemon *)
+  val snarked_ledger : Factory_type.t -> Root_ledger.Config.t
+
+  (** The config for the temporary snarked ledger, used while recovering a
+        vaild potential snarked ledger during startup *)
+  val tmp_snarked_ledger : Factory_type.t -> Root_ledger.Config.t
+
+  (** The name of a json file that lists the directory names of the potential
+        snarked ledgers in the [potential_snarked_ledgers] queue *)
+  val potential_snarked_ledgers : Factory_type.t -> string
+
+  (** A method that generates fresh potential snarked ledger configs, each
+        using a distinct root subdirectory *)
+  val make_potential_snarked_ledger : Factory_type.t -> Root_ledger.Config.t
+
+  (** The name of the file recording the [Root_identifier.t] of the snarked
+        root *)
+  val root_identifier : Factory_type.t -> string
 end
 
 type t = Factory_type.t
+
+val set_root_identifier : t -> Root_identifier.t -> unit
+
+val load_root_identifier : t -> Root_identifier.t option
+
+val set_root_state_hash : t -> Frozen_ledger_hash.t -> unit
 
 val create :
      logger:Logger.t
@@ -113,8 +113,8 @@ val reset_factory_root_exn :
         -> depth:int
         -> unit
         -> Root_ledger.t Or_error.t )
-  -> setup:(Instance_type.t -> 'a)
-  -> 'a Async.Deferred.t
+  -> root_state_hash:State_hash.t
+  -> unit Async.Deferred.t
 
 val reset_to_genesis_exn :
   t -> precomputed_values:Genesis_proof.t -> unit Async.Deferred.t
