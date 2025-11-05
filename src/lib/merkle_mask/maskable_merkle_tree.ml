@@ -17,6 +17,7 @@ module type Inputs_intf = sig
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
        and type parent := Base.t
+       and type maps_t := maps_t
 
   val mask_to_base : Mask.Attached.t -> Base.t
 end
@@ -108,6 +109,10 @@ module Make (Inputs : Inputs_intf) = struct
           let graph = to_graph () in
           Graphviz.output_graph output_channel graph )
   end
+
+  let append_maps = Mask.Attached.append_maps
+
+  let get_maps = Mask.Attached.get_maps
 
   let unsafe_preload_accounts_from_parent =
     Mask.Attached.unsafe_preload_accounts_from_parent
