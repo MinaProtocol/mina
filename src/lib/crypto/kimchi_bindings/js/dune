@@ -19,8 +19,7 @@
    native/native-overrides/util.js
    native/native-overrides/circuit.js
    native/native-overrides/prover-index.js
-   native/native-overrides/gate-vector.js
-   ))
+   native/native-overrides/gate-vector.js))
  (instrumentation
   (backend bisect_ppx))
  (preprocess
