@@ -163,11 +163,17 @@ clean-dir() {
 }
 
 generate-keypair() {
-  ${MINA_EXE} advanced generate-keypair -privkey-path "${1}"
+  if ! ${MINA_EXE} advanced generate-keypair -privkey-path "${1}"; then
+    echo "❌ Failed to generate daemon keypair at '${1}'." >&2
+    return 1
+  fi
 }
 
 generate-libp2p-keypair() {
-  ${MINA_EXE} libp2p generate-keypair -privkey-path "${1}"
+  if ! ${MINA_EXE} libp2p generate-keypair -privkey-path "${1}"; then
+    echo "❌ Failed to generate libp2p keypair at '${1}'." >&2
+    return 1
+  fi 
 }
 
 # Executes the Mina Daemon, exposing all 5 ports in
