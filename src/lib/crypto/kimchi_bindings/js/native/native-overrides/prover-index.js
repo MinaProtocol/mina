@@ -123,7 +123,7 @@ var caml_pasta_fp_plonk_index_create = function (
   );
  console.time("conversion")
   var gate_vec = plonk_wasm.caml_pasta_fp_plonk_gate_vector_from_bytes(gates.serialize());
-  var urs_ser = plonk_wasm.caml_fp_srs_from_bytes(urs.serialize())
+  var urs_ser = plonk_wasm.caml_fp_srs_from_bytes_external(urs.serialize())
   console.timeEnd("conversion")
 
   console.time("index_create")
@@ -216,7 +216,7 @@ var caml_pasta_fq_plonk_index_create = function (
 
   console.time("conversion")
   var gate_vec = plonk_wasm.caml_pasta_fq_plonk_gate_vector_from_bytes(gates.serialize());
-  var urs_ser = plonk_wasm.caml_fq_srs_from_bytes(urs.serialize())
+  var urs_ser = plonk_wasm.caml_fq_srs_from_bytes_external(urs.serialize())
   console.timeEnd("conversion")
 
   console.time("index_create")

@@ -169,10 +169,14 @@ var caml_fq_srs_commit_evaluations = function (t, domain_size, fqs) {
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_fq_srs_b_poly_commitment = function (srs, chals) {
   console.log("native caml_fq_srs_b_poly_commitment");
+  console.log("srs", srs);
+  console.log("chals", chals);
+  console.log("conv", tsRustConversionNative.fq.vectorToRust(chals))
   var res = plonk_wasm.caml_fq_srs_b_poly_commitment(
     srs,
     tsRustConversionNative.fq.vectorToRust(chals)
   );
+  console.log("res", res);
   return tsRustConversionNative.fq.polyCommFromRust(res);
 };
 
