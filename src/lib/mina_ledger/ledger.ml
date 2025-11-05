@@ -425,6 +425,12 @@ module Ledger_inner = struct
     let accumulated = Mask.Attached.to_accumulated t in
     Maskable.register_mask ~accumulated (packed t) mask
 
+  type maps_t = Maskable.maps_t
+
+  let append_maps = Maskable.append_maps
+
+  let get_maps = Maskable.get_maps
+
   let unsafe_preload_accounts_from_parent =
     Maskable.unsafe_preload_accounts_from_parent
 

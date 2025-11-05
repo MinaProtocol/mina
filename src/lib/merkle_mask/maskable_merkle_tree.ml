@@ -109,6 +109,12 @@ module Make (Inputs : Inputs_intf) = struct
           Graphviz.output_graph output_channel graph )
   end
 
+  type maps_t = Mask.maps_t
+
+  let append_maps = Mask.Attached.append_maps
+
+  let get_maps = Mask.Attached.get_maps
+
   let unsafe_preload_accounts_from_parent =
     Mask.Attached.unsafe_preload_accounts_from_parent
 

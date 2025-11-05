@@ -134,6 +134,12 @@ val unregister_mask_exn : loc:string -> Mask.Attached.t -> Mask.t
 val unsafe_preload_accounts_from_parent :
   Mask.Attached.t -> Account_id.t list -> unit
 
+type maps_t
+
+val append_maps : t -> maps_t -> unit
+
+val get_maps : t -> maps_t
+
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
 type maskable_ledger = t

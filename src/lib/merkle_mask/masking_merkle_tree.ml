@@ -201,6 +201,12 @@ module Make (Inputs : Inputs_intf.S) = struct
           acc.current <- f acc.current ;
           acc.next <- f acc.next )
 
+    let get_maps t = assert_is_attached t ; t.maps
+
+    let append_maps t maps =
+      assert_is_attached t ;
+      update_maps t ~f:(Fn.flip maps_merge maps)
+
     let self_set_hash t address hash =
       update_maps t ~f:(fun maps ->
           { maps with hashes = Map.set maps.hashes ~key:address ~data:hash } )
