@@ -19,7 +19,7 @@ sudo apt-get install --no-install-recommends -y nodejs=20.*
 sudo rm -rf /var/lib/apt/lists/*
 
 # --- Install mina-signer
-sudo npm install -g mina-signer
+npm install --prefix scripts/tests/mina-signer mina-signer
 
 # --- Install mina-test-signer
 sudo npm install -g ./scripts/tests/mina-signer
