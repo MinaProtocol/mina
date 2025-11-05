@@ -232,6 +232,7 @@ let start t =
     ; "--seed"
     ; "--demo-mode"
     ; "--background"
+    ; "--insecure-rest-server"
     ; "--working-dir"
     ; "."
     ; "--client-port"
