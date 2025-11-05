@@ -144,6 +144,7 @@ func (t *HardforkTest) RunMainNetwork(mainGenesisTs int64) (*exec.Cmd, error) {
 		"--override-slot-time", strconv.Itoa(t.Config.MainSlot*1000),
 		"--slot-transaction-end", strconv.Itoa(t.Config.SlotTxEnd),
 		"--slot-chain-end", strconv.Itoa(t.Config.SlotChainEnd),
+		"--root", t.Config.Root,
 	)
 	cmd.Env = append(os.Environ(), "MINA_EXE="+t.Config.MainMinaExe)
 
@@ -179,6 +180,7 @@ func (t *HardforkTest) RunForkNetwork(configFile, forkLedgersDir string) (*exec.
 		"--value-transfer-txns",
 		"--transaction-interval", strconv.Itoa(t.Config.PaymentInterval),
 		"--override-slot-time", strconv.Itoa(t.Config.ForkSlot*1000),
+		"--root", t.Config.Root,
 	)
 	cmd.Env = append(os.Environ(), "MINA_EXE="+t.Config.ForkMinaExe)
 
