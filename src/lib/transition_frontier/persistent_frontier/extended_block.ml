@@ -59,18 +59,18 @@ let update_coinbase_stack_and_get_data_result = function
 let to_block
     { Stable.Latest.header; diff; update_coinbase_stack_and_get_data_result; _ }
     =
+  let witness_to_cmd tx =
+    Mina_transaction_logic.Transaction_applied.With_account_update_digests
+    .command_with_status
+    @@ Transaction_snark_scan_state.Transaction_with_witness
+       .With_account_update_digests
+       .Stable
+       .Latest
+       .transaction_with_info tx
+  in
   let cmds =
     match update_coinbase_stack_and_get_data_result with
     | Update_coinbase_stack_and_get_data_result (_, witnesses, _, _, _) ->
-        let witness_to_cmd tx =
-          Mina_transaction_logic.Transaction_applied.With_account_update_digests
-          .command_with_status
-          @@ Transaction_snark_scan_state.Transaction_with_witness
-             .With_account_update_digests
-             .Stable
-             .Latest
-             .transaction_with_info tx
-        in
         List.filter_map ~f:witness_to_cmd witnesses
     | Commands commands ->
         commands
@@ -128,9 +128,7 @@ let of_validate_block ?update_coinbase_stack_and_get_data_result
     | None ->
         Commands (Staged_ledger_diff.commands diff |> List.map ~f:read_proofs)
   in
-  { Stable.Latest.header =
-      Mina_block.Validated.header block
-      (* |> With_hash.data |> Mina_block.read_all_proofs_from_disk *)
+  { Stable.Latest.header = Mina_block.Validated.header block
   ; update_coinbase_stack_and_get_data_result
   ; state_body_hash = Mina_block.Validated.state_body_hash block
   ; diff =

@@ -53,6 +53,8 @@ module Limited : sig
            Mina_base.State_hash.With_state_hashes.Stable.V1.t
            list
 
+      val transition : t -> Mina_block.Validated.Stable.V2.t
+
       val create :
            transition:Mina_block.Validated.Stable.V2.t
         -> scan_state:Staged_ledger.Scan_state.Stable.V2.t

@@ -166,10 +166,13 @@ module Instance = struct
 
   let check_database t = Database.check t.db
 
+  let get_root_hash t =
+    Database.get_root_hash t.db |> Result.map_error ~f:Database.Error.message
+
   let get_root_transition ~signature_kind ~proof_cache_db t =
-    Result.bind (Database.get_root_hash t.db) ~f:(fun root_hash ->
-        Database.get_transition ~logger:t.factory.logger ~signature_kind
-          ~proof_cache_db t.db root_hash )
+    let%bind.Result root_hash = get_root_hash t in
+    Database.get_transition ~logger:t.factory.logger ~signature_kind
+      ~proof_cache_db t.db root_hash
     |> Result.map_error ~f:Database.Error.message
 
   let fast_forward t target_root :

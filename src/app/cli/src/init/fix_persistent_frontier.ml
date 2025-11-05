@@ -8,7 +8,7 @@ let rec build_path_to_root ~(frontier : Transition_frontier.t) ~current_hash
     ~target_hash acc =
   if State_hash.equal current_hash target_hash then
     (* Reached the target (frontier root), return accumulated path *)
-    Ok (List.rev acc)
+    Ok acc
   else
     match Transition_frontier.find frontier current_hash with
     | None ->
@@ -22,7 +22,6 @@ let rec build_path_to_root ~(frontier : Transition_frontier.t) ~current_hash
 
 let check_directories_exist ~logger ~persistent_root_location
     ~persistent_frontier_location =
-  let open Deferred.Let_syntax in
   let%bind root_exists =
     Sys.file_exists persistent_root_location
     >>| function `Yes -> true | `No | `Unknown -> false
@@ -63,6 +62,13 @@ let apply_root_transitions ~logger ~db diffs =
               | Diff.Lite.E.E
                   (Diff.Root_transitioned
                     { new_root; garbage = Lite garbage; _ } ) ->
+                  let parent_hash =
+                    Root_data.Limited.Stable.Latest.transition new_root
+                    |> Mina_block.Validated.Stable.Latest.header
+                    |> Mina_block.Header.protocol_state
+                    |> Mina_state.Protocol_state.previous_state_hash
+                  in
+                  assert (State_hash.equal parent_hash old_root_hash) ;
                   Transition_frontier.Persistent_frontier.Database.move_root
                     ~old_root_hash ~new_root ~garbage batch ;
                   (* Return new root hash for next iteration *)
@@ -73,15 +79,13 @@ let apply_root_transitions ~logger ~db diffs =
         |> ignore ) ;
     [%log' info logger] "Successfully applied $count diffs"
       ~metadata:[ ("count", `Int (List.length diffs)) ] ;
-    Deferred.return (Ok ())
+    Ok ()
   with exn ->
     [%log' error logger] "Failed to apply root transitions: $error"
       ~metadata:[ ("error", `String (Exn.to_string exn)) ] ;
-    Deferred.return
-      (Error ("Failed to apply root transitions: " ^ Exn.to_string exn))
+    Error ("Failed to apply root transitions: " ^ Exn.to_string exn)
 
-let persist_all_transitions ~logger ~db frontier =
-  let breadcrumbs = Transition_frontier.all_breadcrumbs frontier in
+let persist_all_transitions ~logger ~db breadcrumbs =
   [%log info] "Re-persisting %d transitions" (List.length breadcrumbs) ;
   Transition_frontier.Persistent_frontier.Database.with_batch db
     ~f:(fun batch ->
@@ -123,14 +127,20 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~pids:(Child_processes.Termination.create_pid_table ())
       ~conf_dir:(Some config_directory) ()
   in
+  let tmp_root_location = chain_state_locations.root ^ "-tmp" in
+  let%bind () =
+    Mina_stdlib_unix.File_system.copy_dir chain_state_locations.root
+      tmp_root_location
+    >>| Result.ok_exn
+  in
   (* Set up persistent root and frontier *)
   let persistent_root =
-    Transition_frontier.Persistent_root.create ~logger ~backing_type:Stable_db
-      ~directory:chain_state_locations.root
+    Persistent_root.create ~logger ~backing_type:Stable_db
+      ~directory:tmp_root_location
       ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
   in
   let persistent_frontier =
-    Transition_frontier.Persistent_frontier.create ~logger ~verifier
+    Persistent_frontier.create ~logger ~verifier
       ~directory:chain_state_locations.frontier
       ~time_controller:(Block_time.Controller.basic ~logger)
       ~signature_kind
@@ -140,32 +150,17 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     >>| Result.map_error ~f:(fun (`Initialization_error err) ->
             Error.to_string_mach err )
   in
-  let%bind.Deferred.Result { block = root_transition; _ } =
+  let%bind.Deferred.Result persistent_frontier_root_hash =
     Persistent_frontier.with_instance_exn persistent_frontier
-      ~f:
-        (Persistent_frontier.Instance.get_root_transition ~proof_cache_db
-           ~signature_kind )
-  in
-  let snarked_ledger_hash =
-    Mina_block.Validated.header root_transition
-    |> Mina_block.Header.protocol_state
-    |> Mina_state.Protocol_state.blockchain_state
-    |> Mina_state.Blockchain_state.snarked_ledger_hash
-  in
-  let%bind.Deferred.Result persistent_root_loaded =
-    Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
-      ~logger
-    |> Result.map_error ~f:(const "snarked ledger mismatch")
-    |> Deferred.return
+      ~f:Persistent_frontier.Instance.get_root_hash
   in
   let persistent_root_id =
-    Persistent_root.Instance.load_root_identifier persistent_root_loaded
+    Persistent_root.load_root_identifier persistent_root
     |> Option.value_exn ~message:"couldn't load persistent root hash"
   in
   let persistent_root_hash = persistent_root_id.state_hash in
-  Persistent_root.Instance.set_root_state_hash persistent_root_loaded
-    (Mina_block.Validated.state_hash root_transition) ;
-  Persistent_root.Instance.close persistent_root_loaded ;
+  Persistent_root.set_root_state_hash persistent_root
+    persistent_frontier_root_hash ;
   (* Set up context module for frontier loading *)
   let module Context = struct
     let logger = logger
@@ -192,6 +187,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~epoch_ledger_backing_type:Stable_db
       Signature_lib.Public_key.Compressed.Set.empty
   in
+  (* TODO loading of frontier is redundant unless fixing is needed *)
   (* Load transition frontier using the standard API *)
   let%bind frontier =
     match%map
@@ -222,23 +218,19 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
   let frontier_root_hash =
     Transition_frontier.root frontier |> Breadcrumb.state_hash
   in
-  let create_persistent_frontier_db () =
-    let persistent_frontier_for_db =
-      Transition_frontier.persistent_frontier frontier
-    in
-    let persistent_frontier_instance =
-      Transition_frontier.Persistent_frontier.create_instance_exn
-        persistent_frontier_for_db
-    in
-    persistent_frontier_instance.db
+  assert (State_hash.equal frontier_root_hash persistent_frontier_root_hash) ;
+  let with_persistent_frontier_instance f =
+    Persistent_frontier.with_instance_exn persistent_frontier ~f
   in
-  let migrate_frontier_do ?db () =
+  let migrate_frontier_do (instance : Persistent_frontier.Instance.t) =
     if migrate_frontier then
-      let db =
-        match db with Some db -> db | None -> create_persistent_frontier_db ()
-      in
-      persist_all_transitions ~logger ~db frontier
+      let breadcrumbs = Transition_frontier.all_breadcrumbs frontier in
+      persist_all_transitions ~logger ~db:instance.db breadcrumbs
     else ()
+  in
+  let clean_frontier () =
+    let%bind () = Transition_frontier.close ~loc:__LOC__ frontier in
+    Mina_stdlib_unix.File_system.remove_dir tmp_root_location
   in
   (* Check if persistent root is in the frontier *)
   match
@@ -246,21 +238,21 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     , Transition_frontier.find frontier persistent_root_hash )
   with
   | true, _ ->
-      [%log' info logger]
+      [%log info]
         "Frontier root already matches persistent root. Nothing to do." ;
-      migrate_frontier_do () ;
-      let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+      let%bind () = clean_frontier () in
+      let%map () = with_persistent_frontier_instance migrate_frontier_do in
       Ok ()
   | _, None ->
-      [%log' error logger]
+      [%log error]
         "Persistent root $persistent_root not found in frontier. Bootstrap \
          required."
         ~metadata:
           [ ("persistent_root", State_hash.to_yojson persistent_root_hash)
           ; ("frontier_root", State_hash.to_yojson frontier_root_hash)
           ] ;
-      migrate_frontier_do () ;
-      let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+      let%bind () = clean_frontier () in
+      let%map () = with_persistent_frontier_instance migrate_frontier_do in
       Error "Persistent root not found in frontier. Bootstrap required."
   | _, Some _persistent_root_breadcrumb ->
       (* Build path from persistent root back to frontier root *)
@@ -272,25 +264,29 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       [%log info]
         "Built path from persistent root to frontier root: $length blocks"
         ~metadata:[ ("length", `Int (List.length path)) ] ;
+      assert (
+        State_hash.equal
+          (List.hd_exn path |> Breadcrumb.parent_hash)
+          frontier_root_hash ) ;
       (* Generate root transition diffs for each step *)
       let diffs =
-        List.map path ~f:(fun breadcrumb ->
-            let diff =
-              Transition_frontier.calculate_root_transition_diff frontier
-                breadcrumb
-            in
-            (* Convert Full diff to Lite diff *)
-            Diff.Full.E.to_lite diff )
+        List.map path
+          ~f:
+            ( Fn.compose Diff.Full.E.to_lite
+            (* BUG: calculate_root_transition_diff calculates the value
+               assuming root is the parent *)
+            @@ Transition_frontier.calculate_root_transition_diff frontier )
       in
       [%log info] "Generated $count transition diffs"
         ~metadata:[ ("count", `Int (List.length diffs)) ] ;
-      (* Get database before closing frontier *)
-      let db = create_persistent_frontier_db () in
+      let%bind () = clean_frontier () in
       (* Apply the diffs to persistent frontier database *)
-      let%bind.Deferred.Result () = apply_root_transitions ~logger ~db diffs in
-      migrate_frontier_do ~db () ;
       let%map.Deferred.Result () =
-        Transition_frontier.close ~loc:__LOC__ frontier >>| Result.return
+        with_persistent_frontier_instance (fun instance ->
+            let%map.Result () =
+              apply_root_transitions ~logger ~db:instance.db diffs
+            in
+            migrate_frontier_do instance )
       in
       [%log info] "Successfully moved frontier root to match persistent root"
 
@@ -350,13 +346,13 @@ let command =
     (let open Command.Let_syntax in
     let%map_open config_directory = Cli_lib.Flag.conf_dir
     and config_file =
-      flag "--config-file" ~aliases:[ "config-file" ]
-        ~doc:"PATH path to a configuration file" (required string)
+      flag "--config-file" ~doc:"PATH path to a configuration file"
+        (required string)
     and max_frontier_depth =
-      flag "--max-frontier-depth" ~aliases:[ "max-frontier-depth" ]
+      flag "--max-frontier-depth"
         ~doc:"INT maximum frontier depth (default: 10)" (optional int)
     and migrate_frontier =
-      flag "--migrate-frontier" ~aliases:[ "migrate-frontier" ]
+      flag "--migrate-frontier"
         ~doc:
           "BOOL whether to migrate frontier to the new format (default: false)"
         no_arg

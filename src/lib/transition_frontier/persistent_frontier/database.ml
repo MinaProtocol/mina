@@ -516,7 +516,8 @@ let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
     |> Mina_block.Header.protocol_state
     |> Mina_state.Protocol_state.previous_state_hash
   in
-  [%log internal] "Database_write_proofs_to_disk_start"
+  [%log internal]
+    "Update_coinbase_stack_and_get_data_result_write_proofs_to_disk_start"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   let update_coinbase_stack_and_get_data_result =
     update_coinbase_stack_and_get_data_result
@@ -524,16 +525,24 @@ let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
            Staged_ledger.Update_coinbase_stack_and_get_data_result
            .write_all_proofs_to_disk ~proof_cache_db x )
   in
-  let cache_block =
+  [%log internal]
+    "Update_coinbase_stack_and_get_data_result_write_proofs_to_disk_done"
+    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
+  let cache_block, loaded_from_extended_block =
     match update_coinbase_stack_and_get_data_result with
     | Some (_, witnesses, _, _, _) ->
-        Extended_block.take_hashes_from_witnesses ~proof_cache_db ~witnesses
+        ( Extended_block.take_hashes_from_witnesses ~proof_cache_db ~witnesses
+        , true )
     | None ->
-        Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+        ( Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+        , false )
   in
+  [%log internal] "Reconstruct_block_from_persistence"
+    ~metadata:
+      [ ("state_hash", State_hash.to_yojson hash)
+      ; ("loaded_from_extended_block", `Bool loaded_from_extended_block)
+      ] ;
   let cached_block = With_hash.map ~f:cache_block block in
-  [%log internal] "Database_write_proofs_to_disk_done"
-    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   (* TODO: the delta transition chain proof is incorrect (same behavior the daemon used to have, but we should probably fix this?) *)
   let result =
     Mina_block.Validated.unsafe_of_trusted_block

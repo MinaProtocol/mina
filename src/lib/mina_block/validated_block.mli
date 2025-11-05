@@ -8,6 +8,8 @@ module Stable : sig
     type t [@@deriving equal]
 
     val hashes : t -> State_hash.State_hashes.t
+
+    val header : t -> Header.Stable.V2.t
   end
 end]
 

@@ -1126,15 +1126,16 @@ module T = struct
         ; ("max_throughput", `Int max_throughput)
         ] ;
     let%bind update_coinbase_stack_and_get_data_result =
-      match cached_update_coinbase_stack_and_get_data_result with
-      | Some cached ->
-          return cached
-      | None ->
-          O1trace.thread "update_coinbase_stack_start_time" (fun () ->
-              update_coinbase_stack_and_get_data ~logger ~constraint_constants
-                ~global_slot ~signature_kind t.scan_state new_ledger
-                t.pending_coinbase_collection transactions current_state_view
-                state_and_body_hash )
+      ignore cached_update_coinbase_stack_and_get_data_result ;
+      (* match cached_update_coinbase_stack_and_get_data_result with
+         | Some cached ->
+             return cached
+         | None -> *)
+      O1trace.thread "update_coinbase_stack_start_time" (fun () ->
+          update_coinbase_stack_and_get_data ~logger ~constraint_constants
+            ~global_slot ~signature_kind t.scan_state new_ledger
+            t.pending_coinbase_collection transactions current_state_view
+            state_and_body_hash )
     in
     let ( is_new_stack
         , data
