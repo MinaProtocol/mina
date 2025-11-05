@@ -573,10 +573,9 @@ let run_cycle ~context:(module Context : CONTEXT) ~trust_system ~verifier
           in
           (* TODO: lazy load db in persistent root to avoid unnecessary opens like this *)
           Transition_frontier.Persistent_root.(
-            with_instance_exn persistent_root ~f:(fun instance ->
-                Instance.set_root_state_hash instance
-                @@ Mina_block.Validated.state_hash
-                @@ Mina_block.Validated.lift new_root )) ;
+            set_root_state_hash persistent_root
+            @@ Mina_block.Validated.state_hash
+            @@ Mina_block.Validated.lift new_root) ;
           let%map new_frontier =
             let fail msg =
               failwith
