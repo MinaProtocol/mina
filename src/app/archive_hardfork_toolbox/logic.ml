@@ -5,6 +5,8 @@ type check_error = Success | Failure of string
 
 type check_result = { id : string; name : string; result : check_error }
 
+let logger = Logger.create ()
+
 let check_result_to_string { id; name; result } =
   match result with
   | Success ->
@@ -216,9 +218,10 @@ let fetch_last_filled_block ~postgres_uri () =
   Out_channel.newline Out_channel.stdout
 
 let convert_chain_to_canonical ~postgres_uri ~target_block_hash
-    ~protocol_version ~stop_at_slot () =
+    ~protocol_version_str ~stop_at_slot () =
   let pool = connect postgres_uri in
   let query_db = Mina_caqti.query pool in
+  let protocol_version = Sql.Protocol_version.of_string protocol_version_str in
   let%bind genesis_opt = query_db ~f:(Sql.genesis_block ~protocol_version) in
   let%bind.Deferred.Or_error genesis =
     match genesis_opt with
@@ -226,7 +229,8 @@ let convert_chain_to_canonical ~postgres_uri ~target_block_hash
         Deferred.Or_error.return genesis
     | None ->
         Deferred.Or_error.errorf
-          "Cannot locate genesis block for protocol version %d" protocol_version
+          "Cannot locate genesis block for protocol version %s"
+          protocol_version_str
   in
   let%bind target_opt =
     query_db ~f:(Sql.block_info_by_state_hash ~state_hash:target_block_hash)
@@ -239,35 +243,53 @@ let convert_chain_to_canonical ~postgres_uri ~target_block_hash
         Deferred.Or_error.errorf "Cannot find block with state hash %s"
           target_block_hash
   in
-  if target.protocol_version_id <> protocol_version then
-    Deferred.Or_error.errorf "Block %s uses protocol version %d, expected %d"
-      target_block_hash target.protocol_version_id protocol_version
+  let target_protocol_version_as_string =
+    Sql.Protocol_version.to_string target.protocol_version
+  in
+  let%bind.Deferred.Or_error () =
+    if String.( <> ) target_protocol_version_as_string protocol_version_str then
+      Deferred.Or_error.errorf "Block %s uses protocol version %s, expected %s"
+        target_block_hash target_protocol_version_as_string protocol_version_str
+    else Deferred.Or_error.return ()
+  in
+  [%log info]
+    "Marking chain leading to block %s (from %s) as canonical for protocol \
+     version %s"
+    target_block_hash genesis.state_hash target_protocol_version_as_string ;
+  let%bind chain_ids =
+    query_db
+      ~f:
+        (Sql.canonical_chain_ids ~target_block_id:target.id
+           ~genesis_id:genesis.id ~protocol_version )
+  in
+  if List.is_empty chain_ids then
+    Deferred.Or_error.errorf
+      "Failed to compute canonical chain for block %s. Target block id %d, \
+       genesis id %d. protocol version %s"
+      target_block_hash target.id genesis.id target_protocol_version_as_string
   else
-    let%bind chain_ids =
-      query_db
-        ~f:
-          (Sql.canonical_chain_ids ~target_block_id:target.id
-             ~genesis_id:genesis.id ~protocol_version )
+    (* Arbitrary batch size. Pending chain shouldn't be longer than this (k=290).
+       If it is, we can increase the size or implement a more sophisticated
+         batching mechanism.
+    *)
+    let batch_size = 500 in
+    let batch_count =
+      Int.((List.length chain_ids + batch_size - 1) / batch_size)
     in
-    if List.is_empty chain_ids then
-      Deferred.Or_error.errorf "Failed to compute canonical chain for block %s"
-        target_block_hash
-    else
-      let%bind () =
-        query_db ~f:(fun conn ->
-            Sql.mark_blocks_as_orphaned conn ~protocol_version ~stop_at_slot )
-      in
-      (* Arbitrary batch size. Pending chain shouldn't be longer than this (k=290).
-         If it is, we can increase the size or implement a more sophisticated
-           batching mechanism.
-      *)
-      let batch_size = 500 in
-      let%map () =
-        Deferred.List.iter (List.chunks_of chain_ids ~length:batch_size)
-          ~f:(fun ids ->
-            query_db
-              ~f:
-                (Sql.mark_blocks_as_canonical ~protocol_version ~ids
-                   ~stop_at_slot ) )
-      in
-      Ok ()
+    let current_batch = ref 1 in
+    [%log info]
+      "Marking %d blocks as canonical or orphaned for protocol version %s in \
+       batches of %d"
+      (List.length chain_ids) target_protocol_version_as_string batch_size ;
+    let%map () =
+      Deferred.List.iter (List.chunks_of chain_ids ~length:batch_size)
+        ~f:(fun ids ->
+          [%log info] "Marking [%d/%d] batch of blocks as canonical/orphaned"
+            !current_batch batch_count ;
+          current_batch := !current_batch + 1 ;
+          query_db
+            ~f:
+              (Sql.mark_blocks_as_canonical_or_orphaned ~protocol_version ~ids
+                 ~stop_at_slot ) )
+    in
+    Ok ()

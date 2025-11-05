@@ -4,9 +4,50 @@ open Caqti_request.Infix
 
 module type CONNECTION = Mina_caqti.CONNECTION
 
-type genesis_block = { id : int; state_hash : string }
+module Protocol_version = struct
+  type t = { transaction : int; network : int; patch : int }
 
-type block_info = { id : int; height : int64; protocol_version_id : int }
+  let of_string : string -> t = function
+    | version_str -> (
+        String.split version_str ~on:'.'
+        |> List.map ~f:Int.of_string
+        |> function
+        | [ transaction; network; patch ] ->
+            { transaction; network; patch }
+        | _ ->
+            failwithf
+              "Invalid protocol version string: %s. Expected format \
+               <network>.<transaction>.<patch>"
+              version_str () )
+
+  let to_string { transaction; network; patch } =
+    sprintf "%d.%d.%d" network transaction patch
+
+  let typ =
+    let encode { transaction; network; patch } =
+      Ok (transaction, network, patch)
+    in
+    let decode (transaction, network, patch) =
+      Ok { transaction; network; patch }
+    in
+    Caqti_type.(custom ~encode ~decode (t3 int int int))
+end
+
+type block_info =
+  { id : int
+  ; height : int64
+  ; state_hash : string
+  ; protocol_version : Protocol_version.t
+  }
+
+let block_info_typ =
+  let encode { id; height; state_hash; protocol_version } =
+    Ok (id, height, state_hash, protocol_version)
+  in
+  let decode (id, height, state_hash, protocol_version) =
+    Ok { id; height; state_hash; protocol_version }
+  in
+  Caqti_type.(custom ~encode ~decode (t4 int int64 string Protocol_version.typ))
 
 let latest_state_hash_query =
   Caqti_type.(unit ->! string)
@@ -18,98 +59,103 @@ let latest_state_hash (module Conn : CONNECTION) =
   Conn.find latest_state_hash_query ()
 
 let genesis_block_query =
-  Caqti_type.(int ->? t2 int string)
+  (Protocol_version.typ ->? block_info_typ)
     {sql|
-      SELECT id, state_hash
-      FROM blocks
-      WHERE protocol_version_id = ?
+      SELECT blocks.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
+      FROM blocks inner JOIN protocol_versions
+        ON blocks.protocol_version_id = protocol_versions.id
+      WHERE protocol_versions.transaction = $1::int
+        AND protocol_versions.network = $2::int
+        AND protocol_versions.patch = $3::int
         AND global_slot_since_hard_fork = 0
       ORDER BY id ASC
       LIMIT 1;
     |sql}
 
-let genesis_block (module Conn : CONNECTION) ~protocol_version =
-  let open Deferred.Result.Let_syntax in
-  let%map genesis = Conn.find_opt genesis_block_query protocol_version in
-  Option.map genesis ~f:(fun (id, state_hash) -> { id; state_hash })
+let genesis_block (module Conn : CONNECTION)
+    ~(protocol_version : Protocol_version.t) =
+  Conn.find_opt genesis_block_query protocol_version
 
 let block_info_by_state_hash_query =
-  Caqti_type.(string ->? t3 int int64 int)
+  Caqti_type.(string ->? block_info_typ)
     {sql|
-      SELECT id, height, protocol_version_id
-      FROM blocks
+      SELECT blocks.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
+      FROM blocks inner JOIN protocol_versions
+        ON blocks.protocol_version_id = protocol_versions.id
       WHERE state_hash = ?
       LIMIT 1;
     |sql}
 
 let block_info_by_state_hash (module Conn : CONNECTION) ~state_hash =
-  let open Deferred.Result.Let_syntax in
-  let%map info = Conn.find_opt block_info_by_state_hash_query state_hash in
-  Option.map info ~f:(fun (id, height, protocol_version_id) ->
-      { id; height; protocol_version_id } )
+  Conn.find_opt block_info_by_state_hash_query state_hash
 
 let canonical_chain_members_query =
-  Caqti_type.(t5 int int int int int ->* t2 int int64)
+  Caqti_type.(t3 int int Protocol_version.typ ->* block_info_typ)
     {sql|
       WITH RECURSIVE chain AS (
-        SELECT id, parent_id, height
-        FROM blocks
-        WHERE id = ? AND protocol_version_id = ?
+        SELECT blocks.id, parent_id, height, state_hash, transaction, network, patch
+        FROM blocks inner JOIN protocol_versions
+          ON blocks.protocol_version_id = protocol_versions.id
+        WHERE blocks.id = $1::int AND protocol_versions.transaction = $3::int
+          AND protocol_versions.network = $4::int
+          AND protocol_versions.patch = $5::int
 
         UNION ALL
 
-        SELECT b.id, b.parent_id, b.height
+        SELECT b.id, b.parent_id, b.height, b.state_hash, pv.transaction, pv.network, pv.patch
         FROM blocks b
+        INNER JOIN protocol_versions pv
+          ON b.protocol_version_id = pv.id
         INNER JOIN chain
           ON b.id = chain.parent_id
-        WHERE (chain.id <> ? OR b.id = ?)
-          AND b.protocol_version_id = ?
+        WHERE (chain.id <> $2::int OR b.id = $2::int)
+          AND pv.transaction = $3::int
+          AND pv.network = $4::int
+          AND pv.patch = $5::int
       )
-      SELECT id, height
+      SELECT id, height, state_hash, transaction, network, patch
       FROM chain
       ORDER BY height ASC;
     |sql}
 
 let canonical_chain_ids (module Conn : CONNECTION) ~target_block_id ~genesis_id
-    ~protocol_version =
+    ~(protocol_version : Protocol_version.t) =
   let open Deferred.Result.Let_syntax in
-  let%map members =
-    Conn.collect_list canonical_chain_members_query
-      ( target_block_id
-      , protocol_version
-      , genesis_id
-      , genesis_id
-      , protocol_version )
-  in
-  List.map members ~f:fst
+  Conn.collect_list canonical_chain_members_query
+    (target_block_id, genesis_id, protocol_version)
+  >>| List.map ~f:(fun block_info -> block_info.id)
 
-let orphan_blocks_query =
-  Caqti_type.(t2 int (option int) ->. Caqti_type.unit)
+let protocol_version_id_query =
+  Caqti_type.(Protocol_version.typ ->! int)
     {sql|
-      UPDATE blocks
-      SET chain_status = 'orphaned'
-      WHERE protocol_version_id = $1::int
-        AND (global_slot_since_genesis < $2::int OR $2::int IS NULL);
+      SELECT id FROM protocol_versions
+      WHERE transaction = $1::int
+        AND network = $2::int
+        AND patch = $3::int
+      LIMIT 1;
     |sql}
 
-let mark_blocks_as_orphaned (module Conn : CONNECTION) ~protocol_version
-    ~stop_at_slot =
-  Conn.exec orphan_blocks_query (protocol_version, stop_at_slot)
-
-let canonical_blocks_query =
-  Caqti_type.(t3 int Mina_caqti.array_int_typ (option int) ->. Caqti_type.unit)
+let canonical_or_orphaned_blocks_query =
+  Caqti_type.(t3 (option int) int Mina_caqti.array_int_typ ->. Caqti_type.unit)
     {sql|
       UPDATE blocks
-      SET chain_status = 'canonical'
-      WHERE protocol_version_id = $1::int
-        AND id = ANY ($2::int[])
-        AND (global_slot_since_genesis < $3::int OR $3::int IS NULL);
+      SET chain_status = CASE
+          WHEN id = ANY($3::int[]) THEN 'canonical'::chain_status_type
+          ELSE 'orphaned'::chain_status_type
+      END
+      WHERE protocol_version_id = $2::int
+        AND ($1 IS NULL OR global_slot_since_genesis < $1::int);
     |sql}
 
-let mark_blocks_as_canonical (module Conn : CONNECTION) ~protocol_version ~ids
-    ~stop_at_slot =
+let mark_blocks_as_canonical_or_orphaned (module Conn : CONNECTION) ~ids
+    ~stop_at_slot ~protocol_version =
+  let open Deferred.Result.Let_syntax in
   let id_array = Array.of_list ids in
-  Conn.exec canonical_blocks_query (protocol_version, id_array, stop_at_slot)
+  let%bind protocol_version_id =
+    Conn.find protocol_version_id_query protocol_version
+  in
+  Conn.exec canonical_or_orphaned_blocks_query
+    (stop_at_slot, protocol_version_id, id_array)
 
 let chain_of_query =
   {sql|
