@@ -211,9 +211,11 @@ exec-worker-daemon() {
 
   # shellcheck disable=SC2068
   exec ${MINA_EXE} internal snark-worker \
-    -proof-level "${PROOF_LEVEL}" \
-    -shutdown-on-disconnect false \
-    -daemon-address "${COORDINATOR_HOST_AND_PORT}" \
+    --proof-level "${PROOF_LEVEL}" \
+    --shutdown-on-disconnect false \
+    --log-level "${LOG_LEVEL}" \
+    --file-log-level "${FILE_LOG_LEVEL}" \
+    --daemon-address "${COORDINATOR_HOST_AND_PORT}" \
     $@
 }
 
