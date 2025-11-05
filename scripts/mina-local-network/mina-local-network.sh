@@ -63,7 +63,7 @@ SLOT_CHAIN_END=
 # Globals (assigned during execution of script)
 
 ARCHIVE_ADDRESS_CLI_ARG=""
-NETWORK_FOLDER=""
+NETWORK_FOLDER="${HOME}/.mina-network"
 SNARK_COORDINATOR_PUBKEY=""
 NODES_FOLDER=""
 CONFIG=""
@@ -130,7 +130,7 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)
                                          |   Default: ${PROOF_LEVEL}
--c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks, 'inherit_with:CONFIG_PATH,GENESIS_LEDGER_PATH' to inherit keys with new config & genesis ledgers overriden
+-c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks, 'inherit_with:CONFIG_PATH,GENESIS_LEDGER_PATH' to inherit keys with new config & genesis ledgers overriden. Note that any config parameters that should alter the config have priority over the passed in config
                                          |   Default: ${CONFIG_MODE}
 -u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
                                          |   Default: ${UPDATE_GENESIS_TIMESTAMP}
@@ -142,6 +142,8 @@ help() {
                                          |   Default: None
 -sce |--slot-chain-end                   | When set, stop producing blocks from this chain on.
                                          |   Default: None
+-r   |--root                             | When set, override the root working folder (i.e. the value of NETWORK_FOLDER) for this script. WARN: this script will clean up anything inside that folder when initializing any run!
+                                         |   Default: ${NETWORK_FOLDER}
 -h   |--help                             | Displays this help message
 
 Available logging levels:
@@ -421,6 +423,10 @@ while [[ "$#" -gt 0 ]]; do
     SLOT_CHAIN_END="${2}"
     shift
     ;;
+  -r | --root)
+    NETWORK_FOLDER="${2}"
+    shift
+    ;;
   *)
     echo "Unknown parameter passed: ${1}"
 
@@ -503,12 +509,6 @@ fi
 
 # ================================================
 # Create the Genesis Ledger
-
-if ${DEMO_MODE}; then
-  NETWORK_FOLDER="${HOME}/.mina-network/mina-local-network-demo"
-else
-  NETWORK_FOLDER="${HOME}/.mina-network/mina-local-network-${WHALES}-${FISH}-${NODES}"
-fi
 
 if ! config_mode_is_inherit "$CONFIG_MODE" ; then
   rm -rf "${NETWORK_FOLDER}"
