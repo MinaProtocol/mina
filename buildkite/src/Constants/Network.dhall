@@ -4,7 +4,7 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | Berkeley | DevnetLegacy | MainnetLegacy >
+    = < Devnet | Mainnet | Berkeley | DevnetLegacy | MainnetLegacy | PreMesa1 >
 
 let capitalName =
           \(network : Network)
@@ -14,6 +14,7 @@ let capitalName =
             , Berkeley = "Berkeley"
             , DevnetLegacy = "DevnetLegacy"
             , MainnetLegacy = "MainnetLegacy"
+            , PreMesa1 = "PreMesa1"
             }
             network
 
@@ -25,6 +26,7 @@ let lowerName =
             , Berkeley = "berkeley"
             , DevnetLegacy = "devnet_legacy"
             , MainnetLegacy = "mainnet_legacy"
+            , PreMesa1 = "hetzner-pre-mesa-1"
             }
             network
 
@@ -36,6 +38,7 @@ let requiresMainnetBuild =
             , Berkeley = False
             , DevnetLegacy = True
             , MainnetLegacy = True
+            , PreMesa1 = False
             }
             network
 

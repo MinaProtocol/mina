@@ -26,28 +26,18 @@ type merge_outcome =
       { spec : Snark_work_lib.Selector.Single.Spec.t One_or_two.t }
 
 let finalize_one ~submitted_result ~spec ~fee ~prover =
+  let open Snark_work_lib in
   let submitted_result =
-    Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
+    Result.Single.Poly.map ~f_spec:(const spec) ~f_proof:Fn.id submitted_result
   in
-  let Snark_work_lib.Result.Single.Poly.{ proof; _ } = submitted_result in
-  let statements =
-    `One (Snark_work_lib.Selector.Single.Spec.Poly.statement spec)
-  in
-  Done
-    ( statements
-    , Mina_wire_types.Network_pool_priced_proof.V1.
-        { proof = `One proof; fee = { fee; prover } } )
+  Done { results = `One submitted_result; fee; prover }
 
 let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
     ~fee ~prover =
+  let open Snark_work_lib in
   let submitted_result =
-    Snark_work_lib.Result.Single.Poly.map ~f_spec:(const other_spec)
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk submitted_result
-  in
-  let in_pool_result =
-    Snark_work_lib.Result.Single.Poly.map ~f_spec:Fn.id
-      ~f_proof:Ledger_proof.Cached.read_proof_from_disk in_pool_result
+    Result.Single.Poly.map ~f_spec:(const other_spec) ~f_proof:Fn.id
+      submitted_result
   in
   let results =
     match submitted_half with
@@ -56,22 +46,12 @@ let finalize_two ~submitted_result ~other_spec ~in_pool_result ~submitted_half
     | `Second ->
         `Two (in_pool_result, submitted_result)
   in
-  let statements =
-    One_or_two.map
-      ~f:(fun result ->
-        Snark_work_lib.Selector.Single.Spec.Poly.statement result.spec )
-      results
-  in
-  let proof = One_or_two.map ~f:(fun result -> result.proof) results in
-  Done
-    ( statements
-    , Mina_wire_types.Network_pool_priced_proof.V1.
-        { proof; fee = { fee; prover } } )
+  Done { results; fee; prover }
 
-let merge_single_result (current : t)
+let merge_single_result
     ~(submitted_result :
        (unit, Ledger_proof.Cached.t) Snark_work_lib.Result.Single.Poly.t )
-    ~(submitted_half : submitted_half) : merge_outcome =
+    ~(submitted_half : submitted_half) (current : t) : merge_outcome =
   match (current, submitted_half) with
   | Spec_only { spec = `One spec; sok_message = { fee; prover } }, `One ->
       finalize_one ~submitted_result ~spec ~fee ~prover

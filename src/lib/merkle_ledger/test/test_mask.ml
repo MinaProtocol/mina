@@ -633,6 +633,76 @@ module Make (Test : Test_intf) = struct
               ~message:"account in mask should be unchanged" ~expect:acct1
               (Mask.Attached.get attached_mask loc |> Option.value_exn) ) )
 
+  let () =
+    add_test "all_accounts_on_masks works on a chain" (fun () ->
+        Test.with_chain (fun base ~mask:m1_lazy ~mask2:m2_lazy ->
+            (* Subtract one for a shared account *)
+            let num_accounts = (1 lsl min Test.depth 5) - 1 in
+            let num_layer_accounts = num_accounts / 3 in
+            let account_ids = Account_id.gen_accounts num_accounts in
+            let balances =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+            in
+            let T = Account_id.eq in
+            let accounts =
+              List.map2_exn account_ids balances ~f:Account.create
+            in
+            let root_accounts, accounts =
+              List.split_n accounts num_layer_accounts
+            in
+            let middle_accounts, top_accounts =
+              List.split_n accounts num_layer_accounts
+            in
+            (* Two accounts with the same id to go in both masks *)
+            let shared_account_id = Account_id.gen_accounts 1 |> List.hd_exn in
+            let shared_account_middle =
+              Account.create shared_account_id (Balance.of_nanomina_int_exn 11)
+            in
+            let shared_account_top =
+              Account.create shared_account_id (Balance.of_nanomina_int_exn 12)
+            in
+            let create_accounts_map ~create ledger accounts =
+              List.map accounts ~f:(fun account ->
+                  let location = create ledger account in
+                  (location, account) )
+              |> Test.Location.Map.of_alist_reduce ~f:(fun x _ -> x)
+            in
+            let _root_map =
+              create_accounts_map ~create:parent_create_new_account_exn base
+                root_accounts
+            in
+            let middle_ledger, _root = Lazy.force m1_lazy in
+            let middle_map =
+              create_accounts_map ~create:create_new_account_exn middle_ledger
+                middle_accounts
+            in
+            let shared_account_loc =
+              Mask.Attached.get_or_create_account middle_ledger
+                shared_account_id shared_account_middle
+              |> Or_error.ok_exn |> snd
+            in
+            let middle_map =
+              middle_map
+              |> Map.add_exn ~key:shared_account_loc ~data:shared_account_middle
+            in
+            let top_ledger = Lazy.force m2_lazy in
+            let top_map =
+              create_accounts_map ~create:create_new_account_exn top_ledger
+                top_accounts
+            in
+            Mask.Attached.set top_ledger shared_account_loc shared_account_top ;
+            let top_map =
+              top_map
+              |> Map.add_exn ~key:shared_account_loc ~data:shared_account_top
+            in
+            let harvested = Mask.Attached.all_accounts_on_masks top_ledger in
+            let expected =
+              Map.merge_skewed middle_map top_map
+                ~combine:(fun ~key:_ _middle top -> top)
+            in
+            [%test_eq: Account.t Test.Location.Map.t] harvested expected ) )
+
   let tests =
     let actual_tests = Stack.fold test_stack ~init:[] ~f:(fun l e -> e :: l) in
     (test_section_name, actual_tests)
@@ -645,19 +715,19 @@ end
 module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   let depth = Depth.depth
 
-  module Location : Merkle_ledger.Location_intf.S = Merkle_ledger.Location.T
+  module Location : Merkle_ledger.Location_intf.S = Merkle_ledger.Location
 
   module Location_binable = struct
     module Arg = struct
       type t = Location.t =
-        | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+        | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
         | Account of Location.Addr.Stable.Latest.t
         | Hash of Location.Addr.Stable.Latest.t
       [@@deriving bin_io_unversioned, hash, sexp, compare]
     end
 
     type t = Arg.t =
-      | Generic of Merkle_ledger.Location.Bigstring.t
+      | Generic of Mina_stdlib.Bigstring.t
       | Account of Location.Addr.t
       | Hash of Location.Addr.t
     [@@deriving hash, sexp]
@@ -671,7 +741,6 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     module Location = Location
     module Location_binable = Location_binable
     module Kvdb = In_memory_kvdb
-    module Storage_locations = Storage_locations
   end
 
   (* underlying Merkle tree *)

@@ -28,7 +28,7 @@ let DockerPublish = ../Constants/DockerPublish.dhall
 
 let VerifyDockers = ../Command/Packages/VerifyDockers.dhall
 
-let Extensions = ../Lib/Extensions.dhall
+let Arch = ../Constants/Arch.dhall
 
 let ReleaseSpec =
       { Type =
@@ -38,29 +38,32 @@ let ReleaseSpec =
           , version : Text
           , branch : Text
           , repo : Text
+          , arch : Arch.Type
           , no_cache : Bool
           , no_debian : Bool
           , deb_codename : DebianVersions.DebVersion
           , deb_release : Text
           , deb_version : Text
           , deb_legacy_version : Text
+          , deb_suffix : Optional Text
           , deb_profile : Profiles.Type
           , deb_repo : DebianRepo.Type
           , build_flags : BuildFlags.Type
           , step_key_suffix : Text
           , docker_publish : DockerPublish.Type
           , verify : Bool
-          , if : Optional B/If
+          , if_ : Optional B/If
           }
       , default =
           { deps = [] : List Command.TaggedKey.Type
           , network = Network.Type.Berkeley
+          , arch = Arch.Type.Amd64
           , version = "\\\${MINA_DOCKER_TAG}"
           , service = Artifacts.Type.Daemon
           , branch = "\\\${BUILDKITE_BRANCH}"
           , repo = "\\\${BUILDKITE_REPO}"
           , deb_codename = DebianVersions.DebVersion.Bullseye
-          , deb_release = "\\\${MINA_DEB_RELEASE}"
+          , deb_release = "unstable"
           , deb_version = "\\\${MINA_DEB_VERSION}"
           , deb_legacy_version = "3.1.1-alpha1-compatible-14a8b92"
           , deb_profile = Profiles.Type.Devnet
@@ -71,7 +74,8 @@ let ReleaseSpec =
           , no_debian = False
           , step_key_suffix = "-docker-image"
           , verify = False
-          , if = None B/If
+          , deb_suffix = None Text
+          , if_ = None B/If
           }
       }
 
@@ -86,11 +90,14 @@ let stepLabel =
                                          spec.network} ${DebianVersions.capitalName
                                                            spec.deb_codename} ${Profiles.toSuffixUppercase
                                                                                   spec.deb_profile} ${BuildFlags.toSuffixUppercase
-                                                                                                        spec.build_flags}"
+                                                                                                        spec.build_flags} ${Arch.capitalName
+                                                                                                                              spec.arch}"
 
 let generateStep =
           \(spec : ReleaseSpec.Type)
-      ->  let exportMinaDebCmd =
+      ->  let installBuildx = "./scripts/docker/setup_buildx.sh"
+
+          let exportMinaDebCmd =
                 "export MINA_DEB_CODENAME=${DebianVersions.lowerName
                                               spec.deb_codename}"
 
@@ -101,8 +108,9 @@ let generateStep =
 
                 then  " && echo Skipping local debian repo setup "
 
-                else      " && apt update && apt install -y aptly"
-                      ++  " && ./buildkite/scripts/debian/start_local_repo.sh"
+                else      " && ./buildkite/scripts/debian/update.sh --verbose"
+                      ++  " && apt-get install aptly -y && ./buildkite/scripts/debian/start_local_repo.sh --arch ${Arch.lowerName
+                                                                                                                     spec.arch}"
 
           let maybeStopDebianRepo =
                       if spec.no_debian
@@ -111,24 +119,10 @@ let generateStep =
 
                 else  " && ./scripts/debian/aptly.sh stop"
 
-          let suffix =
-                Extensions.joinOptionals
-                  "-"
-                  [ merge
-                      { Mainnet = None Text
-                      , Devnet = None Text
-                      , Dev = None Text
-                      , Lightnet = Some
-                          "${Profiles.toSuffixLowercase spec.deb_profile}"
-                      }
-                      spec.deb_profile
-                  , merge
-                      { None = None Text
-                      , Instrumented = Some
-                          "${BuildFlags.toSuffixLowercase spec.build_flags}"
-                      }
-                      spec.build_flags
-                  ]
+          let debSuffix =
+                merge
+                  { None = "", Some = \(s : Text) -> " --deb-suffix " ++ s }
+                  spec.deb_suffix
 
           let maybeVerify =
                       if     spec.verify
@@ -143,10 +137,15 @@ let generateStep =
                             , networks = [ spec.network ]
                             , version = spec.deb_version
                             , codenames = [ spec.deb_codename ]
-                            , suffix = suffix
+                            , profile = spec.deb_profile
+                            , buildFlag = spec.build_flags
+                            , archs = [ spec.arch ]
                             }
 
                 else  ""
+
+          let pruneDockerImages =
+                "docker system prune --all --force --filter until=24h"
 
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
@@ -164,7 +163,9 @@ let generateStep =
                 ++  " --deb-build-flags ${BuildFlags.lowerName
                                             spec.build_flags}"
                 ++  " --deb-legacy-version ${spec.deb_legacy_version}"
+                ++  debSuffix
                 ++  " --repo ${spec.repo}"
+                ++  " --platform ${Arch.platform spec.arch}"
 
           let releaseDockerCmd =
                       if DockerPublish.shouldPublish
@@ -182,6 +183,7 @@ let generateStep =
                                               spec.deb_profile}"
                       ++  " --deb-build-flags ${BuildFlags.lowerName
                                                   spec.build_flags}"
+                      ++  " --platform ${Arch.platform spec.arch}"
 
                 else  " echo In order to ensure storage optimization, skipping publishing docker as this is not essential one or publishing is disabled . Docker publish setting is set to  ${DockerPublish.show
                                                                                                                                                                                                 spec.docker_publish}."
@@ -205,7 +207,11 @@ let generateStep =
                   , Stable = remoteRepoCmds
                   , Local =
                     [ Cmd.run
-                        (     exportMinaDebCmd
+                        (     installBuildx
+                          ++  " && "
+                          ++  exportMinaDebCmd
+                          ++  " && "
+                          ++  pruneDockerImages
                           ++  maybeStartDebianRepo
                           ++  " && source ./buildkite/scripts/export-git-env-vars.sh "
                           ++  " && "
@@ -227,7 +233,7 @@ let generateStep =
                 , target = Size.XLarge
                 , docker_login = Some DockerLogin::{=}
                 , depends_on = spec.deps
-                , if = spec.if
+                , if_ = spec.if_
                 }
 
 in  { generateStep = generateStep

@@ -278,9 +278,13 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
       Option.map (last_location mdb) ~f:Location.to_path_exn
   end
 
-  let get_at_index_exn mdb index =
+  let get_at_index mdb index =
     let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
-    get mdb (Location.Account addr) |> Option.value_exn
+    get mdb (Location.Account addr)
+
+  let get_at_index_exn mdb index =
+    get_at_index mdb index
+    |> Option.value_exn ~message:"Expected account at index" ~here:[%here]
 
   let all_accounts (t : t) =
     match Account_location.last_location_address t with
@@ -572,13 +576,19 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
     | Ok location ->
         Ok (`Existed, location)
 
-  let iteri t ~f =
+  let iteri_untrusted t ~f =
     match Account_location.last_location_address t with
     | None ->
         ()
     | Some last_addr ->
         Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
-        |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
+        |> Sequence.iter ~f:(fun i -> f i (get_at_index t i))
+
+  let iteri t ~f =
+    iteri_untrusted t ~f:(fun index account_opt ->
+        f index
+          (Option.value_exn ~message:"Expected account at index" ~here:[%here]
+             account_opt ) )
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue
@@ -680,4 +690,6 @@ module Make (Inputs : Intf.Inputs.DATABASE) = struct
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
+
+  let all_accounts_on_masks _ = Location.Map.empty
 end

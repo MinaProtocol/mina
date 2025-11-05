@@ -82,9 +82,11 @@ let output_block : type a. a -> a codec io -> unit =
 *)
 let f (type a) ?parent (outputs : a codec io list) make_breadcrumb =
   Async.Thread_safe.block_on_async_exn (fun () ->
-      let frontier = create_frontier () in
-      let root = Full_frontier.root frontier in
       let open Async_kernel.Deferred.Let_syntax in
+      let%bind frontier =
+        create_frontier ~epoch_ledger_backing_type:Stable_db ()
+      in
+      let root = Full_frontier.root frontier in
       let%map breadcrumb = make_breadcrumb root in
       List.iter outputs ~f:(fun output ->
           let module Enc = (val output.encoding) in

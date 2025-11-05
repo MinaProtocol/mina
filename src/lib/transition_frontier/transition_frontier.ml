@@ -7,6 +7,7 @@ open Core
 open Async_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
 include Frontier_base
 module Full_frontier = Full_frontier
 module Extensions = Extensions
@@ -26,6 +27,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 let max_catchup_chunk_length = 20
@@ -283,7 +286,9 @@ let rec load_with_max_length :
           (State_hash.With_state_hashes.state_hash
              precomputed_values.protocol_state_with_hashes )
     in
-    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    let%bind () =
+      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
+    in
     let genesis_ledger_hash =
       Precomputed_values.genesis_ledger precomputed_values
       |> Lazy.force |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
@@ -616,8 +621,8 @@ module For_tests = struct
                      )
                    ~snarked_ledger:genesis_ledger
                    ~snarked_local_state:(Mina_state.Local_state.empty ())
-                   ~expected_merkle_root:(Ledger.merkle_root genesis_ledger) )
-            )
+                   ~expected_merkle_root:(Ledger.merkle_root genesis_ledger)
+                   ~signature_kind:Testnet ) )
         in
         Breadcrumb.create ~validated_transition:genesis_transition
           ~staged_ledger:genesis_staged_ledger ~just_emitted_a_proof:false
@@ -651,13 +656,14 @@ module For_tests = struct
         Unix.mkdir root_dir ;
         Unix.mkdir frontier_dir ;
         let persistent_root =
-          Persistent_root.create ~logger ~directory:root_dir
+          Persistent_root.create ~logger ~backing_type:Stable_db
+            ~directory:root_dir
             ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
         in
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
             ~time_controller:(Block_time.Controller.basic ~logger)
-            ~directory:frontier_dir
+            ~directory:frontier_dir ~signature_kind:Testnet
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->
@@ -666,7 +672,7 @@ module For_tests = struct
               ~f:(fun instance ->
                 Persistent_frontier.Database.close instance.db ) ;
             Option.iter persistent_root.Persistent_root.Factory_type.instance
-              ~f:(fun instance -> Ledger.Db.close instance.snarked_ledger) ;
+              ~f:(fun instance -> Root_ledger.close instance.snarked_ledger) ;
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
@@ -682,8 +688,8 @@ module For_tests = struct
 
   let gen ?(logger = Logger.null ()) ~verifier ?trust_system
       ?consensus_local_state ~precomputed_values
-      ?(root_ledger_and_accounts =
-        ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
+      ?(create_root_and_accounts =
+        ( Precomputed_values.create_root precomputed_values
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb_with_protocol_states ~logger ~verifier
@@ -699,6 +705,8 @@ module For_tests = struct
       let consensus_constants = precomputed_values.consensus_constants
 
       let proof_cache_db = Proof_cache_tag.For_tests.create_db ()
+
+      let signature_kind = Mina_signature_kind.Testnet
     end in
     let open Context in
     let open Quickcheck.Generator.Let_syntax in
@@ -714,15 +722,15 @@ module For_tests = struct
         ~default:
           (Consensus.Data.Local_state.create
              ~context:(module Context)
-             ~genesis_ledger:
-               (Precomputed_values.genesis_ledger precomputed_values)
+             ~genesis_ledger:precomputed_values.genesis_ledger
              ~genesis_epoch_data:precomputed_values.genesis_epoch_data
              ~epoch_ledger_location Public_key.Compressed.Set.empty
              ~genesis_state_hash:
                (State_hash.With_state_hashes.state_hash
-                  precomputed_values.protocol_state_with_hashes ) )
+                  precomputed_values.protocol_state_with_hashes )
+             ~epoch_ledger_backing_type:Stable_db )
     in
-    let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
+    let create_root, root_ledger_accounts = create_root_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
     let%bind root, branches, protocol_states =
       let%bind root, protocol_states = gen_root_breadcrumb in
@@ -753,13 +761,12 @@ module For_tests = struct
           ~genesis_state_hash:
             (State_hash.With_state_hashes.state_hash
                precomputed_values.protocol_state_with_hashes ) ) ;
-    Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
-        let transition = Root_data.Limited.transition root_data in
-        Persistent_root.Instance.set_root_state_hash instance
-          (Mina_block.Validated.state_hash transition) ;
-        ignore
-        @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
-             ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Persistent_root.reset_factory_root_exn persistent_root ~create_root
+          ~setup:(fun instance ->
+            let transition = Root_data.Limited.transition root_data in
+            Persistent_root.Instance.set_root_state_hash instance
+              (Mina_block.Validated.state_hash transition) ) ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false
@@ -796,21 +803,21 @@ module For_tests = struct
 
   let gen_with_branch ?logger ~verifier ?trust_system ?consensus_local_state
       ~precomputed_values
-      ?(root_ledger_and_accounts =
-        ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
+      ?(create_root_and_accounts =
+        ( Precomputed_values.create_root precomputed_values
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
       gen ?logger ~verifier ?trust_system ?consensus_local_state
-        ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
+        ~precomputed_values ?gen_root_breadcrumb ~create_root_and_accounts
         ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ~precomputed_values ~verifier
         ?trust_system
-        ~accounts_with_secret_keys:(snd root_ledger_and_accounts)
+        ~accounts_with_secret_keys:(snd create_root_and_accounts)
         branch_size
     in
     let branch =

@@ -25,8 +25,7 @@ let network = Network.Type.Berkeley
 let dirtyWhen =
       [ S.strictlyStart (S.contains "src")
       , S.exactly "buildkite/src/Jobs/Test/RosettaIntegrationTests" "dhall"
-      , S.exactly "buildkite/scripts/rosetta-integration-tests" "sh"
-      , S.exactly "buildkite/scripts/rosetta-integration-tests-fast" "sh"
+      , S.exactly "buildkite/scripts/tests/rosetta-integration-tests" "sh"
       , S.exactly "dockerfiles/Dockerfile-mina-rosetta" ""
       ]
 
@@ -44,6 +43,7 @@ in  Pipeline.build
           [ PipelineTag.Type.Long
           , PipelineTag.Type.Test
           , PipelineTag.Type.Stable
+          , PipelineTag.Type.Rosetta
           ]
         }
       , steps =
@@ -54,12 +54,14 @@ in  Pipeline.build
                   "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
-                  "./src/test/archive/sample_db/archive_db.sql"
+                  ( RunWithPostgres.ScriptOrArchive.Script
+                      "./src/test/archive/sample_db/archive_db.sql"
+                  )
                   rosettaDocker
                   "./buildkite/scripts/rosetta-indexer-test.sh"
               , Cmd.runInDocker
                   Cmd.Docker::{ image = rosettaDocker }
-                  "buildkite/scripts/rosetta-integration-tests-fast.sh"
+                  "buildkite/scripts/tests/rosetta-integration-tests.sh"
               ]
             , label = "Rosetta integration tests Bullseye"
             , key = "rosetta-integration-tests-bullseye"

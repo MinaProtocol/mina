@@ -8,6 +8,8 @@ let Optional/map = Prelude.Optional.map
 
 let Optional/default = Prelude.Optional.default
 
+let List/map = Prelude.List.map
+
 let Artifacts = ../../Constants/Artifacts.dhall
 
 let Size = ../../Command/Size.dhall
@@ -33,6 +35,8 @@ let Cmd = ../../Lib/Cmds.dhall
 let Mina = ../Mina.dhall
 
 let Artifact = ../../Constants/Artifacts.dhall
+
+let Architecture = ../../Constants/Arch.dhall
 
 let Spec =
       { Type =
@@ -67,6 +71,8 @@ let Spec =
           , publish_to_docker_io : Bool
           , depends_on : List Command.TaggedKey.Type
           , branch : Text
+          , architectures : List Architecture.Type
+          , if_ : Optional Text
           }
       , default =
           { artifacts = [] : List Package.Type
@@ -82,6 +88,8 @@ let Spec =
           , publish_to_docker_io = False
           , verify = True
           , branch = ""
+          , architectures = [ Architecture.Type.Amd64, Architecture.Type.Arm64 ]
+          , if_ = None Text
           }
       }
 
@@ -143,6 +151,18 @@ let publish
 
           let indexedAdditionalTags = Prelude.List.indexed Text additional_tags
 
+          let architectures =
+                join
+                  ","
+                  ( List/map
+                      Architecture.Type
+                      Text
+                      (     \(architecture : Architecture.Type)
+                        ->  Architecture.lowerName architecture
+                      )
+                      spec.architectures
+                  )
+
           let signedArg =
                       if DebianRepo.isSigned spec.debian_repo
 
@@ -150,57 +170,64 @@ let publish
 
                 else  ""
 
+          let commands =
+                  [ Cmd.runInDocker
+                      Cmd.Docker::{
+                      , image = ContainerImages.minaToolchain
+                      , extraEnv =
+                        [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
+                      , privileged = True
+                      , useRoot = True
+                      }
+                      (     "git config --global --add safe.directory /workdir && "
+                        ++  ". ./buildkite/scripts/export-git-env-vars.sh && "
+                        ++  " gpg --import /var/secrets/debian/key.gpg && "
+                        ++  " mkdir -p ./cache && "
+                        ++  "DEBIAN_CACHE_FOLDER=/workdir/cache ./buildkite/scripts/release/manager.sh publish "
+                        ++  "--artifacts ${artifacts} "
+                        ++  "--networks ${networks} "
+                        ++  "--buildkite-build-id ${spec.build_id} "
+                        ++  "--backend ${spec.backend} "
+                        ++  "--channel ${DebianChannel.lowerName spec.channel} "
+                        ++  "--source-version ${spec.source_version} "
+                        ++  "--target-version ${target_version} "
+                        ++  "--codenames ${codenames} "
+                        ++  "--debian-repo ${DebianRepo.bucket_or_default
+                                               spec.debian_repo} "
+                        ++  "--only-debians "
+                        ++  "--archs ${architectures} "
+                        ++  "--profile ${Profiles.lowerName spec.profile} "
+                        ++  "${keyArg}"
+                      )
+                  ]
+                # [ Cmd.run
+                      (     ". ./buildkite/scripts/export-git-env-vars.sh && "
+                        ++  "./buildkite/scripts/release/manager.sh verify "
+                        ++  "--artifacts ${artifacts} "
+                        ++  "--networks ${networks} "
+                        ++  "--channel ${DebianChannel.lowerName spec.channel} "
+                        ++  "--version ${target_version} "
+                        ++  "--codenames ${codenames} "
+                        ++  "--debian-repo ${DebianRepo.bucket_or_default
+                                               spec.debian_repo} "
+                        ++  "--profile ${Profiles.lowerName spec.profile} "
+                        ++  "--only-debians "
+                        ++  "--archs ${architectures} "
+                        ++  "${signedArg}"
+                      )
+                  ]
+
           in    [ Command.build
                     Command.Config::{
-                    , commands =
-                          [ Mina.fixPermissionsCommand ]
-                        # [ Cmd.runInDocker
-                              Cmd.Docker::{
-                              , image = ContainerImages.minaToolchain
-                              , extraEnv =
-                                [ "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY" ]
-                              , privileged = True
-                              , useRoot = True
-                              }
-                              (     "git config --global --add safe.directory /workdir && "
-                                ++  ". ./buildkite/scripts/export-git-env-vars.sh && "
-                                ++  " gpg --import /var/secrets/debian/key.gpg && "
-                                ++  " mkdir -p ./cache && "
-                                ++  "DEBIAN_CACHE_FOLDER=/workdir/cache ./buildkite/scripts/release/manager.sh publish "
-                                ++  "--artifacts ${artifacts} "
-                                ++  "--networks ${networks} "
-                                ++  "--buildkite-build-id ${spec.build_id} "
-                                ++  "--backend ${spec.backend} "
-                                ++  "--channel ${DebianChannel.lowerName
-                                                   spec.channel} "
-                                ++  "--source-version ${spec.source_version} "
-                                ++  "--target-version ${target_version} "
-                                ++  "--codenames ${codenames} "
-                                ++  "--debian-repo ${DebianRepo.bucket_or_default
-                                                       spec.debian_repo} "
-                                ++  "--only-debians "
-                                ++  "${keyArg}"
-                              )
-                          ]
-                        # [ Cmd.run
-                              (     ". ./buildkite/scripts/export-git-env-vars.sh && "
-                                ++  "./buildkite/scripts/release/manager.sh verify "
-                                ++  "--artifacts ${artifacts} "
-                                ++  "--networks ${networks} "
-                                ++  "--channel ${DebianChannel.lowerName
-                                                   spec.channel} "
-                                ++  "--version ${target_version} "
-                                ++  "--codenames ${codenames} "
-                                ++  "--debian-repo ${DebianRepo.bucket_or_default
-                                                       spec.debian_repo} "
-                                ++  "--only-debians "
-                                ++  "${signedArg}"
-                              )
-                          ]
+                    , commands = [ Mina.fixPermissionsCommand ] # commands
                     , label = "Debian Packages Publishing"
-                    , key = "publish-debians"
+                    , key =
+                        "publish-debians-${DebianChannel.lowerName
+                                             spec.channel}-${Profiles.lowerName
+                                                               spec.profile}"
                     , target = Size.Small
                     , depends_on = spec.depends_on
+                    , if_ = spec.if_
                     }
                 ]
               # Prelude.List.map
@@ -224,12 +251,18 @@ let publish
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
+                                  ++  "--force-upload-debians "
                                 )
                             ]
                           , label = "Docker Packages Publishing"
-                          , key = "publish-dockers-${Natural/show r.index}"
+                          , key =
+                              "publish-dockers-${DebianChannel.lowerName
+                                                   spec.channel}-${Profiles.lowerName
+                                                                     spec.profile}-${Natural/show
+                                                                                       r.index}"
                           , target = Size.Small
                           , depends_on = spec.depends_on
+                          , if_ = spec.if_
                           }
                   )
                   indexedAdditionalTags

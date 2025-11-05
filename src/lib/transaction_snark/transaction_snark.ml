@@ -3370,6 +3370,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   module type S = sig
     include Verification.S
 
+    val signature_kind : Mina_signature_kind.t
+
     val constraint_constants : Genesis_constants.Constraint_constants.t
 
     val cache_handle : Pickles.Cache_handle.t
@@ -3973,6 +3975,8 @@ module Make_str (A : Wire_types.Concrete) = struct
   end) =
   struct
     open Inputs
+
+    let signature_kind = signature_kind
 
     let constraint_constants = constraint_constants
 
@@ -4628,8 +4632,7 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     let deploy_snapp ?(no_auth = false) ?permissions ~constraint_constants
-        (spec : Deploy_snapp_spec.t) =
-      let signature_kind = Mina_signature_kind.Testnet in
+        ~signature_kind (spec : Deploy_snapp_spec.t) =
       let `VK vk, `Prover _trivial_prover = create_trivial_snapp () in
       let%map.Async.Deferred vk = vk in
       (* only allow timing on a single new snapp account
@@ -4750,9 +4753,8 @@ module Make_str (A : Wire_types.Concrete) = struct
     end
 
     let single_account_update ?zkapp_prover_and_vk ~constraint_constants
-        (spec : Single_account_update_spec.t) : Zkapp_command.t Async.Deferred.t
-        =
-      let signature_kind = Mina_signature_kind.Testnet in
+        ~signature_kind (spec : Single_account_update_spec.t) :
+        Zkapp_command.t Async.Deferred.t =
       let `VK vk, `Prover prover =
         match zkapp_prover_and_vk with
         | Some (prover, vk) ->

@@ -1,3 +1,12 @@
+(** Testing
+    -------
+
+    Component: Zkapps_examples
+    Subject: Test zkapp big circuit
+    Invocation: \
+     dune exec src/app/zkapps_examples/test/big_circuit/big_circuit.exe
+*)
+
 open Transaction_snark_tests.Util
 open Core_kernel
 open Mina_base
@@ -133,7 +142,7 @@ let zkapp_command : Zkapp_command.t =
     ; memo
     }
 
-let () =
+let test_big_circuit () =
   Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
       let (_ : _) =
         Ledger.get_or_create_account ledger account_id
@@ -145,3 +154,8 @@ let () =
 
       Async.Thread_safe.block_on_async_exn (fun _ ->
           check_zkapp_command_with_merges_exn ledger [ zkapp_command ] ) )
+
+let () =
+  let open Alcotest in
+  run "Big circuit test"
+    [ ("big_circuit", [ test_case "Big_circuit" `Quick test_big_circuit ]) ]

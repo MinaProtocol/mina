@@ -20,8 +20,7 @@ val with_batch : t -> f:(batch_t -> 'a) -> 'a
 
 module Error : sig
   type not_found_member =
-    [ `Root
-    | `Root_hash
+    [ `Root_hash
     | `Root_common
     | `Best_tip
     | `Frontier_hash
@@ -58,10 +57,11 @@ val check :
        | `Genesis_state_mismatch of State_hash.t
        | `Corrupt of
          [> `Not_found of
-            [> `Best_tip
+            [> `Root_hash
+            | `Root_common
+            | `Best_tip
             | `Best_tip_transition
             | `Frontier_hash
-            | `Root
             | `Root_transition
             | `Transition of State_hash.t
             | `Arcs of State_hash.t
@@ -93,7 +93,8 @@ val move_root :
   -> unit
 
 val get_transition :
-     proof_cache_db:Proof_cache_tag.cache_db
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> t
   -> State_hash.t
   -> ( Mina_block.Validated.t
@@ -107,7 +108,9 @@ val get_arcs :
 
 val get_root :
      t
-  -> (Root_data.Minimal.Stable.Latest.t, [> `Not_found of [> `Root ] ]) Result.t
+  -> ( Root_data.Minimal.Stable.Latest.t
+     , [> `Not_found of [> `Root_hash | `Root_common ] ] )
+     Result.t
 
 val get_protocol_states_for_root_scan_state :
      t
@@ -115,7 +118,8 @@ val get_protocol_states_for_root_scan_state :
      , [> `Not_found of [> `Protocol_states_for_root_scan_state ] ] )
      Result.t
 
-val get_root_hash : t -> (State_hash.t, [> `Not_found of [> `Root ] ]) Result.t
+val get_root_hash :
+  t -> (State_hash.t, [> `Not_found of [> `Root_hash ] ]) Result.t
 
 val get_best_tip :
   t -> (State_hash.t, [> `Not_found of [> `Best_tip ] ]) Result.t
@@ -123,7 +127,8 @@ val get_best_tip :
 val set_best_tip : State_hash.t -> batch_t -> unit
 
 val crawl_successors :
-     proof_cache_db:Proof_cache_tag.cache_db
+     signature_kind:Mina_signature_kind.t
+  -> proof_cache_db:Proof_cache_tag.cache_db
   -> t
   -> State_hash.t
   -> init:'a

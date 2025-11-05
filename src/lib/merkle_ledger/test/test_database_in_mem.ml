@@ -11,19 +11,19 @@ open Core
 open Test_stubs
 module Intf = Merkle_ledger.Intf
 module Database = Merkle_ledger.Database
-module Location = Merkle_ledger.Location.T
+module Location = Merkle_ledger.Location
 
 module Location_binable = struct
   module Arg = struct
     type t = Location.t =
-      | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+      | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
       | Account of Location.Addr.Stable.Latest.t
       | Hash of Location.Addr.Stable.Latest.t
     [@@deriving bin_io_unversioned, hash, sexp, compare]
   end
 
   type t = Arg.t =
-    | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+    | Generic of Mina_stdlib.Bigstring.Stable.Latest.t
     | Account of Location.Addr.Stable.Latest.t
     | Hash of Location.Addr.Stable.Latest.t
   [@@deriving hash, sexp, compare]
@@ -57,7 +57,6 @@ struct
   module Addr = Location.Addr
   module Location_binable = Location_binable
   module Kvdb = In_memory_kvdb
-  module Storage_locations = Storage_locations
 end
 
 module type Test_intf = sig

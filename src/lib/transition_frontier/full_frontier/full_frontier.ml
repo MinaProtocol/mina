@@ -1,6 +1,7 @@
 open Core_kernel
 open Mina_base
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
 open Mina_state
 open Frontier_base
 
@@ -457,23 +458,23 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     (* we need to perform steps 4-7 iff there was a proof emitted in the scan
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
-      let location =
-        Persistent_root.Locations.potential_snarked_ledger
-          t.persistent_root_instance.factory.directory
+      let config =
+        Persistent_root.Instance.Config.make_potential_snarked_ledger
+          t.persistent_root_instance.factory
       in
       let () =
-        Ledger.Db.make_checkpoint t.persistent_root_instance.snarked_ledger
-          ~directory_name:location
+        Root_ledger.make_checkpoint t.persistent_root_instance.snarked_ledger
+          ~config
       in
       [%log' info t.logger]
         ~metadata:
           [ ( "potential_snarked_ledger_hash"
             , Frozen_ledger_hash.to_yojson @@ Frozen_ledger_hash.of_ledger_hash
-              @@ Ledger.Db.merkle_root t.persistent_root_instance.snarked_ledger
-            )
+              @@ Root_ledger.merkle_root
+                   t.persistent_root_instance.snarked_ledger )
           ]
         "Enqueued a snarked ledger" ;
-      Persistent_root.Instance.enqueue_snarked_ledger ~location
+      Persistent_root.Instance.enqueue_snarked_ledger ~config
         t.persistent_root_instance ;
       let s = t.root_ledger in
       (* STEP 4 *)
@@ -508,12 +509,11 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
               (State_hash.to_base58_check state_hash)
       in
       Or_error.ok_exn
-        ( Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
-            ~get_protocol_state ~apply_first_pass ~apply_second_pass
-            ~apply_first_pass_sparse_ledger
-            (Staged_ledger.scan_state
-               (Breadcrumb.staged_ledger new_root_node.breadcrumb) )
-          : unit Or_error.t ) ;
+        (Staged_ledger.Scan_state.get_snarked_ledger_sync ~ledger:mt
+           ~get_protocol_state ~apply_first_pass ~apply_second_pass
+           ~apply_first_pass_sparse_ledger ~signature_kind
+           (Staged_ledger.scan_state
+              (Breadcrumb.staged_ledger new_root_node.breadcrumb) ) ) ;
       (*Check that the new snarked ledger is as expected*)
       let new_snarked_ledger_hash = Ledger.merkle_root mt in
       let expected_snarked_ledger_hash =
@@ -880,34 +880,30 @@ let apply_diffs ({ context = (module Context); _ } as t) diffs
           `Disabled ) )
     && not has_long_catchup_job
   then
-    Debug_assert.debug_assert (fun () ->
-        match
-          Consensus.Hooks.required_local_state_sync
-            ~constants:consensus_constants
-            ~consensus_state:
-              (Breadcrumb.consensus_state
-                 (Hashtbl.find_exn t.table t.best_tip).breadcrumb )
-            ~local_state:t.consensus_local_state
-        with
-        | Some jobs ->
-            (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
-            if local_state_was_synced_at_start then (
-              [%log' fatal t.logger]
-                "after lock transition, the best tip consensus state is out of \
-                 sync with the local state -- bug in either \
-                 required_local_state_sync or frontier_root_transition."
-                ~metadata:
-                  [ ( "sync_jobs"
-                    , Consensus.Hooks.local_state_sync_to_yojson jobs )
-                  ; ( "local_state"
-                    , Consensus.Data.Local_state.to_yojson
-                        t.consensus_local_state )
-                  ; ("tf_viz", `String (visualize_to_string t))
-                  ] ;
-              failwith
-                "local state desynced after applying diffs to full frontier" )
-        | None ->
-            () ) ;
+    assert (
+      match
+        Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
+          ~consensus_state:
+            (Breadcrumb.consensus_state
+               (Hashtbl.find_exn t.table t.best_tip).breadcrumb )
+          ~local_state:t.consensus_local_state
+      with
+      | Some jobs when local_state_was_synced_at_start ->
+          (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
+          [%log' fatal t.logger]
+            "after lock transition, the best tip consensus state is out of \
+             sync with the local state -- bug in either \
+             required_local_state_sync or frontier_root_transition."
+            ~metadata:
+              [ ("sync_jobs", Consensus.Hooks.local_state_sync_to_yojson jobs)
+              ; ( "local_state"
+                , Consensus.Data.Local_state.to_yojson t.consensus_local_state
+                )
+              ; ("tf_viz", `String (visualize_to_string t))
+              ] ;
+          failwith "local state desynced after applying diffs to full frontier"
+      | _ ->
+          true ) ;
   `New_root_and_diffs_with_mutants (new_root, diffs_with_mutants)
 
 module For_tests = struct
@@ -990,8 +986,9 @@ module For_tests = struct
   module Transfer =
     Mina_ledger.Ledger_transfer.Make (Mina_ledger.Ledger) (Mina_ledger.Ledger)
 
-  let create_frontier () =
+  let create_frontier ~epoch_ledger_backing_type () =
     let open Core in
+    let open Async.Deferred.Let_syntax in
     let epoch_ledger_location =
       Filename.temp_dir_name ^/ "epoch_ledger"
       ^ (Uuid_unix.create () |> Uuid.to_string)
@@ -999,12 +996,14 @@ module For_tests = struct
     let consensus_local_state =
       Consensus.Data.Local_state.create
         ~context:(module Context)
-        Public_key.Compressed.Set.empty ~genesis_ledger:Genesis_ledger.t
+        Public_key.Compressed.Set.empty
+        ~genesis_ledger:(module Genesis_ledger)
         ~genesis_epoch_data:precomputed_values.genesis_epoch_data
         ~epoch_ledger_location
         ~genesis_state_hash:
           (State_hash.With_state_hashes.state_hash
              precomputed_values.protocol_state_with_hashes )
+        ~epoch_ledger_backing_type
     in
     let root_ledger =
       Or_error.ok_exn
@@ -1024,11 +1023,13 @@ module For_tests = struct
       }
     in
     let persistent_root =
-      Persistent_root.create ~logger
+      Persistent_root.create ~logger ~backing_type:Stable_db
         ~directory:(Filename.temp_file "snarked_ledger" "")
         ~ledger_depth
     in
-    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+    let%map () =
+      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
+    in
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in

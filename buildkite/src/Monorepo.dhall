@@ -14,6 +14,8 @@ let JobSpec = ./Pipeline/JobSpec.dhall
 
 let Pipeline = ./Pipeline/Dsl.dhall
 
+let PipelineFilterMode = ./Pipeline/FilterMode.dhall
+
 let PipelineJobSelection = ./Pipeline/JobSelection.dhall
 
 let PipelineTagFilter = ./Pipeline/TagFilter.dhall
@@ -46,10 +48,12 @@ let prefixCommands =
 let commands
     :     PipelineJobSelection.Type
       ->  PipelineTagFilter.Type
+      ->  PipelineFilterMode.Type
       ->  PipelineScopeFilter.Type
       ->  List Cmd.Type
     =     \(selection : PipelineJobSelection.Type)
       ->  \(filter : PipelineTagFilter.Type)
+      ->  \(filterMode : PipelineFilterMode.Type)
       ->  \(scope : PipelineScopeFilter.Type)
       ->  List/map
             JobSpec.Type
@@ -61,7 +65,7 @@ let commands
 
                   let isIncludedInTag =
                         Prelude.Bool.show
-                          (PipelineTag.contains job.tags targetTags)
+                          (PipelineTag.contains targetTags job.tags filterMode)
 
                   let targetScopes = PipelineScopeFilter.tags scope
 
@@ -112,6 +116,7 @@ in      \ ( args
           : { selection : PipelineJobSelection.Type
             , tagFilter : PipelineTagFilter.Type
             , scopeFilter : PipelineScopeFilter.Type
+            , filterMode : PipelineFilterMode.Type
             }
           )
     ->  let pipelineType =
@@ -133,17 +138,14 @@ in      \ ( args
                           # commands
                               args.selection
                               args.tagFilter
+                              args.filterMode
                               args.scopeFilter
                       , label =
                           "Monorepo triage ${PipelineTagFilter.show
                                                args.tagFilter} ${PipelineScopeFilter.show
                                                                    args.scopeFilter} ${PipelineJobSelection.capitalName
                                                                                          args.selection}"
-                      , key =
-                          "cmds-${PipelineTagFilter.show
-                                    args.tagFilter}-${PipelineScopeFilter.show
-                                                        args.scopeFilter}-${PipelineJobSelection.capitalName
-                                                                              args.selection}"
+                      , key = "cmds"
                       , target = Size.Multi
                       , docker = Some Docker::{
                         , image =

@@ -1139,7 +1139,6 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
     ~genesis_constants
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) () :
     Zkapp_command.t Quickcheck.Generator.t =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Quickcheck.Let_syntax in
   let fee_payer_pk =
     Signature_lib.Public_key.compress fee_payer_keypair.public_key
@@ -1543,14 +1542,16 @@ let gen_zkapp_command_from ?global_slot ?memo ?(no_account_precondition = false)
         Signed_command_memo.gen
   in
   let zkapp_command =
-    Zkapp_command.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
+    Zkapp_command.write_all_proofs_to_disk ~signature_kind:Testnet
+      ~proof_cache_db
       { Zkapp_command.Poly.fee_payer; account_updates; memo }
   in
   (* update receipt chain hashes in accounts table *)
   let receipt_elt =
     let _txn_commitment, full_txn_commitment =
       (* also computed in replace_authorizations, but easier just to re-compute here *)
-      Zkapp_command.get_transaction_commitments ~signature_kind zkapp_command
+      Zkapp_command.get_transaction_commitments ~signature_kind:Testnet
+        zkapp_command
     in
     Receipt.Zkapp_command_elt.Zkapp_command_commitment full_txn_commitment
   in
@@ -1679,7 +1680,6 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
     ~(fee_payer_keypair : Signature_lib.Keypair.t)
     ~(account_state_tbl : (Account.t * role) Account_id.Table.t) ~vk
     ~(genesis_constants : Genesis_constants.t) () =
-  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   let open Quickcheck.Generator.Let_syntax in
   let%bind memo =
     match memo with
@@ -1739,7 +1739,7 @@ let gen_max_cost_zkapp_command_from ?memo ?fee_range
         None
     | Some (a, role) ->
         Some ({ a with nonce = Account.Nonce.succ a.nonce }, role) ) ;
-  Zkapp_command.of_simple ~signature_kind ~proof_cache_db
+  Zkapp_command.of_simple ~signature_kind:Testnet ~proof_cache_db
     { fee_payer; account_updates; memo }
 
 let%test_module _ =

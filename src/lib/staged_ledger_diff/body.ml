@@ -55,9 +55,9 @@ let compute_reference ~tag =
        (Bitswap_block.blocks_of_data ~max_block_size:262144)
        (serialize_with_len_and_tag ~tag)
 
-let write_all_proofs_to_disk ~proof_cache_db t =
+let write_all_proofs_to_disk ~signature_kind ~proof_cache_db t =
   { staged_ledger_diff =
-      Diff.write_all_proofs_to_disk ~proof_cache_db
+      Diff.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
         t.Stable.Latest.staged_ledger_diff
   }
 

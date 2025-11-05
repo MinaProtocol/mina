@@ -28,35 +28,38 @@ check_required jq
 function start_aptly() {
     local __distribution=$1
     local __debs=$2
-    local __background=$3
-    local __clean=$4
-    local __component=$5
+    local __archs=$3
+    local __background=$4
+    local __clean=$5
+    local __component=$6
     local __repo="${__distribution}"-"${__component}"
-    local __port=$6
-    local __wait=$7
+    local __port=$7
+    local __wait=$8
 
     if [ "${__clean}" = 1 ]; then
         rm -rf ~/.aptly
     fi
 
-    aptly repo create -component "${__component}" -distribution "${__distribution}"  "${__repo}"
+    aptly repo list | grep -q "^${__repo}$" && aptly repo drop "${__repo}" || true
 
-    aptly repo add "${__repo}" "${__debs}"
+    aptly repo create -component "${__component}" -distribution "${__distribution}" -architectures "${__archs}" "${__repo}"
 
-    aptly snapshot create "${__component}" from repo "${__repo}"
+    aptly repo add -architectures "${__archs}" "${__repo}" "${__debs}"
 
-    aptly publish snapshot -distribution="${__distribution}" -skip-signing "${__component}"
+    aptly snapshot create -architectures "${__archs}" "${__component}" from repo "${__repo}"
+
+    aptly publish snapshot -architectures "${__archs}" -distribution "${__distribution}" -skip-signing "${__component}"
 
     if [ "${__background}" = 1 ]; then
-        aptly serve -listen localhost:"${__port}" &
+        aptly serve -listen 0.0.0.0:"${__port}" &
     else
-        aptly serve -listen localhost:"${__port}"
+        aptly serve -listen 0.0.0.0:"${__port}"
     fi
 
     if [ $__wait = 1 ]; then
         local __timeout=300
         local __elapsed=0
-        while ! curl -s "http://localhost:$__port" >/dev/null; do
+        while ! curl -s "http://0.0.0.0:$__port" >/dev/null; do
             sleep 1
             __elapsed=$((__elapsed + 1))
             if [ $__elapsed -ge $__timeout ]; then
@@ -101,6 +104,7 @@ function start(){
     local __background=0
     local __clean=0
     local __component="unstable"
+    local __archs="amd64"
     local __port=$PORT
     local __wait=0
     
@@ -127,6 +131,10 @@ function start(){
                 __debs=${2:?$error_message}
                 shift 2;
             ;;
+            -a | --archs )
+                __archs=${2:?$error_message}
+                shift 2;
+            ;;
             -m | --component )
                 __component=${2:?$error_message}
                 shift 2;
@@ -149,6 +157,7 @@ function start(){
     
     start_aptly $__distribution \
         $__debs \
+        $__archs \
         $__background \
         $__clean \
         $__component \

@@ -146,3 +146,17 @@ let work_selection_method_to_module :
       (module Work_selector.Selection_methods.Random)
   | Random_offset ->
       (module Work_selector.Selection_methods.Random_offset)
+
+module Hardfork_handling = struct
+  type t = Keep_running | Migrate_exit
+
+  let of_string = function
+    | "keep-running" ->
+        Keep_running
+    | "migrate-exit" ->
+        Migrate_exit
+    | _ ->
+        failwith "Invalid hardfork handling"
+
+  let arg = Command.Arg_type.map Command.Param.string ~f:of_string
+end

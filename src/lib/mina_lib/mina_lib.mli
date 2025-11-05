@@ -1,3 +1,9 @@
+(**
+  Mina_lib contains the core logic of the Mina protocol, including the
+  ledger, consensus, SNARK workers, networking, and state management. It
+  provides the foundational components used by Mina_run, CLI tools, and
+  other services to operate a Mina node. *)
+
 open Async_kernel
 open Core
 open Mina_base
@@ -8,6 +14,7 @@ module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Mina_subscriptions
+module Root_ledger = Mina_ledger.Root
 
 type t
 
@@ -46,6 +53,8 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 exception Snark_worker_error of int
@@ -89,6 +98,10 @@ val current_epoch_delegators :
 val last_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
 
+(** [replace_snark_worker_key t key_opt] Replace all SNARK worker's key
+    associated with current coordinator.
+    - If the new key is [None], SNARK worker will be turned off if it's running;
+    - If the new key is [Some k], SNARK worker will be turn on if it's not running. *)
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t
 
@@ -107,11 +120,19 @@ val snark_work_fee : t -> Currency.Fee.t
 
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
-val request_work : t -> Work_selector.work Snark_work_lib.Work.Spec.t option
+val request_work :
+     t
+  -> ( Snark_work_lib.Spec.Partitioned.Stable.Latest.t
+     , Work_partitioner.Snark_worker_shared.Failed_to_generate_inputs.t )
+     Result.t
+     option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_work_lib.Selector.Result.Stable.Latest.t -> unit
+val add_work :
+     t
+  -> Snark_work_lib.Result.Partitioned.Stable.Latest.t
+  -> [> `Ok | `Removed | `SpecUnmatched ]
 
 val add_work_graphql :
      t
@@ -121,7 +142,7 @@ val add_work_graphql :
      * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
      Deferred.Or_error.t
 
-val snark_job_state : t -> Work_selector.State.t
+val work_selector : t -> Work_selector.State.t
 
 val get_current_nonce :
      t
@@ -252,11 +273,84 @@ val genesis_ledger : t -> Mina_ledger.Ledger.t Lazy.t
 val vrf_evaluation_state : t -> Block_producer.Vrf_evaluation_state.t
 
 val best_chain_block_by_height :
-  t -> Unsigned.UInt32.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+  t -> Unsigned.UInt32.t -> Transition_frontier.Breadcrumb.t Or_error.t
 
 val best_chain_block_by_state_hash :
-  t -> State_hash.t -> (Transition_frontier.Breadcrumb.t, string) Result.t
+  t -> State_hash.t -> Transition_frontier.Breadcrumb.t Or_error.t
+
+module Hardfork_config : sig
+  type mina_lib = t
+
+  type breadcrumb_spec =
+    [ `Stop_slot
+    | `State_hash of State_hash.t
+    | `Block_height of Unsigned.UInt32.t ]
+
+  val breadcrumb :
+       breadcrumb_spec:breadcrumb_spec
+    -> mina_lib
+    -> Transition_frontier.Breadcrumb.t Deferred.Or_error.t
+
+  (** The ledgers that will be used to compute the hard fork genesis ledgers.
+      Note that a [Mina_ledger.Ledger.t] here, like the [staged_ledger] or
+      (potentially) the [next_epoch_ledger], must have the [root_snarked_ledger]
+      as its root. *)
+  type genesis_source_ledgers =
+    { root_snarked_ledger : Root_ledger.t
+    ; staged_ledger : Mina_ledger.Ledger.t
+    ; staking_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t | `Root of Root_ledger.t ]
+    ; next_epoch_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Root_ledger.t
+        | `Uncommitted of Mina_ledger.Ledger.t ]
+    }
+
+  val genesis_source_ledger_cast :
+       [< `Genesis of Genesis_ledger.Packed.t
+       | `Root of Root_ledger.t
+       | `Uncommitted of Mina_ledger.Ledger.t ]
+    -> Mina_ledger.Ledger.Any_ledger.witness
+
+  (** Retrieve the [genesis_source_ledgers] from the transition frontier,
+      starting at the given [breadcrumb]. *)
+  val source_ledgers :
+       breadcrumb:Transition_frontier.Breadcrumb.t
+    -> mina_lib
+    -> genesis_source_ledgers Deferred.Or_error.t
+
+  type inputs =
+    { source_ledgers : genesis_source_ledgers
+    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; genesis_state_timestamp : string
+    ; state_hash : State_hash.t
+    ; staking_epoch_seed : Epoch_seed.t
+    ; next_epoch_seed : Epoch_seed.t
+    ; blockchain_length : Mina_numbers.Length.t
+    }
+
+  val prepare_inputs :
+    breadcrumb_spec:breadcrumb_spec -> mina_lib -> inputs Deferred.Or_error.t
+
+  (** Compute a full hard fork config (genesis ledger, genesis epoch ledgers,
+      and node config) both without hard fork ledger migrations applied (the
+      "legacy" format, compatible with the current daemon) and with the hard
+      fork ledger migrations applied (the actual hard fork format, compatible
+      with a hard fork daemon). The legacy format config will be saved in
+      [daemon.legacy.json] and [genesis_legacy/] in [directory_name], and the
+      hard fork format files will be saved in [daemon.json] and [genesis/] in
+      that same directory. An empty [activated] file will be created in
+      [directory_name] at the very end of this process to indicate that the
+      config was generated successfully. *)
+  val dump_reference_config :
+       breadcrumb_spec:breadcrumb_spec
+    -> directory_name:string
+    -> mina_lib
+    -> unit Deferred.Or_error.t
+end
 
 val zkapp_cmd_limit : t -> int option ref
 
 val proof_cache_db : t -> Proof_cache_tag.cache_db
+
+val signature_kind : t -> Mina_signature_kind.t

@@ -5,6 +5,7 @@ open Mina_state
 open Mina_block
 open Frontier_base
 module Database = Database
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -16,13 +17,16 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 exception Invalid_genesis_state_hash of Mina_block.Validated.t
 
 let construct_staged_ledger_at_root ~proof_cache_db
     ~(precomputed_values : Precomputed_values.t) ~root_ledger ~root_transition
-    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger =
+    ~(root : Root_data.Minimal.Stable.Latest.t) ~protocol_states ~logger
+    ~signature_kind =
   let open Deferred.Or_error.Let_syntax in
   let blockchain_state =
     root_transition |> Mina_block.Validated.forget |> With_hash.data
@@ -53,14 +57,14 @@ let construct_staged_ledger_at_root ~proof_cache_db
     | Some protocol_state ->
         Ok protocol_state
   in
-  let mask = Mina_ledger.Ledger.of_database root_ledger in
+  let mask = Root_ledger.as_masked root_ledger in
   let local_state = Blockchain_state.snarked_local_state blockchain_state in
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
   in
   let scan_state =
-    Staged_ledger.Scan_state.write_all_proofs_to_disk ~proof_cache_db
-      scan_state_unwrapped
+    Staged_ledger.Scan_state.write_all_proofs_to_disk ~signature_kind
+      ~proof_cache_db scan_state_unwrapped
   in
   let%bind staged_ledger =
     Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger_unchecked
@@ -68,7 +72,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
       ~constraint_constants:precomputed_values.constraint_constants ~logger
       ~pending_coinbases
       ~expected_merkle_root:(Staged_ledger_hash.ledger_hash staged_ledger_hash)
-      ~get_state
+      ~get_state ~signature_kind
   in
   let constructed_staged_ledger_hash = Staged_ledger.hash staged_ledger in
   if
@@ -96,6 +100,7 @@ and Factory_type : sig
     ; directory : string
     ; verifier : Verifier.t
     ; time_controller : Block_time.Controller.t
+    ; signature_kind : Mina_signature_kind.t
     ; mutable instance : Instance_type.t option
     }
 end =
@@ -164,10 +169,10 @@ module Instance = struct
 
   let check_database t = Database.check t.db
 
-  let get_root_transition ~proof_cache_db t =
+  let get_root_transition ~signature_kind ~proof_cache_db t =
     let open Result.Let_syntax in
     Database.get_root_hash t.db
-    >>= Database.get_transition t.db ~proof_cache_db
+    >>= Database.get_transition t.db ~signature_kind ~proof_cache_db
     |> Result.map_error ~f:Database.Error.message
 
   let fast_forward t target_root :
@@ -222,7 +227,7 @@ module Instance = struct
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.Stable.Latest.hash root in
       let%bind root_transition =
-        Database.get_transition t.db ~proof_cache_db root_hash
+        Database.get_transition t.db ~signature_kind ~proof_cache_db root_hash
       in
       let%bind best_tip = Database.get_best_tip t.db in
       let%map protocol_states =
@@ -244,7 +249,7 @@ module Instance = struct
       match%map
         construct_staged_ledger_at_root ~proof_cache_db ~precomputed_values
           ~root_ledger ~root_transition ~root ~protocol_states
-          ~logger:t.factory.logger
+          ~signature_kind:t.factory.signature_kind ~logger:t.factory.logger
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))
@@ -263,10 +268,7 @@ module Instance = struct
               List.map protocol_states
                 ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
           }
-        ~root_ledger:
-          (Mina_ledger.Ledger.Any_ledger.cast
-             (module Mina_ledger.Ledger.Db)
-             root_ledger )
+        ~root_ledger:(Root_ledger.as_unmasked root_ledger)
         ~consensus_local_state ~max_length ~persistent_root_instance
     in
     let%bind extensions =
@@ -293,8 +295,9 @@ module Instance = struct
     (* crawl through persistent frontier and load transitions into in memory frontier *)
     let%bind () =
       Deferred.map
-        (Database.crawl_successors ~proof_cache_db t.db root_hash
-           ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
+        (Database.crawl_successors ~signature_kind ~proof_cache_db t.db
+           root_hash ~init:(Full_frontier.root frontier)
+           ~f:(fun parent transition ->
              let%bind transition =
                match
                  downgrade_transition transition root_genesis_state_hash
@@ -359,8 +362,14 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~verifier ~time_controller ~directory =
-  { logger; verifier; time_controller; directory; instance = None }
+let create ~logger ~verifier ~time_controller ~directory ~signature_kind =
+  { logger
+  ; verifier
+  ; time_controller
+  ; directory
+  ; signature_kind
+  ; instance = None
+  }
 
 let destroy_database_exn t =
   assert (Option.is_none t.instance) ;
@@ -393,17 +402,19 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
   with_instance_exn t ~f:(fun instance ->
       Database.initialize instance.db ~root_data ;
       (* sanity check database after initialization on debug builds *)
-      Debug_assert.debug_assert (fun () ->
-          ignore
-            ( Database.check instance.db ~genesis_state_hash
-              |> Result.map_error ~f:(function
-                   | `Invalid_version ->
-                       "invalid version"
-                   | `Not_initialized ->
-                       "not initialized"
-                   | `Genesis_state_mismatch _ ->
-                       "genesis state mismatch"
-                   | `Corrupt err ->
-                       Database.Error.message err )
-              |> Result.ok_or_failwith
-              : Frozen_ledger_hash.t ) ) )
+      assert (
+        match Database.check instance.db ~genesis_state_hash with
+        | Ok _ ->
+            true
+        | Error reason ->
+            let string_of_reason = function
+              | `Invalid_version ->
+                  "invalid version"
+              | `Not_initialized ->
+                  "not initialized"
+              | `Genesis_state_mismatch _ ->
+                  "genesis state mismatch"
+              | `Corrupt err ->
+                  Database.Error.message err
+            in
+            failwith (string_of_reason reason) ) )

@@ -17,6 +17,7 @@ module Root_data = Root_data
 module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -28,6 +29,8 @@ module type CONTEXT = sig
   val consensus_constants : Consensus.Constants.t
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
 include Frontier_intf.S
@@ -87,7 +90,7 @@ val persistent_root : t -> Persistent_root.t
 
 val persistent_frontier : t -> Persistent_frontier.t
 
-val root_snarked_ledger : t -> Mina_ledger.Ledger.Db.t
+val root_snarked_ledger : t -> Root_ledger.t
 
 val extensions : t -> Extensions.t
 
@@ -152,8 +155,12 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:
-         Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
+    -> ?create_root_and_accounts:
+         (   config:Mina_ledger.Root.Config.t
+          -> depth:int
+          -> unit
+          -> Root_ledger.t Core_kernel.Or_error.t )
+         * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
          * Mina_state.Protocol_state.value
@@ -171,8 +178,12 @@ module For_tests : sig
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
-    -> ?root_ledger_and_accounts:
-         Mina_ledger.Ledger.t * (Private_key.t option * Account.t) list
+    -> ?create_root_and_accounts:
+         (   config:Mina_ledger.Root.Config.t
+          -> depth:int
+          -> unit
+          -> Root_ledger.t Core_kernel.Or_error.t )
+         * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:
          ( Breadcrumb.t
          * Mina_state.Protocol_state.value

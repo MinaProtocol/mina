@@ -19,14 +19,16 @@ in  { step =
                     [ "ARCHIVE_TEST_APP=mina-archive-node-test"
                     , "MINA_TEST_NETWORK_DATA=/etc/mina/test/archive/sample_db"
                     ]
-                    "src/test/archive/sample_db/archive_db.sql"
+                    ( RunWithPostgres.ScriptOrArchive.Script
+                        "src/test/archive/sample_db/archive_db.sql"
+                    )
                     ( Artifacts.fullDockerTag
                         Artifacts.Tag::{
                         , artifact = Artifacts.Type.FunctionalTestSuite
                         , buildFlags = BuildFlags.Type.Instrumented
                         }
                     )
-                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key}"
+                    "./scripts/tests/archive-node-test.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} && ls -al && ./buildkite/scripts/cache/manager.sh write archive.perf archive-node-test"
                 ]
               , label = "Archive: Node Test"
               , key = key

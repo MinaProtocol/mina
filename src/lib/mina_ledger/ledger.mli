@@ -17,6 +17,32 @@ module Db :
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
 
+module Unstable_db :
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.Unstable.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+
+module Hardfork_db :
+  Merkle_ledger.Intf.Ledger.DATABASE
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.Hardfork.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+
 module Any_ledger :
   Merkle_ledger.Intf.Ledger.ANY
     with module Location = Location
@@ -59,6 +85,40 @@ module Maskable :
      and type accumulated_t := Mask.accumulated_t
      and type t := Any_ledger.M.t
 
+module Converting_ledger :
+  Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+    with module Location = Location
+     and module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Signature_lib.Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type converted_account := Account.Hardfork.t
+     and type primary_ledger = Db.t
+     and type converting_ledger = Hardfork_db.t
+
+module Make_converting (Converting_inputs : sig
+  val convert : Account.t -> Account.Hardfork.t
+end) :
+  Merkle_ledger.Intf.Ledger.Converting.WITH_DATABASE
+    with module Location = Location
+     and module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Signature_lib.Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
+     and type converted_account := Account.Hardfork.t
+     and type primary_ledger = Db.t
+     and type converting_ledger = Hardfork_db.t
+
 include
   Merkle_mask.Maskable_merkle_tree_intf.S
     with module Location := Location
@@ -98,6 +158,8 @@ val create : ?directory_name:string -> depth:int -> unit -> t
 val create_ephemeral : depth:int -> unit -> t
 
 val of_database : Db.t -> t
+
+val of_any_ledger : Any_ledger.witness -> t
 
 (** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
 val copy : t -> t

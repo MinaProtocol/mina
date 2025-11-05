@@ -57,7 +57,7 @@ let tests : test list =
     , (module Chain_reliability_test.Make : Intf.Test.Functor_intf) )
   ; ("epoch-ledger", (module Epoch_ledger.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
-  ; ("hard-fork", (module Hard_fork.Make : Intf.Test.Functor_intf))
+  ; ("post-hard-fork", (module Post_hard_fork.Make : Intf.Test.Functor_intf))
   ; ("medium-bootstrap", (module Medium_bootstrap.Make : Intf.Test.Functor_intf))
   ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
   ; ( "peers-reliability"
@@ -420,7 +420,7 @@ let main inputs =
         let%bind () = Malleable_error.List.iter non_seed_pods ~f:start_print in
         [%log info] "Daemons started" ;
         [%log trace] "executing test" ;
-        T.run network dsl )
+        T.run ~config:test_config network dsl )
   in
   let exit_reason, test_result =
     match monitor_test_result with

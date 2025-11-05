@@ -6,22 +6,22 @@ module Stable : sig
 
   module V1 : sig
     type t =
-      ( unit
-      , unit
-      , ( Core.Time.Stable.Span.V1.t
-        , Ledger_proof.Stable.V2.t )
-        Proof_carrying_data.Stable.V1.t )
-      Partitioned_spec.Poly.Stable.V1.t
+      { id : Id.Any.Stable.V1.t
+      ; data :
+          ( Mina_stdlib.Time.Span.Stable.V1.t
+          , Ledger_proof.Stable.V2.t )
+          Proof_carrying_data.Stable.V1.t
+      }
+    [@@deriving to_yojson]
 
     val to_latest : t -> t
   end
 end]
 
 type t =
-  ( unit
-  , unit
-  , (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t )
-  Partitioned_spec.Poly.Stable.V1.t
+  { id : Id.Any.t
+  ; data : (Core.Time.Span.t, Ledger_proof.Cached.t) Proof_carrying_data.t
+  }
 
 val read_all_proofs_from_disk : t -> Stable.Latest.t
 

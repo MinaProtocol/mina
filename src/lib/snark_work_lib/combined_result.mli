@@ -1,5 +1,6 @@
-open Mina_wire_types
-
 type t =
-  Transaction_snark_work.Statement.V2.t
-  * Ledger_proof.V2.t One_or_two.V1.t Network_pool_priced_proof.V1.t
+  { results :
+      (Single_spec.t, Ledger_proof.Cached.t) Single_result.Poly.t One_or_two.t
+  ; fee : Currency.Fee.t
+  ; prover : Signature_lib.Public_key.Compressed.t
+  }

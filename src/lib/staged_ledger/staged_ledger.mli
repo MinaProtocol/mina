@@ -110,6 +110,7 @@ module Scan_state : sig
           -> Mina_transaction.Transaction.t
           -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
              Or_error.t )
+    -> signature_kind:Mina_signature_kind.t
     -> t
     -> unit Or_error.t
 
@@ -141,11 +142,15 @@ module Scan_state : sig
           -> Mina_transaction.Transaction.t
           -> Mina_ledger.Sparse_ledger.T.Transaction_partially_applied.t
              Or_error.t )
+    -> signature_kind:Mina_signature_kind.t
     -> t
     -> unit Deferred.Or_error.t
 
   val write_all_proofs_to_disk :
-    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+       signature_kind:Mina_signature_kind.t
+    -> proof_cache_db:Proof_cache_tag.cache_db
+    -> Stable.Latest.t
+    -> t
 
   val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
@@ -219,6 +224,7 @@ val apply :
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
+  -> signature_kind:Mina_signature_kind.t
   -> ?transaction_pool_proxy:Check_commands.transaction_pool_proxy
   -> t
   -> Staged_ledger_diff.t
@@ -239,14 +245,15 @@ val apply :
 val apply_diff_unchecked :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> global_slot:Mina_numbers.Global_slot_since_genesis.t
-  -> t
-  -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> logger:Logger.t
   -> current_state_view:Zkapp_precondition.Protocol_state.View.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> coinbase_receiver:Public_key.Compressed.t
   -> supercharge_coinbase:bool
   -> zkapp_cmd_limit_hardcap:int
+  -> signature_kind:Mina_signature_kind.t
+  -> t
+  -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
   -> ( [ `Hash_after_applying of Staged_ledger_hash.t ]
        * [ `Ledger_proof of
            ( Ledger_proof.Cached.t
@@ -329,6 +336,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> signature_kind:Mina_signature_kind.t
   -> t Or_error.t Deferred.t
 
 val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
@@ -340,6 +348,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger_unchecked :
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
   -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> signature_kind:Mina_signature_kind.t
   -> t Or_error.t Deferred.t
 
 (** All the pending work in t and the data required to generate proofs. *)
@@ -362,6 +371,12 @@ val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 val latest_block_accounts_created :
   t -> previous_block_state_hash:State_hash.t -> Account_id.t list
 
+(** Go through all masks until reach root, convert all accounts accumulated 
+    along the way, and commit them to a HF database
+*)
+val convert_and_apply_all_masks_to_ledger :
+  hardfork_db:Ledger.Hardfork_db.t -> t -> unit
+
 module Test_helpers : sig
   val dummy_state_and_view :
        ?global_slot:Mina_numbers.Global_slot_since_genesis.t
@@ -381,6 +396,7 @@ module Test_helpers : sig
     -> first_partition_slots:int
     -> no_second_partition:bool
     -> is_new_stack:bool
+    -> signature_kind:Mina_signature_kind.t
     -> Ledger.t
     -> Pending_coinbase.t
     -> Transaction.t With_status.t list

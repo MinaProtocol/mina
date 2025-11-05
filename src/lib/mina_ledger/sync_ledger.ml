@@ -39,9 +39,9 @@ module Any_ledger = Syncable_ledger.Make (struct
   let account_subtree_height = 6
 end)
 
-module Db = Syncable_ledger.Make (struct
-  module Addr = Ledger.Db.Addr
-  module MT = Ledger.Db
+module Root = Syncable_ledger.Make (struct
+  module Addr = Ledger.Location.Addr
+  module MT = Root
   module Account = Account.Stable.Latest
   module Hash = Hash
   module Root_hash = Root_hash

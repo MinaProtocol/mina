@@ -4,22 +4,33 @@ check_syntax:
 	# xargs will short-circuit if a command fails with code 255
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" &&  dhall --file {} > /dev/null || exit 255'
 
-check_lint:
+convert_backticks_to_ifs:
+	sed -i -E 's/`if` =/if =/g' src/Command/Base.dhall
+
+convert_ifs_to_backticks:
+	sed -i -E 's/if =/`if` =/g' src/Command/Base.dhall
+
+check_lint: convert_backticks_to_ifs
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" && dhall --ascii lint --check --inplace {} || exit 255'
 
-check_format:
+check_format: convert_backticks_to_ifs
+	@echo "Dhall version: $$(dhall --version)"
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{} format" && dhall --ascii format --check --inplace {} || exit 255'
 
 lint:
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" && dhall --ascii lint --inplace {} || exit 255'
+	$(MAKE) convert_ifs_to_backticks
 
 format:
 	find ./src/ -name "*.dhall" -print0 | xargs -I{} -0 -n1 bash -c 'echo "{}" && dhall --ascii format --inplace {} || exit 255'
+	$(MAKE) convert_ifs_to_backticks
 
 check_filter:
 	# Ensure Jobs.dhall is generated before proceeding
 	(cd ../ && ./buildkite/scripts/generate-jobs.sh > ./buildkite/src/gen/Jobs.dhall)
 	python3 ./unit-tests/parse_triage.py
+	# Clean up
+	git checkout -- ./src/gen/Jobs.dhall
 	
 dump_pipelines:
 	$(eval TMP := $(shell mktemp -d))

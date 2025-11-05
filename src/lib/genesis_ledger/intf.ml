@@ -1,6 +1,7 @@
 open Mina_base
 open Signature_lib
 open Core_kernel
+module Root_ledger = Mina_ledger.Root
 
 module Timing = struct
   type t = (int, int, int, int) Account_timing.Poly.t
@@ -61,13 +62,22 @@ end
 module type Ledger_input_intf = sig
   include Accounts_intf
 
-  val directory : [ `Ephemeral | `New | `Path of string ]
+  val directory :
+    [ `Ephemeral
+    | `New of Root_ledger.Config.backing_type
+    | `Path of string * Root_ledger.Config.backing_type ]
 
   val depth : int
+
+  val logger : Logger.t
 end
 
 module type S = sig
   val t : Mina_ledger.Ledger.t Lazy.t
+
+  (** Create a new root ledger that is equal in state to the genesis ledger *)
+  val create_root :
+    config:Root_ledger.Config.t -> depth:int -> unit -> Root_ledger.t Or_error.t
 
   val depth : int
 

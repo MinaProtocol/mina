@@ -3,6 +3,7 @@ open Async
 open Mina_base
 open Mina_transaction
 module Ledger = Mina_ledger.Ledger
+module Root_ledger = Mina_ledger.Root
 open Mina_block
 open Pipe_lib
 open Strict_pipe
@@ -107,7 +108,8 @@ type t =
   ; pipes : pipes
   ; wallets : Secrets.Wallets.t
   ; coinbase_receiver : Consensus.Coinbase_receiver.t ref
-  ; snark_job_state : Work_selector.State.t
+  ; work_selector : Work_selector.State.t
+  ; work_partitioner : Work_partitioner.t
   ; mutable next_producer_timing :
       Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions : Mina_subscriptions.t
@@ -121,6 +123,7 @@ type t =
   ; vrf_evaluation_state : Block_producer.Vrf_evaluation_state.t
   ; commit_id : string
   ; proof_cache_db : Proof_cache_tag.cache_db
+  ; signature_kind : Mina_signature_kind.t
   }
 [@@deriving fields]
 
@@ -450,6 +453,24 @@ let get_node_state t =
   ; uptime_of_node
   }
 
+(** Compute the hard fork genesis slot from the runtime config, if all the stop
+    slots and the genesis slot delta have been set. Note that this is the hard
+    fork genesis slot expressed as a
+    [Mina_numbers.Global_slot_since_hard_fork.t] of the current chain/hard
+    fork. *)
+let scheduled_hard_fork_genesis_slot t :
+    Mina_numbers.Global_slot_since_hard_fork.t option =
+  let open Option.Let_syntax in
+  let runtime_config = t.config.precomputed_values.runtime_config in
+  let%bind slot_chain_end_since_hard_fork =
+    Runtime_config.slot_chain_end runtime_config
+  in
+  let%map hard_fork_genesis_slot_delta =
+    Runtime_config.hard_fork_genesis_slot_delta runtime_config
+  in
+  Mina_numbers.Global_slot_since_hard_fork.add slot_chain_end_since_hard_fork
+    hard_fork_genesis_slot_delta
+
 (* This is a hack put in place to deal with nodes getting stuck
    in Offline states, that is, not receiving blocks for an extended period,
    or stuck in Bootstrap for too long
@@ -691,7 +712,7 @@ let get_snarked_ledger_full t state_hash_opt =
       let root_snarked_ledger =
         Transition_frontier.root_snarked_ledger frontier
       in
-      let ledger = Ledger.of_database root_snarked_ledger in
+      let ledger = Root_ledger.as_masked root_snarked_ledger in
       let path = Transition_frontier.path_map frontier b ~f:Fn.id in
       let%bind () =
         Mina_stdlib.Deferred.Result.List.iter path ~f:(fun b ->
@@ -726,7 +747,7 @@ let get_snarked_ledger_full t state_hash_opt =
               in
               Staged_ledger.Scan_state.get_snarked_ledger_async ~ledger
                 ~get_protocol_state ~apply_first_pass ~apply_second_pass
-                ~apply_first_pass_sparse_ledger
+                ~apply_first_pass_sparse_ledger ~signature_kind
                 (Staged_ledger.scan_state
                    (Transition_frontier.Breadcrumb.staged_ledger b) )
               |> Deferred.Result.map_error ~f:(fun e ->
@@ -796,7 +817,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       let%map account = get_account t account_id in
       account.Account.nonce
 
-let snark_job_state t = t.snark_job_state
+let work_selector t = t.work_selector
 
 let add_block_subscriber t public_key =
   Mina_subscriptions.add_block_subscriber t.subscriptions public_key
@@ -869,45 +890,93 @@ let best_chain ?max_length t =
 
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
-  let fee = snark_work_fee t in
-  let instances_opt =
-    Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) (snark_job_state t)
+  let%bind.Option prover =
+    Option.first_some (snark_worker_key t) (snark_coordinator_key t)
   in
-  Option.map instances_opt ~f:(fun instances ->
-      { Snark_work_lib.Work.Spec.instances; fee } )
+  let fee = snark_work_fee t in
+  let sok_message = Sok_message.create ~fee ~prover in
+  [%log' debug t.config.logger] "Received work request"
+    ~metadata:[ ("sok_message", Sok_message.to_yojson sok_message) ] ;
+  let work_from_selector =
+    lazy
+      (Work_selection_method.work ~snark_pool:(snark_pool t) ~fee
+         ~logger:t.config.logger t.work_selector )
+  in
+  Work_partitioner.request_partitioned_work ~work_from_selector ~sok_message
+    ~partitioner:t.work_partitioner
 
 let work_selection_method t = t.config.work_selection_method
 
-let add_work t (work : Snark_work_lib.Selector.Result.Stable.Latest.t) =
+let add_complete_work ~logger ~fee ~prover
+    ~(results :
+       ( Snark_work_lib.Spec.Single.t
+       , Ledger_proof.Cached.t )
+       Snark_work_lib.Result.Single.Poly.t
+       One_or_two.t ) t =
   let update_metrics () =
     let snark_pool = snark_pool t in
     let fee_opt =
       Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
     in
     let pending_work =
-      Work_selector.pending_work_statements ~snark_pool ~fee_opt
-        t.snark_job_state
+      Work_selector.pending_work_statements ~snark_pool ~fee_opt t.work_selector
       |> List.length
     in
     Mina_metrics.(
       Gauge.set Snark_work.pending_snark_work (Int.to_float pending_work))
   in
-  let spec =
-    One_or_two.map work.spec.instances
-      ~f:Snark_work_lib.Work.Single.Spec.statement
+  let proofs = One_or_two.map ~f:(fun { proof; _ } -> proof) results in
+  let fee_with_prover = Fee_with_prover.{ fee; prover } in
+  let stmts =
+    One_or_two.map
+      ~f:(fun { spec; _ } -> Snark_work_lib.Spec.Single.Poly.statement spec)
+      results
   in
-  let cb _ =
-    (* remove it from seen jobs after attempting to adding it to the pool to avoid this work being reassigned
-     * If the diff is accepted then remove it from the seen jobs.
-     * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
-    Work_selector.remove t.snark_job_state spec
-  in
-  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
+  [%log debug] "Partitioner combined work"
+    ~metadata:
+      [ ("work_ids", Transaction_snark_work.Statement.compact_json stmts)
+      ; ("fee_with_prover", Fee_with_prover.to_yojson fee_with_prover)
+      ] ;
+  Or_error.try_with update_metrics
+  |> Result.iter_error ~f:(fun err ->
+         [%log warn] "Failed to update metrics on adding work"
+           ~metadata:[ ("error", Error_json.error_to_yojson err) ] ) ;
   Network_pool.Snark_pool.(
     Local_sink.push t.pipes.snark_local_sink
-      (Resource_pool.Diff.of_result work, cb))
+      ( Add_solved_work
+          ( stmts
+          , Network_pool.Priced_proof.
+              { proof =
+                  proofs
+                  |> One_or_two.map ~f:Ledger_proof.Cached.read_proof_from_disk
+              ; fee = fee_with_prover
+              } )
+      , Result.iter_error ~f:(fun err ->
+            (* Possible reasons of failure: receiving pipe's capacity exceeded,
+                fee that isn't the lowest, failure in verification or application to the pool *)
+            [%log warn] "Failed to add completed work to the pool"
+              ~metadata:
+                [ ( "work_ids"
+                  , Transaction_snark_work.Statement.compact_json stmts )
+                ; ("error", Error_json.error_to_yojson err)
+                ] ) ))
   |> Deferred.don't_wait_for
+
+let add_work t (work : Snark_work_lib.Result.Partitioned.Stable.Latest.t) =
+  let logger = t.config.logger in
+  match
+    Work_partitioner.submit_partitioned_work ~result:work
+      ~partitioner:t.work_partitioner
+  with
+  | SpecUnmatched ->
+      `SpecUnmatched
+  | Removed ->
+      `Removed
+  | Processed None ->
+      `Ok
+  | Processed (Some { results; fee; prover }) ->
+      add_complete_work ~logger ~fee ~prover ~results t ;
+      `Ok
 
 let add_work_graphql t diff =
   let results_ivar = Ivar.create () in
@@ -1179,7 +1248,12 @@ let check_and_stop_daemon t ~wait =
             `Check_in (Core.Time.Span.scale vrf_poll_interval 2.0) )
 
 let stop_long_running_daemon t =
-  let wait_mins = (t.config.stop_time * 60) + (Random.int 10 * 60) in
+  (* The Random.int upper bound is exclusive *)
+  let additional_wait_hours =
+    if t.config.stop_time_interval < 1 then 0
+    else Random.int (t.config.stop_time_interval + 1)
+  in
+  let wait_mins = (t.config.stop_time + additional_wait_hours) * 60 in
   [%log' info t.config.logger]
     "Stopping daemon after $wait mins and when there are no blocks to be \
      produced"
@@ -1259,9 +1333,12 @@ module type CONTEXT = sig
   val ledger_sync_config : Syncable_ledger.daemon_config
 
   val proof_cache_db : Proof_cache_tag.cache_db
+
+  val signature_kind : Mina_signature_kind.t
 end
 
-let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
+let context ~commit_id ~proof_cache_db ~signature_kind (config : Config.t) :
+    (module CONTEXT) =
   ( module struct
     let logger = config.logger
 
@@ -1299,6 +1376,8 @@ let context ~commit_id ~proof_cache_db (config : Config.t) : (module CONTEXT) =
         ~max_subtree_depth ~default_subtree_depth ()
 
     let proof_cache_db = proof_cache_db
+
+    let signature_kind = signature_kind
   end )
 
 let shorten_commit_id commit_id =
@@ -1375,7 +1454,7 @@ let start t =
   then
     let module Context =
     ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
-            t.config )
+            ~signature_kind:t.signature_kind t.config )
     in
     Block_producer.run
       ~context:(module Context)
@@ -1452,7 +1531,8 @@ let start t =
 
 let start_with_precomputed_blocks t blocks =
   let module Context =
-  (val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id t.config)
+  ( val context ~proof_cache_db:t.proof_cache_db ~commit_id:t.commit_id
+          ~signature_kind:t.signature_kind t.config )
   in
   let%bind () =
     Block_producer.run_precomputed
@@ -1692,16 +1772,16 @@ let raise_on_initialization_error (`Initialization_error e) =
   Error.raise @@ Error.tag ~tag:"proof cache initialization error" e
 
 let initialize_proof_cache_db (config : Config.t) =
-  Proof_cache_tag.create_db ~logger:config.logger
-    (config.conf_dir ^/ "proof_cache")
+  Proof_cache_tag.create_db ~logger:config.logger config.proof_cache_location
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let initialize_zkapp_vk_cache_db (config : Config.t) =
   Zkapp_vk_cache_tag.create_db ~logger:config.logger
-    (config.conf_dir ^/ "zkapp_vk_cache")
+    config.zkapp_vk_cache_location
   >>| function Error e -> raise_on_initialization_error e | Ok db -> db
 
 let create ~commit_id ?wallets (config : Config.t) =
+  let signature_kind = Mina_signature_kind.t_DEPRECATED in
   [%log' info config.logger] "Creating daemon with commit id: %s" commit_id ;
   let commit_id_short = shorten_commit_id commit_id in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1719,9 +1799,8 @@ let create ~commit_id ?wallets (config : Config.t) =
           | Ok () ->
               ()
           | Error err ->
-              [%log' warn config.logger]
-                "Error when setting ITN logger data: %s"
-                (Error.to_string_hum err)
+              [%log' warn config.logger] "Error when setting ITN logger data"
+                ~metadata:[ ("error", Error_json.error_to_yojson err) ]
         else Deferred.unit
       in
       O1trace.thread "mina_lib" (fun () ->
@@ -1737,7 +1816,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           let%bind proof_cache_db = initialize_proof_cache_db config in
           let%bind zkapp_vk_cache_db = initialize_zkapp_vk_cache_db config in
           let module Context =
-          (val context ~proof_cache_db ~commit_id config)
+          (val context ~proof_cache_db ~commit_id ~signature_kind config)
           in
           let%bind prover =
             Monitor.try_with ~here:[%here]
@@ -1757,8 +1836,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~internal_trace_filename:"prover-internal-trace.jsonl"
                         ~proof_level:config.precomputed_values.proof_level
                         ~constraint_constants ~pids:config.pids
-                        ~conf_dir:config.conf_dir
-                        ~signature_kind:Mina_signature_kind.t_DEPRECATED ()
+                        ~conf_dir:config.conf_dir ~signature_kind ()
                     in
                     let%map () = set_itn_data (module Prover) prover in
                     prover ) )
@@ -1792,7 +1870,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                         ~proof_level:config.precomputed_values.proof_level
                         ~pids:config.pids ~conf_dir:(Some config.conf_dir)
                         ~blockchain_verification_key
-                        ~transaction_verification_key ()
+                        ~transaction_verification_key ~signature_kind ()
                     in
                     let%map () = set_itn_data (module Verifier) verifier in
                     verifier ) )
@@ -1807,13 +1885,13 @@ let create ~commit_id ?wallets (config : Config.t) =
               Or_error.iter_error result ~f:(fun error ->
                   [%log' warn config.logger]
                     "Failed to toggle verifier internal tracing: $error"
-                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
+                    ~metadata:[ ("error", Error_json.error_to_yojson error) ] ) ) ;
           Internal_tracing.register_toggle_callback (fun enabled ->
               let%map result = Prover.toggle_internal_tracing prover enabled in
               Or_error.iter_error result ~f:(fun error ->
                   [%log' warn config.logger]
                     "Failed to toggle prover internal tracing: $error"
-                    ~metadata:[ ("error", `String (Error.to_string_hum error)) ] ) ) ;
+                    ~metadata:[ ("error", Error_json.error_to_yojson error) ] ) ) ;
           let%bind vrf_evaluator =
             Monitor.try_with ~here:[%here]
               ~rest:
@@ -2018,6 +2096,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                 config.precomputed_values.genesis_constants.txpool_max_size
               ~genesis_constants:config.precomputed_values.genesis_constants
               ~slot_tx_end ~vk_cache_db:zkapp_vk_cache_db ~proof_cache_db
+              ~signature_kind
           in
           let first_received_message_signal = Ivar.create () in
           let online_status, notify_online_impl =
@@ -2075,11 +2154,17 @@ let create ~commit_id ?wallets (config : Config.t) =
               ; constraint_constants
               }
           in
-          let snark_jobs_state =
+          let work_selector =
             Work_selector.State.init
-              ~reassignment_wait:config.work_reassignment_wait
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
               ~logger:config.logger
+          in
+          (* NOTE: [reassignment_wait] is interpreted as milliseconds *)
+          let work_partitioner =
+            Work_partitioner.create ~signature_kind
+              ~reassignment_timeout:
+                (Time.Span.of_ms (Float.of_int config.work_reassignment_wait))
+              ~logger:config.logger ~proof_cache_db
           in
           let sinks = (block_sink, tx_remote_sink, snark_remote_sink) in
           let%bind net =
@@ -2090,7 +2175,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   ~get_transition_frontier:(fun () ->
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r )
                   ~get_snark_pool:(fun () -> Some snark_pool)
-                  ~snark_job_state:(fun () -> Some snark_jobs_state)
+                  ~snark_job_state:(fun () -> Some work_selector)
                   ~get_node_status )
           in
           let user_command_input_reader, user_command_input_writer =
@@ -2105,7 +2190,7 @@ let create ~commit_id ?wallets (config : Config.t) =
                   match%bind
                     User_command_input.to_user_commands ~get_current_nonce
                       ~get_account ~constraint_constants ~logger:config.logger
-                      uc_inputs
+                      ~signature_kind uc_inputs
                   with
                   | Ok signed_commands ->
                       if List.is_empty signed_commands then (
@@ -2157,6 +2242,9 @@ let create ~commit_id ?wallets (config : Config.t) =
             }
           in
 
+          let ledger_backing =
+            Config.ledger_backing ~hardfork_handling:config.hardfork_handling
+          in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
@@ -2173,7 +2261,7 @@ let create ~commit_id ?wallets (config : Config.t) =
               ~most_recent_valid_block_writer
               ~get_completed_work:
                 (Network_pool.Snark_pool.get_completed_work snark_pool)
-              ~notify_online ~transaction_pool_proxy ()
+              ~notify_online ~transaction_pool_proxy ~ledger_backing ()
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -2510,7 +2598,8 @@ let create ~commit_id ?wallets (config : Config.t) =
               }
           ; wallets
           ; coinbase_receiver = ref config.coinbase_receiver
-          ; snark_job_state = snark_jobs_state
+          ; work_selector
+          ; work_partitioner
           ; subscriptions
           ; sync_status
           ; precomputed_block_writer
@@ -2519,6 +2608,7 @@ let create ~commit_id ?wallets (config : Config.t) =
           ; vrf_evaluation_state = Block_producer.Vrf_evaluation_state.create ()
           ; commit_id
           ; proof_cache_db
+          ; signature_kind
           } ) )
 
 let net { components = { net; _ }; _ } = net
@@ -2560,7 +2650,8 @@ let genesis_ledger t = Genesis_proof.genesis_ledger t.config.precomputed_values
 
 let get_transition_frontier (t : t) =
   transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
-  |> Result.of_option ~error:"Could not obtain transition frontier"
+  |> Result.of_option
+       ~error:(Error.of_string "Could not obtain transition frontier")
 
 let best_chain_block_by_height (t : t) height =
   let open Result.Let_syntax in
@@ -2578,7 +2669,8 @@ let best_chain_block_by_height (t : t) height =
          Unsigned.UInt32.equal block_height height )
   |> Result.of_option
        ~error:
-         (sprintf "Could not find block in transition frontier with height %s"
+         (Error.createf
+            !"Could not find block in transition frontier with height %s"
             (Unsigned.UInt32.to_string height) )
 
 let best_chain_block_by_state_hash (t : t) hash =
@@ -2587,8 +2679,560 @@ let best_chain_block_by_state_hash (t : t) hash =
   Transition_frontier.find transition_frontier hash
   |> Result.of_option
        ~error:
-         (sprintf "Block with state hash %s not found in transition frontier"
+         (Error.createf
+            !"Block with state hash %s not found in transition frontier"
             (State_hash.to_base58_check hash) )
+
+let best_chain_block_before_stop_slot (t : t) =
+  let open Deferred.Result.Let_syntax in
+  let runtime_config = t.config.precomputed_values.runtime_config in
+  match best_tip t with
+  | `Bootstrapping ->
+      Deferred.Or_error.error_string "Daemon is bootstrapping"
+  | `Active breadcrumb -> (
+      let txn_stop_slot_opt = Runtime_config.slot_tx_end runtime_config in
+      match txn_stop_slot_opt with
+      | None ->
+          return breadcrumb
+      | Some stop_slot ->
+          let rec find_block_older_than_stop_slot breadcrumb =
+            let protocol_state =
+              Transition_frontier.Breadcrumb.protocol_state breadcrumb
+            in
+            let global_slot =
+              Mina_state.Protocol_state.consensus_state protocol_state
+              |> Consensus.Data.Consensus_state.curr_global_slot
+            in
+            if
+              Mina_numbers.Global_slot_since_hard_fork.( < ) global_slot
+                stop_slot
+            then return breadcrumb
+            else
+              let parent_hash =
+                Transition_frontier.Breadcrumb.parent_hash breadcrumb
+              in
+              let%bind breadcrumb =
+                Deferred.return @@ best_chain_block_by_state_hash t parent_hash
+              in
+              find_block_older_than_stop_slot breadcrumb
+          in
+          find_block_older_than_stop_slot breadcrumb )
+
+module Hardfork_config = struct
+  type mina_lib = t
+
+  type breadcrumb_spec =
+    [ `Stop_slot
+    | `State_hash of State_hash.t
+    | `Block_height of Unsigned.UInt32.t ]
+
+  let breadcrumb ~breadcrumb_spec mina =
+    match breadcrumb_spec with
+    | `Stop_slot ->
+        best_chain_block_before_stop_slot mina
+    | `State_hash state_hash_base58 ->
+        best_chain_block_by_state_hash mina state_hash_base58 |> Deferred.return
+    | `Block_height block_height ->
+        best_chain_block_by_height mina block_height |> Deferred.return
+
+  let genesis_source_of_snapshot = function
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Genesis_epoch_ledger l
+      ->
+        `Genesis l
+    | Consensus.Data.Local_state.Snapshot.Ledger_snapshot.Ledger_root l ->
+        `Root l
+
+  let genesis_source_ledger_cast = function
+    | `Genesis l ->
+        let l_inner = Lazy.force @@ Genesis_ledger.Packed.t l in
+        Ledger.Any_ledger.cast (module Ledger) l_inner
+    | `Root l ->
+        Root_ledger.as_unmasked l
+    | `Uncommitted l ->
+        Ledger.Any_ledger.cast (module Ledger) l
+
+  let genesis_source_ledger_merkle_root l =
+    genesis_source_ledger_cast l |> Ledger.Any_ledger.M.merkle_root
+
+  type genesis_source_ledgers =
+    { root_snarked_ledger : Root_ledger.t
+    ; staged_ledger : Ledger.t
+    ; staking_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t | `Root of Root_ledger.t ]
+    ; next_epoch_ledger :
+        [ `Genesis of Genesis_ledger.Packed.t
+        | `Root of Root_ledger.t
+        | `Uncommitted of Ledger.t ]
+    }
+
+  let source_ledgers ~breadcrumb mina =
+    let open Deferred.Result.Let_syntax in
+    let mina_config = config mina in
+    let frontier_consensus_local_state = mina_config.consensus_local_state in
+    let consensus_state =
+      breadcrumb |> Transition_frontier.Breadcrumb.protocol_state
+      |> Mina_state.Protocol_state.consensus_state
+    in
+    let staking_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data
+        consensus_state
+    in
+    let next_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data
+        consensus_state
+    in
+    let frontier =
+      transition_frontier mina |> Pipe_lib.Broadcast_pipe.Reader.peek
+      |> Option.value_exn
+    in
+    let root_consensus_state =
+      frontier |> Transition_frontier.root
+      |> Transition_frontier.Breadcrumb.protocol_state
+      |> Mina_state.Protocol_state.consensus_state
+    in
+    let root_snarked_ledger =
+      frontier |> Transition_frontier.root_snarked_ledger
+    in
+    let staged_ledger =
+      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+      |> Staged_ledger.ledger
+    in
+    let%map staking_ledger, next_epoch_ledger =
+      match
+        (* We pretend that the block is finalized, so that we can query it in
+           advance, for redundancy.
+        *)
+        Consensus.Hooks.get_epoch_ledgers_for_finalized_frontier_block
+          ~root_consensus_state ~target_consensus_state:consensus_state
+          ~local_state:frontier_consensus_local_state
+      with
+      | `Both (staking_ledger, next_epoch_ledger) ->
+          return
+            ( genesis_source_of_snapshot staking_ledger
+            , genesis_source_of_snapshot next_epoch_ledger )
+      | `Snarked_ledger (staking_ledger, num_parents) ->
+          (* The epoch transition was at a block between the given block and
+             the root. We find it by walking back by `num_parents` blocks.
+          *)
+          let%bind epoch_transition_state_hash =
+            let open Result.Let_syntax in
+            let rec ancestor breadcrumb i =
+              if i = 0 then return breadcrumb
+              else
+                let parent_hash =
+                  Transition_frontier.Breadcrumb.parent_hash breadcrumb
+                in
+                let%bind breadcrumb =
+                  best_chain_block_by_state_hash mina parent_hash
+                in
+                ancestor breadcrumb (i - 1)
+            in
+            ancestor breadcrumb num_parents
+            >>| Transition_frontier.Breadcrumb.state_hash |> Deferred.return
+          in
+          (* When this block reaches the root of the frontier, its snarked
+             ledger will become the next epoch ledger; we simulate that here.
+          *)
+          let%map next_epoch_ledger =
+            get_snarked_ledger_full mina (Some epoch_transition_state_hash)
+          in
+          ( genesis_source_of_snapshot staking_ledger
+          , `Uncommitted next_epoch_ledger )
+    in
+    assert (
+      Ledger_hash.equal
+        (genesis_source_ledger_merkle_root staking_ledger)
+        staking_epoch.ledger.hash ) ;
+    assert (
+      Ledger_hash.equal
+        (genesis_source_ledger_merkle_root next_epoch_ledger)
+        next_epoch.ledger.hash ) ;
+    { root_snarked_ledger; staged_ledger; staking_ledger; next_epoch_ledger }
+
+  type inputs =
+    { source_ledgers : genesis_source_ledgers
+    ; global_slot_since_genesis : Mina_numbers.Global_slot_since_genesis.t
+    ; genesis_state_timestamp : string
+    ; state_hash : State_hash.t
+    ; staking_epoch_seed : Epoch_seed.t
+    ; next_epoch_seed : Epoch_seed.t
+    ; blockchain_length : Mina_numbers.Length.t
+    }
+
+  (** The genesis state timestamp string is the timestamp of the start of the
+      [global_slot] of the hard fork, relative to the current chain *)
+  let genesis_timestamp_str ~consensus_constants global_slot =
+    Consensus.Data.Consensus_time.(
+      start_time ~constants:consensus_constants
+        (of_global_slot ~constants:consensus_constants global_slot))
+    |> Block_time.to_time_exn
+    |> Time.to_string_iso8601_basic ~zone:Time.Zone.utc
+
+  (** Compute the hard fork slot. This will be derived from the stop slots and
+      hard fork genesis slot delta in the runtime config, if those have been set
+      and the [breadcrum_spec] was [`Stop_slot]. Otherwise, it will be the
+      global slot since genesis of the hard fork block. *)
+  let hard_fork_global_slot ~breadcrumb_spec ~block mina :
+      Mina_numbers.Global_slot_since_hard_fork.t =
+    let block_global_slot =
+      Mina_block.consensus_state block
+      |> Consensus.Data.Consensus_state.curr_global_slot
+    in
+    let configured_slot =
+      match breadcrumb_spec with
+      | `Stop_slot ->
+          scheduled_hard_fork_genesis_slot mina
+      | `State_hash _state_hash_base58 ->
+          None
+      | `Block_height _block_height ->
+          None
+    in
+    Option.value ~default:block_global_slot configured_slot
+
+  (** We schedule the hard fork genesis to occur at a particular
+      [Mina_numbers.Global_slot_since_hard_fork.t], but need a
+      [Mina_numbers.Global_slot_since_genesis.t] for the hard fork config. This
+      method does this conversion by taking the hard fork block's consensus data
+      applying the same slot update as [Consensus.Data.Consensus_state.update]
+      to the hard fork block's global slots (since hard fork and since genesis),
+      then returning the resulting global slot since genesis.
+
+      This method requires that the desired hard fork genesis slot occur after
+      the hard fork block's slot. This property is guaranteed by
+      [hard_fork_global_slot] (which determines the scheduled genesis slot) and
+      [breadcrumb] (which retrieves the hard fork block). *)
+  let move_hard_fork_consensus_to_scheduled_genesis ~hard_fork_consensus_data
+      next_genesis_global_slot =
+    let block_global_slot =
+      Consensus.Data.Consensus_state.curr_global_slot hard_fork_consensus_data
+    in
+    let block_global_slot_since_genesis =
+      Consensus.Data.Consensus_state.global_slot_since_genesis
+        hard_fork_consensus_data
+    in
+    (* We pretend that the consensus moved forward from the hard fork block's
+       slot to the scheduled genesis slot, and get that slot difference *)
+    let global_slot_span =
+      Mina_numbers.Global_slot_since_hard_fork.diff next_genesis_global_slot
+        block_global_slot
+      |> Option.value_exn ~here:[%here]
+           ~message:
+             "Invariant: hard fork genesis cannot be scheduled before the hard \
+              fork block"
+    in
+    (* Now apply that difference to the hard fork block's slot since genesis *)
+    Mina_numbers.Global_slot_since_genesis.add block_global_slot_since_genesis
+      global_slot_span
+
+  let prepare_inputs ~breadcrumb_spec mina =
+    let open Deferred.Result.Let_syntax in
+    let%bind breadcrumb = breadcrumb ~breadcrumb_spec mina in
+    let block = Transition_frontier.Breadcrumb.block breadcrumb in
+    let blockchain_length = Mina_block.blockchain_length block in
+    let global_slot_since_hard_fork =
+      hard_fork_global_slot ~breadcrumb_spec ~block mina
+    in
+    let global_slot_since_genesis =
+      move_hard_fork_consensus_to_scheduled_genesis
+        ~hard_fork_consensus_data:(Mina_block.consensus_state block)
+        global_slot_since_hard_fork
+    in
+    let genesis_state_timestamp =
+      genesis_timestamp_str
+        ~consensus_constants:mina.config.precomputed_values.consensus_constants
+        global_slot_since_hard_fork
+    in
+    let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+    let protocol_state =
+      Transition_frontier.Breadcrumb.protocol_state breadcrumb
+    in
+    let consensus = Mina_state.Protocol_state.consensus_state protocol_state in
+    let staking_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.staking_epoch_data consensus
+    in
+    let next_epoch =
+      Consensus.Proof_of_stake.Data.Consensus_state.next_epoch_data consensus
+    in
+    let staking_epoch_seed = staking_epoch.Epoch_data.Poly.seed in
+    let next_epoch_seed = next_epoch.Epoch_data.Poly.seed in
+    let%map source_ledgers = source_ledgers ~breadcrumb mina in
+    { source_ledgers
+    ; global_slot_since_genesis
+    ; genesis_state_timestamp
+    ; state_hash
+    ; staking_epoch_seed
+    ; next_epoch_seed
+    ; blockchain_length
+    }
+
+  (** Copy the roots of the [source_ledgers] and gather the stable ledger
+      diffs from the [source_ledgers] to their roots *)
+  let copy_genesis_roots_and_diffs ~source_ledgers parent_directory =
+    Core.Unix.mkdir_p parent_directory ;
+    let genesis_ledger_data =
+      let directory_name = parent_directory ^/ "genesis_ledger" in
+      let root =
+        Root_ledger.create_checkpoint_with_directory
+          source_ledgers.root_snarked_ledger ~directory_name
+      in
+      let diff = Ledger.all_accounts_on_masks source_ledgers.staged_ledger in
+      (root, diff)
+    in
+    let genesis_staking_ledger_data =
+      let directory_name = parent_directory ^/ "staking_ledger" in
+      match source_ledgers.staking_ledger with
+      | `Genesis _l ->
+          failwith
+            "Daemon has genesis staking ledger - hard fork dump currently \
+             unsupported"
+      | `Root l ->
+          let root =
+            Root_ledger.create_checkpoint_with_directory l ~directory_name
+          in
+          let diff = Ledger.Location.Map.empty in
+          (root, diff)
+    in
+    let genesis_next_epoch_ledger_data =
+      let directory_name = parent_directory ^/ "next_epoch_ledger" in
+      match source_ledgers.next_epoch_ledger with
+      | `Genesis _l ->
+          failwith
+            "Daemon has genesis epoch ledger - hard fork dump currently \
+             unsupported"
+      | `Root l ->
+          let root =
+            Root_ledger.create_checkpoint_with_directory l ~directory_name
+          in
+          let diff = Ledger.Location.Map.empty in
+          (root, diff)
+      | `Uncommitted l ->
+          let root =
+            Root_ledger.create_checkpoint_with_directory
+              source_ledgers.root_snarked_ledger ~directory_name
+          in
+          let diff = Ledger.all_accounts_on_masks l in
+          (root, diff)
+    in
+    ( genesis_ledger_data
+    , genesis_staking_ledger_data
+    , genesis_next_epoch_ledger_data )
+
+  (** Generate the tar file and runtime ledger config for the given root
+      database, and close and delete the database *)
+  let generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
+      ~ledger_name_prefix root =
+    let open Deferred.Or_error.Let_syntax in
+    let root_hash = get_root_hash root in
+    let ledger_dirname =
+      get_directory root
+      |> Option.value_exn ~message:"Root ledger must have a directory"
+    in
+    let%bind tar_path =
+      Genesis_ledger_helper.Ledger.generate_tar ~logger ~target_dir
+        ~ledger_name_prefix ~root_hash ~ledger_dirname ()
+    in
+    let%map s3_data_hash =
+      Genesis_ledger_helper.sha3_hash tar_path
+      |> Deferred.map ~f:Or_error.return
+    in
+    Runtime_config.ledger_of_hashes
+      ~root_hash:(Mina_base.Ledger_hash.to_base58_check root_hash)
+      ~s3_data_hash ()
+
+  (** Bracket to close the temporary root ledger connections opened by
+      [copy_genesis_roots_and_diffs]. The underlying databases on disk are
+      created in a temporary build directory that will be automatically cleaned
+      up in [dump_reference_config]. *)
+  let with_root_close ledgers f =
+    let open Deferred.Or_error.Let_syntax in
+    let close () =
+      let genesis_ledger, genesis_staking_ledger, genesis_next_epoch_ledger =
+        ledgers
+      in
+      Root_ledger.close genesis_ledger ;
+      Root_ledger.close genesis_staking_ledger ;
+      Root_ledger.close genesis_next_epoch_ledger
+    in
+    try
+      let%map result = f () in
+      close () ; result
+    with exn -> close () ; raise exn
+
+  let generate_tars_and_configs ~get_directory ~get_root_hash ~logger
+      ~target_dir genesis_ledger genesis_staking_ledger
+      genesis_next_epoch_ledger =
+    let open Deferred.Or_error.Let_syntax in
+    Core.Unix.mkdir_p target_dir ;
+    let%bind genesis_ledger_config =
+      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
+        ~ledger_name_prefix:"genesis_ledger" genesis_ledger
+    in
+    let%bind genesis_staking_ledger_config =
+      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
+        ~ledger_name_prefix:"epoch_ledger" genesis_staking_ledger
+    in
+    let%map genesis_next_epoch_ledger_config =
+      generate_tar_and_config ~get_directory ~get_root_hash ~logger ~target_dir
+        ~ledger_name_prefix:"epoch_ledger" genesis_next_epoch_ledger
+    in
+    ( genesis_ledger_config
+    , genesis_staking_ledger_config
+    , genesis_next_epoch_ledger_config )
+
+  let make_full_config ~genesis_state_timestamp ~global_slot_since_genesis
+      ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
+      ( genesis_ledger_config
+      , genesis_staking_ledger_config
+      , genesis_next_epoch_ledger_config ) =
+    Runtime_config.make_automatic_fork_config ~genesis_state_timestamp
+      ~genesis_ledger_config ~global_slot_since_genesis ~state_hash
+      ~blockchain_length ~staking_ledger_config:genesis_staking_ledger_config
+      ~staking_epoch_seed:(Epoch_seed.to_base58_check staking_epoch_seed)
+      ~next_epoch_ledger_config:(Some genesis_next_epoch_ledger_config)
+      ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
+
+  let write_config_file ~filename daemon_config =
+    Async.Writer.save filename
+      ~contents:(Yojson.Safe.to_string (Runtime_config.to_yojson daemon_config))
+    |> Deferred.map ~f:Or_error.return
+
+  let write_stable_config_directory ~logger ~genesis_state_timestamp
+      ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+      ~next_epoch_seed ~blockchain_length ~config_dir genesis_ledger
+      genesis_staking_ledger genesis_next_epoch_ledger =
+    let open Deferred.Or_error.Let_syntax in
+    [%log debug]
+      "Generating database files and daemon.json for stable hard fork config" ;
+    Core.Unix.mkdir_p config_dir ;
+    let genesis_dir = config_dir ^/ "genesis" in
+    let%bind genesis_config =
+      generate_tars_and_configs ~get_directory:Ledger.Db.get_directory
+        ~get_root_hash:Ledger.Db.merkle_root ~logger ~target_dir:genesis_dir
+        genesis_ledger genesis_staking_ledger genesis_next_epoch_ledger
+    in
+    write_config_file
+      ~filename:(config_dir ^/ "daemon.json")
+      (make_full_config ~genesis_state_timestamp ~global_slot_since_genesis
+         ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
+         genesis_config )
+
+  let write_migrated_config_directory ~logger ~genesis_state_timestamp
+      ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+      ~next_epoch_seed ~blockchain_length ~config_dir genesis_ledger
+      genesis_staking_ledger genesis_next_epoch_ledger =
+    let open Deferred.Or_error.Let_syntax in
+    [%log debug]
+      "Generating database files and daemon.json for migrated hard fork config" ;
+    Core.Unix.mkdir_p config_dir ;
+    let genesis_dir = config_dir ^/ "genesis" in
+    let%bind genesis_config =
+      generate_tars_and_configs ~get_directory:Ledger.Hardfork_db.get_directory
+        ~get_root_hash:Ledger.Hardfork_db.merkle_root ~logger
+        ~target_dir:genesis_dir genesis_ledger genesis_staking_ledger
+        genesis_next_epoch_ledger
+    in
+    write_config_file
+      ~filename:(config_dir ^/ "daemon.json")
+      (make_full_config ~genesis_state_timestamp ~global_slot_since_genesis
+         ~state_hash ~blockchain_length ~staking_epoch_seed ~next_epoch_seed
+         genesis_config )
+
+  let generate_hardfork_configs ~logger
+      ~inputs:
+        { source_ledgers
+        ; global_slot_since_genesis
+        ; genesis_state_timestamp
+        ; state_hash
+        ; staking_epoch_seed
+        ; next_epoch_seed
+        ; blockchain_length
+        } ~build_dir directory_name =
+    let open Deferred.Or_error.Let_syntax in
+    let migrate_and_apply (root, diff) =
+      let%map.Deferred root = Root_ledger.make_converting root in
+      Ledger.Any_ledger.M.set_batch
+        (Root_ledger.as_unmasked root)
+        (Map.to_alist diff) ;
+      let stable_db, migrated_db_opt =
+        Root_ledger.unsafely_decompose_root root
+      in
+      let migrated_db =
+        migrated_db_opt
+        |> Option.value_exn
+             ~message:"Invariant: root was already made converting"
+      in
+      (stable_db, migrated_db)
+    in
+    [%log debug] "Copying hard fork genesis ledger inputs" ;
+    let ( genesis_ledger_data
+        , genesis_staking_ledger_data
+        , genesis_next_epoch_ledger_data ) =
+      copy_genesis_roots_and_diffs ~source_ledgers build_dir
+    in
+    with_root_close
+      ( fst genesis_ledger_data
+      , fst genesis_staking_ledger_data
+      , fst genesis_next_epoch_ledger_data )
+    @@ fun () ->
+    let%bind.Deferred genesis_ledger_legacy, genesis_ledger_migrated =
+      migrate_and_apply genesis_ledger_data
+    in
+    let%bind.Deferred ( genesis_staking_ledger_legacy
+                      , genesis_staking_ledger_migrated ) =
+      migrate_and_apply genesis_staking_ledger_data
+    in
+    let%bind.Deferred ( genesis_next_epoch_ledger_legacy
+                      , genesis_next_epoch_ledger_migrated ) =
+      migrate_and_apply genesis_next_epoch_ledger_data
+    in
+    [%log debug] "Writing hard fork config directories" ;
+    let%bind () =
+      write_stable_config_directory ~logger ~genesis_state_timestamp
+        ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+        ~next_epoch_seed ~blockchain_length
+        ~config_dir:(directory_name ^/ "fork_validation" ^/ "legacy")
+        genesis_ledger_legacy genesis_staking_ledger_legacy
+        genesis_next_epoch_ledger_legacy
+    in
+    let%bind () =
+      write_migrated_config_directory ~logger ~genesis_state_timestamp
+        ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
+        ~next_epoch_seed ~blockchain_length ~config_dir:directory_name
+        genesis_ledger_migrated genesis_staking_ledger_migrated
+        genesis_next_epoch_ledger_migrated
+    in
+    let activated_file_name = directory_name ^/ "activated" in
+    let%map () =
+      Async.Writer.with_file ~exclusive:true activated_file_name
+        ~f:(fun writer -> return (Async.Writer.writef writer ""))
+    in
+    [%log debug]
+      "Successfully generated and activated reference hard fork config"
+
+  let dump_reference_config ~breadcrumb_spec ~directory_name mina =
+    let open Deferred.Or_error.Let_syntax in
+    let logger = mina.config.logger in
+    Deferred.Or_error.try_with_join ~here:[%here]
+    @@ fun () ->
+    let%bind.Deferred dir_exists =
+      Mina_stdlib_unix.File_system.dir_exists directory_name
+    in
+    let%bind () =
+      if dir_exists then
+        Deferred.Or_error.error_string
+          "Requested config directory already exists"
+      else return ()
+    in
+    [%log debug] "Creating reference hard fork config in $directory_name"
+      ~metadata:[ ("directory_name", `String directory_name) ] ;
+    let%bind.Deferred () =
+      Mina_stdlib_unix.File_system.create_dir directory_name
+    in
+    let%bind inputs = prepare_inputs ~breadcrumb_spec mina in
+    Mina_stdlib_unix.File_system.with_temp_dir (directory_name ^/ "_build")
+      ~f:(fun build_dir ->
+        generate_hardfork_configs ~logger ~inputs ~build_dir directory_name )
+end
 
 let zkapp_cmd_limit t = t.config.zkapp_cmd_limit
 
