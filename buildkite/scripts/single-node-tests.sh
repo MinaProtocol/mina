@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -eox pipefail
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
