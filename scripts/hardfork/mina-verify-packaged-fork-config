@@ -138,23 +138,31 @@ export MINA_LIBP2P_PASS=''
 mkdir -p "$WORKDIR"/{ledgers{,-backup},keys}
 chmod 700 "$WORKDIR/keys"
 
-fork_block_state_hash=$(jq -r '.proof.fork.state_hash' "$2")
-fork_block_length=$(jq -r '.proof.fork.blockchain_length' "$2")
+fork_block_state_hash=$(jq -r '.proof.fork.state_hash' "$FORK_CONFIG")
+fork_block_length=$(jq -r '.proof.fork.blockchain_length' "$FORK_CONFIG")
 
-# Put the fork block where we want it, fetch it from gcloud if necessary
-if [ ! -e "$PRECOMPUTED_FORK_BLOCK" ]; then
-    if [ "$PRECOMPUTED_FORK_BLOCK" = "" ]; then
-        prefix=$4
-        if [ "$prefix" = "" ]; then
-            prefix="gs://mina_network_block_data/$1"
-        fi
-        PRECOMPUTED_FORK_BLOCK="$prefix-$fork_block_length-$fork_block_state_hash.json"
+# Fetch the precomputed fork block from local file or gcloud
+fetch_precomputed_fork_block() {
+    local network_name=$1
+    local fork_block_length=$2
+    local fork_block_state_hash=$3
+    local precomputed_block_prefix=$4
+    local dst=$5
+
+    # Put the fork block where we want it, fetch it from gcloud if necessary
+    if [[ -z "${PRECOMPUTED_FORK_BLOCK:-}" ]]; then
+        PRECOMPUTED_FORK_BLOCK="${precomputed_block_prefix:-gs://mina_network_block_data/$network_name}-$fork_block_length-$fork_block_state_hash.json"
     fi
-    "$GSUTIL" cp "$PRECOMPUTED_FORK_BLOCK" "$WORKDIR/precomputed_fork_block.json"
-else
-    cp "$PRECOMPUTED_FORK_BLOCK" "$WORKDIR/precomputed_fork_block.json"
-fi
 
+    local src="$PRECOMPUTED_FORK_BLOCK"
+    if [[ -e "$src" ]]; then
+        cp "$src" "$dst"
+    else
+        "$GSUTIL" cp "$src" "$dst"
+    fi
+}
+
+fetch_precomputed_fork_block "$NETWORK_NAME" "$fork_block_length" "$fork_block_state_hash" "$PRECOMPUTED_BLOCK_PREFIX" "$WORKDIR/precomputed_fork_block.json"
 
 if [ ! -e "$WORKDIR/keys/p2p" ]; then
     "$MINA_EXE" libp2p generate-keypair --privkey-path "$WORKDIR/keys/p2p"
