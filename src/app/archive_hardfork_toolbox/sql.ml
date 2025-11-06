@@ -9,16 +9,14 @@ module Protocol_version = struct
 
   let of_string : string -> t = function
     | version_str -> (
-        String.split version_str ~on:'.'
-        |> List.map ~f:Int.of_string
-        |> function
-        | [ transaction; network; patch ] ->
-            { transaction; network; patch }
-        | _ ->
-            failwithf
-              "Invalid protocol version string: %s. Expected format \
-               <network>.<transaction>.<patch>"
-              version_str () )
+        try
+          Scanf.sscanf version_str "%d.%d.%d" (fun transaction network patch ->
+              { transaction; network; patch } )
+        with _ ->
+          failwithf
+            "Invalid protocol version string: %s. Expected format \
+             <network>.<transaction>.<patch>"
+            version_str () )
 
   let to_string { transaction; network; patch } =
     sprintf "%d.%d.%d" network transaction patch
