@@ -280,7 +280,8 @@ for file in "$WORKDIR"/ledgers/*.tar.gz; do
         $MINA_ROCKSDB_SCANNER --db-path "$tardir/$kind" --output-file "$WORKDIR/$kind.scan"
     done
 
-    if ! cmp "$WORKDIR/generated.scan" "$WORKDIR/packaged.scan" || ! cmp "$WORKDIR/packaged.scan" "$WORKDIR/web.scan"; then
+    if ! ( cmp -s "$WORKDIR/generated.scan" "$WORKDIR/packaged.scan" && \
+           cmp -s "$WORKDIR/packaged.scan" "$WORKDIR/web.scan" ); then
         echo "Error: kvdb contents mismatch for $tarname" >&2
         error=1
     fi
