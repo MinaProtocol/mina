@@ -672,6 +672,7 @@ module For_tests = struct
           Persistent_frontier.create ~logger ~verifier
             ~time_controller:(Block_time.Controller.basic ~logger)
             ~directory:frontier_dir ~signature_kind:Testnet
+            ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->

@@ -618,6 +618,7 @@ let run ?(sync_local_state = true) ?(cache_exceptions = false)
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location
           ~signature_kind
+          ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger

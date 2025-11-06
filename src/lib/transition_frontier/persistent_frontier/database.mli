@@ -45,7 +45,7 @@ module Error : sig
   val message : t -> string
 end
 
-val create : logger:Logger.t -> directory:string -> t
+val create : logger:Logger.t -> directory:string -> ledger_depth:int -> t
 
 val close : t -> unit
 

@@ -98,6 +98,7 @@ and Factory_type : sig
     ; verifier : Verifier.t
     ; time_controller : Block_time.Controller.t
     ; signature_kind : Mina_signature_kind.t
+    ; ledger_depth : int
     ; mutable instance : Instance_type.t option
     }
 end =
@@ -112,6 +113,7 @@ module Instance = struct
   let create factory =
     let db =
       Database.create ~logger:factory.logger ~directory:factory.directory
+        ~ledger_depth:factory.ledger_depth
     in
     { db; sync = None; factory }
 
@@ -415,13 +417,15 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~verifier ~time_controller ~directory ~signature_kind =
+let create ~logger ~verifier ~time_controller ~directory ~signature_kind
+    ~ledger_depth =
   { logger
   ; verifier
   ; time_controller
   ; directory
   ; signature_kind
   ; instance = None
+  ; ledger_depth
   }
 
 let destroy_database_exn t =

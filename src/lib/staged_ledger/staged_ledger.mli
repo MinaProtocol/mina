@@ -231,12 +231,13 @@ module Update_coinbase_stack_and_get_data_result : sig
             Pending_coinbase.Stack_versioned.Stable.V1.t
             * Pending_coinbase.Stack_versioned.Stable.V1.t ]
         * [ `First_pass_ledger_end of Frozen_ledger_hash.Stable.V1.t ]
+        * Ledger.Mask_maps.Stable.V1.t
 
       val to_latest : t -> t
     end
   end]
 
-  type t =
+  type t_ =
     bool
     * Transaction_snark_scan_state.Transaction_with_witness.t list
     * Pending_coinbase.Update.Action.t
@@ -247,10 +248,15 @@ module Update_coinbase_stack_and_get_data_result : sig
       ]
     * [ `First_pass_ledger_end of Frozen_ledger_hash.t ]
 
-  val read_all_proofs_from_disk : t -> Stable.Latest.t
+  type t = t_ * Ledger.Mask_maps.t
+
+  val read_all_proofs_from_disk : ledger_depth:int -> t -> Stable.Latest.t
 
   val write_all_proofs_to_disk :
-    proof_cache_db:Proof_cache_tag.cache_db -> Stable.Latest.t -> t
+       ledger_depth:int
+    -> proof_cache_db:Proof_cache_tag.cache_db
+    -> Stable.Latest.t
+    -> t
 end
 
 val apply :
@@ -453,7 +459,7 @@ module Test_helpers : sig
     -> Transaction.t With_status.t list
     -> Zkapp_precondition.Protocol_state.View.t
     -> Frozen_ledger_hash.t * Frozen_ledger_hash.t
-    -> ( Update_coinbase_stack_and_get_data_result.t
+    -> ( Update_coinbase_stack_and_get_data_result.t_
        , Staged_ledger_error.t )
        Deferred.Result.t
 end

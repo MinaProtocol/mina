@@ -144,6 +144,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~directory:chain_state_locations.frontier
       ~time_controller:(Block_time.Controller.basic ~logger)
       ~signature_kind
+      ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
   in
   let%bind.Deferred.Result proof_cache_db =
     Proof_cache_tag.create_db ~logger chain_state_locations.proof_cache

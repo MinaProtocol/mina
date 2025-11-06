@@ -782,7 +782,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
        and type hash := Hash.t
-       and type parent := Base.t = Merkle_mask.Masking_merkle_tree.Make (struct
+       and type parent := Base.t
+       and type maps_t = Inputs.maps_t =
+  Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Base
   end)
@@ -805,6 +807,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type accumulated_t = Mask.accumulated_t
        and type t := Base.t = struct
     type accumulated_t = Mask.accumulated_t
+
+    type maps_t = Inputs.maps_t
 
     include Merkle_mask.Maskable_merkle_tree.Make (struct
       include Inputs

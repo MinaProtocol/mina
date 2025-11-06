@@ -70,7 +70,7 @@ let to_block
   in
   let cmds =
     match update_coinbase_stack_and_get_data_result with
-    | Update_coinbase_stack_and_get_data_result (_, witnesses, _, _, _) ->
+    | Update_coinbase_stack_and_get_data_result (_, witnesses, _, _, _, _) ->
         List.filter_map ~f:witness_to_cmd witnesses
     | Commands commands ->
         commands
@@ -83,7 +83,7 @@ let to_block
       }
 
 let take_hashes_from_witnesses ~proof_cache_db
-    ~(witnesses : Transaction_snark_scan_state.Transaction_with_witness.t list)
+    ~update_coinbase_stack_and_get_data_result:((_, witnesses, _, _, _), _)
     block =
   let header = Mina_block.Stable.Latest.header block in
   let { Staged_ledger_diff.Body.Stable.Latest.staged_ledger_diff = { diff } } =
@@ -111,7 +111,7 @@ let take_hashes_from_witnesses ~proof_cache_db
   let body' = Staged_ledger_diff.Body.create { diff = diff' } in
   Mina_block.create ~header ~body:body'
 
-let of_validate_block ?update_coinbase_stack_and_get_data_result
+let of_validated_block ?update_coinbase_stack_and_get_data_result ~ledger_depth
     (block : Mina_block.Validated.t) =
   let diff =
     Mina_block.Validated.body block
@@ -124,7 +124,7 @@ let of_validate_block ?update_coinbase_stack_and_get_data_result
         Update_coinbase_stack_and_get_data_result_or_commands.Stable.Latest
         .Update_coinbase_stack_and_get_data_result
           (Staged_ledger.Update_coinbase_stack_and_get_data_result
-           .read_all_proofs_from_disk upd )
+           .read_all_proofs_from_disk ~ledger_depth upd )
     | None ->
         Commands (Staged_ledger_diff.commands diff |> List.map ~f:read_proofs)
   in

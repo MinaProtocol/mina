@@ -257,19 +257,20 @@ end
 
 module Rocks = Rocksdb.Serializable.GADT.Make (Schema)
 
-type t = { directory : string; logger : Logger.t; db : Rocks.t }
+type t =
+  { directory : string; logger : Logger.t; db : Rocks.t; ledger_depth : int }
 
-let create ~logger ~directory =
+let create ~logger ~directory ~ledger_depth =
   if not (Result.is_ok (Unix.access directory [ `Exists ])) then
     Unix.mkdir ~perm:0o766 directory ;
-  { directory; logger; db = Rocks.create directory }
+  { directory; logger; db = Rocks.create directory; ledger_depth }
 
 let close t = Rocks.close t.db
 
 open Schema
 open Rocks
 
-type batch_t = Batch.t
+type batch_t = { batch : Batch.t; ledger_depth : int }
 
 let get_if_exists db ~default ~key =
   match get db ~key with Some x -> x | None -> default
@@ -413,7 +414,9 @@ let initialize t ~root_data =
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Transition_extended root_state_hash)
-        ~data:(Extended_block.of_validate_block root_transition) ;
+        ~data:
+          (Extended_block.of_validated_block ~ledger_depth:t.ledger_depth
+             root_transition ) ;
       Batch.set batch ~key:(Arcs root_state_hash) ~data:[] ;
       Batch.set batch ~key:Root_hash ~data:root_state_hash ;
       Batch.set batch ~key:Root_common
@@ -451,10 +454,10 @@ let find_arcs_and_root t ~(arcs_cache : State_hash.t list State_hash.Table.t)
 
 let set_transition ~update_coinbase_stack_and_get_data_result ~transition =
   let hash = Mina_block.Validated.state_hash transition in
-  fun batch ->
+  fun ({ batch; ledger_depth } : batch_t) ->
     Batch.set batch ~key:(Transition_extended hash)
       ~data:
-        (Extended_block.of_validate_block
+        (Extended_block.of_validated_block ~ledger_depth
            ?update_coinbase_stack_and_get_data_result transition )
 
 let add ~update_coinbase_stack_and_get_data_result ~arcs_cache ~transition =
@@ -467,8 +470,9 @@ let add ~update_coinbase_stack_and_get_data_result ~arcs_cache ~transition =
   let parent_arcs = State_hash.Table.find_exn arcs_cache parent_hash in
   State_hash.Table.set arcs_cache ~key:parent_hash ~data:(hash :: parent_arcs) ;
   State_hash.Table.set arcs_cache ~key:hash ~data:[] ;
-  fun batch ->
-    set_transition ~update_coinbase_stack_and_get_data_result ~transition batch ;
+  fun ({ batch; ledger_depth } : batch_t) ->
+    set_transition ~update_coinbase_stack_and_get_data_result ~transition
+      { ledger_depth; batch } ;
     Batch.set batch ~key:(Arcs hash) ~data:[] ;
     Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs)
 
@@ -476,7 +480,7 @@ let move_root ~old_root_hash ~new_root ~garbage =
   let new_root_hash =
     (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
   in
-  fun batch ->
+  fun ({ batch; _ } : batch_t) ->
     Batch.remove batch ~key:Root ;
     Batch.set batch ~key:Root_hash ~data:new_root_hash ;
     Batch.set batch ~key:Root_common
@@ -523,15 +527,17 @@ let get_transition ~logger ~signature_kind ~proof_cache_db t hash =
     update_coinbase_stack_and_get_data_result
     |> Option.map ~f:(fun x ->
            Staged_ledger.Update_coinbase_stack_and_get_data_result
-           .write_all_proofs_to_disk ~proof_cache_db x )
+           .write_all_proofs_to_disk ~ledger_depth:t.ledger_depth
+             ~proof_cache_db x )
   in
   [%log internal]
     "Update_coinbase_stack_and_get_data_result_write_proofs_to_disk_done"
     ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
   let cache_block, loaded_from_extended_block =
     match update_coinbase_stack_and_get_data_result with
-    | Some (_, witnesses, _, _, _) ->
-        ( Extended_block.take_hashes_from_witnesses ~proof_cache_db ~witnesses
+    | Some res ->
+        ( Extended_block.take_hashes_from_witnesses ~proof_cache_db
+            ~update_coinbase_stack_and_get_data_result:res
         , true )
     | None ->
         ( Mina_block.write_all_proofs_to_disk ~signature_kind ~proof_cache_db
@@ -570,7 +576,7 @@ let get_best_tip t =
   [%log' internal t.logger] "Get_best_tip_done" ;
   result
 
-let set_best_tip data = Batch.set ~key:Best_tip ~data
+let set_best_tip data { batch; _ } = Batch.set ~key:Best_tip ~data batch
 
 let rec crawl_successors ~logger ~signature_kind ~proof_cache_db ?max_depth t
     hash ~init ~f =
@@ -614,4 +620,6 @@ let rec crawl_successors ~logger ~signature_kind ~proof_cache_db ?max_depth t
           crawl_successors ~logger ~signature_kind ~proof_cache_db
             ?max_depth:remaining_depth t succ_hash ~init:init' ~f )
 
-let with_batch t = Batch.with_batch t.db
+let with_batch t ~f =
+  Batch.with_batch t.db ~f:(fun batch ->
+      f { batch; ledger_depth = t.ledger_depth } )

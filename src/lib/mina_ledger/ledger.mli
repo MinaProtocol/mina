@@ -12,6 +12,8 @@ type maps_t =
   ; non_existent_accounts : Account_id.Set.t
   }
 
+module Mask_maps : Mask_maps.S with type t = maps_t
+
 module Db :
   Merkle_ledger.Intf.Ledger.DATABASE
     with module Location = Location

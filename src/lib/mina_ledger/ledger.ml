@@ -195,14 +195,20 @@ module Ledger_inner = struct
 
   module Inputs = struct
     include Make_inputs (Account.Stable.Latest) (Hash.Stable.Latest)
+    module Mask_maps = Mask_maps.F (Location_at_depth)
 
-    type nonrec maps_t =
+    type maps_t = Mask_maps.t =
       { accounts : Account.t Location.Map.t
       ; token_owners : Account_id.t Token_id.Map.t
       ; hashes : Hash.t Location.Addr.Map.t
       ; locations : Location.t Account_id.Map.t
       ; non_existent_accounts : Account_id.Set.t
       }
+  end
+
+  module Mask_maps = struct
+    include Mask_maps
+    include Inputs.Mask_maps
   end
 
   type maps_t = Inputs.maps_t =
