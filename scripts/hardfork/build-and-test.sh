@@ -3,9 +3,10 @@
 # This scripts builds compatible and current branch with nix
 # 0. Prepare environment if needed
 # 1. Build compatible as a prefork build;
-# 2. Build current branch(not compatible) as a postfork build;
-# 3. Build hardfork_test on current branch;
-# 4. Upload to nix cache 
+# 2. Upload to nix cache, the reason for not uploading cache for following 2 
+# steps is that they change for each PR. 
+# 3. Build current branch(not compatible) as a postfork build;
+# 4. Build hardfork_test on current branch;
 # 5. Execute hardfork_test on them.
 
 # Step 0. Prepare environment if needed
@@ -74,16 +75,7 @@ git checkout origin/compatible
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
-# 2. Build current branch(not compatible) as a postfork build;
-git checkout -
-git submodule update --init --recursive --depth 1
-nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
-
-
-# 3. Build hardfork_test on current branch;
-nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
-
-# 4. Upload to nix cache 
+# 2. Upload to nix cache 
 
 if [[ -n "${NIX_CACHE_GCP_ID:-}" ]] && [[ -n "${NIX_CACHE_GCP_SECRET:-}" ]]; then
   mkdir -p $HOME/.aws
@@ -97,6 +89,14 @@ EOF
     --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" \
     --stdin </tmp/nix-paths
 fi
+
+# 3. Build current branch(not compatible) as a postfork build;
+git checkout -
+git submodule update --init --recursive --depth 1
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "postfork-devnet"
+
+# 4. Build hardfork_test on current branch;
+nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#hardfork_test" --out-link "hardfork_test"
 
 # 5. Execute hardfork_test on them.
 
