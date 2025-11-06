@@ -4857,6 +4857,9 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
         (fun () extensional_block ->
           Strict_pipe.Writer.write extensional_block_writer extensional_block )
+    ; Async.Rpc.Rpc.implement Archive_rpc.shutdown (fun () () ->
+          [%log info] "Received shutdown signal from daemon!, shutting down" ;
+          Shutdown.exit 0 )
     ]
   in
   match Mina_caqti.connect_pool ~max_size:30 postgres_address with
