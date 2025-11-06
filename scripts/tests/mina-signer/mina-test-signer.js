@@ -133,6 +133,8 @@ class PaymentApp {
       const paymentId = result?.data?.sendPayment?.payment?.id;
       if (!paymentId) {
         record('GraphQL submission', false, 'No payment id returned');
+        logger.error('Full GraphQL response:');
+        logger.error(JSON.stringify(result, null, 2));
         throw new Error('GraphQL response did not include a payment id.');
       }
       record('GraphQL submission', true, `Payment id ${paymentId}`);
@@ -163,7 +165,15 @@ class PaymentApp {
     } catch (error) {
       logger.error(`Application error: ${error.message}`);
       if (error.response) {
-        logger.error(`Response: ${JSON.stringify(error.response)}`);
+        logger.error(`Response status: ${error.response.status}`);
+        logger.error(`Response headers: ${JSON.stringify(error.response.headers)}`);
+        logger.error(`Response data: ${JSON.stringify(error.response.data, null, 2)}`);
+      }
+      if (error.cause) {
+        logger.error(`Error cause: ${error.cause.message || JSON.stringify(error.cause)}`);
+      }
+      if (error.stack) {
+        logger.error(`Stack trace: ${error.stack}`);
       }
       record('Run status', false, error.message);
       logger.summary(summary);
