@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# This scripts builds compatible and current branch with nix
+# This scripts builds master and current branch with nix
 # 0. Prepare environment if needed
-# 1. Build compatible as a prefork build;
+# 1. Build master as a prefork build;
 # 2. Upload to nix cache, the reason for not uploading cache for following 2 
 # steps is that they change for each PR. 
 # 3. Build current branch as a postfork build;
@@ -70,8 +70,8 @@ if [ -n "${BUILDKITE:-}" ]; then
   git fetch origin
 fi
 
-# 1. Build compatible as a prefork build;
-git checkout origin/compatible
+# 1. Build master as a prefork build;
+git checkout origin/master
 git submodule update --init --recursive --depth 1
 nix "${NIX_OPTS[@]}" build "$PWD?submodules=1#devnet" --out-link "prefork-devnet"
 
