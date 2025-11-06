@@ -40,7 +40,10 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; hashes = Map.merge_skewed ~combine base.hashes hashes
     ; locations = Map.merge_skewed ~combine base.locations locations
     ; non_existent_accounts =
-        Account_id.Set.union base.non_existent_accounts non_existent_accounts
+        Account_id.Set.(
+          union
+            (diff base.non_existent_accounts @@ of_map_keys locations)
+            non_existent_accounts)
     }
 
   (** Structure managing cache accumulated since the "base" ledger.
