@@ -62,9 +62,6 @@ const logger = {
   },
 };
 
-// Simple sleep helper (ms)
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 /**
  * Orchestrates the CLI flow by coordinating validation, signing, submission,
  * and follow-up checks against the daemon.
@@ -180,11 +177,6 @@ class PaymentApp {
       }
       record('Run status', false, error.message);
       logger.summary(summary);
-      
-      // Wait here for 4 hours before exiting
-      logger.info('Pausing for 4 hours before exiting...');
-      await sleep(4 * 60 * 60 * 1000);
-
       process.exit(1);
     }
   }
