@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -Eeuxo pipefail
+
 usage() {
     cat <<EOF
 Usage: $0 --network <name> --fork-config <fork-config.json> --working-dir <dir> [options]
