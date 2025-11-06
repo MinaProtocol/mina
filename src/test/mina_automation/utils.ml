@@ -44,7 +44,15 @@ let dedup_and_sort_archive_files files : string list =
 
 let force_kill process =
   Process.send_signal process Core.Signal.kill ;
-  Deferred.map (Process.wait process) ~f:Or_error.return
+  match%map Process.wait process with
+  | Ok () ->
+      Ok (`Exited 0)
+  | Error (`Exit_non_zero exit_code) ->
+      Ok (`Exited exit_code)
+  | Error (`Signal signal) when Signal.(equal signal kill) ->
+      Ok `Sig_killed
+  | Error (`Signal signal) ->
+      Or_error.errorf "Process exited with signal %s" (Signal.to_string signal)
 
 (** [get_memory_usage_mib pid] retrieves the memory usage in mebibytes for the process
   with the given [pid].

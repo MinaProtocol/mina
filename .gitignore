@@ -34,12 +34,6 @@ target
 ./release
 .vscode
 
-### IntelliJ IDEA ###
-**/.idea/
-*.iws
-*.iml
-*.ipr
-
 ### Direnv ###
 .env
 .envrc

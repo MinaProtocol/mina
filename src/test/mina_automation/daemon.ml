@@ -163,7 +163,8 @@ end
 module Process = struct
   type t = { process : Process.t; config : Config.t; client : Client.t }
 
-  (** [force_kill t] sends a kill signal to the process associated with [t] and waits for the process to terminate.
+  (** [force_kill t] sends a kill signal to the process associated with [t] and 
+      waits for the process to terminate.
     @param t The daemon instance containing the process to be killed.
     @return A deferred result indicating the success or failure of the operation.
   *)
@@ -207,7 +208,6 @@ let start t =
     [ "daemon"
     ; "--seed"
     ; "--demo-mode"
-    ; "--background"
     ; "--working-dir"
     ; "."
     ; "--client-port"

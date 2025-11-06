@@ -104,12 +104,12 @@ if [[ "${INSTALL_BINFMT}" = "1" ]]; then
   echo "[binfmt] Ensuring emulators are installed (driver: $CURRENT_DRIVER)"
 
   # Install all requested emulators in one shot (idempotent)
-  docker run --privileged --rm tonistiigi/binfmt --install "$(IFS=','; echo "${_ARCHES[*]}")" >/dev/null || {
+  docker run --privileged --rm europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/tonistiigi/binfmt:latest --install "$(IFS=','; echo "${_ARCHES[*]}")" >/dev/null || {
     echo "[binfmt] ERROR: Failed to install binfmt for: ${_ARCHES[*]}" >&2
     exit 1
   }
 
-  # Smoke-test non-native arches using busybox where applicable
+  # Smoke-test non-native arches using europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/busybox:latest where applicable
   # Build map from arch -> platform string
   for a in "${_ARCHES[@]}"; do
     # Skip test for native arch
@@ -118,7 +118,7 @@ if [[ "${INSTALL_BINFMT}" = "1" ]]; then
     fi
     platform="linux/${a}"
     echo "[binfmt] Smoke test for ${platform} ..."
-    if docker run --rm --platform="$platform" busybox uname -m 2>/dev/null | grep -qiE 'aarch64|arm64|x86_64|amd64|ppc64le|s390x|riscv64'; then
+    if docker run --rm --platform="$platform" europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/busybox:latest uname -m 2>/dev/null | grep -qiE 'aarch64|arm64|x86_64|amd64|ppc64le|s390x|riscv64'; then
       echo "[binfmt] OK: ${platform} emulation working"
     else
       echo "[binfmt] WARNING: ${platform} smoke test did not confirm; emulation may still be fine depending on image availability" >&2
