@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
-
-if [ $# -lt 3 ]; then
-    echo "Usage: $0 <network-name> <fork-config.json> <working-dir> <optional: precomputed block prefix>"
+usage() {
     cat <<EOF
+Usage: $0 --network <name> --fork-config <fork-config.json> --working-dir <dir> [options]
+
+Required:
+  --network                   Name of the network
+  --fork-config               Path to fork_config.json
+  --working-dir               Working directory
+
+Optional:
+  --precomputed-block-prefix  Precomputed block prefix
+
 This script is used to validate that an installed package is correct
 according to an exported fork_config.json file.
 
@@ -36,6 +43,54 @@ Outputs:
 EOF
 
     exit 1
+}
+
+PRECOMPUTED_BLOCK_PREFIX=""
+
+# Parse named flags
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --network)
+            NETWORK_NAME="$2"
+            shift 2
+            ;;
+        --fork-config)
+            FORK_CONFIG="$2"
+            shift 2
+            ;;
+        --working-dir)
+            workdir="$2"
+            shift 2
+            ;;
+        --precomputed-block-prefix)
+            PRECOMPUTED_BLOCK_PREFIX="$2"
+            shift 2
+            ;;
+        -*)
+            echo "Unknown option $1"
+            usage
+            ;;
+        *)
+            echo "Unexpected argument $1"
+            usage
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [[ -z "$NETWORK_NAME" ]]; then
+    echo "Error: --network is required"
+    usage
+fi
+
+if [[ -z "$FORK_CONFIG" ]]; then
+    echo "Error: --fork-config is required"
+    usage
+fi
+
+if [[ -z "$workdir" ]]; then
+    echo "Error: --working-dir is required"
+    usage
 fi
 
 source_build_fallback() {
@@ -59,7 +114,7 @@ CREATE_RUNTIME_CONFIG=${CREATE_RUNTIME_CONFIG:-$(source_build_fallback mina-hf-c
 MINA_ROCKSDB_SCANNER=${MINA_ROCKSDB_SCANNER:-$(source_build_fallback mina-rocksdb-scanner ./_build/default/src/app/rocksdb-scanner/rocksdb_scanner.exe)}
 GSUTIL=${GSUTIL:-$(command -v gsutil || echo "")}
 
-if [[ ! -e "$PRECOMPUTED_FORK_BLOCK" && ( -z "$GSUTIL" || ! -x "$GSUTIL" ) ]]; then
+if [[ ! -e "${PRECOMPUTED_FORK_BLOCK:-}" && ( -z "$GSUTIL" || ! -x "$GSUTIL" ) ]]; then
     echo "Error: gsutil is required when PRECOMPUTED_FORK_BLOCK is nonexistent path"
     exit 1
 fi
@@ -80,7 +135,6 @@ export FORKING_FROM_CONFIG_JSON=${FORKING_FROM_CONFIG_JSON:-$(source_build_fallb
 
 export MINA_LIBP2P_PASS=''
 
-workdir=$3
 mkdir -p "$workdir"/{ledgers{,-backup},keys}
 chmod 700 "$workdir/keys"
 
@@ -122,14 +176,14 @@ result=$(jq --slurpfile block "$workdir/precomputed_fork_block.json" \
    $legacy_hashes[0].ledger.hash == $block[0].data.protocol_state.body.blockchain_state.staged_ledger_hash.non_snark.ledger_hash)')
 
 if [ "$result" != "true" ]; then
-    echo "Hashes in config $2 don't match hashes from the precomputed block $PRECOMPUTED_FORK_BLOCK" >&2
+    echo "Hashes in config $FORK_CONFIG don't match hashes from the precomputed block $PRECOMPUTED_FORK_BLOCK" >&2
     exit 1
 fi
 
 sed -i -e 's/"set_verification_key": "signature"/"set_verification_key": {"auth": "signature", "txn_version": "2"}/g' "$workdir/config.json"
 "$MINA_GENESIS_EXE" --config-file "$workdir/config.json" --genesis-dir "$workdir/ledgers" --hash-output-file "$workdir/hashes.json"
 
-FORK_CONFIG_JSON="$2" \
+FORK_CONFIG_JSON="$FORK_CONFIG" \
 LEDGER_HASHES_JSON="$workdir/hashes.json" \
 GENESIS_TIMESTAMP=$(jq -r '.genesis.genesis_state_timestamp' "$PACKAGED_DAEMON_CONFIG") \
 "$CREATE_RUNTIME_CONFIG" > "$workdir/config-substituted.json"
