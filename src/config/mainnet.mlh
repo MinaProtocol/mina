@@ -76,7 +76,6 @@
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]
 [%%define vrf_poll_interval 5000]
-[%%define zkapp_cmd_limit 24]
 [%%undef scan_state_transaction_capacity_log_2]
 
 (* Constants determining sync ledger query/response size*)
