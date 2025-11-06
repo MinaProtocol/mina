@@ -106,7 +106,7 @@ let convert_chain_to_canonical_command =
 let fetch_last_filled_block_command =
   Async.Command.async ~summary:"Select last filled block"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres in
-     Logic.fetch_last_filled_block ~postgres_uri )
+     fetch_last_filled_block ~postgres_uri )
 
 (* TODO: consider refactor these commands to reuse queries in the future. *)
 let commands =
