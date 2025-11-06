@@ -2,8 +2,8 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on the given debian or ubuntu image
 #################################################################################################
-# Supports debian:bullseye-slim, and ubuntu:focal
-ARG image=ubuntu:focal
+# Supports europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/debian:bullseye-slim, and europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
+ARG image=europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/ubuntu:focal
 # Use the image argument to select the base image for this stage
 # This allows us to use the same Dockerfile for different base images
 # This arg is defined here globally and does not need to be redefined in
@@ -45,6 +45,7 @@ ARG OPAM_VERSION=2.3.0
 #   `nix flake update opam-repository`).
 # - scripts/update_opam_switch.sh
 ARG OPAM_REPOSITORY_COMMIT=08d8c16c16dc6b23a5278b06dff0ac6c7a217356
+ARG O1LABS_OPAM_REPOSITORY_COMMIT=dd90c5c72b7b7caeca3db3224b2503924deea08a
 
 # Golang version number used to detemine tarball name
 ARG GO_VERSION=1.19.11
@@ -93,6 +94,7 @@ RUN apt-get update --quiet \
   git-lfs \
   m4 \
   pkg-config \
+  rocksdb-tools \
   rsync \
   sudo \
   unzip \
@@ -189,10 +191,12 @@ RUN opam init --disable-sandboxing \
     -k git \
     -a /home/opam/opam-repository \
     --bare
+# We pin the opam-repo SHA so this step gets 
+# cache-busted when we update the opam repo
 RUN opam repository add --yes \
     --all \
     --set-default o1-labs \
-    https://github.com/o1-labs/opam-repository.git \
+    https://github.com/o1-labs/opam-repository.git#${O1LABS_OPAM_REPOSITORY_COMMIT} \
   && opam switch create "${OCAML_VERSION}${OCAML_REVISION}" \
     "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
   && opam switch "${OCAML_VERSION}${OCAML_REVISION}"

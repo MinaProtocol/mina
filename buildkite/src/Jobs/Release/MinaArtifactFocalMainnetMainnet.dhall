@@ -32,6 +32,9 @@ in  Pipeline.build
             [ PipelineTag.Type.Long
             , PipelineTag.Type.Release
             , PipelineTag.Type.Stable
+            , PipelineTag.Type.Mainnet
+            , PipelineTag.Type.Amd64
+            , PipelineTag.Type.Focal
             ]
           , profile = Profiles.Type.Mainnet
           , scope =

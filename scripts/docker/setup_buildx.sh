@@ -33,7 +33,7 @@
 #   - Handles special case for 'docker' driver (uses default builder)
 #   - Creates or reuses existing builders for other drivers
 #   - Bootstraps builder instances
-#   - Installs binfmt emulation for cross-architecture builds
+#   - Installs binfmt emulation for cross-architecture builds (now independent of driver)
 #   - Provides summary of available builders
 #
 # REQUIREMENTS:
@@ -41,12 +41,10 @@
 #   - Privileged access (for binfmt installation)
 set -euo pipefail
 
-
-
 # Config (override via env or args)
 NAME="${1:-${BUILDX_NAME:-xbuilder}}"
 DRIVER="${DRIVER:-docker}"            # docker | docker-container | kubernetes
-ARCHS="${ARCHS:-arm64}"               # binfmt architectures to install
+ARCHS="${ARCHS:-arm64}"               # binfmt architectures to install (comma-separated)
 INSTALL_BINFMT="${INSTALL_BINFMT:-1}"
 
 command -v docker >/dev/null || { echo "docker not found"; exit 1; }
@@ -62,12 +60,12 @@ use_builder () {
 # Special case: docker driver can only have ONE instance (the implicit 'default')
 if [[ "$DRIVER" == "docker" ]]; then
   echo "[buildx] Using 'docker' driver -> switching to existing 'default' builder"
-  use_builder default || {
+  if ! use_builder default; then
     # On some setups 'default' exists but isn't initialized yet; bootstrap via inspect
     docker buildx create --name default --driver docker --use || true
     docker buildx inspect default --bootstrap >/dev/null || true
     docker buildx use default
-  }
+  fi
 else
   # For docker-container (recommended) or other drivers: create or reuse NAME
   if docker buildx inspect "$NAME" >/dev/null 2>&1; then
@@ -84,14 +82,52 @@ fi
 echo "[buildx] Bootstrapping current builder"
 docker buildx inspect --bootstrap >/dev/null
 
-# Install binfmt only when using docker-container (useful for cross-building)
+# Snapshot builder/driver for logs
 CURRENT_BUILDER="$(docker buildx ls | awk '/\*/{gsub(/\*/, "", $1); print $1}')"
 CURRENT_DRIVER="$(docker buildx inspect "$CURRENT_BUILDER" | awk -F': ' '/Driver:/ {print $2}')"
 
-if [[ "$INSTALL_BINFMT" = "1" && "$CURRENT_DRIVER" = "docker-container" ]]; then
-  echo "[binfmt] Ensuring $ARCHS emulation is installed"
-  docker run --privileged --rm tonistiigi/binfmt --install "$ARCHS" >/dev/null
+# --- NEW: Ensure binfmt (QEMU) regardless of driver when requested ---
+if [[ "${INSTALL_BINFMT}" = "1" ]]; then
+  # Normalize commas/spaces, split into array
+  IFS=',' read -r -a _ARCHES <<<"$(echo "$ARCHS" | tr -d ' ')"
+
+  # Map host arch to docker "platform arch" names for quick decisions
+  HOST_UNAME="$(uname -m)"
+  case "$HOST_UNAME" in
+    x86_64)  HOST_ARCH_DOCKER="amd64"   ;;
+    aarch64) HOST_ARCH_DOCKER="arm64"   ;;
+    arm64)   HOST_ARCH_DOCKER="arm64"   ;;
+    *)       HOST_ARCH_DOCKER="$HOST_UNAME" ;;
+  esac
+
+  echo "[binfmt] Requested arches: ${_ARCHES[*]} (host: $HOST_UNAME -> $HOST_ARCH_DOCKER)"
+  echo "[binfmt] Ensuring emulators are installed (driver: $CURRENT_DRIVER)"
+
+  # Install all requested emulators in one shot (idempotent)
+  docker run --privileged --rm europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/tonistiigi/binfmt:latest --install "$(IFS=','; echo "${_ARCHES[*]}")" >/dev/null || {
+    echo "[binfmt] ERROR: Failed to install binfmt for: ${_ARCHES[*]}" >&2
+    exit 1
+  }
+
+  # Smoke-test non-native arches using europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/busybox:latest where applicable
+  # Build map from arch -> platform string
+  for a in "${_ARCHES[@]}"; do
+    # Skip test for native arch
+    if [[ "$a" == "$HOST_ARCH_DOCKER" ]]; then
+      continue
+    fi
+    platform="linux/${a}"
+    echo "[binfmt] Smoke test for ${platform} ..."
+    if docker run --rm --platform="$platform" europe-west3-docker.pkg.dev/o1labs-192920/euro-docker-repo/busybox:latest uname -m 2>/dev/null | grep -qiE 'aarch64|arm64|x86_64|amd64|ppc64le|s390x|riscv64'; then
+      echo "[binfmt] OK: ${platform} emulation working"
+    else
+      echo "[binfmt] WARNING: ${platform} smoke test did not confirm; emulation may still be fine depending on image availability" >&2
+    fi
+  done
+else
+  echo "[binfmt] Skipped (INSTALL_BINFMT=${INSTALL_BINFMT})"
 fi
+# --------------------------------------------------------------------
 
 echo
 echo "[summary]"

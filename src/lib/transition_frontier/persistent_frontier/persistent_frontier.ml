@@ -5,6 +5,7 @@ open Mina_state
 open Mina_block
 open Frontier_base
 module Database = Database
+module Root_ledger = Mina_ledger.Root
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -56,7 +57,7 @@ let construct_staged_ledger_at_root ~proof_cache_db
     | Some protocol_state ->
         Ok protocol_state
   in
-  let mask = Mina_ledger.Ledger.Root.as_masked root_ledger in
+  let mask = Root_ledger.as_masked root_ledger in
   let local_state = Blockchain_state.snarked_local_state blockchain_state in
   let staged_ledger_hash =
     Blockchain_state.staged_ledger_hash blockchain_state
@@ -267,7 +268,7 @@ module Instance = struct
               List.map protocol_states
                 ~f:(With_hash.of_data ~hash_data:Protocol_state.hashes)
           }
-        ~root_ledger:(Mina_ledger.Ledger.Root.as_unmasked root_ledger)
+        ~root_ledger:(Root_ledger.as_unmasked root_ledger)
         ~consensus_local_state ~max_length ~persistent_root_instance
     in
     let%bind extensions =

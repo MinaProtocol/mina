@@ -879,10 +879,15 @@ module Make (Inputs : Inputs_intf.S) = struct
       let addr = Location.to_path_exn location in
       Addr.to_int addr
 
-    let get_at_index_exn t index =
+    let get_at_index t index =
       assert_is_attached t ;
       let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
-      get t (Location.Account addr) |> Option.value_exn
+      get t (Location.Account addr)
+
+    let get_at_index_exn t index =
+      assert_is_attached t ;
+      get_at_index t index
+      |> Option.value_exn ~message:"Expected account at index" ~here:[%here]
 
     let set_at_index_exn t index account =
       assert_is_attached t ;
@@ -906,11 +911,17 @@ module Make (Inputs : Inputs_intf.S) = struct
       let%map.Async.Deferred accts = to_list t in
       List.map accts ~f:Account.identifier |> Account_id.Set.of_list
 
-    let iteri t ~f =
+    let iteri_untrusted t ~f =
       assert_is_attached t ;
       let num_accounts = num_accounts t in
       Sequence.range ~stop:`exclusive 0 num_accounts
-      |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
+      |> Sequence.iter ~f:(fun i -> f i (get_at_index t i))
+
+    let iteri t ~f =
+      iteri_untrusted t ~f:(fun index account_opt ->
+          f index
+            (Option.value_exn ~message:"Expected account at index" ~here:[%here]
+               account_opt ) )
 
     let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
       assert_is_attached t ;
