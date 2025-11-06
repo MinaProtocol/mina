@@ -189,17 +189,18 @@ exec-daemon() {
 
   # shellcheck disable=SC2068
   exec ${MINA_EXE} daemon \
-    -client-port "${CLIENT_PORT}" \
-    -rest-port ${REST_PORT} \
-    -insecure-rest-server \
-    -external-port ${EXTERNAL_PORT} \
-    -metrics-port ${DAEMON_METRICS_PORT} \
-    -libp2p-metrics-port ${LIBP2P_METRICS_PORT} \
-    -config-file "${CONFIG}" \
-    -log-level "${LOG_LEVEL}" \
-    -file-log-level "${FILE_LOG_LEVEL}" \
-    -precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
-    -log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
+    --client-port "${CLIENT_PORT}" \
+    --rest-port ${REST_PORT} \
+    --insecure-rest-server \
+    --external-port ${EXTERNAL_PORT} \
+    --metrics-port ${DAEMON_METRICS_PORT} \
+    --libp2p-metrics-port ${LIBP2P_METRICS_PORT} \
+    --config-file "${CONFIG}" \
+    --log-json \
+    --log-level "${LOG_LEVEL}" \
+    --file-log-level "${FILE_LOG_LEVEL}" \
+    --precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
+    --log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
     $@
 }
 
@@ -213,6 +214,7 @@ exec-worker-daemon() {
   exec ${MINA_EXE} internal snark-worker \
     --proof-level "${PROOF_LEVEL}" \
     --shutdown-on-disconnect false \
+    --log-json \
     --log-level "${LOG_LEVEL}" \
     --file-log-level "${FILE_LOG_LEVEL}" \
     --daemon-address "${COORDINATOR_HOST_AND_PORT}" \
@@ -224,6 +226,7 @@ exec-archive-node() {
   # shellcheck disable=SC2068
   exec ${ARCHIVE_EXE} run \
     --config-file "${CONFIG}" \
+    --log-json \
     --log-level "${LOG_LEVEL}" \
     --postgres-uri postgresql://"${PG_USER}":"${PG_PASSWD}"@"${PG_HOST}":"${PG_PORT}"/"${PG_DB}" \
     --server-port "${ARCHIVE_SERVER_PORT}" \
