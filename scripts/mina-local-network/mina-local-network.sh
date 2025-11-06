@@ -74,6 +74,7 @@ WHALE_PIDS=()
 SNARK_WORKERS_PIDS=()
 FISH_PIDS=()
 NODE_PIDS=()
+OVERRIDE_GENSIS_LEDGER=""
 
 # ================================================
 # Helper functions
@@ -130,7 +131,7 @@ help() {
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
 -pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)
                                          |   Default: ${PROOF_LEVEL}
--c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks, 'inherit_with:CONFIG_PATH,GENESIS_LEDGER_PATH' to inherit keys with new config & genesis ledgers overriden. Note that any config parameters that should alter the config have priority over the passed in config
+-c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks, 'inherit_with:CONFIG_PATH,GENESIS_LEDGER_PATH' to inherit keys with new config & genesis ledgers overridden. Note that any config parameters that should alter the config have priority over the passed in config
                                          |   Default: ${CONFIG_MODE}
 -u   |--update-genesis-timestamp         | Whether to update the Genesis Ledger timestamp (presence of argument). Set to 'fixed:TIMESTAMP' to be a fixed time, 'delay_sec:SECONDS' to be set genesis to be SECONDS in the future, or 'no' to do nothing.
                                          |   Default: ${UPDATE_GENESIS_TIMESTAMP}
@@ -187,6 +188,14 @@ exec-daemon() {
   DAEMON_METRICS_PORT=$((BASE_PORT + 3))
   LIBP2P_METRICS_PORT=$((BASE_PORT + 4))
 
+
+  local extra_opts=()
+  if [ -d "$OVERRIDE_GENSIS_LEDGER" ]; then
+    local copied_override_genesis_ledger="${CONFIG}/override_genesis_ledger"
+    cp "$OVERRIDE_GENSIS_LEDGER" "$copied_override_genesis_ledger"
+    extra_opts+=( --genesis-ledger-dir "$copied_override_genesis_ledger")
+  fi
+
   # shellcheck disable=SC2068
   exec ${MINA_EXE} daemon \
     --client-port "${CLIENT_PORT}" \
@@ -201,7 +210,7 @@ exec-daemon() {
     --file-log-level "${FILE_LOG_LEVEL}" \
     --precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
     --log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
-    $@
+    $@ ${extra_opts[@]}
 }
 
 # Executes the Mina Snark Worker
@@ -594,9 +603,6 @@ if [ ! -d "${NETWORK_FOLDER}" ]; then
   chmod -R 0700 "${NETWORK_FOLDER}"/libp2p_keys
 fi
 
-export MINA_KEYS_PATH="${NETWORK_FOLDER}"/genesis_ledger_dir
-mkdir -p "$MINA_KEYS_PATH"
-
 printf "\n"
 echo "================================"
 printf "\n"
@@ -678,12 +684,9 @@ load_config() {
       reset-genesis-ledger "${NETWORK_FOLDER}" "${config_file}"
       ;;
     inherit_with:*)
-      local replaced_config_file replaced_genesis_ledger_folder
-      IFS=',' read -r replaced_config_file replaced_genesis_ledger_folder <<< "${config_mode#inherit_with:}"
-      echo "Inheirting ledgers with config at ${replaced_config_file} and ledgers at ${replaced_genesis_ledger_folder}"
+      local replaced_config_file
+      IFS=',' read -r replaced_config_file OVERRIDE_GENSIS_LEDGER <<< "${config_mode#inherit_with:}"
       cp -f "${replaced_config_file}" "${config_file}"
-      rm -rf "${MINA_KEYS_PATH:?}"/*
-      cp -a "${replaced_genesis_ledger_folder}" "$MINA_KEYS_PATH"
       ;;
   esac
 }
