@@ -119,7 +119,8 @@ let canonical_chain_members_query =
     |sql}
 
 let canonical_chain_ids (module Conn : CONNECTION) ~target_block_id ~genesis_id
-    ~(protocol_version : Protocol_version.t) =
+    ~(protocol_version : Protocol_version.t) :
+    (int list, Caqti_error.t) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   Conn.collect_list canonical_chain_members_query
     (target_block_id, genesis_id, protocol_version)

@@ -52,7 +52,7 @@ let connect postgres_uri =
 
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let pool = connect postgres_uri in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query pool ~f in
 
   let%bind tip = query_db ~f:Sql.latest_state_hash in
   let%map (in_chain : bool) =
@@ -76,7 +76,7 @@ let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
 let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
     ~required_confirmations () =
   let pool = connect postgres_uri in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query pool ~f in
   let%map confirmations =
     query_db ~f:(Sql.num_of_confirmations ~latest_state_hash ~fork_slot)
   in
@@ -96,7 +96,7 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
 
 let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let pool = connect postgres_uri in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query pool ~f in
   let%bind _, _, _, user_commands_count =
     query_db
       ~f:(Sql.number_of_user_commands_since_block ~fork_state_hash ~fork_slot)
@@ -135,7 +135,7 @@ let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
 let verify_upgrade ~postgres_uri ~expected_protocol_version
     ~expected_migration_version () =
   let pool = connect postgres_uri in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query pool ~f in
   let%map res = query_db ~f:Sql.fetch_latest_migration_history in
   match res with
   | Some (status, protocol_version, migration_version) -> (
@@ -164,7 +164,7 @@ let verify_upgrade ~postgres_uri ~expected_protocol_version
               Failure
                 (sprintf
                    "Latest migration version mismatch: actual %s vs expected %s"
-                   migration_version expected_protocol_version )
+                   migration_version expected_migration_version )
           } ;
       match Queue.to_list results with
       | [] ->
@@ -180,7 +180,7 @@ let verify_upgrade ~postgres_uri ~expected_protocol_version
 
 let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let pool = connect postgres_uri in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query pool ~f in
   let fork_slot = Int64.of_int fork_slot in
 
   let%map last_fork_block = query_db ~f:Sql.last_fork_block in
@@ -202,7 +202,7 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
 let fetch_last_filled_block ~postgres_uri () =
   let open Deferred.Let_syntax in
   let pool = connect postgres_uri in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query pool ~f in
   let%map hash, slot_since_genesis, height =
     query_db ~f:(fun db -> Sql.fetch_last_filled_block db)
   in
@@ -220,7 +220,7 @@ let fetch_last_filled_block ~postgres_uri () =
 let convert_chain_to_canonical ~postgres_uri ~target_block_hash
     ~protocol_version_str ~stop_at_slot () =
   let pool = connect postgres_uri in
-  let query_db = Mina_caqti.query pool in
+  let query_db ~f = Mina_caqti.query pool ~f in
   let protocol_version = Sql.Protocol_version.of_string protocol_version_str in
   let%bind genesis_opt = query_db ~f:(Sql.genesis_block ~protocol_version) in
   let%bind.Deferred.Or_error genesis =
