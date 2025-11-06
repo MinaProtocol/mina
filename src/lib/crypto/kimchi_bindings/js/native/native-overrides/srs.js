@@ -177,7 +177,7 @@ var caml_fq_srs_b_poly_commitment = function (srs, chals) {
 };
 
 // Provides: caml_fq_srs_batch_accumulator_check
-// Requires: plonk_wasm, tsRustConversion
+// Requires: plonk_wasm, tsRustConversionNative
 var caml_fq_srs_batch_accumulator_check = function (srs, comms, chals) {
   console.log("native caml_fq_srs_batch_accumulator_check");
   var rust_comms = tsRustConversionNative.fq.pointsToRust(comms);
