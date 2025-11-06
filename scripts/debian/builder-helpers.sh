@@ -25,22 +25,22 @@ TEST_EXECUTIVE_DEPS=", mina-logproc, python3, docker-ce "
 
 case "${MINA_DEB_CODENAME}" in
   noble)
-    SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, rocksdb-tools, liblmdb0"
+    SHARED_DEPS="libssl3t64, libgmp10, libgomp1, tzdata, liblmdb0"
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc"
     ARCHIVE_DEPS="libssl3t64, libgomp1, libpq-dev, libjemalloc2"
     ;;
   jammy)
-    SHARED_DEPS="libssl3, libgmp10, libgomp1, tzdata, rocksdb-tools, liblmdb0"
+    SHARED_DEPS="libssl3, libgmp10, libgomp1, tzdata, liblmdb0"
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ARCHIVE_DEPS="libssl3, libgomp1, libpq-dev, libjemalloc2"
   ;;
   bookworm)
-    SHARED_DEPS="libssl3, libgmp10, libgomp1, tzdata, rocksdb-tools, liblmdb0"
+    SHARED_DEPS="libssl3, libgmp10, libgomp1, tzdata, liblmdb0"
     DAEMON_DEPS=", libffi8, libjemalloc2, libpq-dev, libproc2-0, mina-logproc"
     ARCHIVE_DEPS="libssl3, libgomp1, libpq-dev, libjemalloc2"
     ;;
   bullseye|focal)
-    SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, rocksdb-tools, liblmdb0"
+    SHARED_DEPS="libssl1.1, libgmp10, libgomp1, tzdata, liblmdb0"
     DAEMON_DEPS=", libffi7, libjemalloc2, libpq-dev, libprocps8, mina-logproc"
     ARCHIVE_DEPS="libssl1.1, libgomp1, libpq-dev, libjemalloc2"
     ;;
@@ -169,6 +169,9 @@ copy_common_daemon_configs() {
     "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
   cp ./default/src/lib/snark_worker/standalone/run_snark_worker.exe \
     "${BUILDDIR}/usr/local/bin/mina-standalone-snark-worker"
+  cp ./default/src/app/rocksdb-scanner/rocksdb_scanner.exe \
+    "${BUILDDIR}/usr/local/bin/mina-rocksdb-scanner"
+
   # Copy signature-based Binaries (based on signature type $2 passed into the \
   # function)
   cp ./default/src/app/cli/src/mina_"${2}"_signatures.exe \
@@ -714,6 +717,8 @@ copy_common_archive_configs() {
     "${BUILDDIR}/usr/local/bin/mina-archive-blocks"
   cp ./default/src/app/extract_blocks/extract_blocks.exe \
     "${BUILDDIR}/usr/local/bin/mina-extract-blocks"
+  cp ./default/src/app/archive_hardfork_toolbox/archive_hardfork_toolbox.exe \
+    "${BUILDDIR}/usr/local/bin/mina-archive-hardfork-toolbox"
 
   mkdir -p "${BUILDDIR}/etc/mina/archive"
   cp ../scripts/archive/missing-blocks-guardian.sh \

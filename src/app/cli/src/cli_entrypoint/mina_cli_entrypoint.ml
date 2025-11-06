@@ -547,6 +547,14 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             were no slots won within an hour after the stop time) (Default: \
             %d)"
            Cli_lib.Default.stop_time )
+  and stop_time_interval =
+    flag "--stop-time-interval" ~aliases:[ "stop-time-interval" ] (optional int)
+      ~doc:
+        (sprintf
+           "UPTIME An upper bound (inclusive) on the random number of hours \
+            added to the stop-time. Setting it to zero disables this \
+            randomness. (Default: %d)"
+           Cli_lib.Default.stop_time_interval )
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:[ "upload-blocks-to-gcloud" ]
@@ -610,20 +618,24 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
         "true|false Whether to send the commit SHA used to build the node to \
          the uptime service. (default: false)"
       no_arg
-  and hardfork_mode =
-    (*
-      There's 2 hardfork mode, namely Legacy and Auto. Reference:
-        - https://www.notion.so/o1labs/HF-Mina-node-changes-specification-216e79b1f910805d9865e44f2f4baf0e 
-        - https://www.notion.so/o1labs/V2-MIP-draft-HF-automation-250e79b1f9108010b0c5f2b1f416640b
-        *)
-    flag "--hardfork-mode" ~aliases:[ "hardfork-mode" ]
+  and hardfork_handling =
+    (* The two hard fork modes are migrate-exit (the "auto" hard fork mode) and
+       keep-running (the "legacy" hard fork mode). See
+       https://github.com/MinaProtocol/MIPs/pull/32. This option currently only
+       controls the ledger sync feature (keeping migrated versions of the root
+       and epoch ledger databases alongside the stable ones). TODO: the code
+       will eventually need to be updated so this option also causes the daemon
+       to generate and save its own hard fork config at the [slot_chain_end] and
+       then shut down. *)
+    flag "--hardfork-handling" ~aliases:[ "hardfork-handling" ]
       ~doc:
-        "auto|legacy Mode of hardfork. Under auto mode, the daemon would back \
-         all ledgers that are needed for post-hardfork node to bootstrap with \
-         2 databases, one for before, and one for after the hardfork. Under \
-         legacy mode, all databased backed ledgers are backed by one database. \
-         THIS FLAG IS INTERNAL USE ONLY AND WOULD BE REMOVED WITHOUT NOTICE"
-      (optional_with_default Hardfork_mode.Legacy Hardfork_mode.arg)
+        "keep-running|migrate-exit Internal flag, controlling how the daemon \
+         handles an upcoming hard fork. Exposed for testing purposes. \
+         Currently it only causes the daemon to maintain migrated versions of \
+         the root and epoch ledger databases alongside the stable databases. \
+         (default: keep-running). "
+      (optional_with_default Hardfork_handling.Keep_running
+         Hardfork_handling.arg )
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -833,7 +845,7 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           in
           let compile_config = Mina_compile_config.Compiled.t in
           let ledger_backing_type =
-            Mina_lib.Config.ledger_backing ~hardfork_mode
+            Mina_lib.Config.ledger_backing ~hardfork_handling
           in
           let%bind ( precomputed_values
                    , config_jsons
@@ -1289,6 +1301,10 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
             or_from_config YJ.Util.to_int_option "stop-time"
               ~default:Cli_lib.Default.stop_time stop_time
           in
+          let stop_time_interval =
+            or_from_config YJ.Util.to_int_option "stop-time-interval"
+              ~default:Cli_lib.Default.stop_time_interval stop_time_interval
+          in
           if enable_tracing then Mina_tracing.start conf_dir |> don't_wait_for ;
           let%bind () =
             if enable_internal_tracing then
@@ -1469,10 +1485,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                  ~log_precomputed_blocks ~start_filtered_logs
                  ~upload_blocks_to_gcloud ~block_reward_threshold ~uptime_url
                  ~uptime_submitter_keypair ~uptime_send_node_commit ~stop_time
-                 ~node_status_url ~graphql_control_port:itn_graphql_port
-                 ~simplified_node_stats
+                 ~stop_time_interval ~node_status_url
+                 ~graphql_control_port:itn_graphql_port ~simplified_node_stats
                  ~zkapp_cmd_limit:(ref compile_config.zkapp_cmd_limit)
-                 ~itn_features ~compile_config ~hardfork_mode () )
+                 ~itn_features ~compile_config ~hardfork_handling () )
           in
           { mina
           ; client_trustlist

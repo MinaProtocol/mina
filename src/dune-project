@@ -3,6 +3,7 @@
 
 (package (name allocation_functor))
 (package (name archive))
+(package (name archive_hardfork_toolbox))
 (package (name archive_blocks))
 (package (name archive_lib))
 (package (name base58_check))
@@ -159,6 +160,7 @@
 (package (name random_oracle))
 (package (name replayer))
 (package (name rocksdb))
+(package (name rocksdb_scanner))
 (package (name rosetta_coding))
 (package (name rosetta_lib))
 (package (name rosetta_models))
