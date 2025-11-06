@@ -498,8 +498,7 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
       Deferred.Result.return ()
     else Deferred.Result.fail `Invalid_body_reference
   in
-  let%bind.Deferred.Result ( `Hash_after_applying staged_ledger_hash
-                           , `Ledger_proof proof_opt
+  let%bind.Deferred.Result ( `Ledger_proof proof_opt
                            , `Staged_ledger transitioned_staged_ledger
                            , `Pending_coinbase_update _ ) =
     Staged_ledger.apply ?skip_verification:skip_staged_ledger_verification
@@ -527,6 +526,16 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     |> Deferred.Result.map_error ~f:(fun e ->
            `Staged_ledger_application_failed e )
   in
+  let staged_ledger_hash_opt =
+    match skip_staged_ledger_verification with
+    | Some `All ->
+        None
+    | _ ->
+        [%log internal] "Hash_new_staged_ledger" ;
+        let hash = Staged_ledger.hash transitioned_staged_ledger in
+        [%log internal] "Hash_new_staged_ledger_done" ;
+        Some hash
+  in
   [%log debug]
     ~metadata:
       [ ( "time_elapsed"
@@ -542,23 +551,28 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
         Mina_state.Snarked_ledger_state.snarked_ledger_hash
         @@ Ledger_proof.Cached.statement proof
   in
+  let staged_ledger_hash_check staged_ledger_hash =
+    if
+      Staged_ledger_hash.equal staged_ledger_hash
+        (Blockchain_state.staged_ledger_hash blockchain_state)
+    then Ok ()
+    else Error `Incorrect_target_staged_ledger_hash
+  in
+  let snarked_ledger_hash_check =
+    if
+      Frozen_ledger_hash.equal snarked_ledger_hash
+        (Blockchain_state.snarked_ledger_hash blockchain_state)
+    then Ok ()
+    else Error `Incorrect_target_snarked_ledger_hash
+  in
   let hash_errors =
-    Result.combine_errors_unit
-      [ ( if
-          Staged_ledger_hash.equal staged_ledger_hash
-            (Blockchain_state.staged_ledger_hash blockchain_state)
-        then Ok ()
-        else Error `Incorrect_target_staged_ledger_hash )
-      ; ( if
-          Frozen_ledger_hash.equal snarked_ledger_hash
-            (Blockchain_state.snarked_ledger_hash blockchain_state)
-        then Ok ()
-        else Error `Incorrect_target_snarked_ledger_hash )
-      ]
+    Option.value_map ~default:ident staged_ledger_hash_opt
+      ~f:(Fn.compose List.cons staged_ledger_hash_check)
+      [ snarked_ledger_hash_check ]
   in
   Deferred.return
   @@
-  match hash_errors with
+  match Result.combine_errors_unit hash_errors with
   | Ok () ->
       Ok
         ( `Just_emitted_a_proof (Option.is_some proof_opt)
