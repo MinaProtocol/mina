@@ -12,7 +12,7 @@ module MinaSignerIntegrationTest = struct
       genesis_ledger =
         (let open Test_account in
         [ create ~account_name:"bp" ~balance:"400000" ()
-        ; create ~account_name:"sender" ~balance:"30" ()
+        ; create ~account_name:"sender" ~balance:"300" ()
         ; create ~account_name:"receiver" ~balance:"1" ()
         ])
     ; block_producers = [ { node_name = "node"; account_name = "bp" } ]
