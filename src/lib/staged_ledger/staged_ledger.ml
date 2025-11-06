@@ -1282,11 +1282,7 @@ module T = struct
       ; pending_coinbase_collection = updated_pending_coinbase_collection'
       }
     in
-    [%log internal] "Hash_new_staged_ledger" ;
-    let staged_ledger_hash = hash new_staged_ledger in
-    [%log internal] "Hash_new_staged_ledger_done" ;
-    ( `Hash_after_applying staged_ledger_hash
-    , `Ledger_proof res_opt
+    ( `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
     , `Pending_coinbase_update
         ( is_new_stack
@@ -1370,7 +1366,7 @@ module T = struct
     in
     let apply_diff_start_time = Core.Time.now () in
     [%log internal] "Apply_diff" ;
-    let%map ((_, _, `Staged_ledger new_staged_ledger, _, _) as res) =
+    let%map ((_, `Staged_ledger new_staged_ledger, _, _) as res) =
       apply_diff ?cached_update_coinbase_stack_and_get_data_result
         ~skip_verification:
           ([%equal: [ `All | `Proofs ] option] skip_verification (Some `All))
@@ -2568,8 +2564,7 @@ let%test_module "staged ledger tests" =
             Error.raise (Pre_diff_info.Error.to_error e)
       in
       let diff' = Staged_ledger_diff.forget diff in
-      let%map ( `Hash_after_applying hash
-              , `Ledger_proof ledger_proof
+      let%map ( `Ledger_proof ledger_proof
               , `Staged_ledger sl'
               , `Pending_coinbase_update (is_new_stack, pc_update)
               , `Update_coinbase_stack_and_get_data_result
@@ -2585,6 +2580,7 @@ let%test_module "staged ledger tests" =
         | Error e ->
             Error.raise (Sl.Staged_ledger_error.to_error e)
       in
+      let hash = Sl.hash sl' in
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       ( ledger_proof
@@ -3561,8 +3557,7 @@ let%test_module "staged ledger tests" =
                                  %{sexp: Sl.Staged_ledger_error.t}"
                                err
                       | Ok
-                          ( `Hash_after_applying _hash
-                          , `Ledger_proof _ledger_proof
+                          ( `Ledger_proof _ledger_proof
                           , `Staged_ledger sl'
                           , `Pending_coinbase_update _
                           , `Update_coinbase_stack_and_get_data_result _ ) ->

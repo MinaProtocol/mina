@@ -428,9 +428,8 @@ module For_tests = struct
       let body =
         Mina_block.Body.create @@ Staged_ledger_diff.forget staged_ledger_diff
       in
-      let%bind ( `Hash_after_applying staged_ledger_hash
-               , `Ledger_proof ledger_proof_opt
-               , `Staged_ledger _
+      let%bind ( `Ledger_proof ledger_proof_opt
+               , `Staged_ledger transitioned_staged_ledger
                , `Pending_coinbase_update _
                , `Update_coinbase_stack_and_get_data_result _ ) =
         match%bind
@@ -465,6 +464,7 @@ module For_tests = struct
         previous_protocol_state |> Protocol_state.blockchain_state
         |> Blockchain_state.genesis_ledger_hash
       in
+      let staged_ledger_hash = Staged_ledger.hash transitioned_staged_ledger in
       let next_blockchain_state =
         Blockchain_state.create_value
           ~timestamp:(Block_time.now @@ Block_time.Controller.basic ~logger)
