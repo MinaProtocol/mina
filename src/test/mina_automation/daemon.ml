@@ -144,15 +144,16 @@ module Config = struct
   end
 
   type t =
-    { port : int
+    { client_port : int
+    ; rest_port : int
     ; dirs : ConfigDirs.t
     ; config : Test_config.t
     ; runtime_config : Runtime_config.t
     ; genesis_ledger : Genesis_ledger.t
     }
 
-  let create ?(port = 8031) ~(dirs : ConfigDirs.t) ~(config : Test_config.t) ()
-      =
+  let create ?(client_port = 8031) ?(rest_port = 3085) ~(dirs : ConfigDirs.t)
+      ~(config : Test_config.t) () =
     let genesis_ledger = Genesis_ledger.create config.genesis_ledger in
     let runtime_config =
       Runtime_config_builder.create ~test_config:config ~genesis_ledger
@@ -162,7 +163,7 @@ module Config = struct
       (dirs.conf ^/ "daemon.json")
       (Runtime_config.to_yojson runtime_config) ;
 
-    { port; dirs; config; runtime_config; genesis_ledger }
+    { client_port; rest_port; dirs; config; runtime_config; genesis_ledger }
 
   let default () =
     create ~dirs:ConfigDirs.default
@@ -223,7 +224,7 @@ let of_config config = { config; executor = Executor.AutoDetect }
 
 let default () = { config = Config.default (); executor = Executor.AutoDetect }
 
-let client t = Client.create ~port:t.config.port ~executor:t.executor ()
+let client t = Client.create ~port:t.config.client_port ~executor:t.executor ()
 
 let start t =
   let open Deferred.Let_syntax in
@@ -236,7 +237,9 @@ let start t =
     ; "--working-dir"
     ; "."
     ; "--client-port"
-    ; string_of_int t.config.port
+    ; string_of_int t.config.client_port
+    ; "--rest-port"
+    ; string_of_int t.config.rest_port
     ; "--config-directory"
     ; t.config.dirs.conf
     ; "--genesis-ledger-dir"
@@ -255,7 +258,7 @@ let start t =
   let mina_process : Process.t =
     { config = t.config
     ; process
-    ; client = Client.create ~port:t.config.port ~executor:t.executor ()
+    ; client = Client.create ~port:t.config.client_port ~executor:t.executor ()
     }
   in
   Deferred.return mina_process

@@ -37,7 +37,8 @@ module MinaSignerIntegrationTest = struct
         ; receiver_address = receiver.public_key
         ; graphql_url =
             Some
-              (Printf.sprintf "http://localhost:%d/graphql" daemon.config.port)
+              (Printf.sprintf "http://localhost:%d/graphql"
+                 daemon.config.rest_port )
         ; nonce = Some 0
         }
     in
