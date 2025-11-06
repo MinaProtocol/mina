@@ -52,7 +52,7 @@ let connect postgres_uri =
 
 let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
   let pool = connect postgres_uri in
-  let query_db ~f = Mina_caqti.query pool ~f in
+  let query_db = Mina_caqti.query pool in
 
   let%bind tip = query_db ~f:Sql.latest_state_hash in
   let%map (in_chain : bool) =
