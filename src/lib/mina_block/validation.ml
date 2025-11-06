@@ -551,7 +551,15 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
           Staged_ledger_hash.equal staged_ledger_hash
             (Blockchain_state.staged_ledger_hash blockchain_state)
         then Ok ()
-        else Error `Incorrect_target_staged_ledger_hash )
+        else
+          let text =
+            sprintf
+              !"in header %{sexp:Staged_ledger_hash.t} != computed \
+                %{sexp:Staged_ledger_hash.t}"
+              (Blockchain_state.staged_ledger_hash blockchain_state)
+              staged_ledger_hash
+          in
+          Error (`Incorrect_target_staged_ledger_hash text) )
       ; ( if
           Frozen_ledger_hash.equal snarked_ledger_hash
             (Blockchain_state.snarked_ledger_hash blockchain_state)

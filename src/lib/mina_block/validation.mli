@@ -365,7 +365,7 @@ val validate_staged_ledger_diff :
           Staged_ledger.Staged_ledger_error.t
        | `Invalid_body_reference
        | `Invalid_staged_ledger_diff of
-         [ `Incorrect_target_staged_ledger_hash
+         [ `Incorrect_target_staged_ledger_hash of string
          | `Incorrect_target_snarked_ledger_hash ]
          list ] )
      Deferred.Result.t

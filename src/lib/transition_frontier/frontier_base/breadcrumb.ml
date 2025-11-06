@@ -170,8 +170,8 @@ let build ?skip_staged_ledger_verification ?transaction_pool_proxy
           let reasons =
             String.concat ~sep:" && "
               (List.map errors ~f:(function
-                | `Incorrect_target_staged_ledger_hash ->
-                    "staged ledger hash"
+                | `Incorrect_target_staged_ledger_hash text ->
+                    "staged ledger hash: " ^ text
                 | `Incorrect_target_snarked_ledger_hash ->
                     "snarked ledger hash" ) )
           in

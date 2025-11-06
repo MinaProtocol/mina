@@ -1130,10 +1130,19 @@ module T = struct
         ; ("max_throughput", `Int max_throughput)
         ] ;
     let%bind update_coinbase_stack_and_get_data_result =
+      let before = Ledger.merkle_root t.ledger in
       ignore cached_update_coinbase_stack_and_get_data_result ;
       match cached_update_coinbase_stack_and_get_data_result with
       | Some (cached, maps) ->
           Ledger.append_maps new_ledger maps ;
+          [%log info]
+            !"Set ledger for %{sexp:State_hash.t} to root %{sexp:Ledger_hash.t \
+              option} (before: %{sexp:Ledger_hash.t}, after: \
+              %{sexp:Ledger_hash.t})"
+            (fst state_and_body_hash)
+            Ledger.Location.Addr.(Map.find maps.hashes @@ root ())
+            before
+            (Ledger.merkle_root new_ledger) ;
           return (cached, maps)
       | None ->
           let%map result =
@@ -1143,7 +1152,16 @@ module T = struct
                   t.pending_coinbase_collection transactions current_state_view
                   state_and_body_hash )
           in
-          (result, Ledger.get_maps new_ledger)
+          let maps = Ledger.get_maps new_ledger in
+          [%log info]
+            !"Set ledger for %{sexp:State_hash.t} to root %{sexp:Ledger_hash.t \
+              option} (before: %{sexp:Ledger_hash.t}, after: \
+              %{sexp:Ledger_hash.t})"
+            (fst state_and_body_hash)
+            Ledger.Location.Addr.(Map.find maps.hashes @@ root ())
+            before
+            (Ledger.merkle_root new_ledger) ;
+          (result, maps)
     in
     let ( ( is_new_stack
           , data
