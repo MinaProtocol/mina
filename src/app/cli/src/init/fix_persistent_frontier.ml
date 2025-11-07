@@ -146,11 +146,7 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
       ~signature_kind
       ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
   in
-  let%bind.Deferred.Result proof_cache_db =
-    Proof_cache_tag.create_db ~logger chain_state_locations.proof_cache
-    >>| Result.map_error ~f:(fun (`Initialization_error err) ->
-            Error.to_string_mach err )
-  in
+  let proof_cache_db = Proof_cache_tag.create_identity_db () in
   let%bind.Deferred.Result persistent_frontier_root_hash =
     Persistent_frontier.with_instance_exn persistent_frontier
       ~f:Persistent_frontier.Instance.get_root_hash
