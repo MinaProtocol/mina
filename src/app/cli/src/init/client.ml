@@ -2559,6 +2559,7 @@ let advanced ~itn_features =
     ; ("print-signature-kind", signature_kind)
     ; ("generate-hardfork-config", generate_hardfork_config)
     ; ("fix-persistent-frontier", Fix_persistent_frontier.command)
+    ; ("analyze-extended-block", Analyze_extended_block.command)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
           [ ("create-genesis", test_genesis_creation) ] )

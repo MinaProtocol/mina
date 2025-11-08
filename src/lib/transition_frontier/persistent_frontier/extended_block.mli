@@ -4,7 +4,12 @@ module Update_coinbase_stack_and_get_data_result_or_commands : sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type t
+      type t =
+        | Update_coinbase_stack_and_get_data_result of
+            Staged_ledger.Update_coinbase_stack_and_get_data_result.Stable.V1.t
+        | Commands of
+            Mina_base.User_command.Stable.V2.t Mina_base.With_status.Stable.V2.t
+            list
 
       val to_latest : t -> t
     end
