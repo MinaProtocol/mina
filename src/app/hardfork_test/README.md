@@ -28,61 +28,22 @@ This validates the critical hardfork mechanism:
 - **Network Functionality**: Both pre-fork and post-fork networks operate correctly (block production, transaction processing)
 - **Hardfork Tooling**: The `runtime_genesis_ledger` tool correctly generates hardfork genesis ledgers from the extracted state
 
-## Usage
+### Example Usage
 
+This is the use in `scripts/hardfork/build-and-test.sh`:
 ```
-./hardfork_test --main-mina-exe /path/to/mina \
-  --main-runtime-genesis-ledger /path/to/runtime_genesis_ledger \
-  --fork-mina-exe /path/to/mina-fork \
-  --fork-runtime-genesis-ledger /path/to/runtime_genesis_ledger-fork
+./hardfork_test/bin/hardfork_test \
+  --main-mina-exe prefork-devnet/bin/mina \
+  --main-runtime-genesis-ledger prefork-devnet/bin/runtime_genesis_ledger \
+  --fork-mina-exe postfork-devnet/bin/mina \
+  --fork-runtime-genesis-ledger postfork-devnet/bin/runtime_genesis_ledger \
+  --slot-tx-end "$SLOT_TX_END" \
+  --slot-chain-end "$SLOT_CHAIN_END" \
+  --script-dir "$SCRIPT_DIR" \
+  --root "$NETWORK_ROOT"
 ```
 
-### Required Arguments
+### CLI arguments
 
-- `--main-mina-exe`: Path to the main Mina executable
-- `--main-runtime-genesis-ledger`: Path to the main runtime genesis ledger executable
-- `--fork-mina-exe`: Path to the fork Mina executable
-- `--fork-runtime-genesis-ledger`: Path to the fork runtime genesis ledger executable
+Run `hardfork_test --help` for a human readable list of CLI args, or refer to `internal/app/root.go` and `internal/config/config.go` for the implementation of them.
 
-### Optional Arguments
-
-#### Test Configuration
-- `--slot-tx-end`: Slot at which transactions should end (default: 30)
-- `--slot-chain-end`: Slot at which chain should end (default: 38)
-- `--best-chain-query-from`: Slot from which to start calling bestchain query (default: 25)
-
-#### Slot Configuration
-- `--main-slot`: Slot duration in seconds for main version (default: 15)
-- `--fork-slot`: Slot duration in seconds for fork version (default: 15)
-
-#### Delay Configuration
-- `--main-delay`: Delay before genesis slot in minutes for main version (default: 5)
-- `--fork-delay`: Delay before genesis slot in minutes for fork version (default: 5)
-
-#### Script Configuration
-- `--script-dir`: Path to the hardfork script directory (default: "$PWD/scripts/hardfork")
-
-#### Timeout Configuration
-- `--shutdown-timeout`: Timeout in minutes to wait for graceful shutdown before forcing kill (default: 10)
-- `--http-timeout`: HTTP client timeout in seconds for GraphQL requests (default: 600)
-
-#### Polling and Retry Configuration
-- `--polling-interval`: Interval in seconds for polling height checks (default: 5)
-- `--fork-config-retry-delay`: Delay in seconds between fork config fetch retries (default: 60)
-- `--fork-config-max-retries`: Maximum number of retries for fork config fetch (default: 15)
-- `--no-new-blocks-wait`: Wait time in seconds to verify no new blocks after chain end (default: 300)
-- `--user-command-check-max-iterations`: Max iterations to check for user commands in blocks (default: 10)
-- `--fork-earliest-block-max-retries`: Maximum number of retries to wait for earliest block in fork network (default: 10)
-- `--graphql-max-retries`: Maximum number of retries for GraphQL requests (default: 5)
-
-## Example
-
-```
-./hardfork_test \
-  --main-mina-exe ./mina \
-  --main-runtime-genesis-ledger ./runtime_genesis_ledger \
-  --fork-mina-exe ./mina-develop \
-  --fork-runtime-genesis-ledger ./runtime_genesis_ledger-develop \
-  --slot-tx-end 40 \
-  --main-delay 10
-```
