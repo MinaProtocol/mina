@@ -87,21 +87,21 @@ let convert_chain_to_canonical_command =
       "Mark the chain leading to the target block as canonical for a protocol \
        version"
     (let%map_open.Command { value = postgres_uri; _ } = Uri.Archive.postgres
-     and target_block_hash =
+     and latest_block_state_hash =
        Command.Param.(flag "--target-block-hash" (required string))
          ~doc:"String State hash of block that should remain canonical"
-     and protocol_version_str =
+     and expected_protocol_version_str =
        Command.Param.(flag "--protocol-version" (required string))
          ~doc:
            "String Protocol version in format <transaction>.<network>.<patch>"
      and stop_at_slot =
        Command.Param.(flag "--stop-at-slot" (optional int))
          ~doc:
-           "Int If provided, stops marking blocks as canonical when this \
-            global slot since genesis is reached"
+           "Int If provided, stops marking blocks as canonical when that's \
+            older than this global slot since genesis slot"
      in
-     convert_chain_to_canonical ~postgres_uri ~target_block_hash
-       ~protocol_version_str ~stop_at_slot )
+     convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
+       ~expected_protocol_version_str ~stop_at_slot )
 
 let fetch_last_filled_block_command =
   Async.Command.async ~summary:"Select last filled block"

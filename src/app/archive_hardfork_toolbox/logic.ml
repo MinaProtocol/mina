@@ -76,7 +76,7 @@ let is_in_best_chain ~postgres_uri ~fork_state_hash ~fork_height ~fork_slot () =
 let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
     ~required_confirmations () =
   let pool = connect postgres_uri in
-  let query_db ~f = Mina_caqti.query pool ~f in
+  let query_db = Mina_caqti.query pool in
   let%map confirmations =
     query_db ~f:(Sql.num_of_confirmations ~latest_state_hash ~fork_slot)
   in
@@ -96,7 +96,7 @@ let confirmations_check ~postgres_uri ~latest_state_hash ~fork_slot
 
 let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
   let pool = connect postgres_uri in
-  let query_db ~f = Mina_caqti.query pool ~f in
+  let query_db = Mina_caqti.query pool in
   let%bind _, _, _, user_commands_count =
     query_db
       ~f:(Sql.number_of_user_commands_since_block ~fork_state_hash ~fork_slot)
@@ -135,7 +135,7 @@ let no_commands_after ~postgres_uri ~fork_state_hash ~fork_slot () =
 let verify_upgrade ~postgres_uri ~expected_protocol_version
     ~expected_migration_version () =
   let pool = connect postgres_uri in
-  let query_db ~f = Mina_caqti.query pool ~f in
+  let query_db = Mina_caqti.query pool in
   let%map res = query_db ~f:Sql.fetch_latest_migration_history in
   match res with
   | Some (status, protocol_version, migration_version) -> (
@@ -180,7 +180,7 @@ let verify_upgrade ~postgres_uri ~expected_protocol_version
 
 let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
   let pool = connect postgres_uri in
-  let query_db ~f = Mina_caqti.query pool ~f in
+  let query_db = Mina_caqti.query pool in
   let fork_slot = Int64.of_int fork_slot in
 
   let%map last_fork_block = query_db ~f:Sql.last_fork_block in
@@ -202,7 +202,7 @@ let validate_fork ~postgres_uri ~fork_state_hash ~fork_slot () =
 let fetch_last_filled_block ~postgres_uri () =
   let open Deferred.Let_syntax in
   let pool = connect postgres_uri in
-  let query_db ~f = Mina_caqti.query pool ~f in
+  let query_db = Mina_caqti.query pool in
   let%map hash, slot_since_genesis, height =
     query_db ~f:(fun db -> Sql.fetch_last_filled_block db)
   in
@@ -217,79 +217,90 @@ let fetch_last_filled_block ~postgres_uri () =
   Yojson.Safe.to_channel Out_channel.stdout json ;
   Out_channel.newline Out_channel.stdout
 
-let convert_chain_to_canonical ~postgres_uri ~target_block_hash
-    ~protocol_version_str ~stop_at_slot () =
+let convert_chain_to_canonical ~postgres_uri ~latest_block_state_hash
+    ~expected_protocol_version_str ~stop_at_slot () =
+  let expected_protocol_version =
+    Sql.Protocol_version.of_string expected_protocol_version_str
+  in
   let pool = connect postgres_uri in
-  let query_db ~f = Mina_caqti.query pool ~f in
-  let protocol_version = Sql.Protocol_version.of_string protocol_version_str in
-  let%bind genesis_opt = query_db ~f:(Sql.genesis_block ~protocol_version) in
-  let%bind.Deferred.Or_error genesis =
-    match genesis_opt with
-    | Some genesis ->
-        Deferred.Or_error.return genesis
+  let query_db = Mina_caqti.query pool in
+  let%bind.Deferred.Or_error oldest_block =
+    match%map
+      query_db
+        ~f:(Sql.first_block_of_protocol_version ~v:expected_protocol_version)
+    with
+    | Some oldest_block ->
+        Or_error.return oldest_block
     | None ->
-        Deferred.Or_error.errorf
-          "Cannot locate genesis block for protocol version %s"
-          protocol_version_str
+        Or_error.errorf "Cannot locate genesis block for protocol version %s"
+          expected_protocol_version_str
   in
-  let%bind target_opt =
-    query_db ~f:(Sql.block_info_by_state_hash ~state_hash:target_block_hash)
-  in
-  let%bind.Deferred.Or_error target =
-    match target_opt with
+  let%bind.Deferred.Or_error latest_block =
+    match%map
+      query_db
+        ~f:(Sql.block_info_by_state_hash ~state_hash:latest_block_state_hash)
+    with
     | Some info ->
-        Deferred.Or_error.return info
+        Or_error.return info
     | None ->
-        Deferred.Or_error.errorf "Cannot find block with state hash %s"
-          target_block_hash
+        Or_error.errorf "Cannot find block with state hash %s"
+          latest_block_state_hash
   in
-  let target_protocol_version_as_string =
-    Sql.Protocol_version.to_string target.protocol_version
-  in
-  let%bind.Deferred.Or_error () =
-    if String.( <> ) target_protocol_version_as_string protocol_version_str then
-      Deferred.Or_error.errorf "Block %s uses protocol version %s, expected %s"
-        target_block_hash target_protocol_version_as_string protocol_version_str
-    else Deferred.Or_error.return ()
-  in
-  [%log info]
-    "Marking chain leading to block %s (from %s) as canonical for protocol \
-     version %s"
-    target_block_hash genesis.state_hash target_protocol_version_as_string ;
-  let%bind chain_ids =
+  let%bind blocks_to_ensure_canonical =
     query_db
       ~f:
-        (Sql.canonical_chain_ids ~target_block_id:target.id
-           ~genesis_id:genesis.id ~protocol_version )
+        (Sql.blocks_between_both_inclusive ~oldest_block_id:oldest_block.id
+           ~latest_block_id:latest_block.id )
   in
-  if List.is_empty chain_ids then
-    Deferred.Or_error.errorf
-      "Failed to compute canonical chain for block %s. Target block id %d, \
-       genesis id %d. protocol version %s"
-      target_block_hash target.id genesis.id target_protocol_version_as_string
-  else
-    (* Arbitrary batch size. Pending chain shouldn't be longer than this (k=290).
-       If it is, we can increase the size or implement a more sophisticated
-         batching mechanism.
-    *)
-    let batch_size = 500 in
-    let batch_count =
-      Int.((List.length chain_ids + batch_size - 1) / batch_size)
-    in
-    let current_batch = ref 1 in
-    [%log info]
-      "Marking %d blocks as canonical or orphaned for protocol version %s in \
-       batches of %d"
-      (List.length chain_ids) target_protocol_version_as_string batch_size ;
-    let%map () =
-      Deferred.List.iter (List.chunks_of chain_ids ~length:batch_size)
-        ~f:(fun ids ->
-          [%log info] "Marking [%d/%d] batch of blocks as canonical/orphaned"
-            !current_batch batch_count ;
-          current_batch := !current_batch + 1 ;
-          query_db
-            ~f:
-              (Sql.mark_blocks_as_canonical_or_orphaned ~protocol_version ~ids
-                 ~stop_at_slot ) )
-    in
-    Ok ()
+  let%bind.Deferred.Or_error () =
+    match blocks_to_ensure_canonical with
+    | [] ->
+        Deferred.Or_error.errorf
+          "No blocks to mark as canonical found for target block %s and \
+           expected_protocol_version %s "
+          latest_block_state_hash expected_protocol_version_str
+    | actual_oldest_block :: _
+      when String.( <> ) actual_oldest_block.state_hash oldest_block.state_hash
+      ->
+        Deferred.Or_error.errorf
+          "Chain ended at %s doesn't lead back to first block of \
+           expected_protocol_version %s of state hash %s, this means there's \
+           some inconsistency in DB"
+          latest_block_state_hash expected_protocol_version_str
+          oldest_block.state_hash
+    | _ ->
+        Deferred.Or_error.return ()
+  in
+  let problematic_blocks =
+    List.filter_map blocks_to_ensure_canonical ~f:(fun b ->
+        if
+          Sql.Protocol_version.equal b.protocol_version
+            expected_protocol_version
+        then None
+        else Some b )
+  in
+  let%bind.Deferred.Or_error () =
+    if List.is_empty problematic_blocks then Deferred.Or_error.return ()
+    else
+      let message =
+        List.map problematic_blocks ~f:(fun b ->
+            Printf.sprintf "state hash %s has protocol version %s" b.state_hash
+              (Sql.Protocol_version.to_string b.protocol_version) )
+        |> String.concat ~sep:","
+      in
+      Deferred.Or_error.errorf "Some blocks have unexpected state hash: %s"
+        message
+  in
+  [%log info] "Marking chain from %s to %s as canonical for protocol version %s"
+    oldest_block.state_hash latest_block_state_hash
+    (Sql.Protocol_version.to_string expected_protocol_version) ;
+  let canonical_block_ids =
+    List.map blocks_to_ensure_canonical ~f:(fun b -> b.id)
+  in
+  let%map () =
+    query_db
+      ~f:
+        (Sql.mark_pending_blocks_as_canonical_or_orphaned ~canonical_block_ids
+           ~stop_at_slot )
+  in
+  Ok ()

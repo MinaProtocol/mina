@@ -5,7 +5,7 @@ open Caqti_request.Infix
 module type CONNECTION = Mina_caqti.CONNECTION
 
 module Protocol_version = struct
-  type t = { transaction : int; network : int; patch : int }
+  type t = { transaction : int; network : int; patch : int } [@@deriving equal]
 
   let of_string : string -> t = function
     | version_str -> (
@@ -31,133 +31,27 @@ module Protocol_version = struct
     Caqti_type.(custom ~encode ~decode (t3 int int int))
 end
 
-type block_info =
-  { id : int
-  ; height : int64
-  ; state_hash : string
-  ; protocol_version : Protocol_version.t
-  }
+module Block_info = struct
+  type t =
+    { id : int
+    ; height : int64
+    ; state_hash : string
+    ; protocol_version : Protocol_version.t
+    }
 
-let block_info_typ =
-  let encode { id; height; state_hash; protocol_version } =
-    Ok (id, height, state_hash, protocol_version)
-  in
-  let decode (id, height, state_hash, protocol_version) =
-    Ok { id; height; state_hash; protocol_version }
-  in
-  Caqti_type.(custom ~encode ~decode (t4 int int64 string Protocol_version.typ))
+  let typ =
+    let encode { id; height; state_hash; protocol_version } =
+      Ok (id, height, state_hash, protocol_version)
+    in
+    let decode (id, height, state_hash, protocol_version) =
+      Ok { id; height; state_hash; protocol_version }
+    in
+    Caqti_type.(
+      custom ~encode ~decode (t4 int int64 string Protocol_version.typ))
+end
 
-let latest_state_hash_query =
-  Caqti_type.(unit ->! string)
-    {sql|
-          SELECT state_hash from blocks order by height desc limit 1;
-        |sql}
-
-let latest_state_hash (module Conn : CONNECTION) =
-  Conn.find latest_state_hash_query ()
-
-let genesis_block_query =
-  (Protocol_version.typ ->? block_info_typ)
-    {sql|
-      SELECT blocks.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
-      FROM blocks inner JOIN protocol_versions
-        ON blocks.protocol_version_id = protocol_versions.id
-      WHERE protocol_versions.transaction = $1::int
-        AND protocol_versions.network = $2::int
-        AND protocol_versions.patch = $3::int
-        AND global_slot_since_hard_fork = 0
-      ORDER BY id ASC
-      LIMIT 1;
-    |sql}
-
-let genesis_block (module Conn : CONNECTION)
-    ~(protocol_version : Protocol_version.t) =
-  Conn.find_opt genesis_block_query protocol_version
-
-let block_info_by_state_hash_query =
-  Caqti_type.(string ->? block_info_typ)
-    {sql|
-      SELECT blocks.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
-      FROM blocks inner JOIN protocol_versions
-        ON blocks.protocol_version_id = protocol_versions.id
-      WHERE state_hash = ?
-      LIMIT 1;
-    |sql}
-
-let block_info_by_state_hash (module Conn : CONNECTION) ~state_hash =
-  Conn.find_opt block_info_by_state_hash_query state_hash
-
-let canonical_chain_members_query =
-  Caqti_type.(t3 int int Protocol_version.typ ->* block_info_typ)
-    {sql|
-      WITH RECURSIVE chain AS (
-        SELECT blocks.id, parent_id, height, state_hash, transaction, network, patch
-        FROM blocks inner JOIN protocol_versions
-          ON blocks.protocol_version_id = protocol_versions.id
-        WHERE blocks.id = $1::int AND protocol_versions.transaction = $3::int
-          AND protocol_versions.network = $4::int
-          AND protocol_versions.patch = $5::int
-
-        UNION ALL
-
-        SELECT b.id, b.parent_id, b.height, b.state_hash, pv.transaction, pv.network, pv.patch
-        FROM blocks b
-        INNER JOIN protocol_versions pv
-          ON b.protocol_version_id = pv.id
-        INNER JOIN chain
-          ON b.id = chain.parent_id
-        WHERE (chain.id <> $2::int OR b.id = $2::int)
-          AND pv.transaction = $3::int
-          AND pv.network = $4::int
-          AND pv.patch = $5::int
-      )
-      SELECT id, height, state_hash, transaction, network, patch
-      FROM chain
-      ORDER BY height ASC;
-    |sql}
-
-let canonical_chain_ids (module Conn : CONNECTION) ~target_block_id ~genesis_id
-    ~(protocol_version : Protocol_version.t) :
-    (int list, Caqti_error.t) Deferred.Result.t =
-  let open Deferred.Result.Let_syntax in
-  Conn.collect_list canonical_chain_members_query
-    (target_block_id, genesis_id, protocol_version)
-  >>| List.map ~f:(fun block_info -> block_info.id)
-
-let protocol_version_id_query =
-  Caqti_type.(Protocol_version.typ ->! int)
-    {sql|
-      SELECT id FROM protocol_versions
-      WHERE transaction = $1::int
-        AND network = $2::int
-        AND patch = $3::int
-      LIMIT 1;
-    |sql}
-
-let canonical_or_orphaned_blocks_query =
-  Caqti_type.(t3 (option int) int Mina_caqti.array_int_typ ->. Caqti_type.unit)
-    {sql|
-      UPDATE blocks
-      SET chain_status = CASE
-          WHEN id = ANY($3::int[]) THEN 'canonical'::chain_status_type
-          ELSE 'orphaned'::chain_status_type
-      END
-      WHERE protocol_version_id = $2::int
-        AND ($1 IS NULL OR global_slot_since_genesis < $1::int);
-    |sql}
-
-let mark_blocks_as_canonical_or_orphaned (module Conn : CONNECTION) ~ids
-    ~stop_at_slot ~protocol_version =
-  let open Deferred.Result.Let_syntax in
-  let id_array = Array.of_list ids in
-  let%bind protocol_version_id =
-    Conn.find protocol_version_id_query protocol_version
-  in
-  Conn.exec canonical_or_orphaned_blocks_query
-    (stop_at_slot, protocol_version_id, id_array)
-
-let chain_of_query =
-  {sql|
+let chain_of_query_templated ~join_condition =
+  {%string|
     WITH RECURSIVE chain AS (
         SELECT
             b.id AS id,
@@ -166,7 +60,7 @@ let chain_of_query =
             b.height AS height,
             b.global_slot_since_genesis AS global_slot_since_genesis
         FROM blocks b
-        WHERE b.state_hash = ?
+        WHERE b.state_hash = $1
 
         UNION ALL
 
@@ -177,62 +71,134 @@ let chain_of_query =
             p.height,
             p.global_slot_since_genesis
         FROM blocks p
-        JOIN chain c ON p.id = c.parent_id
+        JOIN chain c ON p.id = c.parent_id AND %{join_condition}
         WHERE p.parent_id IS NOT NULL
     )
-  |sql}
+  |}
 
-let is_in_best_chain_query =
-  Caqti_type.(t4 string string int int64 ->! bool)
-    ( chain_of_query
-    ^ {sql|
-    SELECT EXISTS (
-      SELECT 1 FROM chain
-      WHERE state_hash = ?
-        AND height = ?
-        AND global_slot_since_genesis = ?
-    );
-    |sql}
-    )
+let chain_of_query = chain_of_query_templated ~join_condition:"TRUE"
+
+let chain_of_query_until_inclusive =
+  chain_of_query_templated ~join_condition:"c.state_hash <> $2"
+
+let latest_state_hash (module Conn : CONNECTION) =
+  let query =
+    Caqti_type.(unit ->! string)
+      {%string|
+        SELECT state_hash from blocks order by height desc limit 1;
+      |}
+  in
+  Conn.find query ()
+
+(* Returns the first block of a specific protocol version.
+   NOTE: There exists some emergency HF that doesn't bump up protocol version. *)
+let first_block_of_protocol_version (module Conn : CONNECTION)
+    ~(v : Protocol_version.t) =
+  let query =
+    (Protocol_version.typ ->? Block_info.typ)
+      {%string|
+        SELECT blocks.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
+        FROM blocks INNER JOIN protocol_versions
+          ON blocks.protocol_version_id = protocol_versions.id
+        WHERE protocol_versions.transaction = $1::int
+          AND protocol_versions.network = $2::int
+          AND protocol_versions.patch = $3::int
+          AND global_slot_since_hard_fork = 0
+        ORDER BY id ASC
+        LIMIT 1;
+      |}
+  in
+  Conn.find_opt query v
+
+let block_info_by_state_hash (module Conn : CONNECTION) ~state_hash =
+  let query =
+    Caqti_type.(string ->? Block_info.typ)
+      {%string|
+        SELECT blocks.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
+        FROM blocks INNER JOIN protocol_versions
+          ON blocks.protocol_version_id = protocol_versions.id
+        WHERE state_hash = ?
+        LIMIT 1;
+      |}
+  in
+  Conn.find_opt query state_hash
+
+let mark_pending_blocks_as_canonical_or_orphaned (module Conn : CONNECTION)
+    ~canonical_block_ids ~stop_at_slot =
+  let mutation =
+    Caqti_type.(t2 (option int) Mina_caqti.array_int_typ ->. Caqti_type.unit)
+      {%string|
+        UPDATE blocks
+        SET chain_status = CASE
+            WHEN id = ANY($2::int[]) THEN 'canonical'::chain_status_type
+            ELSE 'orphaned'::chain_status_type
+        END
+        WHERE chain_status = 'pending'::chain_status_type
+          AND ($1 IS NULL OR $1::int <= global_slot_since_genesis);
+      |}
+  in
+  Conn.exec mutation (stop_at_slot, Array.of_list canonical_block_ids)
+
+let blocks_between_both_inclusive (module Conn : CONNECTION) ~latest_block_id
+    ~oldest_block_id : (Block_info.t list, Caqti_error.t) Deferred.Result.t =
+  let query =
+    Caqti_type.(t2 int int ->* Block_info.typ)
+      {%string|
+        %{chain_of_query_until_inclusive}
+        SELECT chain.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
+        FROM chain INNER JOIN protocol_versions
+          ON chain.protocol_version_id = protocol_versions.id
+        ORDER BY height ASC
+      |}
+  in
+  Conn.collect_list query (latest_block_id, oldest_block_id)
 
 let is_in_best_chain (module Conn : CONNECTION) ~tip_hash ~check_hash
     ~check_height ~check_slot =
-  Conn.find is_in_best_chain_query
-    (tip_hash, check_hash, check_height, check_slot)
-
-let num_of_confirmations_query =
-  Caqti_type.(t2 string int ->! int)
-    ( chain_of_query
-    ^ {sql|
-    SELECT count(*) FROM chain 
-    WHERE global_slot_since_genesis >= ?;
-    |sql}
-    )
+  let query =
+    Caqti_type.(t4 string string int int64 ->! bool)
+      {%string|
+        %{chain_of_query}
+        SELECT EXISTS (
+          SELECT 1 FROM chain
+          WHERE state_hash = $2
+            AND height = $3
+            AND global_slot_since_genesis = $4
+        );
+      |}
+  in
+  Conn.find query (tip_hash, check_hash, check_height, check_slot)
 
 let num_of_confirmations (module Conn : CONNECTION) ~latest_state_hash
     ~fork_slot =
-  Conn.find num_of_confirmations_query (latest_state_hash, fork_slot)
+  let query =
+    Caqti_type.(t2 string int ->! int)
+      {%string|
+        %{chain_of_query}
+        SELECT COUNT(*) FROM chain 
+        WHERE global_slot_since_genesis >= $2;
+      |}
+  in
+  Conn.find query (latest_state_hash, fork_slot)
 
 let number_of_commands_since_block_query block_commands_table =
   Caqti_type.(t2 string int ->! t4 string int int int)
-    ( chain_of_query
-    ^ Printf.sprintf
-        {sql|
-    SELECT 
-        state_hash,
-        height,
-        global_slot_since_genesis,
-        COUNT(bc.block_id) AS command_count
-    FROM chain
-    LEFT JOIN %s bc 
-        ON chain.id = bc.block_id
-    WHERE global_slot_since_genesis >= ?
-    GROUP BY 
-        state_hash,
-        height,
-        global_slot_since_genesis;
-    |sql}
-        block_commands_table )
+    {%string|
+      %{chain_of_query}
+      SELECT 
+          state_hash,
+          height,
+          global_slot_since_genesis,
+          COUNT(bc.block_id) AS command_count
+      FROM chain
+      LEFT JOIN %{block_commands_table} bc 
+          ON chain.id = bc.block_id
+      WHERE global_slot_since_genesis >= $2
+      GROUP BY 
+          state_hash,
+          height,
+          global_slot_since_genesis;
+    |}
 
 let number_of_user_commands_since_block (module Conn : CONNECTION)
     ~fork_state_hash ~fork_slot =
@@ -252,30 +218,30 @@ let number_of_zkapps_commands_since_block (module Conn : CONNECTION)
     (number_of_commands_since_block_query "blocks_zkapp_commands")
     (fork_state_hash, fork_slot)
 
-let last_fork_block_query =
-  Caqti_type.(unit ->! t2 string int64)
-    {sql|
-    SELECT state_hash, global_slot_since_genesis FROM blocks
-    WHERE global_slot_since_hard_fork = 0
-    ORDER BY height DESC
-    LIMIT 1;
-    |sql}
-
 let last_fork_block (module Conn : CONNECTION) =
-  Conn.find last_fork_block_query ()
-
-let fetch_latest_migration_history_query =
-  Caqti_type.(unit ->? t3 string string string)
-    {|
-      SELECT
-        status, protocol_version, migration_version
-      FROM migration_history
-      ORDER BY commit_start_at DESC
-      LIMIT 1;
-    |}
+  let query =
+    Caqti_type.(unit ->! t2 string int64)
+      {%string|
+        SELECT state_hash, global_slot_since_genesis FROM blocks
+        WHERE global_slot_since_hard_fork = 0
+        ORDER BY height DESC
+        LIMIT 1;
+      |}
+  in
+  Conn.find query ()
 
 let fetch_latest_migration_history (module Conn : CONNECTION) =
-  Conn.find_opt fetch_latest_migration_history_query ()
+  let query =
+    Caqti_type.(unit ->? t3 string string string)
+      {%string|
+        SELECT
+          status, protocol_version, migration_version
+        FROM migration_history
+        ORDER BY commit_start_at DESC
+        LIMIT 1;
+      |}
+  in
+  Conn.find_opt query ()
 
 (* Fetches last filled block before stop transaction slot.
 
@@ -290,15 +256,16 @@ let fetch_latest_migration_history (module Conn : CONNECTION) =
    Knowing above we can detect last filled block by only looking at internal transactions occurrence.
    Therefore our fork candidate is the block with highest height that has internal transaction included in it.
 *)
-let fetch_last_filled_block_query =
-  Caqti_type.(unit ->! t3 string int64 int)
-    {sql|
-    SELECT b.state_hash, b.global_slot_since_genesis, b.height
-    FROM blocks b
-    INNER JOIN blocks_internal_commands bic ON b.id = bic.block_id
-    ORDER BY b.height DESC
-    LIMIT 1;
-    |sql}
 
 let fetch_last_filled_block (module Conn : CONNECTION) =
-  Conn.find fetch_last_filled_block_query ()
+  let query =
+    Caqti_type.(unit ->! t3 string int64 int)
+      {%string|
+        SELECT b.state_hash, b.global_slot_since_genesis, b.height
+        FROM blocks b
+        INNER JOIN blocks_internal_commands bic ON b.id = bic.block_id
+        ORDER BY b.height DESC
+        LIMIT 1;
+      |}
+  in
+  Conn.find query ()
