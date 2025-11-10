@@ -413,4 +413,6 @@ module Test_helpers : sig
          * [> `First_pass_ledger_end of Frozen_ledger_hash.t ]
        , Staged_ledger_error.t )
        Deferred.Result.t
+
+  val with_ledger_mask : Ledger.t -> f:(Ledger.Mask.Attached.t -> 'a) -> 'a
 end

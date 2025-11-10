@@ -2,8 +2,6 @@
  (name staged_ledger)
  (public_name staged_ledger)
  (library_flags -linkall)
- (inline_tests
-  (flags -verbose -show-counts))
  (libraries
   ;; opam libraries
   async
@@ -73,7 +71,6 @@
    ppx_deriving.make
    ppx_deriving_yojson
    ppx_fields_conv
-   ppx_inline_test
    ppx_let
    ppx_mina
    ppx_pipebang

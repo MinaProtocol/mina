@@ -1,29 +1,82 @@
 (tests
- (names main)
+ (names main staged_ledger_tests)
  (libraries
   ;; opam libraries
   alcotest
+  async
   async_kernel
   async_unix
   base
   base.caml
+  core
   core_kernel
   integers
+  lens
+  ppx_inline_test.runtime-lib
   sexplib0
   yojson
   ;; local libraries
+  cache_dir
+  child_processes
+  coda_genesis_ledger
+  consensus
+  currency
+  data_hash_lib
+  error_json
   genesis_constants
+  internal_tracing
+  kimchi_backend
+  kimchi_pasta
+  kimchi_pasta.basic
+  ledger_proof
+  logger
+  merkle_ledger
   mina_base
   mina_base.test_helpers
   mina_generators
   mina_ledger
   mina_ledger_test_helpers
+  mina_metrics
   mina_numbers
+  mina_signature_kind
+  mina_state
   mina_transaction
+  mina_transaction_logic
   mina_wire_types
+  o1trace
+  one_or_two
+  pickles
+  pickles.backend
+  pickles_types
+  quickcheck_lib
+  random_oracle
+  random_oracle_input
+  sgn
+  signature_lib
+  snarky.backendless
+  snark_params
+  snark_work_lib
   staged_ledger
-  transaction_snark)
+  staged_ledger_diff
+  transaction_snark
+  transaction_snark_scan_state
+  transaction_snark_work
+  transaction_witness
+  verifier
+  with_hash
+  zkapp_command_builder)
  (preprocess
-  (pps ppx_base ppx_let ppx_assert ppx_version))
+  (pps
+   lens.ppx_deriving
+   ppx_assert
+   ppx_base
+   ppx_compare
+   ppx_custom_printf
+   ppx_deriving_yojson
+   ppx_fields_conv
+   ppx_let
+   ppx_mina
+   ppx_sexp_conv
+   ppx_version))
  (instrumentation
   (backend bisect_ppx)))
