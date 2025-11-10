@@ -179,7 +179,8 @@ fi
 rm -Rf localnet/hf_ledgers
 mkdir localnet/hf_ledgers
 
-"$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json
+# Forking to mesa need App State size to be expanded to 32 
+"$FORK_RUNTIME_GENESIS_LEDGER_EXE" --config-file localnet/fork_config.json --genesis-dir localnet/hf_ledgers --hash-output-file localnet/hf_ledger_hashes.json --pad-app-state
 
 NOW_UNIX_TS=$(date +%s)
 FORK_GENESIS_UNIX_TS=$((NOW_UNIX_TS - NOW_UNIX_TS%60 + FORK_DELAY*60))
