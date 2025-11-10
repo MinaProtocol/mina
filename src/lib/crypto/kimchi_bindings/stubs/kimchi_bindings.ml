@@ -215,8 +215,7 @@ module Protocol = struct
         -> SRS.Fp.t
         -> bool
         -> t
-        = "caml_pasta_fp_plonk_index_create_bytecode"
-          "caml_pasta_fp_plonk_index_create"
+        = "caml_pasta_fp_plonk_index_create_bytecode" "caml_pasta_fp_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fp_plonk_index_max_degree"
 
@@ -251,8 +250,7 @@ module Protocol = struct
         -> SRS.Fq.t
         -> bool
         -> t
-        = "caml_pasta_fq_plonk_index_create_bytecode"
-          "caml_pasta_fq_plonk_index_create"
+        = "caml_pasta_fq_plonk_index_create_bytecode" "caml_pasta_fq_plonk_index_create"
 
       external max_degree : t -> int = "caml_pasta_fq_plonk_index_max_degree"
 

@@ -2831,7 +2831,8 @@ module Tick : S = struct
                           + if_feature
                               ( LookupPattern RangeCheck
                               , (fun () ->
-                                  cell (var (LookupKindIndex RangeCheck, Curr)) )
+                                  cell (var (LookupKindIndex RangeCheck, Curr))
+                                  )
                               , fun () ->
                                   field
                                     "0x0000000000000000000000000000000000000000000000000000000000000000"
@@ -2841,7 +2842,8 @@ module Tick : S = struct
                               , (fun () ->
                                   cell
                                     (var
-                                       (LookupKindIndex ForeignFieldMul, Curr) ) )
+                                       (LookupKindIndex ForeignFieldMul, Curr) )
+                                  )
                               , fun () ->
                                   field
                                     "0x0000000000000000000000000000000000000000000000000000000000000000"
