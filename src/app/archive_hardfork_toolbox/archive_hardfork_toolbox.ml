@@ -2,7 +2,7 @@
 
 open Async
 open Cli_lib.Flag
-open Logic
+open Archive_hardfork_toolbox_lib.Logic
 
 let run_check_and_exit check_fn () =
   let%bind results = check_fn () in
