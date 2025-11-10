@@ -5,5 +5,13 @@
 // external pointer types.
 
 type WasmPastaFpPlonkIndex = {};
+type NapiVector<T> = {};
+type NapiGVesta = {};
+type NapiGPallas = {};
+type NapiPastaFpPlonkIndex = {};
+type NapiPastaFqPlonkIndex = {};
+type NapiLookupInfo = {};
+type NapiPastaFp = {};
+type NapiPastaFq = {};
 
 // Header section end
