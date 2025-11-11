@@ -194,18 +194,13 @@ let successor_hashes t hash =
   let node = Hashtbl.find_exn t.table hash in
   node.successor_hashes
 
-let rec successor_hashes_rec t hash =
-  List.bind (successor_hashes t hash) ~f:(fun succ_hash ->
-      succ_hash :: successor_hashes_rec t succ_hash )
-
 let successors t breadcrumb =
   List.map
     (successor_hashes t (Breadcrumb.state_hash breadcrumb))
     ~f:(find_exn t)
 
-let rec successors_rec t breadcrumb =
-  List.bind (successors t breadcrumb) ~f:(fun succ ->
-      succ :: successors_rec t succ )
+let rec recursive_list_bind ~f init =
+  List.bind (f init) ~f:(fun succ -> succ :: recursive_list_bind ~f succ)
 
 let path_map ?max_length t breadcrumb ~f =
   let rec find_path b count_opt acc =
@@ -314,7 +309,7 @@ let calculate_root_transition_diff t heir =
   in
   let garbage_breadcrumbs =
     List.bind heir_siblings ~f:(fun sibling ->
-        sibling :: successors_rec t sibling )
+        sibling :: recursive_list_bind ~f:(successors t) sibling )
     |> List.rev
   in
   let garbage_nodes =
