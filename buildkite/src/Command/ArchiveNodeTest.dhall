@@ -19,8 +19,10 @@ in  { step =
                     [ "ARCHIVE_TEST_APP=mina-archive-node-test"
                     , "MINA_TEST_NETWORK_DATA=/etc/mina/test/archive/sample_db"
                     ]
-                    ( RunWithPostgres.ScriptOrArchive.Script
-                        "src/test/archive/sample_db/archive_db.sql"
+                    ( Some
+                        ( RunWithPostgres.ScriptOrArchive.Script
+                            "src/test/archive/sample_db/archive_db.sql"
+                        )
                     )
                     ( Artifacts.fullDockerTag
                         Artifacts.Tag::{
