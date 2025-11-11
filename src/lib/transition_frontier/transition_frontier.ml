@@ -529,6 +529,8 @@ include struct
 
   let common_ancestor = proxy1 common_ancestor
 
+  let successors = proxy1 successors
+
   let hash_path = proxy1 hash_path
 
   let best_tip = proxy1 best_tip
@@ -557,9 +559,6 @@ include struct
   (* why can't this one be proxied? *)
   let path_map ?max_length { full_frontier; _ } breadcrumb ~f =
     path_map ?max_length full_frontier breadcrumb ~f
-
-  let calculate_root_transition_diff { full_frontier; _ } breadcrumb =
-    Full_frontier.calculate_root_transition_diff full_frontier breadcrumb
 end
 
 module For_tests = struct

@@ -65,7 +65,14 @@ val apply_diffs :
   -> [ `New_root_and_diffs_with_mutants of
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
 
-val calculate_root_transition_diff : t -> Breadcrumb.t -> Diff.Full.E.t
+module Util : sig
+  val calculate_root_transition_diff :
+       protocol_states_for_root_scan_state:Protocol_states_for_root_scan_state.t
+    -> parent:Breadcrumb.t
+    -> successors:(Breadcrumb.t -> Breadcrumb.t list)
+    -> Breadcrumb.t
+    -> Diff.full Diff.Root_transition.t
+end
 
 module For_tests : sig
   val equal : t -> t -> bool

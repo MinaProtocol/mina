@@ -32,6 +32,8 @@ module type S = sig
   val find_protocol_state :
     t -> State_hash.t -> Mina_state.Protocol_state.value option
 
+  val successors : t -> Breadcrumb.t -> Breadcrumb.t list
+
   val common_ancestor : t -> Breadcrumb.t -> Breadcrumb.t -> State_hash.t
 
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit

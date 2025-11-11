@@ -112,8 +112,6 @@ val rejected_blocks :
 val validated_blocks :
   (State_hash.t * Network_peer.Envelope.Sender.t * Block_time.t) Core.Queue.t
 
-val calculate_root_transition_diff : t -> Breadcrumb.t -> Diff.Full.E.t
-
 module For_tests : sig
   open Core_kernel
   open Signature_lib
