@@ -37,11 +37,22 @@ let command_run =
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
+     and block_submission_delay_before_accounts_creation_ms =
+       flag "--block-submission-delay-before-accounts-creation-ms"
+         (optional float)
+         ~doc:
+           "FLOAT milliseconds to wait before submitting a 2nd txn in \
+            add_block_aux. WARN: This is for bug reproduction only. "
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
            Yojson.Safe.from_file file |> Runtime_config.of_yojson
            |> Result.ok_or_failwith )
+     in
+     let block_submission_delay_before_accounts_creation =
+       Time.Span.of_ms
+         (Option.value ~default:0.
+            block_submission_delay_before_accounts_creation_ms )
      in
      fun () ->
        let logger = Logger.create () in
@@ -53,8 +64,9 @@ let command_run =
        let proof_cache_db = Proof_cache_tag.create_identity_db () in
        [%log info] "Starting archive process; built with commit $commit"
          ~metadata:[ ("commit", `String Mina_version.commit_id) ] ;
-       Archive_lib.Processor.setup_server ~proof_cache_db ~metrics_server_port
-         ~logger ~genesis_constants ~constraint_constants
+       Archive_lib.Processor.setup_server
+         ~block_submission_delay_before_accounts_creation ~proof_cache_db
+         ~metrics_server_port ~logger ~genesis_constants ~constraint_constants
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)

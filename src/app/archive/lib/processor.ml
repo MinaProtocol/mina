@@ -2831,9 +2831,10 @@ module Block = struct
       id
 
   let add_parts_if_doesn't_exist (module Conn : CONNECTION)
-      ~constraint_constants ~protocol_state ~staged_ledger_diff
-      ~protocol_version ~proposed_protocol_version ~hash ~v1_transaction_hash
-      ~accounts_accessed ~accounts_created =
+      ~block_submission_delay_before_accounts_creation ~constraint_constants
+      ~protocol_state ~staged_ledger_diff ~protocol_version
+      ~proposed_protocol_version ~hash ~v1_transaction_hash ~accounts_accessed
+      ~accounts_created =
     let open Deferred.Result.Let_syntax in
     match%bind find_opt (module Conn) ~state_hash:hash with
     | Some block_id ->
@@ -2995,6 +2996,9 @@ module Block = struct
                 Transaction_status.Failure.Collection.to_display failures
               in
               (failed_str, Some display)
+        in
+        let%bind.Deferred () =
+          after block_submission_delay_before_accounts_creation
         in
         let%bind _accounts_accessed =
           Accounts_accessed.add_accounts_if_don't_exist
@@ -3243,9 +3247,11 @@ module Block = struct
         return block_id
 
   let add_if_doesn't_exist conn ~constraint_constants
+      ~block_submission_delay_before_accounts_creation
       ({ data = t; hash = { state_hash = hash; _ } } :
         Mina_block.t State_hash.With_state_hashes.t ) =
-    add_parts_if_doesn't_exist conn ~constraint_constants
+    add_parts_if_doesn't_exist conn
+      ~block_submission_delay_before_accounts_creation ~constraint_constants
       ~protocol_state:(Header.protocol_state @@ Mina_block.header t)
       ~staged_ledger_diff:(Body.staged_ledger_diff @@ Mina_block.body t)
       ~protocol_version:(Header.current_protocol_version @@ Mina_block.header t)
@@ -4582,7 +4588,8 @@ let add_block_aux_precomputed ~proof_cache_db ~constraint_constants ~logger
     ~add_block:
       (Block.add_from_precomputed ~proof_cache_db ~constraint_constants
          ~accounts_accessed:block.Precomputed.accounts_accessed
-         ~accounts_created:block.Precomputed.accounts_created )
+         ~accounts_created:block.Precomputed.accounts_created
+         ~block_submission_delay_before_accounts_creation:Time.Span.zero )
     ~hash:(fun block ->
       (block.Precomputed.protocol_state |> Protocol_state.hashes).state_hash )
     ~tokens_used:block.Precomputed.tokens_used block
@@ -4597,15 +4604,17 @@ let add_block_aux_extensional ~proof_cache_db ~logger ?retries ~pool
     ~tokens_used:block.Extensional.Block.tokens_used block
 
 (* receive blocks from a daemon, write them to the database *)
-let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
-    ~logger ~delete_older_than : unit Deferred.t =
+let run ?(block_submission_delay_before_accounts_creation = Time.Span.zero) pool
+    reader ~proof_cache_db ~genesis_constants ~constraint_constants ~logger
+    ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
           { block; accounts_accessed; accounts_created; tokens_used; _ } ) -> (
         let add_block =
-          Block.add_if_doesn't_exist ~constraint_constants ~accounts_accessed
-            ~accounts_created
+          Block.add_if_doesn't_exist
+            ~block_submission_delay_before_accounts_creation
+            ~constraint_constants ~accounts_accessed ~accounts_created
         in
         let hash = State_hash.With_state_hashes.state_hash in
         let block =
@@ -4676,6 +4685,7 @@ let add_genesis_accounts ~logger ~(runtime_config_opt : Runtime_config.t option)
                 (module Conn)
                 ~constraint_constants:precomputed_values.constraint_constants
                 genesis_block ~accounts_accessed:[] ~accounts_created:[]
+                ~block_submission_delay_before_accounts_creation:Time.Span.zero
             in
             let%bind.Deferred.Result { ledger_hash; _ } =
               Block.load (module Conn) ~id:genesis_block_id
@@ -4782,7 +4792,8 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port
-    ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
+    ~delete_older_than ~runtime_config_opt ~missing_blocks_width
+    ~block_submission_delay_before_accounts_creation =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4817,6 +4828,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than
+        ~block_submission_delay_before_accounts_creation
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
