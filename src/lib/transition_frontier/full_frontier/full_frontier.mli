@@ -72,6 +72,10 @@ module Util : sig
     -> successors:(Breadcrumb.t -> Breadcrumb.t list)
     -> Breadcrumb.t
     -> Diff.full Diff.Root_transition.t
+
+  val to_protocol_states_map_exn :
+       Protocol_state.value State_hash.With_state_hashes.t list
+    -> Protocol_states_for_root_scan_state.t
 end
 
 module For_tests : sig

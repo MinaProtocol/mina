@@ -350,6 +350,11 @@ module Util = struct
         Full (Breadcrumb.staged_ledger parent |> Staged_ledger.scan_state)
     ; just_emitted_a_proof
     }
+
+  let to_protocol_states_map_exn protocol_states =
+    List.map protocol_states ~f:(fun s ->
+        (State_hash.With_state_hashes.state_hash s, s) )
+    |> State_hash.Map.of_alist_exn
 end
 
 let move_root ({ context = (module Context); _ } as t) ~new_root_hash
@@ -543,12 +548,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     because the protocol states corresponding to those transactions won't be part
     of the new_root_protocol_states since those transactions would have been
     deleted from the scan state after emitting the proof*)
-  let new_protocol_states_map =
-    new_root_protocol_states
-    |> List.map ~f:(fun s -> (State_hash.With_state_hashes.state_hash s, s))
-    |> State_hash.Map.of_alist_exn
-  in
-  t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
+  t.protocol_states_for_root_scan_state <-
+    Util.to_protocol_states_map_exn new_root_protocol_states ;
   let new_root_node = { new_root_node with breadcrumb = new_root_breadcrumb } in
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
