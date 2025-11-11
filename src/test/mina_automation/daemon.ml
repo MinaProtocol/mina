@@ -232,7 +232,6 @@ let start t =
     [ "daemon"
     ; "--seed"
     ; "--demo-mode"
-    ; "--background"
     ; "--insecure-rest-server"
     ; "--working-dir"
     ; "."
