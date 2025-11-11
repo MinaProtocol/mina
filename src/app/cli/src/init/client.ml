@@ -2560,7 +2560,9 @@ let advanced ~itn_features =
     ; ("generate-hardfork-config", generate_hardfork_config)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("submit-to-archive", Test_submit_to_archive.submit_to_archive)
+          ] )
     ]
   in
   let cmds =
