@@ -2532,7 +2532,9 @@ let advanced ~itn_features =
     ; ("print-signature-kind", signature_kind)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("submit-to-archive", Test_submit_to_archive.submit_to_archive)
+          ] )
     ]
   in
   let cmds =
