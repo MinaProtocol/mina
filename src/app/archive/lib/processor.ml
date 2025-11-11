@@ -4477,9 +4477,10 @@ let retry ~f ~logger ~error_str retries =
   in
   go retries
 
-let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
-    ~hash ~delete_older_than ~accounts_accessed ~accounts_created ~tokens_used
-    block =
+let add_block_aux ?(retries = 3)
+    ?(block_submission_delay_before_accounts_creation = Time.Span.zero) ~logger
+    ~genesis_constants ~pool ~add_block ~hash ~delete_older_than
+    ~accounts_accessed ~accounts_created ~tokens_used block =
   let state_hash = hash block in
 
   (* the block itself is added in a single transaction with a transaction block
@@ -4566,6 +4567,9 @@ let add_block_aux ?(retries = 3) ~logger ~genesis_constants ~pool ~add_block
                     ; ( "num_accounts_accessed"
                       , `Int (List.length accounts_accessed) )
                     ] ;
+                let%bind () =
+                  after block_submission_delay_before_accounts_creation
+                in
                 let%bind.Deferred.Result () = Conn.start () in
                 match%bind
                   Caqti_async.Pool.use
@@ -4650,8 +4654,9 @@ let add_block_aux_extensional ~proof_cache_db ~logger ?retries ~pool
     ~tokens_used:block.Extensional.Block.tokens_used block
 
 (* receive blocks from a daemon, write them to the database *)
-let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
-    ~logger ~delete_older_than : unit Deferred.t =
+let run ?block_submission_delay_before_accounts_creation pool reader
+    ~proof_cache_db ~genesis_constants ~constraint_constants ~logger
+    ~delete_older_than : unit Deferred.t =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier
         (Breadcrumb_added
@@ -4664,9 +4669,9 @@ let run pool reader ~proof_cache_db ~genesis_constants ~constraint_constants
             block
         in
         match%bind
-          add_block_aux ~logger ~genesis_constants ~pool ~delete_older_than
-            ~hash ~add_block ~accounts_accessed ~accounts_created ~tokens_used
-            block
+          add_block_aux ?block_submission_delay_before_accounts_creation ~logger
+            ~genesis_constants ~pool ~delete_older_than ~hash ~add_block
+            ~accounts_accessed ~accounts_created ~tokens_used block
         with
         | Error e ->
             let state_hash = hash block in
@@ -4830,7 +4835,8 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
 let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port
-    ~delete_older_than ~runtime_config_opt ~missing_blocks_width =
+    ~delete_older_than ~runtime_config_opt ~missing_blocks_width
+    ~block_submission_delay_before_accounts_creation =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4865,6 +4871,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than
+        ~block_submission_delay_before_accounts_creation
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
