@@ -137,7 +137,7 @@ if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
             jq) NIX_PACKAGES+=("jq") ;;
             initdb|postgres|createdb|psql)
                 if [[ "$NEED_POSTGRESQL" == "false" ]]; then
-                    NIX_PACKAGES+=("postgresql")
+                    NIX_PACKAGES+=("postgresql" "glibcLocales")
                     NEED_POSTGRESQL=true
                 fi
                 ;;
@@ -272,6 +272,7 @@ fi
 
 echo "  Creating ledger directory..."
 mkdir -p "$LEDGER_DIR"
+chmod 700 "$LEDGER_DIR"
 
 echo "  Extracting ledger archive..."
 tar -xf "$LEDGER_ARCHIVE" -C "$LEDGER_DIR"

@@ -268,6 +268,27 @@ sleep 180
 echo "Services should be ready"
 echo ""
 
+# Run initial warmup submit-to-archive (without watchdog)
+echo "[Warmup] Submitting initial block to archive..."
+echo "Preparing genesis and tmp directories..."
+rm -rf genesis tmp
+cp -R "$LEDGER_DIR/ledgers/" genesis
+mkdir -p tmp
+
+echo "Running warmup mina advanced test submit-to-archive (1 block, 1 payment, 0 zkapp)..."
+TMP=tmp MINA_PRIVKEY_PASS= "$MINA_EXE" advanced test submit-to-archive \
+    --archive-node-port "$ARCHIVE_PORT" \
+    --config-file "$LEDGER_DIR/runtime_config.json" \
+    --privkey-path "$LEDGER_DIR/plain1" \
+    --num-zkapp-txs 0 \
+    --num-payments 1 \
+    --num-blocks 1
+
+echo "Warmup submit-to-archive completed"
+echo "Waiting 1 minute before main test..."
+sleep 60
+echo ""
+
 # Start watchdog process
 echo "Starting watchdog process..."
 rm -f "$OPCOUNT_LOG"
@@ -283,13 +304,8 @@ WATCHDOG_PID=$!
 echo "Watchdog started (PID: $WATCHDOG_PID)"
 echo ""
 
-# Run submit-to-archive
-echo "Submitting blocks to archive..."
-echo "Preparing genesis and tmp directories..."
-rm -rf genesis tmp
-cp -R "$LEDGER_DIR/ledgers/" genesis
-mkdir -p tmp
-
+# Run main submit-to-archive test
+echo "[Main Test] Submitting blocks to archive..."
 echo "Running mina advanced test submit-to-archive..."
 TMP=tmp MINA_PRIVKEY_PASS= "$MINA_EXE" advanced test submit-to-archive \
     --archive-node-port "$ARCHIVE_PORT" \
@@ -299,7 +315,7 @@ TMP=tmp MINA_PRIVKEY_PASS= "$MINA_EXE" advanced test submit-to-archive \
     --num-payments "$NUM_PAYMENTS" \
     --num-blocks "$NUM_BLOCKS"
 
-echo "Submit-to-archive completed"
+echo "Main submit-to-archive completed"
 echo "Waiting 3 minutes for archive to finish processing the blocks..."
 sleep 180
 echo ""
