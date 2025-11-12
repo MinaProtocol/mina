@@ -101,12 +101,19 @@ module Instance = struct
   end
 
   let potential_snarked_ledgers_to_yojson queue =
-    `List (List.map (Queue.to_list queue) ~f:Root_ledger.Config.to_yojson)
+    `List
+      (List.map (Queue.to_list queue) ~f:(fun cfg ->
+           `String (Root_ledger.Config.primary_directory cfg) ) )
 
   let potential_snarked_ledgers_of_yojson json =
     Yojson.Safe.Util.to_list json
     |> List.map ~f:(fun json ->
-           Root_ledger.Config.of_yojson json |> Result.ok_or_failwith )
+           match json with
+           | `String directory_name ->
+               Root_ledger.Config.with_directory
+                 ~backing_type:Root_ledger.Config.Stable_db ~directory_name
+           | _ ->
+               Root_ledger.Config.of_yojson json |> Result.ok_or_failwith )
 
   let load_potential_snarked_ledgers_from_disk factory =
     let location = Config.potential_snarked_ledgers factory in
