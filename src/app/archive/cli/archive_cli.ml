@@ -37,6 +37,9 @@ let command_run =
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
+     and skip_genesis_loading =
+       flag "--skip-genesis-loading" no_arg
+         ~doc:"Skip loading genesis accounts into the archive database"
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
@@ -58,7 +61,8 @@ let command_run =
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than ~runtime_config_opt ~missing_blocks_width )
+         ~delete_older_than ~runtime_config_opt ~missing_blocks_width
+         ~skip_genesis_loading )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
