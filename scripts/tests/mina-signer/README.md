@@ -16,18 +16,17 @@ The optional `graphql_url` flag lets you override the default target defined in 
 4. `utils.js` provides small helpers for GraphQL string construction and CLI validation.
 5. `config.js` centralises network defaults and usage messaging.
 
-Check the console output for a transaction id; you can re-run the pool check or the `getPooledUserCommands` helper to confirm inclusion.
-Provide a `nonce` argument when you need to synchronise with on-chain account state manually.
-The CLI prints emoji-enhanced step logs and a summary table so you can spot successes and failures at a glance.
-GraphQL errors (including malformed responses) cause the CLI to exit with a non-zero status so they can be surfaced in scripts and CI.
-
-## File Guide
 - `mina-test-signer.js` – CLI entry point orchestrating validation, signing, submission, and pool verification.
 - `payment-service.js` – Thin wrapper around `mina-signer` with sensible defaults for MINA amounts and fees.
 - `graphql-client.js` – Minimal fetch-based GraphQL transport for sending payments and querying pooled commands.
 - `utils.js` – GraphQL stringification helpers plus basic CLI argument validation/parsing.
 - `config.js` – Configuration constants and usage text surfaced by the CLI.
 - `key/` – Sample key material for experimentation; do not use in production environments.
+
+Check the console output for a transaction id; you can re-run the pool check or the `getPooledUserCommands` helper to confirm inclusion.
+Provide a `nonce` argument when you need to synchronise with on-chain account state manually.
+The CLI prints emoji-enhanced step logs and a summary table so you can spot successes and failures at a glance.
+GraphQL errors (including malformed responses) cause the CLI to exit with a non-zero status so they can be surfaced in scripts and CI.
 
 ## Customisation Tips
 - Update `CONFIG.DEFAULT_GRAPHQL_URL` in `config.js` to point at your daemon or a hosted GraphQL endpoint.

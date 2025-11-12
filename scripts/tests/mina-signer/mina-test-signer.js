@@ -9,16 +9,16 @@
  *  - Submit the signed payload to a Mina daemon and verify it reached the pool
  *
  * Usage:
- *    node test-signer.js <private_key> <recipient_address> [graphql_url] [nonce]
+ *    node test-signer.js --private-key <key> --recipient <address> [--url <graphql_url>] [--nonce <nonce>]
  */
-import { PaymentService } from './payment-service.js';
+import { Command } from 'commander';
 import { GraphQLClient } from './graphql-client.js';
-import { ValidationUtils } from './utils.js';
-import { CONFIG, USAGE_INFO } from './config.js';
+import { CONFIG } from './config.js';
+import Client from 'mina-signer';
 
 const DIVIDER = '────────────────────────────────────────';
 
-const shortenKey = value => {
+const showKey = value => {
   if (!value) return 'n/a';
   const normalized = String(value);
   if (normalized.length <= 12) {
@@ -68,28 +68,39 @@ const logger = {
  */
 class PaymentApp {
   constructor() {
-    this.paymentService = new PaymentService();
+    this.program = new Command();
+    this.setupCLI();
+  }
+
+  /** Configure CLI options and arguments using commander */
+  setupCLI() {
+    this.program
+      .name('mina-test-signer')
+      .description('CLI utility for signing and broadcasting Mina payments')
+      .version('1.0.0')
+      .requiredOption('-k, --private-key <key>', 'Private key for signing the payment')
+      .requiredOption('-r, --recipient <address>', 'Recipient public key address')
+      .option('-u, --url <url>', 'GraphQL endpoint URL', CONFIG.DEFAULT_GRAPHQL_URL)
+      .option('-n, --nonce <nonce>', 'Transaction nonce (optional, will be fetched if not provided)', parseInt)
+      .parse();
   }
 
   /** Prints user-friendly guidance for invoking the CLI correctly. */
   displayUsage() {
-    console.log(USAGE_INFO.message);
-    console.log(USAGE_INFO.example);
-    console.log(USAGE_INFO.defaultUrl);
+    this.program.help();
   }
 
   /**
-   * Ensures the caller provided required arguments before we attempt to sign.
-   * Returns a normalized object that downstream logic can destructure safely.
+   * Get parsed and validated CLI options from commander
    */
-  validateAndParseArgs(args) {
-    const validation = ValidationUtils.validateArgs(args);
-    if (!validation.isValid) {
-      console.error(validation.error);
-      this.displayUsage();
-      process.exit(1);
-    }
-    return ValidationUtils.parseArguments(args);
+  validateAndParseArgs() {
+    const options = this.program.opts();
+    return {
+      privateKey: options.privateKey,
+      recipientAddress: options.recipient,
+      url: options.url,
+      nonce: options.nonce
+    };
   }
 
   /**
@@ -106,21 +117,30 @@ class PaymentApp {
 
     try {
       logger.step('Parsing command line arguments...');
-      const args = process.argv.slice(2);
-      const { privateKey, recipientAddress, url = CONFIG.DEFAULT_GRAPHQL_URL, nonce } =
-        this.validateAndParseArgs(args);
-      record('CLI arguments', true, `Recipient ${shortenKey(recipientAddress)} | Nonce ${nonce ?? 'auto'}`);
+      const { privateKey, recipientAddress, url, nonce } = this.validateAndParseArgs();
+      record('CLI arguments', true, `Recipient ${showKey(recipientAddress)} | Nonce ${nonce ?? 'auto'}`);
 
       logger.step('Creating unsigned payment payload...');
-      const payment = this.paymentService.createPayment(privateKey, recipientAddress, { nonce });
-      logger.info(`Sender public key: ${shortenKey(payment.from)}`);
+      const client = new Client({ network: CONFIG.NETWORK });
+      const publicKey = client.derivePublicKey(privateKey);
+      const { ONE_MINA, DEFAULT_FEE_MULTIPLIER } = CONFIG.MINA_UNITS;
+
+      const payment = {
+        from: publicKey,
+        to: recipientAddress,
+        amount: ONE_MINA,
+        nonce,
+        fee: ONE_MINA * DEFAULT_FEE_MULTIPLIER,
+      };
+
+      logger.info(`Sender public key: ${showKey(payment.from)}`);
       logger.info(`Amount: ${payment.amount} nanomina | Fee: ${payment.fee} nanomina`);
-      record('Payment draft', true, `From ${shortenKey(payment.from)} → ${shortenKey(payment.to)} (nonce ${payment.nonce})`);
+      record('Payment draft', true, `From ${showKey(payment.from)} → ${showKey(payment.to)} (nonce ${payment.nonce})`);
 
       logger.step('Signing payment...');
-      const signedPayment = this.paymentService.signPayment(payment, privateKey);
-      logger.info(`Signature field: ${shortenKey(signedPayment.signature?.field)} | scalar: ${shortenKey(signedPayment.signature?.scalar)}`);
-      record('Signature', true, `Field ${shortenKey(signedPayment.signature?.field)}...`);
+      const signedPayment = client.signPayment(payment, privateKey);
+      logger.info(`Signature field: ${showKey(signedPayment.signature?.field)} | scalar: ${showKey(signedPayment.signature?.scalar)}`);
+      record('Signature', true, `Field ${showKey(signedPayment.signature?.field)}...`);
 
       const graphqlClient = new GraphQLClient(url);
       logger.step(`Submitting to GraphQL endpoint ${url}...`);

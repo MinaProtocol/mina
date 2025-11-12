@@ -19,6 +19,6 @@ export const CONFIG = {
  */
 export const USAGE_INFO = {
   message: 'Usage: node test-signer.js <private_key> <recipient_address> [graphql_url] [nonce]',
-  example: 'Example: node test-signer.js <private_key> <recipient_address> http://localhost:3085/graphql 3',
+  example: 'Example: node test-signer.js EKErBK1KznrJJY3raJafSyxSayJ6viejaVrmjzXkSmoxXiJQsesU  B62qp4wcxoJyFFyXZ2RVw8kGPpWn6ncK4RtsTz29jFf6fY2XYN42R1v http://172.17.0.3:3085/graphql 3',
   defaultUrl: `Default GraphQL URL: ${CONFIG.DEFAULT_GRAPHQL_URL}`
 };
