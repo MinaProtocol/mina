@@ -100,11 +100,17 @@ module Instance = struct
     let root_identifier = make_instance_location "root"
   end
 
+  (* There is a breaking change in the (Yojson) schema for the Mesa HF ledger
+     config type -- previously a list of directories (ie strings), it became
+     a list of objects. This loader is compatible with both for the awkward
+     period when we don't everyone is running a post-Mesa build.
+  *)
   let potential_snarked_ledgers_to_yojson queue =
     `List
       (List.map (Queue.to_list queue) ~f:(fun cfg ->
            `String (Root_ledger.Config.primary_directory cfg) ) )
 
+  (* See comment for potential_snarked_ledgers_to_yojson above *)
   let potential_snarked_ledgers_of_yojson json =
     Yojson.Safe.Util.to_list json
     |> List.map ~f:(fun json ->
