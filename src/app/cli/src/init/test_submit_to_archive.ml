@@ -432,7 +432,7 @@ let submit_to_archive =
            ~directory:"internal-tracing" () )
       () ;
     let log_processor =
-      Logger.Processor.pretty ~log_level:Logger.Level.Trace
+      Logger.Processor.pretty ~log_level:Info
         ~config:
           { Interpolator_lib.Interpolator.mode = After
           ; max_interpolation_length = 50
