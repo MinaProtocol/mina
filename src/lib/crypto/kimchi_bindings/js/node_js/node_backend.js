@@ -89,6 +89,10 @@ var plonk_wasm = (function() {
       "WasmGVesta",
       "WasmPastaFp",
       "WasmPastaFq",
+      "caml_pasta_fp_plonk_proof_create",
+      "caml_pasta_fp_plonk_proof_verify",
+      "caml_pasta_fq_plonk_proof_create",
+      "caml_pasta_fq_plonk_proof_verify",
     ];
 
     overrides.forEach(function (override) {
