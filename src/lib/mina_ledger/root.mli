@@ -31,6 +31,10 @@ module Config : sig
       backing at [dst], and there must be no database connections open for
       [src]. *)
   val move_backing_exn : src:t -> dst:t -> unit
+
+  (** primary root ledger directory, e.g. in the case of converting ledger its 
+  the primary directory, in the case of stable it's the only one *)
+  val primary_directory : t -> string
 end
 
 (** The interface for an abstract root ledger. Root ledgers are used to
