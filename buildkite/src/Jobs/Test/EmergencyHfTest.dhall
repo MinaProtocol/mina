@@ -10,19 +10,15 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let BuildFlags = ../../Constants/BuildFlags.dhall
-
-let RunWithPostgres = ../../Command/RunWithPostgres.dhall
-
-let key = "emergency-hf-test"
+let Cmd = ../../Lib/Cmds.dhall
 
 in  Pipeline.build
       Pipeline.Config::{
       , spec = JobSpec::{
         , dirtyWhen =
-          [ S.strictlyStart (S.contains "src/app/archive_hardfork_toolbox") ]
+          [ S.strictlyStart (S.contains "scripts/archive/emergency_hf")
+          , S.strictlyStart (S.contains "src/app/archive")
+          ]
         , path = "Test"
         , name = "EmergencyHfTest"
         , tags =
@@ -35,20 +31,11 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ RunWithPostgres.runInDockerWithPostgresConn
-                  [ "CONVERT_CANONICAL_BLOCKS_TEST_APP=mina-test-convert-canonical"
-                  ]
-                  (None RunWithPostgres.ScriptOrArchive)
-                  ( Artifacts.fullDockerTag
-                      Artifacts.Tag::{
-                      , artifact = Artifacts.Type.FunctionalTestSuite
-                      , buildFlags = BuildFlags.Type.Instrumented
-                      }
-                  )
-                  "./scripts/tests/archive-hardfork-toolbox/test_convert_canonical_blocks.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} "
+              [ Cmd.run
+                  "PSQL=\"docker exec replayer-postgres psql\" ./scripts/archive/emergency_hf/test/runner.sh "
               ]
             , label = "Emergency HF test"
-            , key = key
+            , key = "emergency-hf-test"
             , target = Size.Large
             }
         ]
