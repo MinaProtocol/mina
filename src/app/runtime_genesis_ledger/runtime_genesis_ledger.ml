@@ -15,14 +15,23 @@ end
 
 let logger = Logger.create ()
 
-let load_ledger ~ignore_missing_fields ~pad_app_state
+let load_ledger ~ignore_missing_fields ~pad_app_state ~hardfork_slot
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     (accounts : Runtime_config.Accounts.t) =
+  let transform_account account =
+    let account_padded =
+      Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
+        ~pad_app_state account
+    in
+    match hardfork_slot with
+    | None ->
+        account_padded
+    | Some hardfork_slot ->
+        Mina_base.Account.slot_reduction_update ~hardfork_slot account_padded
+  in
+
   let accounts =
-    List.map accounts ~f:(fun account ->
-        ( None
-        , Runtime_config.Accounts.Single.to_account ~ignore_missing_fields
-            ~pad_app_state account ) )
+    List.map accounts ~f:(fun account -> (None, transform_account account))
   in
   let packed =
     Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts ~logger
@@ -132,24 +141,26 @@ let load_config_exn config_file =
 
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
-    ~pad_app_state () =
+    ~pad_app_state ~hardfork_slot () =
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
   let ledger =
     load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
-      accounts
+      ~hardfork_slot accounts
   in
   let staking_ledger : Ledger.t =
     Option.value_map ~default:ledger
       ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
+           ~hardfork_slot )
       staking_accounts_opt
   in
   let next_ledger =
     Option.value_map ~default:staking_ledger
       ~f:
-        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants)
+        (load_ledger ~ignore_missing_fields ~pad_app_state ~constraint_constants
+           ~hardfork_slot )
       next_accounts_opt
   in
   let%bind hash_json =
@@ -197,6 +208,13 @@ let () =
              ~doc:
                "BOOL whether to pad app_state to max allowed size (default: \
                 false)"
+         and hardfork_slot =
+           flag "--hardfork-slot"
+             (optional Cli_lib.Arg_type.global_slot)
+             ~doc:
+               "INT the hardfork slot since global genesis at which vesting \
+                parameter update should happen. By default, don't update the \
+                vesting parameters"
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
-           ~ignore_missing_fields ~pad_app_state) )
+           ~ignore_missing_fields ~pad_app_state ~hardfork_slot) )
