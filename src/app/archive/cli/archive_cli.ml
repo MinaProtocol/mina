@@ -45,6 +45,9 @@ let command_run =
             Postgres Out of Memory errors when handling very big genesis file. \
             Default is 100."
          (optional_with_default 100 int)
+     and skip_genesis_loading =
+       flag "--skip-genesis-loading" no_arg
+         ~doc:"Skip loading genesis accounts into the archive database"
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
@@ -67,7 +70,8 @@ let command_run =
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
          ~delete_older_than ~runtime_config_opt ~missing_blocks_width
-         ~signature_kind:Mina_signature_kind.t_DEPRECATED )
+         ~signature_kind:Mina_signature_kind.t_DEPRECATED ~skip_genesis_loading
+    )
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)

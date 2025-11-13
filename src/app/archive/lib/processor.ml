@@ -4837,7 +4837,7 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~metrics_server_port ~logger ~postgres_address ~server_port ~chunks_length
     ~delete_older_than ~runtime_config_opt ~missing_blocks_width ~signature_kind
-    =
+    ~skip_genesis_loading =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -4867,8 +4867,14 @@ let setup_server ~proof_cache_db ~(genesis_constants : Genesis_constants.t)
       Deferred.unit
   | Ok pool ->
       let%bind () =
-        add_genesis_accounts pool ~logger ~genesis_constants
-          ~constraint_constants ~runtime_config_opt ~chunks_length
+        if skip_genesis_loading then (
+          [%log info]
+            "Skipping genesis accounts loading (--skip-genesis-loading flag \
+             set)" ;
+          Deferred.unit )
+        else
+          add_genesis_accounts pool ~logger ~genesis_constants
+            ~constraint_constants ~runtime_config_opt ~chunks_length
       in
       run ~proof_cache_db ~constraint_constants ~genesis_constants pool reader
         ~logger ~delete_older_than
