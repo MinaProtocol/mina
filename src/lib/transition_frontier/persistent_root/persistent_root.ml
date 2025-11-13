@@ -93,37 +93,6 @@ module Config = struct
   let root_identifier = make_instance_location "root"
 end
 
-let set_root_identifier t new_root_identifier =
-  [%log' trace t.logger]
-    ~metadata:
-      [ ("root_identifier", Root_identifier.to_yojson new_root_identifier) ]
-    "Setting persistent root identifier" ;
-  let size = Root_identifier.Stable.Latest.bin_size_t new_root_identifier in
-  with_file (Config.root_identifier t) `Write ~size ~f:(fun buf ->
-      ignore
-        ( Root_identifier.Stable.Latest.bin_write_t buf ~pos:0
-            new_root_identifier
-          : int ) )
-
-(* defaults to genesis *)
-let load_root_identifier t =
-  let file = Config.root_identifier t in
-  match Unix.access file [ `Exists; `Read ] with
-  | Error _ ->
-      None
-  | Ok () ->
-      with_file file `Read ~f:(fun buf ->
-          let root_identifier =
-            Root_identifier.Stable.Latest.bin_read_t buf ~pos_ref:(ref 0)
-          in
-          [%log' trace t.logger]
-            ~metadata:
-              [ ("root_identifier", Root_identifier.to_yojson root_identifier) ]
-            "Loaded persistent root identifier" ;
-          Some root_identifier )
-
-let set_root_state_hash t state_hash = set_root_identifier t { state_hash }
-
 module Instance = struct
   type t = Instance_type.t
 
@@ -304,6 +273,37 @@ let with_instance_exn t ~f =
   let instance = create_instance_exn t in
   let x = f instance in
   Instance.close instance ; x
+
+let set_root_identifier t new_root_identifier =
+  [%log' trace t.logger]
+    ~metadata:
+      [ ("root_identifier", Root_identifier.to_yojson new_root_identifier) ]
+    "Setting persistent root identifier" ;
+  let size = Root_identifier.Stable.Latest.bin_size_t new_root_identifier in
+  with_file (Config.root_identifier t) `Write ~size ~f:(fun buf ->
+      ignore
+        ( Root_identifier.Stable.Latest.bin_write_t buf ~pos:0
+            new_root_identifier
+          : int ) )
+
+(* defaults to genesis *)
+let load_root_identifier t =
+  let file = Config.root_identifier t in
+  match Unix.access file [ `Exists; `Read ] with
+  | Error _ ->
+      None
+  | Ok () ->
+      with_file file `Read ~f:(fun buf ->
+          let root_identifier =
+            Root_identifier.Stable.Latest.bin_read_t buf ~pos_ref:(ref 0)
+          in
+          [%log' trace t.logger]
+            ~metadata:
+              [ ("root_identifier", Root_identifier.to_yojson root_identifier) ]
+            "Loaded persistent root identifier" ;
+          Some root_identifier )
+
+let set_root_state_hash t state_hash = set_root_identifier t { state_hash }
 
 (** Clear the factory directory and recreate the snarked ledger instance for
     this factory with [create_root] and [setup] *)

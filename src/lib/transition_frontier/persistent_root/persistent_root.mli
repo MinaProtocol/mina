@@ -83,12 +83,6 @@ end
 
 type t = Factory_type.t
 
-val set_root_identifier : t -> Root_identifier.t -> unit
-
-val load_root_identifier : t -> Root_identifier.t option
-
-val set_root_state_hash : t -> Frozen_ledger_hash.t -> unit
-
 val create :
      logger:Logger.t
   -> directory:string
@@ -105,6 +99,12 @@ val load_from_disk_exn :
   -> (Instance_type.t, [> `Snarked_ledger_mismatch ]) result
 
 val with_instance_exn : t -> f:(Instance_type.t -> 'a) -> 'a
+
+val set_root_identifier : t -> Root_identifier.t -> unit
+
+val load_root_identifier : t -> Root_identifier.t option
+
+val set_root_state_hash : t -> Frozen_ledger_hash.t -> unit
 
 val reset_factory_root_exn :
      t
