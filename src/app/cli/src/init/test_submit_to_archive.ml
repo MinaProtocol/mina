@@ -5,8 +5,6 @@ open Signature_lib
 open Mina_base
 open Mina_state
 
-let time_to_ms = Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
-
 let ledger_proof_opt next_state = function
   | Some t ->
       Ledger_proof.(statement_with_sok t, underlying_proof t)
@@ -167,6 +165,9 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
   let consensus_state =
     Mina_state.Protocol_state.consensus_state (Block.protocol_state genesis)
   in
+  let time_to_ms =
+    Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
+  in
   let epoch_data_for_vrf, ledger_snapshot =
     Consensus.Hooks.get_epoch_data_for_vrf
       ~constants:Context.consensus_constants
@@ -182,6 +183,9 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
       } =
     epoch_data_for_vrf
   in
+  [%log info] "Generated epoch data for vrf: global slot %s, since genesis: %s"
+    (Mina_numbers.Global_slot_since_hard_fork.to_string epoch_start_hf)
+    (Mina_numbers.Global_slot_since_genesis.to_string epoch_start) ;
   Deferred.repeat_until_finished (1, [], 100)
   @@ fun (current_slot, found_slots, attempts_left) ->
   if List.length found_slots >= n_blocks then
@@ -189,11 +193,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
   else if attempts_left <= 0 then (
     [%log error] "Could not find enough winning slots after many attempts" ;
     failwith "Could not find enough winning slots" )
-  else (
-    [%log info]
-      "Generated epoch data for vrf: global slot %s, since genesis: %s"
-      (Mina_numbers.Global_slot_since_hard_fork.to_string epoch_start_hf)
-      (Mina_numbers.Global_slot_since_genesis.to_string epoch_start) ;
+  else
     let global_slot =
       Mina_numbers.Global_slot_since_hard_fork.of_int current_slot
     in
@@ -233,7 +233,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
         `Repeat
           ( current_slot + 1
           , (slot_won, ledger_snapshot) :: found_slots
-          , attempts_left - 1 ) )
+          , attempts_left - 1 )
 
 let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     (module Keys : Keys_S) (slot_won, ledger_snapshot) previous =
@@ -357,9 +357,8 @@ let mk_payment ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
   in
   { Signed_command.Poly.signer = signer_keypair.public_key; signature; payload }
 
-let generate_txs ~logger:_ ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments
-    ~n_blocks ~constraint_constants keypair :
-    User_command.Valid.t Sequence.t list Deferred.t =
+let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
+    ~constraint_constants keypair : User_command.Valid.t Sequence.t list =
   let signer_pk = Public_key.compress keypair.Keypair.public_key in
   let event_elements = 12 in
   let action_elements = 12 in
@@ -387,9 +386,147 @@ let generate_txs ~logger:_ ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments
         in
         valid_command )
   in
-  return (List.init n_blocks ~f:generate_payments)
+  List.init n_blocks ~f:generate_payments
 
-let submit_to_archive =
+let load_and_initialize_config ~logger ~config_file =
+  let%bind runtime_config_json =
+    Genesis_ledger_helper.load_config_json config_file >>| Or_error.ok_exn
+  in
+  let runtime_config =
+    Runtime_config.of_yojson runtime_config_json
+    |> Result.map_error ~f:Error.of_string
+    |> Or_error.ok_exn
+  in
+  let genesis_constants = Genesis_constants.Compiled.genesis_constants in
+  let constraint_constants = Genesis_constants.Compiled.constraint_constants in
+  let proof_level = Genesis_constants.Compiled.proof_level in
+  Genesis_ledger_helper.init_from_config_file ~genesis_constants
+    ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
+    ~genesis_dir:"genesis" ~genesis_backing_type:Stable_db runtime_config
+  >>| Or_error.ok_exn >>| fst
+
+let initialize_verifier_and_components ~logger
+    ~(precomputed_values : Precomputed_values.t) =
+  let module Context = struct
+    let logger = logger
+
+    let constraint_constants = precomputed_values.constraint_constants
+
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let proof_level = precomputed_values.proof_level
+  end in
+  let module Keys = Keys (Context) in
+  Parallel.init_master () ;
+  let%bind blockchain_verification_key =
+    Lazy.force Keys.B.Proof.verification_key
+  in
+  let%bind transaction_verification_key = Lazy.force Keys.T.verification_key in
+  let%bind cwd = Sys.getcwd () in
+  let%map verifier =
+    Verifier.create ~logger ~commit_id:"" ~blockchain_verification_key
+      ~transaction_verification_key ~proof_level:precomputed_values.proof_level
+      ~pids:(Child_processes.Termination.create_pid_table ())
+      ~conf_dir:(Some (Filename.concat cwd "verifier"))
+      ~signature_kind:Testnet ()
+  in
+  ((module Context : Consensus.Intf.CONTEXT), (module Keys : Keys_S), verifier)
+
+let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
+    ~n_blocks ~n_zkapp_txs ~n_payments ~keypair genesis =
+  let genesis_slot =
+    Block.protocol_state genesis
+    |> Protocol_state.consensus_state
+    |> Consensus.Data.Consensus_state.global_slot_since_genesis
+  in
+  let valid_until =
+    Mina_numbers.Global_slot_since_genesis.add genesis_slot
+      (Mina_numbers.Global_slot_span.of_int @@ (n_blocks * 10))
+  in
+  let signer_account_id = Account_id.of_public_key keypair.Keypair.public_key in
+  let genesis_ledger = Staged_ledger.ledger genesis.staged_ledger in
+  let init_nonce =
+    Mina_ledger.Ledger.location_of_account genesis_ledger signer_account_id
+    |> Option.value_exn ~message:"Sender's account not found in ledger"
+    |> Mina_ledger.Ledger.get genesis_ledger
+    |> Option.value_exn
+         ~message:"Sender's account not found in ledger by location"
+    |> Account.nonce
+  in
+  generate_txs ~init_nonce ~valid_until ~n_payments ~n_zkapp_txs ~n_blocks
+    ~constraint_constants:precomputed_values.constraint_constants keypair
+
+let create_blocks_with_diffs ~logger
+    ~(precomputed_values : Precomputed_values.t) ~verifier ~context ~keys_module
+    ~winning_slots ~all_transactions ~genesis =
+  let%map _, diffs_rev =
+    Deferred.List.fold (List.zip_exn winning_slots all_transactions)
+      ~init:(genesis, [])
+      ~f:(fun (block, diffs) ((slot, ledger_snapshot), transactions) ->
+        let%map breadcrumb =
+          build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
+            keys_module (slot, ledger_snapshot) block
+        in
+        let diff =
+          Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values ~logger
+            breadcrumb
+        in
+        (Block.of_breadcrumb breadcrumb, diff :: diffs) )
+  in
+  List.rev diffs_rev
+
+let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
+    ~n_payments ~n_blocks =
+  (* Section 1: Load and initialize precomputed values from config *)
+  let%bind precomputed_values =
+    load_and_initialize_config ~logger ~config_file
+  in
+
+  (* Section 2: Initialize verifier and other components *)
+  let%bind context, keys_module, verifier =
+    initialize_verifier_and_components ~logger ~precomputed_values
+  in
+
+  (* Section 3: Generate genesis block *)
+  [%log info] "Generating genesis block" ;
+  let%bind genesis =
+    Block.compute_genesis keys_module ~precomputed_values ~logger
+  in
+
+  (* Section 4: Compute VRF to find n_blocks winning slots *)
+  [%log info] "Computing VRF to find %d winning slots" n_blocks ;
+  let%bind winning_slots =
+    find_winning_slots ~context ~precomputed_values ~n_blocks ~keypair genesis
+  in
+  [%log info] "Found %d winning slots" (List.length winning_slots) ;
+
+  (* Section 5: Generate zkApp transactions and payments *)
+  [%log info] "Generate %d blocks with %d zkApp transactions and %d payments"
+    n_blocks n_zkapp_txs n_payments ;
+  let all_transactions =
+    generate_all_transactions ~precomputed_values ~n_blocks ~n_zkapp_txs
+      ~n_payments ~keypair genesis
+  in
+
+  (* Section 6: Create blocks *)
+  [%log info] "Creating %d blocks" (List.length winning_slots) ;
+  let%bind diffs =
+    create_blocks_with_diffs ~logger ~precomputed_values ~verifier ~context
+      ~keys_module ~winning_slots ~all_transactions ~genesis
+  in
+
+  (* Section 7: Submit blocks to archive *)
+  [%log info] "Submit blocks to archive at port %d" archive_node_port ;
+  let%map () =
+    Deferred.List.iter diffs ~f:(fun diff ->
+        Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t (Transition_frontier diff)
+          { host = "127.0.0.1"; port = archive_node_port }
+        >>| Or_error.ok_exn )
+  in
+
+  [%log info] "Test completed"
+
+let command =
   Command.async
     ~summary:
       "Generate blocks with zkApp transactions and payments, and submit them \
@@ -428,7 +565,6 @@ let submit_to_archive =
         ; ("n_payments", `Int n_payments)
         ; ("n_blocks", `Int n_blocks)
         ] ;
-    (* Step 1: Load secret key and config file *)
     [%log info] "Loading keypair from %s" privkey_path ;
     let%bind keypair =
       Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair" privkey_path
@@ -453,122 +589,6 @@ let submit_to_archive =
       ~transport:(Logger.Transport.stdout ())
       () ;
     let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
-    (* Load the persistent root identifier *)
-    (* Load and initialize precomputed values from config *)
-    let%bind runtime_config_json =
-      Genesis_ledger_helper.load_config_json config_file >>| Or_error.ok_exn
-    in
-    let runtime_config =
-      Runtime_config.of_yojson runtime_config_json
-      |> Result.map_error ~f:Error.of_string
-      |> Or_error.ok_exn
-    in
-    (* Get compile-time constants *)
-    let%bind precomputed_values, _ =
-      let genesis_constants = Genesis_constants.Compiled.genesis_constants in
-      let constraint_constants =
-        Genesis_constants.Compiled.constraint_constants
-      in
-      let proof_level = Genesis_constants.Compiled.proof_level in
-      Genesis_ledger_helper.init_from_config_file ~genesis_constants
-        ~constraint_constants ~logger ~proof_level ~cli_proof_level:None
-        ~genesis_dir:"genesis" ~genesis_backing_type:Stable_db runtime_config
-      >>| Or_error.ok_exn
-    in
-    let module Context = struct
-      let logger = logger
 
-      let constraint_constants = precomputed_values.constraint_constants
-
-      let consensus_constants = precomputed_values.consensus_constants
-
-      let proof_level = precomputed_values.proof_level
-    end in
-    let module Keys = Keys (Context) in
-    Parallel.init_master () ;
-    let%bind blockchain_verification_key =
-      Lazy.force Keys.B.Proof.verification_key
-    in
-    let%bind transaction_verification_key =
-      Lazy.force Keys.T.verification_key
-    in
-    let%bind cwd = Sys.getcwd () in
-    let%bind verifier =
-      Verifier.create ~logger ~commit_id:"" ~blockchain_verification_key
-        ~transaction_verification_key
-        ~proof_level:precomputed_values.proof_level
-        ~pids:(Child_processes.Termination.create_pid_table ())
-        ~conf_dir:(Some (Filename.concat cwd "verifier"))
-        ~signature_kind:Testnet ()
-    in
-    [%log info] "Generating genesis block" ;
-    let%bind genesis =
-      Block.compute_genesis (module Keys) ~precomputed_values ~logger
-    in
-    [%log info] "Configuration loaded successfully" ;
-    (* Step 2: Compute VRF to find n_blocks winning slots *)
-    [%log info] "Computing VRF to find %d winning slots" n_blocks ;
-    let%bind winning_slots =
-      find_winning_slots
-        ~context:(module Context)
-        ~precomputed_values ~n_blocks ~keypair genesis
-    in
-    [%log info] "Found %d winning slots" (List.length winning_slots) ;
-    [%log info] "Generate %d blocks with %d zkApp transactions and %d payments"
-      n_blocks n_zkapp_txs n_payments ;
-    let genesis_slot =
-      Block.protocol_state genesis
-      |> Protocol_state.consensus_state
-      |> Consensus.Data.Consensus_state.global_slot_since_genesis
-    in
-    let valid_until =
-      Mina_numbers.Global_slot_since_genesis.add genesis_slot
-        (Mina_numbers.Global_slot_span.of_int @@ (n_blocks * 10))
-    in
-    let signer_account_id =
-      Account_id.of_public_key keypair.Keypair.public_key
-    in
-    let genesis_ledger = Staged_ledger.ledger genesis.staged_ledger in
-    let init_nonce =
-      Mina_ledger.Ledger.location_of_account genesis_ledger signer_account_id
-      |> Option.value_exn ~message:"Sender's account not found in ledger"
-      |> Mina_ledger.Ledger.get genesis_ledger
-      |> Option.value_exn
-           ~message:"Sender's account not found in ledger by location"
-      |> Account.nonce
-    in
-    let%bind all_transactions =
-      generate_txs ~logger ~init_nonce ~valid_until ~n_payments ~n_zkapp_txs
-        ~n_blocks ~constraint_constants:precomputed_values.constraint_constants
-        keypair
-    in
-    [%log info] "Creating %d blocks" (List.length winning_slots) ;
-    let%bind _, diffs_rev =
-      Deferred.List.fold (List.zip_exn winning_slots all_transactions)
-        ~init:(genesis, [])
-        ~f:(fun (block, diffs) ((slot, ledger_snapshot), transactions) ->
-          let%map breadcrumb =
-            build_breadcrumb ~transactions
-              ~context:(module Context)
-              ~precomputed_values ~verifier
-              (module Keys)
-              (slot, ledger_snapshot) block
-          in
-          [%log info] "Building archive diff" ;
-          let diff =
-            Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
-              ~logger breadcrumb
-          in
-          (Block.of_breadcrumb breadcrumb, diff :: diffs) )
-    in
-    ignore diffs_rev ;
-    [%log info] "Submit blocks to archive at port %d" archive_node_port ;
-    let%bind () =
-      Deferred.List.iter (List.rev diffs_rev) ~f:(fun diff ->
-          Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t
-            (Transition_frontier diff)
-            { host = "127.0.0.1"; port = archive_node_port }
-          >>| Or_error.ok_exn )
-    in
-    [%log info] "Test completed (stub implementation)" ;
-    return ())
+    run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
+      ~n_payments ~n_blocks)

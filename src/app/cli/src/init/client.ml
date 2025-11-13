@@ -2561,7 +2561,7 @@ let advanced ~itn_features =
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
           [ ("create-genesis", test_genesis_creation)
-          ; ("submit-to-archive", Test_submit_to_archive.submit_to_archive)
+          ; ("submit-to-archive", Test_submit_to_archive.command)
           ] )
     ]
   in
