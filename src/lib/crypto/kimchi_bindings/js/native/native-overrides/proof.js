@@ -20,21 +20,21 @@ var caml_pasta_fp_plonk_proof_create = function (
   var wasm_runtime_tables =
     tsRustConversionNative.fp.runtimeTablesToRust(caml_runtime_tables);
   prev_sgs = tsRustConversionNative.fp.pointsToRust(prev_sgs);
-  // Because proof is an external object, it does not need conversion
-  return plonk_wasm.caml_pasta_fp_plonk_proof_create(
+  var proof = plonk_wasm.caml_pasta_fp_plonk_proof_create(
     index,
     witness_cols,
     wasm_runtime_tables,
     prev_challenges,
     prev_sgs
   );
+  return tsRustConversionNative.fp.proofFromRust(proof);
 };
 
 // Provides: caml_pasta_fp_plonk_proof_verify
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_pasta_fp_plonk_proof_verify = function (index, proof) {
   index = tsRustConversionNative.fp.verifierIndexToRust(index);
-  // Because proof is an external object, it does not need conversion
+  proof = tsRustConversionNative.fp.proofToRust(proof);
   return plonk_wasm.caml_pasta_fp_plonk_proof_verify(index, proof);
 };
 
@@ -58,20 +58,20 @@ var caml_pasta_fq_plonk_proof_create = function (
   var wasm_runtime_tables =
     tsRustConversionNative.fq.runtimeTablesToRust(caml_runtime_tables);
   prev_sgs = tsRustConversionNative.fq.pointsToRust(prev_sgs);
-  // Because proof is an external object, it does not need conversion
-  return plonk_wasm.caml_pasta_fq_plonk_proof_create(
+  var proof = plonk_wasm.caml_pasta_fq_plonk_proof_create(
     index,
     witness_cols,
     wasm_runtime_tables,
     prev_challenges,
     prev_sgs
   );
+  return tsRustConversionNative.fq.proofFromRust(proof);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_verify
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_pasta_fq_plonk_proof_verify = function (index, proof) {
   index = tsRustConversionNative.fq.verifierIndexToRust(index);
-  // Because proof is an external object, it does not need conversion
+  proof = tsRustConversionNative.fq.proofToRust(proof);
   return plonk_wasm.caml_pasta_fq_plonk_proof_verify(index, proof);
 };
