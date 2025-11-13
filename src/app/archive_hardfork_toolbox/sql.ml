@@ -19,7 +19,7 @@ module Protocol_version = struct
             version_str () )
 
   let to_string { transaction; network; patch } =
-    sprintf "%d.%d.%d" network transaction patch
+    sprintf "%d.%d.%d" transaction network patch
 
   let typ =
     let encode { transaction; network; patch } =
@@ -58,9 +58,10 @@ let chain_of_query_templated ~join_condition =
             b.parent_id AS parent_id,
             b.state_hash AS state_hash,
             b.height AS height,
-            b.global_slot_since_genesis AS global_slot_since_genesis
+            b.global_slot_since_genesis AS global_slot_since_genesis,
+            b.protocol_version_id AS protocol_version_id
         FROM blocks b
-        WHERE b.state_hash = $1
+        WHERE b.id = $1
 
         UNION ALL
 
@@ -69,17 +70,17 @@ let chain_of_query_templated ~join_condition =
             p.parent_id,
             p.state_hash,
             p.height,
-            p.global_slot_since_genesis
+            p.global_slot_since_genesis,
+            p.protocol_version_id
         FROM blocks p
-        JOIN chain c ON p.id = c.parent_id AND %{join_condition}
-        WHERE p.parent_id IS NOT NULL
+        JOIN chain c ON p.id = c.parent_id AND %{join_condition} AND c.parent_id IS NOT NULL
     )
   |}
 
 let chain_of_query = chain_of_query_templated ~join_condition:"TRUE"
 
 let chain_of_query_until_inclusive =
-  chain_of_query_templated ~join_condition:"c.state_hash <> $2"
+  chain_of_query_templated ~join_condition:"c.id <> $2"
 
 let latest_state_hash (module Conn : CONNECTION) =
   let query =
@@ -97,7 +98,7 @@ let first_block_of_protocol_version (module Conn : CONNECTION)
   let query =
     (Protocol_version.typ ->? Block_info.typ)
       {%string|
-        SELECT blocks.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
+        SELECT blocks.id, height, state_hash, protocol_versions.transaction, protocol_versions.network, protocol_versions.patch
         FROM blocks INNER JOIN protocol_versions
           ON blocks.protocol_version_id = protocol_versions.id
         WHERE protocol_versions.transaction = $1::int
@@ -114,7 +115,7 @@ let block_info_by_state_hash (module Conn : CONNECTION) ~state_hash =
   let query =
     Caqti_type.(string ->? Block_info.typ)
       {%string|
-        SELECT blocks.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
+        SELECT blocks.id, height, state_hash, protocol_versions.transaction, protocol_versions.network, protocol_versions.patch
         FROM blocks INNER JOIN protocol_versions
           ON blocks.protocol_version_id = protocol_versions.id
         WHERE state_hash = ?
@@ -124,20 +125,29 @@ let block_info_by_state_hash (module Conn : CONNECTION) ~state_hash =
   Conn.find_opt query state_hash
 
 let mark_pending_blocks_as_canonical_or_orphaned (module Conn : CONNECTION)
-    ~canonical_block_ids ~stop_at_slot =
+    ~canonical_block_ids ~stop_at_slot ~protocol_version =
   let mutation =
-    Caqti_type.(t2 (option int) Mina_caqti.array_int_typ ->. Caqti_type.unit)
+    Caqti_type.(
+      t3 (option int) Mina_caqti.array_int_typ Protocol_version.typ
+      ->. Caqti_type.unit)
       {%string|
         UPDATE blocks
         SET chain_status = CASE
             WHEN id = ANY($2::int[]) THEN 'canonical'::chain_status_type
             ELSE 'orphaned'::chain_status_type
         END
-        WHERE chain_status = 'pending'::chain_status_type
-          AND ($1 IS NULL OR $1::int <= global_slot_since_genesis);
+        WHERE ($1 IS NULL OR $1::int <= global_slot_since_genesis)
+          AND protocol_version_id = (
+            SELECT id FROM protocol_versions
+            WHERE transaction = $3::int
+              AND network = $4::int
+              AND patch = $5::int
+            LIMIT 1
+          );
       |}
   in
-  Conn.exec mutation (stop_at_slot, Array.of_list canonical_block_ids)
+  Conn.exec mutation
+    (stop_at_slot, Array.of_list canonical_block_ids, protocol_version)
 
 let blocks_between_both_inclusive (module Conn : CONNECTION) ~latest_block_id
     ~oldest_block_id : (Block_info.t list, Caqti_error.t) Deferred.Result.t =
@@ -145,7 +155,7 @@ let blocks_between_both_inclusive (module Conn : CONNECTION) ~latest_block_id
     Caqti_type.(t2 int int ->* Block_info.typ)
       {%string|
         %{chain_of_query_until_inclusive}
-        SELECT chain.id, height, state_hash, protocol_versions.network, protocol_versions.transaction, protocol_versions.patch
+        SELECT chain.id, height, state_hash, protocol_versions.transaction, protocol_versions.network, protocol_versions.patch
         FROM chain INNER JOIN protocol_versions
           ON chain.protocol_version_id = protocol_versions.id
         ORDER BY height ASC

@@ -73,71 +73,88 @@ module TestDb = struct
             global_slot_since_hard_fork bigint NOT NULL,
             global_slot_since_genesis bigint NOT NULL,
             protocol_version_id integer NOT NULL,
-            chain_status text NOT NULL,
+            chain_status chain_status_type NOT NULL,
             CONSTRAINT blocks_pkey PRIMARY KEY (id)
-          );
+          )
         |sql}
     in
-    let uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
-    let%bind pool =
-      Deferred.Or_error.return (Mina_caqti.connect_pool uri)
-      >>= function
-      | Error e ->
-          Deferred.Or_error.error_string (Caqti_error.show e)
-      | Ok pool ->
-          Deferred.Or_error.return pool
+    let query0 =
+      (Caqti_type.unit ->. Caqti_type.unit) chain_status_type_schema
     in
-    let query = (Caqti_type.unit ->. Caqti_type.unit) schema in
-    Deferred.Or_error.try_with (fun () ->
-        Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-            Conn.exec query () ) )
-
-  let insert_blocks conn_str db_name blocks =
-    let open Deferred.Or_error.Let_syntax in
-    let uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
-    let%bind pool =
-      Deferred.Or_error.return (Mina_caqti.connect_pool uri)
-      >>= function
-      | Error e ->
-          Deferred.Or_error.error_string (Caqti_error.show e)
-      | Ok pool ->
-          Deferred.Or_error.return pool
+    let query1 =
+      (Caqti_type.unit ->. Caqti_type.unit) protocol_versions_schema
     in
-    Deferred.Or_error.List.iter blocks ~f:(fun block ->
-        let ( id
-            , state_hash
-            , parent_id
-            , parent_hash
-            , height
-            , global_slot_since_genesis
-            , global_slot_since_hard_fork
-            , protocol_version_id
-            , chain_status ) =
-          block
+    let query2 = (Caqti_type.unit ->. Caqti_type.unit) blocks_schema in
+    with_pool conn_str ~db_name (fun pool ->
+        let%bind () =
+          Deferred.Or_error.try_with (fun () ->
+              Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
+                  Conn.exec query0 () ) )
         in
-        let query =
-          ( Caqti_type.(
-              t3 (t4 int string (option int) string) (t4 int int int int) string)
-          ->. Caqti_type.unit )
-            {sql|
-              INSERT INTO blocks
-                (id, state_hash, parent_id, parent_hash, height,
-                global_slot_since_genesis, global_slot_since_hard_fork,
-                protocol_version_id, chain_status)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            |sql}
-        in
-        let params =
-          ( (id, state_hash, parent_id, parent_hash)
-          , ( height
-            , global_slot_since_genesis
-            , global_slot_since_hard_fork
-            , protocol_version_id )
-          , chain_status )
+        let%bind () =
+          Deferred.Or_error.try_with (fun () ->
+              Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
+                  Conn.exec query1 () ) )
         in
         Deferred.Or_error.try_with (fun () ->
             Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                Conn.exec query params ) ) )
+                Conn.exec query2 () ) ) )
+
+  let insert_protocol_versions conn_str db_name versions =
+    let query =
+      (Caqti_type.(t3 int int int) ->. Caqti_type.unit)
+        {sql|
+          INSERT INTO protocol_versions
+            (transaction, network, patch)
+          VALUES (?, ?, ?)
+        |sql}
+    in
+    with_pool conn_str ~db_name (fun pool ->
+        Deferred.Or_error.List.iter versions
+          ~f:(fun (transaction, network, patch) ->
+            Deferred.Or_error.try_with (fun () ->
+                Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
+                    Conn.exec query (transaction, network, patch) ) ) ) )
+
+  let insert_blocks conn_str db_name blocks =
+    with_pool conn_str ~db_name (fun pool ->
+        Deferred.Or_error.List.iter blocks ~f:(fun block ->
+            let ( id
+                , state_hash
+                , parent_id
+                , parent_hash
+                , height
+                , global_slot_since_genesis
+                , global_slot_since_hard_fork
+                , protocol_version_id
+                , chain_status ) =
+              block
+            in
+            let query =
+              ( Caqti_type.(
+                  t3
+                    (t4 int string (option int) string)
+                    (t4 int int int int) string)
+              ->. Caqti_type.unit )
+                {sql|
+                  INSERT INTO blocks
+                    (id, state_hash, parent_id, parent_hash, height,
+                    global_slot_since_genesis, global_slot_since_hard_fork,
+                    protocol_version_id, chain_status)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                |sql}
+            in
+            let params =
+              ( (id, state_hash, parent_id, parent_hash)
+              , ( height
+                , global_slot_since_genesis
+                , global_slot_since_hard_fork
+                , protocol_version_id )
+              , chain_status )
+            in
+            Deferred.Or_error.try_with (fun () ->
+                Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
+                    Conn.exec query params ) ) ) )
 
   let get_all_blocks conn_str db_name =
     let query =
@@ -293,7 +310,7 @@ module TestScenarios = struct
           ; parent_hash = "D"
           ; height = 5
           ; global_slot_since_genesis = 4
-          ; global_slot_since_hard_fork = 4
+          ; global_slot_since_hard_fork = 2
           ; protocol_version_id = 2
           ; chain_status = "pending"
           }
@@ -310,7 +327,7 @@ module TestScenarios = struct
     }
 
   let test_fork_on_last_canonical =
-    { name = "test_fork_on_new_network"
+    { name = "test_fork_on_last_canonical"
     ; blocks =
         [ { id = 1
           ; state_hash = "A"
