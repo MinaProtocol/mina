@@ -177,7 +177,7 @@ let Tag =
           , version = "\\\${MINA_DOCKER_TAG}"
           , profile = Profiles.Type.Devnet
           , buildFlags = BuildFlags.Type.None
-          , network = Network.Type.Berkeley
+          , network = Network.Type.TestnetGeneric
           , remove_profile_from_name = False
           }
       }

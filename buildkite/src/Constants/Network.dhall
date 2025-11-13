@@ -4,14 +4,20 @@ let List/any = Prelude.List.any
 
 let Network
     : Type
-    = < Devnet | Mainnet | Berkeley | DevnetLegacy | MainnetLegacy | PreMesa1 >
+    = < Devnet
+      | Mainnet
+      | TestnetGeneric
+      | DevnetLegacy
+      | MainnetLegacy
+      | PreMesa1
+      >
 
 let capitalName =
           \(network : Network)
       ->  merge
             { Devnet = "Devnet"
             , Mainnet = "Mainnet"
-            , Berkeley = "Berkeley"
+            , TestnetGeneric = "TestnetGeneric"
             , DevnetLegacy = "DevnetLegacy"
             , MainnetLegacy = "MainnetLegacy"
             , PreMesa1 = "PreMesa1"
@@ -23,7 +29,7 @@ let lowerName =
       ->  merge
             { Devnet = "devnet"
             , Mainnet = "mainnet"
-            , Berkeley = "berkeley"
+            , TestnetGeneric = "testnet-generic"
             , DevnetLegacy = "devnet_legacy"
             , MainnetLegacy = "mainnet_legacy"
             , PreMesa1 = "hetzner-pre-mesa-1"
@@ -35,7 +41,7 @@ let requiresMainnetBuild =
       ->  merge
             { Devnet = True
             , Mainnet = True
-            , Berkeley = False
+            , TestnetGeneric = True
             , DevnetLegacy = True
             , MainnetLegacy = True
             , PreMesa1 = False
