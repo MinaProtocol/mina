@@ -636,6 +636,12 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
          (default: keep-running). "
       (optional_with_default Hardfork_handling.Keep_running
          Hardfork_handling.arg )
+  and hardfork_slot =
+    flag "--hardfork-slot"
+      ~doc:
+        "INT slot when HF should happen, this is only used for Migrate_exit \
+         mode"
+      (optional Cli_lib.Arg_type.global_slot)
   in
   let to_pubsub_topic_mode_option =
     let open Gossip_net.Libp2p in
@@ -845,7 +851,8 @@ let setup_daemon logger ~itn_features ~default_snark_worker_fee =
           in
           let compile_config = Mina_compile_config.Compiled.t in
           let ledger_backing_type =
-            Mina_lib.Config.ledger_backing ~hardfork_handling
+            Mina_lib.Config.ledger_backing ~logger ~hardfork_slot
+              ~hardfork_handling
           in
           let%bind ( precomputed_values
                    , config_jsons

@@ -2243,7 +2243,9 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
 
           let ledger_backing =
-            Config.ledger_backing ~hardfork_handling:config.hardfork_handling
+            Config.ledger_backing ~logger:config.logger
+              ~hardfork_slot:config.hardfork_slot
+              ~hardfork_handling:config.hardfork_handling
           in
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
@@ -3149,7 +3151,10 @@ module Hardfork_config = struct
         } ~build_dir directory_name =
     let open Deferred.Or_error.Let_syntax in
     let migrate_and_apply (root, diff) =
-      let%map.Deferred root = Root_ledger.make_converting root in
+      let%map.Deferred root =
+        Root_ledger.make_converting ~hardfork_slot:global_slot_since_genesis
+          root
+      in
       Ledger.Any_ledger.M.set_batch
         (Root_ledger.as_unmasked root)
         (Map.to_alist diff) ;
