@@ -341,7 +341,7 @@ if [[ ! -f "$OPCOUNT_LOG" ]]; then
 fi
 
 # Count lines with exactly "0"
-ZERO_COUNT=$(grep -E '^0$' "$OPCOUNT_LOG" | wc -l || echo 0)
+ZERO_COUNT=$(grep -E '^0$' "$OPCOUNT_LOG" | wc -l)
 
 echo "Total lines in log: $(wc -l < "$OPCOUNT_LOG")"
 echo "Lines with zero operations: $ZERO_COUNT"
