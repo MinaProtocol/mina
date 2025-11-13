@@ -1,5 +1,5 @@
 /* global plonk_wasm, caml_jsstring_of_string, 
-  tsBindings, tsRustConversion
+  tsBindings, tsRustConversionNative
 */
 
 // Provides: tsSrs

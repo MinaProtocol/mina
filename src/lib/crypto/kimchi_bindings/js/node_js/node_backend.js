@@ -60,8 +60,8 @@ var plonk_wasm = (function() {
       "WasmFpSrs",
       "caml_fp_srs_create",
       "caml_fp_srs_create_parallel",
-      "caml_fq_srs_get",
-      "caml_fq_srs_set",
+      "caml_fp_srs_get",
+      "caml_fp_srs_set",
       "caml_fp_srs_write",
       "caml_fp_srs_read",
       "caml_fp_srs_add_lagrange_basis",
@@ -92,7 +92,10 @@ var plonk_wasm = (function() {
     ];
 
     overrides.forEach(function (override) {
-      wasm[override] = native[override]
+      wasm[override] = function (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12) {
+        console.log("calling native override for " + override);
+        return native[override](x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12);
+      }
     })
     wasm.native = true;
   } catch (e) {
