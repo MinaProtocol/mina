@@ -6,44 +6,63 @@ open Caqti_request.Infix
 (* Test database setup and teardown *)
 (* This setup is purely for tests and should not be used in production or exposed *)
 module TestDb = struct
-  let drop_database_if_exists conn_str db_name =
+  (* New helpers to de-duplicate connection logic *)
+  let uri_for conn_str = function
+    | None ->
+        Uri.of_string conn_str
+    | Some db_name ->
+        Uri.of_string (sprintf "%s/%s" conn_str db_name)
+
+  let connect_pool uri =
+    match Mina_caqti.connect_pool uri with
+    | Ok pool ->
+        Deferred.Or_error.return pool
+    | Error e ->
+        Deferred.Or_error.error_string (Caqti_error.show e)
+
+  let with_pool conn_str ?db_name f =
     let open Deferred.Or_error.Let_syntax in
-    let uri = Uri.of_string conn_str in
-    let%bind pool =
-      Deferred.Or_error.return (Mina_caqti.connect_pool uri)
-      >>= function
-      | Error e ->
-          Deferred.Or_error.error_string (Caqti_error.show e)
-      | Ok pool ->
-          Deferred.Or_error.return pool
-    in
+    let uri = uri_for conn_str db_name in
+    let%bind pool = connect_pool uri in
+    f pool
+
+  let drop_database_if_exists conn_str db_name =
     let sql_string = sprintf "DROP DATABASE IF EXISTS %s" db_name in
     let query = (Caqti_type.unit ->. Caqti_type.unit) sql_string in
-    Deferred.Or_error.try_with (fun () ->
-        Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-            Conn.exec query () ) )
+    with_pool conn_str (fun pool ->
+        Deferred.Or_error.try_with (fun () ->
+            Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
+                Conn.exec query () ) ) )
 
   let create_database conn_str db_name =
-    let open Deferred.Or_error.Let_syntax in
-    let uri = Uri.of_string conn_str in
-    let%bind pool =
-      Deferred.Or_error.return (Mina_caqti.connect_pool uri)
-      >>= function
-      | Error e ->
-          Deferred.Or_error.error_string (Caqti_error.show e)
-      | Ok pool ->
-          Deferred.Or_error.return pool
-    in
     let sql_string = sprintf "CREATE DATABASE %s" db_name in
     let query = (Caqti_type.unit ->. Caqti_type.unit) sql_string in
-    Deferred.Or_error.try_with (fun () ->
-        Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-            Conn.exec query () ) )
+    with_pool conn_str (fun pool ->
+        Deferred.Or_error.try_with (fun () ->
+            Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
+                Conn.exec query () ) ) )
 
   (* This should always be in sync with src/app/archive/create_schema.sql *)
   let create_test_schema conn_str db_name =
     let open Deferred.Or_error.Let_syntax in
-    let schema =
+    let chain_status_type_schema =
+      {sql|
+          CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending')
+        |sql}
+    in
+    let protocol_versions_schema =
+      {sql|
+          CREATE TABLE protocol_versions (
+            id serial NOT NULL,
+            transaction int NOT NULL,
+            network int NOT NULL,
+            patch int NOT NULL,
+            CONSTRAINT protocol_versions_pkey PRIMARY KEY (id),
+            UNIQUE (transaction,network,patch)
+          )
+        |sql}
+    in
+    let blocks_schema =
       {sql|
           CREATE TABLE blocks (
             id serial NOT NULL,
@@ -121,16 +140,6 @@ module TestDb = struct
                 Conn.exec query params ) ) )
 
   let get_all_blocks conn_str db_name =
-    let open Deferred.Or_error.Let_syntax in
-    let uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
-    let%bind pool =
-      Deferred.Or_error.return (Mina_caqti.connect_pool uri)
-      >>= function
-      | Error e ->
-          Deferred.Or_error.error_string (Caqti_error.show e)
-      | Ok pool ->
-          Deferred.Or_error.return pool
-    in
     let query =
       (Caqti_type.unit ->* Caqti_type.(t2 string string))
         {sql|
@@ -139,9 +148,10 @@ module TestDb = struct
           ORDER BY state_hash ASC
         |sql}
     in
-    Deferred.Or_error.try_with (fun () ->
-        Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-            Conn.collect_list query () ) )
+    with_pool conn_str ~db_name (fun pool ->
+        Deferred.Or_error.try_with (fun () ->
+            Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
+                Conn.collect_list query () ) ) )
 end
 
 (* Test scenarios based on the bash test fixtures *)
@@ -562,14 +572,12 @@ end
 let test_convert_scenario conn_str
     ({ name; blocks; expected; target_hash; protocol_version } :
       TestScenarios.scenario ) () =
-  let open Deferred.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   (* Create test database *)
   let db_name = sprintf "test_%s" name in
-  let%bind _drop =
-    TestDb.drop_database_if_exists conn_str db_name |> Deferred.ok
-  in
-  let%bind _create = TestDb.create_database conn_str db_name |> Deferred.ok in
-  let%bind _setup = TestDb.create_test_schema conn_str db_name |> Deferred.ok in
+  let%bind _drop = TestDb.drop_database_if_exists conn_str db_name in
+  let%bind _create = TestDb.create_database conn_str db_name in
+  let%bind _setup = TestDb.create_test_schema conn_str db_name in
   let blocks_tuples =
     List.map blocks ~f:(fun b ->
         ( b.id
@@ -582,28 +590,20 @@ let test_convert_scenario conn_str
         , b.protocol_version_id
         , b.chain_status ) )
   in
-  let%bind _insert =
-    TestDb.insert_blocks conn_str db_name blocks_tuples |> Deferred.ok
+  let%bind _ =
+    TestDb.insert_protocol_versions conn_str db_name [ (1, 0, 0); (2, 0, 0) ]
   in
-
+  let%bind _insert = TestDb.insert_blocks conn_str db_name blocks_tuples in
   (* Run conversion *)
   let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
   let%bind _result =
     Logic.convert_chain_to_canonical ~postgres_uri
       ~latest_block_state_hash:target_hash
       ~expected_protocol_version_str:protocol_version ~stop_at_slot:None ()
-    |> Deferred.ok
   in
 
   (* Get results *)
-  let%bind actual_result = TestDb.get_all_blocks conn_str db_name in
-  let actual =
-    match actual_result with
-    | Ok blocks ->
-        blocks
-    | Error e ->
-        failwith (Error.to_string_hum e)
-  in
+  let%bind actual = TestDb.get_all_blocks conn_str db_name in
 
   (* Convert expected to tuples for comparison *)
   let expected_tuples =
@@ -621,18 +621,20 @@ let test_convert_scenario conn_str
 
   if matches then (
     printf "✅ Test %s passed\n" name ;
-    Deferred.return () )
+    Deferred.Or_error.return () )
   else (
     printf "❌ Test %s failed\n" name ;
     printf "Expected: %s\n"
       (List.to_string ~f:(fun (h, s) -> sprintf "%s->%s" h s) expected_tuples) ;
     printf "Actual: %s\n"
       (List.to_string ~f:(fun (h, s) -> sprintf "%s->%s" h s) actual) ;
-    failwith (sprintf "Test %s failed" name) )
+    Deferred.Or_error.error_string (sprintf "Test %s failed" name) )
 
 let make_test scenario conn_str =
   Thread_safe.block_on_async_exn (fun () ->
-      test_convert_scenario conn_str scenario () )
+      let open Deferred.Let_syntax in
+      let%map result = test_convert_scenario conn_str scenario () in
+      Or_error.ok_exn result )
 
 let conn_str_arg =
   let open Cmdliner in
