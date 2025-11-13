@@ -355,30 +355,37 @@ let mk_payment ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
     Signed_command.sign_payload ~signature_kind:Testnet
       signer_keypair.Keypair.private_key payload
   in
-  let command =
-    User_command.Signed_command
-      { Signed_command.Poly.signer = signer_keypair.public_key
-      ; signature
-      ; payload
-      }
-  in
-  (* This is used in the context of a test, and we know that the command is valid *)
-  let (`If_this_is_used_it_should_have_a_comment_justifying_it res) =
-    User_command.to_valid_unsafe command
-  in
-  res
+  { Signed_command.Poly.signer = signer_keypair.public_key; signature; payload }
 
-let generate_txs ~logger:_ ~valid_until ~init_nonce ~n_zkapp_txs:_ ~n_payments
-    ~n_blocks ~constraint_constants:_ keypair :
+let generate_txs ~logger:_ ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments
+    ~n_blocks ~constraint_constants keypair :
     User_command.Valid.t Sequence.t list Deferred.t =
   let signer_pk = Public_key.compress keypair.Keypair.public_key in
+  let event_elements = 12 in
+  let action_elements = 12 in
   let generate_payments block_i =
-    Sequence.init n_payments ~f:(fun payment_i ->
-        let open Mina_numbers.Account_nonce in
+    Sequence.init (n_payments + n_zkapp_txs) ~f:(fun i ->
         let nonce =
-          add init_nonce (of_int ((block_i * n_payments) + payment_i))
+          Mina_numbers.Account_nonce.(
+            add init_nonce @@ of_int
+            @@ ((block_i * (n_payments + n_zkapp_txs)) + i))
         in
-        mk_payment ~valid_until ~nonce ~signer_pk keypair )
+        let command =
+          if i < n_payments then
+            User_command.Signed_command
+              (mk_payment ~valid_until ~nonce ~signer_pk keypair)
+          else
+            Zkapp_command
+              (Test_ledger_application.mk_tx
+                 ~transfer_parties_get_actions_events:true ~event_elements
+                 ~action_elements ~constraint_constants keypair nonce )
+        in
+        (* This is used in the context of a test, and we know that the command is valid *)
+        let (`If_this_is_used_it_should_have_a_comment_justifying_it
+              valid_command ) =
+          User_command.to_valid_unsafe command
+        in
+        valid_command )
   in
   return (List.init n_blocks ~f:generate_payments)
 
