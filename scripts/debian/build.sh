@@ -35,14 +35,14 @@ if [ $# -eq 0 ]
   then
     echo "No arguments supplied. Building all known debian packages"
     build_logproc_deb
-    build_archive_berkeley_deb
+    build_archive_testnet_generic_deb
     build_archive_devnet_deb
     build_archive_mainnet_deb
     build_batch_txn_deb
-    build_daemon_berkeley_deb
+    build_daemon_testnet_generic_deb
     build_daemon_mainnet_deb
     build_daemon_devnet_deb
-    build_rosetta_berkeley_deb
+    build_rosetta_testnet_generic_deb
     build_rosetta_mainnet_deb
     build_rosetta_devnet_deb
     build_test_executive_deb
