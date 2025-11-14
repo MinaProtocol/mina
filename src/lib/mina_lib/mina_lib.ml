@@ -453,24 +453,6 @@ let get_node_state t =
   ; uptime_of_node
   }
 
-(** Compute the hard fork genesis slot from the runtime config, if all the stop
-    slots and the genesis slot delta have been set. Note that this is the hard
-    fork genesis slot expressed as a
-    [Mina_numbers.Global_slot_since_hard_fork.t] of the current chain/hard
-    fork. *)
-let scheduled_hard_fork_genesis_slot t :
-    Mina_numbers.Global_slot_since_hard_fork.t option =
-  let open Option.Let_syntax in
-  let runtime_config = t.config.precomputed_values.runtime_config in
-  let%bind slot_chain_end_since_hard_fork =
-    Runtime_config.slot_chain_end runtime_config
-  in
-  let%map hard_fork_genesis_slot_delta =
-    Runtime_config.hard_fork_genesis_slot_delta runtime_config
-  in
-  Mina_numbers.Global_slot_since_hard_fork.add slot_chain_end_since_hard_fork
-    hard_fork_genesis_slot_delta
-
 (* This is a hack put in place to deal with nodes getting stuck
    in Offline states, that is, not receiving blocks for an extended period,
    or stuck in Bootstrap for too long
@@ -2883,7 +2865,8 @@ module Hardfork_config = struct
     let configured_slot =
       match breadcrumb_spec with
       | `Stop_slot ->
-          scheduled_hard_fork_genesis_slot mina
+          Runtime_config.scheduled_hard_fork_genesis_slot
+            mina.config.precomputed_values.runtime_config
       | `State_hash _state_hash_base58 ->
           None
       | `Block_height _block_height ->
