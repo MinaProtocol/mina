@@ -154,7 +154,7 @@ copy_common_daemon_configs() {
 
   echo "------------------------------------------------------------"
   echo "copy_common_daemon_configs inputs:"
-  echo "Network Name: ${1} (like mainnet, devnet)"
+  echo "Network Name: ${1} (like mainnet, devnet, testnet-generic)"
   echo "Signature Type: ${2} (mainnet or testnet)"
   echo "Seed List URL path: ${3} (like seed-lists/devnet_seeds.txt)"
 
@@ -190,21 +190,20 @@ copy_common_daemon_configs() {
   # We want to copy the genesis ledger for the network ($1) and in case of
   # devnet/mainnet also copy the magic config (config_$GITHASH_CONFIG.json).
   # This config is automatically picked up by the daemon on startup.
-  # In case of generic-testnet we only copy the devnet ledger without magic one
-  # as generic-testnet should be testnet agnostic.
+  # In case of testnet-generic we only copy the devnet ledger without magic one
+  # as testnet-generic should be testnet agnostic.
   case "${1}" in
     devnet|mainnet)
       cp ../genesis_ledgers/"${1}".json \
         "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
       cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/${1}.json"
       ;;
-    generic-testnet)
-      cp ../genesis_ledgers/${1}.json "${BUILDDIR}/var/lib/coda/devnet.json"
+    testnet-generic)
+      cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
       ;;
     *)
       echo "Unknown network name provided: ${1}"; exit 1
       ;;
-
   esac
 
   cp ../scripts/hardfork/create_runtime_config.sh \
@@ -532,7 +531,7 @@ build_daemon_mainnet_legacy_deb() {
 # Builds mina-devnet-legacy package with legacy testnet binary
 #
 # Output: mina-devnet-legacy_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Contains only the legacy testnet binary as "mina-legacy" without
 # configuration files or genesis ledgers.
@@ -565,7 +564,7 @@ build_daemon_devnet_legacy_deb() {
 #   - "mina-testnet-generic-instrumented" (if DUNE_INSTRUMENT_WITH is set)
 #   - "mina-testnet-generic-lightnet-instrumented" (both conditions)
 #
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Testnet Generic testnet daemon with testnet signatures and testnet generic genesis ledger
 # as default. Package name includes suffixes for different profiles.
@@ -575,11 +574,11 @@ build_daemon_testnet_generic_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building Mina Testnet Generic testnet signatures deb without keys:"
 
-  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEBS}" \
+  create_control_file "${MINA_DEB_NAME}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Testnet Generic Network' \
     "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs testnet_generic testnet 'seed-lists/devnet_seeds.txt'
+  copy_common_daemon_configs testnet-generic testnet 'seed-lists/devnet_seeds.txt'
   build_deb "${MINA_DEB_NAME}"
 
 }
@@ -627,7 +626,7 @@ replace_runtime_config_and_ledgers_with_hardforked_ones() {
 # Builds mina-devnet-hardfork package for devnet hardfork
 #
 # Output: mina-devnet-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEBS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Devnet daemon package with hardfork-specific runtime config and ledgers.
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
@@ -638,7 +637,7 @@ build_daemon_devnet_hardfork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building hardfork testnet signatures deb without keys:"
 
-  create_control_file "${__deb_name}" "${SHARED_DEBS}${DAEMON_DEBS}" \
+  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Devnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs devnet testnet 'seed-lists/devnet_seeds.txt'
@@ -657,7 +656,7 @@ build_daemon_devnet_hardfork_deb() {
 # Builds mina-testnet-generic-hardfork package for Testnet Generic hardfork
 #
 # Output: mina-testnet-generic-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Testnet Generic daemon package with hardfork-specific runtime config and ledgers.
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
@@ -667,12 +666,12 @@ build_daemon_testnet_generic_hardfork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building hardfork testnet generic signatures deb without keys:"
 
-  create_control_file "${__deb_name}" "${SHARED_DEBS}${DAEMON_DEBS}" \
+  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Testnet Generic Network' "${SUGGESTED_DEPS}"
 
-  copy_common_daemon_configs testnet_generic testnet 'seed-lists/devnet_seeds.txt'
+  copy_common_daemon_configs testnet-generic testnet 'seed-lists/devnet_seeds.txt'
 
-  replace_runtime_config_and_ledgers_with_hardforked_ones testnet_generic
+  replace_runtime_config_and_ledgers_with_hardforked_ones testnet-generic
   build_deb "${__deb_name}"
 
 }
@@ -685,7 +684,7 @@ build_daemon_testnet_generic_hardfork_deb() {
 # Builds mina-mainnet-hardfork package for mainnet hardfork
 #
 # Output: mina-mainnet-hardfork_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEPS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Mainnet daemon package with hardfork-specific runtime config and ledgers.
 # Requires RUNTIME_CONFIG_JSON and LEDGER_TARBALLS environment variables.
@@ -697,7 +696,7 @@ build_daemon_mainnet_hardfork_deb() {
   echo "------------------------------------------------------------"
   echo "--- Building hardfork mainnet signatures deb without keys:"
 
-  create_control_file "${__deb_name}" "${SHARED_DEBS}${DAEMON_DEBS}" \
+  create_control_file "${__deb_name}" "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Mina Protocol Client and Daemon for the Mainnet Network' "${SUGGESTED_DEPS}"
 
   copy_common_daemon_configs mainnet testnet 'seed-lists/mainnet_seeds.txt'
@@ -792,7 +791,7 @@ build_archive_testnet_generic_deb () {
   echo "--- Building archive testnet-generic deb"
 
 
-  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEBS}" 'Mina Archive Process
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
  Compatible with Mina Daemon'
 
   copy_common_archive_configs "$ARCHIVE_DEB"
@@ -806,7 +805,7 @@ build_archive_testnet_generic_deb () {
 # Builds mina-zkapp-test-transaction package for zkApp testing
 #
 # Output: mina-zkapp-test-transaction_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEBS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Utility for generating zkApp transactions in Mina GraphQL format for testing.
 #
@@ -815,7 +814,7 @@ build_zkapp_test_transaction_deb () {
   echo "--- Building Mina Generic testnet ZkApp test transaction tool:"
 
   create_control_file mina-zkapp-test-transaction \
-    "${SHARED_DEBS}${DAEMON_DEBS}" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to generate ZkApp transactions in Mina GraphQL format'
 
   # Binaries
@@ -832,7 +831,7 @@ build_zkapp_test_transaction_deb () {
 # Builds mina-create-legacy-genesis package for legacy genesis creation
 #
 # Output: mina-create-legacy-genesis_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
-# Dependencies: ${SHARED_DEBS}${DAEMON_DEBS}
+# Dependencies: ${SHARED_DEPS}${DAEMON_DEPS}
 #
 # Utility for creating legacy genesis ledgers for post-hardfork verification.
 # Contains the runtime_genesis_ledger tool for Mina protocol.
@@ -842,7 +841,7 @@ build_create_legacy_genesis_deb() {
   echo "--- Building Mina Generic testnet create legacy genesis tool:"
 
   create_control_file mina-create-legacy-genesis \
-    "${SHARED_DEBS}${DAEMON_DEBS}" \
+    "${SHARED_DEPS}${DAEMON_DEPS}" \
     'Utility to verify post hardfork ledger for Mina'
 
   # Binaries
