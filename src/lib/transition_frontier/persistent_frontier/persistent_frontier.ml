@@ -270,7 +270,7 @@ module Instance = struct
 
   let load_full_frontier t ~context:(module Context : CONTEXT) ~root_ledger
       ~consensus_local_state ~max_length ~ignore_consensus_local_state
-      ~persistent_root_instance =
+      ~persistent_root_instance ?max_frontier_depth () =
     let open Context in
     let open Deferred.Result.Let_syntax in
     let%bind () = Deferred.return (assert_no_sync t) in
@@ -345,7 +345,7 @@ module Instance = struct
     let%map () =
       Deferred.map
         (Database.crawl_successors ~signature_kind ~proof_cache_db t.db
-           root_hash
+           ?max_depth:max_frontier_depth root_hash
            ~init:(Full_frontier.root frontier)
            ~f:visit )
         ~f:
