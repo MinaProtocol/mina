@@ -539,8 +539,6 @@ include struct
 
   let iter = proxy1 iter
 
-  let common_ancestor = proxy1 common_ancestor
-
   (* reduce successors functions (probably remove hashes special case *)
   let successors = proxy1 successors
 

@@ -38,8 +38,6 @@ module type S = sig
 
   val successors_rec : t -> Breadcrumb.t -> Breadcrumb.t list
 
-  val common_ancestor : t -> Breadcrumb.t -> Breadcrumb.t -> State_hash.t
-
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
   val best_tip_path_length_exn : t -> int
