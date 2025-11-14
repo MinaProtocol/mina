@@ -142,6 +142,13 @@ let load_config_exn config_file =
 let main ~(constraint_constants : Genesis_constants.Constraint_constants.t)
     ~config_file ~genesis_dir ~hash_output_file ~ignore_missing_fields
     ~pad_app_state ~hardfork_slot () =
+  let hardfork_slot =
+    Option.map
+      ~f:
+        (Genesis_ledger_helper.global_slot_since_hard_fork_to_genesis
+           ~constraint_constants )
+      hardfork_slot
+  in
   let%bind accounts, staking_accounts_opt, next_accounts_opt =
     load_config_exn config_file
   in
@@ -210,11 +217,11 @@ let () =
                 false)"
          and hardfork_slot =
            flag "--hardfork-slot"
-             (optional Cli_lib.Arg_type.global_slot)
+             (optional Cli_lib.Arg_type.hardfork_slot)
              ~doc:
-               "INT the hardfork slot since global genesis at which vesting \
-                parameter update should happen. By default, don't update the \
-                vesting parameters"
+               "INT the scheduled hardfork slot since last hardfork at which \
+                vesting parameter update should happen. If absent, don't \
+                update the vesting parameters"
          in
          main ~constraint_constants ~config_file ~genesis_dir ~hash_output_file
            ~ignore_missing_fields ~pad_app_state ~hardfork_slot) )
