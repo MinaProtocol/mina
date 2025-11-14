@@ -712,10 +712,10 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
           (Transition_frontier.extensions frontier)
           Transition_registry
       in
-      let crumb = Transition_frontier.best_tip frontier in
-      let crumb =
+      let%bind crumb =
+        let best_tip = Transition_frontier.best_tip frontier in
         let crumb_global_slot_since_genesis =
-          Breadcrumb.protocol_state crumb
+          Breadcrumb.protocol_state best_tip
           |> Protocol_state.consensus_state
           |> Consensus.Data.Consensus_state.global_slot_since_genesis
         in
@@ -726,15 +726,26 @@ let produce ~genesis_breadcrumb ~context:(module Context : CONTEXT) ~prover
         if
           Mina_numbers.Global_slot_since_genesis.equal
             crumb_global_slot_since_genesis block_global_slot_since_genesis
-        then
+        then (
           (* We received a block for this slot over the network before
              attempting to produce our own. Build upon its parent instead
              of attempting (and failing) to build upon the block itself.
           *)
-          Transition_frontier.find frontier (Breadcrumb.parent_hash crumb)
-          |> Option.value_exn
-               ~message:"block producer: parent not found in frontier"
-        else crumb
+          match
+            Transition_frontier.find frontier (Breadcrumb.parent_hash best_tip)
+          with
+          | Some parent ->
+              return parent
+          | None ->
+              [%log error]
+                "Aborting block production: parent of $best_tip not found in \
+                 frontier (unexpected case, there is likely a bug somewhere)"
+                ~metadata:
+                  [ ( "best_tip"
+                    , State_hash.to_yojson (Breadcrumb.state_hash best_tip) )
+                  ] ;
+              Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
+        else return best_tip
       in
       let start = Block_time.now time_controller in
       [%log info]
