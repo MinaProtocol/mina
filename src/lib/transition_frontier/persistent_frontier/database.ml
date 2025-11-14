@@ -494,8 +494,8 @@ let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 
 let set_best_tip data = Batch.set ~key:Best_tip ~data
 
-let rec crawl_successors ~signature_kind ~proof_cache_db ?max_depth t hash ~init
-    ~f =
+let rec crawl_successors ?max_depth ~signature_kind ~proof_cache_db ~init ~f t
+    hash =
   let open Deferred.Result.Let_syntax in
   match max_depth with
   | Some 0 ->

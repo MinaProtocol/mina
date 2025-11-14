@@ -124,13 +124,13 @@ val get_best_tip :
 val set_best_tip : State_hash.t -> batch_t -> unit
 
 val crawl_successors :
-     signature_kind:Mina_signature_kind.t
+     ?max_depth:int
+  -> signature_kind:Mina_signature_kind.t
   -> proof_cache_db:Proof_cache_tag.cache_db
-  -> ?max_depth:int
-  -> t
-  -> State_hash.t
   -> init:'a
   -> f:('a -> Mina_block.Validated.t -> ('a, 'b) Deferred.Result.t)
+  -> t
+  -> State_hash.t
   -> ( unit
      , [> `Crawl_error of 'b
        | `Not_found of [> `Arcs of State_hash.t | `Transition of State_hash.t ]
