@@ -486,7 +486,7 @@ let initialize_verifier_and_components ~logger
   let%bind cwd = Sys.getcwd () in
   (* Copied from CLI entrypoint. Creates a verifier parallel process.
      In future we may consider not launching a parallel verifier process
-     and just use a dummy implementation, or even make the [Breadcrumbn.build]
+     and just use a dummy implementation, or even make the [Breadcrumb.build]
      not accept the verifier as an argument when it's asked
      not to verify certain stuff. *)
   let%map verifier =

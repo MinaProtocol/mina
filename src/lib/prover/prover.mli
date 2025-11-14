@@ -14,6 +14,6 @@ val create_genesis_block_inputs :
   -> Blockchain_snark.Blockchain.t
      * Mina_state.Protocol_state.Value.t
      * Mina_state.Snark_transition.value
-     * 'a option
+     * Ledger_proof.t option
      * Consensus.Data.Prover_state.t
      * Mina_base.Pending_coinbase_witness.t
