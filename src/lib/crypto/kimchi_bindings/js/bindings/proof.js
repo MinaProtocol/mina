@@ -1,21 +1,6 @@
 /* global plonk_wasm, tsRustConversion
  */
 
-
-// Provides: caml_pasta_fp_plonk_proof_batch_verify
-// Requires: plonk_wasm, tsRustConversion
-var caml_pasta_fp_plonk_proof_batch_verify = function (indexes, proofs) {
-  indexes = tsRustConversion.mapMlArrayToRustVector(
-    indexes,
-    tsRustConversion.fp.verifierIndexToRust
-  );
-  proofs = tsRustConversion.mapMlArrayToRustVector(
-    proofs,
-    tsRustConversion.fp.proofToRust
-  );
-  return plonk_wasm.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
-};
-
 // Provides: caml_pasta_fp_plonk_proof_dummy
 // Requires: plonk_wasm, tsRustConversion
 var caml_pasta_fp_plonk_proof_dummy = function () {
@@ -32,22 +17,6 @@ var caml_pasta_fp_plonk_proof_deep_copy = function (proof) {
       tsRustConversion.fp.proofToRust(proof)
     )
   );
-};
-
-
-
-// Provides: caml_pasta_fq_plonk_proof_batch_verify
-// Requires: plonk_wasm, tsRustConversion
-var caml_pasta_fq_plonk_proof_batch_verify = function (indexes, proofs) {
-  indexes = tsRustConversion.mapMlArrayToRustVector(
-    indexes,
-    tsRustConversion.fq.verifierIndexToRust
-  );
-  proofs = tsRustConversion.mapMlArrayToRustVector(
-    proofs,
-    tsRustConversion.fq.proofToRust
-  );
-  return plonk_wasm.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
 };
 
 // Provides: caml_pasta_fq_plonk_proof_dummy
