@@ -43,4 +43,11 @@ module type S = sig
   val precomputed_values : t -> Precomputed_values.t
 
   val genesis_constants : t -> Genesis_constants.t
+
+  module Protocol_states_for_root_scan_state : sig
+    type t
+  end
+
+  val protocol_states_for_root_scan_state :
+    t -> Protocol_states_for_root_scan_state.t
 end
