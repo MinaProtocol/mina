@@ -66,6 +66,8 @@ val apply_diffs :
        Root_identifier.t option * Diff.Full.With_mutant.t list ]
 
 module Util : sig
+  (** given an heir, calculate the diff that will transition
+      the root to that heir (assuming parent is the root) *)
   val calculate_root_transition_diff :
        protocol_states_for_root_scan_state:Protocol_states_for_root_scan_state.t
     -> parent:Breadcrumb.t

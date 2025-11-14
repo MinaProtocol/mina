@@ -299,7 +299,8 @@ module Util = struct
   let rec recursive_list_bind ~f init =
     List.bind (f init) ~f:(fun succ -> succ :: recursive_list_bind ~f succ)
 
-  (* given an heir, calculate the diff that will transition the root to that heir *)
+  (** given an heir, calculate the diff that will transition
+      the root to that heir (assuming parent is the root) *)
   let calculate_root_transition_diff ~protocol_states_for_root_scan_state
       ~parent ~successors heir =
     let heir_hash = Breadcrumb.state_hash heir in

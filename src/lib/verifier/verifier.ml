@@ -37,8 +37,8 @@ let get_verification_keys_eagerly ~signature_kind ~constraint_constants
   end) in
   let open Async.Deferred.Let_syntax in
   let%bind blockchain_vk = Lazy.force B.Proof.verification_key in
-  let%bind transaction_vk = Lazy.force T.verification_key in
-  return (`Blockchain blockchain_vk, `Transaction transaction_vk)
+  let%map transaction_vk = Lazy.force T.verification_key in
+  (`Blockchain blockchain_vk, `Transaction transaction_vk)
 
 module For_tests = struct
   let default ~logger ~constraint_constants ?enable_internal_tracing
