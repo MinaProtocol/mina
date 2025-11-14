@@ -62,6 +62,8 @@ module Limited : sig
              State_hash.With_state_hashes.Stable.V1.t
              list
         -> t
+
+      val transition : t -> Mina_block.Validated.Stable.V2.t
     end
   end]
 
