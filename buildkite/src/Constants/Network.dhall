@@ -29,7 +29,7 @@ let lowerName =
       ->  merge
             { Devnet = "devnet"
             , Mainnet = "mainnet"
-            , TestnetGeneric = "testnet-generic"
+            , TestnetGeneric = "testnet_generic"
             , DevnetLegacy = "devnet_legacy"
             , MainnetLegacy = "mainnet_legacy"
             , PreMesa1 = "hetzner-pre-mesa-1"
