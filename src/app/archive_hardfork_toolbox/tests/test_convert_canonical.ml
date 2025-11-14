@@ -585,13 +585,22 @@ module TestScenarios = struct
     ]
 end
 
-(* Alcotest integration *)
-let test_convert_scenario conn_str
+let get_postgres_uri () =
+  match Sys.getenv "POSTGRES_URI" with
+  | Some uri ->
+      uri
+  | None ->
+      failwith
+        "POSTGRES_URI environment variable is not set. Please set it to run \
+         the tests."
+
+let test_convert_scenario
     ({ name; blocks; expected; target_hash; protocol_version } :
       TestScenarios.scenario ) () =
   let open Deferred.Or_error.Let_syntax in
   (* Create test database *)
   let db_name = sprintf "test_%s" name in
+  let conn_str = get_postgres_uri () in
   let%bind _drop = TestDb.drop_database_if_exists conn_str db_name in
   let%bind _create = TestDb.create_database conn_str db_name in
   let%bind _setup = TestDb.create_test_schema conn_str db_name in
@@ -647,24 +656,15 @@ let test_convert_scenario conn_str
       (List.to_string ~f:(fun (h, s) -> sprintf "%s->%s" h s) actual) ;
     Deferred.Or_error.error_string (sprintf "Test %s failed" name) )
 
-let make_test scenario conn_str =
+let make_test scenario =
   Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
-      let%map result = test_convert_scenario conn_str scenario () in
+      let%map result = test_convert_scenario scenario () in
       Or_error.ok_exn result )
 
-let conn_str_arg =
-  let open Cmdliner in
-  let doc = "PostgreSQL connection string" in
-  let env = Arg.env_var "POSTGRES_URI" ~doc in
-  Arg.(
-    required
-    & opt (some string) None
-    & info [ "postgres-uri" ] ~env ~docv:"URI" ~doc)
-
 let () =
-  Alcotest.run_with_args "Archive Hardfork Toolbox Tests" conn_str_arg
+  Alcotest.run "Archive Hardfork Toolbox Tests"
     [ ( "convert_chain_to_canonical"
       , List.map TestScenarios.all_scenarios ~f:(fun scenario ->
-            (scenario.name, `Quick, make_test scenario) ) )
+            (scenario.name, `Quick, fun () -> make_test scenario) ) )
     ]
