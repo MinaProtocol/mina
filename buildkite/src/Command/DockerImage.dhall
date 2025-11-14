@@ -167,7 +167,7 @@ let generateStep =
           let buildDockerCmd =
                     "./scripts/docker/build.sh"
                 ++  " --service ${Artifacts.dockerName spec.service}"
-                ++  " --network ${Network.lowerName spec.network}"
+                ++  " --network ${Network.debianSuffix spec.network}"
                 ++  " --version ${spec.version}"
                 ++  " --branch ${spec.branch}"
                 ++  " ${maybeCacheOption} "
