@@ -9,7 +9,7 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
 
 CONN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${PG_PORT}
 
-source ~/.profile
+eval "$(opam config env)"
 
 echo "Running convert canonical blocks test"
 POSTGRES_URI="${CONN}" dune runtest src/app/archive_hardfork_toolbox/tests
