@@ -12,14 +12,27 @@ NUM_BLOCKS=3
 NUM_ZKAPP_TXS=10
 NUM_PAYMENTS=110
 
-# Data URLs
-ARCHIVE_DUMP_URL="https://storage.googleapis.com/mina-archive-dumps/mainnet-archive-dump-2025-11-11_0000.sql.tar.gz"
+# Just an arbitrary dump from mainnet. It's important to use a mainnet dump to have performance
+# characteristics of archive node operation similar to mainnet.
+# If this value is changed, it's important to update the runtime config json in the ledger
+# archive below.
+DUMP_SQL="mainnet-archive-dump-2025-11-11_0000.sql"
+DUMP_ARCHIVE="mainnet-archive-dump.tar.gz"
+ARCHIVE_DUMP_URL="https://storage.googleapis.com/mina-archive-dumps/$DUMP_SQL.tar.gz"
+
+# Ledger generated from a recent mainnet's ledger with all of the stake split more or
+# less equally among two accounts (one whale key with small balance, and one plain key).
+# with lots of delegations to it and 100mln MINA balance).
+# Generated with: scripts/generate-ledger-hf-dryrun.sh -p 1 -k 1 --output-dir new-ledger
+#
+# After generation, `runtime-config.json` was manually extended with `proof` section
+# containing the fork config. This fork config was populated with data of the most recent
+# block extract from the archive dump via SQL:
+# `select state_hash, height, global_slot_since_genesis from blocks ORDER BY height DESC LIMIT 1`
 LEDGER_URL="https://storage.googleapis.com/o1labs-ci-test-data/ledgers/single-bp-ledger.tar"
 
 # Local paths
-DUMP_ARCHIVE="mainnet-archive-dump-2025-11-11_0000.sql.tar.gz"
-DUMP_SQL="mainnet-archive-dump-2025-11-11_0000.sql"
-LEDGER_ARCHIVE="single-bp-ledger.tar"
+LEDGER_ARCHIVE="ledger.tar"
 DB_DIR="db"
 LEDGER_DIR="ledger"
 
@@ -300,9 +313,9 @@ TEST_RESULT=$?
 echo ""
 echo "=========================================="
 if [[ $TEST_RESULT -eq 0 ]]; then
-    echo "OVERALL TEST PASSED"
+    echo "TEST PASSED"
 else
-    echo "OVERALL TEST FAILED (exit code: $TEST_RESULT)"
+    echo "TEST FAILED (exit code: $TEST_RESULT)"
 fi
 echo "=========================================="
 

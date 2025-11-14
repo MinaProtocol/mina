@@ -246,7 +246,22 @@ echo "Archive started (PID: $ARCHIVE_PID)"
 
 # Start GraphQL mock server
 echo "[2/3] Starting GraphQL mock server..."
-python3 -c "from http.server import BaseHTTPRequestHandler, HTTPServer; import json; exec(\"class H(BaseHTTPRequestHandler):\\n  def do_POST(self):\\n    self.send_response(200)\\n    self.send_header('Content-type', 'application/json')\\n    self.end_headers()\\n    self.wfile.write(json.dumps({'data': {'networkID': 'mina:devnet'}}).encode())\\n  def log_message(self, format, *args): pass\\nHTTPServer(('', $GRAPHQL_PORT), H).serve_forever()\")" &
+python3 -c "
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+
+class H(BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'data': {'networkID': 'mina:devnet'}}).encode())
+    
+    def log_message(self, format, *args):
+        pass
+
+HTTPServer(('', $GRAPHQL_PORT), H).serve_forever()
+" &
 GRAPHQL_MOCK_PID=$!
 echo "GraphQL mock started (PID: $GRAPHQL_MOCK_PID)"
 

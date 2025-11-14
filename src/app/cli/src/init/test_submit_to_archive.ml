@@ -6,6 +6,7 @@ open Mina_base
 open Mina_state
 
 let ledger_proof_opt next_state = function
+  (* Copied from the prover.ml *)
   | Some t ->
       Ledger_proof.(statement_with_sok t, underlying_proof t)
   | None ->
@@ -20,6 +21,7 @@ let extend_blockchain (module B : Blockchain_snark.Blockchain_snark_state.S)
     ~constraint_constants (chain : Blockchain_snark.Blockchain.t)
     (next_state : Protocol_state.Value.t) (block : Snark_transition.value)
     (t : Ledger_proof.t option) state_for_handler pending_coinbase =
+  (* Copied from the prover.ml *)
   Deferred.Or_error.try_with ~here:[%here] (fun () ->
       let txn_snark_statement, txn_snark_proof =
         ledger_proof_opt next_state t
@@ -41,6 +43,7 @@ let extend_blockchain (module B : Blockchain_snark.Blockchain_snark_state.S)
 
 let create_genesis_proof m ~constraint_constants
     (genesis_inputs : Genesis_proof.Inputs.t) =
+  (* Copied from block_producer.ml *)
   let ( blockchain
       , protocol_state
       , snark_transition
@@ -49,6 +52,9 @@ let create_genesis_proof m ~constraint_constants
       , pending_coinbase ) =
     Prover.create_genesis_block_inputs genesis_inputs
   in
+  (* In block producer you'd see a call to [Prover.t] component,
+     which is a wrapper around [extend_blockchain] executed in a parallel process.
+     Here we just do it inline. *)
   extend_blockchain m ~constraint_constants blockchain protocol_state
     snark_transition ledger_proof_opt prover_state pending_coinbase
 
@@ -58,6 +64,7 @@ module type Keys_S = sig
   module B : Blockchain_snark.Blockchain_snark_state.S
 end
 
+(* Copied from prover.ml, Worker_state.create *)
 module Keys (Params : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
@@ -76,6 +83,7 @@ end) : Keys_S = struct
   end)
 end
 
+(* Just a stub trust system copied from tests *)
 let trust_system =
   let s = Trust_system.null () in
   don't_wait_for
@@ -100,21 +108,31 @@ module Block = struct
   let state_hash t = Frontier_base.Breadcrumb.state_hash t.breadcrumb
 
   let compute_genesis ~logger ~precomputed_values (module Keys : Keys_S) =
+    (* Generate genesis block, used in a bunch of other places
+       (including block producer and tests) *)
     let genesis_block_with_hash, genesis_validation =
       Mina_block.genesis ~precomputed_values
     in
-    let constraint_constants = precomputed_values.constraint_constants in
     let validated =
       Mina_block.Validated.lift (genesis_block_with_hash, genesis_validation)
     in
+    let constraint_constants = precomputed_values.constraint_constants in
+    (* Create a staged ledger out of genesis ledger.
+       Fresh code, not copied from anywhere else. *)
+    (* Load the genesis ledger, should be read-only. *)
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values |> Lazy.force
     in
+    (* Create a mask for the ledger to catch all of the modifications
+       that we make on top of genesis ledger, so that the genesis ledger
+       remains unchanged. *)
     let mask =
       Mina_ledger.Ledger.Mask.create ~depth:constraint_constants.ledger_depth ()
     in
     let ledger = Mina_ledger.Ledger.register_mask genesis_ledger mask in
+    (* Create a staged ledger from the ledger. *)
     let staged_ledger =
+      (* [create_exn] is only safe to use for initial genesis block. *)
       Staged_ledger.create_exn ~constraint_constants ~ledger
     in
     [%log info] "Generating genesis breadcrumb" ;
@@ -124,6 +142,9 @@ module Block = struct
         ~transition_receipt_time:(Some (Time.now ()))
         ~just_emitted_a_proof:false
     in
+    (* Block proof contained in genesis header is just a stub.
+       Hence we need to generate the real proof here, in order to
+       be able to produce some new blocks. *)
     [%log info] "Generating genesis proof" ;
     let%map proof =
       create_genesis_proof
@@ -151,6 +172,7 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
   let logger = Context.logger in
   [%log info] "Loaded keypair for public key: %s"
     (Public_key.Compressed.to_base58_check public_key_compressed) ;
+  (* Copied from CLI entry point. Needed for generating the first epoch data *)
   let consensus_local_state =
     Consensus.Data.Local_state.create
       ~context:(module Context)
@@ -168,6 +190,8 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
   let time_to_ms =
     Fn.compose Block_time.Span.to_ms Block_time.to_span_since_epoch
   in
+  (* Copied from block producer. We generate VRF evaluator's
+     inputs for the very first epoch *)
   let epoch_data_for_vrf, ledger_snapshot =
     Consensus.Hooks.get_epoch_data_for_vrf
       ~constants:Context.consensus_constants
@@ -197,6 +221,10 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
     let global_slot =
       Mina_numbers.Global_slot_since_hard_fork.of_int current_slot
     in
+    (* Copied from VRF evaluator. This evaluates VRF function for
+       a single pair of block-producer and slot. Inside it actually
+       tests every account that delegates to this block producer
+       for the slot. *)
     match%map
       Consensus.Data.Vrf.check
         ~context:(module Context)
@@ -217,12 +245,15 @@ let find_winning_slots ~context:(module Context : Consensus.Intf.CONTEXT)
         (Some
           (`Vrf_eval _vrf_eval, `Vrf_output vrf_result, `Delegator delegator) )
       ->
+        (* Copied from VRF evaluator *)
         [%log info] "Found winning slot at global slot %d" current_slot ;
         let slot_won =
           { Consensus.Data.Slot_won.delegator
           ; producer = keypair
           ; global_slot
           ; global_slot_since_genesis =
+              (* Converting slot since HF to slot since genesis in a way that accounts for
+                 section `fork` in the runtime config. *)
               Mina_numbers.Global_slot_since_genesis.add epoch_start
                 ( Mina_numbers.Global_slot_since_hard_fork.diff global_slot
                     epoch_start_hf
@@ -240,10 +271,17 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   let module V = Mina_block.Validation in
   let (module Context : V.CONTEXT) = context in
   let open Context in
+  (* Copied from block producer, needed for a call to [generate_next_state] *)
   let block_data =
     Consensus.Hooks.get_block_data ~slot_won ~ledger_snapshot
       ~coinbase_receiver:`Producer
   in
+  (* TODO: consider using a similar logic before VRF evaluation ? Or debug this one.
+     Now it produces Error logs about wrong timing of block creation w.r.t. VRF result. *)
+  (* Offset block creation time so that when breadcrumb
+     is created appears just right for the consensus.
+     We're creating blocks sequentially one by one without 3-minutes pauses in
+     between, for that reason we need to offset block creation time. *)
   Block_time.Controller.enable_setting_offset () ;
   let scheduled_time =
     Consensus.Data.Consensus_time.(
@@ -255,9 +293,12 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     @@ Block_time.diff
          (Block_time.now @@ Block_time.Controller.basic ~logger)
          scheduled_time ) ;
+  (* Time controller created below will use the time offset set above.  *)
   let time_controller = Block_time.Controller.basic ~logger in
   let previous_protocol_state = Block.protocol_state previous in
   let winner_pk = fst slot_won.delegator in
+  (* Copied from block producer, creates inputs for
+     generating a new block's proof, header and body. *)
   let%bind protocol_state, internal_transition, pending_coinbase_witness =
     Block_producer.generate_next_state ~commit_id:"" ~constraint_constants
       ~scheduled_time ~block_data ~previous_protocol_state ~time_controller
@@ -291,6 +332,12 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     >>| Or_error.ok_exn >>| Blockchain_snark.Blockchain.proof
   in
   let previous_state_hash = Block.state_hash previous in
+  (* Protocol is configured with [delta = 0], and for that reason
+     we specify an empty list of delta block chain proofs.
+
+     TODO: consider failing if [delta] is not 0.
+     If we attempt to run with a different [delta], we need to
+     specify the correct delta block chain proofs. *)
   let delta_block_chain_proof = (previous_state_hash, []) in
   let header =
     Mina_block.Header.create ~protocol_state ~protocol_state_proof
@@ -300,6 +347,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
     Mina_block.Body.create
     @@ Mina_block.Internal_transition.staged_ledger_diff internal_transition
   in
+  (* Copied from block producer, wraps the header and body into a transition
+     with validation. *)
   let transition =
     let open Result.Let_syntax in
     V.wrap_header
@@ -324,6 +373,12 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
   in
   let transition_receipt_time = Some (Time.now ()) in
   [%log info] "Building breadcrumb" ;
+  (* Create breadcrumb using parent and the new block transition that we just generated.
+     Most of the logic of the function call below is for updating the staged ledger. *)
+  (* We use [~get_completed_work:(Fn.const None)] because we don't run a snark worker
+       in this test. Hence, nobody is creating snark work. It's fine to create a few blocks
+     with this tool as when the blockchain is started from genesis, scan state has ~750
+      transaction slots empty and snark work production is necessary only after that. *)
   Frontier_base.Breadcrumb.build ~logger ~precomputed_values ~verifier
     ~get_completed_work:(Fn.const None) ~trust_system
     ~parent:previous.breadcrumb ~transition ~sender:None
@@ -333,6 +388,8 @@ let build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
 
 let mk_payment ~(valid_until : Mina_numbers.Global_slot_since_genesis.t)
     ~signer_pk ~nonce signer_keypair =
+  (* Fresh code which demonstrates the simplest
+     possible way to construct a payment *)
   let fresh_keypair = Keypair.create () in
   let receiver_pk = Public_key.compress fresh_keypair.Keypair.public_key in
   let common =
@@ -371,9 +428,12 @@ let generate_txs ~valid_until ~init_nonce ~n_zkapp_txs ~n_payments ~n_blocks
         in
         let command =
           if i < n_payments then
+            (* Creates a simple payment that initializes a new account *)
             User_command.Signed_command
               (mk_payment ~valid_until ~nonce ~signer_pk keypair)
           else
+            (* Generates a 9-account-update zkapp transaction
+               creating 8 new accounts with 0 balance each *)
             Zkapp_command
               (Test_ledger_application.mk_tx
                  ~transfer_parties_get_actions_events:true ~event_elements
@@ -417,12 +477,18 @@ let initialize_verifier_and_components ~logger
     let proof_level = precomputed_values.proof_level
   end in
   let module Keys = Keys (Context) in
-  Parallel.init_master () ;
   let%bind blockchain_verification_key =
     Lazy.force Keys.B.Proof.verification_key
   in
   let%bind transaction_verification_key = Lazy.force Keys.T.verification_key in
+  (* Copied from CLI entrypoint. Needed for rpc-parallel initialization. *)
+  Parallel.init_master () ;
   let%bind cwd = Sys.getcwd () in
+  (* Copied from CLI entrypoint. Creates a verifier parallel process.
+     In future we may consider not launching a parallel verifier process
+     and just use a dummy implementation, or even make the [Breadcrumbn.build]
+     not accept the verifier as an argument when it's asked
+     not to verify certain stuff. *)
   let%map verifier =
     Verifier.create ~logger ~commit_id:"" ~blockchain_verification_key
       ~transaction_verification_key ~proof_level:precomputed_values.proof_level
@@ -440,12 +506,17 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
     |> Consensus.Data.Consensus_state.global_slot_since_genesis
   in
   let valid_until =
+    (* Just stub out valid until with enough slots that
+       payment is guaranteed to pass. *)
+    (* TODO: replace [n_blocks * 10] with the value of the last
+       won slot + delta. *)
     Mina_numbers.Global_slot_since_genesis.add genesis_slot
       (Mina_numbers.Global_slot_span.of_int @@ (n_blocks * 10))
   in
   let signer_account_id = Account_id.of_public_key keypair.Keypair.public_key in
   let genesis_ledger = Staged_ledger.ledger genesis.staged_ledger in
   let init_nonce =
+    (* Retrieve the nonce of the signer's account from genesis ledger. *)
     Mina_ledger.Ledger.location_of_account genesis_ledger signer_account_id
     |> Option.value_exn ~message:"Sender's account not found in ledger"
     |> Mina_ledger.Ledger.get genesis_ledger
@@ -468,6 +539,7 @@ let create_blocks_with_diffs ~logger
             keys_module (slot, ledger_snapshot) block
         in
         let diff =
+          (* Copied from archive_client.ml *)
           Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values ~logger
             breadcrumb
         in
@@ -519,6 +591,7 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
   [%log info] "Submit blocks to archive at port %d" archive_node_port ;
   let%map () =
     Deferred.List.iter diffs ~f:(fun diff ->
+        (* Copied from archive_client.ml *)
         Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t (Transition_frontier diff)
           { host = "127.0.0.1"; port = archive_node_port }
         >>| Or_error.ok_exn )
