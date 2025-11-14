@@ -252,23 +252,29 @@ let best_tip_path_length_exn { table; root; best_tip; _ } =
   in
   result |> Option.value_exn
 
-let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t =
+let common_ancestor t bc1 bc2 =
   let rec go ancestors1 ancestors2 b1 b2 =
     let sh1 = Breadcrumb.state_hash b1 in
     let sh2 = Breadcrumb.state_hash b2 in
     Hash_set.add ancestors1 sh1 ;
     Hash_set.add ancestors2 sh2 ;
-    if Hash_set.mem ancestors1 sh2 then sh2
-    else if Hash_set.mem ancestors2 sh1 then sh1
+    if Hash_set.mem ancestors1 sh2 then Result.return sh2
+    else if Hash_set.mem ancestors2 sh1 then Result.return sh1
     else
       let parent_unless_root breadcrumb =
-        if State_hash.equal (Breadcrumb.state_hash breadcrumb) t.root then
-          breadcrumb
+        let state_hash = Breadcrumb.state_hash breadcrumb in
+        let parent_hash = Breadcrumb.parent_hash breadcrumb in
+        if State_hash.equal state_hash t.root then Result.return breadcrumb
         else
-          find_exn ~message:"parent (in common_ancestor)" t
-            (Breadcrumb.parent_hash breadcrumb)
+          match find t parent_hash with
+          | None ->
+              Error (`Parent_not_found (state_hash, `Parent parent_hash))
+          | Some breadcrumb ->
+              Ok breadcrumb
       in
-      go ancestors1 ancestors2 (parent_unless_root b1) (parent_unless_root b2)
+      let%bind.Result b1 = parent_unless_root b1 in
+      let%bind.Result b2 = parent_unless_root b2 in
+      go ancestors1 ancestors2 b1 b2
   in
   go
     (Hash_set.create (module State_hash))

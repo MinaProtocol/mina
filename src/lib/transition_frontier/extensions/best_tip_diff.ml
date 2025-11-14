@@ -54,7 +54,18 @@ module T = struct
      Ordered oldest to newest. *)
   let get_path_diff t frontier (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
       (Breadcrumb.t list * Breadcrumb.t list, _) Result.t =
-    let ancestor_hash = Full_frontier.common_ancestor frontier bc1 bc2 in
+    let%bind.Result ancestor_hash =
+      Full_frontier.common_ancestor frontier bc1 bc2
+      |> Result.map_error
+           ~f:(fun (`Parent_not_found (hash, `Parent parent_hash)) ->
+             ( parent_hash
+             , sprintf
+                 "Finding common ancestor for %s and %s: parent for %s not \
+                  found"
+                 (State_hash.to_base58_check @@ Breadcrumb.state_hash bc1)
+                 (State_hash.to_base58_check @@ Breadcrumb.state_hash bc2)
+                 (State_hash.to_base58_check hash) ) )
+    in
     (* Find the breadcrumbs connecting t1 and t2, excluding t1. Precondition:
        t1 is an ancestor of t2. *)
     let path_from_to t1 t2 =
