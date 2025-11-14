@@ -265,13 +265,9 @@ echo "  PostgreSQL started (PID: $POSTGRES_PID)"
 echo "  Waiting for PostgreSQL to be ready..."
 sleep 5
 
-# Create the archive database
-echo "  Creating 'archive' database..."
-createdb -h "$DB_DIR_ABS" -p "$POSTGRES_PORT" archive || true
-
 # Import the dump
-echo "  Importing SQL dump (this may take a while)..."
-psql -h "$DB_DIR_ABS" -p "$POSTGRES_PORT" -d archive -f "$DUMP_SQL" > /dev/null 2>&1
+echo "  Importing SQL dump (will create and initialize archive DB, this may take a while)..."
+psql -h "$DB_DIR_ABS" -p "$POSTGRES_PORT" -d postgres -f "$DUMP_SQL"
 
 echo "  Database setup complete"
 echo ""
