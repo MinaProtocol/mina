@@ -9,13 +9,13 @@ open Mina_base
 module Ledger = Mina_ledger.Ledger
 module Root_ledger = Mina_ledger.Root
 include Frontier_base
-module Full_frontier = Full_frontier
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Catchup_state = Catchup_state
 module Full_catchup_tree = Full_catchup_tree
 module Catchup_hash_tree = Catchup_hash_tree
+module Util = Full_frontier.Util
 
 module type CONTEXT = sig
   val logger : Logger.t
@@ -564,6 +564,12 @@ include struct
   (* why can't this one be proxied? *)
   let path_map ?max_length { full_frontier; _ } breadcrumb ~f =
     path_map ?max_length full_frontier breadcrumb ~f
+
+  module Protocol_states_for_root_scan_state =
+    Protocol_states_for_root_scan_state
+
+  let protocol_states_for_root_scan_state =
+    proxy1 protocol_states_for_root_scan_state
 end
 
 module For_tests = struct
