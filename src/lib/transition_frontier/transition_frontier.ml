@@ -529,14 +529,7 @@ include struct
 
   let common_ancestor = proxy1 common_ancestor
 
-  (* reduce successors functions (probably remove hashes special case *)
   let successors = proxy1 successors
-
-  let successors_rec = proxy1 successors_rec
-
-  let successor_hashes = proxy1 successor_hashes
-
-  let successor_hashes_rec = proxy1 successor_hashes_rec
 
   let hash_path = proxy1 hash_path
 
