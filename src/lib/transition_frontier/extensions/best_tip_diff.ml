@@ -60,7 +60,7 @@ module T = struct
            ~f:(fun (`Parent_not_found (hash, `Parent parent_hash)) ->
              ( parent_hash
              , sprintf
-                 "Finding common ancestor for %s and %s: parent for %s not \
+                 "finding common ancestor for %s and %s: parent for %s not \
                   found"
                  (State_hash.to_base58_check @@ Breadcrumb.state_hash bc1)
                  (State_hash.to_base58_check @@ Breadcrumb.state_hash bc2)
@@ -74,9 +74,18 @@ module T = struct
         else
           let parent_hash = Breadcrumb.parent_hash cursor in
           let%bind.Result parent =
-            find_in_frontier
-              ~message:"get_path_diff: parent not found in frontier" frontier
-              parent_hash
+            match Full_frontier.find frontier parent_hash with
+            | Some parent ->
+                Result.return parent
+            | None ->
+                Result.fail
+                  ( parent_hash
+                  , sprintf
+                      "finding path from %s to %s: parent for %s not found"
+                      (State_hash.to_base58_check @@ Breadcrumb.state_hash t1)
+                      (State_hash.to_base58_check @@ Breadcrumb.state_hash t2)
+                      ( State_hash.to_base58_check
+                      @@ Breadcrumb.state_hash cursor ) )
           in
           go parent (cursor :: acc)
       in
