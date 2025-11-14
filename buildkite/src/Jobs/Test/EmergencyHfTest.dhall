@@ -10,22 +10,11 @@ let Command = ../../Command/Base.dhall
 
 let Size = ../../Command/Size.dhall
 
-let Artifacts = ../../Constants/Artifacts.dhall
-
-let BuildFlags = ../../Constants/BuildFlags.dhall
-
 let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
-let Dockers = ../../Constants/DockerVersions.dhall
+let ContainerImages = ../../Constants/ContainerImages.dhall
 
 let key = "emergency-hf-test"
-
-let dependsOn =
-      Dockers.dependsOn
-        Dockers.DepsSpec::{
-        , buildFlags = BuildFlags.Type.Instrumented
-        , artifact = Artifacts.Type.FunctionalTestSuite
-        }
 
 in  Pipeline.build
       Pipeline.Config::{
@@ -47,21 +36,14 @@ in  Pipeline.build
             Command.Config::{
             , commands =
               [ RunWithPostgres.runInDockerWithPostgresConn
-                  [ "CONVERT_CANONICAL_BLOCKS_TEST_APP=mina-test-convert-canonical"
-                  ]
+                  ([] : List Text)
                   (None RunWithPostgres.ScriptOrArchive)
-                  ( Artifacts.fullDockerTag
-                      Artifacts.Tag::{
-                      , artifact = Artifacts.Type.FunctionalTestSuite
-                      , buildFlags = BuildFlags.Type.Instrumented
-                      }
-                  )
+                  ContainerImages.minaToolchain
                   "./scripts/tests/archive-hardfork-toolbox/test-convert-canonical-blocks.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} "
               ]
             , label = "Emergency HF test"
             , key = "emergency-hf-test"
             , target = Size.Large
-            , depends_on = dependsOn
             }
         ]
       }

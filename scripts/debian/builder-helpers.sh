@@ -321,8 +321,6 @@ build_functional_test_suite_deb() {
     "${BUILDDIR}/usr/local/bin/mina-heap-usage"
   cp ./default/src/app/zkapp_limits/zkapp_limits.exe \
     "${BUILDDIR}/usr/local/bin/mina-zkapp-limits"
-  cp ./default/src/app/archive_hardfork_toolbox/tests/test_convert_canonical.exe \
-    "${BUILDDIR}/usr/local/bin/mina-test-convert-canonical"
   cp ./default/src/test/archive/patch_archive_test/patch_archive_test.exe \
     "${BUILDDIR}/usr/local/bin/mina-patch-archive-test"
   cp ./default/src/test/archive/archive_node_tests/archive_node_tests.exe \
