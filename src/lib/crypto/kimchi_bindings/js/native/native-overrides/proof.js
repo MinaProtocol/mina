@@ -52,6 +52,14 @@ var caml_pasta_fp_plonk_proof_batch_verify = function (indexes, proofs) {
   return plonk_wasm.caml_pasta_fp_plonk_proof_batch_verify(indexes, proofs);
 };
 
+// Provides: caml_pasta_fp_plonk_proof_dummy
+// Requires: plonk_wasm, tsRustConversionNative
+var caml_pasta_fp_plonk_proof_dummy = function () {
+  return tsRustConversionNative.fp.proofFromRust(
+    plonk_wasm.caml_pasta_fp_plonk_proof_dummy()
+  );
+};
+
 // Provides: caml_pasta_fq_plonk_proof_create
 // Requires: plonk_wasm, tsRustConversionNative
 var caml_pasta_fq_plonk_proof_create = function (
@@ -100,4 +108,12 @@ var caml_pasta_fq_plonk_proof_batch_verify = function (indexes, proofs) {
     tsRustConversionNative.fq.proofToRust
   );
   return plonk_wasm.caml_pasta_fq_plonk_proof_batch_verify(indexes, proofs);
+};
+
+// Provides: caml_pasta_fq_plonk_proof_dummy
+// Requires: plonk_wasm, tsRustConversionNative
+var caml_pasta_fq_plonk_proof_dummy = function () {
+  return tsRustConversionNative.fq.proofFromRust(
+    plonk_wasm.caml_pasta_fq_plonk_proof_dummy()
+  );
 };
