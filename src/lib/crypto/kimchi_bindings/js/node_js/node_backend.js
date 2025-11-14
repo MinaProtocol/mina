@@ -93,6 +93,14 @@ var plonk_wasm = (function() {
       "caml_pasta_fp_plonk_proof_verify",
       "caml_pasta_fq_plonk_proof_create",
       "caml_pasta_fq_plonk_proof_verify",
+      "fp_oracles_create",
+      "fp_oracles_create_no_public",
+      "fp_oracles_dummy",
+      "fp_oracles_deep_copy",
+      "fq_oracles_create",
+      "fq_oracles_create_no_public",
+      "fq_oracles_dummy",
+      "fq_oracles_deep_copy",
     ];
 
     overrides.forEach(function (override) {
