@@ -25,6 +25,12 @@ end
 module Instance : sig
   type t = Instance_type.t
 
+  val potential_snarked_ledgers_to_yojson :
+    Root_ledger.Config.t Queue.t -> Yojson.Safe.t
+
+  val potential_snarked_ledgers_of_yojson :
+    Yojson.Safe.t -> Root_ledger.Config.t list
+
   val enqueue_snarked_ledger : config:Root_ledger.Config.t -> t -> unit
 
   val dequeue_snarked_ledger : t -> unit
@@ -56,7 +62,7 @@ module Config : sig
         the [Factory_type.t] directory. *)
   val make_instance_location : string -> Factory_type.t -> string
 
-  (** Helper to create a [Root_ledger.Config.t] for a snarked ledger based on a
+  (** Helper to create a [Root.Config.t] for a snarked ledger based on a
         subdirectory of the [Factory_type.t] directory *)
   val make_instance_config : string -> Factory_type.t -> Root_ledger.Config.t
 
