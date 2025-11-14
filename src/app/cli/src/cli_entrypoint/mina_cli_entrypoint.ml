@@ -147,7 +147,7 @@ let load_config_files ~logger ~genesis_constants ~constraint_constants ~conf_dir
         ~logger ~genesis_constants ~constraint_constants ~proof_level
         ~genesis_backing_type config
     with
-    | Ok (precomputed_values, _) ->
+    | Ok precomputed_values ->
         precomputed_values
     | Error err ->
         let ( json_config

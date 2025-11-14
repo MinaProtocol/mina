@@ -67,7 +67,7 @@ let instantiate_verify_functions ~logger ~genesis_constants
       in
       let%map.Deferred precomputed_values =
         match precomputed_values with
-        | Ok (precomputed_values, _) ->
+        | Ok precomputed_values ->
             Deferred.return precomputed_values
         | Error _ ->
             Output.display_error "fail to read config file" ;

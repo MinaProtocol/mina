@@ -85,7 +85,7 @@ let%test_module "Epoch ledger sync tests" =
             ~proof_level:No_check runtime_config ~cli_proof_level:None
             ~genesis_backing_type:Stable_db
         with
-        | Ok (precomputed_values, _) ->
+        | Ok precomputed_values ->
             precomputed_values
         | Error err ->
             failwithf "Could not create precomputed values: %s"
