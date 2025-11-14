@@ -93,6 +93,16 @@ var plonk_wasm = (function() {
       "caml_pasta_fp_plonk_proof_verify",
       "caml_pasta_fq_plonk_proof_create",
       "caml_pasta_fq_plonk_proof_verify",
+      "WasmFpOpeningProof",
+      "WasmFqOpeningProof",
+      "WasmFpLookupCommitments",
+      "WasmFqLookupCommitments",
+      "WasmFpProverProof",
+      "WasmFqProverProof",
+      "WasmFpProofEvaluations",
+      "WasmFqProofEvaluations",
+      "WasmFpProverCommitments",
+      "WasmFqProverCommitments",
     ];
 
     overrides.forEach(function (override) {
