@@ -55,6 +55,12 @@ module Instance : sig
     val root_identifier : Factory_type.t -> string
   end
 
+  val potential_snarked_ledgers_to_yojson :
+    Root_ledger.Config.t Queue.t -> Yojson.Safe.t
+
+  val potential_snarked_ledgers_of_yojson :
+    Yojson.Safe.t -> Root_ledger.Config.t list
+
   val enqueue_snarked_ledger : config:Root_ledger.Config.t -> t -> unit
 
   val dequeue_snarked_ledger : t -> unit

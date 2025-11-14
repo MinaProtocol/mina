@@ -54,8 +54,10 @@ in  Pipeline.build
                   "export MINA_DEB_CODENAME=bullseye && source ./buildkite/scripts/export-git-env-vars.sh && echo \\\${MINA_DOCKER_TAG}"
               , RunWithPostgres.runInDockerWithPostgresConn
                   ([] : List Text)
-                  ( RunWithPostgres.ScriptOrArchive.Script
-                      "./src/test/archive/sample_db/archive_db.sql"
+                  ( Some
+                      ( RunWithPostgres.ScriptOrArchive.Script
+                          "./src/test/archive/sample_db/archive_db.sql"
+                      )
                   )
                   rosettaDocker
                   "./buildkite/scripts/rosetta-indexer-test.sh"
