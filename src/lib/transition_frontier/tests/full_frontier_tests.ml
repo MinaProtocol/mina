@@ -41,8 +41,8 @@ let%test_module "Full_frontier tests" =
               let%map breadcrumb = make_breadcrumb root in
               add_breadcrumb frontier breadcrumb ;
               let queried_breadcrumb =
-                Full_frontier.find_exn frontier
-                  (Breadcrumb.state_hash breadcrumb)
+                Full_frontier.find frontier (Breadcrumb.state_hash breadcrumb)
+                |> Option.value_exn ~message:"breadcrumb not found in frontier"
               in
               test_eq ~message:"retrieved unexpected benchmark from frontier"
                 breadcrumb queried_breadcrumb ;
@@ -194,8 +194,12 @@ let%test_module "Full_frontier tests" =
               in
               add_breadcrumbs frontier ancestors ;
               add_breadcrumbs frontier (branch_a @ branch_b) ;
-              [%test_eq: State_hash.t]
-                (Full_frontier.common_ancestor frontier tip_a tip_b)
+              let common_ancestor =
+                Full_frontier.common_ancestor frontier tip_a tip_b
+                |> Result.map_error ~f:(fun _ -> "Common ancestor not found")
+                |> Result.ok_or_failwith
+              in
+              [%test_eq: State_hash.t] common_ancestor
                 (Breadcrumb.state_hash youngest_ancestor) ;
               clean_up_persistent_root ~frontier ) )
   end )

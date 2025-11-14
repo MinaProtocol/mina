@@ -370,8 +370,8 @@ let try_to_connect_hash_chain t hashes ~frontier
       with
       | Some node, None ->
           f (`Node node)
-      | Some node, Some b ->
-          finish t node (Ok b) ;
+      | Some node, Some _ ->
+          finish t node ~is_error:false ;
           f (`Node node)
       | None, Some b ->
           f (`Breadcrumb b)
@@ -916,7 +916,20 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                 Time.(Span.to_ms @@ diff (now ()) start_time)) ;
             match result with
             | `In_frontier hash ->
-                finish t node (Ok (Transition_frontier.find_exn frontier hash)) ;
+                let is_error =
+                  Option.is_none @@ Transition_frontier.find frontier hash
+                in
+                if is_error then (
+                  [%log' error t.logger]
+                    "Failed to find transition in frontier despite In_frontier \
+                     result"
+                    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
+                  failwithf
+                    "Failed to find transition %s in frontier despite \
+                     In_frontier result"
+                    (State_hash.to_base58_check hash)
+                    () ) ;
+                finish t node ~is_error:false ;
                 Deferred.return (Ok ())
             | `Building_path tv ->
                 (* To_initial_validate may only occur for a downloaded block,
@@ -1001,7 +1014,7 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
                  ignore
                    ( Cached.invalidate_with_failure av
                      : Mina_block.almost_valid_block Envelope.Incoming.t ) ;
-                 finish t node (Error ()) ;
+                 finish t node ~is_error:true ;
                  Error `Finished )
         in
         set_state t node (To_build_breadcrumb (`Parent parent, av, valid_cb)) ;
