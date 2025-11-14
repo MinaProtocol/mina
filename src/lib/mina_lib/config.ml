@@ -75,16 +75,3 @@ type t =
   ; hardfork_slot : Mina_numbers.Global_slot_since_genesis.t option
   }
 [@@deriving make]
-
-let ledger_backing ~logger ~hardfork_slot ~hardfork_handling =
-  match (hardfork_handling, hardfork_slot) with
-  | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit, Some hardfork_slot ->
-      Root_ledger.Config.Converting_db hardfork_slot
-  | Migrate_exit, _ ->
-      failwith "No hardfork slot provided for Migrate_exit mode"
-  | Keep_running, Some _ ->
-      [%log warn]
-        "hardfork slot is set for keep_running hardfork handle, ignoring" ;
-      Stable_db
-  | Keep_running, None ->
-      Stable_db

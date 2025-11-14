@@ -837,10 +837,50 @@ let print_config ~logger config =
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata
 
+(** Helper to convert a global slot since hard fork to a global slot since genesis *)
+let global_slot_since_hard_fork_to_genesis
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    global_slot =
+  (* Convert the global slot to a span of slots since the current hard fork *)
+  let global_slot_span =
+    global_slot |> Mina_numbers.Global_slot_since_hard_fork.to_uint32
+    |> Mina_numbers.Global_slot_span.of_uint32
+  in
+  (* Retrieve the global slot since genesis of the genesis of the current
+     chain *)
+  let current_genesis_global_slot =
+    constraint_constants.fork
+    |> Option.value_map ~default:Mina_numbers.Global_slot_since_genesis.zero
+         ~f:(fun fork -> fork.global_slot_since_genesis)
+  in
+  (* Add the slot span to the current chain's genesis slot to get the desired quantity *)
+  Mina_numbers.Global_slot_since_genesis.add current_genesis_global_slot
+    global_slot_span
+
+let make_ledger_backing ~logger ~constraint_constants ~runtime_config
+    ~hardfork_handling =
+  let hardfork_slot =
+    Runtime_config.scheduled_hard_fork_genesis_slot runtime_config
+    |> Option.map
+         ~f:(global_slot_since_hard_fork_to_genesis ~constraint_constants)
+  in
+  match (hardfork_handling, hardfork_slot) with
+  | Cli_lib.Arg_type.Hardfork_handling.Migrate_exit, Some hardfork_slot ->
+      Root_ledger.Config.Converting_db hardfork_slot
+  | Migrate_exit, _ ->
+      failwith "No hardfork slot provided for Migrate_exit mode"
+  | Keep_running, Some _ ->
+      [%log warn]
+        "hardfork slot is set for keep_running hardfork handle, ignoring" ;
+      Stable_db
+  | Keep_running, None ->
+      Stable_db
+
 let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~cli_proof_level ~(genesis_constants : Genesis_constants.t)
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~genesis_backing_type ~proof_level:compiled_proof_level ?overwrite_version
+    ~(hardfork_handling : Cli_lib.Arg_type.Hardfork_handling.t)
+    ~proof_level:compiled_proof_level ?overwrite_version
     (config : Runtime_config.t) =
   print_config ~logger config ;
   let open Deferred.Or_error.Let_syntax in
@@ -896,6 +936,10 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
           "Proof level %s is not compatible with compile-time proof level %s"
           (str proof_level) (str compiled)
   in
+  let genesis_backing_type =
+    make_ledger_backing ~logger ~constraint_constants ~runtime_config:config
+      ~hardfork_handling
+  in
   let%bind genesis_ledger, ledger_config, ledger_file =
     match config.ledger with
     | Some ledger ->
@@ -927,11 +971,11 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     ~blockchain_proof_system_id ~genesis_epoch_data
 
 let init_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ~genesis_backing_type
+    ~constraint_constants ~logger ~proof_level ~hardfork_handling
     ?overwrite_version ?genesis_dir (config : Runtime_config.t) :
     Precomputed_values.t Deferred.Or_error.t =
   inputs_from_config_file ~cli_proof_level ~genesis_constants
-    ~constraint_constants ~logger ~proof_level ~genesis_backing_type
+    ~constraint_constants ~logger ~proof_level ~hardfork_handling
     ?overwrite_version ?genesis_dir config
   |> Deferred.Or_error.map ~f:Genesis_proof.create_values_no_proof
 

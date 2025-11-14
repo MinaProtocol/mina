@@ -2225,10 +2225,13 @@ let create ~commit_id ?wallets (config : Config.t) =
           in
 
           let ledger_backing =
-            Config.ledger_backing ~logger:config.logger
-              ~hardfork_slot:config.hardfork_slot
+            Genesis_ledger_helper.make_ledger_backing ~logger:config.logger
+              ~constraint_constants:
+                config.precomputed_values.constraint_constants
+              ~runtime_config:config.precomputed_values.runtime_config
               ~hardfork_handling:config.hardfork_handling
           in
+
           let valid_transitions, initialization_finish_signal =
             Transition_router.run
               ~context:(module Context)
