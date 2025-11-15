@@ -566,9 +566,11 @@ let validate_staged_ledger_diff ?skip_staged_ledger_verification ~logger
     else Error `Incorrect_target_snarked_ledger_hash
   in
   let hash_errors =
-    Option.value_map ~default:ident staged_ledger_hash_opt
-      ~f:(Fn.compose List.cons staged_ledger_hash_check)
-      [ snarked_ledger_hash_check ]
+    match staged_ledger_hash_opt with
+    | Some hash ->
+        [ staged_ledger_hash_check hash; snarked_ledger_hash_check ]
+    | None ->
+        [ snarked_ledger_hash_check ]
   in
   Deferred.return
   @@
