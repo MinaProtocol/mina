@@ -24,9 +24,9 @@ module Make () : Common.Database = struct
 
   let set_block t ~block_num values =
     let path = block_path t block_num in
-    (* Concatenate all values and write in a single operation *)
-    let concatenated = String.concat ~sep:"" values in
-    Out_channel.write_all path ~data:concatenated
+    (* Write all values directly to file without in-memory concatenation *)
+    Out_channel.with_file path ~binary:true ~f:(fun oc ->
+        List.iter values ~f:(Out_channel.output_string oc) )
 
   let get t ~key =
     let block_num = block_of_key key in
