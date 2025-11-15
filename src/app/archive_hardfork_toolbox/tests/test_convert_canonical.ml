@@ -3,6 +3,28 @@ open Async
 open Archive_hardfork_toolbox_lib
 open Caqti_request.Infix
 
+module Block = struct
+  type t =
+    { id : int
+    ; state_hash : string
+    ; parent_id : int option
+    ; parent_hash : string
+    ; height : int
+    ; global_slot_since_genesis : int
+    ; global_slot_since_hard_fork : int
+    ; protocol_version_id : int
+    ; chain_status : string
+    }
+end
+
+module BlockState = struct
+  type t = { state_hash : string; expected_chain_status : string }
+  [@@deriving equal]
+
+  let show { state_hash; expected_chain_status } =
+    Printf.sprintf "%s->%s" state_hash expected_chain_status
+end
+
 (* Test database setup and teardown *)
 (* This setup is purely for tests and should not be used in production or exposed *)
 module TestDb = struct
@@ -21,30 +43,28 @@ module TestDb = struct
         Deferred.Or_error.error_string (Caqti_error.show e)
 
   let with_pool conn_str ?db_name f =
-    let open Deferred.Or_error.Let_syntax in
     let uri = uri_for conn_str db_name in
-    let%bind pool = connect_pool uri in
+    let%bind.Deferred.Or_error pool = connect_pool uri in
     f pool
 
   let drop_database_if_exists conn_str db_name =
     let sql_string = sprintf "DROP DATABASE IF EXISTS %s" db_name in
-    let query = (Caqti_type.unit ->. Caqti_type.unit) sql_string in
+    let mutation = Caqti_type.(unit ->. unit) sql_string in
     with_pool conn_str (fun pool ->
         Deferred.Or_error.try_with (fun () ->
             Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                Conn.exec query () ) ) )
+                Conn.exec mutation () ) ) )
 
   let create_database conn_str db_name =
     let sql_string = sprintf "CREATE DATABASE %s" db_name in
-    let query = (Caqti_type.unit ->. Caqti_type.unit) sql_string in
+    let mutation = Caqti_type.(unit ->. unit) sql_string in
     with_pool conn_str (fun pool ->
         Deferred.Or_error.try_with (fun () ->
             Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                Conn.exec query () ) ) )
+                Conn.exec mutation () ) ) )
 
   (* This should always be in sync with src/app/archive/create_schema.sql *)
   let create_test_schema conn_str db_name =
-    let open Deferred.Or_error.Let_syntax in
     let chain_status_type_schema =
       {sql|
           CREATE TYPE chain_status_type AS ENUM ('canonical', 'orphaned', 'pending')
@@ -78,31 +98,24 @@ module TestDb = struct
           )
         |sql}
     in
-    let query0 =
-      (Caqti_type.unit ->. Caqti_type.unit) chain_status_type_schema
+    let mutations =
+      [ chain_status_type_schema; protocol_versions_schema; blocks_schema ]
+      |> List.map ~f:Caqti_type.(unit ->. unit)
     in
-    let query1 =
-      (Caqti_type.unit ->. Caqti_type.unit) protocol_versions_schema
-    in
-    let query2 = (Caqti_type.unit ->. Caqti_type.unit) blocks_schema in
     with_pool conn_str ~db_name (fun pool ->
-        let%bind () =
-          Deferred.Or_error.try_with (fun () ->
-              Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                  Conn.exec query0 () ) )
-        in
-        let%bind () =
-          Deferred.Or_error.try_with (fun () ->
-              Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                  Conn.exec query1 () ) )
-        in
         Deferred.Or_error.try_with (fun () ->
             Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                Conn.exec query2 () ) ) )
+                Deferred.List.fold mutations ~init:(Ok ())
+                  ~f:(fun last_result this_mutation ->
+                    match last_result with
+                    | Ok () ->
+                        Conn.exec this_mutation ()
+                    | e ->
+                        Deferred.return e ) ) ) )
 
   let insert_protocol_versions conn_str db_name versions =
     let query =
-      (Caqti_type.(t3 int int int) ->. Caqti_type.unit)
+      Caqti_type.(t3 int int int ->. unit)
         {sql|
           INSERT INTO protocol_versions
             (transaction, network, patch)
@@ -119,15 +132,17 @@ module TestDb = struct
   let insert_blocks conn_str db_name blocks =
     with_pool conn_str ~db_name (fun pool ->
         Deferred.Or_error.List.iter blocks ~f:(fun block ->
-            let ( id
-                , state_hash
-                , parent_id
-                , parent_hash
-                , height
-                , global_slot_since_genesis
-                , global_slot_since_hard_fork
-                , protocol_version_id
-                , chain_status ) =
+            let Block.
+                  { id
+                  ; state_hash
+                  ; parent_id
+                  ; parent_hash
+                  ; height
+                  ; global_slot_since_genesis
+                  ; global_slot_since_hard_fork
+                  ; protocol_version_id
+                  ; chain_status
+                  } =
               block
             in
             let query =
@@ -168,30 +183,21 @@ module TestDb = struct
     with_pool conn_str ~db_name (fun pool ->
         Deferred.Or_error.try_with (fun () ->
             Mina_caqti.query pool ~f:(fun (module Conn : Sql.CONNECTION) ->
-                Conn.collect_list query () ) ) )
+                let%map.Deferred.Result raw_blocks =
+                  Conn.collect_list query ()
+                in
+                List.map
+                  ~f:(fun (state_hash, expected_chain_status) ->
+                    BlockState.{ state_hash; expected_chain_status } )
+                  raw_blocks ) ) )
 end
 
 (* Test scenarios based on the bash test fixtures *)
 module TestScenarios = struct
-  type block =
-    { id : int
-    ; state_hash : string
-    ; parent_id : int option
-    ; parent_hash : string
-    ; height : int
-    ; global_slot_since_genesis : int
-    ; global_slot_since_hard_fork : int
-    ; protocol_version_id : int
-    ; chain_status : string
-    }
-
-  type block_expected_state =
-    { state_hash : string; expected_chain_status : string }
-
   type scenario =
     { name : string
-    ; blocks : block list
-    ; expected : block_expected_state list
+    ; blocks : Block.t list
+    ; expected : BlockState.t list
     ; target_hash : string
     ; protocol_version : string
     }
@@ -601,28 +607,16 @@ let test_convert_scenario
   (* Create test database *)
   let db_name = sprintf "test_%s" name in
   let conn_str = get_postgres_uri () in
-  let%bind _drop = TestDb.drop_database_if_exists conn_str db_name in
-  let%bind _create = TestDb.create_database conn_str db_name in
-  let%bind _setup = TestDb.create_test_schema conn_str db_name in
-  let blocks_tuples =
-    List.map blocks ~f:(fun b ->
-        ( b.id
-        , b.state_hash
-        , b.parent_id
-        , b.parent_hash
-        , b.height
-        , b.global_slot_since_genesis
-        , b.global_slot_since_hard_fork
-        , b.protocol_version_id
-        , b.chain_status ) )
-  in
-  let%bind _ =
+  let%bind () = TestDb.drop_database_if_exists conn_str db_name in
+  let%bind () = TestDb.create_database conn_str db_name in
+  let%bind () = TestDb.create_test_schema conn_str db_name in
+  let%bind () =
     TestDb.insert_protocol_versions conn_str db_name [ (1, 0, 0); (2, 0, 0) ]
   in
-  let%bind _insert = TestDb.insert_blocks conn_str db_name blocks_tuples in
+  let%bind () = TestDb.insert_blocks conn_str db_name blocks in
   (* Run conversion *)
   let postgres_uri = Uri.of_string (sprintf "%s/%s" conn_str db_name) in
-  let%bind _result =
+  let%bind () =
     Logic.convert_chain_to_canonical ~postgres_uri
       ~latest_block_state_hash:target_hash
       ~expected_protocol_version_str:protocol_version ~stop_at_slot:None ()
@@ -631,36 +625,19 @@ let test_convert_scenario
   (* Get results *)
   let%bind actual = TestDb.get_all_blocks conn_str db_name in
 
-  (* Convert expected to tuples for comparison *)
-  let expected_tuples =
-    List.map expected
-      ~f:(fun { TestScenarios.state_hash; expected_chain_status } ->
-        (state_hash, expected_chain_status) )
-  in
-
   (* Check results match expected *)
-  let matches =
-    List.equal
-      (fun (h1, s1) (h2, s2) -> String.equal h1 h2 && String.equal s1 s2)
-      actual expected_tuples
-  in
-
-  if matches then (
+  if List.equal BlockState.equal actual expected then (
     printf "✅ Test %s passed\n" name ;
     Deferred.Or_error.return () )
   else (
     printf "❌ Test %s failed\n" name ;
-    printf "Expected: %s\n"
-      (List.to_string ~f:(fun (h, s) -> sprintf "%s->%s" h s) expected_tuples) ;
-    printf "Actual: %s\n"
-      (List.to_string ~f:(fun (h, s) -> sprintf "%s->%s" h s) actual) ;
+    printf "Expected: %s\n" (List.to_string ~f:BlockState.show expected) ;
+    printf "Actual: %s\n" (List.to_string ~f:BlockState.show actual) ;
     Deferred.Or_error.error_string (sprintf "Test %s failed" name) )
 
 let make_test scenario =
-  Thread_safe.block_on_async_exn (fun () ->
-      let open Deferred.Let_syntax in
-      let%map result = test_convert_scenario scenario () in
-      Or_error.ok_exn result )
+  Thread_safe.block_on_async_exn (test_convert_scenario scenario)
+  |> Or_error.ok_exn
 
 let () =
   Alcotest.run "Archive Hardfork Toolbox Tests"
