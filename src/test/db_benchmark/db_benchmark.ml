@@ -63,10 +63,6 @@ let () =
   Printf.printf "  Warmup keys: %d\n"
     (Common.warmup_blocks * Common.keys_per_block) ;
   Printf.printf "\n" ;
-  Printf.printf
-    "NOTE: Each benchmark iteration includes warmup + operation + cleanup.\n" ;
-  Printf.printf "This ensures fair comparison but may take some time.\n" ;
-  Printf.printf "\n" ;
 
   (* Run benchmarks *)
   Command.run (Bench.make_command (all_benchmarks ()))
