@@ -1,6 +1,16 @@
 # Database Benchmark Suite
 
-A comprehensive benchmark suite comparing four different database/storage implementations for key-value storage with 128KB values.
+A comprehensive benchmark suite comparing four different database/storage implementations for key-value storage with fixed-size values.
+
+## Benchmark description
+
+Benchmark runs two test scenarios per implementation:
+
+1. Write benchmark: Delete oldest block + Insert new block (steady state)
+2. Read benchmark: Repeated read from random keys
+
+Write benchmark measures pure write performance, without any read operations.
+Read benchmark measures pure read performance, without any write operations.
 
 ## Implementations Tested
 
@@ -9,27 +19,15 @@ A comprehensive benchmark suite comparing four different database/storage implem
 3. **Single-file** - One file per key (filesystem-based)
 4. **Multi-file** - One file per block, 125 keys per file
 
-## Test Configuration
+## Default Test Configuration
 
 - **Keys per block**: 125
 - **Value size**: 128 KB (131,072 bytes)
 - **Warmup phase**: 800 blocks (100,000 keys, ~12.5 GB data)
 - **Write benchmark**: Delete oldest block + Insert new block (steady state)
-- **Read benchmark**: Random reads from 100,000 keys
+- **Read benchmark**: Repeated read from random keys
 
 ## Usage
-
-### Quick Start
-
-```bash
-# Run all benchmarks and generate report
-./run_benchmarks.sh
-```
-
-This will:
-1. Build the benchmark executable using dune
-2. Run all benchmarks (write and read operations for each implementation)
-3. Generate a detailed report in `benchmark_report.txt`
 
 ### Manual Build
 
@@ -45,17 +43,16 @@ $HOME/work/shell dune build src/test/db_benchmark/db_benchmark.exe
 
 The benchmark uses Core_bench which supports various options:
 
-- `-ascii`: Plain text output (default in script)
+- `-ascii`: Plain text output
 - `-quota <time>`: How long to run each benchmark (e.g., `10s`, `1m`)
-- `-samples <n>`: Number of samples to collect
-- `-verbosity <level>`: Control output detail
+- `-v`: Verbose output
 - `-help`: Show all available options
 
 ## Output
 
 ### Report File
 
-The `benchmark_report.txt` file contains:
+Output is printed to stdout in plain text format. It contains:
 
 1. **System Information**: CPU, memory, OS details
 2. **Test Configuration**: Parameters and setup details
@@ -99,46 +96,13 @@ The `benchmark_report.txt` file contains:
 - Reduces file count from 100,000 to 800
 - Single write operation per block (no seeking needed)
 
-## Common Module (`common.ml`)
-
-Shared utilities and interfaces:
-
-- `Database` module type: Interface all implementations must satisfy
-- `Ops` module: Benchmark operations (write_block, delete_block, read_key)
-- Configuration constants
-- Temporary directory management
-
 ## Customization
 
-To modify test parameters, edit `common.ml`:
+To modify test parameters, provide environment variables:
 
-```ocaml
-let keys_per_block = 125        (* Keys per block *)
-let value_size = 128 * 1024     (* 128 KB *)
-let warmup_blocks = 800         (* Initial data *)
-let steady_state_ops = 800      (* Write iterations *)
-let random_read_count = 800000  (* Read iterations *)
-```
-
-## Performance Considerations
-
-### Write Performance
-- RocksDB: Sequential writes to WAL, batched compaction
-- LMDB: In-place updates with copy-on-write
-- Single-file: Many small file operations
-- Multi-file: Fewer, larger file operations with seeks
-
-### Read Performance
-- RocksDB: May require multiple level lookups
-- LMDB: Direct B+ tree lookup via mmap
-- Single-file: One file open per read
-- Multi-file: Seek within larger file
-
-### Space Amplification
-- RocksDB: Space amplification from LSM levels
-- LMDB: Minimal space overhead, sparse files
-- Single-file: Filesystem overhead per file
-- Multi-file: Pre-allocated 16MB blocks
+- `KEYS_PER_BLOCK`: Number of keys per block
+- `VALUE_SIZE`: Size of each value in bytes
+- `WARMUP_BLOCKS`: Number of blocks to warmup with
 
 ## Troubleshooting
 
@@ -152,40 +116,5 @@ $HOME/work/shell dune build src/test/db_benchmark
 
 ### Out of Disk Space
 
-The benchmark writes ~25 GB during steady state (2x 12.5 GB for warmup + operations). Ensure adequate free space.
-
-### Slow Performance
-
-First run may be slower due to:
-- OS page cache warming
-- Filesystem allocation
-- Database initialization
-
-## Files
-
-- `common.ml` - Shared types and utilities
-- `rocksdb_impl.ml` - RocksDB implementation
-- `lmdb_impl.ml` - LMDB implementation  
-- `single_file_impl.ml` - Single-file-per-key implementation
-- `multi_file_impl.ml` - Multi-key-per-file implementation
-- `db_benchmark.ml` - Main benchmark runner
-- `run_benchmarks.sh` - Convenience script
-- `dune` - Build configuration
-
-## Extending
-
-To add a new implementation:
-
-1. Create `your_impl.ml` implementing `Common.Database`
-2. Add to `db_benchmark.ml` implementations list:
-   ```ocaml
-   let implementations = [
-     ...
-     (module Your_impl.Make());
-   ]
-   ```
-3. Rebuild and run
-
-## License
-
-Same as the Mina project.
+The benchmark writes ~14 GB per run, with two runs per implementation (up to 120 GB total).
+Ensure there is enough disk space before running the benchmark.
