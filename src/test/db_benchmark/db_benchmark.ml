@@ -52,6 +52,25 @@ let all_benchmarks () =
   ; test ~name:"multi_file_read" (module Multi_file_db) make_read_bench
   ]
 
+(* Filter benchmarks based on BENCHMARKS environment variable *)
+let filter_benchmarks benchmarks =
+  match Sys.getenv "BENCHMARKS" with
+  | None ->
+      benchmarks
+  | Some names_str ->
+      let requested_names =
+        String.split names_str ~on:','
+        |> List.map ~f:String.strip |> String.Set.of_list
+      in
+      let filtered =
+        List.filter benchmarks ~f:(fun bench ->
+            String.Set.mem requested_names (Bench.Test.name bench) )
+      in
+      Printf.printf "Filtering benchmarks: running %d of %d\n"
+        (List.length filtered) (List.length benchmarks) ;
+      Printf.printf "  Requested: %s\n" names_str ;
+      filtered
+
 (* Main entry point *)
 let () =
   (* Print configuration *)
@@ -65,4 +84,5 @@ let () =
   Printf.printf "\n" ;
 
   (* Run benchmarks *)
-  Command.run (Bench.make_command (all_benchmarks ()))
+  let benchmarks = all_benchmarks () |> filter_benchmarks in
+  Command.run (Bench.make_command benchmarks)

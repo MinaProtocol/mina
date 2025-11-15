@@ -103,6 +103,7 @@ To modify test parameters, provide environment variables:
 - `KEYS_PER_BLOCK`: Number of keys per block
 - `VALUE_SIZE`: Size of each value in bytes
 - `WARMUP_BLOCKS`: Number of blocks to warmup with
+- `BENCHMARKS`: Comma-separated list of benchmarks to run
 
 ## Troubleshooting
 
