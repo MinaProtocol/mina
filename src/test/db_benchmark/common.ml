@@ -1,15 +1,16 @@
 open Core
 
-(* Configuration constants *)
-let keys_per_block = 125
+(* Configuration constants - configurable via environment variables *)
+let keys_per_block =
+  Sys.getenv "KEYS_PER_BLOCK" |> Option.value_map ~default:125 ~f:int_of_string
 
-let value_size = 128 * 1024 (* 128 KB *)
+let value_size =
+  Sys.getenv "VALUE_SIZE"
+  |> Option.value_map ~default:(128 * 1024) ~f:int_of_string
+(* 128 KB *)
 
-let warmup_blocks = 800
-
-let steady_state_ops = 800
-
-let random_read_count = 800 * 1000
+let warmup_blocks =
+  Sys.getenv "WARMUP_BLOCKS" |> Option.value_map ~default:800 ~f:int_of_string
 
 (* Fixed seed for reproducibility *)
 let random_seed = 42
