@@ -527,27 +527,26 @@ let generate_all_transactions ~(precomputed_values : Precomputed_values.t)
   generate_txs ~init_nonce ~valid_until ~n_payments ~n_zkapp_txs ~n_blocks
     ~constraint_constants:precomputed_values.constraint_constants keypair
 
-let create_blocks_with_diffs ~logger
-    ~(precomputed_values : Precomputed_values.t) ~verifier ~context ~keys_module
-    ~winning_slots ~all_transactions ~genesis =
-  let%map _, diffs_rev =
+let create_blocks_with_breadcrumbs ~(precomputed_values : Precomputed_values.t)
+    ~verifier ~context ~keys_module ~winning_slots ~all_transactions ~genesis =
+  let%map _, breadcrumbs_rev =
     Deferred.List.fold (List.zip_exn winning_slots all_transactions)
       ~init:(genesis, [])
-      ~f:(fun (block, diffs) ((slot, ledger_snapshot), transactions) ->
+      ~f:(fun (block, breadcrumbs) ((slot, ledger_snapshot), transactions) ->
         let%map breadcrumb =
           build_breadcrumb ~transactions ~context ~precomputed_values ~verifier
             keys_module (slot, ledger_snapshot) block
         in
-        let diff =
-          (* Copied from archive_client.ml *)
-          Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values ~logger
-            breadcrumb
-        in
-        (Block.of_breadcrumb breadcrumb, diff :: diffs) )
+        (Block.of_breadcrumb breadcrumb, breadcrumb :: breadcrumbs) )
   in
-  List.rev diffs_rev
+  List.rev breadcrumbs_rev
 
-let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
+let read_all_proofs_for_work_single_spec =
+  Snark_work_lib.Work.Single.Spec.map
+    ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+    ~f_witness:Transaction_witness.read_all_proofs_from_disk
+
+let run ~logger ~keypair ?archive_node_port ~config_file ~n_zkapp_txs
     ~n_payments ~n_blocks =
   (* Section 1: Load and initialize precomputed values from config *)
   let%bind precomputed_values =
@@ -582,19 +581,51 @@ let run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
 
   (* Section 6: Create blocks *)
   [%log info] "Creating %d blocks" (List.length winning_slots) ;
-  let%bind diffs =
-    create_blocks_with_diffs ~logger ~precomputed_values ~verifier ~context
+  let%bind breadcrumbs =
+    create_blocks_with_breadcrumbs ~precomputed_values ~verifier ~context
       ~keys_module ~winning_slots ~all_transactions ~genesis
   in
 
+  let last_breadcrumb = List.last_exn breadcrumbs in
+  let get_state state_hash =
+    List.find_map breadcrumbs ~f:(fun breadcrumb ->
+        Option.some_if
+          ( State_hash.equal state_hash
+          @@ Frontier_base.Breadcrumb.state_hash breadcrumb )
+        @@ Frontier_base.Breadcrumb.protocol_state breadcrumb )
+    |> Option.value_map ~f:Or_error.return
+         ~default:(Error (Error.of_string "State hash not found"))
+  in
+  let last_spec =
+    Frontier_base.Breadcrumb.staged_ledger last_breadcrumb
+    |> Staged_ledger.all_work_pairs ~get_state
+    |> Or_error.ok_exn
+    |> List.concat_map ~f:One_or_two.to_list
+    |> List.last_exn |> read_all_proofs_for_work_single_spec
+  in
+  Out_channel.write_all "spec.dat"
+    ~data:
+      (Binable.to_string
+         (module Snark_work_lib.Spec.Single.Stable.Latest)
+         last_spec ) ;
+
   (* Section 7: Submit blocks to archive *)
-  [%log info] "Submit blocks to archive at port %d" archive_node_port ;
   let%map () =
-    Deferred.List.iter diffs ~f:(fun diff ->
-        (* Copied from archive_client.ml *)
-        Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t (Transition_frontier diff)
-          { host = "127.0.0.1"; port = archive_node_port }
-        >>| Or_error.ok_exn )
+    Option.value_map archive_node_port ~default:Deferred.unit ~f:(fun port ->
+        let diffs =
+          let f =
+            Archive_lib.Diff.Builder.breadcrumb_added ~precomputed_values
+              ~logger
+          in
+          (* Copied from archive_client.ml *)
+          List.map breadcrumbs ~f
+        in
+        [%log info] "Submit blocks to archive at port %d" port ;
+        Deferred.List.iter diffs ~f:(fun diff ->
+            Daemon_rpcs.Client.dispatch Archive_lib.Rpc.t
+              (Transition_frontier diff)
+              { host = "127.0.0.1"; port }
+            >>| Or_error.ok_exn ) )
   in
 
   [%log info] "Test completed"
@@ -608,7 +639,7 @@ let command =
     let%map_open archive_node_port =
       flag "--archive-node-port"
         ~doc:"PORT Archive node's daemon port to submit blocks to"
-        (required int)
+        (optional int)
     and config_file =
       flag "--config-file" ~doc:"FILE Path to the runtime configuration file"
         (required string)
@@ -632,7 +663,10 @@ let command =
     let logger = Logger.create ~id:Logger.Logger_id.mina () in
     [%log info] "Starting submit-to-archive test"
       ~metadata:
-        [ ("archive_node_port", `Int archive_node_port)
+        [ ( "archive_node_port"
+          , Option.value_map
+              ~f:(fun x -> `Int x)
+              ~default:`Null archive_node_port )
         ; ("config_file", `String config_file)
         ; ("n_zkapp_txs", `Int n_zkapp_txs)
         ; ("n_payments", `Int n_payments)
@@ -663,5 +697,5 @@ let command =
       () ;
     let%bind () = Internal_tracing.toggle ~commit_id:"" ~logger `Enabled in
 
-    run ~logger ~keypair ~archive_node_port ~config_file ~n_zkapp_txs
+    run ~logger ~keypair ?archive_node_port ~config_file ~n_zkapp_txs
       ~n_payments ~n_blocks)
