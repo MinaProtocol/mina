@@ -249,9 +249,8 @@ let process_transition ~context:(module Context : CONTEXT) ~trust_system
               ~metadata:[ ("reason", `String "Parent_missing_from_frontier") ] ;
             [%log error] ~metadata
               "Refusing to process the transition with hash $state_hash \
-               because parent is missing from the transition frontier\n\
-              \               (unexpected case, there is likely a bug \
-               somewhere)" ;
+               because parent is missing from the transition frontier \
+               (unexpected case, there is likely a bug somewhere)" ;
             let (_ : Mina_block.initial_valid_block Envelope.Incoming.t) =
               Cached.invalidate_with_failure
                 cached_initially_validated_transition
