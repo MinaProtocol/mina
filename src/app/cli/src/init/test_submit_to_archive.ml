@@ -588,7 +588,7 @@ let run ~logger ~keypair ?archive_node_port ~config_file ~n_zkapp_txs
 
   let last_breadcrumb = List.last_exn breadcrumbs in
   let get_state state_hash =
-    List.find_map breadcrumbs ~f:(fun breadcrumb ->
+    List.find_map (genesis.breadcrumb :: breadcrumbs) ~f:(fun breadcrumb ->
         Option.some_if
           ( State_hash.equal state_hash
           @@ Frontier_base.Breadcrumb.state_hash breadcrumb )
