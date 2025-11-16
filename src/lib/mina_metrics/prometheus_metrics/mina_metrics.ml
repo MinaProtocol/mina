@@ -262,8 +262,7 @@ module Process_memory = struct
       in
       let ic = In_channel.create proc_file in
       let rec find_vmrss () =
-        let open Option.Let_syntax in
-        let%bind line = In_channel.input_line ic in
+        let%bind.Option line = In_channel.input_line ic in
         match
           Option.try_with (fun () -> Scanf.sscanf line "VmRSS: %f" Fn.id)
         with
