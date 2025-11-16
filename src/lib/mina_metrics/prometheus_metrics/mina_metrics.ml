@@ -285,10 +285,6 @@ module Process_memory = struct
   struct
     let process_pid : Pid.t option ref = ref None
 
-    let set_pid pid = process_pid := Some pid
-
-    let clear_pid () = process_pid := None
-
     let gauge =
       let name = Printf.sprintf "rss_%s" Config.process_name in
       let help =
@@ -296,6 +292,12 @@ module Process_memory = struct
           Config.process_name
       in
       Gauge.v name ~help ~namespace ~subsystem
+
+    let set_pid pid = process_pid := Some pid
+
+    let clear_pid () =
+      process_pid := None ;
+      Gauge.set gauge 0.
 
     let update () =
       if Config.is_daemon || Option.is_some !process_pid then
