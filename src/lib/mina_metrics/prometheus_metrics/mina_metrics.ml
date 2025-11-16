@@ -262,23 +262,15 @@ module Process_memory = struct
       in
       let ic = In_channel.create proc_file in
       let rec find_vmrss () =
-        match In_channel.input_line ic with
+        let open Option.Let_syntax in
+        let%bind line = In_channel.input_line ic in
+        match
+          Option.try_with (fun () -> Scanf.sscanf line "VmRSS: %f" Fn.id)
+        with
         | None ->
-            None
-        | Some line ->
-            if String.is_prefix line ~prefix:"VmRSS:" then
-              (* VmRSS line format: "VmRSS:    12345 kB" *)
-              let parts = String.split line ~on:' ' in
-              let kb_str =
-                List.find parts ~f:(fun s ->
-                    String.for_all s ~f:Char.is_digit && not (String.is_empty s) )
-              in
-              match kb_str with
-              | Some kb ->
-                  Option.try_with (fun () -> Float.of_string kb)
-              | None ->
-                  None
-            else find_vmrss ()
+            find_vmrss ()
+        | Some kb ->
+            Some kb
       in
       let result = find_vmrss () in
       In_channel.close ic ; result
