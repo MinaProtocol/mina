@@ -70,6 +70,8 @@ module Process_memory : sig
     val clear_pid : unit -> unit
   end
 
+  (* NOTE: this only tracks memory used by the SNARK workers that is spawned by
+     the coordinator. SNARK workers spawned manually is not tracked. *)
   module Snark_worker : sig
     val set_pid : int -> unit
 
