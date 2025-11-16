@@ -436,6 +436,7 @@ let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Vrf_evaluator ;
+  Mina_metrics.Process_memory.Vrf_evaluator.set_pid (Process.pid process) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stdout process |> Reader.pipe)
