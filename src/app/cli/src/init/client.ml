@@ -2562,7 +2562,10 @@ let test_uptime_snark_worker =
                (Time.to_string (Time.now ()))
                i ;
              let (module M) = get uptime_sw in
-             Deferred.ignore_m @@ M.perform_single (msg, spec) ) ) )
+             let%map res = M.perform_single (msg, spec) in
+             Or_error.iter_error res ~f:(fun e ->
+                 printf "Error performing snark work: %s\n"
+                   (Error.to_string_hum e) ) ) ) )
 
 let advanced ~itn_features =
   let cmds0 =
