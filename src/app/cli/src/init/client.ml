@@ -2514,6 +2514,56 @@ let client_trustlist_group =
     ; ("remove", trustlist_remove)
     ]
 
+let test_uptime_snark_worker =
+  Command.async ~summary:"Test uptime snark worker"
+    (let%map_open.Command spec_file =
+       flag "--spec-file" ~doc:"PATH path to a spec file" (required string)
+     and config_file =
+       flag "--config-file" ~doc:"PATH path to a configuration file"
+         (required string)
+     and num_iterations =
+       flag "--num-iterations" ~doc:"NN Number of iterations" (required int)
+     in
+     Cli_lib.Exceptions.handle_nicely (fun () ->
+         let spec =
+           In_channel.with_file ~binary:true spec_file ~f:(fun chan ->
+               In_channel.input_all chan
+               |> Binable.of_string
+                    (module Snark_work_lib.Spec.Single.Stable.Latest) )
+         in
+         let%bind.Deferred runtime_config_json =
+           Genesis_ledger_helper.load_config_json config_file
+           >>| Or_error.ok_exn
+         in
+         let runtime_config =
+           Runtime_config.of_yojson runtime_config_json
+           |> Result.map_error ~f:Error.of_string
+           |> Or_error.ok_exn
+         in
+         let constraint_constants =
+           let default = Genesis_constants.Compiled.constraint_constants in
+           Option.value_map runtime_config.proof ~default
+             ~f:(Genesis_ledger_helper.make_constraint_constants ~default)
+         in
+         let open Uptime_service.Uptime_snark_worker.Worker_state in
+         let%bind uptime_sw = create ~constraint_constants () in
+         let keypair = Signature_lib.Keypair.create () in
+         let msg =
+           Sok_message.create ~fee:Currency.Fee.zero
+             ~prover:(Signature_lib.Public_key.compress keypair.public_key)
+         in
+         Deferred.for_ 1 ~to_:num_iterations ~do_:(fun i ->
+             (* Every 100th iteration print RSS *)
+             if i mod 100 = 0 then
+               Option.iter
+                 (Mina_stdlib_unix.Process_memory.read_rss_kb None)
+                 ~f:(printf "RSS: %f\n") ;
+             printf "[%s] Performing snark work iteration %d\n"
+               (Time.to_string (Time.now ()))
+               i ;
+             let (module M) = get uptime_sw in
+             Deferred.ignore_m @@ M.perform_single (msg, spec) ) ) )
+
 let advanced ~itn_features =
   let cmds0 =
     [ ("get-nonce", get_nonce_cmd)
@@ -2561,7 +2611,9 @@ let advanced ~itn_features =
     ; ("fix-persistent-frontier", Fix_persistent_frontier.command)
     ; ( "test"
       , Command.group ~summary:"Testing-only commands"
-          [ ("create-genesis", test_genesis_creation) ] )
+          [ ("create-genesis", test_genesis_creation)
+          ; ("uptime-snark-worker", test_uptime_snark_worker)
+          ] )
     ]
   in
   let cmds =

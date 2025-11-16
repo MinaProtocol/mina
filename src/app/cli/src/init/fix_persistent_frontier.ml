@@ -226,26 +226,13 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
              true
          | _ ->
              false )
+    |> read_all_proofs_for_work_single_spec
   in
-  [%log info] "Starting uptime snark worker" ;
-  let%bind uptime_sw =
-    Uptime_service.Uptime_snark_worker.create ~logger ~constraint_constants
-      ~pids
-  in
-  let keypair = Signature_lib.Keypair.create () in
-  let msg =
-    Sok_message.create ~fee:Currency.Fee.zero
-      ~prover:(Signature_lib.Public_key.compress keypair.public_key)
-  in
-  [%log info] "Performing snark work" ;
-  let%bind () =
-    Deferred.for_ 1 ~to_:10000 ~do_:(fun i ->
-        [%log info] "Performing snark work iteration %d" i ;
-        Deferred.ignore_m
-        @@ Uptime_service.Uptime_snark_worker.perform_single uptime_sw
-             (msg, read_all_proofs_for_work_single_spec some_tx_spec) )
-  in
-  [%log info] "Snark work performed" ;
+  Out_channel.write_all "tx_spec.dat"
+    ~data:
+      (Binable.to_string
+         (module Snark_work_lib.Spec.Single.Stable.Latest)
+         some_tx_spec ) ;
   let frontier_root_hash = Breadcrumb.state_hash frontier_root in
   assert (State_hash.equal frontier_root_hash persistent_frontier_root_hash) ;
   let with_persistent_frontier_instance f =

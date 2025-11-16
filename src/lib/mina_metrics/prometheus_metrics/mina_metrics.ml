@@ -250,31 +250,6 @@ end
 module Process_memory = struct
   let subsystem = "Process_memory"
 
-  (* Read RSS (Resident Set Size) from /proc/<pid>/status *)
-  let read_rss_kb pid_opt =
-    try
-      let proc_file =
-        match pid_opt with
-        | None ->
-            "/proc/self/status"
-        | Some pid ->
-            Printf.sprintf "/proc/%d/status" (Pid.to_int pid)
-      in
-      let ic = In_channel.create proc_file in
-      let rec find_vmrss () =
-        let%bind.Option line = In_channel.input_line ic in
-        match
-          Option.try_with (fun () -> Scanf.sscanf line "VmRSS: %f" Fn.id)
-        with
-        | None ->
-            find_vmrss ()
-        | Some kb ->
-            Some kb
-      in
-      let result = find_vmrss () in
-      In_channel.close ic ; result
-    with _ -> None
-
   (* Functor to create RSS gauge for a specific process type *)
   module Make_rss_gauge (Config : sig
     val process_name : string
@@ -300,7 +275,9 @@ module Process_memory = struct
 
     let update () =
       if Config.is_daemon || Option.is_some !process_pid then
-        Option.iter (read_rss_kb !process_pid) ~f:(Gauge.set gauge)
+        Option.iter
+          (Mina_stdlib_unix.Process_memory.read_rss_kb !process_pid)
+          ~f:(Gauge.set gauge)
   end
 
   module Daemon = Make_rss_gauge (struct

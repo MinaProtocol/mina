@@ -22,7 +22,8 @@
   ;; local libraries
   logger
   o1trace
-  mina_node_config)
+  mina_node_config
+  mina_stdlib_unix)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
