@@ -85,6 +85,11 @@ let apply_root_transitions ~logger ~db diffs =
       ~metadata:[ ("error", `String (Exn.to_string exn)) ] ;
     Error ("Failed to apply root transitions: " ^ Exn.to_string exn)
 
+let read_all_proofs_for_work_single_spec =
+  Snark_work_lib.Work.Single.Spec.map
+    ~f_proof:Ledger_proof.Cached.read_proof_from_disk
+    ~f_witness:Transaction_witness.read_all_proofs_from_disk
+
 let fix_persistent_frontier_root_do ~logger ~config_directory
     ~chain_state_locations ~max_frontier_depth runtime_config =
   let signature_kind = Mina_signature_kind.t_DEPRECATED in
@@ -107,11 +112,11 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     Verifier.get_verification_keys_eagerly ~constraint_constants ~proof_level
       ~signature_kind
   in
+  let pids = Child_processes.Termination.create_pid_table () in
   let%bind verifier =
     Verifier.create ~logger ~commit_id:"" ~blockchain_verification_key
       ~transaction_verification_key ~signature_kind
-      ~proof_level:precomputed_values.proof_level
-      ~pids:(Child_processes.Termination.create_pid_table ())
+      ~proof_level:precomputed_values.proof_level ~pids
       ~conf_dir:(Some config_directory) ()
   in
   let tmp_root_location = chain_state_locations.root ^ "-tmp" in
@@ -198,9 +203,50 @@ let fix_persistent_frontier_root_do ~logger ~config_directory
     | Ok f ->
         f
   in
-  let frontier_root_hash =
-    Transition_frontier.root frontier |> Breadcrumb.state_hash
+  let frontier_root = Transition_frontier.root frontier in
+  let frontier_root_staged_ledger =
+    Transition_frontier.Breadcrumb.staged_ledger frontier_root
   in
+  let some_tx_spec =
+    Staged_ledger.all_work_pairs frontier_root_staged_ledger
+      ~get_state:(fun state_hash ->
+        match Transition_frontier.find_protocol_state frontier state_hash with
+        | None ->
+            Error
+              (Error.createf
+                 "Could not find state_hash %s in transition frontier for \
+                  uptime service"
+                 (State_hash.to_base58_check state_hash) )
+        | Some protocol_state ->
+            Ok protocol_state )
+    |> Or_error.ok_exn
+    |> List.concat_map ~f:One_or_two.to_list
+    |> List.find_exn ~f:(function
+         | Snark_work_lib.Spec.Single.Poly.Transition _ ->
+             true
+         | _ ->
+             false )
+  in
+  [%log info] "Starting uptime snark worker" ;
+  let%bind uptime_sw =
+    Uptime_service.Uptime_snark_worker.create ~logger ~constraint_constants
+      ~pids
+  in
+  let keypair = Signature_lib.Keypair.create () in
+  let msg =
+    Sok_message.create ~fee:Currency.Fee.zero
+      ~prover:(Signature_lib.Public_key.compress keypair.public_key)
+  in
+  [%log info] "Performing snark work" ;
+  let%bind () =
+    Deferred.for_ 1 ~to_:10000 ~do_:(fun i ->
+        [%log info] "Performing snark work iteration %d" i ;
+        Deferred.ignore_m
+        @@ Uptime_service.Uptime_snark_worker.perform_single uptime_sw
+             (msg, read_all_proofs_for_work_single_spec some_tx_spec) )
+  in
+  [%log info] "Snark work performed" ;
+  let frontier_root_hash = Breadcrumb.state_hash frontier_root in
   assert (State_hash.equal frontier_root_hash persistent_frontier_root_hash) ;
   let with_persistent_frontier_instance f =
     Persistent_frontier.with_instance_exn persistent_frontier ~f
