@@ -63,7 +63,7 @@ module Process_memory = struct
   let rss_update_interval_mins : float ref = ref 1.
 
   module type Rss_gauge_intf = sig
-    val set_pid : int -> unit
+    val set_pid : Pid.t -> unit
 
     val clear_pid : unit -> unit
   end

@@ -285,7 +285,7 @@ module Snark_worker = struct
             ]
           "Started snark worker process with pid: $snark_worker_pid" ;
         Mina_metrics.Process_memory.Snark_worker.set_pid
-          (Pid.to_int (Process.pid snark_worker_process)) ;
+          (Process.pid snark_worker_process) ;
         if Ivar.is_full process_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill process_ivar snark_worker_process

@@ -411,8 +411,7 @@ let create ~logger ?(enable_internal_tracing = false) ?internal_trace_filename
         ] ;
     Child_processes.Termination.register_process pids process
       Child_processes.Termination.Verifier ;
-    Mina_metrics.Process_memory.Verifier.set_pid
-      (Process.pid process |> Pid.to_int) ;
+    Mina_metrics.Process_memory.Verifier.set_pid (Process.pid process) ;
     (* Always report termination as expected, and use the restart logic here
        instead.
     *)

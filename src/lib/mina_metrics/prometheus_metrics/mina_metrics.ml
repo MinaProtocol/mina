@@ -258,7 +258,7 @@ module Process_memory = struct
         | None ->
             "/proc/self/status"
         | Some pid ->
-            Printf.sprintf "/proc/%d/status" pid
+            Printf.sprintf "/proc/%d/status" (Pid.to_int pid)
       in
       let ic = In_channel.create proc_file in
       let rec find_vmrss () =
@@ -283,7 +283,7 @@ module Process_memory = struct
     val is_daemon : bool
   end) =
   struct
-    let process_pid : int option ref = ref None
+    let process_pid : Pid.t option ref = ref None
 
     let set_pid pid = process_pid := Some pid
 

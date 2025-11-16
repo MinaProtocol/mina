@@ -249,7 +249,7 @@ let spawn ?(allow_multiple_instances = false) ~logger ~pids ~conf_dir
   | Ok process ->
       Child_processes.register_process pids process Libp2p_helper ;
       Mina_metrics.Process_memory.Libp2p_helper.set_pid
-        (Child_processes.pid process |> Pid.to_int) ;
+        (Child_processes.pid process) ;
       let t =
         { process
         ; logger
