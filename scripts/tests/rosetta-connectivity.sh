@@ -81,6 +81,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
     --run-load-test) RUN_LOAD_TEST=true ;;
     --run-compatibility-test) COMPATIBILITY_BRANCH="$2"; shift;;
     -t|--tag) TAG="$2"; shift;;
+    -r|--repo) REPO="$2"; shift;;
     --timeout) TIMEOUT="$2"; shift;;
     --upgrade-scripts-workdir) UPGRADE_SCRIPTS_WORKDIR="$2"; shift;;
     -h|--help) usage; exit 0;;
@@ -94,11 +95,17 @@ if [[ "$NETWORK" != "devnet" && "$NETWORK" != "mainnet" && "$NETWORK" != "berkel
     usage; exit 1;
 fi
 
+if [[ -z "$REPO" ]]; then
+    echo "❌  Docker repo is not set! Use -r or --repo to set it."
+    echo ""
+    usage; exit 1;
+fi
+
 if [[ -z "$TAG" ]]; then usage "Docker tag is not set!"; usage; exit 1; fi;
 
 set -x
 
-container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK gcr.io/o1labs-192920/mina-rosetta:$TAG-$NETWORK )
+container_id=$(docker run -v .:/workdir -p 3087:3087 -d --env MINA_NETWORK=$NETWORK $REPO/mina-rosetta:$TAG-$NETWORK )
 
 stop_docker() {
         { docker stop "$container_id" ; docker rm "$container_id" ; } || true
