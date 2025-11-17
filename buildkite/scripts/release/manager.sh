@@ -527,6 +527,7 @@ function promote_and_verify_docker() {
             -v $__artifact_full_source_version \
             -t $__artifact_full_target_version \
             -a $__arch \
+            -r "$__repo" \
             $__publish_arg
 
             echo ""
@@ -1013,6 +1014,7 @@ function promote(){
     local __debian_repo=$DEBIAN_REPO
     local __debian_sign_key=""
     local __arch="$DEFAULT_ARCHITECTURES"
+    local __profile=$DEFAULT_PROFILE
 
 
     while [ ${#} -gt 0 ]; do
@@ -1083,6 +1085,10 @@ function promote(){
             ;;
             --arch )
                 __arch=${2:?$error_message}
+                shift 2;
+            ;;
+            --profile )
+                __profile=${2:?$error_message}
                 shift 2;
             ;;
             * )
