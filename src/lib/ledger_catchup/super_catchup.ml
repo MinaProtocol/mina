@@ -915,22 +915,21 @@ let setup_state_machine_runner ~context:(module Context : CONTEXT) ~t ~verifier
               Gauge.set Catchup.initial_validation_time
                 Time.(Span.to_ms @@ diff (now ()) start_time)) ;
             match result with
-            | `In_frontier hash ->
-                let is_error =
-                  Option.is_none @@ Transition_frontier.find frontier hash
-                in
-                if is_error then (
-                  [%log' error t.logger]
-                    "Failed to find transition in frontier despite In_frontier \
-                     result"
-                    ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
-                  failwithf
-                    "Failed to find transition %s in frontier despite \
-                     In_frontier result"
-                    (State_hash.to_base58_check hash)
-                    () ) ;
-                finish t node ~is_error:false ;
-                Deferred.return (Ok ())
+            | `In_frontier hash -> (
+                match Transition_frontier.find frontier hash with
+                | None ->
+                    [%log' error t.logger]
+                      "Failed to find transition in frontier despite \
+                       In_frontier result"
+                      ~metadata:[ ("state_hash", State_hash.to_yojson hash) ] ;
+                    failwithf
+                      "Failed to find transition %s in frontier despite \
+                       In_frontier result"
+                      (State_hash.to_base58_check hash)
+                      ()
+                | Some _ ->
+                    finish t node ~is_error:false ;
+                    Deferred.return (Ok ()) )
             | `Building_path tv ->
                 (* To_initial_validate may only occur for a downloaded block,
                    hence there is no validation callback *)
