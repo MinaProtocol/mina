@@ -1,0 +1,8 @@
+(library
+ (name multi_key_file_storage)
+ (public_name multi_key_file_storage)
+ (libraries core_kernel bin_prot)
+ (preprocess
+  (pps ppx_jane))
+ (instrumentation
+  (backend bisect_ppx)))
