@@ -3181,14 +3181,13 @@ module Hardfork_config = struct
         ; next_epoch_seed
         ; blockchain_length
         } ~build_dir directory_name =
-    let open Deferred.Or_error.Let_syntax in
     (* Clean up old generated files if regenerating *)
-    let%bind.Deferred () =
+    let%bind () =
       let activated_file = directory_name ^/ "activated" in
       let fork_validation_dir = directory_name ^/ "fork_validation" in
       (* Delete activated file first - it signals generation completion *)
-      let%bind.Deferred () =
-        match%bind.Deferred Sys.file_exists activated_file with
+      let%bind () =
+        match%bind Sys.file_exists activated_file with
         | `Yes ->
             [%log info] "Removing old activated file" ;
             Sys.remove activated_file
@@ -3196,7 +3195,7 @@ module Hardfork_config = struct
             Deferred.return ()
       in
       (* Then clean up validation data *)
-      match%bind.Deferred Sys.file_exists fork_validation_dir with
+      match%bind Sys.file_exists fork_validation_dir with
       | `Yes ->
           [%log info] "Cleaning up old fork_validation directory" ;
           Mina_stdlib_unix.File_system.clear_dir fork_validation_dir
@@ -3204,7 +3203,7 @@ module Hardfork_config = struct
           Deferred.return ()
     in
     let migrate_and_apply (root, diff) =
-      let%map.Deferred root = Root_ledger.make_converting root in
+      let%map root = Root_ledger.make_converting root in
       Ledger.Any_ledger.M.set_batch
         (Root_ledger.as_unmasked root)
         (Map.to_alist diff) ;
@@ -3229,17 +3228,17 @@ module Hardfork_config = struct
       , fst genesis_staking_ledger_data
       , fst genesis_next_epoch_ledger_data )
     @@ fun () ->
-    let%bind.Deferred genesis_ledger_legacy, genesis_ledger_migrated =
+    let%bind genesis_ledger_legacy, genesis_ledger_migrated =
       migrate_and_apply genesis_ledger_data
     in
-    let%bind.Deferred ( genesis_staking_ledger_legacy
-                      , genesis_staking_ledger_migrated ) =
+    let%bind genesis_staking_ledger_legacy, genesis_staking_ledger_migrated =
       migrate_and_apply genesis_staking_ledger_data
     in
-    let%bind.Deferred ( genesis_next_epoch_ledger_legacy
-                      , genesis_next_epoch_ledger_migrated ) =
+    let%bind ( genesis_next_epoch_ledger_legacy
+             , genesis_next_epoch_ledger_migrated ) =
       migrate_and_apply genesis_next_epoch_ledger_data
     in
+    let open Deferred.Result.Let_syntax in
     [%log debug] "Writing hard fork config directories" ;
     let%bind () =
       write_stable_config_directory ~logger ~genesis_state_timestamp
