@@ -22,24 +22,21 @@ let rec build_path_to_root ~(frontier : Transition_frontier.t) ~current_hash
 
 let check_directories_exist ~logger ~persistent_root_location
     ~persistent_frontier_location =
-  let%bind root_exists =
-    Sys.file_exists persistent_root_location
-    >>| function `Yes -> true | `No | `Unknown -> false
-  in
-  let%bind frontier_exists =
-    Sys.file_exists persistent_frontier_location
-    >>| function `Yes -> true | `No | `Unknown -> false
-  in
-  if not root_exists then (
-    [%log' error logger] "Persistent root directory not found at $location"
-      ~metadata:[ ("location", `String persistent_root_location) ] ;
-    Deferred.return (Error "Persistent root not found - nothing to fix against")
-    )
-  else if not frontier_exists then (
-    [%log' info logger]
-      "Persistent frontier directory not found - nothing to fix" ;
-    Deferred.return (Ok `No_frontier) )
-  else Deferred.return (Ok `Both_exist)
+  match%map
+    Deferred.both
+      (Sys.file_exists persistent_root_location)
+      (Sys.file_exists persistent_frontier_location)
+  with
+  | (`No | `Unknown), _ ->
+      [%log' error logger] "Persistent root directory not found at $location"
+        ~metadata:[ ("location", `String persistent_root_location) ] ;
+      Error "Persistent root not found - nothing to fix against"
+  | _, (`No | `Unknown) ->
+      [%log' info logger]
+        "Persistent frontier directory not found - nothing to fix" ;
+      Ok `No_frontier
+  | _ ->
+      Ok `Both_exist
 
 (* Apply a sequence of root transition diffs to the persistent database *)
 let apply_root_transitions ~logger ~db diffs =
