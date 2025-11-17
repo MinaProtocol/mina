@@ -52,9 +52,10 @@ let apply_root_transitions ~logger ~db diffs =
                     .message err ) ) )
       |> Result.ok_exn
     in
-    Transition_frontier.Persistent_frontier.Database.with_batch db
-      ~f:(fun batch ->
-        ( List.fold diffs ~init:initial_root_hash ~f:(fun old_root_hash diff ->
+    let final_state_hash =
+      Transition_frontier.Persistent_frontier.Database.with_batch db
+        ~f:(fun batch ->
+          List.fold diffs ~init:initial_root_hash ~f:(fun old_root_hash diff ->
               match diff with
               | Diff.Lite.E.E
                   (Diff.Root_transitioned
@@ -71,11 +72,13 @@ let apply_root_transitions ~logger ~db diffs =
                   (* Return new root hash for next iteration *)
                   (Root_data.Limited.Stable.Latest.hashes new_root).state_hash
               | _ ->
-                  failwith "Expected Root_transitioned diff" )
-          : State_hash.t )
-        |> ignore ) ;
+                  failwith "Expected Root_transitioned diff" ) )
+    in
     [%log' info logger] "Successfully applied $count diffs"
-      ~metadata:[ ("count", `Int (List.length diffs)) ] ;
+      ~metadata:
+        [ ("count", `Int (List.length diffs))
+        ; ("final_state_hash", Frozen_ledger_hash.to_yojson final_state_hash)
+        ] ;
     Ok ()
   with exn ->
     [%log' error logger] "Failed to apply root transitions: $error"
