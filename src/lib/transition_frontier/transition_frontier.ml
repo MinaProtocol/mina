@@ -104,9 +104,7 @@ let load_from_persistence_and_start ~context:(module Context : CONTEXT)
   let open Context in
   let open Deferred.Result.Let_syntax in
   let root_identifier =
-    match
-      Persistent_root.Instance.load_root_identifier persistent_root_instance
-    with
+    match Persistent_root.load_root_identifier persistent_root with
     | Some root_identifier ->
         root_identifier
     | None ->
@@ -459,7 +457,7 @@ let add_breadcrumb_exn t breadcrumb =
   in
   [%log internal] "Apply_full_frontier_diffs_done" ;
   Option.iter new_root_identifier
-    ~f:(Persistent_root.Instance.set_root_identifier t.persistent_root_instance) ;
+    ~f:(Persistent_root.set_root_identifier t.persistent_root) ;
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
@@ -529,14 +527,7 @@ include struct
 
   let common_ancestor = proxy1 common_ancestor
 
-  (* reduce successors functions (probably remove hashes special case *)
   let successors = proxy1 successors
-
-  let successors_rec = proxy1 successors_rec
-
-  let successor_hashes = proxy1 successor_hashes
-
-  let successor_hashes_rec = proxy1 successor_hashes_rec
 
   let hash_path = proxy1 hash_path
 
@@ -763,10 +754,9 @@ module For_tests = struct
                precomputed_values.protocol_state_with_hashes ) ) ;
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_root.reset_factory_root_exn persistent_root ~create_root
-          ~setup:(fun instance ->
-            let transition = Root_data.Limited.transition root_data in
-            Persistent_root.Instance.set_root_state_hash instance
-              (Mina_block.Validated.state_hash transition) ) ) ;
+          ~root_state_hash:
+            ( Root_data.Limited.transition root_data
+            |> Mina_block.Validated.state_hash ) ) ;
     let frontier_result =
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false

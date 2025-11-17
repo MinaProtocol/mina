@@ -76,20 +76,20 @@ function to_dhall_list() {
   echo "$dhall_list"
 }
 
-if [[ -z "$CODENAMES" ]]; then
+if [[ -z "${CODENAMES:-}" ]]; then
   usage "CODENAMES environment variable is required"
 fi
 
-if [[ -z "$NETWORK" ]]; then
+if [[ -z "${NETWORK:-}" ]]; then
   usage "NETWORK environment variable is required"
 fi
 
-if [[ -z "$CONFIG_JSON_GZ_URL" ]]; then
+if [[ -z "${CONFIG_JSON_GZ_URL:-}" ]]; then
   usage "CONFIG_JSON_GZ_URL environment variable is required"
 fi
 
 # Format GENESIS_TIMESTAMP as Optional Text for Dhall
-if [[ -z "$GENESIS_TIMESTAMP" ]]; then
+if [[ -z "${GENESIS_TIMESTAMP:-}" ]]; then
   GENESIS_TIMESTAMP="None Text"
 else
   # shellcheck disable=SC2089
@@ -97,7 +97,7 @@ else
 fi
 
 # Format VERSION as Optional Text for Dhall
-if [[ -z "$VERSION" ]]; then
+if [[ -z "${VERSION:-}" ]]; then
   VERSION="(None Text)"
 else
   # shellcheck disable=SC2089
@@ -105,14 +105,14 @@ else
 fi
 
 # Format PRECOMPUTED_FORK_BLOCK_PREFIX as Optional Text for Dhall
-if [[ -z "$PRECOMPUTED_FORK_BLOCK_PREFIX" ]]; then
+if [[ -z "${PRECOMPUTED_FORK_BLOCK_PREFIX:-}" ]]; then
   PRECOMPUTED_FORK_BLOCK_PREFIX="(None Text)"
 else
   # shellcheck disable=SC2089
   PRECOMPUTED_FORK_BLOCK_PREFIX="(Some \"${PRECOMPUTED_FORK_BLOCK_PREFIX}\")"
 fi
 
-DHALL_CODENAMES=$(to_dhall_list "$CODENAMES" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
+DHALL_CODENAMES=$(to_dhall_list "${CODENAMES:-}" "$DEBIAN_VERSION_DHALL_DEF.DebVersion")
 
 # shellcheck disable=SC2089
 printf '%s.generate_hardfork_package %s %s.Type.%s %s "%s" "%s" %s %s\n' \

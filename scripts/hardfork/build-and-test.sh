@@ -54,14 +54,24 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 if [[ $# -gt 0 ]]; then
   # Branch is specified, this is a CI run
-  ln -sf /usr/share/zoneinfo/UTC /etc/localtime
   chown -R "${USER}" /workdir
   git config --global --add safe.directory /workdir
   git fetch
-  nix-env -iA unstable.jq
-  nix-env -iA unstable.curl
-  nix-env -iA unstable.gnused
-  nix-env -iA unstable.git-lfs
+  nix-env -iA unstable.{curl,git-lfs,gnused,jq}
+
+  # Manually patch zone infos, nix doesn't provide stdenv breaking janestreet's core
+  zone_info=(/nix/store/*tzdata*/share/zoneinfo)
+  if [ "${#zone_info[@]}" -lt 1 ]; then
+    echo "Error: expected at least one tzdata path, none found" >&2
+    exit 1
+  fi
+  unlink /usr/share && mkdir -p /usr/share
+  ln -sf "${zone_info[0]}" /usr/share/zoneinfo
+  ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+  if [ ! -L /etc/localtime ] || [ ! -e /etc/localtime ]; then
+    echo "Error: timezone file invalid!" >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -L compatible-devnet ]]; then
@@ -106,9 +116,20 @@ EOF
   nix --experimental-features nix-command copy --to "s3://mina-nix-cache?endpoint=https://storage.googleapis.com" --stdin </tmp/nix-paths
 fi
 
+
+nix "${NIX_OPTS[@]}" build "$INIT_DIR?submodules=1#hardfork_test" --out-link "$INIT_DIR/hardfork_test"
+
 SLOT_TX_END=${SLOT_TX_END:-$((RANDOM%120+30))}
-export SLOT_TX_END
+SLOT_CHAIN_END=${SLOT_CHAIN_END:-$((SLOT_TX_END+8))}
 
 echo "Running HF test with SLOT_TX_END=$SLOT_TX_END"
 
-"$SCRIPT_DIR"/test.sh compatible-devnet{/bin/mina,-genesis/bin/runtime_genesis_ledger} fork-devnet{/bin/mina,-genesis/bin/runtime_genesis_ledger} && echo "HF test completed successfully"
+"$INIT_DIR/hardfork_test/bin/hardfork_test" \
+  --main-mina-exe "$INIT_DIR/compatible-devnet/bin/mina" \
+  --main-runtime-genesis-ledger "$INIT_DIR/compatible-devnet-genesis/bin/runtime_genesis_ledger" \
+  --fork-mina-exe "$INIT_DIR/fork-devnet/bin/mina" \
+  --fork-runtime-genesis-ledger "$INIT_DIR/fork-devnet-genesis/bin/runtime_genesis_ledger" \
+  --slot-tx-end "$SLOT_TX_END" \
+  --slot-chain-end "$SLOT_CHAIN_END" \
+  --script-dir "$SCRIPT_DIR" \
+&& echo "HF test completed successfully"

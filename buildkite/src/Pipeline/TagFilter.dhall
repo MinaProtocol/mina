@@ -17,6 +17,7 @@ let Filter
       | DebianBuild
       | DockerBuild
       | Rosetta
+      | Hardfork
       | DockerBuildArm64
       | DockerBuildAmd64
       | DockerBuildArm64Devnet
@@ -59,6 +60,7 @@ let tags
             , Release = [ Tag.Type.Release ]
             , Promote = [ Tag.Type.Promote ]
             , Rosetta = [ Tag.Type.Rosetta ]
+            , Hardfork = [ Tag.Type.Hardfork ]
             , DockerBuildArm64 = [ Tag.Type.Docker, Tag.Type.Arm64 ]
             , DockerBuildAmd64 = [ Tag.Type.Docker, Tag.Type.Amd64 ]
             , DockerBuildArm64Devnet =
@@ -193,6 +195,7 @@ let show
             , DebianBuild = "DebianBuild"
             , DockerBuild = "DockerBuild"
             , Rosetta = "Rosetta"
+            , Hardfork = "Hardfork"
             , DockerBuildArm64 = "DockerBuildArm64"
             , DockerBuildAmd64 = "DockerBuildAmd64"
             , DockerBuildArm64Devnet = "DockerBuildArm64Devnet"
