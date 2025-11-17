@@ -799,6 +799,31 @@ build_archive_testnet_generic_deb () {
 }
 ## END ARCHIVE PACKAGE ##
 
+## ARCHIVE MAINNET PACKAGE ##
+
+#
+# Builds mina-archive-mainnet package for mainnet archive node
+#
+# Output: mina-archive-mainnet_${MINA_DEB_VERSION}_${ARCHITECTURE}.deb
+# Dependencies: ${ARCHIVE_DEPS}
+#
+# Archive node package for mainnet with all archive utilities and SQL scripts.
+#
+build_archive_mainnet_deb () {
+  ARCHIVE_DEB=mina-archive-mainnet
+
+  echo "------------------------------------------------------------"
+  echo "--- Building archive mainnet deb"
+
+  create_control_file "$ARCHIVE_DEB" "${ARCHIVE_DEPS}" 'Mina Archive Process
+ Compatible with Mina Daemon'
+
+  copy_common_archive_configs "$ARCHIVE_DEB"
+
+}
+## END ARCHIVE MAINNET PACKAGE ##
+
+
 ## ZKAPP TEST TXN ##
 
 #
