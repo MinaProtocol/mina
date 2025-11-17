@@ -18,7 +18,6 @@ var plonk_wasm = (function() {
       "caml_pasta_fp_poseidon_block_cipher",
       "caml_pasta_fq_poseidon_block_cipher",
       "caml_pasta_fp_plonk_proof_create",
-      "caml_pasta_fq_plonk_proof_create",
       "caml_pasta_fp_plonk_verifier_index_shifts",
       "caml_pasta_fq_plonk_verifier_index_shifts",
       "caml_pasta_fp_plonk_gate_vector_create",
