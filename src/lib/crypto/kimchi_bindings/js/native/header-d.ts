@@ -11,13 +11,13 @@ type NapiPastaFqPlonkIndex = {};
 type NapiPastaFp = {};
 type NapiPastaFq = {};
 type NapiLookupInfo = {};
-type WasmPastaFqPlonkIndex = {};
 type WasmPastaFpPlonkIndex = {};
+type WasmPastaFqPlonkIndex = {};
 type Proof = {}
 type NapiVector<T> = {};
 type NapiFlatVector<T> = {};
-type WasmVecVecFq = {};
 type WasmVecVecFp = {};
+type WasmVecVecFq = {};
 type Self = {};
 
 // Header section end

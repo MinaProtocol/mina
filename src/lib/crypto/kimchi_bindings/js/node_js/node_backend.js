@@ -18,6 +18,7 @@ var plonk_wasm = (function() {
       "caml_pasta_fp_poseidon_block_cipher",
       "caml_pasta_fq_poseidon_block_cipher",
       "caml_pasta_fp_plonk_proof_create",
+      "caml_pasta_fq_plonk_proof_create",
       "caml_pasta_fp_plonk_verifier_index_shifts",
       "caml_pasta_fq_plonk_verifier_index_shifts",
       "caml_pasta_fp_plonk_gate_vector_create",
@@ -99,9 +100,7 @@ var plonk_wasm = (function() {
     wasm.native = true;
   } catch (e) {
     if (process.env.O1JS_REQUIRE_NATIVE_BINDINGS) {
-      console.error(e)
-      console.log("native didn't load")
-      process.exit(1);
+      throw e
     }
   }
   return wasm
