@@ -1,7 +1,16 @@
 (** Multi-key file storage - stores multiple keys with heterogeneous types in a single file *)
 
+module Tag : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type 'a t
+    end
+  end]
+end
+
 (** Tag representing the location and metadata of a stored value *)
-type 'a tag
+type 'a tag = 'a Tag.t
 
 (** Writer object used to write values to the single-file database *)
 type writer_t
