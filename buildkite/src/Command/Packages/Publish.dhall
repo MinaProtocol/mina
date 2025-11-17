@@ -70,7 +70,7 @@ let Spec =
               ->  Text
               ->  Text
               ->  List Text
-          , publish_to_docker_io : Bool
+          , docker_repo : DockerRepo.Type
           , depends_on : List Command.TaggedKey.Type
           , branch : Text
           , architectures : List Architecture.Type
@@ -88,7 +88,7 @@ let Spec =
             ]
           , channel = DebianChannel.Type.Compatible
           , depends_on = [] : List Command.TaggedKey.Type
-          , publish_to_docker_io = False
+          , docker_repo = DockerRepo.Type.InternalEurope
           , verify = True
           , branch = ""
           , architectures = [ Architecture.Type.Amd64, Architecture.Type.Arm64 ]
