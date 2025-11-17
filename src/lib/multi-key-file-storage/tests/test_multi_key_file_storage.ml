@@ -5,52 +5,77 @@ open Multi_key_file_storage
 let temp_filename prefix = Core.Filename.temp_file prefix ".db"
 
 (* Helper to clean up temp files *)
-let cleanup_file filename = if Sys.file_exists filename then Sys.remove filename
+let cleanup_file filename =
+  try if Sys.file_exists filename then Sys.remove filename with _exn -> ()
 
-(* Test basic write and read with a single value *)
-let test_single_values () =
-  let filename = temp_filename "single_value" in
+let simplest_test (type fkey) (module M : S with type filename_key = fkey)
+    (filename_key : fkey) =
   let int_value = 42 in
   let string_value = "hello world" in
 
   let int_tag, string_tag =
-    write_values_exn
+    M.write_values_exn
       ~f:(fun writer ->
-        let int_tag = write_value writer (module Int) int_value in
-        let string_tag = write_value writer (module String) string_value in
+        let int_tag = M.write_value writer (module Int) int_value in
+        let string_tag = M.write_value writer (module String) string_value in
         (int_tag, string_tag) )
-      filename
+      filename_key
   in
 
-  let int_result = read (module Int) int_tag |> Or_error.ok_exn in
-  let string_result = read (module String) string_tag |> Or_error.ok_exn in
-  cleanup_file filename ;
+  let int_result = M.read (module Int) int_tag |> Or_error.ok_exn in
+  let string_result = M.read (module String) string_tag |> Or_error.ok_exn in
 
   Alcotest.(check int) "Single int value round-trip" int_value int_result ;
   Alcotest.(check string)
     "Single string value round-trip" string_value string_result
+
+(* Test basic write and read with a single value *)
+let test_single_values () =
+  let filename = temp_filename "single_value" in
+  let res =
+    Or_error.try_with
+    @@ fun () -> simplest_test (module Multi_key_file_storage) filename
+  in
+  cleanup_file filename ; Or_error.ok_exn res
 
 (* Test multiple values of the same type *)
 let test_multiple_same_type () =
   let filename = temp_filename "multiple_same" in
   let original_values = [ 1; 2; 3; 42; 100; 999 ] in
 
-  (* Write *)
-  let tags =
-    write_values_exn
-      ~f:(fun writer ->
-        List.map original_values ~f:(fun v ->
-            write_value writer (module Int) v ) )
-      filename
-  in
-
-  let results =
+  let res =
+    Or_error.try_with
+    @@ fun () ->
+    let tags =
+      write_values_exn
+        ~f:(fun writer ->
+          List.map original_values ~f:(fun v ->
+              write_value writer (module Int) v ) )
+        filename
+    in
     List.map tags ~f:(fun tag -> read (module Int) tag |> Or_error.ok_exn)
   in
   cleanup_file filename ;
+  Or_error.ok_exn res
+  |> Alcotest.(check (list int))
+       "Multiple int values round-trip" original_values
 
-  Alcotest.(check (list int))
-    "Multiple int values round-trip" original_values results
+let test_custom_filename_key () =
+  let filename x = Data_hash_lib.State_hash.to_decimal_string x ^ ".dat" in
+  let state_hash : Data_hash_lib.State_hash.t =
+    Base_quickcheck.Generator.generate Data_hash_lib.State_hash.gen ~size:1
+      ~random:(Splittable_random.State.create Random.State.default)
+  in
+  let module M = Make_custom (struct
+    type filename_key = Data_hash_lib.State_hash.t
+
+    let filename = filename
+  end) in
+  let res =
+    Or_error.try_with @@ fun () -> simplest_test (module M) state_hash
+  in
+  cleanup_file (filename state_hash) ;
+  Or_error.ok_exn res
 
 module Write_and_test_later = struct
   type read_and_check_t = { read_and_check : unit -> unit }
@@ -122,18 +147,23 @@ let test_property () =
   let file1 = temp_filename "file1" in
   let file2 = temp_filename "file2" in
   let file3 = temp_filename "file3" in
-  Quickcheck.test three_op_groups ~f:(fun write_three_groups ->
-      let read_ops =
-        write_values_exn file1 ~f:(fun writer1 ->
-            write_values_exn file2 ~f:(fun writer2 ->
-                write_values_exn file3 ~f:(fun writer3 ->
-                    write_three_groups (writer1, writer2, writer3) ) ) )
-      in
-      List.iter read_ops ~f:(fun { Write_and_test_later.read_and_check } ->
-          read_and_check () ) ) ;
+  let res =
+    Or_error.try_with
+    @@ fun () ->
+    Quickcheck.test three_op_groups ~f:(fun write_three_groups ->
+        let read_ops =
+          write_values_exn file1 ~f:(fun writer1 ->
+              write_values_exn file2 ~f:(fun writer2 ->
+                  write_values_exn file3 ~f:(fun writer3 ->
+                      write_three_groups (writer1, writer2, writer3) ) ) )
+        in
+        List.iter read_ops ~f:(fun { Write_and_test_later.read_and_check } ->
+            read_and_check () ) )
+  in
   cleanup_file file1 ;
   cleanup_file file2 ;
-  cleanup_file file3
+  cleanup_file file3 ;
+  Or_error.ok_exn res
 
 (* Main test suite *)
 let () =
@@ -141,6 +171,8 @@ let () =
     [ ( "Basic operations"
       , [ Alcotest.test_case "Single value write/read" `Quick test_single_values
         ; Alcotest.test_case "Multiple same type" `Quick test_multiple_same_type
+        ; Alcotest.test_case "Custom filename key" `Quick
+            test_custom_filename_key
         ; Alcotest.test_case "Property test" `Quick test_property
         ] )
     ]

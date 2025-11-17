@@ -6,9 +6,9 @@
   core
   core_kernel
   bin_prot
-  qcheck-alcotest
   ;; local libraries
-  multi_key_file_storage)
+  multi_key_file_storage
+  data_hash_lib)
  (instrumentation
   (backend bisect_ppx))
  (preprocess
