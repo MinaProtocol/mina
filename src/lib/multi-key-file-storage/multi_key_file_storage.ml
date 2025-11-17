@@ -1,0 +1,96 @@
+open Core_kernel
+
+(** Tag containing file location and size information for a stored value *)
+type 'a tag = { filename : string; offset : int64; size : int }
+
+(** Buffer size for writing: 128 KB *)
+let buffer_size = 131072
+
+(* Flush buffer to file when it exceeds threshold *)
+let flush_buffer oc buffer =
+  Out_channel.output_string oc (Buffer.contents buffer)
+
+type writer_t =
+  { f : 'a. (module Bin_prot.Binable.S with type t = 'a) -> 'a -> 'a tag }
+
+let write_value :
+    writer_t -> (module Bin_prot.Binable.S with type t = 'a) -> 'a -> 'a tag =
+ fun { f } -> f
+
+(* Write key function provided to the callback *)
+let make_writer ~oc ~filename ~buffer : writer_t =
+  { f =
+      (fun (type a) (module B : Bin_prot.Binable.S with type t = a) (value : a) ->
+        (* Serialize the value to a bigstring *)
+        let serialized_size = B.bin_size_t value in
+        let buf = Bigstring.create serialized_size in
+        let written = B.bin_write_t buf ~pos:0 value in
+        assert (written = serialized_size) ;
+
+        (* Convert bigstring to string for writing *)
+        let data = Bigstring.to_string buf in
+
+        (* Create tag before writing *)
+        let tag =
+          { filename
+          ; offset = Int64.of_int @@ Buffer.length buffer
+          ; size = serialized_size
+          }
+        in
+
+        (* Add to buffer *)
+        Buffer.add_string buffer data ;
+
+        (* Flush if buffer is large enough *)
+        if Buffer.length buffer >= buffer_size then (
+          flush_buffer oc buffer ; Buffer.clear buffer ) ;
+
+        tag )
+  }
+
+(** Write multiple keys to a database file with buffered I/O *)
+let write_values_exn ~f filename =
+  let do_writing oc =
+    (* Buffer for accumulating writes *)
+    let buffer = Buffer.create buffer_size in
+    let writer = make_writer ~oc ~filename ~buffer in
+
+    (* Call user function with write_value *)
+    let result = f writer in
+
+    (* Flush any remaining data *)
+    if Buffer.length buffer > 0 then flush_buffer oc buffer ;
+
+    result
+  in
+  Out_channel.with_file filename ~binary:true ~f:do_writing
+
+(** Read a value from the database using a tag *)
+let read :
+    type a. (module Bin_prot.Binable.S with type t = a) -> a tag -> a Or_error.t
+    =
+ fun (module B : Bin_prot.Binable.S with type t = a) tag ->
+  let do_reading ic =
+    (* Seek to the specified offset *)
+    In_channel.seek ic tag.offset ;
+
+    (* Read the exact number of bytes *)
+    let buffer = Bytes.create tag.size in
+    In_channel.really_input_exn ic ~buf:buffer ~pos:0 ~len:tag.size ;
+
+    (* Deserialize using bin_prot *)
+    let bigstring = Bigstring.of_bytes buffer in
+    let pos_ref = ref 0 in
+    let%bind.Or_error value =
+      Or_error.try_with ~backtrace:true
+      @@ fun () -> B.bin_read_t bigstring ~pos_ref
+    in
+    if !pos_ref <> tag.size then
+      Or_error.error_string
+        (sprintf "Size mismatch: expected %d bytes, read %d bytes" tag.size
+           !pos_ref )
+    else Ok value
+  in
+  Or_error.tag ~tag:tag.filename
+  @@ Or_error.try_with_join ~backtrace:true
+  @@ fun () -> In_channel.with_file tag.filename ~binary:true ~f:do_reading
