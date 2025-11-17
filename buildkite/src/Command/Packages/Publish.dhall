@@ -88,7 +88,7 @@ let Spec =
             ]
           , channel = DebianChannel.Type.Compatible
           , depends_on = [] : List Command.TaggedKey.Type
-          , docker_repo = DockerRepo.Type.InternalEurope
+          , docker_repo = DockerRepo.Type.Internal
           , verify = True
           , branch = ""
           , architectures = [ Architecture.Type.Amd64, Architecture.Type.Arm64 ]
