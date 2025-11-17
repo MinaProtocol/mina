@@ -3093,13 +3093,28 @@ module Hardfork_config = struct
 
   let write_config_file ~staging_path ~final_path daemon_config =
     let dir = Filename.dirname final_path in
-    let backup_name = dir ^/ "daemon.berkeley.json" in
     (* Step 1: Backup existing daemon.json if present *)
+    let rec find_backup_path ?idx () =
+      let preferred_name =
+        match idx with
+        | None ->
+            Printf.sprintf "daemon.berkeley.json"
+        | Some idx ->
+            Printf.sprintf "daemon.berkeley.%d.json" idx
+      in
+      let test_path = dir ^/ preferred_name in
+      match%bind Sys.file_exists test_path with
+      | `Yes ->
+          find_backup_path ~idx:(Option.value_map idx ~default:1 ~f:Int.succ) ()
+      | _ ->
+          return test_path
+    in
     let%bind () =
       match%bind Sys.file_exists final_path with
       | `Yes ->
           let%bind contents = Async.Reader.file_contents final_path in
-          Async.Writer.save backup_name ~contents ~fsync:true
+          let%bind backup_path = find_backup_path () in
+          Async.Writer.save backup_path ~contents ~fsync:true
       | _ ->
           return ()
     in
