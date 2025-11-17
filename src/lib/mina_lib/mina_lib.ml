@@ -3092,30 +3092,26 @@ module Hardfork_config = struct
       ~next_epoch_seed:(Epoch_seed.to_base58_check next_epoch_seed)
 
   let write_config_file ~staging_path ~final_path daemon_config =
-    let open Deferred.Or_error.Let_syntax in
     let dir = Filename.dirname final_path in
     let backup_name = dir ^/ "daemon.berkeley.json" in
     (* Step 1: Backup existing daemon.json if present *)
     let%bind () =
-      match%bind.Deferred Sys.file_exists final_path with
+      match%bind Sys.file_exists final_path with
       | `Yes ->
-          let%bind.Deferred contents = Async.Reader.file_contents final_path in
+          let%bind contents = Async.Reader.file_contents final_path in
           Async.Writer.save backup_name ~contents ~fsync:true
-          |> Deferred.map ~f:Or_error.return
       | _ ->
           return ()
     in
-    (* Step 2: Write new config to staging location with fsync *)
-    let contents =
-      Yojson.Safe.to_string (Runtime_config.to_yojson daemon_config)
+    (* Step 2: Write new config to location with fsync atomically *)
+    let%map () =
+      Async.Writer.with_file_atomic ~temp_file:staging_path ~fsync:true
+        final_path ~f:(fun writer ->
+          Yojson.Safe.to_string (Runtime_config.to_yojson daemon_config)
+          |> Async.Writer.write writer ;
+          Deferred.unit )
     in
-    let%bind () =
-      Async.Writer.save staging_path ~contents ~fsync:true
-      |> Deferred.map ~f:Or_error.return
-    in
-    (* Step 3: Atomic rename from staging to final location *)
-    Unix.rename ~src:staging_path ~dst:final_path
-    |> Deferred.map ~f:Or_error.return
+    Ok ()
 
   let write_stable_config_directory ~logger ~genesis_state_timestamp
       ~global_slot_since_genesis ~state_hash ~staking_epoch_seed
