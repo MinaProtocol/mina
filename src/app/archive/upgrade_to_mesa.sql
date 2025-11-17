@@ -18,7 +18,7 @@ SET archive.current_protocol_version = '3.0.0';
 -- Post-HF protocol version. This one corresponds to Mesa, specifically
 SET archive.target_protocol_version = '4.0.0';
 -- The version of this script. If you modify the script, please bump the version
-SET archive.migration_version = '0.0.4';
+SET archive.migration_version = '0.0.5';
 
 -- TODO: put below in a common script
 
@@ -29,7 +29,7 @@ BEGIN
     END IF;
 END $$;
 
-CREATE OR REPLACE FUNCTION set_migration_status(p_target_status migration_status)
+CREATE FUNCTION pg_temp.set_migration_status(p_target_status migration_status)
 RETURNS VOID AS $$
 DECLARE
     target_protocol_version  text := current_setting('archive.target_protocol_version');
@@ -114,7 +114,7 @@ END$$;
 
 -- 2. `zkapp_states_nullable`: Add nullable columns element8..element31
 
-CREATE OR REPLACE FUNCTION add_zkapp_states_nullable_element(p_element_num INT)
+CREATE FUNCTION pg_temp.add_zkapp_states_nullable_element(p_element_num INT)
 RETURNS VOID AS $$
 DECLARE
     col_name TEXT := 'element' || p_element_num;
@@ -131,39 +131,39 @@ BEGIN
 
 EXCEPTION
     WHEN OTHERS THEN
-        PERFORM set_migration_status('failed'::migration_status);
+        PERFORM pg_temp.set_migration_status('failed'::migration_status);
         RAISE EXCEPTION 'An error occurred while adding column % to zkapp_states_nullable: %', col_name, SQLERRM;
 END
 $$ LANGUAGE plpgsql;
 
-SELECT add_zkapp_states_nullable_element(8);
-SELECT add_zkapp_states_nullable_element(9);
-SELECT add_zkapp_states_nullable_element(10);
-SELECT add_zkapp_states_nullable_element(11);
-SELECT add_zkapp_states_nullable_element(12);
-SELECT add_zkapp_states_nullable_element(13);
-SELECT add_zkapp_states_nullable_element(14);
-SELECT add_zkapp_states_nullable_element(15);
-SELECT add_zkapp_states_nullable_element(16);
-SELECT add_zkapp_states_nullable_element(17);
-SELECT add_zkapp_states_nullable_element(18);
-SELECT add_zkapp_states_nullable_element(19);
-SELECT add_zkapp_states_nullable_element(20);
-SELECT add_zkapp_states_nullable_element(21);
-SELECT add_zkapp_states_nullable_element(22);
-SELECT add_zkapp_states_nullable_element(23);
-SELECT add_zkapp_states_nullable_element(24);
-SELECT add_zkapp_states_nullable_element(25);
-SELECT add_zkapp_states_nullable_element(26);
-SELECT add_zkapp_states_nullable_element(27);
-SELECT add_zkapp_states_nullable_element(28);
-SELECT add_zkapp_states_nullable_element(29);
-SELECT add_zkapp_states_nullable_element(30);
-SELECT add_zkapp_states_nullable_element(31);
+SELECT pg_temp.add_zkapp_states_nullable_element(8);
+SELECT pg_temp.add_zkapp_states_nullable_element(9);
+SELECT pg_temp.add_zkapp_states_nullable_element(10);
+SELECT pg_temp.add_zkapp_states_nullable_element(11);
+SELECT pg_temp.add_zkapp_states_nullable_element(12);
+SELECT pg_temp.add_zkapp_states_nullable_element(13);
+SELECT pg_temp.add_zkapp_states_nullable_element(14);
+SELECT pg_temp.add_zkapp_states_nullable_element(15);
+SELECT pg_temp.add_zkapp_states_nullable_element(16);
+SELECT pg_temp.add_zkapp_states_nullable_element(17);
+SELECT pg_temp.add_zkapp_states_nullable_element(18);
+SELECT pg_temp.add_zkapp_states_nullable_element(19);
+SELECT pg_temp.add_zkapp_states_nullable_element(20);
+SELECT pg_temp.add_zkapp_states_nullable_element(21);
+SELECT pg_temp.add_zkapp_states_nullable_element(22);
+SELECT pg_temp.add_zkapp_states_nullable_element(23);
+SELECT pg_temp.add_zkapp_states_nullable_element(24);
+SELECT pg_temp.add_zkapp_states_nullable_element(25);
+SELECT pg_temp.add_zkapp_states_nullable_element(26);
+SELECT pg_temp.add_zkapp_states_nullable_element(27);
+SELECT pg_temp.add_zkapp_states_nullable_element(28);
+SELECT pg_temp.add_zkapp_states_nullable_element(29);
+SELECT pg_temp.add_zkapp_states_nullable_element(30);
+SELECT pg_temp.add_zkapp_states_nullable_element(31);
 
 -- 3. `zkapp_states`: Add columns element8..element31
 
-CREATE OR REPLACE FUNCTION get_zero_field_id() RETURNS int AS $$
+CREATE FUNCTION pg_temp.get_zero_field_id() RETURNS int AS $$
 DECLARE
   result int;
   zero text := '0';
@@ -182,11 +182,11 @@ BEGIN
 END
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION add_zkapp_states_element(p_element_num INT)
+CREATE FUNCTION pg_temp.add_zkapp_states_element(p_element_num INT)
 RETURNS VOID AS $$
 DECLARE
     col_name TEXT := 'element' || p_element_num;
-    default_id int := get_zero_field_id();
+    default_id int := pg_temp.get_zero_field_id();
 BEGIN
 
     RAISE DEBUG 'Adding column % for zkapp_states', col_name;
@@ -201,51 +201,51 @@ BEGIN
 
 EXCEPTION
     WHEN OTHERS THEN
-        PERFORM set_migration_status('failed'::migration_status);
+        PERFORM pg_temp.set_migration_status('failed'::migration_status);
         RAISE EXCEPTION 'An error occurred while adding column % to zkapp_states: %', col_name, SQLERRM;
 END
 $$ LANGUAGE plpgsql;
 
 DO $$
 DECLARE
-    default_id int := get_zero_field_id();
+    default_id int := pg_temp.get_zero_field_id();
 BEGIN
     RAISE NOTICE 'Zero field in table zkapp_field is of id = %', default_id;
 END
 $$;
 
-SELECT add_zkapp_states_element(8);
-SELECT add_zkapp_states_element(9);
-SELECT add_zkapp_states_element(10);
-SELECT add_zkapp_states_element(11);
-SELECT add_zkapp_states_element(12);
-SELECT add_zkapp_states_element(13);
-SELECT add_zkapp_states_element(14);
-SELECT add_zkapp_states_element(15);
-SELECT add_zkapp_states_element(16);
-SELECT add_zkapp_states_element(17);
-SELECT add_zkapp_states_element(18);
-SELECT add_zkapp_states_element(19);
-SELECT add_zkapp_states_element(20);
-SELECT add_zkapp_states_element(21);
-SELECT add_zkapp_states_element(22);
-SELECT add_zkapp_states_element(23);
-SELECT add_zkapp_states_element(24);
-SELECT add_zkapp_states_element(25);
-SELECT add_zkapp_states_element(26);
-SELECT add_zkapp_states_element(27);
-SELECT add_zkapp_states_element(28);
-SELECT add_zkapp_states_element(29);
-SELECT add_zkapp_states_element(30);
-SELECT add_zkapp_states_element(31);
+SELECT pg_temp.add_zkapp_states_element(8);
+SELECT pg_temp.add_zkapp_states_element(9);
+SELECT pg_temp.add_zkapp_states_element(10);
+SELECT pg_temp.add_zkapp_states_element(11);
+SELECT pg_temp.add_zkapp_states_element(12);
+SELECT pg_temp.add_zkapp_states_element(13);
+SELECT pg_temp.add_zkapp_states_element(14);
+SELECT pg_temp.add_zkapp_states_element(15);
+SELECT pg_temp.add_zkapp_states_element(16);
+SELECT pg_temp.add_zkapp_states_element(17);
+SELECT pg_temp.add_zkapp_states_element(18);
+SELECT pg_temp.add_zkapp_states_element(19);
+SELECT pg_temp.add_zkapp_states_element(20);
+SELECT pg_temp.add_zkapp_states_element(21);
+SELECT pg_temp.add_zkapp_states_element(22);
+SELECT pg_temp.add_zkapp_states_element(23);
+SELECT pg_temp.add_zkapp_states_element(24);
+SELECT pg_temp.add_zkapp_states_element(25);
+SELECT pg_temp.add_zkapp_states_element(26);
+SELECT pg_temp.add_zkapp_states_element(27);
+SELECT pg_temp.add_zkapp_states_element(28);
+SELECT pg_temp.add_zkapp_states_element(29);
+SELECT pg_temp.add_zkapp_states_element(30);
+SELECT pg_temp.add_zkapp_states_element(31);
 
 -- 4. Update schema_history
 
 DO $$
 BEGIN
-    PERFORM set_migration_status('applied'::migration_status);
+    PERFORM pg_temp.set_migration_status('applied'::migration_status);
 EXCEPTION
     WHEN OTHERS THEN
-        PERFORM set_migration_status('failed'::migration_status);
+        PERFORM pg_temp.set_migration_status('failed'::migration_status);
         RAISE;
 END$$

@@ -194,18 +194,10 @@ let successor_hashes t hash =
   let node = Hashtbl.find_exn t.table hash in
   node.successor_hashes
 
-let rec successor_hashes_rec t hash =
-  List.bind (successor_hashes t hash) ~f:(fun succ_hash ->
-      succ_hash :: successor_hashes_rec t succ_hash )
-
 let successors t breadcrumb =
   List.map
     (successor_hashes t (Breadcrumb.state_hash breadcrumb))
     ~f:(find_exn t)
-
-let rec successors_rec t breadcrumb =
-  List.bind (successors t breadcrumb) ~f:(fun succ ->
-      succ :: successors_rec t succ )
 
 let path_map ?max_length t breadcrumb ~f =
   let rec find_path b count_opt acc =
@@ -303,58 +295,68 @@ let visualize_to_string t =
   Format.pp_print_flush formatter () ;
   Buffer.contents buf
 
-(* given an heir, calculate the diff that will transition the root to that heir *)
-let calculate_root_transition_diff t heir =
-  let root = root t in
-  let heir_hash = Breadcrumb.state_hash heir in
-  let heir_staged_ledger = Breadcrumb.staged_ledger heir in
-  let heir_siblings =
-    List.filter (successors t root) ~f:(fun breadcrumb ->
-        not (State_hash.equal heir_hash (Breadcrumb.state_hash breadcrumb)) )
-  in
-  let garbage_breadcrumbs =
-    List.bind heir_siblings ~f:(fun sibling ->
-        sibling :: successors_rec t sibling )
-    |> List.rev
-  in
-  let garbage_nodes =
-    List.map garbage_breadcrumbs ~f:(fun breadcrumb ->
-        let open Diff.Node_list in
-        let transition = Breadcrumb.validated_transition breadcrumb in
-        let scan_state =
-          Staged_ledger.scan_state (Breadcrumb.staged_ledger breadcrumb)
-        in
-        { transition; scan_state } )
-  in
-  let new_scan_state = Staged_ledger.scan_state heir_staged_ledger in
-  let protocol_states =
-    Protocol_states_for_root_scan_state.protocol_states_for_next_root_scan_state
-      t.protocol_states_for_root_scan_state ~new_scan_state
-      ~old_root_state:(Breadcrumb.protocol_state_with_hashes root)
-  in
-  let heir_transition =
-    Breadcrumb.validated_transition heir
-    |> Mina_block.Validated.read_all_proofs_from_disk
-  in
-  let new_scan_state_unwrapped =
-    Staged_ledger.Scan_state.read_all_proofs_from_disk new_scan_state
-  in
-  let new_root_data =
-    Root_data.Limited.Stable.Latest.create ~transition:heir_transition
-      ~scan_state:new_scan_state_unwrapped
-      ~pending_coinbase:
-        (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
-      ~protocol_states
-  in
-  let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
-  Diff.Full.E.E
-    (Root_transitioned
-       { new_root = new_root_data
-       ; garbage = Full garbage_nodes
-       ; old_root_scan_state =
-           Full (Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
-       ; just_emitted_a_proof
-       } )
+module Util = struct
+  let rec recursive_list_bind ~f init =
+    List.bind (f init) ~f:(fun succ -> succ :: recursive_list_bind ~f succ)
+
+  (** given an heir, calculate the diff that will transition
+      the root to that heir (assuming parent is the root) *)
+  let calculate_root_transition_diff ~protocol_states_for_root_scan_state
+      ~parent ~successors heir =
+    let heir_hash = Breadcrumb.state_hash heir in
+    let heir_staged_ledger = Breadcrumb.staged_ledger heir in
+    let heir_siblings =
+      List.filter (successors parent) ~f:(fun breadcrumb ->
+          not (State_hash.equal heir_hash (Breadcrumb.state_hash breadcrumb)) )
+    in
+    let garbage_breadcrumbs =
+      List.bind heir_siblings ~f:(fun sibling ->
+          sibling :: recursive_list_bind ~f:successors sibling )
+      |> List.rev
+    in
+    let garbage_nodes =
+      List.map garbage_breadcrumbs ~f:(fun breadcrumb ->
+          let open Diff.Node_list in
+          let transition = Breadcrumb.validated_transition breadcrumb in
+          let scan_state =
+            Staged_ledger.scan_state (Breadcrumb.staged_ledger breadcrumb)
+          in
+          { transition; scan_state } )
+    in
+    let new_scan_state = Staged_ledger.scan_state heir_staged_ledger in
+    let protocol_states =
+      Protocol_states_for_root_scan_state
+      .protocol_states_for_next_root_scan_state
+        protocol_states_for_root_scan_state ~new_scan_state
+        ~old_root_state:(Breadcrumb.protocol_state_with_hashes parent)
+    in
+    let heir_transition =
+      Breadcrumb.validated_transition heir
+      |> Mina_block.Validated.read_all_proofs_from_disk
+    in
+    let new_scan_state_unwrapped =
+      Staged_ledger.Scan_state.read_all_proofs_from_disk new_scan_state
+    in
+    let new_root_data =
+      Root_data.Limited.Stable.Latest.create ~transition:heir_transition
+        ~scan_state:new_scan_state_unwrapped
+        ~pending_coinbase:
+          (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
+        ~protocol_states
+    in
+    let just_emitted_a_proof = Breadcrumb.just_emitted_a_proof heir in
+    { Diff.Root_transition.new_root = new_root_data
+    ; garbage = Full garbage_nodes
+    ; old_root_scan_state =
+        Full (Breadcrumb.staged_ledger parent |> Staged_ledger.scan_state)
+    ; just_emitted_a_proof
+    }
+
+  let to_protocol_states_map_exn protocol_states =
+    List.map protocol_states ~f:(fun s ->
+        (State_hash.With_state_hashes.state_hash s, s) )
+    |> State_hash.Map.of_alist_exn
+end
 
 let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     ~new_root_protocol_states ~garbage ~enable_epoch_ledger_sync =
@@ -459,7 +461,7 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
      * state we are transitioning to *)
     if Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb then (
       let config =
-        Persistent_root.Instance.Config.make_potential_snarked_ledger
+        Persistent_root.Config.make_potential_snarked_ledger
           t.persistent_root_instance.factory
       in
       let () =
@@ -547,12 +549,8 @@ let move_root ({ context = (module Context); _ } as t) ~new_root_hash
     because the protocol states corresponding to those transactions won't be part
     of the new_root_protocol_states since those transactions would have been
     deleted from the scan state after emitting the proof*)
-  let new_protocol_states_map =
-    new_root_protocol_states
-    |> List.map ~f:(fun s -> (State_hash.With_state_hashes.state_hash s, s))
-    |> State_hash.Map.of_alist_exn
-  in
-  t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
+  t.protocol_states_for_root_scan_state <-
+    Util.to_protocol_states_map_exn new_root_protocol_states ;
   let new_root_node = { new_root_node with breadcrumb = new_root_breadcrumb } in
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
@@ -582,7 +580,13 @@ let calculate_diffs ({ context = (module Context); _ } as t) breadcrumb =
       let diffs =
         if parent_node.length + 1 - root_node.length > t.max_length then
           let heir = find_exn t (List.hd_exn (hash_path t breadcrumb)) in
-          calculate_root_transition_diff t heir :: diffs
+          let root_transition =
+            Util.calculate_root_transition_diff ~parent:(root t)
+              ~protocol_states_for_root_scan_state:
+                t.protocol_states_for_root_scan_state ~successors:(successors t)
+              heir
+          in
+          Diff.Full.E.E (Root_transitioned root_transition) :: diffs
         else diffs
       in
       (* check if new breadcrumb will be best tip *)
