@@ -1,7 +1,17 @@
 open Core_kernel
+module Filename = Mina_stdlib.Bounded_types.String
 
-(** Tag containing file location and size information for a stored value *)
-type 'a tag = { filename : string; offset : int64; size : int }
+module Tag = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'a t =
+        { filename : Filename.Stable.V1.t; offset : int64; size : int }
+    end
+  end]
+end
+
+type 'a tag = 'a Tag.t
 
 (** Buffer size for writing: 128 KB *)
 let buffer_size = 131072
@@ -32,7 +42,7 @@ let make_writer ~oc ~filename ~buffer : writer_t =
 
         (* Create tag before writing *)
         let tag =
-          { filename
+          { Tag.filename
           ; offset = Int64.of_int @@ Buffer.length buffer
           ; size = serialized_size
           }

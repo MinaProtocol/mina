@@ -1,8 +1,8 @@
 (library
  (name multi_key_file_storage)
  (public_name multi_key_file_storage)
- (libraries core_kernel bin_prot)
+ (libraries core_kernel bin_prot mina_stdlib)
  (preprocess
-  (pps ppx_jane))
+  (pps ppx_jane ppx_version))
  (instrumentation
   (backend bisect_ppx)))
