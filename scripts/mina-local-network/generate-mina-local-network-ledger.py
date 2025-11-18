@@ -1,3 +1,4 @@
+# Note: this script creates 2 ledgers json file, annotated_ledger.json and genesis_ledger.json
 import csv
 import glob
 import json
@@ -24,6 +25,8 @@ DEFAULT_SERVICES = {"faucet": 100000 * (10**9),
                     "echo": 100 * (10**9),
                     "snark_coordinator": 5 * (10**9)}
 
+DEFAULT_GENESIS_LEDGER_FILE = SCRIPT_DIR / 'genesis_ledger.json'
+DEFAULT_ANNOTATED_LEDGER_FILE = SCRIPT_DIR / 'annotated_ledger.json'
 
 def encode_nanominas(nanominas):
     s = str(nanominas)
@@ -79,6 +82,16 @@ def encode_nanominas(nanominas):
 @click.option('--snark-coordinator-accounts-directory',
               default=DEFAULT_SNARK_COORDINATOR_KEYS_DIR.absolute(),
               help='Directory where Snark Coordinator Account Keys will be stored.')
+@click.option(
+    '--out-genesis-ledger-file',
+    default=DEFAULT_GENESIS_LEDGER_FILE.absolute(),
+    help='output location of generated genesis ledger'
+)
+@click.option(
+    '--out-annotated-ledger-file',
+    default=DEFAULT_ANNOTATED_LEDGER_FILE.absolute(),
+    help='output location of generated annotated ledger'
+)
 def generate_ledger(generate_remainder,
                     service_accounts_directory,
                     num_whale_accounts,
@@ -88,7 +101,10 @@ def generate_ledger(generate_remainder,
                     online_fish_accounts_directory,
                     offline_fish_accounts_directory,
                     staker_csv_file,
-                    snark_coordinator_accounts_directory):
+                    snark_coordinator_accounts_directory,
+                    out_genesis_ledger_file,
+                    out_annotated_ledger_file,
+                    ):
     """
     Generates a Genesis Ledger based on previously generated Service, Snark Worker, Stakers, Whale, Fish, and Block Producer keys.
     If keys are not present on the filesystem at the specified location, they are not generated.
@@ -424,24 +440,25 @@ def generate_ledger(generate_remainder,
     print()
     # TODO: dynamic num_accounts
     # Write ledger and annotated ledger to disk
-    with open(str(SCRIPT_DIR / 'genesis_ledger.json'), 'w') as outfile:
+    out_genesis_ledger_file = str(out_genesis_ledger_file)
+    with open(out_genesis_ledger_file, 'w') as outfile:
         ledger_wrapper = {
             "name": "release",
             "num_accounts": 250,
             "accounts": ledger
         }
         json.dump(ledger_wrapper, outfile, indent=1)
-        print("Ledger Path: " + str(SCRIPT_DIR / 'genesis_ledger.json'))
+        print(f"Ledger Path: {out_genesis_ledger_file}")
 
-    with open(str(SCRIPT_DIR / 'annotated_ledger.json'), 'w') as outfile:
+    out_annotated_ledger_file = str(out_annotated_ledger_file)
+    with open(out_annotated_ledger_file, 'w') as outfile:
         annotated_ledger_wrapper = {
             "name": "annotated_release",
             "num_accounts": 250,
             "accounts": ledger
         }
         json.dump(annotated_ledger_wrapper, outfile, indent=1)
-        print("Annotated Ledger Path: " +
-              str(SCRIPT_DIR / 'annotated_ledger.json'))
+        print(f"Annotated Ledger Path: {out_annotated_ledger_file}")
 
 
 if __name__ == '__main__':

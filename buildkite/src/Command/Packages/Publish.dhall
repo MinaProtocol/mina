@@ -26,6 +26,8 @@ let DebianVersions = ../../Constants/DebianVersions.dhall
 
 let DebianRepo = ../../Constants/DebianRepo.dhall
 
+let DockerRepo = ../../Constants/DockerRepo.dhall
+
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
 let Command = ../Base.dhall
@@ -72,6 +74,7 @@ let Spec =
           , depends_on : List Command.TaggedKey.Type
           , branch : Text
           , architectures : List Architecture.Type
+          , docker_repo : DockerRepo.Type
           , if_ : Optional Text
           }
       , default =
@@ -89,6 +92,7 @@ let Spec =
           , verify = True
           , branch = ""
           , architectures = [ Architecture.Type.Amd64, Architecture.Type.Arm64 ]
+          , docker_repo = DockerRepo.Type.Internal
           , if_ = None Text
           }
       }
@@ -251,6 +255,8 @@ let publish
                                   ++  "--target-version ${r.value} "
                                   ++  "--codenames ${codenames} "
                                   ++  "--only-dockers "
+                                  ++  "--docker-repo ${DockerRepo.show
+                                                         spec.docker_repo} "
                                   ++  "--force-upload-debians "
                                 )
                             ]
