@@ -1,69 +1,5 @@
-open Core_kernel
-
-module type Inputs_intf = sig
-  module Account : sig
-    type t
-  end
-
-  module Account_id : sig
-    type t
-
-    include Comparable.S with type t := t
-  end
-
-  module Hash : sig
-    type t
-  end
-
-  module Token_id : sig
-    type t
-
-    include Comparable.S with type t := t
-  end
-
-  module Location : sig
-    type t
-
-    include Comparable.S with type t := t
-
-    module Addr : sig
-      type t
-
-      include Comparable.S with type t := t
-    end
-  end
-end
-
-module type Intf = sig
-  type account
-
-  type account_id
-
-  type 'a account_id_map
-
-  type account_id_set
-
-  type 'a address_map
-
-  type hash
-
-  type location
-
-  type 'a location_map
-
-  type 'a token_id_map
-
-  type t =
-    { accounts : account location_map
-    ; token_owners : account_id token_id_map (* Fixed: was token_map *)
-    ; hashes : hash address_map
-    ; locations : location account_id_map
-    ; non_existent_accounts : account_id_set
-    }
-end
-
-module Make (I : Inputs_intf) :
-  Intf
+module Make (I : Mask_maps_intf.Inputs_intf) :
+  Mask_maps_intf.S
     with type account := I.Account.t
      and type account_id := I.Account_id.t
      and type 'a account_id_map := 'a I.Account_id.Map.t
@@ -73,29 +9,11 @@ module Make (I : Inputs_intf) :
      and type location := I.Location.t
      and type 'a location_map := 'a I.Location.Map.t
      and type 'a token_id_map := 'a I.Token_id.Map.t = struct
-  type account = I.Account.t
-
-  type account_id = I.Account_id.t
-
-  type 'a account_id_map = 'a I.Account_id.Map.t
-
-  type account_id_set = I.Account_id.Set.t
-
-  type 'a address_map = 'a I.Location.Addr.Map.t
-
-  type hash = I.Hash.t
-
-  type location = I.Location.t
-
-  type 'a location_map = 'a I.Location.Map.t
-
-  type 'a token_id_map = 'a I.Token_id.Map.t
-
   type t =
-    { accounts : account location_map
-    ; token_owners : account_id token_id_map
-    ; hashes : hash address_map
-    ; locations : location account_id_map
-    ; non_existent_accounts : account_id_set
+    { accounts : I.Account.t I.Location.Map.t
+    ; token_owners : I.Account_id.t I.Token_id.Map.t
+    ; hashes : I.Hash.t I.Location.Addr.Map.t
+    ; locations : I.Location.t I.Account_id.Map.t
+    ; non_existent_accounts : I.Account_id.Set.t
     }
 end

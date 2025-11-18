@@ -200,14 +200,6 @@ module Ledger_inner = struct
     module Mask_maps = Mask_maps
   end
 
-  type maps_t = Mask_maps.t =
-    { accounts : Account.t Location_at_depth.Map.t
-    ; token_owners : Account_id.t Token_id.Map.t
-    ; hashes : Hash.t Location_at_depth.Addr.Map.t
-    ; locations : Location_at_depth.t Account_id.Map.t
-    ; non_existent_accounts : Account_id.Set.t
-    }
-
   module Unstable_inputs = Make_inputs (Account.Unstable) (Hash.Unstable)
   module Hardfork_inputs = Make_inputs (Account.Hardfork) (Hash.Hardfork)
 
