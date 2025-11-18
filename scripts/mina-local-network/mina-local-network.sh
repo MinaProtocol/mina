@@ -129,7 +129,7 @@ help() {
                                          |   Default: ${SNARK_WORKER_FEE}
 -lp  |--log-precomputed-blocks           | Log precomputed blocks
                                          |   Default: ${LOG_PRECOMPUTED_BLOCKS}
--pl  |--proof-level <proof-level>        | Proof level (currently consumed by SNARK Workers only)
+-pl  |--proof-level <proof-level>        | Proof level
                                          |   Default: ${PROOF_LEVEL}
 -c   |--config                           | Config to use. Set to 'reset' to generate a new config, new keypairs and new ledgers, 'inherit' to reuse the one found in previously deployed networks, 'inherit_with:CONFIG_PATH,GENESIS_LEDGER_PATH' to inherit keys with new config & genesis ledgers overridden. Note that any config parameters that should alter the config have priority over the passed in config
                                          |   Default: ${CONFIG_MODE}
@@ -209,6 +209,7 @@ exec-daemon() {
     --file-log-level "${FILE_LOG_LEVEL}" \
     --precomputed-blocks-file "${FOLDER}"/precomputed_blocks.log \
     --log-precomputed-blocks ${LOG_PRECOMPUTED_BLOCKS} \
+    --proof-level "${PROOF_LEVEL}" \
     $@ ${extra_opts[@]}
 }
 
