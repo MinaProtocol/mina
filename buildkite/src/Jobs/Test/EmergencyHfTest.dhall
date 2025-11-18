@@ -14,6 +14,8 @@ let RunWithPostgres = ../../Command/RunWithPostgres.dhall
 
 let ContainerImages = ../../Constants/ContainerImages.dhall
 
+let Mina = ../../Command/Mina.dhall
+
 let key = "emergency-hf-test"
 
 in  Pipeline.build
@@ -35,12 +37,13 @@ in  Pipeline.build
         [ Command.build
             Command.Config::{
             , commands =
-              [ RunWithPostgres.runInDockerWithPostgresConn
-                  ([] : List Text)
-                  (None RunWithPostgres.ScriptOrArchive)
-                  ContainerImages.minaToolchain
-                  "./scripts/tests/archive-hardfork-toolbox/test-convert-canonical-blocks.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} "
-              ]
+                  [ Mina.fixPermissionsCommand ]
+                # [ RunWithPostgres.runInDockerWithPostgresConn
+                      ([] : List Text)
+                      (None RunWithPostgres.ScriptOrArchive)
+                      ContainerImages.minaToolchain
+                      "./scripts/tests/archive-hardfork-toolbox/test-convert-canonical-blocks.sh && buildkite/scripts/upload-partial-coverage-data.sh ${key} "
+                  ]
             , label = "Emergency HF test"
             , key = "emergency-hf-test"
             , target = Size.Large
