@@ -1,7 +1,7 @@
 ARG deb_version=latest
 ARG deb_codename=bullseye
 ARG network=mainnet
-ARG docker_repo="gcr.io/o1labs-192920"
+ARG docker_repo
 ARG deb_release=unstable
 ARG deb_legacy_version
 ARG deb_repo="http://packages.o1test.net"
