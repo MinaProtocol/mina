@@ -22,7 +22,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     type t = unit Async.Ivar.t
   end
 
-  type maps_t = Inputs.Maps.t =
+  type maps_t = Inputs.Mask_maps.t =
     { accounts : Account.t Location.Map.t
     ; token_owners : Account_id.t Token_id.Map.t
     ; hashes : Hash.t Addr.Map.t

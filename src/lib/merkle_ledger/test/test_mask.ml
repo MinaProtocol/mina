@@ -17,8 +17,8 @@ module type Test_intf = sig
 
   module Location : Merkle_ledger.Location_intf.S
 
-  module Maps :
-    Merkle_mask.Maps.Intf
+  module Mask_maps :
+    Merkle_mask.Mask_maps.Intf
       with type account := Account.t
        and type account_id := Account_id.t
        and type 'a account_id_map := 'a Account_id.Map.t
@@ -55,7 +55,7 @@ module type Test_intf = sig
        and type token_id_set := Token_id.Set.t
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
-       and type maps_t := Maps.t
+       and type maps_t := Mask_maps.t
 
   module Maskable :
     Merkle_mask.Maskable_merkle_tree_intf.S
@@ -72,7 +72,7 @@ module type Test_intf = sig
        and type token_id_set := Token_id.Set.t
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
-       and type maps_t := Maps.t
+       and type maps_t := Mask_maps.t
 
   val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
@@ -750,7 +750,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     include Hashable.Make_binable (Arg) [@@deriving sexp, compare, hash, yojson]
   end
 
-  module Maps = Merkle_mask.Maps.Make (struct
+  module Mask_maps = Merkle_mask.Mask_maps.Make (struct
     module Account = Account
     module Location = Location
     module Hash = Hash
@@ -763,7 +763,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     module Location = Location
     module Location_binable = Location_binable
     module Kvdb = In_memory_kvdb
-    module Maps = Maps
+    module Mask_maps = Mask_maps
   end
 
   (* underlying Merkle tree *)
@@ -798,7 +798,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type account_id_set := Account_id.Set.t
        and type hash := Hash.t
        and type parent := Base.t
-       and type maps_t := Inputs.Maps.t =
+       and type maps_t := Inputs.Mask_maps.t =
   Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
     module Base = Base
@@ -820,7 +820,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
        and type unattached_mask := Mask.t
        and type attached_mask := Mask.Attached.t
        and type accumulated_t = Mask.accumulated_t
-       and type maps_t := Maps.t
+       and type maps_t := Inputs.Mask_maps.t
        and type t := Base.t = struct
     type accumulated_t = Mask.accumulated_t
 

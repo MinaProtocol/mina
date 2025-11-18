@@ -10,4 +10,4 @@ module Make (I : Inputs_intf.S) :
      and type account_id := I.Account_id.t
      and type account_id_set := I.Account_id.Set.t
      and type location := I.Location.t
-     and type maps_t = I.Maps.t
+     and type maps_t = I.Mask_maps.t
