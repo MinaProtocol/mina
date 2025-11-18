@@ -60,3 +60,10 @@ module With_state_hashes = struct
     State_hashes.state_body_hash hash ~compute_hashes:(fun () ->
         compute_hashes data )
 end
+
+module File_storage = Multi_key_file_storage.Make_custom (struct
+  type filename_key = t
+
+  (* TODO replace with hex string, pass directory parameter *)
+  let filename h = T.to_decimal_string h ^ ".dat"
+end)

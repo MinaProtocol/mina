@@ -35,6 +35,35 @@ module Pre_statement = struct
     }
 end
 
+let persist_witnesses_and_works witnesses works writer =
+  let module FS = State_hash.File_storage in
+  let write_witness =
+    FS.write_value writer
+      ( module Transaction_snark_scan_state.Transaction_with_witness.Stable
+               .Latest )
+  in
+  let write_proof = FS.write_value writer (module Ledger_proof.Stable.Latest) in
+  let write_witness' =
+    (* TODO remove read_all_proofs_from_disk *)
+    Fn.compose write_witness
+      Transaction_snark_scan_state.Transaction_with_witness
+      .read_all_proofs_from_disk
+  in
+  let write_proof' ~fee ~prover proof =
+    (* TODO remove read_proof_from_disk *)
+    let proof_tag =
+      Ledger_proof.Cached.read_proof_from_disk proof |> write_proof
+    in
+    (proof_tag, Sok_message.create ~fee ~prover)
+  in
+  let tagged_witnesses = List.map ~f:write_witness' witnesses in
+  let tagged_works =
+    List.concat_map works
+      ~f:(fun { Transaction_snark_work.proofs; fee; prover } ->
+        One_or_two.to_list proofs |> List.map ~f:(write_proof' ~fee ~prover) )
+  in
+  (tagged_witnesses, tagged_works)
+
 module T = struct
   module Scan_state = Transaction_snark_scan_state
   module Pre_diff_info = Pre_diff_info
@@ -1065,6 +1094,15 @@ module T = struct
             ~global_slot ~signature_kind t.scan_state new_ledger
             t.pending_coinbase_collection transactions current_state_view
             state_and_body_hash )
+    in
+    let state_hash =
+      Mina_state.Protocol_state.compute_state_hash
+        ~previous_state_hash:(fst state_and_body_hash)
+        ~state_body_hash:(snd state_and_body_hash)
+    in
+    let _tagged_witnesses, _tagged_works =
+      State_hash.File_storage.write_values_exn state_hash
+        ~f:(persist_witnesses_and_works data works)
     in
     let slots = List.length data in
     let work_count = List.length works in

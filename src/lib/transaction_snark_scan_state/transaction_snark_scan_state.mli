@@ -18,6 +18,15 @@ end]
 type t
 
 module Transaction_with_witness : sig
+  [%%versioned:
+  module Stable : sig
+    [@@@no_toplevel_latest_type]
+
+    module V2 : sig
+      type t
+    end
+  end]
+
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
     { transaction_with_info : Mina_transaction_logic.Transaction_applied.t
@@ -28,6 +37,14 @@ module Transaction_with_witness : sig
     ; second_pass_ledger_witness : Mina_ledger.Sparse_ledger.t
     ; block_global_slot : Mina_numbers.Global_slot_since_genesis.t
     }
+
+  val write_all_proofs_to_disk :
+       signature_kind:Mina_signature_kind.t
+    -> proof_cache_db:Proof_cache_tag.cache_db
+    -> Stable.Latest.t
+    -> t
+
+  val read_all_proofs_from_disk : t -> Stable.Latest.t
 end
 
 module Ledger_proof_with_sok_message : sig
