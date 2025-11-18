@@ -17,7 +17,7 @@ module type Inputs_intf = sig
        and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
        and type parent := Base.t
-       and type maps_t := maps_t
+       and type maps_t := Maps.t
 
   val mask_to_base : Mask.Attached.t -> Base.t
 end
