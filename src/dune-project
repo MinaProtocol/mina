@@ -88,6 +88,7 @@
 (package (name mina_block))
 (package (name mina_caqti))
 (package (name mina_command_line_tests))
+(package (name mina_hardfork_tests))
 (package (name mina_commands))
 (package (name mina_compile_config))
 (package (name mina_debug))

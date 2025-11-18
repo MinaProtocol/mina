@@ -1,7 +1,7 @@
 (executable
- (name command_line_tests)
- (package mina_command_line_tests)
- (public_name mina-command-line-tests)
+ (name hardfork_tests)
+ (package mina_hardfork_tests)
+ (public_name mina-hardfork-tests)
  (libraries
   ;; opam libraries
   async_kernel
