@@ -11,6 +11,7 @@ module Tag = struct
     module V1 = struct
       type ('filename_key, 'a) t =
         { filename_key : 'filename_key; offset : int64; size : int }
+      [@@deriving sexp]
     end
   end]
 end

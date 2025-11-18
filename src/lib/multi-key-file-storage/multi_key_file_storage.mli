@@ -4,7 +4,7 @@ module Tag : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type ('filename_key, 'a) t
+      type ('filename_key, 'a) t [@@deriving sexp]
     end
   end]
 end
