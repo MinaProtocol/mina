@@ -55,7 +55,7 @@ module type S = sig
 
   type t =
     { accounts : account location_map
-    ; token_owners : account_id token_id_map (* Fixed: was token_map *)
+    ; token_owners : account_id token_id_map
     ; hashes : hash address_map
     ; locations : location account_id_map
     ; non_existent_accounts : account_id_set
