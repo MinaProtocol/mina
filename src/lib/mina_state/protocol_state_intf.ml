@@ -14,6 +14,11 @@ module type Full = sig
     end]
   end
 
+  val compute_state_hash :
+       previous_state_hash:State_hash.t
+    -> state_body_hash:State_body_hash.t
+    -> State_hash.t
+
   val hashes_abstract :
        hash_body:('body -> State_body_hash.t)
     -> (State_hash.t, 'body) Poly.t

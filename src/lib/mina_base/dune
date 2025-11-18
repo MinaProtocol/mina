@@ -51,6 +51,7 @@
   mina_signature_kind
   mina_stdlib
   mina_wire_types
+  multi_key_file_storage
   one_or_two
   outside_hash_image
   pickles
