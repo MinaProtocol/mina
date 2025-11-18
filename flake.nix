@@ -382,7 +382,7 @@
           default = ocamlPackages.mina;
           inherit (pkgs)
             libp2p_helper kimchi_bindings_stubs snarky_js validation trace-tool
-            zkapp-cli;
+            zkapp-cli hardfork_test;
           inherit (dockerImages)
             mina-image-slim mina-image-full mina-archive-image-full
             mina-image-instr-full;

@@ -15,8 +15,15 @@ module type TestCaseWithBootstrap = TestCase with type t = after_bootstrap
 
 module type TestCaseWithoutBootstrap = TestCase with type t = before_bootstrap
 
+module type TestCaseWithoutBootstrapAndWithSetup =
+  TestCaseWithSetup with type t = Integration_test_lib.Test_config.t
+
 module Make_FixtureWithBootstrap (M : TestCaseWithBootstrap) :
   Fixture with type t = after_bootstrap
 
 module Make_FixtureWithoutBootstrap (M : TestCaseWithoutBootstrap) :
   Fixture with type t = before_bootstrap
+
+module Make_FixtureWithBootstrapAndFromTestConfig
+    (M : TestCaseWithoutBootstrapAndWithSetup) :
+  Fixture with type t = Integration_test_lib.Test_config.t

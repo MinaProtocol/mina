@@ -12,7 +12,7 @@ for database-dependent operations.
 
 **Parameters:**
 - `environment : List Text` - Additional environment variables to pass to the container
-- `initScript : Text` - Path to SQL initialization script to run against the database
+- `initScript : Optional ScriptOrArchive` - Optional database initialization. Either a script path or an archive + script selector.
 - `docker : Text` - Docker image name to run the main command in
 - `innerScript : Text` - Script or command to execute inside the Docker container
 
@@ -46,7 +46,6 @@ for database-dependent operations.
 - `PG_CONN` - Full database connection string
 -}
 
-
 let Prelude = ../External/Prelude.dhall
 
 let P = Prelude
@@ -62,9 +61,9 @@ let ScriptOrArchive
     = < Script : Text | Archive : { Script : Text, Archive : Text } >
 
 let runInDockerWithPostgresConn
-    : List Text -> ScriptOrArchive -> Text -> Text -> Cmd.Type
+    : List Text -> Optional ScriptOrArchive -> Text -> Text -> Cmd.Type
     =     \(environment : List Text)
-      ->  \(initScript : ScriptOrArchive)
+      ->  \(initScript : Optional ScriptOrArchive)
       ->  \(docker : Text)
       ->  \(innerScript : Text)
       ->  let port = "5432"
@@ -103,15 +102,23 @@ let runInDockerWithPostgresConn
 
           let runInitScript =
                 merge
-                  { Script =
-                          \(script : Text)
-                      ->  [ "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${script}"
-                          ]
-                  , Archive =
-                          \(archive : { Script : Text, Archive : Text })
-                      ->  [ "tar -xzf ${archive.Archive}"
-                          , "docker exec ${postgresDockerName} find /workdir -name \"${archive.Script}\" -exec psql ${pg_conn} -f {} \\;"
-                          ]
+                  { Some =
+                          \(script : ScriptOrArchive)
+                      ->  merge
+                            { Script =
+                                    \(s : Text)
+                                ->  [ "docker exec ${postgresDockerName} psql ${pg_conn} -f /workdir/${s}"
+                                    ]
+                            , Archive =
+                                    \ ( archive
+                                      : { Script : Text, Archive : Text }
+                                      )
+                                ->  [ "tar -xzf ${archive.Archive}"
+                                    , "docker exec ${postgresDockerName} find /workdir -name \"${archive.Script}\" -exec psql ${pg_conn} -f {} \\;"
+                                    ]
+                            }
+                            script
+                  , None = [] : List Text
                   }
                   initScript
 

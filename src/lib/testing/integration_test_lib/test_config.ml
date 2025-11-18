@@ -59,6 +59,25 @@ type constants =
   }
 [@@deriving to_yojson]
 
+let default_constants =
+  let protocol =
+    { Genesis_constants.Compiled.genesis_constants.protocol with
+      k = 20
+    ; delta = 0
+    ; slots_per_epoch = 3 * 8 * 20
+    ; slots_per_sub_window = 2
+    ; grace_period_slots = 140
+    }
+  in
+  { genesis_constants =
+      { Genesis_constants.Compiled.genesis_constants with
+        protocol
+      ; txpool_max_size = 3000
+      }
+  ; constraint_constants = Genesis_constants.Compiled.constraint_constants
+  ; compile_config = Mina_compile_config.Compiled.t
+  }
+
 let proof_config_default : Runtime_config.Proof_keys.t =
   { level = Some Full
   ; sub_windows_per_window = None

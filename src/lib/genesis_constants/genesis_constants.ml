@@ -92,18 +92,25 @@ module Helpers = struct
     t |> Int64.to_float |> Time.Span.of_ms |> Time.of_span_since_epoch
 
   let validate_time time_str =
-    match
-      Result.try_with (fun () ->
-          Option.value_map ~default:(Time.now ()) ~f:genesis_timestamp_of_string
-            time_str )
-    with
-    | Ok time ->
-        Ok (of_time time)
-    | Error _ ->
-        Error
-          "Invalid timestamp. Please specify timestamp in \"%Y-%m-%d \
-           %H:%M:%S%z\". For example, \"2019-01-30 12:00:00-0800\" for \
-           UTC-08:00 timezone"
+    match time_str with
+    | None ->
+        Ok (of_time (Time.now ()))
+    | Some time_str -> (
+        match
+          Result.try_with (fun () -> genesis_timestamp_of_string time_str)
+        with
+        | Ok time ->
+            Ok (of_time time)
+        | Error exn ->
+            let help_info =
+              "Please specify timestamp in \"%Y-%m-%d %H:%M:%S%z\". For \
+               example, \"2019-01-30 12:00:00-0800\" for UTC-08:00 timezone"
+            in
+            let err_message_verbose =
+              Printf.sprintf "Invalid timestamp `%s`: `%s`. %s" time_str
+                (Exn.to_string exn) help_info
+            in
+            Error err_message_verbose )
 
   let genesis_timestamp_to_string time =
     Int64.to_float time |> Time.Span.of_ms |> Time.of_span_since_epoch

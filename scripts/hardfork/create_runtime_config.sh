@@ -22,6 +22,7 @@ DIFFERENCE_IN_SECONDS=$(($(date -d "$GENESIS_TIMESTAMP" "+%s") - $(date -d "$ORI
 SECONDS_PER_SLOT=${SECONDS_PER_SLOT:=180}
 DIFFERENCE_IN_SLOTS=$(($DIFFERENCE_IN_SECONDS / $SECONDS_PER_SLOT))
 
+# TODO modify, this won't work in a hardfork with Berkeley as basis
 SLOT=$((DIFFERENCE_IN_SLOTS+OFFSET))
 
 # jq expression below could be written with less code,
